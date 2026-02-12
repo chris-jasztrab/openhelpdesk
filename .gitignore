@@ -1,0 +1,11 @@
+.env
+/vendor/
+/public/uploads/avatars/*
+!/public/uploads/avatars/.gitkeep
+*.log
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db

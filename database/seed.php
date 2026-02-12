@@ -1,0 +1,202 @@
+<?php
+/**
+ * Database seeder — drops existing tables, applies schema, and seeds all data.
+ *
+ * Usage:  php database/seed.php
+ */
+
+declare(strict_types=1);
+
+define('ROOT_DIR', dirname(__DIR__));
+require ROOT_DIR . '/src/helpers.php';
+
+loadEnv(ROOT_DIR . '/.env');
+
+$host   = env('DB_HOST', '127.0.0.1');
+$port   = env('DB_PORT', '3306');
+$dbname = env('DB_NAME', 'localdesk');
+$dbuser = env('DB_USER', 'root');
+$dbpass = env('DB_PASS', '');
+
+try {
+    $pdo = new PDO("mysql:host={$host};port={$port}", $dbuser, $dbpass, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+    ]);
+
+    $pdo->exec("CREATE DATABASE IF NOT EXISTS `{$dbname}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+    $pdo->exec("USE `{$dbname}`");
+    echo "[OK] Database '{$dbname}' ready.\n";
+
+    // Drop tables in FK-safe order
+    $pdo->exec("SET FOREIGN_KEY_CHECKS = 0");
+    foreach (['notifications','ticket_tag_map','ticket_timeline','tickets','ticket_tags','ticket_types','ticket_priorities','users','locations'] as $t) {
+        $pdo->exec("DROP TABLE IF EXISTS `{$t}`");
+    }
+    $pdo->exec("SET FOREIGN_KEY_CHECKS = 1");
+    echo "[OK] Old tables dropped.\n";
+
+    // Apply schema
+    $schema = file_get_contents(ROOT_DIR . '/database/schema.sql');
+    $pdo->exec($schema);
+    echo "[OK] Schema applied.\n";
+
+    // ── Locations ────────────────────────────────────────────────
+    $locStmt = $pdo->prepare('INSERT INTO locations (name, address, description) VALUES (?, ?, ?)');
+    $locations = [
+        ['Main Library',    '35 Albert St, Waterloo, ON N2L 5E2',   'Central branch and administrative offices.'],
+        ['East Branch',     '500 Parkside Dr, Waterloo, ON N2L 5R4', 'Eastside community branch.'],
+        ['McCormick Branch','500 Parkside Dr, Waterloo, ON N2L 5Z4', 'McCormick neighbourhood branch.'],
+    ];
+    foreach ($locations as $loc) {
+        $locStmt->execute($loc);
+    }
+    echo "[OK] 3 locations seeded.\n";
+
+    // ── Users ────────────────────────────────────────────────────
+    $userStmt = $pdo->prepare(
+        'INSERT INTO users (first_name, last_name, email, password, role, work_phone, location_id) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    );
+    $users = [
+        ['Admin', 'User',  'admin@localdesk.user', 'Password123!',  'admin', '519-555-0001', 1],
+        ['Agent', 'User',  'agent@localdesk.user', 'Password 123!', 'agent', '519-555-0002', 1],
+        ['End',   'User',  'user@localdesk.user',  'Password123!',  'user',  '519-555-0003', 2],
+    ];
+    foreach ($users as [$fn, $ln, $em, $pw, $role, $phone, $locId]) {
+        $userStmt->execute([$fn, $ln, $em, password_hash($pw, PASSWORD_DEFAULT), $role, $phone, $locId]);
+    }
+    echo "[OK] 3 users seeded.\n";
+
+    // ── Priorities ───────────────────────────────────────────────
+    $priStmt = $pdo->prepare('INSERT INTO ticket_priorities (name, color, sort_order) VALUES (?, ?, ?)');
+    $priorities = [
+        ['Low',      '#198754', 1],
+        ['Medium',   '#ffc107', 2],
+        ['High',     '#fd7e14', 3],
+        ['Critical', '#dc3545', 4],
+    ];
+    foreach ($priorities as $p) {
+        $priStmt->execute($p);
+    }
+    echo "[OK] 4 priorities seeded.\n";
+
+    // ── Ticket Types ───────────────────────────────────────────────
+    $typeStmt = $pdo->prepare('INSERT INTO ticket_types (name, sort_order) VALUES (?, ?)');
+    $types = [
+        ['IT', 1],
+        ['Marketing', 2],
+        ['Customer Experience/Circulation', 3],
+        ['Facilities', 4],
+        ['Collections / Discover Job Requests', 5],
+        ['Lifelong Learning', 6],
+    ];
+    foreach ($types as $type) {
+        $typeStmt->execute($type);
+    }
+    echo "[OK] " . count($types) . " ticket types seeded.\n";
+
+    // ── Tags ─────────────────────────────────────────────────────
+    $tagStmt = $pdo->prepare('INSERT INTO ticket_tags (name) VALUES (?)');
+    $tags = ['hardware', 'software', 'network', 'account', 'printing', 'email', 'vpn', 'password-reset'];
+    foreach ($tags as $tag) {
+        $tagStmt->execute([$tag]);
+    }
+    echo "[OK] " . count($tags) . " tags seeded.\n";
+
+    // ── Sample Tickets ───────────────────────────────────────────
+    $ticketStmt = $pdo->prepare(
+        'INSERT INTO tickets (subject, description, browser_info, os_info, created_by, due_date, type_id, location_id, status, priority_id, assigned_to, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    );
+    $sampleTickets = [
+        [
+            'Cannot connect to WiFi in meeting room 3',
+            "I've been unable to connect to the guest WiFi network in Meeting Room 3 since Monday morning. My laptop sees the network but cannot obtain an IP address. Other staff have the same issue.",
+            'Chrome 120.0.6099.130', 'Windows 11 Pro 23H2',
+            3, '2026-02-18', 1, 1, 'open', 3, 2, '2026-02-10 09:15:00',
+        ],
+        [
+            'Printer on 2nd floor jamming repeatedly',
+            "The HP LaserJet on the 2nd floor jams every 5-10 pages. I've cleared the paper path multiple times but it keeps happening. Tray 2 seems to be the culprit.",
+            'Firefox 122.0', 'macOS 14.3 Sonoma',
+            3, '2026-02-14', 4, 1, 'in_progress', 2, 2, '2026-02-08 14:30:00',
+        ],
+        [
+            'Need VPN access for remote work',
+            "I've been approved for remote work starting next week and need VPN credentials set up. My manager (Jane Smith) has already approved this. Please set up my account.",
+            'Edge 121.0.2277.83', 'Windows 10 Enterprise 22H2',
+            3, '2026-02-20', 1, 2, 'open', 1, null, '2026-02-11 11:00:00',
+        ],
+        [
+            'Email not syncing on mobile device',
+            "My work email stopped syncing on my iPhone since the last iOS update. I can still access it via webmail. I've tried removing and re-adding the account.",
+            'Safari 17.3', 'iOS 17.3.1',
+            3, '2026-02-15', 1, 2, 'resolved', 2, 2, '2026-02-05 08:45:00',
+        ],
+        [
+            'Software license expired for Adobe Creative Suite',
+            "Adobe Creative Suite is showing a license expiration notice on my workstation. I need this for the marketing materials we're producing this month.",
+            'Chrome 120.0.6099.216', 'Windows 11 Pro 23H2',
+            3, '2026-02-13', 2, 1, 'closed', 4, 2, '2026-02-01 10:20:00',
+        ],
+        [
+            'New employee workstation setup',
+            "We have a new hire starting on Feb 24. They will need a full workstation setup at the East Branch: computer, monitors, phone, and all standard software.",
+            'Chrome 121.0.6167.85', 'Windows 11 Pro 23H2',
+            3, '2026-02-24', 1, 2, 'open', 2, null, '2026-02-12 09:00:00',
+        ],
+    ];
+    foreach ($sampleTickets as $t) {
+        $ticketStmt->execute($t);
+    }
+    echo "[OK] 6 sample tickets seeded.\n";
+
+    // ── Ticket-tag mappings ──────────────────────────────────────
+    $mapStmt = $pdo->prepare('INSERT INTO ticket_tag_map (ticket_id, tag_id) VALUES (?, ?)');
+    $mappings = [[1,3],[1,1],[2,1],[2,5],[3,7],[3,4],[4,6],[5,2],[6,1]];
+    foreach ($mappings as [$tid, $tagid]) {
+        $mapStmt->execute([$tid, $tagid]);
+    }
+    echo "[OK] Ticket tags mapped.\n";
+
+    // ── Timeline entries ─────────────────────────────────────────
+    // is_internal: 0 = public (visible to everyone), 1 = internal (agents/admins only)
+    $tlStmt = $pdo->prepare(
+        'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+    );
+    $timeline = [
+        [1, 3, 'created',  'Ticket created.',                                       0, '2026-02-10 09:15:00'],
+        [2, 3, 'created',  'Ticket created.',                                       0, '2026-02-08 14:30:00'],
+        [2, 2, 'assigned', 'Ticket assigned to Agent User.',                        0, '2026-02-08 15:00:00'],
+        [2, 2, 'status_changed', 'Status changed from Open to In Progress.',        0, '2026-02-08 15:01:00'],
+        [2, 2, 'comment',  'Inspected the printer. Ordering replacement rollers.',  0, '2026-02-09 10:00:00'],
+        [2, 2, 'comment',  'Internal: Rollers are on backorder, ETA 2 weeks. @Admin User can you approve the rush order?', 1, '2026-02-09 10:30:00'],
+        [3, 3, 'created',  'Ticket created.',                                       0, '2026-02-11 11:00:00'],
+        [4, 3, 'created',  'Ticket created.',                                       0, '2026-02-05 08:45:00'],
+        [4, 2, 'assigned', 'Ticket assigned to Agent User.',                        0, '2026-02-05 09:00:00'],
+        [4, 2, 'comment',  'Reconfigured Exchange ActiveSync profile. Email syncing now.', 0, '2026-02-05 11:30:00'],
+        [4, 2, 'status_changed', 'Status changed from Open to Resolved.',           0, '2026-02-05 11:31:00'],
+        [5, 3, 'created',  'Ticket created.',                                       0, '2026-02-01 10:20:00'],
+        [5, 1, 'assigned', 'Ticket assigned to Agent User.',                        0, '2026-02-01 10:30:00'],
+        [5, 1, 'priority_changed', 'Priority changed from High to Critical.',       0, '2026-02-01 10:31:00'],
+        [5, 2, 'comment',  'Renewed license through Adobe admin portal.',           0, '2026-02-02 09:00:00'],
+        [5, 2, 'status_changed', 'Status changed from Open to Closed.',             0, '2026-02-02 09:05:00'],
+        [6, 3, 'created',  'Ticket created.',                                       0, '2026-02-12 09:00:00'],
+    ];
+    foreach ($timeline as $tl) {
+        $tlStmt->execute($tl);
+    }
+    echo "[OK] Timeline entries seeded.\n";
+
+    // ── Sample notification (from the @mention in the internal note above)
+    // Timeline entry #6 is the internal note on ticket #2 mentioning Admin User
+    $pdo->prepare(
+        'INSERT INTO notifications (user_id, ticket_id, timeline_id, mentioned_by) VALUES (?, ?, ?, ?)'
+    )->execute([1, 2, 6, 2]); // Admin User notified, ticket #2, timeline #6, mentioned by Agent User
+    echo "[OK] Sample notification seeded.\n";
+
+    echo "\nAll done! Database fully seeded.\n";
+
+} catch (PDOException $e) {
+    echo "[ERROR] " . $e->getMessage() . "\n";
+    exit(1);
+}
