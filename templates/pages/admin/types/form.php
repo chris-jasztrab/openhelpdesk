@@ -2,9 +2,10 @@
 $isEdit       = !empty($editing);
 $layout       = 'app';
 $pageTitle    = $isEdit ? 'Edit Ticket Type' : 'Add Ticket Type';
-$sidebarItems = adminSidebar('types');
+$sidebarItems = adminSidebar('settings');
 $breadcrumbs  = [
     ['label' => 'Admin', 'url' => '/admin'],
+    ['label' => 'Settings', 'url' => '/admin/settings'],
     ['label' => 'Ticket Types', 'url' => '/admin/types'],
     ['label' => $isEdit ? 'Edit' : 'Add'],
 ];

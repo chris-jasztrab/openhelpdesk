@@ -2,9 +2,10 @@
 $isEdit       = !empty($editing);
 $layout       = 'app';
 $pageTitle    = $isEdit ? 'Edit Priority' : 'Add Priority';
-$sidebarItems = adminSidebar('priorities');
+$sidebarItems = adminSidebar('settings');
 $breadcrumbs  = [
     ['label' => 'Admin', 'url' => '/admin'],
+    ['label' => 'Settings', 'url' => '/admin/settings'],
     ['label' => 'Priorities', 'url' => '/admin/priorities'],
     ['label' => $isEdit ? 'Edit' : 'Add'],
 ];

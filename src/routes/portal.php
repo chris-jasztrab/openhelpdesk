@@ -95,7 +95,64 @@ $router->post('/portal/tickets/create', function () {
         'INSERT INTO ticket_timeline (ticket_id, user_id, action, details) VALUES (?, ?, ?, ?)'
     )->execute([$ticketId, Auth::id(), 'created', 'Ticket created.']);
 
-    flash('success', 'Ticket #' . $ticketId . ' created successfully.');
+    // Handle file attachments
+    $attachments = handleAttachmentUploads('attachments');
+    saveAttachments($db, $ticketId, null, Auth::id(), $attachments);
+
+    // Send confirmation email to ticket creator
+    $creator   = Auth::user();
+    $appUrl    = env('APP_URL', 'http://localhost:8000');
+    $ticketUrl = $appUrl . '/portal/tickets/' . $ticketId;
+
+    // Look up names for type, location, priority
+    $typeName     = '';
+    $locationName = '';
+    $priorityName = '';
+    if ($typeId) {
+        $tStmt = $db->prepare('SELECT name FROM ticket_types WHERE id = ?');
+        $tStmt->execute([$typeId]);
+        $typeName = $tStmt->fetchColumn() ?: '';
+    }
+    if ($locationId) {
+        $lStmt = $db->prepare('SELECT name FROM locations WHERE id = ?');
+        $lStmt->execute([$locationId]);
+        $locationName = $lStmt->fetchColumn() ?: '';
+    }
+    if ($priorityId) {
+        $pStmt = $db->prepare('SELECT name FROM ticket_priorities WHERE id = ?');
+        $pStmt->execute([$priorityId]);
+        $priorityName = $pStmt->fetchColumn() ?: '';
+    }
+
+    $emailHtml = renderEmail('ticket-created', [
+        'ticketId'     => $ticketId,
+        'subject'      => $subject,
+        'description'  => $description,
+        'typeName'     => $typeName,
+        'locationName' => $locationName,
+        'priorityName' => $priorityName,
+        'ticketUrl'    => $ticketUrl,
+    ]);
+
+    sendMail(
+        $creator['email'],
+        $creator['first_name'] . ' ' . $creator['last_name'],
+        '[Ticket #' . $ticketId . '] ' . $subject,
+        $emailHtml,
+        '',
+        $ticketId
+    );
+
+    // Initialize SLA timers if priority is set and SLA is configured
+    if ($priorityId) {
+        Sla::initializeForTicket($db, $ticketId, $priorityId);
+    }
+
+    $msg = 'Ticket #' . $ticketId . ' created successfully.';
+    if (!empty($attachments)) {
+        $msg .= ' ' . count($attachments) . ' file(s) attached.';
+    }
+    flash('success', $msg);
     redirect('/portal/tickets/' . $ticketId);
 });
 
@@ -147,7 +204,17 @@ $router->get('/portal/tickets/{id}', function (array $p) {
     $tl->execute([$ticket['id']]);
     $timeline = $tl->fetchAll();
 
-    render('portal/tickets/view', ['ticket' => $ticket, 'timeline' => $timeline]);
+    // Attachments (exclude those on internal notes)
+    $attStmt = $db->prepare(
+        'SELECT ta.* FROM ticket_attachments ta
+         LEFT JOIN ticket_timeline tl ON ta.timeline_id = tl.id
+         WHERE ta.ticket_id = ? AND (tl.is_internal IS NULL OR tl.is_internal = 0)
+         ORDER BY ta.created_at ASC'
+    );
+    $attStmt->execute([$ticket['id']]);
+    $attachments = $attStmt->fetchAll();
+
+    render('portal/tickets/view', ['ticket' => $ticket, 'timeline' => $timeline, 'attachments' => $attachments]);
 });
 
 /* ==================================================================
@@ -181,7 +248,176 @@ $router->post('/portal/tickets/{id}/comment', function (array $p) {
     $db->prepare(
         'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
     )->execute([$id, Auth::id(), 'comment', $message]);
+    $timelineId = (int) $db->lastInsertId();
 
-    flash('success', 'Comment added.');
+    // Handle file attachments
+    $attachments = handleAttachmentUploads('attachments');
+    saveAttachments($db, $id, $timelineId, Auth::id(), $attachments);
+
+    $msg = 'Comment added.';
+    if (!empty($attachments)) {
+        $msg = 'Comment added with ' . count($attachments) . ' file(s).';
+    }
+    flash('success', $msg);
     redirect("/portal/tickets/{$id}");
+});
+
+/* ==================================================================
+ * PORTAL – Knowledge Base
+ * ================================================================== */
+
+$router->get('/portal/kb', function () {
+    Auth::requireAuth();
+    $categories = Database::connect()->query(
+        'SELECT c.*, COUNT(DISTINCT f.id) AS folder_count
+         FROM kb_categories c
+         LEFT JOIN kb_folders f ON f.category_id = c.id
+         GROUP BY c.id
+         ORDER BY c.sort_order, c.name'
+    )->fetchAll();
+    render('portal/kb/index', ['categories' => $categories]);
+});
+
+$router->get('/portal/kb/search', function () {
+    Auth::requireAuth();
+    $q = trim($_GET['q'] ?? '');
+    if ($q === '') {
+        header('Content-Type: application/json');
+        echo json_encode([]);
+        exit;
+    }
+    $db   = Database::connect();
+    $like = '%' . $q . '%';
+    $stmt = $db->prepare(
+        "SELECT a.title, a.slug, f.name AS folder_name, c.name AS category_name
+         FROM kb_articles a
+         LEFT JOIN kb_folders f    ON a.folder_id   = f.id
+         LEFT JOIN kb_categories c ON f.category_id = c.id
+         WHERE a.status = 'published' AND (a.title LIKE ? OR a.body_markdown LIKE ?)
+         ORDER BY a.updated_at DESC
+         LIMIT 10"
+    );
+    $stmt->execute([$like, $like]);
+    $results = $stmt->fetchAll();
+    header('Content-Type: application/json');
+    echo json_encode($results);
+    exit;
+});
+
+$router->get('/portal/kb/articles/{slug}', function (array $p) {
+    Auth::requireAuth();
+    $db   = Database::connect();
+    $stmt = $db->prepare(
+        "SELECT a.*, f.name AS folder_name, f.slug AS folder_slug,
+                c.name AS category_name, c.slug AS category_slug
+         FROM kb_articles a
+         LEFT JOIN kb_folders f    ON a.folder_id   = f.id
+         LEFT JOIN kb_categories c ON f.category_id = c.id
+         WHERE a.slug = ? AND a.status = 'published'"
+    );
+    $stmt->execute([$p['slug']]);
+    $article = $stmt->fetch();
+    if (!$article) {
+        flash('error', 'Article not found.');
+        redirect('/portal/kb');
+    }
+    $article['body_html'] = renderMarkdown($article['body_markdown']);
+    render('portal/kb/article', ['article' => $article]);
+});
+
+$router->get('/portal/kb/{slug}/{folder_slug}', function (array $p) {
+    Auth::requireAuth();
+    $db = Database::connect();
+
+    // Get category
+    $catStmt = $db->prepare('SELECT * FROM kb_categories WHERE slug = ?');
+    $catStmt->execute([$p['slug']]);
+    $category = $catStmt->fetch();
+    if (!$category) {
+        flash('error', 'Category not found.');
+        redirect('/portal/kb');
+    }
+
+    // Get folder
+    $folderStmt = $db->prepare('SELECT * FROM kb_folders WHERE slug = ? AND category_id = ?');
+    $folderStmt->execute([$p['folder_slug'], $category['id']]);
+    $folder = $folderStmt->fetch();
+    if (!$folder) {
+        flash('error', 'Folder not found.');
+        redirect('/portal/kb/' . $p['slug']);
+    }
+
+    // Get published articles in this folder
+    $artStmt = $db->prepare(
+        "SELECT id, title, slug, published_at, sort_order
+         FROM kb_articles
+         WHERE folder_id = ? AND status = 'published'
+         ORDER BY sort_order, title"
+    );
+    $artStmt->execute([$folder['id']]);
+    $articles = $artStmt->fetchAll();
+
+    render('portal/kb/folder', ['category' => $category, 'folder' => $folder, 'articles' => $articles]);
+});
+
+$router->get('/portal/kb/{slug}', function (array $p) {
+    Auth::requireAuth();
+    $db = Database::connect();
+
+    $catStmt = $db->prepare('SELECT * FROM kb_categories WHERE slug = ?');
+    $catStmt->execute([$p['slug']]);
+    $category = $catStmt->fetch();
+    if (!$category) {
+        flash('error', 'Category not found.');
+        redirect('/portal/kb');
+    }
+
+    $folders = $db->prepare(
+        'SELECT f.*, COUNT(a.id) AS article_count
+         FROM kb_folders f
+         LEFT JOIN kb_articles a ON a.folder_id = f.id AND a.status = \'published\'
+         WHERE f.category_id = ?
+         GROUP BY f.id
+         ORDER BY f.sort_order, f.name'
+    );
+    $folders->execute([$category['id']]);
+    $folders = $folders->fetchAll();
+
+    render('portal/kb/category', ['category' => $category, 'folders' => $folders]);
+});
+
+/* ==================================================================
+ * PORTAL – Download Attachment (must be own ticket)
+ * ================================================================== */
+
+$router->get('/portal/attachments/{id}/download', function (array $p) {
+    Auth::requireAuth();
+    $db = Database::connect();
+
+    $stmt = $db->prepare(
+        'SELECT ta.*, t.created_by
+         FROM ticket_attachments ta
+         INNER JOIN tickets t ON ta.ticket_id = t.id
+         LEFT JOIN ticket_timeline tl ON ta.timeline_id = tl.id
+         WHERE ta.id = ? AND t.created_by = ? AND (tl.is_internal IS NULL OR tl.is_internal = 0)'
+    );
+    $stmt->execute([(int) $p['id'], Auth::id()]);
+    $att = $stmt->fetch();
+
+    if (!$att) {
+        flash('error', 'Attachment not found.');
+        redirect('/portal/tickets');
+    }
+
+    $filePath = ATTACHMENT_STORAGE_PATH . $att['stored_name'];
+    if (!file_exists($filePath)) {
+        flash('error', 'File not found on server.');
+        redirect('/portal/tickets/' . $att['ticket_id']);
+    }
+
+    header('Content-Type: ' . $att['mime_type']);
+    header('Content-Disposition: attachment; filename="' . str_replace('"', '\\"', $att['original_name']) . '"');
+    header('Content-Length: ' . $att['file_size']);
+    readfile($filePath);
+    exit;
 });

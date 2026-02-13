@@ -59,9 +59,14 @@ CREATE TABLE IF NOT EXISTS `tickets` (
     `due_date`     DATE         DEFAULT NULL,
     `type_id`      INT UNSIGNED DEFAULT NULL,
     `location_id`  INT UNSIGNED DEFAULT NULL,
-    `status`       ENUM('open','in_progress','resolved','closed') NOT NULL DEFAULT 'open',
+    `status`       ENUM('open','in_progress','pending','resolved','closed') NOT NULL DEFAULT 'open',
     `priority_id`  INT UNSIGNED DEFAULT NULL,
     `assigned_to`  INT UNSIGNED DEFAULT NULL,
+    `first_response_due_at` DATETIME DEFAULT NULL,
+    `resolution_due_at`     DATETIME DEFAULT NULL,
+    `first_responded_at`    DATETIME DEFAULT NULL,
+    `sla_state`    ENUM('on_track','warning','breached') DEFAULT NULL,
+    `sla_paused_at` DATETIME DEFAULT NULL,
     `updated_at`   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (`created_by`)  REFERENCES `users`(`id`),
     FOREIGN KEY (`type_id`)     REFERENCES `ticket_types`(`id`) ON DELETE SET NULL,
@@ -99,6 +104,63 @@ CREATE TABLE IF NOT EXISTS `ticket_timeline` (
     FOREIGN KEY (`user_id`)   REFERENCES `users`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Ticket attachments (secure file storage outside webroot)
+CREATE TABLE IF NOT EXISTS `ticket_attachments` (
+    `id`            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `ticket_id`     INT UNSIGNED NOT NULL,
+    `timeline_id`   INT UNSIGNED DEFAULT NULL,
+    `uploaded_by`   INT UNSIGNED NOT NULL,
+    `original_name` VARCHAR(255) NOT NULL,
+    `stored_name`   VARCHAR(255) NOT NULL,
+    `mime_type`     VARCHAR(127) NOT NULL,
+    `file_size`     INT UNSIGNED NOT NULL,
+    `created_at`    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (`ticket_id`)   REFERENCES `tickets`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`timeline_id`) REFERENCES `ticket_timeline`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`uploaded_by`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Knowledge Base categories
+CREATE TABLE IF NOT EXISTS `kb_categories` (
+    `id`          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `name`        VARCHAR(255) NOT NULL,
+    `slug`        VARCHAR(255) NOT NULL UNIQUE,
+    `description` TEXT,
+    `sort_order`  INT UNSIGNED NOT NULL DEFAULT 0,
+    `created_at`  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Knowledge Base folders (belong to a category)
+CREATE TABLE IF NOT EXISTS `kb_folders` (
+    `id`          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `category_id` INT UNSIGNED NOT NULL,
+    `name`        VARCHAR(255) NOT NULL,
+    `slug`        VARCHAR(255) NOT NULL UNIQUE,
+    `description` TEXT,
+    `sort_order`  INT UNSIGNED NOT NULL DEFAULT 0,
+    `created_at`  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (`category_id`) REFERENCES `kb_categories`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Knowledge Base articles (belong to a folder)
+CREATE TABLE IF NOT EXISTS `kb_articles` (
+    `id`            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `folder_id`     INT UNSIGNED NOT NULL,
+    `title`         VARCHAR(255) NOT NULL,
+    `slug`          VARCHAR(255) NOT NULL UNIQUE,
+    `body_markdown` LONGTEXT NOT NULL,
+    `status`        ENUM('draft','published') NOT NULL DEFAULT 'draft',
+    `published_at`  TIMESTAMP NULL DEFAULT NULL,
+    `created_by`    INT UNSIGNED NOT NULL,
+    `sort_order`    INT UNSIGNED NOT NULL DEFAULT 0,
+    `created_at`    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`    TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (`folder_id`)   REFERENCES `kb_folders`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`created_by`)  REFERENCES `users`(`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Notifications (for @mentions)
 CREATE TABLE IF NOT EXISTS `notifications` (
     `id`           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -112,4 +174,40 @@ CREATE TABLE IF NOT EXISTS `notifications` (
     FOREIGN KEY (`ticket_id`)    REFERENCES `tickets`(`id`) ON DELETE CASCADE,
     FOREIGN KEY (`timeline_id`)  REFERENCES `ticket_timeline`(`id`) ON DELETE CASCADE,
     FOREIGN KEY (`mentioned_by`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- SLA policies (per priority)
+CREATE TABLE IF NOT EXISTS `sla_policies` (
+    `id`                     INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `priority_id`            INT UNSIGNED NOT NULL UNIQUE,
+    `first_response_minutes` INT UNSIGNED NOT NULL DEFAULT 60,
+    `resolution_minutes`     INT UNSIGNED NOT NULL DEFAULT 480,
+    `created_at`             TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`             TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (`priority_id`) REFERENCES `ticket_priorities`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Groups (organizational groups for agents/admins)
+CREATE TABLE IF NOT EXISTS `groups` (
+    `id`          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `name`        VARCHAR(255) NOT NULL,
+    `description` TEXT,
+    `sort_order`  INT UNSIGNED NOT NULL DEFAULT 0,
+    `created_at`  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Group ↔ user pivot
+CREATE TABLE IF NOT EXISTS `group_user_map` (
+    `group_id` INT UNSIGNED NOT NULL,
+    `user_id`  INT UNSIGNED NOT NULL,
+    PRIMARY KEY (`group_id`, `user_id`),
+    FOREIGN KEY (`group_id`) REFERENCES `groups`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`user_id`)  REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Application settings (key-value store)
+CREATE TABLE IF NOT EXISTS `settings` (
+    `setting_key`   VARCHAR(100) NOT NULL PRIMARY KEY,
+    `setting_value` TEXT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -4,7 +4,11 @@
       "*",
       "Bash(dir:*)",
       "Bash(\"/c/xampp/php/php.exe\" -v)",
-      "Bash(\"/c/xampp/mysql/bin/mysql.exe\" --version)"
+      "Bash(\"/c/xampp/mysql/bin/mysql.exe\" --version)",
+      "Bash(\"C:/xampp/mysql/bin/mysql.exe\":*)",
+      "Bash(composer update:*)",
+      "Bash(php -l:*)",
+      "Bash(php:*)"
     ],
     "deny": [],
     "ask": [],

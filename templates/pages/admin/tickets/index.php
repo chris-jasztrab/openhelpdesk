@@ -6,8 +6,9 @@ $breadcrumbs  = [
     ['label' => 'Admin', 'url' => '/admin'],
     ['label' => 'Tickets'],
 ];
-$statusColors = ['open' => 'primary', 'in_progress' => 'warning', 'resolved' => 'success', 'closed' => 'secondary'];
-$statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'resolved' => 'Resolved', 'closed' => 'Closed'];
+$statusColors = ['open' => 'primary', 'in_progress' => 'warning', 'pending' => 'info', 'resolved' => 'success', 'closed' => 'secondary'];
+$statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 'Pending', 'resolved' => 'Resolved', 'closed' => 'Closed'];
+$slaStateColors = ['on_track' => 'success', 'warning' => 'warning', 'breached' => 'danger'];
 ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="fw-bold mb-0">All Tickets</h2>
@@ -27,13 +28,14 @@ $statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'resolved' =>
                     <th>Assigned To</th>
                     <th>Created By</th>
                     <th>Location</th>
+                    <th>SLA</th>
                     <th>Created</th>
                     <th>Due</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($tickets)): ?>
-                <tr><td colspan="10" class="text-center py-4 text-muted">No tickets found.</td></tr>
+                <tr><td colspan="11" class="text-center py-4 text-muted">No tickets found.</td></tr>
                 <?php else: ?>
                     <?php foreach ($tickets as $t): ?>
                     <tr style="cursor:pointer;" onclick="window.location='/admin/tickets/<?= $t['id'] ?>'">
@@ -61,6 +63,15 @@ $statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'resolved' =>
                         <td><?= e($t['agent_name'] ?: '— Unassigned —') ?></td>
                         <td class="text-muted"><?= e($t['creator_name'] ?? '—') ?></td>
                         <td class="text-muted"><?= e($t['location_name'] ?? '—') ?></td>
+                        <td>
+                            <?php if ($t['sla_state']): ?>
+                            <span class="badge bg-<?= $slaStateColors[$t['sla_state']] ?? 'secondary' ?>" title="<?= e(ucfirst(str_replace('_', ' ', $t['sla_state']))) ?>">
+                                <i class="bi bi-stopwatch"></i>
+                            </span>
+                            <?php else: ?>
+                            <span class="text-muted">—</span>
+                            <?php endif; ?>
+                        </td>
                         <td class="text-muted small"><?= date('M j, Y', strtotime($t['created_at'])) ?></td>
                         <td class="text-muted small">
                             <?php if ($t['due_date']): ?>

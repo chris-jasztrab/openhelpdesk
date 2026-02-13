@@ -29,7 +29,7 @@ try {
 
     // Drop tables in FK-safe order
     $pdo->exec("SET FOREIGN_KEY_CHECKS = 0");
-    foreach (['notifications','ticket_tag_map','ticket_timeline','tickets','ticket_tags','ticket_types','ticket_priorities','users','locations'] as $t) {
+    foreach (['notifications','ticket_attachments','ticket_tag_map','ticket_timeline','tickets','ticket_tags','ticket_types','ticket_priorities','group_user_map','groups','users','locations'] as $t) {
         $pdo->exec("DROP TABLE IF EXISTS `{$t}`");
     }
     $pdo->exec("SET FOREIGN_KEY_CHECKS = 1");
@@ -101,6 +101,29 @@ try {
         $tagStmt->execute([$tag]);
     }
     echo "[OK] " . count($tags) . " tags seeded.\n";
+
+    // ── Groups ─────────────────────────────────────────────────────
+    $grpStmt = $pdo->prepare('INSERT INTO `groups` (name, description, sort_order) VALUES (?, ?, ?)');
+    $groups = [
+        ['IT',                'Information Technology support and infrastructure.',            1],
+        ['Collections',       'Library collections, cataloguing and acquisitions.',            2],
+        ['Facilities',        'Building maintenance, safety and facilities management.',       3],
+        ['Lifelong Learning', 'Programming, outreach and lifelong learning initiatives.',      4],
+        ['Marketing',         'Communications, marketing and public relations.',               5],
+        ['Circulation',       'Front-desk services, holds and circulation operations.',        6],
+    ];
+    foreach ($groups as $g) {
+        $grpStmt->execute($g);
+    }
+    echo "[OK] " . count($groups) . " groups seeded.\n";
+
+    // ── Group ↔ user mappings ──────────────────────────────────────
+    $gumStmt = $pdo->prepare('INSERT INTO group_user_map (group_id, user_id) VALUES (?, ?)');
+    $groupMappings = [[1, 1], [1, 2], [3, 1], [6, 2]]; // Admin in IT+Facilities, Agent in IT+Circulation
+    foreach ($groupMappings as [$gid, $uid]) {
+        $gumStmt->execute([$gid, $uid]);
+    }
+    echo "[OK] Group memberships seeded.\n";
 
     // ── Sample Tickets ───────────────────────────────────────────
     $ticketStmt = $pdo->prepare(

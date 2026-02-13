@@ -7,9 +7,11 @@ $breadcrumbs  = [
     ['label' => 'Tickets', 'url' => '/agent/tickets'],
     ['label' => '#' . $ticket['id']],
 ];
-$statusColors = ['open' => 'primary', 'in_progress' => 'warning', 'resolved' => 'success', 'closed' => 'secondary'];
-$statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'resolved' => 'Resolved', 'closed' => 'Closed'];
-$actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-person-check text-primary', 'status_changed' => 'bi-arrow-repeat text-warning', 'priority_changed' => 'bi-flag text-danger', 'comment' => 'bi-chat-dots text-info', 'internal_note' => 'bi-lock text-secondary'];
+$statusColors = ['open' => 'primary', 'in_progress' => 'warning', 'pending' => 'info', 'resolved' => 'success', 'closed' => 'secondary'];
+$statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 'Pending', 'resolved' => 'Resolved', 'closed' => 'Closed'];
+$actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-person-check text-primary', 'status_changed' => 'bi-arrow-repeat text-warning', 'priority_changed' => 'bi-flag text-danger', 'comment' => 'bi-chat-dots text-info', 'internal_note' => 'bi-lock text-secondary', 'sla_set' => 'bi-stopwatch text-primary', 'sla_paused' => 'bi-pause-circle text-warning', 'sla_resumed' => 'bi-play-circle text-success'];
+$slaStateColors = ['on_track' => 'success', 'warning' => 'warning', 'breached' => 'danger'];
+$slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' => 'Breached'];
 ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
@@ -21,6 +23,11 @@ $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-p
             <?php if ($ticket['priority_name']): ?>
             <span class="badge fs-6" style="background:<?= e($ticket['priority_color']) ?>;">
                 <?= e($ticket['priority_name']) ?>
+            </span>
+            <?php endif; ?>
+            <?php if ($ticket['sla_state']): ?>
+            <span class="badge bg-<?= $slaStateColors[$ticket['sla_state']] ?? 'secondary' ?> fs-6">
+                <i class="bi bi-stopwatch me-1"></i><?= e($slaStateLabels[$ticket['sla_state']] ?? $ticket['sla_state']) ?>
             </span>
             <?php endif; ?>
             <span class="text-muted">Ticket #<?= $ticket['id'] ?></span>
@@ -42,6 +49,32 @@ $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-p
                 <div style="white-space:pre-wrap;"><?= e($ticket['description']) ?></div>
             </div>
         </div>
+
+        <?php if (!empty($attachments)): ?>
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white border-bottom">
+                <h5 class="mb-0 fw-semibold"><i class="bi bi-paperclip me-2"></i>Attachments</h5>
+            </div>
+            <div class="list-group list-group-flush">
+                <?php foreach ($attachments as $att): ?>
+                <a href="/agent/attachments/<?= $att['id'] ?>/download"
+                   class="list-group-item list-group-item-action d-flex align-items-center gap-3 <?= !empty($att['is_internal']) ? 'bg-warning bg-opacity-10' : '' ?>">
+                    <i class="bi <?= getFileIcon($att['mime_type']) ?> fs-4"></i>
+                    <div class="flex-grow-1">
+                        <div class="fw-semibold">
+                            <?= e($att['original_name']) ?>
+                            <?php if (!empty($att['is_internal'])): ?>
+                            <span class="badge bg-warning text-dark ms-1">Internal</span>
+                            <?php endif; ?>
+                        </div>
+                        <small class="text-muted"><?= formatFileSize($att['file_size']) ?></small>
+                    </div>
+                    <i class="bi bi-download text-muted"></i>
+                </a>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <?php endif; ?>
 
         <?php if (!empty($ticket['tags'])): ?>
         <div class="mb-4">
@@ -101,7 +134,7 @@ $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-p
                 <h5 class="mb-0 fw-semibold"><i class="bi bi-chat-dots me-2"></i>Add Comment</h5>
             </div>
             <div class="card-body">
-                <form method="POST" action="/agent/tickets/<?= $ticket['id'] ?>/comment">
+                <form method="POST" action="/agent/tickets/<?= $ticket['id'] ?>/comment" enctype="multipart/form-data">
                     <?= csrfField() ?>
                     <div class="mb-3">
                         <textarea class="form-control" name="message" id="commentMessage" rows="3" required
@@ -115,6 +148,10 @@ $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-p
                             </button>
                             <?php endforeach; ?>
                         </div>
+                    </div>
+                    <div class="mb-3">
+                        <input type="file" class="form-control" name="attachments[]" multiple>
+                        <div class="form-text">Max <?= UPLOAD_MAX_SIZE / 1024 / 1024 ?>MB per file</div>
                     </div>
                     <div class="d-flex justify-content-between align-items-center">
                         <div class="form-check">
@@ -132,9 +169,9 @@ $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-p
         </div>
     </div>
 
-    <!-- Right column: Metadata -->
+    <!-- Right column: Metadata + Update -->
     <div class="col-lg-4">
-        <div class="card border-0 shadow-sm">
+        <div class="card border-0 shadow-sm mb-4">
             <div class="card-header bg-white border-bottom">
                 <h5 class="mb-0 fw-semibold"><i class="bi bi-info-circle me-2"></i>Details</h5>
             </div>
@@ -199,6 +236,111 @@ $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-p
                     <dt class="text-muted small">Operating System</dt>
                     <dd class="small"><?= e($ticket['os_info'] ?? 'Unknown') ?></dd>
                 </dl>
+            </div>
+        </div>
+
+        <!-- SLA Info -->
+        <?php if ($ticket['sla_state']): ?>
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white border-bottom">
+                <h5 class="mb-0 fw-semibold"><i class="bi bi-stopwatch me-2"></i>SLA</h5>
+            </div>
+            <div class="card-body">
+                <dl class="mb-0">
+                    <dt class="text-muted small">State</dt>
+                    <dd>
+                        <span class="badge bg-<?= $slaStateColors[$ticket['sla_state']] ?? 'secondary' ?>">
+                            <?= e($slaStateLabels[$ticket['sla_state']] ?? $ticket['sla_state']) ?>
+                        </span>
+                        <?php if (!empty($ticket['sla_paused_at'])): ?>
+                        <span class="badge bg-info ms-1"><i class="bi bi-pause-fill"></i> Paused</span>
+                        <?php endif; ?>
+                    </dd>
+
+                    <dt class="text-muted small">First Response</dt>
+                    <dd>
+                        <?php if ($ticket['first_responded_at']): ?>
+                            <span class="text-success"><i class="bi bi-check-circle me-1"></i>Responded <?= date('M j, g:i A', strtotime($ticket['first_responded_at'])) ?></span>
+                        <?php elseif ($ticket['first_response_due_at']): ?>
+                            <?php
+                            $frDue = new DateTimeImmutable($ticket['first_response_due_at']);
+                            $frOverdue = $frDue < new DateTimeImmutable('now');
+                            ?>
+                            <span class="<?= $frOverdue ? 'text-danger fw-bold' : '' ?>">
+                                Due <?= $frDue->format('M j, g:i A') ?>
+                                <?= $frOverdue ? ' (Overdue)' : '' ?>
+                            </span>
+                        <?php else: ?>
+                            <span class="text-muted">N/A</span>
+                        <?php endif; ?>
+                    </dd>
+
+                    <dt class="text-muted small">Resolution</dt>
+                    <dd>
+                        <?php if ($ticket['resolution_due_at']): ?>
+                            <?php
+                            $resDue = new DateTimeImmutable($ticket['resolution_due_at']);
+                            $resOverdue = $resDue < new DateTimeImmutable('now') && !in_array($ticket['status'], ['resolved', 'closed']);
+                            ?>
+                            <span class="<?= $resOverdue ? 'text-danger fw-bold' : '' ?>">
+                                Due <?= $resDue->format('M j, g:i A') ?>
+                                <?= $resOverdue ? ' (Overdue)' : '' ?>
+                            </span>
+                        <?php else: ?>
+                            <span class="text-muted">N/A</span>
+                        <?php endif; ?>
+                    </dd>
+                </dl>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <!-- Update Ticket -->
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom">
+                <h5 class="mb-0 fw-semibold"><i class="bi bi-pencil-square me-2"></i>Update Ticket</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="/agent/tickets/<?= $ticket['id'] ?>/update">
+                    <?= csrfField() ?>
+
+                    <div class="mb-3">
+                        <label for="status" class="form-label fw-semibold small">Status</label>
+                        <select class="form-select form-select-sm" name="status" id="status">
+                            <?php foreach ($statusLabels as $val => $label): ?>
+                            <option value="<?= e($val) ?>" <?= $ticket['status'] === $val ? 'selected' : '' ?>><?= e($label) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="priority_id" class="form-label fw-semibold small">Priority</label>
+                        <select class="form-select form-select-sm" name="priority_id" id="priority_id">
+                            <option value="">None</option>
+                            <?php foreach ($priorities as $pri): ?>
+                            <option value="<?= $pri['id'] ?>" <?= (int) ($ticket['priority_id'] ?? 0) === (int) $pri['id'] ? 'selected' : '' ?>>
+                                <?= e($pri['name']) ?>
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="assigned_to" class="form-label fw-semibold small">Assigned To</label>
+                        <select class="form-select form-select-sm" name="assigned_to" id="assigned_to">
+                            <option value="">Unassigned</option>
+                            <?php foreach ($agents as $a): ?>
+                            <option value="<?= $a['id'] ?>" <?= (int) ($ticket['assigned_to'] ?? 0) === (int) $a['id'] ? 'selected' : '' ?>>
+                                <?= e($a['first_name'] . ' ' . $a['last_name']) ?>
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn btn-sm text-white w-100" style="background:#4f46e5;">
+                        <i class="bi bi-check-lg me-1"></i>Update
+                    </button>
+                </form>
             </div>
         </div>
     </div>

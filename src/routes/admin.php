@@ -396,6 +396,134 @@ $router->post('/admin/types/{id}/delete', function (array $p) {
 });
 
 /* ==================================================================
+ * ADMIN – Group Management
+ * ================================================================== */
+
+$router->get('/admin/groups', function () {
+    Auth::requireRole('admin');
+    $groups = Database::connect()->query(
+        'SELECT g.*, COUNT(gum.user_id) AS member_count
+         FROM `groups` g
+         LEFT JOIN group_user_map gum ON g.id = gum.group_id
+         GROUP BY g.id
+         ORDER BY g.sort_order, g.name'
+    )->fetchAll();
+    render('admin/groups/index', ['groups' => $groups]);
+});
+
+$router->get('/admin/groups/create', function () {
+    Auth::requireRole('admin');
+    $users = Database::connect()->query(
+        "SELECT id, first_name, last_name, role FROM users WHERE role IN ('agent','admin') ORDER BY first_name, last_name"
+    )->fetchAll();
+    render('admin/groups/form', ['editing' => null, 'users' => $users, 'memberIds' => []]);
+});
+
+$router->post('/admin/groups/create', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/groups/create');
+    }
+
+    $name  = trim($_POST['name'] ?? '');
+    $desc  = trim($_POST['description'] ?? '');
+    $order = (int) ($_POST['sort_order'] ?? 0);
+
+    if ($name === '') {
+        flashInput($_POST);
+        flash('error', 'Group name is required.');
+        redirect('/admin/groups/create');
+    }
+
+    $db = Database::connect();
+    $db->prepare('INSERT INTO `groups` (name, description, sort_order) VALUES (?, ?, ?)')
+        ->execute([$name, $desc, $order]);
+    $groupId = (int) $db->lastInsertId();
+
+    // Assign members
+    $userIds = isset($_POST['members']) && is_array($_POST['members']) ? $_POST['members'] : [];
+    if (!empty($userIds)) {
+        $stmt = $db->prepare('INSERT INTO group_user_map (group_id, user_id) VALUES (?, ?)');
+        foreach ($userIds as $uid) {
+            $stmt->execute([$groupId, (int) $uid]);
+        }
+    }
+
+    flash('success', 'Group created.');
+    redirect('/admin/groups');
+});
+
+$router->get('/admin/groups/{id}/edit', function (array $p) {
+    Auth::requireRole('admin');
+    $db   = Database::connect();
+    $stmt = $db->prepare('SELECT * FROM `groups` WHERE id = ?');
+    $stmt->execute([(int) $p['id']]);
+    $editing = $stmt->fetch();
+    if (!$editing) {
+        flash('error', 'Group not found.');
+        redirect('/admin/groups');
+    }
+
+    $users = $db->query(
+        "SELECT id, first_name, last_name, role FROM users WHERE role IN ('agent','admin') ORDER BY first_name, last_name"
+    )->fetchAll();
+
+    $memberStmt = $db->prepare('SELECT user_id FROM group_user_map WHERE group_id = ?');
+    $memberStmt->execute([$editing['id']]);
+    $memberIds = $memberStmt->fetchAll(PDO::FETCH_COLUMN);
+
+    render('admin/groups/form', ['editing' => $editing, 'users' => $users, 'memberIds' => $memberIds]);
+});
+
+$router->post('/admin/groups/{id}/edit', function (array $p) {
+    Auth::requireRole('admin');
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect("/admin/groups/{$id}/edit");
+    }
+
+    $name  = trim($_POST['name'] ?? '');
+    $desc  = trim($_POST['description'] ?? '');
+    $order = (int) ($_POST['sort_order'] ?? 0);
+
+    if ($name === '') {
+        flashInput($_POST);
+        flash('error', 'Group name is required.');
+        redirect("/admin/groups/{$id}/edit");
+    }
+
+    $db = Database::connect();
+    $db->prepare('UPDATE `groups` SET name=?, description=?, sort_order=? WHERE id=?')
+        ->execute([$name, $desc, $order, $id]);
+
+    // Sync members: delete existing, insert new
+    $db->prepare('DELETE FROM group_user_map WHERE group_id = ?')->execute([$id]);
+    $userIds = isset($_POST['members']) && is_array($_POST['members']) ? $_POST['members'] : [];
+    if (!empty($userIds)) {
+        $stmt = $db->prepare('INSERT INTO group_user_map (group_id, user_id) VALUES (?, ?)');
+        foreach ($userIds as $uid) {
+            $stmt->execute([$id, (int) $uid]);
+        }
+    }
+
+    flash('success', 'Group updated.');
+    redirect('/admin/groups');
+});
+
+$router->post('/admin/groups/{id}/delete', function (array $p) {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/groups');
+    }
+    Database::connect()->prepare('DELETE FROM `groups` WHERE id = ?')->execute([(int) $p['id']]);
+    flash('success', 'Group deleted.');
+    redirect('/admin/groups');
+});
+
+/* ==================================================================
  * ADMIN – Ticket Viewing
  * ================================================================== */
 
@@ -465,10 +593,23 @@ $router->get('/admin/tickets/{id}', function (array $p) {
     $tl->execute([$ticket['id']]);
     $timeline = $tl->fetchAll();
 
-    // Agents list for @mention suggestions
+    // Agents list for @mention suggestions and assignment dropdown
     $agents = $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin') ORDER BY first_name")->fetchAll();
 
-    render('admin/tickets/view', ['ticket' => $ticket, 'timeline' => $timeline, 'agents' => $agents]);
+    // Priorities for update dropdown
+    $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
+
+    // Attachments (admins see all including internal)
+    $attStmt = $db->prepare(
+        'SELECT ta.*, tl.is_internal FROM ticket_attachments ta
+         LEFT JOIN ticket_timeline tl ON ta.timeline_id = tl.id
+         WHERE ta.ticket_id = ?
+         ORDER BY ta.created_at ASC'
+    );
+    $attStmt->execute([$ticket['id']]);
+    $attachments = $attStmt->fetchAll();
+
+    render('admin/tickets/view', ['ticket' => $ticket, 'timeline' => $timeline, 'agents' => $agents, 'priorities' => $priorities, 'attachments' => $attachments]);
 });
 
 /* ==================================================================
@@ -509,8 +650,700 @@ $router->post('/admin/tickets/{id}/comment', function (array $p) {
     // Process @mentions and create notifications
     processAtMentions($db, $message, $id, $timelineId, Auth::id());
 
-    flash('success', $isInternal ? 'Internal note added.' : 'Comment added.');
+    // Handle file attachments
+    $attachments = handleAttachmentUploads('attachments');
+    saveAttachments($db, $id, $timelineId, Auth::id(), $attachments);
+
+    // Email the ticket creator for non-internal comments
+    if (!$isInternal) {
+        notifyTicketCreator($db, $id, $message, Auth::fullName());
+
+        // SLA: record first response if this is the first agent/admin public reply
+        $ticket = $db->prepare('SELECT created_by, first_responded_at FROM tickets WHERE id = ?');
+        $ticket->execute([$id]);
+        $tRow = $ticket->fetch();
+        if ($tRow && $tRow['first_responded_at'] === null && (int) $tRow['created_by'] !== Auth::id()) {
+            $db->prepare('UPDATE tickets SET first_responded_at = NOW() WHERE id = ?')->execute([$id]);
+            $db->prepare(
+                'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, ?, ?, 1)'
+            )->execute([$id, 'sla_set', 'First response recorded']);
+        }
+    }
+
+    $base = $isInternal ? 'Internal note added.' : 'Comment added.';
+    if (!empty($attachments)) {
+        $base .= ' ' . count($attachments) . ' file(s) attached.';
+    }
+    flash('success', $base);
     redirect("/admin/tickets/{$id}");
+});
+
+/* ==================================================================
+ * ADMIN – Update Ticket (status, priority, assignment)
+ * ================================================================== */
+
+$router->post('/admin/tickets/{id}/update', function (array $p) {
+    Auth::requireRole('admin');
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect("/admin/tickets/{$id}");
+    }
+
+    $db = Database::connect();
+    $stmt = $db->prepare('SELECT * FROM tickets WHERE id = ?');
+    $stmt->execute([$id]);
+    $ticket = $stmt->fetch();
+    if (!$ticket) {
+        flash('error', 'Ticket not found.');
+        redirect('/admin/tickets');
+    }
+
+    $changes = [];
+
+    // Status change
+    $newStatus = $_POST['status'] ?? '';
+    $validStatuses = ['open', 'in_progress', 'pending', 'resolved', 'closed'];
+    if ($newStatus !== '' && in_array($newStatus, $validStatuses, true) && $newStatus !== $ticket['status']) {
+        $oldStatus = $ticket['status'];
+        $db->prepare('UPDATE tickets SET status = ? WHERE id = ?')->execute([$newStatus, $id]);
+        $db->prepare(
+            'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
+        )->execute([$id, Auth::id(), 'status_changed', "Status changed from {$oldStatus} to {$newStatus}"]);
+        $changes[] = 'status';
+
+        // SLA: pause on pending, resume when leaving pending
+        if ($newStatus === 'pending') {
+            Sla::pause($db, $id);
+        } elseif ($oldStatus === 'pending') {
+            Sla::resume($db, $id);
+        }
+    }
+
+    // Priority change
+    $newPriorityRaw = $_POST['priority_id'] ?? '';
+    $newPriority = $newPriorityRaw === '' ? null : (int) $newPriorityRaw;
+    $oldPriority = $ticket['priority_id'] ? (int) $ticket['priority_id'] : null;
+    if ($newPriority !== $oldPriority) {
+        $db->prepare('UPDATE tickets SET priority_id = ? WHERE id = ?')->execute([$newPriority, $id]);
+
+        $oldName = 'None';
+        $newName = 'None';
+        if ($oldPriority) {
+            $s = $db->prepare('SELECT name FROM ticket_priorities WHERE id = ?');
+            $s->execute([$oldPriority]);
+            $oldName = $s->fetchColumn() ?: 'None';
+        }
+        if ($newPriority) {
+            $s = $db->prepare('SELECT name FROM ticket_priorities WHERE id = ?');
+            $s->execute([$newPriority]);
+            $newName = $s->fetchColumn() ?: 'None';
+        }
+
+        $db->prepare(
+            'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
+        )->execute([$id, Auth::id(), 'priority_changed', "Priority changed from {$oldName} to {$newName}"]);
+        $changes[] = 'priority';
+
+        if ($newPriority) {
+            Sla::onPriorityChanged($db, $id, $newPriority);
+        }
+    }
+
+    // Assignment change
+    $newAssignedRaw = $_POST['assigned_to'] ?? '';
+    $newAssigned = $newAssignedRaw === '' ? null : (int) $newAssignedRaw;
+    $oldAssigned = $ticket['assigned_to'] ? (int) $ticket['assigned_to'] : null;
+    if ($newAssigned !== $oldAssigned) {
+        $db->prepare('UPDATE tickets SET assigned_to = ? WHERE id = ?')->execute([$newAssigned, $id]);
+
+        $agentName = 'Unassigned';
+        if ($newAssigned) {
+            $s = $db->prepare("SELECT CONCAT(first_name, ' ', last_name) FROM users WHERE id = ?");
+            $s->execute([$newAssigned]);
+            $agentName = $s->fetchColumn() ?: 'Unknown';
+        }
+
+        $db->prepare(
+            'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
+        )->execute([$id, Auth::id(), 'assigned', "Assigned to {$agentName}"]);
+        $changes[] = 'assignment';
+    }
+
+    if (!empty($changes)) {
+        flash('success', 'Ticket updated: ' . implode(', ', $changes) . '.');
+    } else {
+        flash('info', 'No changes made.');
+    }
+    redirect("/admin/tickets/{$id}");
+});
+
+/* ==================================================================
+ * ADMIN – Download Attachment
+ * ================================================================== */
+
+$router->get('/admin/attachments/{id}/download', function (array $p) {
+    Auth::requireRole('admin');
+    $db = Database::connect();
+
+    $stmt = $db->prepare('SELECT * FROM ticket_attachments WHERE id = ?');
+    $stmt->execute([(int) $p['id']]);
+    $att = $stmt->fetch();
+
+    if (!$att) {
+        flash('error', 'Attachment not found.');
+        redirect('/admin/tickets');
+    }
+
+    $filePath = ATTACHMENT_STORAGE_PATH . $att['stored_name'];
+    if (!file_exists($filePath)) {
+        flash('error', 'File not found on server.');
+        redirect('/admin/tickets/' . $att['ticket_id']);
+    }
+
+    header('Content-Type: ' . $att['mime_type']);
+    header('Content-Disposition: attachment; filename="' . str_replace('"', '\\"', $att['original_name']) . '"');
+    header('Content-Length: ' . $att['file_size']);
+    readfile($filePath);
+    exit;
+});
+
+/* ==================================================================
+ * ADMIN – KB Category Management
+ * ================================================================== */
+
+$router->get('/admin/kb/categories', function () {
+    Auth::requireRole('admin');
+    $categories = Database::connect()->query('SELECT * FROM kb_categories ORDER BY sort_order, name')->fetchAll();
+    render('admin/kb/categories/index', ['categories' => $categories]);
+});
+
+$router->get('/admin/kb/categories/create', function () {
+    Auth::requireRole('admin');
+    render('admin/kb/categories/form', ['editing' => null]);
+});
+
+$router->post('/admin/kb/categories/create', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/kb/categories/create');
+    }
+    $name  = trim($_POST['name'] ?? '');
+    $desc  = trim($_POST['description'] ?? '');
+    $order = (int) ($_POST['sort_order'] ?? 0);
+    if ($name === '') {
+        flashInput($_POST);
+        flash('error', 'Category name is required.');
+        redirect('/admin/kb/categories/create');
+    }
+    $slug = slugify($name);
+    $db   = Database::connect();
+    // Ensure unique slug
+    $existing = $db->prepare('SELECT id FROM kb_categories WHERE slug = ?');
+    $existing->execute([$slug]);
+    if ($existing->fetch()) {
+        $slug .= '-' . time();
+    }
+    $db->prepare('INSERT INTO kb_categories (name, slug, description, sort_order) VALUES (?, ?, ?, ?)')
+        ->execute([$name, $slug, $desc, $order]);
+    flash('success', 'Category created.');
+    redirect('/admin/kb/categories');
+});
+
+$router->get('/admin/kb/categories/{id}/edit', function (array $p) {
+    Auth::requireRole('admin');
+    $stmt = Database::connect()->prepare('SELECT * FROM kb_categories WHERE id = ?');
+    $stmt->execute([(int) $p['id']]);
+    $editing = $stmt->fetch();
+    if (!$editing) {
+        flash('error', 'Category not found.');
+        redirect('/admin/kb/categories');
+    }
+    render('admin/kb/categories/form', ['editing' => $editing]);
+});
+
+$router->post('/admin/kb/categories/{id}/edit', function (array $p) {
+    Auth::requireRole('admin');
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect("/admin/kb/categories/{$id}/edit");
+    }
+    $name  = trim($_POST['name'] ?? '');
+    $desc  = trim($_POST['description'] ?? '');
+    $order = (int) ($_POST['sort_order'] ?? 0);
+    if ($name === '') {
+        flashInput($_POST);
+        flash('error', 'Category name is required.');
+        redirect("/admin/kb/categories/{$id}/edit");
+    }
+    $slug = slugify($name);
+    $db   = Database::connect();
+    $existing = $db->prepare('SELECT id FROM kb_categories WHERE slug = ? AND id != ?');
+    $existing->execute([$slug, $id]);
+    if ($existing->fetch()) {
+        $slug .= '-' . time();
+    }
+    $db->prepare('UPDATE kb_categories SET name=?, slug=?, description=?, sort_order=? WHERE id=?')
+        ->execute([$name, $slug, $desc, $order, $id]);
+    flash('success', 'Category updated.');
+    redirect('/admin/kb/categories');
+});
+
+$router->post('/admin/kb/categories/{id}/delete', function (array $p) {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/kb/categories');
+    }
+    Database::connect()->prepare('DELETE FROM kb_categories WHERE id = ?')->execute([(int) $p['id']]);
+    flash('success', 'Category deleted.');
+    redirect('/admin/kb/categories');
+});
+
+/* ==================================================================
+ * ADMIN – KB Folder Management
+ * ================================================================== */
+
+$router->get('/admin/kb/folders', function () {
+    Auth::requireRole('admin');
+    $folders = Database::connect()->query(
+        'SELECT f.*, c.name AS category_name
+         FROM kb_folders f
+         LEFT JOIN kb_categories c ON f.category_id = c.id
+         ORDER BY c.sort_order, c.name, f.sort_order, f.name'
+    )->fetchAll();
+    render('admin/kb/folders/index', ['folders' => $folders]);
+});
+
+$router->get('/admin/kb/folders/create', function () {
+    Auth::requireRole('admin');
+    $categories = Database::connect()->query('SELECT * FROM kb_categories ORDER BY sort_order, name')->fetchAll();
+    render('admin/kb/folders/form', ['editing' => null, 'categories' => $categories]);
+});
+
+$router->post('/admin/kb/folders/create', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/kb/folders/create');
+    }
+    $name       = trim($_POST['name'] ?? '');
+    $categoryId = !empty($_POST['category_id']) ? (int) $_POST['category_id'] : null;
+    $desc       = trim($_POST['description'] ?? '');
+    $order      = (int) ($_POST['sort_order'] ?? 0);
+    if ($name === '' || $categoryId === null) {
+        flashInput($_POST);
+        flash('error', 'Folder name and category are required.');
+        redirect('/admin/kb/folders/create');
+    }
+    $slug = slugify($name);
+    $db   = Database::connect();
+    $existing = $db->prepare('SELECT id FROM kb_folders WHERE slug = ?');
+    $existing->execute([$slug]);
+    if ($existing->fetch()) {
+        $slug .= '-' . time();
+    }
+    $db->prepare('INSERT INTO kb_folders (category_id, name, slug, description, sort_order) VALUES (?, ?, ?, ?, ?)')
+        ->execute([$categoryId, $name, $slug, $desc, $order]);
+    flash('success', 'Folder created.');
+    redirect('/admin/kb/folders');
+});
+
+$router->get('/admin/kb/folders/{id}/edit', function (array $p) {
+    Auth::requireRole('admin');
+    $db   = Database::connect();
+    $stmt = $db->prepare('SELECT * FROM kb_folders WHERE id = ?');
+    $stmt->execute([(int) $p['id']]);
+    $editing = $stmt->fetch();
+    if (!$editing) {
+        flash('error', 'Folder not found.');
+        redirect('/admin/kb/folders');
+    }
+    $categories = $db->query('SELECT * FROM kb_categories ORDER BY sort_order, name')->fetchAll();
+    render('admin/kb/folders/form', ['editing' => $editing, 'categories' => $categories]);
+});
+
+$router->post('/admin/kb/folders/{id}/edit', function (array $p) {
+    Auth::requireRole('admin');
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect("/admin/kb/folders/{$id}/edit");
+    }
+    $name       = trim($_POST['name'] ?? '');
+    $categoryId = !empty($_POST['category_id']) ? (int) $_POST['category_id'] : null;
+    $desc       = trim($_POST['description'] ?? '');
+    $order      = (int) ($_POST['sort_order'] ?? 0);
+    if ($name === '' || $categoryId === null) {
+        flashInput($_POST);
+        flash('error', 'Folder name and category are required.');
+        redirect("/admin/kb/folders/{$id}/edit");
+    }
+    $slug = slugify($name);
+    $db   = Database::connect();
+    $existing = $db->prepare('SELECT id FROM kb_folders WHERE slug = ? AND id != ?');
+    $existing->execute([$slug, $id]);
+    if ($existing->fetch()) {
+        $slug .= '-' . time();
+    }
+    $db->prepare('UPDATE kb_folders SET category_id=?, name=?, slug=?, description=?, sort_order=? WHERE id=?')
+        ->execute([$categoryId, $name, $slug, $desc, $order, $id]);
+    flash('success', 'Folder updated.');
+    redirect('/admin/kb/folders');
+});
+
+$router->post('/admin/kb/folders/{id}/delete', function (array $p) {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/kb/folders');
+    }
+    Database::connect()->prepare('DELETE FROM kb_folders WHERE id = ?')->execute([(int) $p['id']]);
+    flash('success', 'Folder deleted.');
+    redirect('/admin/kb/folders');
+});
+
+/* ==================================================================
+ * ADMIN – KB Article Management
+ * ================================================================== */
+
+$router->get('/admin/kb/articles', function () {
+    Auth::requireRole('admin');
+    $articles = Database::connect()->query(
+        "SELECT a.*, f.name AS folder_name, c.name AS category_name,
+                CONCAT(u.first_name, ' ', u.last_name) AS author_name
+         FROM kb_articles a
+         LEFT JOIN kb_folders f    ON a.folder_id   = f.id
+         LEFT JOIN kb_categories c ON f.category_id = c.id
+         LEFT JOIN users u         ON a.created_by  = u.id
+         ORDER BY a.updated_at DESC"
+    )->fetchAll();
+    render('admin/kb/articles/index', ['articles' => $articles]);
+});
+
+$router->get('/admin/kb/articles/create', function () {
+    Auth::requireRole('admin');
+    $folders = Database::connect()->query(
+        'SELECT f.id, f.name, c.name AS category_name
+         FROM kb_folders f
+         LEFT JOIN kb_categories c ON f.category_id = c.id
+         ORDER BY c.sort_order, c.name, f.sort_order, f.name'
+    )->fetchAll();
+    render('admin/kb/articles/form', ['editing' => null, 'folders' => $folders]);
+});
+
+$router->post('/admin/kb/articles/create', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/kb/articles/create');
+    }
+    $title    = trim($_POST['title'] ?? '');
+    $folderId = !empty($_POST['folder_id']) ? (int) $_POST['folder_id'] : null;
+    $body     = $_POST['body_markdown'] ?? '';
+    $status   = ($_POST['status'] ?? 'draft') === 'published' ? 'published' : 'draft';
+    $order    = (int) ($_POST['sort_order'] ?? 0);
+
+    if ($title === '' || $folderId === null || $body === '') {
+        flashInput($_POST);
+        flash('error', 'Title, folder, and body are required.');
+        redirect('/admin/kb/articles/create');
+    }
+
+    $slug = slugify($title);
+    $db   = Database::connect();
+    $existing = $db->prepare('SELECT id FROM kb_articles WHERE slug = ?');
+    $existing->execute([$slug]);
+    if ($existing->fetch()) {
+        $slug .= '-' . time();
+    }
+
+    $publishedAt = $status === 'published' ? date('Y-m-d H:i:s') : null;
+
+    $db->prepare(
+        'INSERT INTO kb_articles (folder_id, title, slug, body_markdown, status, published_at, created_by, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    )->execute([$folderId, $title, $slug, $body, $status, $publishedAt, Auth::id(), $order]);
+    flash('success', 'Article created.');
+    redirect('/admin/kb/articles');
+});
+
+$router->get('/admin/kb/articles/{id}/edit', function (array $p) {
+    Auth::requireRole('admin');
+    $db   = Database::connect();
+    $stmt = $db->prepare('SELECT * FROM kb_articles WHERE id = ?');
+    $stmt->execute([(int) $p['id']]);
+    $editing = $stmt->fetch();
+    if (!$editing) {
+        flash('error', 'Article not found.');
+        redirect('/admin/kb/articles');
+    }
+    $folders = $db->query(
+        'SELECT f.id, f.name, c.name AS category_name
+         FROM kb_folders f
+         LEFT JOIN kb_categories c ON f.category_id = c.id
+         ORDER BY c.sort_order, c.name, f.sort_order, f.name'
+    )->fetchAll();
+    render('admin/kb/articles/form', ['editing' => $editing, 'folders' => $folders]);
+});
+
+$router->post('/admin/kb/articles/{id}/edit', function (array $p) {
+    Auth::requireRole('admin');
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect("/admin/kb/articles/{$id}/edit");
+    }
+    $title    = trim($_POST['title'] ?? '');
+    $folderId = !empty($_POST['folder_id']) ? (int) $_POST['folder_id'] : null;
+    $body     = $_POST['body_markdown'] ?? '';
+    $status   = ($_POST['status'] ?? 'draft') === 'published' ? 'published' : 'draft';
+    $order    = (int) ($_POST['sort_order'] ?? 0);
+
+    if ($title === '' || $folderId === null || $body === '') {
+        flashInput($_POST);
+        flash('error', 'Title, folder, and body are required.');
+        redirect("/admin/kb/articles/{$id}/edit");
+    }
+
+    $slug = slugify($title);
+    $db   = Database::connect();
+    $existing = $db->prepare('SELECT id FROM kb_articles WHERE slug = ? AND id != ?');
+    $existing->execute([$slug, $id]);
+    if ($existing->fetch()) {
+        $slug .= '-' . time();
+    }
+
+    // Determine published_at
+    $oldStmt = $db->prepare('SELECT status, published_at FROM kb_articles WHERE id = ?');
+    $oldStmt->execute([$id]);
+    $old = $oldStmt->fetch();
+    if ($status === 'published' && ($old['status'] ?? '') !== 'published') {
+        $publishedAt = date('Y-m-d H:i:s');
+    } elseif ($status === 'published') {
+        $publishedAt = $old['published_at'];
+    } else {
+        $publishedAt = null;
+    }
+
+    $db->prepare(
+        'UPDATE kb_articles SET folder_id=?, title=?, slug=?, body_markdown=?, status=?, published_at=?, sort_order=? WHERE id=?'
+    )->execute([$folderId, $title, $slug, $body, $status, $publishedAt, $order, $id]);
+    flash('success', 'Article updated.');
+    redirect('/admin/kb/articles');
+});
+
+$router->post('/admin/kb/articles/{id}/delete', function (array $p) {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/kb/articles');
+    }
+    Database::connect()->prepare('DELETE FROM kb_articles WHERE id = ?')->execute([(int) $p['id']]);
+    flash('success', 'Article deleted.');
+    redirect('/admin/kb/articles');
+});
+
+$router->get('/admin/kb/articles/{id}/preview', function (array $p) {
+    Auth::requireRole('admin');
+    $db   = Database::connect();
+    $stmt = $db->prepare(
+        'SELECT a.*, f.name AS folder_name, f.slug AS folder_slug,
+                c.name AS category_name, c.slug AS category_slug
+         FROM kb_articles a
+         LEFT JOIN kb_folders f    ON a.folder_id   = f.id
+         LEFT JOIN kb_categories c ON f.category_id = c.id
+         WHERE a.id = ?'
+    );
+    $stmt->execute([(int) $p['id']]);
+    $article = $stmt->fetch();
+    if (!$article) {
+        flash('error', 'Article not found.');
+        redirect('/admin/kb/articles');
+    }
+    $article['body_html'] = renderMarkdown($article['body_markdown']);
+    render('admin/kb/articles/preview', ['article' => $article]);
+});
+
+/* ==================================================================
+ * ADMIN – Settings (Email / SMTP Configuration)
+ * ================================================================== */
+
+$router->get('/admin/settings', function () {
+    Auth::requireRole('admin');
+    $keys = ['smtp_host', 'smtp_port', 'smtp_encryption', 'smtp_username', 'smtp_password', 'mail_from_address', 'mail_from_name'];
+    $settings = [];
+    foreach ($keys as $k) {
+        $settings[$k] = getSetting($k);
+    }
+    render('admin/settings/index', ['settings' => $settings]);
+});
+
+$router->post('/admin/settings', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings');
+    }
+
+    $fields = [
+        'smtp_host'        => trim($_POST['smtp_host'] ?? ''),
+        'smtp_port'        => trim($_POST['smtp_port'] ?? '587'),
+        'smtp_encryption'  => in_array($_POST['smtp_encryption'] ?? '', ['none', 'tls', 'ssl'], true) ? $_POST['smtp_encryption'] : 'tls',
+        'smtp_username'    => trim($_POST['smtp_username'] ?? ''),
+        'mail_from_address' => trim($_POST['mail_from_address'] ?? ''),
+        'mail_from_name'   => trim($_POST['mail_from_name'] ?? ''),
+    ];
+
+    // Only update password if a new one was provided (don't blank it on save)
+    $password = $_POST['smtp_password'] ?? '';
+    if ($password !== '') {
+        $fields['smtp_password'] = $password;
+    }
+
+    foreach ($fields as $key => $value) {
+        setSetting($key, $value);
+    }
+
+    flash('success', 'Email settings saved.');
+    redirect('/admin/settings');
+});
+
+$router->post('/admin/settings/test-email', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings');
+    }
+
+    $user    = Auth::user();
+    $toEmail = $user['email'] ?? '';
+    if ($toEmail === '') {
+        flash('error', 'Your account has no email address set.');
+        redirect('/admin/settings');
+    }
+
+    $htmlBody = '<h2>It works!</h2><p>This is a test email from <strong>LocalDesk</strong>. Your SMTP configuration is correct.</p>';
+    $result   = sendMail(
+        $toEmail,
+        $user['first_name'] . ' ' . $user['last_name'],
+        'LocalDesk – Test Email',
+        $htmlBody,
+        "It works!\n\nThis is a test email from LocalDesk. Your SMTP configuration is correct."
+    );
+
+    if ($result !== false) {
+        flash('success', 'Test email sent to ' . $toEmail . '.');
+    } else {
+        flash('error', 'Failed to send test email. Check your SMTP settings and server error log.');
+    }
+
+    redirect('/admin/settings');
+});
+
+/* ==================================================================
+ * ADMIN – Business Hours Settings
+ * ================================================================== */
+
+$router->get('/admin/settings/business-hours', function () {
+    Auth::requireRole('admin');
+    $timezone = getSetting('business_hours_timezone');
+    $json = getSetting('business_hours_schedule');
+    $schedule = $json !== '' ? (json_decode($json, true) ?: []) : [];
+    render('admin/settings/business-hours', ['timezone' => $timezone, 'schedule' => $schedule]);
+});
+
+$router->post('/admin/settings/business-hours', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/business-hours');
+    }
+
+    $timezone = trim($_POST['timezone'] ?? '');
+    $days = $_POST['days'] ?? [];
+
+    $schedule = [];
+    foreach (['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as $day) {
+        if (!empty($days[$day]['active'])) {
+            $start = $days[$day]['start'] ?? '09:00';
+            $end = $days[$day]['end'] ?? '17:00';
+            $schedule[$day] = [$start, $end];
+        } else {
+            $schedule[$day] = null;
+        }
+    }
+
+    setSetting('business_hours_timezone', $timezone);
+    setSetting('business_hours_schedule', json_encode($schedule));
+
+    flash('success', 'Business hours saved.');
+    redirect('/admin/settings/business-hours');
+});
+
+/* ==================================================================
+ * ADMIN – SLA Policy Settings
+ * ================================================================== */
+
+$router->get('/admin/settings/sla-policies', function () {
+    Auth::requireRole('admin');
+    $db = Database::connect();
+    $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
+
+    // Load existing policies
+    $policyStmt = $db->query('SELECT * FROM sla_policies');
+    $policies = [];
+    while ($row = $policyStmt->fetch()) {
+        $policies[(int) $row['priority_id']] = $row;
+    }
+
+    render('admin/settings/sla-policies', ['priorities' => $priorities, 'policies' => $policies]);
+});
+
+$router->post('/admin/settings/sla-policies', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/sla-policies');
+    }
+
+    $db = Database::connect();
+    $policiesData = $_POST['policies'] ?? [];
+
+    $upsert = $db->prepare(
+        'INSERT INTO sla_policies (priority_id, first_response_minutes, resolution_minutes)
+         VALUES (?, ?, ?)
+         ON DUPLICATE KEY UPDATE first_response_minutes = VALUES(first_response_minutes), resolution_minutes = VALUES(resolution_minutes)'
+    );
+    $delete = $db->prepare('DELETE FROM sla_policies WHERE priority_id = ?');
+
+    foreach ($policiesData as $priorityId => $data) {
+        $priorityId = (int) $priorityId;
+        $firstResponse = (int) ($data['first_response_minutes'] ?? 0);
+        $resolution = (int) ($data['resolution_minutes'] ?? 0);
+
+        if ($firstResponse > 0 && $resolution > 0) {
+            $upsert->execute([$priorityId, $firstResponse, $resolution]);
+        } else {
+            $delete->execute([$priorityId]);
+        }
+    }
+
+    flash('success', 'SLA policies saved.');
+    redirect('/admin/settings/sla-policies');
+});
+
+$router->post('/admin/settings/sla-recalculate', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/sla-policies');
+    }
+
+    $count = Sla::recalculateAll(Database::connect());
+    flash('success', "SLA recalculated for {$count} ticket(s).");
+    redirect('/admin/settings/sla-policies');
 });
 
 /* ==================================================================

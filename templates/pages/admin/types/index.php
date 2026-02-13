@@ -1,14 +1,21 @@
 <?php
 $layout       = 'app';
-$pageTitle    = 'Ticket Types';
-$sidebarItems = adminSidebar('types');
+$pageTitle    = 'Ticket Types – Settings';
+$sidebarItems = adminSidebar('settings');
 $breadcrumbs  = [
     ['label' => 'Admin', 'url' => '/admin'],
+    ['label' => 'Settings', 'url' => '/admin/settings'],
     ['label' => 'Ticket Types'],
 ];
 ?>
+<div class="mb-4">
+    <h2 class="fw-bold mb-0">Settings</h2>
+</div>
+
+<?php require ROOT_DIR . '/templates/partials/settings-nav.php'; ?>
+
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2 class="fw-bold mb-0">Ticket Types</h2>
+    <h5 class="fw-bold mb-0">Ticket Types</h5>
     <a href="/admin/types/create" class="btn text-white" style="background:#4f46e5;">
         <i class="bi bi-plus-lg me-1"></i>Add Type
     </a>

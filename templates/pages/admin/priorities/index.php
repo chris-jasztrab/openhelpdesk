@@ -1,14 +1,21 @@
 <?php
 $layout       = 'app';
-$pageTitle    = 'Priorities';
-$sidebarItems = adminSidebar('priorities');
+$pageTitle    = 'Priorities – Settings';
+$sidebarItems = adminSidebar('settings');
 $breadcrumbs  = [
     ['label' => 'Admin', 'url' => '/admin'],
+    ['label' => 'Settings', 'url' => '/admin/settings'],
     ['label' => 'Priorities'],
 ];
 ?>
+<div class="mb-4">
+    <h2 class="fw-bold mb-0">Settings</h2>
+</div>
+
+<?php require ROOT_DIR . '/templates/partials/settings-nav.php'; ?>
+
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2 class="fw-bold mb-0">Ticket Priorities</h2>
+    <h5 class="fw-bold mb-0">Ticket Priorities</h5>
     <a href="/admin/priorities/create" class="btn text-white" style="background:#4f46e5;">
         <i class="bi bi-flag me-1"></i>Add Priority
     </a>

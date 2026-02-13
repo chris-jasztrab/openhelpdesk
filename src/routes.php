@@ -178,7 +178,41 @@ $router->post('/notifications/read-all', function () {
  * ------------------------------------------------------------------ */
 $router->get('/agent', function () {
     Auth::requireRole('agent', 'admin');
-    render('agent/dashboard');
+    $db = Database::connect();
+    $agentId = Auth::id();
+
+    $unassigned = (int) $db->query("SELECT COUNT(*) FROM tickets WHERE assigned_to IS NULL AND status IN ('open','in_progress','pending')")->fetchColumn();
+
+    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets WHERE assigned_to = ? AND status IN ('open','in_progress','pending')");
+    $stmt->execute([$agentId]);
+    $myTickets = (int) $stmt->fetchColumn();
+
+    $pending = (int) $db->query("SELECT COUNT(*) FROM tickets WHERE status = 'pending'")->fetchColumn();
+
+    $resolvedToday = (int) $db->query("SELECT COUNT(*) FROM tickets WHERE status = 'resolved' AND DATE(updated_at) = CURDATE()")->fetchColumn();
+
+    // Recent tickets (open/in_progress/pending, newest first)
+    $recent = $db->query(
+        "SELECT t.id, t.subject, t.status, t.created_at,
+                tp.name AS priority_name, tp.color AS priority_color,
+                CONCAT(c.first_name, ' ', c.last_name) AS creator_name,
+                CONCAT(a.first_name, ' ', a.last_name) AS agent_name
+         FROM tickets t
+         LEFT JOIN ticket_priorities tp ON t.priority_id = tp.id
+         LEFT JOIN users c ON t.created_by = c.id
+         LEFT JOIN users a ON t.assigned_to = a.id
+         WHERE t.status IN ('open','in_progress','pending')
+         ORDER BY t.created_at DESC
+         LIMIT 10"
+    )->fetchAll();
+
+    render('agent/dashboard', [
+        'unassigned'    => $unassigned,
+        'myTickets'     => $myTickets,
+        'pending'       => $pending,
+        'resolvedToday' => $resolvedToday,
+        'recentTickets' => $recent,
+    ]);
 });
 
 require ROOT_DIR . '/src/routes/agent.php';
@@ -188,7 +222,31 @@ require ROOT_DIR . '/src/routes/agent.php';
  * ------------------------------------------------------------------ */
 $router->get('/admin', function () {
     Auth::requireRole('admin');
-    render('admin/dashboard');
+    $db = Database::connect();
+
+    $totalTickets = (int) $db->query("SELECT COUNT(*) FROM tickets")->fetchColumn();
+    $openTickets = (int) $db->query("SELECT COUNT(*) FROM tickets WHERE status IN ('open','in_progress','pending')")->fetchColumn();
+    $totalUsers = (int) $db->query("SELECT COUNT(*) FROM users")->fetchColumn();
+    $totalAgents = (int) $db->query("SELECT COUNT(*) FROM users WHERE role IN ('agent','admin')")->fetchColumn();
+
+    // Recent activity (last 10 timeline entries)
+    $recentActivity = $db->query(
+        "SELECT tl.*, t.subject AS ticket_subject,
+                CONCAT(u.first_name, ' ', u.last_name) AS user_name
+         FROM ticket_timeline tl
+         LEFT JOIN tickets t ON tl.ticket_id = t.id
+         LEFT JOIN users u ON tl.user_id = u.id
+         ORDER BY tl.created_at DESC
+         LIMIT 10"
+    )->fetchAll();
+
+    render('admin/dashboard', [
+        'totalTickets'   => $totalTickets,
+        'openTickets'    => $openTickets,
+        'totalUsers'     => $totalUsers,
+        'totalAgents'    => $totalAgents,
+        'recentActivity' => $recentActivity,
+    ]);
 });
 
 require ROOT_DIR . '/src/routes/admin.php';

@@ -6,6 +6,18 @@ $breadcrumbs = [
     ['label' => 'Dashboard'],
 ];
 $sidebarItems = adminSidebar('dashboard');
+$actionIcons = [
+    'created'          => 'bi-plus-circle text-success',
+    'comment'          => 'bi-chat-dots text-primary',
+    'internal_note'    => 'bi-lock text-secondary',
+    'status_changed'   => 'bi-arrow-repeat text-warning',
+    'priority_changed' => 'bi-flag text-info',
+    'assigned'         => 'bi-person-check text-primary',
+    'sla_initialized'  => 'bi-stopwatch text-info',
+    'sla_paused'       => 'bi-pause-circle text-warning',
+    'sla_resumed'      => 'bi-play-circle text-success',
+    'first_response'   => 'bi-reply text-success',
+];
 ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
@@ -23,7 +35,20 @@ $sidebarItems = adminSidebar('dashboard');
                 </div>
                 <div>
                     <div class="text-muted small">Total Tickets</div>
-                    <div class="fs-4 fw-bold">0</div>
+                    <div class="fs-4 fw-bold"><?= $totalTickets ?></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="stat-icon bg-warning bg-opacity-10 text-warning">
+                    <i class="bi bi-exclamation-circle"></i>
+                </div>
+                <div>
+                    <div class="text-muted small">Open Tickets</div>
+                    <div class="fs-4 fw-bold"><?= $openTickets ?></div>
                 </div>
             </div>
         </div>
@@ -36,7 +61,7 @@ $sidebarItems = adminSidebar('dashboard');
                 </div>
                 <div>
                     <div class="text-muted small">Users</div>
-                    <div class="fs-4 fw-bold">3</div>
+                    <div class="fs-4 fw-bold"><?= $totalUsers ?></div>
                 </div>
             </div>
         </div>
@@ -49,20 +74,7 @@ $sidebarItems = adminSidebar('dashboard');
                 </div>
                 <div>
                     <div class="text-muted small">Agents</div>
-                    <div class="fs-4 fw-bold">1</div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card stat-card h-100">
-            <div class="card-body d-flex align-items-center gap-3">
-                <div class="stat-icon bg-warning bg-opacity-10 text-warning">
-                    <i class="bi bi-clock-history"></i>
-                </div>
-                <div>
-                    <div class="text-muted small">Avg. Resolution</div>
-                    <div class="fs-4 fw-bold">&mdash;</div>
+                    <div class="fs-4 fw-bold"><?= $totalAgents ?></div>
                 </div>
             </div>
         </div>
@@ -75,10 +87,35 @@ $sidebarItems = adminSidebar('dashboard');
             <div class="card-header bg-white border-bottom">
                 <h5 class="mb-0 fw-semibold"><i class="bi bi-activity me-2"></i>Recent Activity</h5>
             </div>
+            <?php if (empty($recentActivity)): ?>
             <div class="card-body text-center py-5 text-muted">
                 <i class="bi bi-clock-history fs-1 d-block mb-2"></i>
                 <p class="mb-0">No recent activity to show.</p>
             </div>
+            <?php else: ?>
+            <div class="list-group list-group-flush">
+                <?php foreach ($recentActivity as $a): ?>
+                <a href="/admin/tickets/<?= $a['ticket_id'] ?>" class="list-group-item list-group-item-action py-3">
+                    <div class="d-flex align-items-start gap-3">
+                        <i class="bi <?= $actionIcons[$a['action']] ?? 'bi-circle text-muted' ?> fs-5 mt-1"></i>
+                        <div class="flex-grow-1">
+                            <div class="d-flex justify-content-between">
+                                <span class="fw-semibold"><?= e($a['ticket_subject'] ?? 'Ticket #' . $a['ticket_id']) ?></span>
+                                <small class="text-muted"><?= date('M j, g:ia', strtotime($a['created_at'])) ?></small>
+                            </div>
+                            <div class="text-muted small">
+                                <?= e($a['user_name'] ?? 'System') ?> &mdash;
+                                <?= e(ucfirst(str_replace('_', ' ', $a['action']))) ?>
+                            </div>
+                            <?php if ($a['details']): ?>
+                            <div class="text-muted small text-truncate" style="max-width:500px;"><?= e($a['details']) ?></div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </a>
+                <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
         </div>
     </div>
     <div class="col-lg-4">
@@ -88,6 +125,9 @@ $sidebarItems = adminSidebar('dashboard');
             </div>
             <div class="card-body">
                 <div class="d-grid gap-2">
+                    <a href="/admin/tickets" class="btn btn-outline-secondary btn-sm text-start">
+                        <i class="bi bi-ticket-detailed me-2"></i>View All Tickets
+                    </a>
                     <a href="/admin/users/create" class="btn btn-outline-secondary btn-sm text-start">
                         <i class="bi bi-person-plus me-2"></i>Add User
                     </a>
@@ -96,6 +136,9 @@ $sidebarItems = adminSidebar('dashboard');
                     </a>
                     <a href="/admin/priorities" class="btn btn-outline-secondary btn-sm text-start">
                         <i class="bi bi-flag me-2"></i>Manage Priorities
+                    </a>
+                    <a href="/admin/settings" class="btn btn-outline-secondary btn-sm text-start">
+                        <i class="bi bi-gear me-2"></i>Settings
                     </a>
                 </div>
             </div>

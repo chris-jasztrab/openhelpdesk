@@ -2,9 +2,10 @@
 $isEdit       = !empty($editing);
 $layout       = 'app';
 $pageTitle    = $isEdit ? 'Edit Location' : 'Add Location';
-$sidebarItems = adminSidebar('locations');
+$sidebarItems = adminSidebar('settings');
 $breadcrumbs  = [
     ['label' => 'Admin', 'url' => '/admin'],
+    ['label' => 'Settings', 'url' => '/admin/settings'],
     ['label' => 'Locations', 'url' => '/admin/locations'],
     ['label' => $isEdit ? 'Edit' : 'Add'],
 ];

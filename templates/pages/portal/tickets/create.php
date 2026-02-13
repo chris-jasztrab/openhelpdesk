@@ -17,14 +17,26 @@ $breadcrumbs  = [
 
 <div class="card border-0 shadow-sm">
     <div class="card-body p-4">
-        <form method="POST" action="/portal/tickets/create">
+        <form method="POST" action="/portal/tickets/create" enctype="multipart/form-data">
             <?= csrfField() ?>
 
             <div class="mb-3">
                 <label for="subject" class="form-label fw-semibold">Subject <span class="text-danger">*</span></label>
                 <input type="text" class="form-control" id="subject" name="subject"
                        value="<?= e(old('subject')) ?>" required
-                       placeholder="Brief summary of your issue">
+                       placeholder="Brief summary of your issue" autocomplete="off">
+                <!-- KB suggestions -->
+                <div id="kb-suggestions" class="mt-2" style="display:none;">
+                    <div class="card border-info">
+                        <div class="card-body py-2 px-3">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <small class="fw-semibold text-info"><i class="bi bi-lightbulb me-1"></i>Related KB articles that may help:</small>
+                                <button type="button" class="btn-close btn-close-sm" id="kb-dismiss" aria-label="Close" style="font-size:.6rem;"></button>
+                            </div>
+                            <div id="kb-suggestion-list"></div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="mb-3">
@@ -100,6 +112,14 @@ $breadcrumbs  = [
             </div>
             <?php endif; ?>
 
+            <div class="mb-3">
+                <label for="attachments" class="form-label fw-semibold">Attachments</label>
+                <input type="file" class="form-control" id="attachments" name="attachments[]" multiple>
+                <div class="form-text">
+                    Max <?= UPLOAD_MAX_SIZE / 1024 / 1024 ?>MB per file. Allowed: PDF, images, Office documents, text, ZIP.
+                </div>
+            </div>
+
             <!-- Hidden fields for browser/OS auto-detection -->
             <input type="hidden" id="browser_info" name="browser_info" value="">
             <input type="hidden" id="os_info" name="os_info" value="">
@@ -129,5 +149,56 @@ $breadcrumbs  = [
     else if (ua.indexOf('Android') !== -1) os = 'Android';
     else if (ua.indexOf('iPhone') !== -1 || ua.indexOf('iPad') !== -1) os = 'iOS';
     document.getElementById('os_info').value = os + ' (' + navigator.platform + ')';
+})();
+
+// KB article suggestions on subject input
+(function() {
+    var subjectInput   = document.getElementById('subject');
+    var suggestionsBox = document.getElementById('kb-suggestions');
+    var suggestionList = document.getElementById('kb-suggestion-list');
+    var dismissBtn     = document.getElementById('kb-dismiss');
+    var timer          = null;
+    var dismissed      = false;
+
+    subjectInput.addEventListener('input', function() {
+        if (dismissed) return;
+        clearTimeout(timer);
+        var q = this.value.trim();
+        if (q.length < 3) {
+            suggestionsBox.style.display = 'none';
+            return;
+        }
+        timer = setTimeout(function() {
+            fetch('/portal/kb/search?q=' + encodeURIComponent(q))
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (dismissed) return;
+                    if (data.length === 0) {
+                        suggestionsBox.style.display = 'none';
+                        return;
+                    }
+                    var html = '';
+                    data.slice(0, 5).forEach(function(a) {
+                        html += '<a href="/portal/kb/articles/' + encodeURIComponent(a.slug)
+                            + '" target="_blank" class="d-block text-decoration-none py-1">'
+                            + '<small><i class="bi bi-file-text me-1"></i>' + escHtml(a.title) + '</small>'
+                            + '</a>';
+                    });
+                    suggestionList.innerHTML = html;
+                    suggestionsBox.style.display = '';
+                });
+        }, 400);
+    });
+
+    dismissBtn.addEventListener('click', function() {
+        dismissed = true;
+        suggestionsBox.style.display = 'none';
+    });
+
+    function escHtml(s) {
+        var d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+    }
 })();
 </script>

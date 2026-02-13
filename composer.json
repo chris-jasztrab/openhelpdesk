@@ -1,0 +1,6 @@
+{
+    "require": {
+        "league/commonmark": "^2",
+        "phpmailer/phpmailer": "^6"
+    }
+}

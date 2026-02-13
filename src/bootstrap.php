@@ -2,13 +2,20 @@
 
 declare(strict_types=1);
 
+require_once ROOT_DIR . '/vendor/autoload.php';
 require_once ROOT_DIR . '/src/helpers.php';
 require_once ROOT_DIR . '/src/Database.php';
 require_once ROOT_DIR . '/src/Auth.php';
 require_once ROOT_DIR . '/src/Router.php';
+require_once ROOT_DIR . '/src/Sla.php';
 
 // Load environment configuration
 loadEnv(ROOT_DIR . '/.env');
+
+// Upload configuration
+define('UPLOAD_MAX_SIZE', (int) env('UPLOAD_MAX_SIZE', '20971520'));
+define('UPLOAD_ALLOWED_TYPES', array_map('trim', explode(',', env('UPLOAD_ALLOWED_TYPES', 'application/pdf,image/jpeg,image/png'))));
+define('ATTACHMENT_STORAGE_PATH', ROOT_DIR . '/storage/attachments/');
 
 // Error reporting
 if (env('APP_DEBUG', 'false') === 'true') {

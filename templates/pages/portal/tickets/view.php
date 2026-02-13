@@ -7,8 +7,8 @@ $breadcrumbs  = [
     ['label' => 'My Tickets', 'url' => '/portal/tickets'],
     ['label' => '#' . $ticket['id']],
 ];
-$statusColors = ['open' => 'primary', 'in_progress' => 'warning', 'resolved' => 'success', 'closed' => 'secondary'];
-$statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'resolved' => 'Resolved', 'closed' => 'Closed'];
+$statusColors = ['open' => 'primary', 'in_progress' => 'warning', 'pending' => 'info', 'resolved' => 'success', 'closed' => 'secondary'];
+$statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 'Pending', 'resolved' => 'Resolved', 'closed' => 'Closed'];
 $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-person-check text-primary', 'status_changed' => 'bi-arrow-repeat text-warning', 'priority_changed' => 'bi-flag text-danger', 'comment' => 'bi-chat-dots text-info'];
 ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -42,6 +42,27 @@ $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-p
                 <div style="white-space:pre-wrap;"><?= e($ticket['description']) ?></div>
             </div>
         </div>
+
+        <?php if (!empty($attachments)): ?>
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white border-bottom">
+                <h5 class="mb-0 fw-semibold"><i class="bi bi-paperclip me-2"></i>Attachments</h5>
+            </div>
+            <div class="list-group list-group-flush">
+                <?php foreach ($attachments as $att): ?>
+                <a href="/portal/attachments/<?= $att['id'] ?>/download"
+                   class="list-group-item list-group-item-action d-flex align-items-center gap-3">
+                    <i class="bi <?= getFileIcon($att['mime_type']) ?> fs-4"></i>
+                    <div class="flex-grow-1">
+                        <div class="fw-semibold"><?= e($att['original_name']) ?></div>
+                        <small class="text-muted"><?= formatFileSize($att['file_size']) ?></small>
+                    </div>
+                    <i class="bi bi-download text-muted"></i>
+                </a>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <?php endif; ?>
 
         <?php if (!empty($ticket['tags'])): ?>
         <div class="mb-4">
@@ -94,11 +115,15 @@ $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-p
                 <h5 class="mb-0 fw-semibold"><i class="bi bi-chat-dots me-2"></i>Add Comment</h5>
             </div>
             <div class="card-body">
-                <form method="POST" action="/portal/tickets/<?= $ticket['id'] ?>/comment">
+                <form method="POST" action="/portal/tickets/<?= $ticket['id'] ?>/comment" enctype="multipart/form-data">
                     <?= csrfField() ?>
                     <div class="mb-3">
                         <textarea class="form-control" name="message" rows="3" required
                                   placeholder="Add an update or ask a question..."></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <input type="file" class="form-control" name="attachments[]" multiple>
+                        <div class="form-text">Max <?= UPLOAD_MAX_SIZE / 1024 / 1024 ?>MB per file</div>
                     </div>
                     <button type="submit" class="btn text-white" style="background:#4f46e5;">
                         <i class="bi bi-send me-1"></i>Post Comment
