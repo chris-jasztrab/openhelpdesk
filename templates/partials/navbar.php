@@ -33,6 +33,32 @@
                 </li>
             </ul>
 
+            <!-- Global Search -->
+            <div class="position-relative mx-3 flex-grow-1 d-none d-lg-block" style="max-width:420px;" id="ld-search-wrap"
+                 data-role="<?= e(Auth::role() ?? 'user') ?>">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text border-0 text-white text-opacity-50" style="background:rgba(255,255,255,.1);">
+                        <i class="bi bi-search"></i>
+                    </span>
+                    <input type="text" id="ld-search-input" class="form-control form-control-sm border-0 text-white"
+                           placeholder="Search... ( / )" autocomplete="off"
+                           style="background:rgba(255,255,255,.1);box-shadow:none;">
+                </div>
+                <div id="ld-search-dropdown" class="d-none position-absolute w-100 bg-white rounded-3 shadow-lg mt-1" style="z-index:1055;max-height:420px;overflow-y:auto;">
+                    <div class="d-flex border-bottom px-3 pt-2 gap-1" id="ld-search-tabs">
+                        <button type="button" class="btn btn-sm px-2 py-1 ld-search-tab active" data-type="all">Everything</button>
+                        <button type="button" class="btn btn-sm px-2 py-1 ld-search-tab" data-type="tickets">Tickets</button>
+                        <?php if (in_array(Auth::role(), ['admin', 'agent'], true)): ?>
+                        <button type="button" class="btn btn-sm px-2 py-1 ld-search-tab" data-type="contacts">Contacts</button>
+                        <?php endif; ?>
+                        <button type="button" class="btn btn-sm px-2 py-1 ld-search-tab" data-type="kb">KB Articles</button>
+                    </div>
+                    <div id="ld-search-results" class="p-2">
+                        <div class="text-center text-muted py-3 small">Type to search...</div>
+                    </div>
+                </div>
+            </div>
+
             <ul class="navbar-nav">
                 <?php
                 $notifCount = notificationCount();
@@ -75,46 +101,197 @@
         </div>
     </div>
 </nav>
-<?php if (Auth::check() && in_array(Auth::role(), ['admin', 'agent'], true)): ?>
+<?php if (Auth::check()): ?>
 <script>
 (function () {
-    var bell      = document.getElementById('ld-notif-bell');
-    if (!bell) return;
-    var link      = bell.querySelector('a');
-    var badge     = document.getElementById('ld-notif-badge');
-    var lastCount = parseInt(bell.dataset.count, 10) || 0;
+    // --- Notification bell polling (admin/agent only) ---
+    var bell = document.getElementById('ld-notif-bell');
+    if (bell) {
+        var link      = bell.querySelector('a');
+        var badge     = document.getElementById('ld-notif-badge');
+        var lastCount = parseInt(bell.dataset.count, 10) || 0;
 
-    function poll() {
-        fetch('/notifications/count', { credentials: 'same-origin' })
-            .then(function (r) { return r.json(); })
-            .then(function (data) {
-                var n = data.count || 0;
-                // Update badge text
-                badge.textContent = n > 99 ? '99+' : n;
-
-                if (n > 0) {
-                    badge.classList.remove('d-none');
-                    link.classList.add('ld-bell-active');
-                } else {
-                    badge.classList.add('d-none');
-                    link.classList.remove('ld-bell-active');
-                }
-
-                // Jiggle when count increases
-                if (n > lastCount) {
-                    link.classList.remove('ld-bell-ring');
-                    // Force reflow so re-adding the class restarts the animation
-                    void link.offsetWidth;
-                    link.classList.add('ld-bell-ring');
-                }
-
-                lastCount = n;
-                bell.dataset.count = n;
-            })
-            .catch(function () { /* silently ignore network errors */ });
+        function poll() {
+            fetch('/notifications/count', { credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    var n = data.count || 0;
+                    badge.textContent = n > 99 ? '99+' : n;
+                    if (n > 0) {
+                        badge.classList.remove('d-none');
+                        link.classList.add('ld-bell-active');
+                    } else {
+                        badge.classList.add('d-none');
+                        link.classList.remove('ld-bell-active');
+                    }
+                    if (n > lastCount) {
+                        link.classList.remove('ld-bell-ring');
+                        void link.offsetWidth;
+                        link.classList.add('ld-bell-ring');
+                    }
+                    lastCount = n;
+                    bell.dataset.count = n;
+                })
+                .catch(function () {});
+        }
+        setInterval(poll, 15000);
     }
 
-    setInterval(poll, 15000); // poll every 15 seconds
+    // --- Global Search ---
+    var wrap     = document.getElementById('ld-search-wrap');
+    if (!wrap) return;
+    var input    = document.getElementById('ld-search-input');
+    var dropdown = document.getElementById('ld-search-dropdown');
+    var results  = document.getElementById('ld-search-results');
+    var tabs     = document.querySelectorAll('.ld-search-tab');
+    var role     = wrap.dataset.role;
+    var timer    = null;
+    var activeType = 'all';
+
+    var statusColors = {
+        open: 'primary', in_progress: 'warning', pending: 'info',
+        resolved: 'success', closed: 'secondary'
+    };
+    var statusLabels = {
+        open: 'Open', in_progress: 'In Progress', pending: 'Pending',
+        resolved: 'Resolved', closed: 'Closed'
+    };
+
+    function ticketUrl(id) {
+        if (role === 'admin') return '/admin/tickets/' + id;
+        if (role === 'agent') return '/agent/tickets/' + id;
+        return '/portal/tickets/' + id;
+    }
+
+    function esc(s) {
+        var d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+    }
+
+    function renderResults(data) {
+        var html = '';
+        var hasResults = false;
+
+        // Tickets
+        if (data.tickets && data.tickets.length > 0) {
+            hasResults = true;
+            html += '<div class="ld-search-group">';
+            html += '<div class="px-2 py-1 text-muted small fw-semibold text-uppercase" style="font-size:.7rem;letter-spacing:.05em;">Tickets</div>';
+            data.tickets.forEach(function (t) {
+                var color = statusColors[t.status] || 'secondary';
+                var label = statusLabels[t.status] || t.status;
+                html += '<a href="' + ticketUrl(t.id) + '" class="ld-search-item d-flex align-items-center gap-2 px-2 py-2 rounded text-decoration-none text-dark">';
+                html += '<i class="bi bi-ticket-perforated text-muted"></i>';
+                html += '<div class="flex-grow-1 text-truncate">';
+                html += '<span class="text-muted small me-1">#' + t.id + '</span>';
+                html += '<span class="fw-medium">' + esc(t.subject) + '</span>';
+                html += '</div>';
+                html += '<span class="badge bg-' + color + '" style="font-size:.65rem;">' + esc(label) + '</span>';
+                html += '</a>';
+            });
+            html += '</div>';
+        }
+
+        // Contacts
+        if (data.contacts && data.contacts.length > 0) {
+            hasResults = true;
+            html += '<div class="ld-search-group">';
+            html += '<div class="px-2 py-1 text-muted small fw-semibold text-uppercase" style="font-size:.7rem;letter-spacing:.05em;">Contacts</div>';
+            var badgeColors = { admin: 'danger', agent: 'primary', user: 'secondary' };
+            data.contacts.forEach(function (u) {
+                var href = role === 'admin' ? '/admin/users/' + u.id + '/edit' : '#';
+                html += '<a href="' + href + '" class="ld-search-item d-flex align-items-center gap-2 px-2 py-2 rounded text-decoration-none text-dark">';
+                html += '<i class="bi bi-person text-muted"></i>';
+                html += '<div class="flex-grow-1 text-truncate">';
+                html += '<span class="fw-medium">' + esc(u.first_name + ' ' + u.last_name) + '</span>';
+                html += '<span class="text-muted small ms-1">' + esc(u.email) + '</span>';
+                html += '</div>';
+                html += '<span class="badge bg-' + (badgeColors[u.role] || 'secondary') + '" style="font-size:.65rem;">' + esc(u.role) + '</span>';
+                html += '</a>';
+            });
+            html += '</div>';
+        }
+
+        // KB Articles
+        if (data.kb && data.kb.length > 0) {
+            hasResults = true;
+            html += '<div class="ld-search-group">';
+            html += '<div class="px-2 py-1 text-muted small fw-semibold text-uppercase" style="font-size:.7rem;letter-spacing:.05em;">Knowledge Base</div>';
+            data.kb.forEach(function (a) {
+                html += '<a href="/portal/kb/articles/' + encodeURIComponent(a.slug) + '" class="ld-search-item d-flex align-items-center gap-2 px-2 py-2 rounded text-decoration-none text-dark">';
+                html += '<i class="bi bi-book text-muted"></i>';
+                html += '<div class="flex-grow-1 text-truncate">';
+                html += '<span class="fw-medium">' + esc(a.title) + '</span>';
+                var path = [a.category_name, a.folder_name].filter(Boolean).join(' / ');
+                if (path) html += '<span class="text-muted small ms-1">' + esc(path) + '</span>';
+                html += '</div>';
+                html += '</a>';
+            });
+            html += '</div>';
+        }
+
+        if (!hasResults) {
+            html = '<div class="text-center text-muted py-3 small">No results found.</div>';
+        }
+
+        results.innerHTML = html;
+    }
+
+    function doSearch() {
+        var q = input.value.trim();
+        if (q.length < 2) {
+            results.innerHTML = '<div class="text-center text-muted py-3 small">Type to search...</div>';
+            return;
+        }
+        results.innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-muted" role="status"></div></div>';
+        fetch('/search?q=' + encodeURIComponent(q) + '&type=' + activeType, { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(renderResults)
+            .catch(function () {
+                results.innerHTML = '<div class="text-center text-muted py-3 small">Search failed.</div>';
+            });
+    }
+
+    // Debounced input
+    input.addEventListener('input', function () {
+        clearTimeout(timer);
+        timer = setTimeout(doSearch, 300);
+    });
+
+    // Show dropdown on focus
+    input.addEventListener('focus', function () {
+        dropdown.classList.remove('d-none');
+    });
+
+    // Tab switching
+    tabs.forEach(function (tab) {
+        tab.addEventListener('click', function () {
+            tabs.forEach(function (t) { t.classList.remove('active'); });
+            tab.classList.add('active');
+            activeType = tab.dataset.type;
+            doSearch();
+        });
+    });
+
+    // Close on click outside
+    document.addEventListener('click', function (e) {
+        if (!wrap.contains(e.target)) {
+            dropdown.classList.add('d-none');
+        }
+    });
+
+    // Close on Escape, focus on /
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            dropdown.classList.add('d-none');
+            input.blur();
+        }
+        if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA' && document.activeElement.tagName !== 'SELECT') {
+            e.preventDefault();
+            input.focus();
+        }
+    });
 })();
 </script>
 <?php endif; ?>

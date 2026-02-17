@@ -7,6 +7,8 @@ $settingsNav = [
     ['label' => 'Priorities',     'url' => '/admin/priorities',              'icon' => 'bi-flag'],
     ['label' => 'Ticket Types',   'url' => '/admin/types',                   'icon' => 'bi-tags'],
     ['label' => 'Groups',         'url' => '/admin/groups',                  'icon' => 'bi-people-fill'],
+    ['label' => 'Import Tickets', 'url' => '/admin/settings/import',         'icon' => 'bi-cloud-upload'],
+    ['label' => 'Danger Zone',   'url' => '/admin/settings/danger-zone',    'icon' => 'bi-exclamation-triangle'],
 ];
 $currentPath = currentPath();
 ?>

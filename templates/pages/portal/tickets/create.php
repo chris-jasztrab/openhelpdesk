@@ -95,22 +95,14 @@ $breadcrumbs  = [
                 </div>
             </div>
 
-            <?php if (!empty($tags)): ?>
             <div class="mb-3">
                 <label class="form-label fw-semibold">Tags</label>
-                <div class="d-flex flex-wrap gap-2">
-                    <?php foreach ($tags as $tag): ?>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="tags[]"
-                               value="<?= $tag['id'] ?>" id="tag_<?= $tag['id'] ?>">
-                        <label class="form-check-label" for="tag_<?= $tag['id'] ?>">
-                            <span class="badge bg-light text-dark border">#<?= e($tag['name']) ?></span>
-                        </label>
-                    </div>
-                    <?php endforeach; ?>
+                <div id="tagContainer" class="d-flex flex-wrap gap-1 align-items-center form-control" style="min-height:38px;cursor:text;" onclick="document.getElementById('tagInput').focus();">
+                    <input type="text" id="tagInput" class="border-0 flex-grow-1" style="outline:none;min-width:120px;background:transparent;"
+                           placeholder="Type #tag and press Enter">
                 </div>
+                <div class="form-text">Type <strong>#</strong> followed by a tag name, then press Enter to add it.</div>
             </div>
-            <?php endif; ?>
 
             <div class="mb-3">
                 <label for="attachments" class="form-label fw-semibold">Attachments</label>
@@ -200,5 +192,52 @@ $breadcrumbs  = [
         d.textContent = s;
         return d.innerHTML;
     }
+})();
+
+// Tag input
+(function() {
+    var input = document.getElementById('tagInput');
+    var container = document.getElementById('tagContainer');
+    var tags = [];
+
+    function addTag(name) {
+        name = name.replace(/^#+/, '').replace(/[^a-zA-Z0-9_\-\s]/g, '').trim().toLowerCase();
+        if (!name || tags.indexOf(name) !== -1) return;
+        tags.push(name);
+
+        var badge = document.createElement('span');
+        badge.className = 'badge bg-light text-dark border d-flex align-items-center gap-1';
+        badge.innerHTML = '<i class="bi bi-hash"></i>' + escTag(name)
+            + '<input type="hidden" name="tags[]" value="' + escTag(name) + '">'
+            + '<button type="button" class="btn-close" style="font-size:.5rem;" aria-label="Remove"></button>';
+        badge.querySelector('.btn-close').addEventListener('click', function() {
+            tags.splice(tags.indexOf(name), 1);
+            badge.remove();
+        });
+        container.insertBefore(badge, input);
+    }
+
+    function escTag(s) {
+        var d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+    }
+
+    input.addEventListener('keydown', function(ev) {
+        if (ev.key === 'Enter') {
+            ev.preventDefault();
+            var val = this.value.trim();
+            if (val) {
+                addTag(val);
+                this.value = '';
+            }
+        }
+        if (ev.key === 'Backspace' && this.value === '' && tags.length > 0) {
+            var last = tags[tags.length - 1];
+            tags.pop();
+            var badges = container.querySelectorAll('.badge');
+            if (badges.length) badges[badges.length - 1].remove();
+        }
+    });
 })();
 </script>

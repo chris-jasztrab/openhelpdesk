@@ -8,13 +8,57 @@ declare(strict_types=1);
 
 $router->get('/admin/users', function () {
     Auth::requireRole('admin');
-    $db    = Database::connect();
-    $users = $db->query(
-        'SELECT u.*, l.name AS location_name
-         FROM users u LEFT JOIN locations l ON u.location_id = l.id
-         ORDER BY u.created_at DESC'
-    )->fetchAll();
-    render('admin/users/index', ['users' => $users]);
+    $db   = Database::connect();
+    $role  = $_GET['role'] ?? '';
+    $locId = trim($_GET['location'] ?? '');
+
+    $sql    = 'SELECT u.*, l.name AS location_name FROM users u LEFT JOIN locations l ON u.location_id = l.id';
+    $where  = [];
+    $params = [];
+    if (in_array($role, ['admin', 'agent', 'user'], true)) {
+        $where[]  = 'u.role = ?';
+        $params[] = $role;
+    }
+    if ($locId !== '') {
+        if ($locId === 'none') {
+            $where[] = 'u.location_id IS NULL';
+        } else {
+            $where[]  = 'u.location_id = ?';
+            $params[] = (int) $locId;
+        }
+    }
+    if (!empty($where)) {
+        $sql .= ' WHERE ' . implode(' AND ', $where);
+    }
+
+    // Sorting
+    $sortableColumns = [
+        'name'       => 'u.first_name',
+        'email'      => 'u.email',
+        'role'       => 'u.role',
+        'location'   => 'l.name',
+        'created_at' => 'u.created_at',
+    ];
+    $sort = $_GET['sort'] ?? 'created_at';
+    $dir  = strtolower($_GET['dir'] ?? 'desc') === 'asc' ? 'ASC' : 'DESC';
+    $orderCol = $sortableColumns[$sort] ?? 'u.created_at';
+
+    $sql .= " ORDER BY {$orderCol} {$dir}";
+
+    $stmt = $db->prepare($sql);
+    $stmt->execute($params);
+    $users = $stmt->fetchAll();
+
+    $locations = $db->query('SELECT * FROM locations ORDER BY name')->fetchAll();
+
+    render('admin/users/index', [
+        'users'      => $users,
+        'roleFilter' => $role,
+        'locFilter'  => $locId,
+        'locations'  => $locations,
+        'sort'       => $sort,
+        'dir'        => strtolower($dir),
+    ]);
 });
 
 $router->get('/admin/users/create', function () {
@@ -148,6 +192,24 @@ $router->post('/admin/users/{id}/delete', function (array $p) {
         redirect('/admin/users');
     }
     $db = Database::connect();
+
+    // Check for records that would prevent deletion
+    $ticketCount = $db->prepare('SELECT COUNT(*) FROM tickets WHERE created_by = ?');
+    $ticketCount->execute([$id]);
+    $tickets = (int) $ticketCount->fetchColumn();
+
+    $kbCount = $db->prepare('SELECT COUNT(*) FROM kb_articles WHERE created_by = ?');
+    $kbCount->execute([$id]);
+    $kbArticles = (int) $kbCount->fetchColumn();
+
+    if ($tickets > 0 || $kbArticles > 0) {
+        $parts = [];
+        if ($tickets > 0) $parts[] = $tickets . ' ticket' . ($tickets > 1 ? 's' : '');
+        if ($kbArticles > 0) $parts[] = $kbArticles . ' KB article' . ($kbArticles > 1 ? 's' : '');
+        flash('error', 'Cannot delete this user because they have ' . implode(' and ', $parts) . '. Reassign or remove those records first.');
+        redirect('/admin/users');
+    }
+
     // Remove avatar file
     $avatar = $db->prepare('SELECT avatar FROM users WHERE id = ?');
     $avatar->execute([$id]);
@@ -529,8 +591,49 @@ $router->post('/admin/groups/{id}/delete', function (array $p) {
 
 $router->get('/admin/tickets', function () {
     Auth::requireRole('admin');
-    $tickets = Database::connect()->query(
-        "SELECT t.*,
+    $db = Database::connect();
+
+    // Read filter params
+    $fStatus   = trim($_GET['status'] ?? '');
+    $fPriority = trim($_GET['priority'] ?? '');
+    $fType     = trim($_GET['type'] ?? '');
+    $fLocation = trim($_GET['location'] ?? '');
+    $fAgent    = trim($_GET['agent'] ?? '');
+    $fSearch   = trim($_GET['q'] ?? '');
+
+    $where  = [];
+    $params = [];
+
+    if ($fStatus !== '') {
+        $where[]  = 't.status = ?';
+        $params[] = $fStatus;
+    }
+    if ($fPriority !== '') {
+        $where[]  = 't.priority_id = ?';
+        $params[] = (int) $fPriority;
+    }
+    if ($fType !== '') {
+        $where[]  = 't.type_id = ?';
+        $params[] = (int) $fType;
+    }
+    if ($fLocation !== '') {
+        $where[]  = 't.location_id = ?';
+        $params[] = (int) $fLocation;
+    }
+    if ($fAgent !== '') {
+        if ($fAgent === 'unassigned') {
+            $where[] = 't.assigned_to IS NULL';
+        } else {
+            $where[]  = 't.assigned_to = ?';
+            $params[] = (int) $fAgent;
+        }
+    }
+    if ($fSearch !== '') {
+        $where[]  = 't.subject LIKE ?';
+        $params[] = '%' . $fSearch . '%';
+    }
+
+    $sql = "SELECT t.*,
                 tp.name AS priority_name, tp.color AS priority_color,
                 l.name  AS location_name,
                 tt.name AS type_name,
@@ -541,10 +644,163 @@ $router->get('/admin/tickets', function () {
          LEFT JOIN ticket_types tt     ON t.type_id     = tt.id
          LEFT JOIN locations l         ON t.location_id  = l.id
          LEFT JOIN users c             ON t.created_by   = c.id
-         LEFT JOIN users a             ON t.assigned_to  = a.id
-         ORDER BY t.created_at DESC"
-    )->fetchAll();
-    render('admin/tickets/index', ['tickets' => $tickets]);
+         LEFT JOIN users a             ON t.assigned_to  = a.id";
+
+    $whereClause = !empty($where) ? ' WHERE ' . implode(' AND ', $where) : '';
+
+    // Count total matching tickets
+    $countSql = "SELECT COUNT(*) FROM tickets t" . $whereClause;
+    $countStmt = $db->prepare($countSql);
+    $countStmt->execute($params);
+    $totalTickets = (int) $countStmt->fetchColumn();
+
+    // Sorting
+    $sortableColumns = [
+        'id'         => 't.id',
+        'subject'    => 't.subject',
+        'status'     => 't.status',
+        'priority'   => 'tp.sort_order',
+        'type'       => 'tt.name',
+        'agent'      => 'a.first_name',
+        'creator'    => 'c.first_name',
+        'location'   => 'l.name',
+        'created_at' => 't.created_at',
+        'due_date'   => 't.due_date',
+    ];
+    $sort = $_GET['sort'] ?? 'created_at';
+    $dir  = strtolower($_GET['dir'] ?? 'desc') === 'asc' ? 'ASC' : 'DESC';
+    $orderCol = $sortableColumns[$sort] ?? 't.created_at';
+
+    // Pagination
+    $perPage    = 30;
+    $totalPages = max(1, (int) ceil($totalTickets / $perPage));
+    $page       = max(1, min($totalPages, (int) ($_GET['page'] ?? 1)));
+    $offset     = ($page - 1) * $perPage;
+
+    $sql .= $whereClause . " ORDER BY {$orderCol} {$dir} LIMIT {$perPage} OFFSET {$offset}";
+
+    $stmt = $db->prepare($sql);
+    $stmt->execute($params);
+    $tickets = $stmt->fetchAll();
+
+    // Load filter dropdown options
+    $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
+    $types      = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
+    $locations  = $db->query('SELECT * FROM locations ORDER BY name')->fetchAll();
+    $agents     = $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin') ORDER BY first_name")->fetchAll();
+
+    $filters = [
+        'status'   => $fStatus,
+        'priority' => $fPriority,
+        'type'     => $fType,
+        'location' => $fLocation,
+        'agent'    => $fAgent,
+        'q'        => $fSearch,
+    ];
+
+    // Load saved filters (own + shared)
+    $sfStmt = $db->prepare(
+        "SELECT sf.*, CONCAT(u.first_name, ' ', u.last_name) AS owner_name
+         FROM saved_filters sf
+         JOIN users u ON sf.user_id = u.id
+         WHERE sf.user_id = ? OR sf.is_shared = 1
+         ORDER BY sf.user_id = ? DESC, sf.name ASC"
+    );
+    $sfStmt->execute([Auth::id(), Auth::id()]);
+    $savedFilters = $sfStmt->fetchAll();
+
+    render('admin/tickets/index', [
+        'tickets'      => $tickets,
+        'priorities'   => $priorities,
+        'types'        => $types,
+        'locations'    => $locations,
+        'agents'       => $agents,
+        'filters'      => $filters,
+        'savedFilters' => $savedFilters,
+        'page'         => $page,
+        'totalPages'   => $totalPages,
+        'totalTickets' => $totalTickets,
+        'sort'         => $sort,
+        'dir'          => strtolower($dir),
+    ]);
+});
+
+/* ── Saved Filters (Admin) ────────────────────────────────────────── */
+
+$router->post('/admin/tickets/filters/save', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/tickets');
+    }
+
+    $name = trim($_POST['name'] ?? '');
+    if ($name === '') {
+        flash('error', 'Filter name is required.');
+        redirect('/admin/tickets');
+    }
+
+    $filterData = [];
+    foreach (['status', 'priority', 'type', 'location', 'agent', 'q'] as $key) {
+        $val = trim($_POST[$key] ?? '');
+        if ($val !== '') {
+            $filterData[$key] = $val;
+        }
+    }
+
+    $db = Database::connect();
+    $stmt = $db->prepare('INSERT INTO saved_filters (user_id, name, filters) VALUES (?, ?, ?)');
+    $stmt->execute([Auth::id(), $name, json_encode($filterData)]);
+
+    flash('success', 'Filter "' . e($name) . '" saved.');
+    $qs = http_build_query($filterData);
+    redirect('/admin/tickets' . ($qs ? '?' . $qs : ''));
+});
+
+$router->post('/admin/tickets/filters/{id}/delete', function (array $p) {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/tickets');
+    }
+
+    $id = (int) $p['id'];
+    $db = Database::connect();
+
+    $stmt = $db->prepare('SELECT * FROM saved_filters WHERE id = ? AND user_id = ?');
+    $stmt->execute([$id, Auth::id()]);
+    if (!$stmt->fetch()) {
+        flash('error', 'Filter not found or access denied.');
+        redirect('/admin/tickets');
+    }
+
+    $db->prepare('DELETE FROM saved_filters WHERE id = ?')->execute([$id]);
+    flash('success', 'Filter deleted.');
+    redirect('/admin/tickets');
+});
+
+$router->post('/admin/tickets/filters/{id}/toggle-share', function (array $p) {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/tickets');
+    }
+
+    $id = (int) $p['id'];
+    $db = Database::connect();
+
+    $stmt = $db->prepare('SELECT * FROM saved_filters WHERE id = ? AND user_id = ?');
+    $stmt->execute([$id, Auth::id()]);
+    $filter = $stmt->fetch();
+    if (!$filter) {
+        flash('error', 'Filter not found or access denied.');
+        redirect('/admin/tickets');
+    }
+
+    $newShared = $filter['is_shared'] ? 0 : 1;
+    $db->prepare('UPDATE saved_filters SET is_shared = ? WHERE id = ?')->execute([$newShared, $id]);
+    flash('success', $newShared ? 'Filter is now shared.' : 'Filter is now private.');
+    redirect('/admin/tickets');
 });
 
 $router->get('/admin/tickets/{id}', function (array $p) {
@@ -609,7 +865,18 @@ $router->get('/admin/tickets/{id}', function (array $p) {
     $attStmt->execute([$ticket['id']]);
     $attachments = $attStmt->fetchAll();
 
-    render('admin/tickets/view', ['ticket' => $ticket, 'timeline' => $timeline, 'agents' => $agents, 'priorities' => $priorities, 'attachments' => $attachments]);
+    // CC'd users
+    $ccStmt = $db->prepare(
+        'SELECT u.id, u.first_name, u.last_name, u.email, u.role
+         FROM ticket_cc tc
+         JOIN users u ON tc.user_id = u.id
+         WHERE tc.ticket_id = ?
+         ORDER BY u.first_name'
+    );
+    $ccStmt->execute([$ticket['id']]);
+    $ccUsers = $ccStmt->fetchAll();
+
+    render('admin/tickets/view', ['ticket' => $ticket, 'timeline' => $timeline, 'agents' => $agents, 'priorities' => $priorities, 'attachments' => $attachments, 'ccUsers' => $ccUsers]);
 });
 
 /* ==================================================================
@@ -657,6 +924,7 @@ $router->post('/admin/tickets/{id}/comment', function (array $p) {
     // Email the ticket creator for non-internal comments
     if (!$isInternal) {
         notifyTicketCreator($db, $id, $message, Auth::fullName());
+        notifyCcUsers($db, $id, $message, Auth::fullName());
 
         // SLA: record first response if this is the first agent/admin public reply
         $ticket = $db->prepare('SELECT created_by, first_responded_at FROM tickets WHERE id = ?');
@@ -776,6 +1044,34 @@ $router->post('/admin/tickets/{id}/update', function (array $p) {
         flash('info', 'No changes made.');
     }
     redirect("/admin/tickets/{$id}");
+});
+
+/* ==================================================================
+ * ADMIN – Delete All Tickets
+ * ================================================================== */
+$router->post('/admin/tickets/delete-all', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/tickets');
+    }
+
+    $db = Database::connect();
+
+    // Delete attachment files from disk
+    $files = $db->query('SELECT stored_name FROM ticket_attachments')->fetchAll();
+    foreach ($files as $f) {
+        $path = ATTACHMENT_STORAGE_PATH . $f['stored_name'];
+        if (file_exists($path)) {
+            unlink($path);
+        }
+    }
+
+    // Delete all tickets (cascades to timeline, attachments, notifications)
+    $count = $db->exec('DELETE FROM tickets');
+
+    flash('success', "Deleted {$count} ticket(s) and all associated data.");
+    redirect('/admin/settings/danger-zone');
 });
 
 /* ==================================================================
@@ -1344,6 +1640,994 @@ $router->post('/admin/settings/sla-recalculate', function () {
     $count = Sla::recalculateAll(Database::connect());
     flash('success', "SLA recalculated for {$count} ticket(s).");
     redirect('/admin/settings/sla-policies');
+});
+
+/* ==================================================================
+ * ADMIN – Import Tickets from CSV
+ * ================================================================== */
+
+$router->get('/admin/settings/import', function () {
+    Auth::requireRole('admin');
+    render('admin/settings/import');
+});
+
+$router->post('/admin/settings/import/preview', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/import');
+    }
+
+    // Validate upload
+    if (empty($_FILES['csv_file']['tmp_name']) || $_FILES['csv_file']['error'] !== UPLOAD_ERR_OK) {
+        flash('error', 'Please select a valid CSV file.');
+        redirect('/admin/settings/import');
+    }
+    if ($_FILES['csv_file']['size'] > 10 * 1024 * 1024) {
+        flash('error', 'File is too large. Maximum 10 MB.');
+        redirect('/admin/settings/import');
+    }
+
+    $handle = fopen($_FILES['csv_file']['tmp_name'], 'r');
+    if (!$handle) {
+        flash('error', 'Could not read the uploaded file.');
+        redirect('/admin/settings/import');
+    }
+
+    // Read header row
+    $header = fgetcsv($handle);
+    if (!$header || !in_array('Ticket ID', $header, true) || !in_array('Subject', $header, true)) {
+        fclose($handle);
+        flash('error', 'Invalid CSV format. Expected Freshdesk export with "Ticket ID" and "Subject" columns.');
+        redirect('/admin/settings/import');
+    }
+
+    // Build column index map
+    $colMap = array_flip($header);
+
+    // Load existing data for lookups
+    $db = Database::connect();
+
+    $existingUsers = [];
+    foreach ($db->query("SELECT id, email, CONCAT(first_name, ' ', last_name) AS full_name FROM users")->fetchAll() as $u) {
+        $existingUsers[strtolower($u['email'])] = $u;
+        $existingUsers['name:' . strtolower($u['full_name'])] = $u;
+    }
+
+    $existingLocations = [];
+    foreach ($db->query('SELECT id, name FROM locations')->fetchAll() as $l) {
+        $existingLocations[strtolower($l['name'])] = $l['id'];
+    }
+
+    $existingTypes = [];
+    foreach ($db->query('SELECT id, name FROM ticket_types')->fetchAll() as $t) {
+        $existingTypes[strtolower($t['name'])] = $t['id'];
+    }
+
+    $existingPriorities = [];
+    foreach ($db->query('SELECT id, name FROM ticket_priorities')->fetchAll() as $p) {
+        $existingPriorities[strtolower($p['name'])] = $p['id'];
+    }
+
+    // Parse all rows
+    $rows = [];
+    $newUserEmails = [];
+    $newAgentNames = [];
+    $newLocationNames = [];
+
+    while (($csvRow = fgetcsv($handle)) !== false) {
+        if (count($csvRow) < count($header)) {
+            continue; // skip malformed rows
+        }
+
+        $data = [];
+        foreach ($colMap as $col => $idx) {
+            $data[$col] = trim($csvRow[$idx] ?? '');
+        }
+
+        $legacyId   = $data['Ticket ID'] ?? '';
+        $subject    = $data['Subject'] ?? '';
+        $status     = strtolower($data['Status'] ?? 'open');
+        $priority   = $data['Priority'] ?? '';
+        $agentName  = $data['Agent'] ?? '';
+        $createdAt  = $data['Created time'] ?? '';
+        $dueDate    = $data['Due by Time'] ?? '';
+        $updatedAt  = $data['Last update time'] ?? '';
+        $respondedAt = $data['Initial response time'] ?? '';
+        $typeName   = $data['Type of Ticket'] ?? '';
+        $location   = $data['Location'] ?? '';
+        $fullName   = $data['Full name'] ?? '';
+        $email      = strtolower(trim($data['Email'] ?? ''));
+        $tags       = $data['Tags'] ?? '';
+
+        if ($subject === '' || $legacyId === '') {
+            continue;
+        }
+
+        // Normalize status
+        $statusMap = ['open' => 'open', 'closed' => 'closed', 'pending' => 'pending', 'resolved' => 'resolved'];
+        $status = $statusMap[$status] ?? 'open';
+
+        // Track new users (submitters)
+        if ($email !== '' && !isset($existingUsers[$email])) {
+            $newUserEmails[$email] = $fullName;
+        }
+
+        // Track new agents
+        if ($agentName !== '' && $agentName !== 'No Agent' && !isset($existingUsers['name:' . strtolower($agentName)])) {
+            $newAgentNames[strtolower($agentName)] = $agentName;
+        }
+
+        // Track new locations
+        if ($location !== '' && !isset($existingLocations[strtolower($location)])) {
+            $newLocationNames[strtolower($location)] = $location;
+        }
+
+        $rows[] = [
+            'legacy_id'     => $legacyId,
+            'subject'       => $subject,
+            'status'        => $status,
+            'priority'      => $priority,
+            'agent'         => $agentName,
+            'created_at'    => $createdAt,
+            'due_date'      => $dueDate,
+            'updated_at'    => $updatedAt,
+            'responded_at'  => $respondedAt,
+            'type'          => $typeName,
+            'location'      => $location,
+            'submitter_name'=> $fullName,
+            'email'         => $email,
+            'tags'          => $tags,
+        ];
+    }
+    fclose($handle);
+
+    if (empty($rows)) {
+        flash('error', 'No valid ticket rows found in the CSV file.');
+        redirect('/admin/settings/import');
+    }
+
+    // Store in session for the confirm step
+    $_SESSION['import_data'] = $rows;
+
+    $summary = [
+        'total_tickets'     => count($rows),
+        'new_users'         => count($newUserEmails),
+        'new_agents'        => count($newAgentNames),
+        'new_locations'     => count($newLocationNames),
+        'new_user_list'     => array_values($newUserEmails),
+        'new_agent_list'    => array_values($newAgentNames),
+        'new_location_list' => array_values($newLocationNames),
+    ];
+
+    $previewRows = array_slice($rows, 0, 15);
+
+    render('admin/settings/import-preview', [
+        'summary'     => $summary,
+        'previewRows' => $previewRows,
+    ]);
+});
+
+$router->post('/admin/settings/import/confirm', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/import');
+    }
+
+    $rows = $_SESSION['import_data'] ?? [];
+    unset($_SESSION['import_data']);
+
+    if (empty($rows)) {
+        flash('error', 'No import data found. Please upload the CSV again.');
+        redirect('/admin/settings/import');
+    }
+
+    $db = Database::connect();
+
+    // Load lookups
+    $existingUsers = [];
+    foreach ($db->query("SELECT id, email, CONCAT(first_name, ' ', last_name) AS full_name FROM users")->fetchAll() as $u) {
+        $existingUsers[strtolower($u['email'])] = (int) $u['id'];
+        $existingUsers['name:' . strtolower($u['full_name'])] = (int) $u['id'];
+    }
+
+    $existingLocations = [];
+    foreach ($db->query('SELECT id, name FROM locations')->fetchAll() as $l) {
+        $existingLocations[strtolower($l['name'])] = (int) $l['id'];
+    }
+
+    $existingTypes = [];
+    foreach ($db->query('SELECT id, name FROM ticket_types')->fetchAll() as $t) {
+        $existingTypes[strtolower($t['name'])] = (int) $t['id'];
+    }
+
+    $existingPriorities = [];
+    foreach ($db->query('SELECT id, name FROM ticket_priorities')->fetchAll() as $p) {
+        $existingPriorities[strtolower($p['name'])] = (int) $p['id'];
+    }
+
+    $existingTags = [];
+    foreach ($db->query('SELECT id, name FROM ticket_tags')->fetchAll() as $t) {
+        $existingTags[strtolower($t['name'])] = (int) $t['id'];
+    }
+
+    $imported = 0;
+    $skipped  = 0;
+    $randomPassword = password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT);
+
+    $db->beginTransaction();
+    try {
+        // Prepared statements
+        $insertUser = $db->prepare(
+            'INSERT INTO users (first_name, last_name, email, password, role, location_id) VALUES (?, ?, ?, ?, ?, ?)'
+        );
+        $insertLocation = $db->prepare(
+            'INSERT INTO locations (name) VALUES (?)'
+        );
+        $insertType = $db->prepare(
+            'INSERT INTO ticket_types (name, sort_order) VALUES (?, ?)'
+        );
+        $insertTicket = $db->prepare(
+            'INSERT INTO tickets (subject, description, legacy_id, created_by, created_at, due_date, type_id, location_id, status, priority_id, assigned_to, first_responded_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        );
+        $insertTimeline = $db->prepare(
+            'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal, created_at) VALUES (?, ?, ?, ?, 0, ?)'
+        );
+        $insertTag = $db->prepare('INSERT INTO ticket_tags (name) VALUES (?)');
+        $insertTagMap = $db->prepare('INSERT INTO ticket_tag_map (ticket_id, tag_id) VALUES (?, ?)');
+
+        $nextTypeOrder = (int) ($db->query('SELECT COALESCE(MAX(sort_order), 0) FROM ticket_types')->fetchColumn()) + 1;
+
+        foreach ($rows as $row) {
+            // --- Resolve submitter ---
+            $creatorId = null;
+            if ($row['email'] !== '') {
+                if (isset($existingUsers[$row['email']])) {
+                    $creatorId = $existingUsers[$row['email']];
+                } else {
+                    $nameParts = splitFullName($row['submitter_name']);
+                    $locId = $row['location'] !== '' ? ($existingLocations[strtolower($row['location'])] ?? null) : null;
+                    $insertUser->execute([$nameParts[0], $nameParts[1], $row['email'], $randomPassword, 'user', $locId]);
+                    $creatorId = (int) $db->lastInsertId();
+                    $existingUsers[$row['email']] = $creatorId;
+                    $existingUsers['name:' . strtolower($row['submitter_name'])] = $creatorId;
+                }
+            }
+
+            if ($creatorId === null) {
+                $skipped++;
+                continue;
+            }
+
+            // --- Resolve agent ---
+            $agentId = null;
+            $agentName = $row['agent'];
+            if ($agentName !== '' && $agentName !== 'No Agent') {
+                $agentKey = 'name:' . strtolower($agentName);
+                if (isset($existingUsers[$agentKey])) {
+                    $agentId = $existingUsers[$agentKey];
+                } else {
+                    $nameParts = splitFullName($agentName);
+                    $agentEmail = strtolower(str_replace(' ', '.', $agentName)) . '@imported.local';
+                    $insertUser->execute([$nameParts[0], $nameParts[1], $agentEmail, $randomPassword, 'agent', null]);
+                    $agentId = (int) $db->lastInsertId();
+                    $existingUsers[$agentKey] = $agentId;
+                    $existingUsers[$agentEmail] = $agentId;
+                }
+            }
+
+            // --- Resolve location ---
+            $locationId = null;
+            if ($row['location'] !== '') {
+                $locKey = strtolower($row['location']);
+                if (isset($existingLocations[$locKey])) {
+                    $locationId = $existingLocations[$locKey];
+                } else {
+                    $insertLocation->execute([$row['location']]);
+                    $locationId = (int) $db->lastInsertId();
+                    $existingLocations[$locKey] = $locationId;
+                }
+            }
+
+            // --- Resolve type ---
+            $typeId = null;
+            if ($row['type'] !== '') {
+                $typeKey = strtolower($row['type']);
+                if (isset($existingTypes[$typeKey])) {
+                    $typeId = $existingTypes[$typeKey];
+                } else {
+                    $insertType->execute([$row['type'], $nextTypeOrder++]);
+                    $typeId = (int) $db->lastInsertId();
+                    $existingTypes[$typeKey] = $typeId;
+                }
+            }
+
+            // --- Resolve priority ---
+            $priorityId = null;
+            if ($row['priority'] !== '') {
+                $priorityId = $existingPriorities[strtolower($row['priority'])] ?? null;
+            }
+
+            // --- Parse dates ---
+            $createdAt   = $row['created_at'] !== '' ? $row['created_at'] : date('Y-m-d H:i:s');
+            $dueDate     = $row['due_date'] !== '' ? substr($row['due_date'], 0, 10) : null;
+            $updatedAt   = $row['updated_at'] !== '' ? $row['updated_at'] : $createdAt;
+            $respondedAt = $row['responded_at'] !== '' ? $row['responded_at'] : null;
+
+            // --- Insert ticket ---
+            $insertTicket->execute([
+                $row['subject'],
+                '(Imported from legacy system)',
+                $row['legacy_id'],
+                $creatorId,
+                $createdAt,
+                $dueDate,
+                $typeId,
+                $locationId,
+                $row['status'],
+                $priorityId,
+                $agentId,
+                $respondedAt,
+                $updatedAt,
+            ]);
+            $ticketId = (int) $db->lastInsertId();
+
+            // --- Timeline entry ---
+            $insertTimeline->execute([$ticketId, $creatorId, 'created', 'Ticket created (imported from legacy system).', $createdAt]);
+
+            // --- Tags ---
+            $tagStr = trim($row['tags'], '" ');
+            if ($tagStr !== '') {
+                $tagNames = array_filter(array_map('trim', explode(',', $tagStr)));
+                foreach ($tagNames as $tagName) {
+                    $tagKey = strtolower($tagName);
+                    if (!isset($existingTags[$tagKey])) {
+                        $insertTag->execute([$tagName]);
+                        $existingTags[$tagKey] = (int) $db->lastInsertId();
+                    }
+                    $insertTagMap->execute([$ticketId, $existingTags[$tagKey]]);
+                }
+            }
+
+            $imported++;
+        }
+
+        $db->commit();
+    } catch (PDOException $e) {
+        $db->rollBack();
+        flash('error', 'Import failed: ' . $e->getMessage());
+        redirect('/admin/settings/import');
+    }
+
+    $msg = "Successfully imported {$imported} ticket(s).";
+    if ($skipped > 0) {
+        $msg .= " {$skipped} row(s) skipped (missing email).";
+    }
+    flash('success', $msg);
+    redirect('/admin/tickets');
+});
+
+/* ==================================================================
+ * ADMIN – Settings: Danger Zone
+ * ================================================================== */
+$router->get('/admin/settings/danger-zone', function () {
+    Auth::requireRole('admin');
+    $db = Database::connect();
+    $ticketCount = (int) $db->query('SELECT COUNT(*) FROM tickets')->fetchColumn();
+    render('admin/settings/danger-zone', ['ticketCount' => $ticketCount]);
+});
+
+/* ==================================================================
+ * Reports & Analytics
+ * ================================================================== */
+
+/** Helper: format minutes into human-readable string */
+function formatMinutes(float $minutes): string
+{
+    if ($minutes < 1) return '< 1m';
+    if ($minutes < 60) return round($minutes) . 'm';
+    if ($minutes < 1440) return round($minutes / 60, 1) . 'h';
+    return round($minutes / 1440, 1) . 'd';
+}
+
+/** Helper: parse date-range query params with defaults */
+function reportDateRange(): array
+{
+    $to   = (!empty($_GET['to']) && strtotime($_GET['to'])) ? $_GET['to'] : date('Y-m-d');
+    $from = (!empty($_GET['from']) && strtotime($_GET['from'])) ? $_GET['from'] : date('Y-m-d', strtotime('-30 days', strtotime($to)));
+    return [$from, $to];
+}
+
+/* ── Reports Overview ─────────────────────────────────────────────── */
+
+$router->get('/admin/reports', function () {
+    Auth::requireRole('admin');
+    $db = Database::connect();
+    [$from, $to] = reportDateRange();
+    $toEnd = $to . ' 23:59:59';
+
+    $stmt = $db->prepare('SELECT COUNT(*) FROM tickets WHERE created_at BETWEEN ? AND ?');
+    $stmt->execute([$from, $toEnd]);
+    $ticketsCreated = (int) $stmt->fetchColumn();
+
+    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets WHERE status IN ('resolved','closed') AND created_at BETWEEN ? AND ?");
+    $stmt->execute([$from, $toEnd]);
+    $ticketsResolved = (int) $stmt->fetchColumn();
+
+    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets WHERE status NOT IN ('resolved','closed')");
+    $stmt->execute();
+    $unresolvedCount = (int) $stmt->fetchColumn();
+
+    $stmt = $db->prepare('SELECT AVG(TIMESTAMPDIFF(MINUTE, created_at, first_responded_at)) FROM tickets WHERE first_responded_at IS NOT NULL AND created_at BETWEEN ? AND ?');
+    $stmt->execute([$from, $toEnd]);
+    $avgFirstResponse = formatMinutes((float) $stmt->fetchColumn());
+
+    // Avg resolution: time from creation to the status_changed → resolved timeline entry
+    $stmt = $db->prepare(
+        "SELECT AVG(TIMESTAMPDIFF(MINUTE, t.created_at, tl.created_at))
+         FROM tickets t
+         JOIN ticket_timeline tl ON tl.ticket_id = t.id AND tl.action = 'status_changed' AND tl.details LIKE '%→ Resolved%'
+         WHERE t.created_at BETWEEN ? AND ?"
+    );
+    $stmt->execute([$from, $toEnd]);
+    $avgResolution = formatMinutes((float) $stmt->fetchColumn());
+
+    // SLA compliance
+    $stmt = $db->prepare(
+        "SELECT COUNT(*) FROM tickets WHERE first_response_due_at IS NOT NULL AND created_at BETWEEN ? AND ?"
+    );
+    $stmt->execute([$from, $toEnd]);
+    $slaTotal = (int) $stmt->fetchColumn();
+
+    $stmt = $db->prepare(
+        "SELECT COUNT(*) FROM tickets WHERE sla_state = 'breached' AND created_at BETWEEN ? AND ?"
+    );
+    $stmt->execute([$from, $toEnd]);
+    $slaBreached = (int) $stmt->fetchColumn();
+    $slaCompliance = $slaTotal > 0 ? round(($slaTotal - $slaBreached) / $slaTotal * 100) : 100;
+
+    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets WHERE assigned_to IS NULL AND status NOT IN ('resolved','closed')");
+    $stmt->execute();
+    $unassignedCount = (int) $stmt->fetchColumn();
+
+    render('admin/reports/index', compact(
+        'from', 'to', 'ticketsCreated', 'ticketsResolved', 'unresolvedCount',
+        'avgFirstResponse', 'avgResolution', 'slaCompliance', 'slaBreached', 'unassignedCount'
+    ));
+});
+
+/* ── Agent Performance ────────────────────────────────────────────── */
+
+$router->get('/admin/reports/agent-performance', function () {
+    Auth::requireRole('admin');
+    $db = Database::connect();
+    [$from, $to] = reportDateRange();
+    $toEnd = $to . ' 23:59:59';
+
+    $stmt = $db->prepare(
+        "SELECT
+            u.id AS agent_id,
+            CONCAT(u.first_name, ' ', u.last_name) AS agent_name,
+            COUNT(t.id) AS assigned,
+            SUM(CASE WHEN t.status IN ('resolved','closed') THEN 1 ELSE 0 END) AS resolved,
+            SUM(CASE WHEN t.status NOT IN ('resolved','closed') THEN 1 ELSE 0 END) AS open_count,
+            AVG(CASE WHEN t.first_responded_at IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, t.created_at, t.first_responded_at) END) AS avg_first_response_min,
+            AVG(
+                CASE WHEN t.status IN ('resolved','closed') THEN
+                    (SELECT TIMESTAMPDIFF(MINUTE, t.created_at, tl.created_at)
+                     FROM ticket_timeline tl
+                     WHERE tl.ticket_id = t.id AND tl.action = 'status_changed' AND tl.details LIKE '%→ Resolved%'
+                     ORDER BY tl.created_at DESC LIMIT 1)
+                END
+            ) AS avg_resolution_min,
+            SUM(CASE WHEN t.first_response_due_at IS NOT NULL THEN 1 ELSE 0 END) AS sla_total,
+            SUM(CASE WHEN t.sla_state = 'breached' THEN 1 ELSE 0 END) AS sla_breached
+         FROM users u
+         LEFT JOIN tickets t ON t.assigned_to = u.id AND t.created_at BETWEEN ? AND ?
+         WHERE u.role IN ('admin','agent')
+         GROUP BY u.id, u.first_name, u.last_name
+         ORDER BY resolved DESC"
+    );
+    $stmt->execute([$from, $toEnd]);
+    $agents = $stmt->fetchAll();
+
+    foreach ($agents as &$a) {
+        $a['avg_first_response'] = $a['avg_first_response_min'] !== null ? formatMinutes((float) $a['avg_first_response_min']) : '—';
+        $a['avg_resolution'] = $a['avg_resolution_min'] !== null ? formatMinutes((float) $a['avg_resolution_min']) : '—';
+        $a['sla_compliance'] = $a['sla_total'] > 0
+            ? round(($a['sla_total'] - $a['sla_breached']) / $a['sla_total'] * 100)
+            : 100;
+    }
+    unset($a);
+
+    render('admin/reports/agent-performance', compact('from', 'to', 'agents'));
+});
+
+/* ── Response Times ───────────────────────────────────────────────── */
+
+$router->get('/admin/reports/response-times', function () {
+    Auth::requireRole('admin');
+    $db = Database::connect();
+    [$from, $to] = reportDateRange();
+    $toEnd = $to . ' 23:59:59';
+
+    // Overall averages
+    $stmt = $db->prepare(
+        'SELECT AVG(TIMESTAMPDIFF(MINUTE, created_at, first_responded_at)) FROM tickets WHERE first_responded_at IS NOT NULL AND created_at BETWEEN ? AND ?'
+    );
+    $stmt->execute([$from, $toEnd]);
+    $overallFirstResponse = formatMinutes((float) $stmt->fetchColumn());
+
+    $stmt = $db->prepare(
+        "SELECT AVG(TIMESTAMPDIFF(MINUTE, t.created_at, tl.created_at))
+         FROM tickets t
+         JOIN ticket_timeline tl ON tl.ticket_id = t.id AND tl.action = 'status_changed' AND tl.details LIKE '%→ Resolved%'
+         WHERE t.created_at BETWEEN ? AND ?"
+    );
+    $stmt->execute([$from, $toEnd]);
+    $overallResolution = formatMinutes((float) $stmt->fetchColumn());
+
+    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets WHERE first_responded_at IS NOT NULL AND created_at BETWEEN ? AND ?");
+    $stmt->execute([$from, $toEnd]);
+    $ticketsMeasured = (int) $stmt->fetchColumn();
+
+    // By priority
+    $stmt = $db->prepare(
+        "SELECT
+            tp.name AS priority_name, tp.color AS priority_color,
+            COUNT(t.id) AS ticket_count,
+            AVG(CASE WHEN t.first_responded_at IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, t.created_at, t.first_responded_at) END) AS avg_fr_min,
+            AVG(
+                (SELECT TIMESTAMPDIFF(MINUTE, t.created_at, tl.created_at)
+                 FROM ticket_timeline tl
+                 WHERE tl.ticket_id = t.id AND tl.action = 'status_changed' AND tl.details LIKE '%→ Resolved%'
+                 ORDER BY tl.created_at DESC LIMIT 1)
+            ) AS avg_res_min,
+            MIN(
+                (SELECT TIMESTAMPDIFF(MINUTE, t.created_at, tl.created_at)
+                 FROM ticket_timeline tl
+                 WHERE tl.ticket_id = t.id AND tl.action = 'status_changed' AND tl.details LIKE '%→ Resolved%'
+                 ORDER BY tl.created_at ASC LIMIT 1)
+            ) AS fastest_min,
+            MAX(
+                (SELECT TIMESTAMPDIFF(MINUTE, t.created_at, tl.created_at)
+                 FROM ticket_timeline tl
+                 WHERE tl.ticket_id = t.id AND tl.action = 'status_changed' AND tl.details LIKE '%→ Resolved%'
+                 ORDER BY tl.created_at DESC LIMIT 1)
+            ) AS slowest_min
+         FROM tickets t
+         LEFT JOIN ticket_priorities tp ON t.priority_id = tp.id
+         WHERE t.created_at BETWEEN ? AND ?
+         GROUP BY tp.id, tp.name, tp.color, tp.sort_order
+         ORDER BY tp.sort_order"
+    );
+    $stmt->execute([$from, $toEnd]);
+    $byPriority = $stmt->fetchAll();
+
+    foreach ($byPriority as &$row) {
+        $row['avg_first_response'] = $row['avg_fr_min'] !== null ? formatMinutes((float) $row['avg_fr_min']) : '—';
+        $row['avg_resolution'] = $row['avg_res_min'] !== null ? formatMinutes((float) $row['avg_res_min']) : '—';
+        $row['fastest'] = $row['fastest_min'] !== null ? formatMinutes((float) $row['fastest_min']) : '—';
+        $row['slowest'] = $row['slowest_min'] !== null ? formatMinutes((float) $row['slowest_min']) : '—';
+    }
+    unset($row);
+
+    // Weekly trend
+    $stmt = $db->prepare(
+        "SELECT
+            DATE_FORMAT(t.created_at, '%Y-%u') AS week_key,
+            DATE_FORMAT(MIN(t.created_at), '%b %e') AS week_label,
+            ROUND(AVG(CASE WHEN t.first_responded_at IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, t.created_at, t.first_responded_at) END) / 60, 1) AS avg_response_hrs,
+            ROUND(AVG(
+                (SELECT TIMESTAMPDIFF(MINUTE, t.created_at, tl.created_at)
+                 FROM ticket_timeline tl
+                 WHERE tl.ticket_id = t.id AND tl.action = 'status_changed' AND tl.details LIKE '%→ Resolved%'
+                 ORDER BY tl.created_at DESC LIMIT 1)
+            ) / 60, 1) AS avg_resolution_hrs
+         FROM tickets t
+         WHERE t.created_at BETWEEN ? AND ?
+         GROUP BY week_key
+         ORDER BY week_key"
+    );
+    $stmt->execute([$from, $toEnd]);
+    $weeklyTrend = $stmt->fetchAll();
+
+    render('admin/reports/response-times', compact(
+        'from', 'to', 'overallFirstResponse', 'overallResolution', 'ticketsMeasured',
+        'byPriority', 'weeklyTrend'
+    ));
+});
+
+/* ── SLA Compliance ───────────────────────────────────────────────── */
+
+$router->get('/admin/reports/sla', function () {
+    Auth::requireRole('admin');
+    $db = Database::connect();
+    [$from, $to] = reportDateRange();
+    $toEnd = $to . ' 23:59:59';
+
+    // Overall compliance
+    $stmt = $db->prepare(
+        "SELECT
+            SUM(CASE WHEN first_responded_at IS NOT NULL AND first_response_due_at IS NOT NULL AND first_responded_at <= first_response_due_at THEN 1 ELSE 0 END) AS response_met,
+            SUM(CASE WHEN first_responded_at IS NOT NULL AND first_response_due_at IS NOT NULL AND first_responded_at > first_response_due_at THEN 1 ELSE 0 END) AS response_breached,
+            SUM(CASE WHEN first_response_due_at IS NOT NULL AND (first_responded_at IS NULL OR first_responded_at <= first_response_due_at) AND sla_state != 'breached' THEN 1 ELSE 0 END) AS resolution_met_approx,
+            SUM(CASE WHEN sla_state = 'breached' THEN 1 ELSE 0 END) AS sla_breached_count,
+            COUNT(CASE WHEN first_response_due_at IS NOT NULL THEN 1 END) AS sla_total
+         FROM tickets
+         WHERE created_at BETWEEN ? AND ?"
+    );
+    $stmt->execute([$from, $toEnd]);
+    $overall = $stmt->fetch();
+
+    $responseMet     = (int) ($overall['response_met'] ?? 0);
+    $responseBreached = (int) ($overall['response_breached'] ?? 0);
+    $totalBreached    = (int) ($overall['sla_breached_count'] ?? 0);
+    $slaTotal         = (int) ($overall['sla_total'] ?? 0);
+    $totalMet         = max(0, $slaTotal - $totalBreached);
+
+    $firstResponseCompliance = ($responseMet + $responseBreached) > 0
+        ? round($responseMet / ($responseMet + $responseBreached) * 100) : 100;
+
+    $resolutionCompliance = $slaTotal > 0
+        ? round($totalMet / $slaTotal * 100) : 100;
+
+    $overallCompliance = $slaTotal > 0
+        ? round($totalMet / $slaTotal * 100) : 100;
+
+    // By priority
+    $stmt = $db->prepare(
+        "SELECT
+            tp.name AS priority_name, tp.color AS priority_color,
+            COUNT(t.id) AS total,
+            SUM(CASE WHEN t.first_responded_at IS NOT NULL AND t.first_response_due_at IS NOT NULL AND t.first_responded_at <= t.first_response_due_at THEN 1 ELSE 0 END) AS response_met,
+            SUM(CASE WHEN t.first_responded_at IS NOT NULL AND t.first_response_due_at IS NOT NULL AND t.first_responded_at > t.first_response_due_at THEN 1 ELSE 0 END) AS response_breached,
+            SUM(CASE WHEN t.sla_state != 'breached' AND t.first_response_due_at IS NOT NULL THEN 1 ELSE 0 END) AS resolution_met,
+            SUM(CASE WHEN t.sla_state = 'breached' THEN 1 ELSE 0 END) AS resolution_breached
+         FROM tickets t
+         LEFT JOIN ticket_priorities tp ON t.priority_id = tp.id
+         WHERE t.first_response_due_at IS NOT NULL AND t.created_at BETWEEN ? AND ?
+         GROUP BY tp.id, tp.name, tp.color, tp.sort_order
+         ORDER BY tp.sort_order"
+    );
+    $stmt->execute([$from, $toEnd]);
+    $byPriority = $stmt->fetchAll();
+
+    foreach ($byPriority as &$row) {
+        $row['compliance'] = $row['total'] > 0
+            ? round(($row['total'] - $row['resolution_breached']) / $row['total'] * 100) : 100;
+    }
+    unset($row);
+
+    // Breached tickets
+    $stmt = $db->prepare(
+        "SELECT t.id, t.subject, t.created_at, t.sla_state,
+                t.first_responded_at, t.first_response_due_at,
+                tp.name AS priority_name, tp.color AS priority_color,
+                CONCAT(a.first_name, ' ', a.last_name) AS agent_name
+         FROM tickets t
+         LEFT JOIN ticket_priorities tp ON t.priority_id = tp.id
+         LEFT JOIN users a ON t.assigned_to = a.id
+         WHERE t.sla_state = 'breached' AND t.created_at BETWEEN ? AND ?
+         ORDER BY t.created_at DESC"
+    );
+    $stmt->execute([$from, $toEnd]);
+    $breachedTickets = $stmt->fetchAll();
+
+    foreach ($breachedTickets as &$bt) {
+        $bt['response_breached'] = ($bt['first_responded_at'] && $bt['first_response_due_at'] && $bt['first_responded_at'] > $bt['first_response_due_at']);
+        $bt['resolution_breached'] = ($bt['sla_state'] === 'breached');
+    }
+    unset($bt);
+
+    render('admin/reports/sla', compact(
+        'from', 'to', 'overallCompliance', 'firstResponseCompliance', 'resolutionCompliance',
+        'totalBreached', 'totalMet', 'byPriority', 'breachedTickets'
+    ));
+});
+
+/* ── Unresolved Tickets ───────────────────────────────────────────── */
+
+$router->get('/admin/reports/unresolved', function () {
+    Auth::requireRole('admin');
+    $db = Database::connect();
+
+    // No date filter for unresolved — it's current state
+    $stmt = $db->prepare(
+        "SELECT t.*, tp.name AS priority_name, tp.color AS priority_color,
+                CONCAT(a.first_name, ' ', a.last_name) AS agent_name
+         FROM tickets t
+         LEFT JOIN ticket_priorities tp ON t.priority_id = tp.id
+         LEFT JOIN users a ON t.assigned_to = a.id
+         WHERE t.status NOT IN ('resolved','closed')
+         ORDER BY t.created_at ASC"
+    );
+    $stmt->execute();
+    $tickets = $stmt->fetchAll();
+
+    $totalUnresolved = count($tickets);
+    $unassigned = 0;
+    $breachedCount = 0;
+    $totalAgeMin = 0;
+    $agingBuckets = [0, 0, 0, 0, 0]; // <1d, 1-3d, 3-7d, 7-14d, >14d
+    $byStatus = [];
+
+    $now = new DateTime();
+    foreach ($tickets as &$t) {
+        if (empty($t['assigned_to'])) $unassigned++;
+        if ($t['sla_state'] === 'breached') $breachedCount++;
+
+        $created = new DateTime($t['created_at']);
+        $diffMin = ($now->getTimestamp() - $created->getTimestamp()) / 60;
+        $totalAgeMin += $diffMin;
+        $t['age_display'] = formatMinutes($diffMin);
+
+        $days = $diffMin / 1440;
+        if ($days < 1) $agingBuckets[0]++;
+        elseif ($days < 3) $agingBuckets[1]++;
+        elseif ($days < 7) $agingBuckets[2]++;
+        elseif ($days < 14) $agingBuckets[3]++;
+        else $agingBuckets[4]++;
+
+        $byStatus[$t['status']] = ($byStatus[$t['status']] ?? 0) + 1;
+    }
+    unset($t);
+
+    $avgAge = $totalUnresolved > 0 ? formatMinutes($totalAgeMin / $totalUnresolved) : '—';
+
+    $byStatusArr = [];
+    foreach ($byStatus as $status => $count) {
+        $byStatusArr[] = ['status' => $status, 'count' => $count];
+    }
+    $byStatus = $byStatusArr;
+
+    render('admin/reports/unresolved', compact(
+        'tickets', 'totalUnresolved', 'unassigned', 'breachedCount', 'avgAge',
+        'agingBuckets', 'byStatus'
+    ));
+});
+
+/* ── Ticket Volume ────────────────────────────────────────────────── */
+
+$router->get('/admin/reports/ticket-volume', function () {
+    Auth::requireRole('admin');
+    $db = Database::connect();
+    [$from, $to] = reportDateRange();
+    $toEnd = $to . ' 23:59:59';
+
+    // Daily volume
+    $stmt = $db->prepare(
+        "SELECT DATE(created_at) AS date_label, COUNT(*) AS count
+         FROM tickets
+         WHERE created_at BETWEEN ? AND ?
+         GROUP BY DATE(created_at)
+         ORDER BY DATE(created_at)"
+    );
+    $stmt->execute([$from, $toEnd]);
+    $dailyVolume = $stmt->fetchAll();
+
+    // Format date labels
+    foreach ($dailyVolume as &$row) {
+        $row['date_label'] = date('M j', strtotime($row['date_label']));
+    }
+    unset($row);
+
+    // By priority
+    $stmt = $db->prepare(
+        "SELECT tp.name, tp.color, COUNT(t.id) AS count
+         FROM tickets t
+         LEFT JOIN ticket_priorities tp ON t.priority_id = tp.id
+         WHERE t.created_at BETWEEN ? AND ?
+         GROUP BY tp.id, tp.name, tp.color, tp.sort_order
+         ORDER BY tp.sort_order"
+    );
+    $stmt->execute([$from, $toEnd]);
+    $byPriority = $stmt->fetchAll();
+
+    // By type
+    $stmt = $db->prepare(
+        "SELECT COALESCE(tt.name, 'Untyped') AS name, COUNT(t.id) AS count
+         FROM tickets t
+         LEFT JOIN ticket_types tt ON t.type_id = tt.id
+         WHERE t.created_at BETWEEN ? AND ?
+         GROUP BY tt.id, tt.name
+         ORDER BY count DESC"
+    );
+    $stmt->execute([$from, $toEnd]);
+    $byType = $stmt->fetchAll();
+
+    // By location
+    $stmt = $db->prepare(
+        "SELECT COALESCE(l.name, 'No Location') AS name, COUNT(t.id) AS count
+         FROM tickets t
+         LEFT JOIN locations l ON t.location_id = l.id
+         WHERE t.created_at BETWEEN ? AND ?
+         GROUP BY l.id, l.name
+         ORDER BY count DESC"
+    );
+    $stmt->execute([$from, $toEnd]);
+    $byLocation = $stmt->fetchAll();
+
+    render('admin/reports/ticket-volume', compact(
+        'from', 'to', 'dailyVolume', 'byPriority', 'byType', 'byLocation'
+    ));
+});
+
+/* ── Ticket Lifecycle ─────────────────────────────────────────────── */
+
+$router->get('/admin/reports/lifecycle', function () {
+    Auth::requireRole('admin');
+    $db = Database::connect();
+    [$from, $to] = reportDateRange();
+    $toEnd = $to . ' 23:59:59';
+
+    // Get status transitions from timeline
+    $stmt = $db->prepare(
+        "SELECT tl.ticket_id, tl.details, tl.created_at
+         FROM ticket_timeline tl
+         JOIN tickets t ON t.id = tl.ticket_id
+         WHERE tl.action = 'status_changed' AND t.created_at BETWEEN ? AND ?
+         ORDER BY tl.ticket_id, tl.created_at"
+    );
+    $stmt->execute([$from, $toEnd]);
+    $changes = $stmt->fetchAll();
+
+    // Also get ticket creation times
+    $stmt = $db->prepare(
+        "SELECT id, created_at, status FROM tickets WHERE created_at BETWEEN ? AND ?"
+    );
+    $stmt->execute([$from, $toEnd]);
+    $ticketRows = $stmt->fetchAll();
+
+    $ticketCreated = [];
+    foreach ($ticketRows as $tr) {
+        $ticketCreated[$tr['id']] = $tr['created_at'];
+    }
+
+    // Build status duration map per ticket
+    $statusTimes = []; // status => [minutes, ...]
+    $transitionCounts = []; // "from→to" => [count, total_minutes]
+
+    // Group changes by ticket
+    $byTicket = [];
+    foreach ($changes as $c) {
+        $byTicket[$c['ticket_id']][] = $c;
+    }
+
+    foreach ($byTicket as $ticketId => $ticketChanges) {
+        // Start from 'open' at created_at
+        $prevStatus = 'open';
+        $prevTime = $ticketCreated[$ticketId] ?? null;
+        if (!$prevTime) continue;
+
+        foreach ($ticketChanges as $change) {
+            // Parse "Status → New Status" from details
+            if (preg_match('/^(.+?)\s*→\s*(.+)$/', $change['details'] ?? '', $m)) {
+                $toStatus = strtolower(trim($m[2]));
+                $toStatus = str_replace(' ', '_', $toStatus);
+
+                $minutes = (strtotime($change['created_at']) - strtotime($prevTime)) / 60;
+                if ($minutes > 0) {
+                    $statusTimes[$prevStatus][] = $minutes;
+
+                    $key = $prevStatus . '→' . $toStatus;
+                    if (!isset($transitionCounts[$key])) {
+                        $transitionCounts[$key] = ['count' => 0, 'total_min' => 0];
+                    }
+                    $transitionCounts[$key]['count']++;
+                    $transitionCounts[$key]['total_min'] += $minutes;
+                }
+
+                $prevStatus = $toStatus;
+                $prevTime = $change['created_at'];
+            }
+        }
+    }
+
+    // Build statusDurations array
+    $statusOrder = ['open', 'in_progress', 'pending', 'resolved', 'closed'];
+    $statusDurations = [];
+    foreach ($statusOrder as $status) {
+        $times = $statusTimes[$status] ?? [];
+        $avg = count($times) > 0 ? array_sum($times) / count($times) : 0;
+        $statusDurations[] = [
+            'status' => $status,
+            'avg_duration' => count($times) > 0 ? formatMinutes($avg) : '—',
+            'avg_hours' => round($avg / 60, 1),
+            'transitions' => count($times),
+        ];
+    }
+
+    // Build transitions array
+    $transitions = [];
+    arsort($transitionCounts);
+    foreach ($transitionCounts as $key => $data) {
+        [$fromS, $toS] = explode('→', $key);
+        $transitions[] = [
+            'from_status' => $fromS,
+            'to_status' => $toS,
+            'count' => $data['count'],
+            'avg_duration' => formatMinutes($data['total_min'] / $data['count']),
+        ];
+    }
+
+    // By priority: avg to first response and resolution
+    $stmt = $db->prepare(
+        "SELECT
+            tp.name AS priority_name, tp.color AS priority_color,
+            AVG(CASE WHEN t.first_responded_at IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, t.created_at, t.first_responded_at) END) AS avg_fr_min,
+            AVG(
+                (SELECT TIMESTAMPDIFF(MINUTE, t.created_at, tl.created_at)
+                 FROM ticket_timeline tl
+                 WHERE tl.ticket_id = t.id AND tl.action = 'status_changed' AND tl.details LIKE '%→ Resolved%'
+                 ORDER BY tl.created_at DESC LIMIT 1)
+            ) AS avg_res_min
+         FROM tickets t
+         LEFT JOIN ticket_priorities tp ON t.priority_id = tp.id
+         WHERE t.created_at BETWEEN ? AND ?
+         GROUP BY tp.id, tp.name, tp.color, tp.sort_order
+         ORDER BY tp.sort_order"
+    );
+    $stmt->execute([$from, $toEnd]);
+    $byPriority = $stmt->fetchAll();
+
+    foreach ($byPriority as &$row) {
+        $row['avg_to_first_response'] = $row['avg_fr_min'] !== null ? formatMinutes((float) $row['avg_fr_min']) : '—';
+        $row['avg_to_resolution'] = $row['avg_res_min'] !== null ? formatMinutes((float) $row['avg_res_min']) : '—';
+    }
+    unset($row);
+
+    render('admin/reports/lifecycle', compact(
+        'from', 'to', 'statusDurations', 'transitions', 'byPriority'
+    ));
+});
+
+/* ── Location Report ──────────────────────────────────────────────── */
+
+$router->get('/admin/reports/location', function () {
+    Auth::requireRole('admin');
+    $db = Database::connect();
+    [$from, $to] = reportDateRange();
+    $toEnd = $to . ' 23:59:59';
+
+    $stmt = $db->prepare(
+        "SELECT
+            COALESCE(l.name, 'No Location') AS location_name,
+            COUNT(t.id) AS total,
+            SUM(CASE WHEN t.status NOT IN ('resolved','closed') THEN 1 ELSE 0 END) AS open_count,
+            SUM(CASE WHEN t.status IN ('resolved','closed') THEN 1 ELSE 0 END) AS resolved,
+            AVG(
+                CASE WHEN t.status IN ('resolved','closed') THEN
+                    (SELECT TIMESTAMPDIFF(MINUTE, t.created_at, tl.created_at)
+                     FROM ticket_timeline tl
+                     WHERE tl.ticket_id = t.id AND tl.action = 'status_changed' AND tl.details LIKE '%→ Resolved%'
+                     ORDER BY tl.created_at DESC LIMIT 1)
+                END
+            ) AS avg_res_min,
+            SUM(CASE WHEN t.first_response_due_at IS NOT NULL THEN 1 ELSE 0 END) AS sla_total,
+            SUM(CASE WHEN t.sla_state = 'breached' THEN 1 ELSE 0 END) AS sla_breached
+         FROM tickets t
+         LEFT JOIN locations l ON t.location_id = l.id
+         WHERE t.created_at BETWEEN ? AND ?
+         GROUP BY l.id, l.name
+         ORDER BY total DESC"
+    );
+    $stmt->execute([$from, $toEnd]);
+    $locations = $stmt->fetchAll();
+
+    foreach ($locations as &$loc) {
+        $loc['resolution_rate'] = $loc['total'] > 0
+            ? round($loc['resolved'] / $loc['total'] * 100) : 0;
+        $loc['avg_resolution'] = $loc['avg_res_min'] !== null
+            ? formatMinutes((float) $loc['avg_res_min']) : '—';
+        $loc['sla_compliance'] = $loc['sla_total'] > 0
+            ? round(($loc['sla_total'] - $loc['sla_breached']) / $loc['sla_total'] * 100) : 100;
+    }
+    unset($loc);
+
+    render('admin/reports/location', compact('from', 'to', 'locations'));
 });
 
 /* ==================================================================

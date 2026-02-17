@@ -171,5 +171,21 @@ $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-p
                 </dl>
             </div>
         </div>
+
+        <?php if (!empty($ccUsers)): ?>
+        <div class="card border-0 shadow-sm mt-4">
+            <div class="card-header bg-white border-bottom">
+                <h5 class="mb-0 fw-semibold"><i class="bi bi-people me-2"></i>CC</h5>
+            </div>
+            <div class="card-body">
+                <?php foreach ($ccUsers as $cc): ?>
+                <div class="mb-1">
+                    <span class="fw-semibold small"><?= e($cc['first_name'] . ' ' . $cc['last_name']) ?></span>
+                    <span class="text-muted small"><?= e($cc['email']) ?></span>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <?php endif; ?>
     </div>
 </div>

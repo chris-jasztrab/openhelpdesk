@@ -12,6 +12,274 @@ $router->get('/health', function () {
 });
 
 /* ------------------------------------------------------------------
+ * Ticket Tag Management (JSON API)
+ * ------------------------------------------------------------------ */
+$router->post('/api/tickets/{id}/tags', function (array $p) {
+    Auth::requireAuth();
+    if (!in_array(Auth::role(), ['admin', 'agent'], true)) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Forbidden']);
+        exit;
+    }
+    header('Content-Type: application/json');
+
+    $ticketId = (int) $p['id'];
+    $input    = json_decode(file_get_contents('php://input'), true);
+    $action   = $input['action'] ?? '';
+    $tagName  = trim(preg_replace('/[^a-zA-Z0-9_\-\s]/', '', strtolower($input['tag'] ?? '')));
+
+    if ($tagName === '' || !in_array($action, ['add', 'remove'], true)) {
+        echo json_encode(['error' => 'Invalid request']);
+        exit;
+    }
+
+    $db = Database::connect();
+
+    // Verify ticket exists
+    $stmt = $db->prepare('SELECT id FROM tickets WHERE id = ?');
+    $stmt->execute([$ticketId]);
+    if (!$stmt->fetch()) {
+        echo json_encode(['error' => 'Ticket not found']);
+        exit;
+    }
+
+    if ($action === 'add') {
+        // Find or create tag
+        $findTag = $db->prepare('SELECT id FROM ticket_tags WHERE name = ?');
+        $findTag->execute([$tagName]);
+        $tagId = $findTag->fetchColumn();
+        if (!$tagId) {
+            $db->prepare('INSERT INTO ticket_tags (name) VALUES (?)')->execute([$tagName]);
+            $tagId = (int) $db->lastInsertId();
+        }
+        // Check if already linked
+        $check = $db->prepare('SELECT 1 FROM ticket_tag_map WHERE ticket_id = ? AND tag_id = ?');
+        $check->execute([$ticketId, $tagId]);
+        if (!$check->fetch()) {
+            $db->prepare('INSERT INTO ticket_tag_map (ticket_id, tag_id) VALUES (?, ?)')->execute([$ticketId, $tagId]);
+        }
+    } else {
+        // Remove tag link
+        $findTag = $db->prepare('SELECT id FROM ticket_tags WHERE name = ?');
+        $findTag->execute([$tagName]);
+        $tagId = $findTag->fetchColumn();
+        if ($tagId) {
+            $db->prepare('DELETE FROM ticket_tag_map WHERE ticket_id = ? AND tag_id = ?')->execute([$ticketId, $tagId]);
+        }
+    }
+
+    // Return updated tag list
+    $tags = $db->prepare(
+        'SELECT tt.name FROM ticket_tags tt
+         INNER JOIN ticket_tag_map ttm ON tt.id = ttm.tag_id
+         WHERE ttm.ticket_id = ? ORDER BY tt.name'
+    );
+    $tags->execute([$ticketId]);
+    echo json_encode(['tags' => $tags->fetchAll(\PDO::FETCH_COLUMN)]);
+    exit;
+});
+
+/* ------------------------------------------------------------------
+ * User Search for CC (JSON API)
+ * ------------------------------------------------------------------ */
+$router->get('/api/user-search', function () {
+    Auth::requireAuth();
+    if (!in_array(Auth::role(), ['admin', 'agent'], true)) {
+        http_response_code(403);
+        echo json_encode([]);
+        exit;
+    }
+    header('Content-Type: application/json');
+
+    $q = trim($_GET['q'] ?? '');
+    if (strlen($q) < 1) {
+        echo json_encode([]);
+        exit;
+    }
+
+    $like = '%' . $q . '%';
+    $db   = Database::connect();
+    $stmt = $db->prepare(
+        "SELECT id, first_name, last_name, email, role
+         FROM users
+         WHERE first_name LIKE ? OR last_name LIKE ? OR email LIKE ?
+               OR CONCAT(first_name, ' ', last_name) LIKE ?
+         ORDER BY first_name
+         LIMIT 8"
+    );
+    $stmt->execute([$like, $like, $like, $like]);
+    echo json_encode($stmt->fetchAll());
+    exit;
+});
+
+/* ------------------------------------------------------------------
+ * Ticket CC Management (JSON API)
+ * ------------------------------------------------------------------ */
+$router->post('/api/tickets/{id}/cc', function (array $p) {
+    Auth::requireAuth();
+    if (!in_array(Auth::role(), ['admin', 'agent'], true)) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Forbidden']);
+        exit;
+    }
+    header('Content-Type: application/json');
+
+    $ticketId = (int) $p['id'];
+    $input    = json_decode(file_get_contents('php://input'), true);
+    $action   = $input['action'] ?? '';
+    $userId   = (int) ($input['user_id'] ?? 0);
+
+    if ($userId <= 0 || !in_array($action, ['add', 'remove'], true)) {
+        echo json_encode(['error' => 'Invalid request']);
+        exit;
+    }
+
+    $db = Database::connect();
+
+    // Verify ticket exists
+    $stmt = $db->prepare('SELECT id FROM tickets WHERE id = ?');
+    $stmt->execute([$ticketId]);
+    if (!$stmt->fetch()) {
+        echo json_encode(['error' => 'Ticket not found']);
+        exit;
+    }
+
+    if ($action === 'add') {
+        $check = $db->prepare('SELECT 1 FROM ticket_cc WHERE ticket_id = ? AND user_id = ?');
+        $check->execute([$ticketId, $userId]);
+        if (!$check->fetch()) {
+            $db->prepare('INSERT INTO ticket_cc (ticket_id, user_id, added_by) VALUES (?, ?, ?)')
+                ->execute([$ticketId, $userId, Auth::id()]);
+        }
+    } else {
+        $db->prepare('DELETE FROM ticket_cc WHERE ticket_id = ? AND user_id = ?')
+            ->execute([$ticketId, $userId]);
+    }
+
+    // Return updated CC list
+    $cc = $db->prepare(
+        'SELECT u.id, u.first_name, u.last_name, u.email, u.role
+         FROM ticket_cc tc
+         JOIN users u ON tc.user_id = u.id
+         WHERE tc.ticket_id = ?
+         ORDER BY u.first_name'
+    );
+    $cc->execute([$ticketId]);
+    echo json_encode(['cc' => $cc->fetchAll()]);
+    exit;
+});
+
+/* ------------------------------------------------------------------
+ * Mention Autocomplete (JSON API)
+ * ------------------------------------------------------------------ */
+$router->get('/api/mention-search', function () {
+    Auth::requireAuth();
+    if (!in_array(Auth::role(), ['admin', 'agent'], true)) {
+        http_response_code(403);
+        echo json_encode([]);
+        exit;
+    }
+    header('Content-Type: application/json');
+
+    $q = trim($_GET['q'] ?? '');
+    if (strlen($q) < 1) {
+        echo json_encode([]);
+        exit;
+    }
+
+    $like = '%' . $q . '%';
+    $db   = Database::connect();
+    $stmt = $db->prepare(
+        "SELECT id, first_name, last_name, role
+         FROM users
+         WHERE role IN ('agent','admin')
+           AND (first_name LIKE ? OR last_name LIKE ? OR CONCAT(first_name, ' ', last_name) LIKE ?)
+         ORDER BY first_name
+         LIMIT 8"
+    );
+    $stmt->execute([$like, $like, $like]);
+    echo json_encode($stmt->fetchAll());
+    exit;
+});
+
+/* ------------------------------------------------------------------
+ * Global Search (JSON API)
+ * ------------------------------------------------------------------ */
+$router->get('/search', function () {
+    Auth::requireAuth();
+    header('Content-Type: application/json');
+
+    $q = trim($_GET['q'] ?? '');
+    if (strlen($q) < 2) {
+        echo json_encode(['tickets' => [], 'contacts' => [], 'kb' => []]);
+        exit;
+    }
+
+    $type = $_GET['type'] ?? 'all';
+    $db   = Database::connect();
+    $like = '%' . $q . '%';
+    $role = Auth::role();
+
+    $result = ['tickets' => [], 'contacts' => [], 'kb' => []];
+
+    // --- Tickets ---
+    if ($type === 'all' || $type === 'tickets') {
+        $ticketWhere = '(t.subject LIKE ? OR t.description LIKE ?)';
+        $ticketParams = [$like, $like];
+
+        // Regular users only see their own tickets
+        if ($role === 'user') {
+            $ticketWhere .= ' AND t.created_by = ?';
+            $ticketParams[] = Auth::id();
+        }
+
+        $stmt = $db->prepare(
+            "SELECT t.id, t.subject, t.status,
+                    CONCAT(a.first_name, ' ', a.last_name) AS agent_name
+             FROM tickets t
+             LEFT JOIN users a ON t.assigned_to = a.id
+             WHERE {$ticketWhere}
+             ORDER BY t.created_at DESC
+             LIMIT 5"
+        );
+        $stmt->execute($ticketParams);
+        $result['tickets'] = $stmt->fetchAll();
+    }
+
+    // --- Contacts (admin/agent only) ---
+    if (($type === 'all' || $type === 'contacts') && in_array($role, ['admin', 'agent'], true)) {
+        $stmt = $db->prepare(
+            "SELECT id, first_name, last_name, email, role
+             FROM users
+             WHERE first_name LIKE ? OR last_name LIKE ? OR email LIKE ?
+                   OR CONCAT(first_name, ' ', last_name) LIKE ?
+             ORDER BY first_name
+             LIMIT 5"
+        );
+        $stmt->execute([$like, $like, $like, $like]);
+        $result['contacts'] = $stmt->fetchAll();
+    }
+
+    // --- KB Articles ---
+    if ($type === 'all' || $type === 'kb') {
+        $stmt = $db->prepare(
+            "SELECT a.title, a.slug, f.name AS folder_name, c.name AS category_name
+             FROM kb_articles a
+             LEFT JOIN kb_folders f    ON a.folder_id   = f.id
+             LEFT JOIN kb_categories c ON f.category_id = c.id
+             WHERE a.status = 'published' AND (a.title LIKE ? OR a.body_markdown LIKE ?)
+             ORDER BY a.updated_at DESC
+             LIMIT 5"
+        );
+        $stmt->execute([$like, $like]);
+        $result['kb'] = $stmt->fetchAll();
+    }
+
+    echo json_encode($result);
+    exit;
+});
+
+/* ------------------------------------------------------------------
  * Home – redirect authenticated users by role
  * ------------------------------------------------------------------ */
 $router->get('/', function () {

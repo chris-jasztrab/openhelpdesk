@@ -114,15 +114,3 @@ document.querySelectorAll('.sla-input').forEach(function(input) {
     });
 });
 </script>
-
-<?php
-function formatMinutes(int $minutes): string {
-    if ($minutes < 60) return $minutes . 'm';
-    $h = intdiv($minutes, 60);
-    $m = $minutes % 60;
-    if ($h < 24) return $h . 'h' . ($m > 0 ? ' ' . $m . 'm' : '');
-    $d = intdiv($h, 8);
-    $rh = $h % 8;
-    return $d . 'd' . ($rh > 0 ? ' ' . $rh . 'h' : '') . ($m > 0 ? ' ' . $m . 'm' : '');
-}
-?>

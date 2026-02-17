@@ -8,8 +8,58 @@ declare(strict_types=1);
 
 $router->get('/portal/tickets', function () {
     Auth::requireAuth();
-    $tickets = Database::connect()->query(
-        "SELECT t.*,
+    $db = Database::connect();
+
+    // Read filter params
+    $fStatus   = trim($_GET['status'] ?? '');
+    $fPriority = trim($_GET['priority'] ?? '');
+    $fSearch   = trim($_GET['q'] ?? '');
+
+    $where  = ['t.created_by = ?'];
+    $params = [Auth::id()];
+
+    if ($fStatus !== '') {
+        $where[]  = 't.status = ?';
+        $params[] = $fStatus;
+    }
+    if ($fPriority !== '') {
+        $where[]  = 't.priority_id = ?';
+        $params[] = (int) $fPriority;
+    }
+    if ($fSearch !== '') {
+        $where[]  = 't.subject LIKE ?';
+        $params[] = '%' . $fSearch . '%';
+    }
+
+    $whereClause = ' WHERE ' . implode(' AND ', $where);
+
+    // Count total matching tickets
+    $countSql = "SELECT COUNT(*) FROM tickets t" . $whereClause;
+    $countStmt = $db->prepare($countSql);
+    $countStmt->execute($params);
+    $totalTickets = (int) $countStmt->fetchColumn();
+
+    // Sorting
+    $sortableColumns = [
+        'id'         => 't.id',
+        'subject'    => 't.subject',
+        'status'     => 't.status',
+        'priority'   => 'tp.sort_order',
+        'type'       => 'tt.name',
+        'agent'      => 'a.first_name',
+        'created_at' => 't.created_at',
+    ];
+    $sort = $_GET['sort'] ?? 'created_at';
+    $dir  = strtolower($_GET['dir'] ?? 'desc') === 'asc' ? 'ASC' : 'DESC';
+    $orderCol = $sortableColumns[$sort] ?? 't.created_at';
+
+    // Pagination
+    $perPage    = 30;
+    $totalPages = max(1, (int) ceil($totalTickets / $perPage));
+    $page       = max(1, min($totalPages, (int) ($_GET['page'] ?? 1)));
+    $offset     = ($page - 1) * $perPage;
+
+    $sql = "SELECT t.*,
                 tp.name AS priority_name, tp.color AS priority_color,
                 l.name  AS location_name,
                 tt.name AS type_name,
@@ -18,11 +68,32 @@ $router->get('/portal/tickets', function () {
          LEFT JOIN ticket_priorities tp ON t.priority_id = tp.id
          LEFT JOIN ticket_types tt     ON t.type_id     = tt.id
          LEFT JOIN locations l         ON t.location_id  = l.id
-         LEFT JOIN users a             ON t.assigned_to  = a.id
-         WHERE t.created_by = " . Auth::id() . "
-         ORDER BY t.created_at DESC"
-    )->fetchAll();
-    render('portal/tickets/index', ['tickets' => $tickets]);
+         LEFT JOIN users a             ON t.assigned_to  = a.id"
+         . $whereClause . " ORDER BY {$orderCol} {$dir} LIMIT {$perPage} OFFSET {$offset}";
+
+    $stmt = $db->prepare($sql);
+    $stmt->execute($params);
+    $tickets = $stmt->fetchAll();
+
+    // Load filter dropdown options
+    $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
+
+    $filters = [
+        'status'   => $fStatus,
+        'priority' => $fPriority,
+        'q'        => $fSearch,
+    ];
+
+    render('portal/tickets/index', [
+        'tickets'      => $tickets,
+        'priorities'   => $priorities,
+        'filters'      => $filters,
+        'page'         => $page,
+        'totalPages'   => $totalPages,
+        'totalTickets' => $totalTickets,
+        'sort'         => $sort,
+        'dir'          => strtolower($dir),
+    ]);
 });
 
 /* ==================================================================
@@ -61,7 +132,7 @@ $router->post('/portal/tickets/create', function () {
     $assignedTo  = !empty($_POST['assigned_to']) ? (int) $_POST['assigned_to'] : null;
     $browserInfo = trim($_POST['browser_info'] ?? '');
     $osInfo      = trim($_POST['os_info'] ?? '');
-    $tagIds      = $_POST['tags'] ?? [];
+    $tagNames    = $_POST['tags'] ?? [];
 
     if ($subject === '' || $description === '') {
         flashInput($_POST);
@@ -82,10 +153,20 @@ $router->post('/portal/tickets/create', function () {
     ]);
     $ticketId = (int) $db->lastInsertId();
 
-    // Attach selected tags
-    if (!empty($tagIds)) {
-        $mapStmt = $db->prepare('INSERT INTO ticket_tag_map (ticket_id, tag_id) VALUES (?, ?)');
-        foreach ($tagIds as $tagId) {
+    // Attach tags (create if they don't exist)
+    if (!empty($tagNames)) {
+        $findTag   = $db->prepare('SELECT id FROM ticket_tags WHERE name = ?');
+        $createTag = $db->prepare('INSERT INTO ticket_tags (name) VALUES (?)');
+        $mapStmt   = $db->prepare('INSERT INTO ticket_tag_map (ticket_id, tag_id) VALUES (?, ?)');
+        foreach ($tagNames as $rawName) {
+            $name = trim(preg_replace('/[^a-zA-Z0-9_\-\s]/', '', strtolower($rawName)));
+            if ($name === '') continue;
+            $findTag->execute([$name]);
+            $tagId = $findTag->fetchColumn();
+            if (!$tagId) {
+                $createTag->execute([$name]);
+                $tagId = (int) $db->lastInsertId();
+            }
             $mapStmt->execute([$ticketId, (int) $tagId]);
         }
     }
@@ -214,7 +295,18 @@ $router->get('/portal/tickets/{id}', function (array $p) {
     $attStmt->execute([$ticket['id']]);
     $attachments = $attStmt->fetchAll();
 
-    render('portal/tickets/view', ['ticket' => $ticket, 'timeline' => $timeline, 'attachments' => $attachments]);
+    // CC'd users
+    $ccStmt = $db->prepare(
+        'SELECT u.id, u.first_name, u.last_name, u.email, u.role
+         FROM ticket_cc tc
+         JOIN users u ON tc.user_id = u.id
+         WHERE tc.ticket_id = ?
+         ORDER BY u.first_name'
+    );
+    $ccStmt->execute([$ticket['id']]);
+    $ccUsers = $ccStmt->fetchAll();
+
+    render('portal/tickets/view', ['ticket' => $ticket, 'timeline' => $timeline, 'attachments' => $attachments, 'ccUsers' => $ccUsers]);
 });
 
 /* ==================================================================
@@ -253,6 +345,9 @@ $router->post('/portal/tickets/{id}/comment', function (array $p) {
     // Handle file attachments
     $attachments = handleAttachmentUploads('attachments');
     saveAttachments($db, $id, $timelineId, Auth::id(), $attachments);
+
+    // Notify CC'd users when portal user replies
+    notifyCcUsers($db, $id, $message, Auth::fullName());
 
     $msg = 'Comment added.';
     if (!empty($attachments)) {

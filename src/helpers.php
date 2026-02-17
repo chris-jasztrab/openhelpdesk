@@ -438,6 +438,80 @@ function notifyTicketCreator(PDO $db, int $ticketId, string $message, string $au
     );
 }
 
+/**
+ * Email all CC'd users on a ticket about a new comment.
+ * Skips the comment author and the ticket creator (already notified separately).
+ */
+function notifyCcUsers(PDO $db, int $ticketId, string $message, string $authorName): void
+{
+    // Get ticket subject and creator
+    $ticket = $db->prepare('SELECT subject, created_by FROM tickets WHERE id = ?');
+    $ticket->execute([$ticketId]);
+    $ticketRow = $ticket->fetch();
+    if (!$ticketRow) return;
+
+    $creatorId = (int) $ticketRow['created_by'];
+    $currentId = Auth::id();
+    $appUrl    = env('APP_URL', 'http://localhost:8000');
+
+    // Fetch CC'd users
+    $cc = $db->prepare(
+        'SELECT u.id, u.first_name, u.last_name, u.email, u.role
+         FROM ticket_cc tc
+         JOIN users u ON tc.user_id = u.id
+         WHERE tc.ticket_id = ?'
+    );
+    $cc->execute([$ticketId]);
+
+    foreach ($cc->fetchAll() as $user) {
+        $uid = (int) $user['id'];
+        if ($uid === $currentId || $uid === $creatorId) continue;
+
+        // Build the correct URL based on role
+        $prefix = match ($user['role']) {
+            'admin' => '/admin',
+            'agent' => '/agent',
+            default => '/portal',
+        };
+        $ticketUrl = $appUrl . $prefix . '/tickets/' . $ticketId;
+
+        $emailHtml = renderEmail('ticket-updated', [
+            'ticketId'   => $ticketId,
+            'subject'    => $ticketRow['subject'],
+            'message'    => $message,
+            'authorName' => $authorName,
+            'ticketUrl'  => $ticketUrl,
+        ]);
+
+        sendMail(
+            $user['email'],
+            $user['first_name'] . ' ' . $user['last_name'],
+            '[Ticket #' . $ticketId . '] Update: ' . $ticketRow['subject'],
+            $emailHtml,
+            '',
+            $ticketId
+        );
+    }
+}
+
+/* ── Name helpers ─────────────────────────────────────────────── */
+
+/**
+ * Split a "First Last" string into [first_name, last_name].
+ */
+function splitFullName(string $name): array
+{
+    $name = trim($name);
+    if ($name === '') {
+        return ['Unknown', 'User'];
+    }
+    $parts = preg_split('/\s+/', $name, 2);
+    return [
+        $parts[0],
+        $parts[1] ?? '',
+    ];
+}
+
 /* ── Sidebar helpers ──────────────────────────────────────────── */
 
 function adminSidebar(string $active = ''): array
@@ -448,7 +522,7 @@ function adminSidebar(string $active = ''): array
         ['icon' => 'bi-people',          'label' => 'Users',      'url' => '/admin/users',      'key' => 'users'],
         ['icon' => 'bi-book',            'label' => 'Knowledge Base', 'url' => '/admin/kb/categories', 'key' => 'kb'],
         ['icon' => 'bi-sliders',         'label' => 'Settings',     'url' => '/admin/settings', 'key' => 'settings'],
-        ['icon' => 'bi-bar-chart',       'label' => 'Reports',    'url' => '#', 'badge' => 'Soon', 'key' => 'reports'],
+        ['icon' => 'bi-bar-chart',       'label' => 'Reports',    'url' => '/admin/reports', 'key' => 'reports'],
     ]);
 }
 
@@ -469,4 +543,19 @@ function agentSidebar(string $active = ''): array
         ['icon' => 'bi-book',            'label' => 'Knowledge Base', 'url' => '/portal/kb',          'key' => 'kb'],
         ['icon' => 'bi-people',          'label' => 'Customers',      'url' => '#', 'badge' => 'Soon', 'key' => 'customers'],
     ]);
+}
+
+function sortUrl(string $col, string $currentSort, string $currentDir, array $baseParams, string $basePath): string
+{
+    $newDir = ($col === $currentSort && $currentDir === 'asc') ? 'desc' : 'asc';
+    return e($basePath . '?' . http_build_query(array_merge($baseParams, ['sort' => $col, 'dir' => $newDir])));
+}
+
+function sortIcon(string $col, string $currentSort, string $currentDir): string
+{
+    if ($col !== $currentSort) {
+        return '';
+    }
+    $icon = $currentDir === 'asc' ? 'bi-arrow-up' : 'bi-arrow-down';
+    return '<i class="bi ' . $icon . ' ms-1" style="font-size:.7rem;color:#4f46e5;"></i>';
 }

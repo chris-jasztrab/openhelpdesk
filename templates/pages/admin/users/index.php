@@ -6,12 +6,58 @@ $breadcrumbs = [
     ['label' => 'Admin', 'url' => '/admin'],
     ['label' => 'Users'],
 ];
+$filterParams = [];
+if ($roleFilter !== '') $filterParams['role'] = $roleFilter;
+if ($locFilter !== '')  $filterParams['location'] = $locFilter;
 ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="fw-bold mb-0">Users</h2>
-    <a href="/admin/users/create" class="btn text-white" style="background:#4f46e5;">
-        <i class="bi bi-person-plus me-1"></i>Add User
-    </a>
+    <div class="d-flex gap-2 align-items-center">
+        <span class="badge bg-secondary fs-6"><?= count($users) ?><?= (!empty($filterParams)) ? ' filtered' : ' total' ?></span>
+        <a href="/admin/users/create" class="btn text-white" style="background:#4f46e5;">
+            <i class="bi bi-person-plus me-1"></i>Add User
+        </a>
+    </div>
+</div>
+
+<!-- Filter Bar -->
+<div class="card border-0 shadow-sm mb-3">
+    <div class="card-body py-3">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-auto">
+                <label class="form-label small text-muted mb-1">Role</label>
+                <div class="d-flex gap-1">
+                    <a href="<?= e('/admin/users' . ($locFilter !== '' ? '?location=' . urlencode($locFilter) : '')) ?>"
+                       class="btn btn-sm <?= empty($roleFilter) ? 'text-white' : 'btn-outline-secondary' ?>" <?= empty($roleFilter) ? 'style="background:#4f46e5;"' : '' ?>>All</a>
+                    <?php
+                    $roleButtons = ['admin' => ['Admins', 'danger'], 'agent' => ['Agents', 'primary'], 'user' => ['Users', 'secondary']];
+                    foreach ($roleButtons as $rKey => [$rLabel, $rColor]):
+                        $rParams = $locFilter !== '' ? ['role' => $rKey, 'location' => $locFilter] : ['role' => $rKey];
+                    ?>
+                    <a href="<?= e('/admin/users?' . http_build_query($rParams)) ?>"
+                       class="btn btn-sm <?= $roleFilter === $rKey ? "btn-{$rColor}" : "btn-outline-{$rColor}" ?>"><?= $rLabel ?></a>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            <div class="col-md-auto" style="min-width:160px;">
+                <label class="form-label small text-muted mb-1">Location</label>
+                <select class="form-select form-select-sm" onchange="var p=new URLSearchParams(window.location.search);if(this.value)p.set('location',this.value);else p.delete('location');p.delete('page');window.location='/admin/users?'+p.toString();">
+                    <option value="">All Locations</option>
+                    <option value="none" <?= $locFilter === 'none' ? 'selected' : '' ?>>No Location</option>
+                    <?php foreach ($locations as $loc): ?>
+                    <option value="<?= $loc['id'] ?>" <?= $locFilter == $loc['id'] ? 'selected' : '' ?>><?= e($loc['name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <?php if (!empty($filterParams)): ?>
+            <div class="col-md-auto">
+                <a href="/admin/users" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-x-lg me-1"></i>Clear
+                </a>
+            </div>
+            <?php endif; ?>
+        </div>
+    </div>
 </div>
 
 <div class="card border-0 shadow-sm">
@@ -20,12 +66,12 @@ $breadcrumbs = [
             <thead class="table-light">
                 <tr>
                     <th style="width:50px"></th>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Role</th>
+                    <th><a href="<?= sortUrl('name', $sort, $dir, $filterParams, '/admin/users') ?>" class="text-decoration-none text-dark">Name <?= sortIcon('name', $sort, $dir) ?></a></th>
+                    <th><a href="<?= sortUrl('email', $sort, $dir, $filterParams, '/admin/users') ?>" class="text-decoration-none text-dark">Email <?= sortIcon('email', $sort, $dir) ?></a></th>
+                    <th><a href="<?= sortUrl('role', $sort, $dir, $filterParams, '/admin/users') ?>" class="text-decoration-none text-dark">Role <?= sortIcon('role', $sort, $dir) ?></a></th>
                     <th>Phone</th>
-                    <th>Location</th>
-                    <th>Created</th>
+                    <th><a href="<?= sortUrl('location', $sort, $dir, $filterParams, '/admin/users') ?>" class="text-decoration-none text-dark">Location <?= sortIcon('location', $sort, $dir) ?></a></th>
+                    <th><a href="<?= sortUrl('created_at', $sort, $dir, $filterParams, '/admin/users') ?>" class="text-decoration-none text-dark">Created <?= sortIcon('created_at', $sort, $dir) ?></a></th>
                     <th style="width:110px">Actions</th>
                 </tr>
             </thead>

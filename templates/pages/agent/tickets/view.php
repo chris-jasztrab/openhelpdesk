@@ -76,15 +76,12 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
         </div>
         <?php endif; ?>
 
-        <?php if (!empty($ticket['tags'])): ?>
-        <div class="mb-4">
-            <?php foreach ($ticket['tags'] as $tag): ?>
-            <span class="badge bg-light text-dark border me-1 mb-1">
-                <i class="bi bi-hash"></i><?= e($tag) ?>
-            </span>
-            <?php endforeach; ?>
+        <!-- Tags -->
+        <div class="mb-4" id="ticketTags"
+             data-ticket-id="<?= $ticket['id'] ?>"
+             data-tags="<?= e(json_encode($ticket['tags'] ?? [])) ?>">
+            <div class="d-flex flex-wrap gap-1 align-items-center" id="tagList"></div>
         </div>
-        <?php endif; ?>
 
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white border-bottom">
@@ -136,18 +133,10 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
             <div class="card-body">
                 <form method="POST" action="/agent/tickets/<?= $ticket['id'] ?>/comment" enctype="multipart/form-data">
                     <?= csrfField() ?>
-                    <div class="mb-3">
+                    <div class="mb-3" style="position:relative;">
                         <textarea class="form-control" name="message" id="commentMessage" rows="3" required
-                                  placeholder="Write a comment... Use @Name to mention an agent"></textarea>
-                        <div class="form-text">
-                            <i class="bi bi-at"></i> Mention:
-                            <?php foreach ($agents as $a): ?>
-                            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1 me-1 mt-1 mention-btn"
-                                    data-name="<?= e($a['first_name'] . ' ' . $a['last_name']) ?>">
-                                @<?= e($a['first_name'] . ' ' . $a['last_name']) ?>
-                            </button>
-                            <?php endforeach; ?>
-                        </div>
+                                  placeholder="Write a comment... Type @ to mention someone"></textarea>
+                        <div id="mentionDropdown" class="mention-dropdown" style="display:none;"></div>
                     </div>
                     <div class="mb-3">
                         <input type="file" class="form-control" name="attachments[]" multiple>
@@ -295,6 +284,23 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
         </div>
         <?php endif; ?>
 
+        <!-- CC -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white border-bottom">
+                <h5 class="mb-0 fw-semibold"><i class="bi bi-people me-2"></i>CC</h5>
+            </div>
+            <div class="card-body" id="ccSection"
+                 data-ticket-id="<?= $ticket['id'] ?>"
+                 data-cc="<?= e(json_encode($ccUsers ?? [])) ?>">
+                <div id="ccList"></div>
+                <div class="mt-2" style="position:relative;">
+                    <input type="text" class="form-control form-control-sm" id="ccSearchInput"
+                           placeholder="Search users to CC..." autocomplete="off">
+                    <div id="ccDropdown" class="mention-dropdown" style="display:none;"></div>
+                </div>
+            </div>
+        </div>
+
         <!-- Update Ticket -->
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white border-bottom">
@@ -347,14 +353,316 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
 </div>
 
 <script>
-document.querySelectorAll('.mention-btn').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-        var textarea = document.getElementById('commentMessage');
-        var mention = '@' + this.dataset.name + ' ';
+(function() {
+    var textarea = document.getElementById('commentMessage');
+    var dropdown = document.getElementById('mentionDropdown');
+    var debounceTimer = null;
+    var activeIndex = -1;
+    var items = [];
+    var mentionStart = -1;
+
+    function getQuery() {
+        var val = textarea.value, pos = textarea.selectionStart;
+        for (var i = pos - 1; i >= 0; i--) {
+            if (val[i] === '@') {
+                if (i === 0 || /\s/.test(val[i - 1])) {
+                    mentionStart = i;
+                    return val.substring(i + 1, pos);
+                }
+                break;
+            }
+            if (/\s/.test(val[i]) && i < pos - 1) break;
+        }
+        mentionStart = -1;
+        return null;
+    }
+
+    function render(results) {
+        items = results;
+        activeIndex = -1;
+        if (!results.length) { dropdown.style.display = 'none'; return; }
+        var html = '';
+        results.forEach(function(u, idx) {
+            var badge = u.role === 'admin' ? '<span class="badge bg-danger" style="font-size:.65rem;">Admin</span>'
+                                           : '<span class="badge bg-primary" style="font-size:.65rem;">Agent</span>';
+            html += '<div class="mention-item" data-index="' + idx + '">'
+                  + '<span class="mention-name">' + u.first_name + ' ' + u.last_name + '</span> ' + badge
+                  + '</div>';
+        });
+        dropdown.innerHTML = html;
+        dropdown.style.display = 'block';
+
+        dropdown.querySelectorAll('.mention-item').forEach(function(el) {
+            el.addEventListener('mousedown', function(ev) {
+                ev.preventDefault();
+                select(parseInt(this.dataset.index));
+            });
+        });
+    }
+
+    function select(idx) {
+        if (idx < 0 || idx >= items.length) return;
+        var u = items[idx];
+        var name = '@' + u.first_name + ' ' + u.last_name + ' ';
+        var val = textarea.value;
         var pos = textarea.selectionStart;
-        textarea.value = textarea.value.substring(0, pos) + mention + textarea.value.substring(pos);
+        textarea.value = val.substring(0, mentionStart) + name + val.substring(pos);
+        var newPos = mentionStart + name.length;
         textarea.focus();
-        textarea.selectionStart = textarea.selectionEnd = pos + mention.length;
+        textarea.selectionStart = textarea.selectionEnd = newPos;
+        close();
+    }
+
+    function close() {
+        dropdown.style.display = 'none';
+        items = [];
+        activeIndex = -1;
+        mentionStart = -1;
+    }
+
+    function highlight(idx) {
+        var els = dropdown.querySelectorAll('.mention-item');
+        els.forEach(function(el) { el.classList.remove('active'); });
+        if (idx >= 0 && idx < els.length) {
+            els[idx].classList.add('active');
+            els[idx].scrollIntoView({ block: 'nearest' });
+        }
+        activeIndex = idx;
+    }
+
+    textarea.addEventListener('input', function() {
+        clearTimeout(debounceTimer);
+        var q = getQuery();
+        if (q === null || q.length < 1) { close(); return; }
+        debounceTimer = setTimeout(function() {
+            fetch('/api/mention-search?q=' + encodeURIComponent(q))
+                .then(function(r) { return r.json(); })
+                .then(function(data) { render(data); });
+        }, 250);
     });
-});
+
+    textarea.addEventListener('keydown', function(ev) {
+        if (dropdown.style.display === 'none') return;
+        if (ev.key === 'ArrowDown') {
+            ev.preventDefault();
+            highlight(Math.min(activeIndex + 1, items.length - 1));
+        } else if (ev.key === 'ArrowUp') {
+            ev.preventDefault();
+            highlight(Math.max(activeIndex - 1, 0));
+        } else if ((ev.key === 'Enter' || ev.key === 'Tab') && activeIndex >= 0) {
+            ev.preventDefault();
+            select(activeIndex);
+        } else if (ev.key === 'Escape') {
+            ev.preventDefault();
+            close();
+        }
+    });
+
+    document.addEventListener('click', function(ev) {
+        if (!dropdown.contains(ev.target) && ev.target !== textarea) close();
+    });
+})();
+
+// Tag management
+(function() {
+    var container = document.getElementById('ticketTags');
+    var list      = document.getElementById('tagList');
+    var ticketId  = container.dataset.ticketId;
+    var tags      = JSON.parse(container.dataset.tags || '[]');
+
+    function render() {
+        var html = '';
+        tags.forEach(function(tag) {
+            html += '<span class="badge bg-light text-dark border d-flex align-items-center gap-1">'
+                  + '<i class="bi bi-hash"></i>' + escHtml(tag)
+                  + '<button type="button" class="btn-close" style="font-size:.5rem;" data-tag="' + escHtml(tag) + '" aria-label="Remove"></button>'
+                  + '</span>';
+        });
+        html += '<span id="tagInputWrap" class="d-inline-flex align-items-center">'
+              + '<input type="text" id="tagInputField" class="border-0" style="outline:none;width:120px;font-size:.875rem;background:transparent;" placeholder="#add tag">'
+              + '</span>';
+        list.innerHTML = html;
+
+        list.querySelectorAll('.btn-close').forEach(function(btn) {
+            btn.addEventListener('click', function() { removeTag(this.dataset.tag); });
+        });
+
+        var input = document.getElementById('tagInputField');
+        input.addEventListener('keydown', function(ev) {
+            if (ev.key === 'Enter') {
+                ev.preventDefault();
+                var val = this.value.trim();
+                if (val) { addTag(val); this.value = ''; }
+            }
+        });
+    }
+
+    function addTag(name) {
+        name = name.replace(/^#+/, '').replace(/[^a-zA-Z0-9_\-\s]/g, '').trim().toLowerCase();
+        if (!name || tags.indexOf(name) !== -1) return;
+        fetch('/api/tickets/' + ticketId + '/tags', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({action: 'add', tag: name})
+        }).then(function(r) { return r.json(); }).then(function(data) {
+            if (data.tags) { tags = data.tags; render(); }
+        });
+    }
+
+    function removeTag(name) {
+        fetch('/api/tickets/' + ticketId + '/tags', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({action: 'remove', tag: name})
+        }).then(function(r) { return r.json(); }).then(function(data) {
+            if (data.tags) { tags = data.tags; render(); }
+        });
+    }
+
+    function escHtml(s) {
+        var d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+    }
+
+    render();
+})();
+
+// CC management
+(function() {
+    var section   = document.getElementById('ccSection');
+    var listEl    = document.getElementById('ccList');
+    var input     = document.getElementById('ccSearchInput');
+    var dropdown  = document.getElementById('ccDropdown');
+    var ticketId  = section.dataset.ticketId;
+    var ccUsers   = JSON.parse(section.dataset.cc || '[]');
+    var debounce  = null;
+    var activeIdx = -1;
+    var results   = [];
+
+    function renderList() {
+        if (!ccUsers.length) {
+            listEl.innerHTML = '<span class="text-muted small">No users CC\'d</span>';
+            return;
+        }
+        var html = '';
+        ccUsers.forEach(function(u) {
+            html += '<div class="d-flex align-items-center justify-content-between mb-1">'
+                  + '<div><span class="fw-semibold small">' + escHtml(u.first_name + ' ' + u.last_name) + '</span>'
+                  + ' <span class="text-muted small">' + escHtml(u.email) + '</span></div>'
+                  + '<button type="button" class="btn btn-sm btn-outline-danger border-0 py-0 px-1" data-uid="' + u.id + '" title="Remove"><i class="bi bi-x"></i></button>'
+                  + '</div>';
+        });
+        listEl.innerHTML = html;
+        listEl.querySelectorAll('[data-uid]').forEach(function(btn) {
+            btn.addEventListener('click', function() { removeCc(parseInt(this.dataset.uid)); });
+        });
+    }
+
+    function addCc(userId) {
+        fetch('/api/tickets/' + ticketId + '/cc', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({action: 'add', user_id: userId})
+        }).then(function(r) { return r.json(); }).then(function(data) {
+            if (data.cc) { ccUsers = data.cc; renderList(); }
+        });
+        input.value = '';
+        closeDropdown();
+    }
+
+    function removeCc(userId) {
+        fetch('/api/tickets/' + ticketId + '/cc', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({action: 'remove', user_id: userId})
+        }).then(function(r) { return r.json(); }).then(function(data) {
+            if (data.cc) { ccUsers = data.cc; renderList(); }
+        });
+    }
+
+    function renderDropdown(data) {
+        results = data;
+        activeIdx = -1;
+        if (!data.length) { dropdown.style.display = 'none'; return; }
+        var html = '';
+        data.forEach(function(u, idx) {
+            var roleBadge = u.role === 'admin' ? '<span class="badge bg-danger" style="font-size:.6rem;">Admin</span>'
+                          : u.role === 'agent' ? '<span class="badge bg-primary" style="font-size:.6rem;">Agent</span>'
+                          : '<span class="badge bg-secondary" style="font-size:.6rem;">User</span>';
+            html += '<div class="mention-item" data-index="' + idx + '">'
+                  + '<span class="mention-name">' + escHtml(u.first_name + ' ' + u.last_name) + '</span> '
+                  + '<span class="text-muted" style="font-size:.75rem;">' + escHtml(u.email) + '</span> ' + roleBadge
+                  + '</div>';
+        });
+        dropdown.innerHTML = html;
+        dropdown.style.display = 'block';
+        dropdown.querySelectorAll('.mention-item').forEach(function(el) {
+            el.addEventListener('mousedown', function(ev) {
+                ev.preventDefault();
+                addCc(data[parseInt(this.dataset.index)].id);
+            });
+        });
+    }
+
+    function closeDropdown() {
+        dropdown.style.display = 'none';
+        results = [];
+        activeIdx = -1;
+    }
+
+    function highlightItem(idx) {
+        var els = dropdown.querySelectorAll('.mention-item');
+        els.forEach(function(el) { el.classList.remove('active'); });
+        if (idx >= 0 && idx < els.length) {
+            els[idx].classList.add('active');
+            els[idx].scrollIntoView({ block: 'nearest' });
+        }
+        activeIdx = idx;
+    }
+
+    input.addEventListener('input', function() {
+        clearTimeout(debounce);
+        var q = this.value.trim();
+        if (q.length < 1) { closeDropdown(); return; }
+        debounce = setTimeout(function() {
+            fetch('/api/user-search?q=' + encodeURIComponent(q))
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    var ids = ccUsers.map(function(u) { return u.id; });
+                    data = data.filter(function(u) { return ids.indexOf(u.id) === -1; });
+                    renderDropdown(data);
+                });
+        }, 250);
+    });
+
+    input.addEventListener('keydown', function(ev) {
+        if (dropdown.style.display === 'none') return;
+        if (ev.key === 'ArrowDown') {
+            ev.preventDefault();
+            highlightItem(Math.min(activeIdx + 1, results.length - 1));
+        } else if (ev.key === 'ArrowUp') {
+            ev.preventDefault();
+            highlightItem(Math.max(activeIdx - 1, 0));
+        } else if ((ev.key === 'Enter' || ev.key === 'Tab') && activeIdx >= 0) {
+            ev.preventDefault();
+            addCc(results[activeIdx].id);
+        } else if (ev.key === 'Escape') {
+            ev.preventDefault();
+            closeDropdown();
+        }
+    });
+
+    document.addEventListener('click', function(ev) {
+        if (!dropdown.contains(ev.target) && ev.target !== input) closeDropdown();
+    });
+
+    function escHtml(s) {
+        var d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+    }
+
+    renderList();
+})();
 </script>

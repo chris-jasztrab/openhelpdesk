@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS `tickets` (
     `id`           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `subject`      VARCHAR(255) NOT NULL,
     `description`  TEXT         NOT NULL,
+    `legacy_id`    VARCHAR(50)  DEFAULT NULL,
     `browser_info` VARCHAR(500) DEFAULT NULL,
     `os_info`      VARCHAR(500) DEFAULT NULL,
     `created_by`   INT UNSIGNED NOT NULL,
@@ -89,6 +90,18 @@ CREATE TABLE IF NOT EXISTS `ticket_tag_map` (
     PRIMARY KEY (`ticket_id`, `tag_id`),
     FOREIGN KEY (`ticket_id`) REFERENCES `tickets`(`id`) ON DELETE CASCADE,
     FOREIGN KEY (`tag_id`)    REFERENCES `ticket_tags`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Ticket CC (users who receive copies of correspondence)
+CREATE TABLE IF NOT EXISTS `ticket_cc` (
+    `ticket_id`  INT UNSIGNED NOT NULL,
+    `user_id`    INT UNSIGNED NOT NULL,
+    `added_by`   INT UNSIGNED NOT NULL,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`ticket_id`, `user_id`),
+    FOREIGN KEY (`ticket_id`) REFERENCES `tickets`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`user_id`)   REFERENCES `users`(`id`)   ON DELETE CASCADE,
+    FOREIGN KEY (`added_by`)  REFERENCES `users`(`id`)   ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Ticket timeline (audit trail of all changes)
@@ -204,6 +217,18 @@ CREATE TABLE IF NOT EXISTS `group_user_map` (
     PRIMARY KEY (`group_id`, `user_id`),
     FOREIGN KEY (`group_id`) REFERENCES `groups`(`id`) ON DELETE CASCADE,
     FOREIGN KEY (`user_id`)  REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Saved ticket filters (per-user, optionally shared)
+CREATE TABLE IF NOT EXISTS `saved_filters` (
+    `id`         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `user_id`    INT UNSIGNED NOT NULL,
+    `name`       VARCHAR(255) NOT NULL,
+    `filters`    JSON NOT NULL,
+    `is_shared`  TINYINT(1) NOT NULL DEFAULT 0,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Application settings (key-value store)
