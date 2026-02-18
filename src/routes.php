@@ -351,7 +351,11 @@ $router->get('/profile', function () {
 
 $router->post('/profile', function () {
     Auth::requireAuth();
-    verifyCsrf();
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/profile');
+        return;
+    }
 
     $fn = trim($_POST['first_name'] ?? '');
     $ln = trim($_POST['last_name'] ?? '');
