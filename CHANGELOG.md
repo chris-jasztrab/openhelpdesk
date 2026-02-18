@@ -5,6 +5,8 @@ All notable changes to LocalDesk will be documented in this file.
 ---
 
 ## Unreleased
+- Need to work on Dark Mode/Light mode. Dark Mode has text issues.
+
 
 ### User Profile
 - "My Profile" page accessible from the navbar user dropdown for all authenticated users
