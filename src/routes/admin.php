@@ -746,9 +746,9 @@ $router->get('/admin/tickets/export', function () {
                 CONCAT(c.first_name, ' ', c.last_name) AS creator_name,
                 CONCAT(a.first_name, ' ', a.last_name) AS agent_name,
                 (SELECT GROUP_CONCAT(tg.name SEPARATOR ', ')
-                 FROM ticket_tag tt2
-                 JOIN tags tg ON tt2.tag_id = tg.id
-                 WHERE tt2.ticket_id = t.id) AS tag_list
+                 FROM ticket_tag_map ttm
+                 JOIN ticket_tags tg ON ttm.tag_id = tg.id
+                 WHERE ttm.ticket_id = t.id) AS tag_list
          FROM tickets t
          LEFT JOIN ticket_priorities tp ON t.priority_id = tp.id
          LEFT JOIN ticket_types tt     ON t.type_id     = tt.id
