@@ -2284,7 +2284,8 @@ $router->post('/admin/settings/import-kb/confirm', function () {
         );
         $checkSlug = $db->prepare('SELECT id FROM kb_articles WHERE slug = ?');
 
-        $imported = 0;
+        $imported    = 0;
+        $publishAll  = !empty($_POST['publish_all']);
         $nextCatOrder = (int) $db->query('SELECT COALESCE(MAX(sort_order),0) FROM kb_categories')->fetchColumn();
 
         foreach ($rows as $row) {
@@ -2314,14 +2315,15 @@ $router->post('/admin/settings/import-kb/confirm', function () {
                 $slug .= '-' . time() . '-' . $imported;
             }
 
-            $publishedAt = $row['status'] === 'published' ? date('Y-m-d H:i:s') : null;
+            $status     = $publishAll ? 'published' : $row['status'];
+            $publishedAt = $status === 'published' ? date('Y-m-d H:i:s') : null;
 
             $insertArticle->execute([
                 $folderId,
                 $row['title'],
                 $slug,
                 $row['body'],
-                $row['status'],
+                $status,
                 $publishedAt,
                 Auth::id(),
                 0,
@@ -2331,7 +2333,7 @@ $router->post('/admin/settings/import-kb/confirm', function () {
 
         $db->commit();
         flash('success', "Successfully imported {$imported} KB article(s).");
-        redirect('/admin/kb');
+        redirect('/admin/kb/articles');
     } catch (PDOException $e) {
         $db->rollBack();
         flash('error', 'Import failed: ' . $e->getMessage());

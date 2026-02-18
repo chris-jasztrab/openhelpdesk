@@ -89,15 +89,21 @@ $breadcrumbs  = [
 </div>
 
 <!-- Confirm / Cancel -->
-<div class="d-flex gap-2">
-    <form method="POST" action="/admin/settings/import-kb/confirm">
-        <?= csrfField() ?>
+<form method="POST" action="/admin/settings/import-kb/confirm">
+    <?= csrfField() ?>
+    <div class="form-check mb-3">
+        <input class="form-check-input" type="checkbox" id="publish_all" name="publish_all" value="1">
+        <label class="form-check-label" for="publish_all">
+            Publish all articles on import <span class="text-muted small">(override draft status)</span>
+        </label>
+    </div>
+    <div class="d-flex gap-2">
         <button type="submit" class="btn text-white" style="background:var(--ld-primary);"
                 onclick="this.disabled=true; this.innerHTML='<span class=\'spinner-border spinner-border-sm me-1\'></span>Importing...'; this.form.submit();">
             <i class="bi bi-check-lg me-1"></i>Confirm Import (<?= $summary['total_articles'] ?> articles)
         </button>
-    </form>
-    <a href="/admin/settings/import-kb" class="btn btn-outline-secondary">
-        <i class="bi bi-x-lg me-1"></i>Cancel
-    </a>
-</div>
+        <a href="/admin/settings/import-kb" class="btn btn-outline-secondary">
+            <i class="bi bi-x-lg me-1"></i>Cancel
+        </a>
+    </div>
+</form>
