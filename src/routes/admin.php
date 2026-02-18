@@ -2145,6 +2145,201 @@ $router->post('/admin/settings/import/confirm', function () {
 });
 
 /* ==================================================================
+ * ADMIN – Settings: Import KB Articles
+ * ================================================================== */
+
+$router->get('/admin/settings/import-kb', function () {
+    Auth::requireRole('admin');
+    render('admin/settings/import-kb');
+});
+
+$router->post('/admin/settings/import-kb/preview', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/import-kb');
+        return;
+    }
+
+    if (empty($_FILES['csv_file']['tmp_name']) || $_FILES['csv_file']['error'] !== UPLOAD_ERR_OK) {
+        flash('error', 'Please upload a valid CSV file.');
+        redirect('/admin/settings/import-kb');
+        return;
+    }
+
+    if ($_FILES['csv_file']['size'] > 10 * 1024 * 1024) {
+        flash('error', 'File too large. Maximum 10 MB.');
+        redirect('/admin/settings/import-kb');
+        return;
+    }
+
+    $handle = fopen($_FILES['csv_file']['tmp_name'], 'r');
+    if (!$handle) {
+        flash('error', 'Unable to read file.');
+        redirect('/admin/settings/import-kb');
+        return;
+    }
+
+    $header = fgetcsv($handle);
+    if (!$header || !in_array('title', $header) || !in_array('body_markdown', $header)) {
+        fclose($handle);
+        flash('error', 'CSV must contain "title" and "body_markdown" columns.');
+        redirect('/admin/settings/import-kb');
+        return;
+    }
+
+    $colMap = array_flip($header);
+    $rows   = [];
+    $categories = [];
+
+    while (($csvRow = fgetcsv($handle)) !== false) {
+        $title    = trim($csvRow[$colMap['title']] ?? '');
+        $body     = trim($csvRow[$colMap['body_markdown']] ?? '');
+        $category = trim($csvRow[$colMap['category'] ?? -1] ?? '') ?: 'General';
+        $status   = strtolower(trim($csvRow[$colMap['status'] ?? -1] ?? ''));
+        $status   = in_array($status, ['published', 'draft']) ? $status : 'draft';
+        $tags     = trim($csvRow[$colMap['tags'] ?? -1] ?? '');
+
+        if ($title === '' || $body === '') {
+            continue; // skip empty rows
+        }
+
+        $categories[$category] = true;
+
+        $rows[] = [
+            'title'    => $title,
+            'body'     => $body,
+            'category' => $category,
+            'status'   => $status,
+            'tags'     => $tags,
+        ];
+    }
+    fclose($handle);
+
+    if (empty($rows)) {
+        flash('error', 'No valid articles found in CSV.');
+        redirect('/admin/settings/import-kb');
+        return;
+    }
+
+    $_SESSION['kb_import_data'] = $rows;
+
+    // Check which categories already exist
+    $db = Database::connect();
+    $existingCats = $db->query('SELECT name FROM kb_categories')->fetchAll(PDO::FETCH_COLUMN);
+    $newCategories = array_diff(array_keys($categories), $existingCats);
+
+    $summary = [
+        'total_articles'  => count($rows),
+        'categories'      => array_keys($categories),
+        'new_categories'  => $newCategories,
+        'draft_count'     => count(array_filter($rows, fn($r) => $r['status'] === 'draft')),
+        'published_count' => count(array_filter($rows, fn($r) => $r['status'] === 'published')),
+    ];
+
+    $previewRows = array_slice($rows, 0, 15);
+
+    render('admin/settings/import-kb-preview', [
+        'summary'     => $summary,
+        'previewRows' => $previewRows,
+    ]);
+});
+
+$router->post('/admin/settings/import-kb/confirm', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/import-kb');
+        return;
+    }
+
+    $rows = $_SESSION['kb_import_data'] ?? [];
+    unset($_SESSION['kb_import_data']);
+
+    if (empty($rows)) {
+        flash('error', 'No import data found. Please upload the CSV again.');
+        redirect('/admin/settings/import-kb');
+        return;
+    }
+
+    $db = Database::connect();
+
+    // Build lookup maps for existing categories and folders
+    $catLookup    = [];
+    $folderLookup = [];
+
+    foreach ($db->query('SELECT id, name FROM kb_categories')->fetchAll() as $c) {
+        $catLookup[strtolower($c['name'])] = (int) $c['id'];
+    }
+    foreach ($db->query('SELECT id, category_id, name FROM kb_folders')->fetchAll() as $f) {
+        $folderLookup[(int) $f['category_id'] . ':' . strtolower($f['name'])] = (int) $f['id'];
+    }
+
+    $db->beginTransaction();
+    try {
+        $insertCat    = $db->prepare('INSERT INTO kb_categories (name, slug, sort_order) VALUES (?, ?, ?)');
+        $insertFolder = $db->prepare('INSERT INTO kb_folders (category_id, name, slug, sort_order) VALUES (?, ?, ?, ?)');
+        $insertArticle = $db->prepare(
+            'INSERT INTO kb_articles (folder_id, title, slug, body_markdown, status, published_at, created_by, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        );
+        $checkSlug = $db->prepare('SELECT id FROM kb_articles WHERE slug = ?');
+
+        $imported = 0;
+        $nextCatOrder = (int) $db->query('SELECT COALESCE(MAX(sort_order),0) FROM kb_categories')->fetchColumn();
+
+        foreach ($rows as $row) {
+            $catName = $row['category'];
+            $catKey  = strtolower($catName);
+
+            // Find or create category
+            if (!isset($catLookup[$catKey])) {
+                $nextCatOrder++;
+                $insertCat->execute([$catName, slugify($catName), $nextCatOrder]);
+                $catLookup[$catKey] = (int) $db->lastInsertId();
+            }
+            $catId = $catLookup[$catKey];
+
+            // Find or create "General" folder in this category
+            $folderKey = $catId . ':general';
+            if (!isset($folderLookup[$folderKey])) {
+                $insertFolder->execute([$catId, 'General', slugify($catName . '-general'), 0]);
+                $folderLookup[$folderKey] = (int) $db->lastInsertId();
+            }
+            $folderId = $folderLookup[$folderKey];
+
+            // Generate unique slug
+            $slug = slugify($row['title']);
+            $checkSlug->execute([$slug]);
+            if ($checkSlug->fetch()) {
+                $slug .= '-' . time() . '-' . $imported;
+            }
+
+            $publishedAt = $row['status'] === 'published' ? date('Y-m-d H:i:s') : null;
+
+            $insertArticle->execute([
+                $folderId,
+                $row['title'],
+                $slug,
+                $row['body'],
+                $row['status'],
+                $publishedAt,
+                Auth::id(),
+                0,
+            ]);
+            $imported++;
+        }
+
+        $db->commit();
+        flash('success', "Successfully imported {$imported} KB article(s).");
+        redirect('/admin/kb');
+    } catch (PDOException $e) {
+        $db->rollBack();
+        flash('error', 'Import failed: ' . $e->getMessage());
+        redirect('/admin/settings/import-kb');
+    }
+});
+
+/* ==================================================================
  * ADMIN – Settings: Branding
  * ================================================================== */
 

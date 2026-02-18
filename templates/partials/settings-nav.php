@@ -10,6 +10,7 @@ $settingsNav = [
     ['label' => 'Branding',       'url' => '/admin/settings/branding',       'icon' => 'bi-palette'],
     ['label' => 'Automations',    'url' => '/admin/settings/automations',    'icon' => 'bi-lightning'],
     ['label' => 'Import Tickets', 'url' => '/admin/settings/import',         'icon' => 'bi-cloud-upload'],
+    ['label' => 'Import KB',      'url' => '/admin/settings/import-kb',      'icon' => 'bi-book'],
     ['label' => 'Danger Zone',   'url' => '/admin/settings/danger-zone',    'icon' => 'bi-exclamation-triangle'],
 ];
 $currentPath = currentPath();

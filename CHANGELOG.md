@@ -16,6 +16,14 @@ All notable changes to LocalDesk will be documented in this file.
 - Login with your Office 365 credentials.
 
 
+### Knowledge Base Import
+- CSV import tool for KB articles under Admin > Settings > Import KB
+- Upload CSV with `title` and `body_markdown` columns (plus optional `category`, `status`, `tags`)
+- Preview page showing article count, categories, draft/published breakdown
+- Auto-creates categories and "General" folders as needed
+- Unique slug generation with collision avoidance
+- Transaction-based import for all-or-nothing safety
+
 ### User Profile
 - "My Profile" page accessible from the navbar user dropdown for all authenticated users
 - Users can update their first name and last name
