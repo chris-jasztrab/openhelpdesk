@@ -86,7 +86,7 @@ $breadcrumbs  = [
                 <div class="form-text">
                     Set both values to 0 to disable SLA for a priority. Times count only business hours.
                 </div>
-                <button type="submit" class="btn text-white" style="background:#4f46e5;">
+                <button type="submit" class="btn text-white" style="background:var(--ld-primary);">
                     <i class="bi bi-check-lg me-1"></i>Save Policies
                 </button>
             </div>

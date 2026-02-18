@@ -48,7 +48,7 @@ $breadcrumbs  = [
                 <div class="form-text">Maximum file size: 10 MB. File must be in CSV format with a header row.</div>
             </div>
 
-            <button type="submit" class="btn text-white" style="background:#4f46e5;">
+            <button type="submit" class="btn text-white" style="background:var(--ld-primary);">
                 <i class="bi bi-eye me-1"></i>Upload &amp; Preview
             </button>
         </form>

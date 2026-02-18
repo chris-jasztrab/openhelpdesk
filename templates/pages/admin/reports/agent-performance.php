@@ -21,7 +21,7 @@ $breadcrumbs  = [
     <input type="date" name="from" value="<?= e($from) ?>" class="form-control form-control-sm" style="width:auto;">
     <span class="text-muted">to</span>
     <input type="date" name="to" value="<?= e($to) ?>" class="form-control form-control-sm" style="width:auto;">
-    <button type="submit" class="btn btn-sm text-white" style="background:#4f46e5;">Apply</button>
+    <button type="submit" class="btn btn-sm text-white" style="background:var(--ld-primary);">Apply</button>
 </form>
 
 <!-- Chart -->

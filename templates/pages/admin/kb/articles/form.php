@@ -65,7 +65,7 @@ $action = $isEdit ? "/admin/kb/articles/{$editing['id']}/edit" : '/admin/kb/arti
             <hr class="my-4">
 
             <div class="d-flex gap-2">
-                <button type="submit" class="btn text-white" style="background:#4f46e5;">
+                <button type="submit" class="btn text-white" style="background:var(--ld-primary);">
                     <i class="bi bi-check-lg me-1"></i><?= $isEdit ? 'Update Article' : 'Create Article' ?>
                 </button>
                 <?php if ($isEdit): ?>

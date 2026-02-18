@@ -14,7 +14,7 @@ if ($locFilter !== '')  $filterParams['location'] = $locFilter;
     <h2 class="fw-bold mb-0">Users</h2>
     <div class="d-flex gap-2 align-items-center">
         <span class="badge bg-secondary fs-6"><?= count($users) ?><?= (!empty($filterParams)) ? ' filtered' : ' total' ?></span>
-        <a href="/admin/users/create" class="btn text-white" style="background:#4f46e5;">
+        <a href="/admin/users/create" class="btn text-white" style="background:var(--ld-primary);">
             <i class="bi bi-person-plus me-1"></i>Add User
         </a>
     </div>
@@ -28,7 +28,7 @@ if ($locFilter !== '')  $filterParams['location'] = $locFilter;
                 <label class="form-label small text-muted mb-1">Role</label>
                 <div class="d-flex gap-1">
                     <a href="<?= e('/admin/users' . ($locFilter !== '' ? '?location=' . urlencode($locFilter) : '')) ?>"
-                       class="btn btn-sm <?= empty($roleFilter) ? 'text-white' : 'btn-outline-secondary' ?>" <?= empty($roleFilter) ? 'style="background:#4f46e5;"' : '' ?>>All</a>
+                       class="btn btn-sm <?= empty($roleFilter) ? 'text-white' : 'btn-outline-secondary' ?>" <?= empty($roleFilter) ? 'style="background:var(--ld-primary);"' : '' ?>>All</a>
                     <?php
                     $roleButtons = ['admin' => ['Admins', 'danger'], 'agent' => ['Agents', 'primary'], 'user' => ['Users', 'secondary']];
                     foreach ($roleButtons as $rKey => [$rLabel, $rColor]):

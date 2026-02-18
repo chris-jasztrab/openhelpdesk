@@ -41,7 +41,7 @@ $breadcrumbs  = [
                             <div class="d-flex align-items-center mb-2">
                                 <div class="rounded-3 d-flex align-items-center justify-content-center me-3"
                                      style="width:44px; height:44px; background:#eef2ff;">
-                                    <i class="bi bi-collection" style="font-size:1.25rem; color:#4f46e5;"></i>
+                                    <i class="bi bi-collection" style="font-size:1.25rem; color:var(--ld-primary);"></i>
                                 </div>
                                 <div>
                                     <h5 class="fw-semibold mb-0 text-dark"><?= e($cat['name']) ?></h5>

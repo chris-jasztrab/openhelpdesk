@@ -83,7 +83,7 @@ $breadcrumbs  = [
 
             <hr class="my-4">
 
-            <button type="submit" class="btn text-white" style="background:#4f46e5;">
+            <button type="submit" class="btn text-white" style="background:var(--ld-primary);">
                 <i class="bi bi-check-lg me-1"></i>Save Settings
             </button>
         </form>

@@ -40,7 +40,7 @@ $pageTitle = 'Sign In';
                 </div>
 
                 <button type="submit" class="btn w-100 py-2 fw-semibold text-white"
-                        style="background-color:#4f46e5;border-color:#4f46e5;">
+                        style="background-color:var(--ld-primary);border-color:var(--ld-primary);">
                     <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
                 </button>
             </form>
@@ -48,6 +48,6 @@ $pageTitle = 'Sign In';
     </div>
 
     <p class="text-center text-white-50 mt-3 small">
-        LocalDesk &copy; <?= date('Y') ?>
+        <?= e(getSetting('branding_app_name', 'LocalDesk')) ?> &copy; <?= date('Y') ?>
     </p>
 </div>

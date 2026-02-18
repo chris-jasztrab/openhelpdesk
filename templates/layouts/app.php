@@ -3,18 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= e($pageTitle) ?> &ndash; LocalDesk</title>
+    <title><?= e($pageTitle) ?> &ndash; <?= e(getSetting('branding_app_name', 'LocalDesk')) ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <style>
         :root {
-            --ld-primary: #4f46e5;
-            --ld-primary-hover: #4338ca;
+            --ld-primary: <?= e(getSetting('branding_primary_color', '#4f46e5')) ?>;
+            --ld-primary-hover: <?= e(getSetting('branding_primary_hover', '#4338ca')) ?>;
             --ld-sidebar-width: 64px;
             --ld-navbar-height: 56px;
         }
         body { background-color: #f1f5f9; overflow-x: hidden; }
-        .navbar { background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%) !important; }
+        .navbar { background: linear-gradient(135deg, <?= e(getSetting('branding_navbar_start', '#1e1b4b')) ?> 0%, <?= e(getSetting('branding_navbar_end', '#312e81')) ?> 100%) !important; }
         .navbar-brand { font-weight: 700; letter-spacing: -0.5px; }
 
         /* Sidebar – icon-only */

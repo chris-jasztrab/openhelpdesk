@@ -317,6 +317,44 @@ function setSetting(string $key, string $value): void
     )->execute([$key, $value]);
 }
 
+/* ── User column preference helpers ──────────────────────────── */
+
+/**
+ * All toggleable ticket columns (id and subject are always shown).
+ */
+function ticketColumnDefinitions(): array
+{
+    return [
+        'status'     => 'Status',
+        'priority'   => 'Priority',
+        'type'       => 'Type',
+        'agent'      => 'Assigned To',
+        'group'      => 'Group',
+        'creator'    => 'Created By',
+        'location'   => 'Location',
+        'sla'        => 'SLA',
+        'created_at' => 'Created',
+        'due_date'   => 'Due',
+    ];
+}
+
+function getUserColumns(int $userId): array
+{
+    $json = getSetting("ticket_columns:{$userId}", '');
+    if ($json === '') {
+        return array_keys(ticketColumnDefinitions());
+    }
+    $cols = json_decode($json, true);
+    return is_array($cols) ? $cols : array_keys(ticketColumnDefinitions());
+}
+
+function setUserColumns(int $userId, array $columns): void
+{
+    $valid = array_keys(ticketColumnDefinitions());
+    $columns = array_values(array_intersect($columns, $valid));
+    setSetting("ticket_columns:{$userId}", json_encode($columns));
+}
+
 /* ── Email helpers ────────────────────────────────────────────── */
 
 /**
@@ -557,5 +595,188 @@ function sortIcon(string $col, string $currentSort, string $currentDir): string
         return '';
     }
     $icon = $currentDir === 'asc' ? 'bi-arrow-up' : 'bi-arrow-down';
-    return '<i class="bi ' . $icon . ' ms-1" style="font-size:.7rem;color:#4f46e5;"></i>';
+    return '<i class="bi ' . $icon . ' ms-1" style="font-size:.7rem;color:var(--ld-primary);"></i>';
+}
+
+/**
+ * Run all enabled automations for a given trigger event against a ticket.
+ */
+function runAutomations(PDO $db, int $ticketId, string $triggerEvent): void
+{
+    $rules = $db->prepare(
+        'SELECT * FROM automations WHERE trigger_event = ? AND is_enabled = 1 ORDER BY sort_order, id'
+    );
+    $rules->execute([$triggerEvent]);
+    $automations = $rules->fetchAll();
+
+    if (empty($automations)) {
+        return;
+    }
+
+    foreach ($automations as $auto) {
+        // Re-fetch ticket for each automation so earlier automations' changes are visible
+        $stmt = $db->prepare('SELECT * FROM tickets WHERE id = ?');
+        $stmt->execute([$ticketId]);
+        $ticket = $stmt->fetch();
+        if (!$ticket) {
+            return;
+        }
+
+        $conditions = json_decode($auto['conditions'], true) ?: [];
+        $actions    = json_decode($auto['actions'], true) ?: [];
+
+        // Evaluate all conditions (AND logic)
+        $match = true;
+        foreach ($conditions as $cond) {
+            $field    = $cond['field'] ?? '';
+            $operator = $cond['operator'] ?? '';
+            $value    = $cond['value'] ?? '';
+            $actual   = $ticket[$field] ?? null;
+
+            switch ($operator) {
+                case 'equals':
+                    if ((string) $actual !== (string) $value) {
+                        $match = false;
+                    }
+                    break;
+                case 'not_equals':
+                    if ((string) $actual === (string) $value) {
+                        $match = false;
+                    }
+                    break;
+                case 'is_empty':
+                    if ($actual !== null && $actual !== '') {
+                        $match = false;
+                    }
+                    break;
+                case 'is_not_empty':
+                    if ($actual === null || $actual === '') {
+                        $match = false;
+                    }
+                    break;
+                default:
+                    $match = false;
+            }
+
+            if (!$match) {
+                break;
+            }
+        }
+
+        if (!$match) {
+            continue;
+        }
+
+        // Execute actions
+        foreach ($actions as $act) {
+            $action = $act['action'] ?? '';
+            $val    = $act['value'] ?? '';
+
+            switch ($action) {
+                case 'set_group':
+                    $groupId = $val === '' ? null : (int) $val;
+                    $db->prepare('UPDATE tickets SET group_id = ? WHERE id = ?')->execute([$groupId, $ticketId]);
+                    $groupName = 'None';
+                    if ($groupId) {
+                        $s = $db->prepare('SELECT name FROM groups WHERE id = ?');
+                        $s->execute([$groupId]);
+                        $groupName = $s->fetchColumn() ?: 'Unknown';
+                    }
+                    $db->prepare(
+                        'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, ?, ?, 1)'
+                    )->execute([$ticketId, 'automation', "Automation '{$auto['name']}': Group set to {$groupName}"]);
+                    break;
+
+                case 'set_assigned_to':
+                    $agentId = $val === '' ? null : (int) $val;
+                    $db->prepare('UPDATE tickets SET assigned_to = ? WHERE id = ?')->execute([$agentId, $ticketId]);
+                    $agentName = 'Unassigned';
+                    if ($agentId) {
+                        $s = $db->prepare("SELECT CONCAT(first_name, ' ', last_name) FROM users WHERE id = ?");
+                        $s->execute([$agentId]);
+                        $agentName = $s->fetchColumn() ?: 'Unknown';
+                    }
+                    $db->prepare(
+                        'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, ?, ?, 1)'
+                    )->execute([$ticketId, 'automation', "Automation '{$auto['name']}': Assigned to {$agentName}"]);
+                    break;
+
+                case 'set_priority':
+                    $priorityId = $val === '' ? null : (int) $val;
+                    $db->prepare('UPDATE tickets SET priority_id = ? WHERE id = ?')->execute([$priorityId, $ticketId]);
+                    $priorityName = 'None';
+                    if ($priorityId) {
+                        $s = $db->prepare('SELECT name FROM ticket_priorities WHERE id = ?');
+                        $s->execute([$priorityId]);
+                        $priorityName = $s->fetchColumn() ?: 'Unknown';
+                        Sla::onPriorityChanged($db, $ticketId, $priorityId);
+                    }
+                    $db->prepare(
+                        'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, ?, ?, 1)'
+                    )->execute([$ticketId, 'automation', "Automation '{$auto['name']}': Priority set to {$priorityName}"]);
+                    break;
+
+                case 'set_status':
+                    $validStatuses = ['open', 'in_progress', 'pending', 'resolved', 'closed'];
+                    if (!in_array($val, $validStatuses, true)) {
+                        break;
+                    }
+                    $oldStatus = $ticket['status'];
+                    $db->prepare('UPDATE tickets SET status = ? WHERE id = ?')->execute([$val, $ticketId]);
+                    if ($val === 'pending') {
+                        Sla::pause($db, $ticketId);
+                    } elseif ($oldStatus === 'pending') {
+                        Sla::resume($db, $ticketId);
+                    }
+                    $db->prepare(
+                        'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, ?, ?, 1)'
+                    )->execute([$ticketId, 'automation', "Automation '{$auto['name']}': Status set to {$val}"]);
+                    break;
+
+                case 'add_tag':
+                    $tagName = trim(strtolower(preg_replace('/[^a-zA-Z0-9_\-\s]/', '', $val)));
+                    if ($tagName === '') {
+                        break;
+                    }
+                    $findTag = $db->prepare('SELECT id FROM ticket_tags WHERE name = ?');
+                    $findTag->execute([$tagName]);
+                    $tagId = $findTag->fetchColumn();
+                    if (!$tagId) {
+                        $db->prepare('INSERT INTO ticket_tags (name) VALUES (?)')->execute([$tagName]);
+                        $tagId = (int) $db->lastInsertId();
+                    }
+                    // Only add if not already tagged
+                    $exists = $db->prepare('SELECT 1 FROM ticket_tag_map WHERE ticket_id = ? AND tag_id = ?');
+                    $exists->execute([$ticketId, $tagId]);
+                    if (!$exists->fetchColumn()) {
+                        $db->prepare('INSERT INTO ticket_tag_map (ticket_id, tag_id) VALUES (?, ?)')->execute([$ticketId, $tagId]);
+                        $db->prepare(
+                            'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, ?, ?, 1)'
+                        )->execute([$ticketId, 'automation', "Automation '{$auto['name']}': Tag #{$tagName} added"]);
+                    }
+                    break;
+
+                case 'add_cc':
+                    $ccUserId = (int) $val;
+                    if ($ccUserId <= 0) {
+                        break;
+                    }
+                    // Only add if not already CC'd
+                    $exists = $db->prepare('SELECT 1 FROM ticket_cc WHERE ticket_id = ? AND user_id = ?');
+                    $exists->execute([$ticketId, $ccUserId]);
+                    if (!$exists->fetchColumn()) {
+                        $db->prepare(
+                            'INSERT INTO ticket_cc (ticket_id, user_id, added_by) VALUES (?, ?, ?)'
+                        )->execute([$ticketId, $ccUserId, $ccUserId]);
+                        $s = $db->prepare("SELECT CONCAT(first_name, ' ', last_name) FROM users WHERE id = ?");
+                        $s->execute([$ccUserId]);
+                        $ccName = $s->fetchColumn() ?: 'Unknown';
+                        $db->prepare(
+                            'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, ?, ?, 1)'
+                        )->execute([$ticketId, 'automation', "Automation '{$auto['name']}': CC'd {$ccName}"]);
+                    }
+                    break;
+            }
+        }
+    }
 }

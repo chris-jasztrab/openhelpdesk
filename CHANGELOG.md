@@ -6,6 +6,26 @@ All notable changes to LocalDesk will be documented in this file.
 
 ## Unreleased
 
+### Branding Settings
+- Admin-configurable branding page under Settings > Branding
+- Custom logo upload (JPG, PNG, GIF, WEBP, SVG) displayed in the navbar
+- Configurable application name shown in navbar, page titles, login page, and emails
+- Color scheme customization: primary color, primary hover, navbar gradient start/end
+- Live preview panel showing navbar, button, badge, and login page appearance
+- Reset to defaults button for restoring original color scheme
+- All hardcoded color values replaced with CSS variables for consistent theming
+- Email templates use dynamic brand color for call-to-action buttons
+
+### Automations
+- Rule-based ticket automation system for admins (Settings > Automations)
+- Trigger on ticket creation or ticket update events
+- Condition builder: match on ticket type, priority, status, location, group, or assigned agent with equals/not equals/is empty/is not empty operators
+- Action builder: set group, assign agent, set priority, set status, or add tag
+- Multiple conditions (AND logic) and multiple actions per rule
+- Enable/disable toggle per automation
+- Sort order for controlling execution priority
+- Automation actions logged in ticket timeline as internal system entries
+
 ### Email Reply Integration
 - Inbound email parsing so users and agents can reply to notification emails and have responses automatically added as comments on the corresponding ticket
 - Match incoming messages to tickets via `Message-ID` / `In-Reply-To` headers and `X-Ticket-ID`

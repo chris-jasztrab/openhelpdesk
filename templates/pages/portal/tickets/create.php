@@ -58,15 +58,8 @@ $breadcrumbs  = [
                     </select>
                 </div>
                 <div class="col-md-6">
-                    <label for="location_id" class="form-label fw-semibold">Location</label>
-                    <select class="form-select" id="location_id" name="location_id">
-                        <option value="">— Select location —</option>
-                        <?php foreach ($locations as $loc): ?>
-                        <option value="<?= $loc['id'] ?>" <?= old('location_id') == $loc['id'] ? 'selected' : '' ?>>
-                            <?= e($loc['name']) ?>
-                        </option>
-                        <?php endforeach; ?>
-                    </select>
+                    <label class="form-label fw-semibold">Location</label>
+                    <input type="text" class="form-control" value="<?= e($userLocationName ?: 'Not set') ?>" readonly disabled>
                 </div>
             </div>
 
@@ -78,17 +71,6 @@ $breadcrumbs  = [
                         <?php foreach ($priorities as $p): ?>
                         <option value="<?= $p['id'] ?>" <?= old('priority_id') == $p['id'] ? 'selected' : '' ?>>
                             <?= e($p['name']) ?>
-                        </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div class="col-md-6">
-                    <label for="assigned_to" class="form-label fw-semibold">Assign To</label>
-                    <select class="form-select" id="assigned_to" name="assigned_to">
-                        <option value="">— Unassigned —</option>
-                        <?php foreach ($agents as $a): ?>
-                        <option value="<?= $a['id'] ?>" <?= old('assigned_to') == $a['id'] ? 'selected' : '' ?>>
-                            <?= e($a['first_name'] . ' ' . $a['last_name']) ?>
                         </option>
                         <?php endforeach; ?>
                     </select>
@@ -119,7 +101,7 @@ $breadcrumbs  = [
             <hr class="my-4">
 
             <div class="d-flex gap-2">
-                <button type="submit" class="btn text-white" style="background:#4f46e5;">
+                <button type="submit" class="btn text-white" style="background:var(--ld-primary);">
                     <i class="bi bi-send me-1"></i>Submit Ticket
                 </button>
                 <a href="/portal/tickets" class="btn btn-outline-secondary">Cancel</a>

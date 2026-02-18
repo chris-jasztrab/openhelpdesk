@@ -66,7 +66,7 @@
 
             <table cellpadding="0" cellspacing="0">
                 <tr>
-                    <td style="border-radius:6px; background:#4f46e5;">
+                    <td style="border-radius:6px; background:<?= e(getSetting('branding_primary_color', '#4f46e5')) ?>;">
                         <a href="<?= htmlspecialchars($ticketUrl, ENT_QUOTES, 'UTF-8') ?>"
                            style="display:inline-block; padding:10px 24px; color:#ffffff; text-decoration:none; font-size:14px; font-weight:600;">
                             View Ticket

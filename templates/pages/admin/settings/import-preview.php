@@ -109,7 +109,7 @@ $breadcrumbs  = [
         <div class="d-flex gap-2">
             <form method="POST" action="/admin/settings/import/confirm">
                 <?= csrfField() ?>
-                <button type="submit" class="btn text-white" style="background:#4f46e5;"
+                <button type="submit" class="btn text-white" style="background:var(--ld-primary);"
                         onclick="this.disabled=true; this.innerHTML='<span class=\'spinner-border spinner-border-sm me-1\'></span>Importing...'; this.form.submit();">
                     <i class="bi bi-check-lg me-1"></i>Confirm Import (<?= (int) $summary['total_tickets'] ?> tickets)
                 </button>

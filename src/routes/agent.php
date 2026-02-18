@@ -16,6 +16,7 @@ $router->get('/agent/tickets', function () {
     $fType     = trim($_GET['type'] ?? '');
     $fLocation = trim($_GET['location'] ?? '');
     $fAgent    = trim($_GET['agent'] ?? '');
+    $fGroup    = trim($_GET['group'] ?? '');
     $fSearch   = trim($_GET['q'] ?? '');
 
     $where  = [];
@@ -48,6 +49,14 @@ $router->get('/agent/tickets', function () {
             $params[] = (int) $fAgent;
         }
     }
+    if ($fGroup !== '') {
+        if ($fGroup === 'none') {
+            $where[] = 't.group_id IS NULL';
+        } else {
+            $where[]  = 't.group_id = ?';
+            $params[] = (int) $fGroup;
+        }
+    }
     if ($fSearch !== '') {
         $where[]  = 't.subject LIKE ?';
         $params[] = '%' . $fSearch . '%';
@@ -57,6 +66,7 @@ $router->get('/agent/tickets', function () {
                 tp.name AS priority_name, tp.color AS priority_color,
                 l.name  AS location_name,
                 tt.name AS type_name,
+                g.name  AS group_name,
                 CONCAT(c.first_name, ' ', c.last_name) AS creator_name,
                 CONCAT(a.first_name, ' ', a.last_name) AS agent_name
          FROM tickets t
@@ -64,7 +74,8 @@ $router->get('/agent/tickets', function () {
          LEFT JOIN ticket_types tt     ON t.type_id     = tt.id
          LEFT JOIN locations l         ON t.location_id  = l.id
          LEFT JOIN users c             ON t.created_by   = c.id
-         LEFT JOIN users a             ON t.assigned_to  = a.id";
+         LEFT JOIN users a             ON t.assigned_to  = a.id
+         LEFT JOIN `groups` g          ON t.group_id     = g.id";
 
     $whereClause = !empty($where) ? ' WHERE ' . implode(' AND ', $where) : '';
 
@@ -83,6 +94,7 @@ $router->get('/agent/tickets', function () {
         'type'       => 'tt.name',
         'agent'      => 'a.first_name',
         'creator'    => 'c.first_name',
+        'group'      => 'g.name',
         'location'   => 'l.name',
         'created_at' => 't.created_at',
         'due_date'   => 't.due_date',
@@ -108,6 +120,7 @@ $router->get('/agent/tickets', function () {
     $types      = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
     $locations  = $db->query('SELECT * FROM locations ORDER BY name')->fetchAll();
     $agents     = $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin') ORDER BY first_name")->fetchAll();
+    $groups     = $db->query('SELECT * FROM `groups` ORDER BY sort_order, name')->fetchAll();
 
     $filters = [
         'status'   => $fStatus,
@@ -115,6 +128,7 @@ $router->get('/agent/tickets', function () {
         'type'     => $fType,
         'location' => $fLocation,
         'agent'    => $fAgent,
+        'group'    => $fGroup,
         'q'        => $fSearch,
     ];
 
@@ -130,19 +144,38 @@ $router->get('/agent/tickets', function () {
     $savedFilters = $sfStmt->fetchAll();
 
     render('agent/tickets/index', [
-        'tickets'      => $tickets,
-        'priorities'   => $priorities,
-        'types'        => $types,
-        'locations'    => $locations,
-        'agents'       => $agents,
-        'filters'      => $filters,
-        'savedFilters' => $savedFilters,
-        'page'         => $page,
-        'totalPages'   => $totalPages,
-        'totalTickets' => $totalTickets,
-        'sort'         => $sort,
-        'dir'          => strtolower($dir),
+        'tickets'        => $tickets,
+        'priorities'     => $priorities,
+        'types'          => $types,
+        'locations'      => $locations,
+        'agents'         => $agents,
+        'groups'         => $groups,
+        'filters'        => $filters,
+        'savedFilters'   => $savedFilters,
+        'page'           => $page,
+        'totalPages'     => $totalPages,
+        'totalTickets'   => $totalTickets,
+        'sort'           => $sort,
+        'dir'            => strtolower($dir),
+        'visibleColumns' => getUserColumns(Auth::id()),
     ]);
+});
+
+/* ── Column Preferences (Agent) ───────────────────────────────────── */
+
+$router->post('/agent/tickets/columns', function () {
+    Auth::requireRole('agent', 'admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/agent/tickets');
+    }
+
+    $columns = $_POST['columns'] ?? [];
+    if (!is_array($columns)) {
+        $columns = [];
+    }
+    setUserColumns(Auth::id(), $columns);
+    redirect($_POST['_redirect'] ?? '/agent/tickets');
 });
 
 /* ── Saved Filters (Agent) ────────────────────────────────────────── */
@@ -233,13 +266,15 @@ $router->get('/agent/tickets/{id}', function (array $p) {
                 l.name  AS location_name,
                 tt.name AS type_name,
                 CONCAT(c.first_name, ' ', c.last_name) AS creator_name, c.email AS creator_email,
-                CONCAT(a.first_name, ' ', a.last_name) AS agent_name
+                CONCAT(a.first_name, ' ', a.last_name) AS agent_name,
+                g.name AS group_name
          FROM tickets t
          LEFT JOIN ticket_priorities tp ON t.priority_id = tp.id
          LEFT JOIN ticket_types tt     ON t.type_id     = tt.id
          LEFT JOIN locations l         ON t.location_id  = l.id
          LEFT JOIN users c             ON t.created_by   = c.id
          LEFT JOIN users a             ON t.assigned_to  = a.id
+         LEFT JOIN groups g            ON t.group_id     = g.id
          WHERE t.id = ?"
     );
     $stmt->execute([(int) $p['id']]);
@@ -296,7 +331,10 @@ $router->get('/agent/tickets/{id}', function (array $p) {
     $ccStmt->execute([$ticket['id']]);
     $ccUsers = $ccStmt->fetchAll();
 
-    render('agent/tickets/view', ['ticket' => $ticket, 'timeline' => $timeline, 'agents' => $agents, 'priorities' => $priorities, 'attachments' => $attachments, 'ccUsers' => $ccUsers]);
+    // Groups for assignment dropdown
+    $groups = $db->query('SELECT id, name FROM groups ORDER BY name')->fetchAll();
+
+    render('agent/tickets/view', ['ticket' => $ticket, 'timeline' => $timeline, 'agents' => $agents, 'priorities' => $priorities, 'attachments' => $attachments, 'ccUsers' => $ccUsers, 'groups' => $groups]);
 });
 
 /* ==================================================================
@@ -457,7 +495,35 @@ $router->post('/agent/tickets/{id}/update', function (array $p) {
         $changes[] = 'assignment';
     }
 
+    // Group change
+    $newGroupRaw = $_POST['group_id'] ?? '';
+    $newGroup = $newGroupRaw === '' ? null : (int) $newGroupRaw;
+    $oldGroup = $ticket['group_id'] ? (int) $ticket['group_id'] : null;
+    if ($newGroup !== $oldGroup) {
+        $db->prepare('UPDATE tickets SET group_id = ? WHERE id = ?')->execute([$newGroup, $id]);
+
+        $oldGroupName = 'None';
+        $newGroupName = 'None';
+        if ($oldGroup) {
+            $s = $db->prepare('SELECT name FROM groups WHERE id = ?');
+            $s->execute([$oldGroup]);
+            $oldGroupName = $s->fetchColumn() ?: 'None';
+        }
+        if ($newGroup) {
+            $s = $db->prepare('SELECT name FROM groups WHERE id = ?');
+            $s->execute([$newGroup]);
+            $newGroupName = $s->fetchColumn() ?: 'None';
+        }
+
+        $db->prepare(
+            'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
+        )->execute([$id, Auth::id(), 'group_changed', "Group changed from {$oldGroupName} to {$newGroupName}"]);
+        $changes[] = 'group';
+    }
+
+    // Run automations on ticket update
     if (!empty($changes)) {
+        runAutomations($db, $id, 'ticket_updated');
         flash('success', 'Ticket updated: ' . implode(', ', $changes) . '.');
     } else {
         flash('info', 'No changes made.');

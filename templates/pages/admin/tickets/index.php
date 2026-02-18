@@ -11,6 +11,9 @@ $statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 
 $slaStateColors = ['on_track' => 'success', 'warning' => 'warning', 'breached' => 'danger'];
 $hasFilters = array_filter($filters, fn($v) => $v !== '');
 $sortParams = array_filter($filters, fn($v) => $v !== '');
+$allColumns = ticketColumnDefinitions();
+$colCount = 2 + count($visibleColumns); // id + subject + visible toggleable columns
+$currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : '');
 ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="fw-bold mb-0">All Tickets</h2>
@@ -72,8 +75,18 @@ $sortParams = array_filter($filters, fn($v) => $v !== '');
                     <?php endforeach; ?>
                 </select>
             </div>
+            <div class="col-md-auto" style="min-width:130px;">
+                <label class="form-label small text-muted mb-1">Group</label>
+                <select class="form-select form-select-sm" name="group">
+                    <option value="">All Groups</option>
+                    <option value="none" <?= $filters['group'] === 'none' ? 'selected' : '' ?>>No Group</option>
+                    <?php foreach ($groups as $grp): ?>
+                    <option value="<?= $grp['id'] ?>" <?= $filters['group'] == $grp['id'] ? 'selected' : '' ?>><?= e($grp['name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
             <div class="col-md-auto d-flex gap-1">
-                <button type="submit" class="btn btn-sm text-white" style="background:#4f46e5;">
+                <button type="submit" class="btn btn-sm text-white" style="background:var(--ld-primary);">
                     <i class="bi bi-funnel me-1"></i>Filter
                 </button>
                 <?php if ($hasFilters): ?>
@@ -86,7 +99,7 @@ $sortParams = array_filter($filters, fn($v) => $v !== '');
     </div>
 </div>
 
-<!-- Saved Filters -->
+<!-- Saved Filters & Column Chooser -->
 <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
     <span class="text-muted small"><i class="bi bi-bookmark me-1"></i>Saved:</span>
     <?php foreach ($savedFilters as $sf):
@@ -95,7 +108,7 @@ $sortParams = array_filter($filters, fn($v) => $v !== '');
         $isOwner = ((int) $sf['user_id'] === Auth::id());
         // Check if this saved filter matches the current filters
         $isActive = true;
-        foreach (['status','priority','type','location','agent','q'] as $fk) {
+        foreach (['status','priority','type','location','agent','group','q'] as $fk) {
             $saved   = (string) ($sfData[$fk] ?? '');
             $current = (string) ($filters[$fk] ?? '');
             if ($saved !== $current) { $isActive = false; break; }
@@ -104,7 +117,7 @@ $sortParams = array_filter($filters, fn($v) => $v !== '');
     <div class="btn-group btn-group-sm">
         <a href="<?= e($sfUrl) ?>"
            class="btn <?= $isActive ? 'text-white' : 'btn-outline-secondary' ?>"
-           <?= $isActive ? 'style="background:#4f46e5;"' : '' ?>
+           <?= $isActive ? 'style="background:var(--ld-primary);"' : '' ?>
            title="<?= $isOwner ? '' : 'Shared by ' . e($sf['owner_name']) ?>">
             <?php if ($sf['is_shared'] && !$isOwner): ?>
                 <i class="bi bi-people-fill me-1" title="Shared by <?= e($sf['owner_name']) ?>"></i>
@@ -149,6 +162,30 @@ $sortParams = array_filter($filters, fn($v) => $v !== '');
         <i class="bi bi-bookmark-plus me-1"></i>Save Current Filter
     </button>
     <?php endif; ?>
+
+    <!-- Column Chooser -->
+    <div class="dropdown ms-auto">
+        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+            <i class="bi bi-layout-three-columns me-1"></i>Columns
+        </button>
+        <div class="dropdown-menu dropdown-menu-end p-3" style="min-width:200px;">
+            <form method="POST" action="/admin/tickets/columns">
+                <?= csrfField() ?>
+                <input type="hidden" name="_redirect" value="<?= e($currentUrl) ?>">
+                <h6 class="dropdown-header px-0 pt-0">Visible Columns</h6>
+                <?php foreach ($allColumns as $colKey => $colLabel): ?>
+                <div class="form-check mb-1">
+                    <input class="form-check-input" type="checkbox" name="columns[]"
+                           value="<?= $colKey ?>" id="col_<?= $colKey ?>"
+                           <?= in_array($colKey, $visibleColumns) ? 'checked' : '' ?>>
+                    <label class="form-check-label small" for="col_<?= $colKey ?>"><?= e($colLabel) ?></label>
+                </div>
+                <?php endforeach; ?>
+                <hr class="my-2">
+                <button type="submit" class="btn btn-sm text-white w-100" style="background:var(--ld-primary);">Apply</button>
+            </form>
+        </div>
+    </div>
 </div>
 
 <!-- Save Filter Modal -->
@@ -172,7 +209,7 @@ $sortParams = array_filter($filters, fn($v) => $v !== '');
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-sm text-white" style="background:#4f46e5;">Save</button>
+                    <button type="submit" class="btn btn-sm text-white" style="background:var(--ld-primary);">Save</button>
                 </div>
             </form>
         </div>
@@ -186,20 +223,41 @@ $sortParams = array_filter($filters, fn($v) => $v !== '');
                 <tr>
                     <th style="width:60px"><a href="<?= sortUrl('id', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark"># <?= sortIcon('id', $sort, $dir) ?></a></th>
                     <th><a href="<?= sortUrl('subject', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Subject <?= sortIcon('subject', $sort, $dir) ?></a></th>
+                    <?php if (in_array('status', $visibleColumns)): ?>
                     <th><a href="<?= sortUrl('status', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Status <?= sortIcon('status', $sort, $dir) ?></a></th>
+                    <?php endif; ?>
+                    <?php if (in_array('priority', $visibleColumns)): ?>
                     <th><a href="<?= sortUrl('priority', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Priority <?= sortIcon('priority', $sort, $dir) ?></a></th>
+                    <?php endif; ?>
+                    <?php if (in_array('type', $visibleColumns)): ?>
                     <th><a href="<?= sortUrl('type', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Type <?= sortIcon('type', $sort, $dir) ?></a></th>
+                    <?php endif; ?>
+                    <?php if (in_array('agent', $visibleColumns)): ?>
                     <th><a href="<?= sortUrl('agent', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Assigned To <?= sortIcon('agent', $sort, $dir) ?></a></th>
+                    <?php endif; ?>
+                    <?php if (in_array('group', $visibleColumns)): ?>
+                    <th><a href="<?= sortUrl('group', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Group <?= sortIcon('group', $sort, $dir) ?></a></th>
+                    <?php endif; ?>
+                    <?php if (in_array('creator', $visibleColumns)): ?>
                     <th><a href="<?= sortUrl('creator', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Created By <?= sortIcon('creator', $sort, $dir) ?></a></th>
+                    <?php endif; ?>
+                    <?php if (in_array('location', $visibleColumns)): ?>
                     <th><a href="<?= sortUrl('location', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Location <?= sortIcon('location', $sort, $dir) ?></a></th>
+                    <?php endif; ?>
+                    <?php if (in_array('sla', $visibleColumns)): ?>
                     <th>SLA</th>
+                    <?php endif; ?>
+                    <?php if (in_array('created_at', $visibleColumns)): ?>
                     <th><a href="<?= sortUrl('created_at', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Created <?= sortIcon('created_at', $sort, $dir) ?></a></th>
+                    <?php endif; ?>
+                    <?php if (in_array('due_date', $visibleColumns)): ?>
                     <th><a href="<?= sortUrl('due_date', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Due <?= sortIcon('due_date', $sort, $dir) ?></a></th>
+                    <?php endif; ?>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($tickets)): ?>
-                <tr><td colspan="11" class="text-center py-4 text-muted">No tickets found.</td></tr>
+                <tr><td colspan="<?= $colCount ?>" class="text-center py-4 text-muted">No tickets found.</td></tr>
                 <?php else: ?>
                     <?php foreach ($tickets as $t): ?>
                     <tr style="cursor:pointer;" onclick="window.location='/admin/tickets/<?= $t['id'] ?>'">
@@ -209,11 +267,14 @@ $sortParams = array_filter($filters, fn($v) => $v !== '');
                                 <?= e($t['subject']) ?>
                             </a>
                         </td>
+                        <?php if (in_array('status', $visibleColumns)): ?>
                         <td>
                             <span class="badge bg-<?= $statusColors[$t['status']] ?? 'secondary' ?>">
                                 <?= e($statusLabels[$t['status']] ?? $t['status']) ?>
                             </span>
                         </td>
+                        <?php endif; ?>
+                        <?php if (in_array('priority', $visibleColumns)): ?>
                         <td>
                             <?php if ($t['priority_name']): ?>
                             <span class="badge" style="background:<?= e($t['priority_color']) ?>;">
@@ -223,10 +284,23 @@ $sortParams = array_filter($filters, fn($v) => $v !== '');
                             <span class="text-muted">—</span>
                             <?php endif; ?>
                         </td>
+                        <?php endif; ?>
+                        <?php if (in_array('type', $visibleColumns)): ?>
                         <td class="text-muted"><?= e($t['type_name'] ?? '—') ?></td>
+                        <?php endif; ?>
+                        <?php if (in_array('agent', $visibleColumns)): ?>
                         <td><?= e($t['agent_name'] ?: '— Unassigned —') ?></td>
+                        <?php endif; ?>
+                        <?php if (in_array('group', $visibleColumns)): ?>
+                        <td class="text-muted"><?= e($t['group_name'] ?? '—') ?></td>
+                        <?php endif; ?>
+                        <?php if (in_array('creator', $visibleColumns)): ?>
                         <td class="text-muted"><?= e($t['creator_name'] ?? '—') ?></td>
+                        <?php endif; ?>
+                        <?php if (in_array('location', $visibleColumns)): ?>
                         <td class="text-muted"><?= e($t['location_name'] ?? '—') ?></td>
+                        <?php endif; ?>
+                        <?php if (in_array('sla', $visibleColumns)): ?>
                         <td>
                             <?php if ($t['sla_state']): ?>
                             <span class="badge bg-<?= $slaStateColors[$t['sla_state']] ?? 'secondary' ?>" title="<?= e(ucfirst(str_replace('_', ' ', $t['sla_state']))) ?>">
@@ -236,7 +310,11 @@ $sortParams = array_filter($filters, fn($v) => $v !== '');
                             <span class="text-muted">—</span>
                             <?php endif; ?>
                         </td>
+                        <?php endif; ?>
+                        <?php if (in_array('created_at', $visibleColumns)): ?>
                         <td class="text-muted small"><?= date('M j, Y', strtotime($t['created_at'])) ?></td>
+                        <?php endif; ?>
+                        <?php if (in_array('due_date', $visibleColumns)): ?>
                         <td class="text-muted small">
                             <?php if ($t['due_date']): ?>
                                 <?php
@@ -250,6 +328,7 @@ $sortParams = array_filter($filters, fn($v) => $v !== '');
                                 —
                             <?php endif; ?>
                         </td>
+                        <?php endif; ?>
                     </tr>
                     <?php endforeach; ?>
                 <?php endif; ?>
@@ -281,7 +360,7 @@ $sortParams = array_filter($filters, fn($v) => $v !== '');
         <?php for ($p = max(1, $page - 2); $p <= min($totalPages, $page + 2); $p++): ?>
         <li class="page-item <?= $p === $page ? 'active' : '' ?>">
             <a class="page-link" href="<?= e($pagerBase . '?' . http_build_query(array_merge($pagerParams, ['page' => $p]))) ?>"
-               <?= $p === $page ? 'style="background:#4f46e5;border-color:#4f46e5;"' : '' ?>><?= $p ?></a>
+               <?= $p === $page ? 'style="background:var(--ld-primary);border-color:var(--ld-primary);"' : '' ?>><?= $p ?></a>
         </li>
         <?php endfor; ?>
         <li class="page-item <?= $page >= $totalPages ? 'disabled' : '' ?>">

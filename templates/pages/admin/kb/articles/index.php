@@ -17,7 +17,7 @@ $breadcrumbs  = [
         <a href="/admin/kb/folders" class="btn btn-outline-secondary">
             <i class="bi bi-folder me-1"></i>Folders
         </a>
-        <a href="/admin/kb/articles/create" class="btn text-white" style="background:#4f46e5;">
+        <a href="/admin/kb/articles/create" class="btn text-white" style="background:var(--ld-primary);">
             <i class="bi bi-plus-lg me-1"></i>Add Article
         </a>
     </div>

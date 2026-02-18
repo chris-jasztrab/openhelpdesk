@@ -149,7 +149,7 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
                                 <i class="bi bi-lock me-1"></i>Internal note <span class="text-muted">(not visible to the user)</span>
                             </label>
                         </div>
-                        <button type="submit" class="btn text-white" style="background:#4f46e5;">
+                        <button type="submit" class="btn text-white" style="background:var(--ld-primary);">
                             <i class="bi bi-send me-1"></i>Post
                         </button>
                     </div>
@@ -187,6 +187,9 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
 
                     <dt class="text-muted small">Assigned To</dt>
                     <dd><?= e($ticket['agent_name'] ?: 'Unassigned') ?></dd>
+
+                    <dt class="text-muted small">Group</dt>
+                    <dd><?= e($ticket['group_name'] ?? 'None') ?></dd>
 
                     <dt class="text-muted small">Created By</dt>
                     <dd>
@@ -343,7 +346,19 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
                         </select>
                     </div>
 
-                    <button type="submit" class="btn btn-sm text-white w-100" style="background:#4f46e5;">
+                    <div class="mb-3">
+                        <label for="group_id" class="form-label fw-semibold small">Group</label>
+                        <select class="form-select form-select-sm" name="group_id" id="group_id">
+                            <option value="">None</option>
+                            <?php foreach ($groups as $grp): ?>
+                            <option value="<?= $grp['id'] ?>" <?= (int) ($ticket['group_id'] ?? 0) === (int) $grp['id'] ? 'selected' : '' ?>>
+                                <?= e($grp['name']) ?>
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn btn-sm text-white w-100" style="background:var(--ld-primary);">
                         <i class="bi bi-check-lg me-1"></i>Update
                     </button>
                 </form>

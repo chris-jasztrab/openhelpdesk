@@ -16,7 +16,7 @@ $breadcrumbs  = [
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h5 class="fw-bold mb-0">Ticket Types</h5>
-    <a href="/admin/types/create" class="btn text-white" style="background:#4f46e5;">
+    <a href="/admin/types/create" class="btn text-white" style="background:var(--ld-primary);">
         <i class="bi bi-plus-lg me-1"></i>Add Type
     </a>
 </div>

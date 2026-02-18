@@ -106,14 +106,30 @@ $router->get('/portal/tickets/create', function () {
     $types      = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
     $locations  = $db->query('SELECT * FROM locations ORDER BY name')->fetchAll();
     $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
-    $agents     = $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin') ORDER BY first_name")->fetchAll();
     $tags       = $db->query('SELECT * FROM ticket_tags ORDER BY name')->fetchAll();
+
+    // Determine the user's location (from profile, or first location as fallback)
+    $userStmt = $db->prepare('SELECT location_id FROM users WHERE id = ?');
+    $userStmt->execute([Auth::id()]);
+    $userLocationId = $userStmt->fetchColumn() ?: null;
+    if (!$userLocationId && !empty($locations)) {
+        $userLocationId = $locations[0]['id'];
+    }
+    $userLocationName = '';
+    foreach ($locations as $loc) {
+        if ((int) $loc['id'] === (int) $userLocationId) {
+            $userLocationName = $loc['name'];
+            break;
+        }
+    }
+
     render('portal/tickets/create', [
-        'types'      => $types,
-        'locations'  => $locations,
-        'priorities' => $priorities,
-        'agents'     => $agents,
-        'tags'       => $tags,
+        'types'            => $types,
+        'locations'        => $locations,
+        'priorities'       => $priorities,
+        'tags'             => $tags,
+        'userLocationId'   => $userLocationId,
+        'userLocationName' => $userLocationName,
     ]);
 });
 
@@ -127,20 +143,29 @@ $router->post('/portal/tickets/create', function () {
     $subject     = trim($_POST['subject'] ?? '');
     $description = trim($_POST['description'] ?? '');
     $typeId      = !empty($_POST['type_id']) ? (int) $_POST['type_id'] : null;
-    $locationId  = !empty($_POST['location_id']) ? (int) $_POST['location_id'] : null;
     $priorityId  = !empty($_POST['priority_id']) ? (int) $_POST['priority_id'] : null;
-    $assignedTo  = !empty($_POST['assigned_to']) ? (int) $_POST['assigned_to'] : null;
     $browserInfo = trim($_POST['browser_info'] ?? '');
     $osInfo      = trim($_POST['os_info'] ?? '');
     $tagNames    = $_POST['tags'] ?? [];
+
+    // Auto-assign location from user profile (fallback to first location)
+    $db = Database::connect();
+    $userLocStmt = $db->prepare('SELECT location_id FROM users WHERE id = ?');
+    $userLocStmt->execute([Auth::id()]);
+    $locationId = $userLocStmt->fetchColumn() ?: null;
+    if (!$locationId) {
+        $firstLoc = $db->query('SELECT id FROM locations ORDER BY name LIMIT 1')->fetchColumn();
+        $locationId = $firstLoc ?: null;
+    }
+
+    // Assignment is handled by agents/admins, not portal users
+    $assignedTo = null;
 
     if ($subject === '' || $description === '') {
         flashInput($_POST);
         flash('error', 'Subject and description are required.');
         redirect('/portal/tickets/create');
     }
-
-    $db = Database::connect();
 
     $stmt = $db->prepare(
         'INSERT INTO tickets (subject, description, browser_info, os_info, created_by, type_id, location_id, status, priority_id, assigned_to)
@@ -175,6 +200,9 @@ $router->post('/portal/tickets/create', function () {
     $db->prepare(
         'INSERT INTO ticket_timeline (ticket_id, user_id, action, details) VALUES (?, ?, ?, ?)'
     )->execute([$ticketId, Auth::id(), 'created', 'Ticket created.']);
+
+    // Run automations for new ticket
+    runAutomations($db, $ticketId, 'ticket_created');
 
     // Handle file attachments
     $attachments = handleAttachmentUploads('attachments');

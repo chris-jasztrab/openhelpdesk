@@ -599,6 +599,7 @@ $router->get('/admin/tickets', function () {
     $fType     = trim($_GET['type'] ?? '');
     $fLocation = trim($_GET['location'] ?? '');
     $fAgent    = trim($_GET['agent'] ?? '');
+    $fGroup    = trim($_GET['group'] ?? '');
     $fSearch   = trim($_GET['q'] ?? '');
 
     $where  = [];
@@ -628,6 +629,14 @@ $router->get('/admin/tickets', function () {
             $params[] = (int) $fAgent;
         }
     }
+    if ($fGroup !== '') {
+        if ($fGroup === 'none') {
+            $where[] = 't.group_id IS NULL';
+        } else {
+            $where[]  = 't.group_id = ?';
+            $params[] = (int) $fGroup;
+        }
+    }
     if ($fSearch !== '') {
         $where[]  = 't.subject LIKE ?';
         $params[] = '%' . $fSearch . '%';
@@ -637,6 +646,7 @@ $router->get('/admin/tickets', function () {
                 tp.name AS priority_name, tp.color AS priority_color,
                 l.name  AS location_name,
                 tt.name AS type_name,
+                g.name  AS group_name,
                 CONCAT(c.first_name, ' ', c.last_name) AS creator_name,
                 CONCAT(a.first_name, ' ', a.last_name) AS agent_name
          FROM tickets t
@@ -644,7 +654,8 @@ $router->get('/admin/tickets', function () {
          LEFT JOIN ticket_types tt     ON t.type_id     = tt.id
          LEFT JOIN locations l         ON t.location_id  = l.id
          LEFT JOIN users c             ON t.created_by   = c.id
-         LEFT JOIN users a             ON t.assigned_to  = a.id";
+         LEFT JOIN users a             ON t.assigned_to  = a.id
+         LEFT JOIN `groups` g          ON t.group_id     = g.id";
 
     $whereClause = !empty($where) ? ' WHERE ' . implode(' AND ', $where) : '';
 
@@ -663,6 +674,7 @@ $router->get('/admin/tickets', function () {
         'type'       => 'tt.name',
         'agent'      => 'a.first_name',
         'creator'    => 'c.first_name',
+        'group'      => 'g.name',
         'location'   => 'l.name',
         'created_at' => 't.created_at',
         'due_date'   => 't.due_date',
@@ -688,6 +700,7 @@ $router->get('/admin/tickets', function () {
     $types      = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
     $locations  = $db->query('SELECT * FROM locations ORDER BY name')->fetchAll();
     $agents     = $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin') ORDER BY first_name")->fetchAll();
+    $groups     = $db->query('SELECT * FROM `groups` ORDER BY sort_order, name')->fetchAll();
 
     $filters = [
         'status'   => $fStatus,
@@ -695,6 +708,7 @@ $router->get('/admin/tickets', function () {
         'type'     => $fType,
         'location' => $fLocation,
         'agent'    => $fAgent,
+        'group'    => $fGroup,
         'q'        => $fSearch,
     ];
 
@@ -710,19 +724,38 @@ $router->get('/admin/tickets', function () {
     $savedFilters = $sfStmt->fetchAll();
 
     render('admin/tickets/index', [
-        'tickets'      => $tickets,
-        'priorities'   => $priorities,
-        'types'        => $types,
-        'locations'    => $locations,
-        'agents'       => $agents,
-        'filters'      => $filters,
-        'savedFilters' => $savedFilters,
-        'page'         => $page,
-        'totalPages'   => $totalPages,
-        'totalTickets' => $totalTickets,
-        'sort'         => $sort,
-        'dir'          => strtolower($dir),
+        'tickets'        => $tickets,
+        'priorities'     => $priorities,
+        'types'          => $types,
+        'locations'      => $locations,
+        'agents'         => $agents,
+        'groups'         => $groups,
+        'filters'        => $filters,
+        'savedFilters'   => $savedFilters,
+        'page'           => $page,
+        'totalPages'     => $totalPages,
+        'totalTickets'   => $totalTickets,
+        'sort'           => $sort,
+        'dir'            => strtolower($dir),
+        'visibleColumns' => getUserColumns(Auth::id()),
     ]);
+});
+
+/* ── Column Preferences (Admin) ───────────────────────────────────── */
+
+$router->post('/admin/tickets/columns', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/tickets');
+    }
+
+    $columns = $_POST['columns'] ?? [];
+    if (!is_array($columns)) {
+        $columns = [];
+    }
+    setUserColumns(Auth::id(), $columns);
+    redirect($_POST['_redirect'] ?? '/admin/tickets');
 });
 
 /* ── Saved Filters (Admin) ────────────────────────────────────────── */
@@ -813,13 +846,15 @@ $router->get('/admin/tickets/{id}', function (array $p) {
                 l.name  AS location_name,
                 tt.name AS type_name,
                 CONCAT(c.first_name, ' ', c.last_name) AS creator_name, c.email AS creator_email,
-                CONCAT(a.first_name, ' ', a.last_name) AS agent_name
+                CONCAT(a.first_name, ' ', a.last_name) AS agent_name,
+                g.name AS group_name
          FROM tickets t
          LEFT JOIN ticket_priorities tp ON t.priority_id = tp.id
          LEFT JOIN ticket_types tt     ON t.type_id     = tt.id
          LEFT JOIN locations l         ON t.location_id  = l.id
          LEFT JOIN users c             ON t.created_by   = c.id
          LEFT JOIN users a             ON t.assigned_to  = a.id
+         LEFT JOIN `groups` g          ON t.group_id     = g.id
          WHERE t.id = ?"
     );
     $stmt->execute([(int) $p['id']]);
@@ -876,7 +911,9 @@ $router->get('/admin/tickets/{id}', function (array $p) {
     $ccStmt->execute([$ticket['id']]);
     $ccUsers = $ccStmt->fetchAll();
 
-    render('admin/tickets/view', ['ticket' => $ticket, 'timeline' => $timeline, 'agents' => $agents, 'priorities' => $priorities, 'attachments' => $attachments, 'ccUsers' => $ccUsers]);
+    $groups = $db->query('SELECT * FROM `groups` ORDER BY sort_order, name')->fetchAll();
+
+    render('admin/tickets/view', ['ticket' => $ticket, 'timeline' => $timeline, 'agents' => $agents, 'priorities' => $priorities, 'attachments' => $attachments, 'ccUsers' => $ccUsers, 'groups' => $groups]);
 });
 
 /* ==================================================================
@@ -1038,7 +1075,35 @@ $router->post('/admin/tickets/{id}/update', function (array $p) {
         $changes[] = 'assignment';
     }
 
+    // Group change
+    $newGroupRaw = $_POST['group_id'] ?? '';
+    $newGroup = $newGroupRaw === '' ? null : (int) $newGroupRaw;
+    $oldGroup = $ticket['group_id'] ? (int) $ticket['group_id'] : null;
+    if ($newGroup !== $oldGroup) {
+        $db->prepare('UPDATE tickets SET group_id = ? WHERE id = ?')->execute([$newGroup, $id]);
+
+        $oldGroupName = 'None';
+        $newGroupName = 'None';
+        if ($oldGroup) {
+            $s = $db->prepare('SELECT name FROM `groups` WHERE id = ?');
+            $s->execute([$oldGroup]);
+            $oldGroupName = $s->fetchColumn() ?: 'None';
+        }
+        if ($newGroup) {
+            $s = $db->prepare('SELECT name FROM `groups` WHERE id = ?');
+            $s->execute([$newGroup]);
+            $newGroupName = $s->fetchColumn() ?: 'None';
+        }
+
+        $db->prepare(
+            'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
+        )->execute([$id, Auth::id(), 'group_changed', "Group changed from {$oldGroupName} to {$newGroupName}"]);
+        $changes[] = 'group';
+    }
+
+    // Run automations on ticket update
     if (!empty($changes)) {
+        runAutomations($db, $id, 'ticket_updated');
         flash('success', 'Ticket updated: ' . implode(', ', $changes) . '.');
     } else {
         flash('info', 'No changes made.');
@@ -2008,6 +2073,321 @@ $router->post('/admin/settings/import/confirm', function () {
     flash('success', $msg);
     redirect('/admin/tickets');
 });
+
+/* ==================================================================
+ * ADMIN – Settings: Branding
+ * ================================================================== */
+
+$router->get('/admin/settings/branding', function () {
+    Auth::requireRole('admin');
+    render('admin/settings/branding', [
+        'appName'      => getSetting('branding_app_name', 'LocalDesk'),
+        'primaryColor' => getSetting('branding_primary_color', '#4f46e5'),
+        'primaryHover' => getSetting('branding_primary_hover', '#4338ca'),
+        'navbarStart'  => getSetting('branding_navbar_start', '#1e1b4b'),
+        'navbarEnd'    => getSetting('branding_navbar_end', '#312e81'),
+        'logo'         => getSetting('branding_logo', ''),
+    ]);
+});
+
+$router->post('/admin/settings/branding', function () {
+    Auth::requireRole('admin');
+    verifyCsrf();
+
+    $appName      = trim($_POST['app_name'] ?? 'LocalDesk');
+    $primaryColor = trim($_POST['primary_color'] ?? '#4f46e5');
+    $primaryHover = trim($_POST['primary_hover'] ?? '#4338ca');
+    $navbarStart  = trim($_POST['navbar_start'] ?? '#1e1b4b');
+    $navbarEnd    = trim($_POST['navbar_end'] ?? '#312e81');
+
+    // Validate hex colors
+    $colorPattern = '/^#[0-9a-fA-F]{6}$/';
+    foreach ([$primaryColor, $primaryHover, $navbarStart, $navbarEnd] as $color) {
+        if (!preg_match($colorPattern, $color)) {
+            flash('error', 'Invalid color format. Use hex colors like #4f46e5.');
+            redirect('/admin/settings/branding');
+            return;
+        }
+    }
+
+    // Handle logo upload
+    $currentLogo = getSetting('branding_logo', '');
+
+    // Remove logo checkbox
+    if (!empty($_POST['remove_logo'])) {
+        if ($currentLogo && file_exists(ROOT_DIR . '/public/uploads/branding/' . $currentLogo)) {
+            unlink(ROOT_DIR . '/public/uploads/branding/' . $currentLogo);
+        }
+        setSetting('branding_logo', '');
+        $currentLogo = '';
+    }
+
+    // New logo upload
+    if (!empty($_FILES['logo']['tmp_name'])) {
+        $file = $_FILES['logo'];
+        $allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mime  = finfo_file($finfo, $file['tmp_name']);
+        finfo_close($finfo);
+
+        if (!in_array($mime, $allowedMimes, true)) {
+            flash('error', 'Invalid logo file type. Allowed: JPG, PNG, GIF, WEBP, SVG.');
+            redirect('/admin/settings/branding');
+            return;
+        }
+
+        if ($file['size'] > 2 * 1024 * 1024) {
+            flash('error', 'Logo file is too large. Maximum 2 MB.');
+            redirect('/admin/settings/branding');
+            return;
+        }
+
+        // Delete old logo
+        if ($currentLogo && file_exists(ROOT_DIR . '/public/uploads/branding/' . $currentLogo)) {
+            unlink(ROOT_DIR . '/public/uploads/branding/' . $currentLogo);
+        }
+
+        $ext = match ($mime) {
+            'image/jpeg'    => 'jpg',
+            'image/png'     => 'png',
+            'image/gif'     => 'gif',
+            'image/webp'    => 'webp',
+            'image/svg+xml' => 'svg',
+            default         => 'png',
+        };
+        $filename = 'logo_' . uniqid() . '.' . $ext;
+        move_uploaded_file($file['tmp_name'], ROOT_DIR . '/public/uploads/branding/' . $filename);
+        setSetting('branding_logo', $filename);
+    }
+
+    // Save settings
+    setSetting('branding_app_name', $appName);
+    setSetting('branding_primary_color', $primaryColor);
+    setSetting('branding_primary_hover', $primaryHover);
+    setSetting('branding_navbar_start', $navbarStart);
+    setSetting('branding_navbar_end', $navbarEnd);
+
+    flash('success', 'Branding settings updated successfully.');
+    redirect('/admin/settings/branding');
+});
+
+/* ==================================================================
+ * ADMIN – Settings: Automations
+ * ================================================================== */
+
+$router->get('/admin/settings/automations', function () {
+    Auth::requireRole('admin');
+    $db = Database::connect();
+    $automations = $db->query('SELECT * FROM automations ORDER BY sort_order, id')->fetchAll();
+    render('admin/automations/index', ['automations' => $automations]);
+});
+
+$router->get('/admin/settings/automations/create', function () {
+    Auth::requireRole('admin');
+    $db = Database::connect();
+    $refData = loadAutomationRefData($db);
+    render('admin/automations/form', $refData);
+});
+
+$router->post('/admin/settings/automations/create', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/automations/create');
+    }
+
+    $name         = trim($_POST['name'] ?? '');
+    $triggerEvent = $_POST['trigger_event'] ?? '';
+    $isEnabled    = !empty($_POST['is_enabled']) ? 1 : 0;
+    $sortOrder    = (int) ($_POST['sort_order'] ?? 0);
+
+    if ($name === '') {
+        flashInput($_POST);
+        flash('error', 'Name is required.');
+        redirect('/admin/settings/automations/create');
+    }
+    if (!in_array($triggerEvent, ['ticket_created', 'ticket_updated'], true)) {
+        flashInput($_POST);
+        flash('error', 'Invalid trigger event.');
+        redirect('/admin/settings/automations/create');
+    }
+
+    $conditions = buildAutomationConditions($_POST);
+    $actions    = buildAutomationActions($_POST);
+
+    if (empty($actions)) {
+        flashInput($_POST);
+        flash('error', 'At least one action is required.');
+        redirect('/admin/settings/automations/create');
+    }
+
+    $db = Database::connect();
+    $db->prepare(
+        'INSERT INTO automations (name, trigger_event, conditions, actions, is_enabled, sort_order) VALUES (?, ?, ?, ?, ?, ?)'
+    )->execute([$name, $triggerEvent, json_encode($conditions), json_encode($actions), $isEnabled, $sortOrder]);
+
+    flash('success', 'Automation created.');
+    redirect('/admin/settings/automations');
+});
+
+$router->get('/admin/settings/automations/{id}/edit', function (array $p) {
+    Auth::requireRole('admin');
+    $db   = Database::connect();
+    $stmt = $db->prepare('SELECT * FROM automations WHERE id = ?');
+    $stmt->execute([(int) $p['id']]);
+    $editing = $stmt->fetch();
+    if (!$editing) {
+        flash('error', 'Automation not found.');
+        redirect('/admin/settings/automations');
+    }
+    $editing['conditions'] = json_decode($editing['conditions'], true) ?: [];
+    $editing['actions']    = json_decode($editing['actions'], true) ?: [];
+
+    $refData = loadAutomationRefData($db);
+    $refData['editing'] = $editing;
+    render('admin/automations/form', $refData);
+});
+
+$router->post('/admin/settings/automations/{id}/edit', function (array $p) {
+    Auth::requireRole('admin');
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect("/admin/settings/automations/{$id}/edit");
+    }
+
+    $db   = Database::connect();
+    $stmt = $db->prepare('SELECT id FROM automations WHERE id = ?');
+    $stmt->execute([$id]);
+    if (!$stmt->fetch()) {
+        flash('error', 'Automation not found.');
+        redirect('/admin/settings/automations');
+    }
+
+    $name         = trim($_POST['name'] ?? '');
+    $triggerEvent = $_POST['trigger_event'] ?? '';
+    $isEnabled    = !empty($_POST['is_enabled']) ? 1 : 0;
+    $sortOrder    = (int) ($_POST['sort_order'] ?? 0);
+
+    if ($name === '') {
+        flashInput($_POST);
+        flash('error', 'Name is required.');
+        redirect("/admin/settings/automations/{$id}/edit");
+    }
+    if (!in_array($triggerEvent, ['ticket_created', 'ticket_updated'], true)) {
+        flashInput($_POST);
+        flash('error', 'Invalid trigger event.');
+        redirect("/admin/settings/automations/{$id}/edit");
+    }
+
+    $conditions = buildAutomationConditions($_POST);
+    $actions    = buildAutomationActions($_POST);
+
+    if (empty($actions)) {
+        flashInput($_POST);
+        flash('error', 'At least one action is required.');
+        redirect("/admin/settings/automations/{$id}/edit");
+    }
+
+    $db->prepare(
+        'UPDATE automations SET name = ?, trigger_event = ?, conditions = ?, actions = ?, is_enabled = ?, sort_order = ? WHERE id = ?'
+    )->execute([$name, $triggerEvent, json_encode($conditions), json_encode($actions), $isEnabled, $sortOrder, $id]);
+
+    flash('success', 'Automation updated.');
+    redirect('/admin/settings/automations');
+});
+
+$router->post('/admin/settings/automations/{id}/delete', function (array $p) {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/automations');
+    }
+    $db = Database::connect();
+    $db->prepare('DELETE FROM automations WHERE id = ?')->execute([(int) $p['id']]);
+    flash('success', 'Automation deleted.');
+    redirect('/admin/settings/automations');
+});
+
+$router->post('/admin/settings/automations/{id}/toggle', function (array $p) {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/automations');
+    }
+    $db   = Database::connect();
+    $stmt = $db->prepare('SELECT is_enabled FROM automations WHERE id = ?');
+    $stmt->execute([(int) $p['id']]);
+    $row = $stmt->fetch();
+    if (!$row) {
+        flash('error', 'Automation not found.');
+        redirect('/admin/settings/automations');
+    }
+    $newState = $row['is_enabled'] ? 0 : 1;
+    $db->prepare('UPDATE automations SET is_enabled = ? WHERE id = ?')->execute([$newState, (int) $p['id']]);
+    flash('success', $newState ? 'Automation enabled.' : 'Automation disabled.');
+    redirect('/admin/settings/automations');
+});
+
+/**
+ * Load reference data for automation forms.
+ */
+function loadAutomationRefData(PDO $db): array
+{
+    return [
+        'types'      => $db->query('SELECT id, name FROM ticket_types ORDER BY sort_order, name')->fetchAll(),
+        'priorities' => $db->query('SELECT id, name FROM ticket_priorities ORDER BY sort_order')->fetchAll(),
+        'locations'  => $db->query('SELECT id, name FROM locations ORDER BY name')->fetchAll(),
+        'groups'     => $db->query('SELECT id, name FROM groups ORDER BY name')->fetchAll(),
+        'agents'     => $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin') ORDER BY first_name")->fetchAll(),
+        'allUsers'   => $db->query("SELECT id, first_name, last_name, email FROM users ORDER BY first_name")->fetchAll(),
+    ];
+}
+
+/**
+ * Build conditions array from POST data.
+ */
+function buildAutomationConditions(array $post): array
+{
+    $conditions = [];
+    $fields    = $post['cond_field'] ?? [];
+    $operators = $post['cond_operator'] ?? [];
+    $values    = $post['cond_value'] ?? [];
+
+    $validFields    = ['type_id', 'priority_id', 'status', 'location_id', 'group_id', 'assigned_to'];
+    $validOperators = ['equals', 'not_equals', 'is_empty', 'is_not_empty'];
+
+    for ($i = 0, $n = count($fields); $i < $n; $i++) {
+        $f = $fields[$i] ?? '';
+        $o = $operators[$i] ?? '';
+        $v = $values[$i] ?? '';
+        if (in_array($f, $validFields, true) && in_array($o, $validOperators, true)) {
+            $conditions[] = ['field' => $f, 'operator' => $o, 'value' => $v];
+        }
+    }
+    return $conditions;
+}
+
+/**
+ * Build actions array from POST data.
+ */
+function buildAutomationActions(array $post): array
+{
+    $actions     = [];
+    $actionTypes = $post['act_type'] ?? [];
+    $actionVals  = $post['act_value'] ?? [];
+
+    $validActions = ['set_group', 'set_assigned_to', 'set_priority', 'set_status', 'add_tag', 'add_cc'];
+
+    for ($i = 0, $n = count($actionTypes); $i < $n; $i++) {
+        $a = $actionTypes[$i] ?? '';
+        $v = $actionVals[$i] ?? '';
+        if (in_array($a, $validActions, true) && $v !== '') {
+            $actions[] = ['action' => $a, 'value' => $v];
+        }
+    }
+    return $actions;
+}
 
 /* ==================================================================
  * ADMIN – Settings: Danger Zone

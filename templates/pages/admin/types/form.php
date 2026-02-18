@@ -40,7 +40,7 @@ $action = $isEdit ? "/admin/types/{$editing['id']}/edit" : '/admin/types/create'
             <hr class="my-4">
 
             <div class="d-flex gap-2">
-                <button type="submit" class="btn text-white" style="background:#4f46e5;">
+                <button type="submit" class="btn text-white" style="background:var(--ld-primary);">
                     <i class="bi bi-check-lg me-1"></i><?= $isEdit ? 'Update Type' : 'Create Type' ?>
                 </button>
                 <a href="/admin/types" class="btn btn-outline-secondary">Cancel</a>

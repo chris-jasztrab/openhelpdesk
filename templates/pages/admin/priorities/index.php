@@ -16,7 +16,7 @@ $breadcrumbs  = [
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h5 class="fw-bold mb-0">Ticket Priorities</h5>
-    <a href="/admin/priorities/create" class="btn text-white" style="background:#4f46e5;">
+    <a href="/admin/priorities/create" class="btn text-white" style="background:var(--ld-primary);">
         <i class="bi bi-flag me-1"></i>Add Priority
     </a>
 </div>

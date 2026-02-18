@@ -13,7 +13,7 @@ $statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'resolved' =>
         <h2 class="fw-bold mb-1">Welcome, <?= e($user['first_name'] ?? 'User') ?></h2>
         <p class="text-muted mb-0">How can we help you today?</p>
     </div>
-    <a href="/portal/tickets/create" class="btn text-white" style="background:#4f46e5;">
+    <a href="/portal/tickets/create" class="btn text-white" style="background:var(--ld-primary);">
         <i class="bi bi-plus-circle me-1"></i>New Ticket
     </a>
 </div>

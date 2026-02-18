@@ -15,7 +15,7 @@ $sortParams = array_filter($filters, fn($v) => $v !== '');
     <h2 class="fw-bold mb-0">My Tickets</h2>
     <div class="d-flex gap-2 align-items-center">
         <span class="badge bg-secondary fs-6"><?= $totalTickets ?><?= $hasFilters ? ' filtered' : ' total' ?></span>
-        <a href="/portal/tickets/create" class="btn text-white" style="background:#4f46e5;">
+        <a href="/portal/tickets/create" class="btn text-white" style="background:var(--ld-primary);">
             <i class="bi bi-plus-circle me-1"></i>New Ticket
         </a>
     </div>
@@ -49,7 +49,7 @@ $sortParams = array_filter($filters, fn($v) => $v !== '');
                 </select>
             </div>
             <div class="col-md-auto d-flex gap-1">
-                <button type="submit" class="btn btn-sm text-white" style="background:#4f46e5;">
+                <button type="submit" class="btn btn-sm text-white" style="background:var(--ld-primary);">
                     <i class="bi bi-funnel me-1"></i>Filter
                 </button>
                 <?php if ($hasFilters): ?>
@@ -138,7 +138,7 @@ $sortParams = array_filter($filters, fn($v) => $v !== '');
         <?php for ($p = max(1, $page - 2); $p <= min($totalPages, $page + 2); $p++): ?>
         <li class="page-item <?= $p === $page ? 'active' : '' ?>">
             <a class="page-link" href="<?= e($pagerBase . '?' . http_build_query(array_merge($pagerParams, ['page' => $p]))) ?>"
-               <?= $p === $page ? 'style="background:#4f46e5;border-color:#4f46e5;"' : '' ?>><?= $p ?></a>
+               <?= $p === $page ? 'style="background:var(--ld-primary);border-color:var(--ld-primary);"' : '' ?>><?= $p ?></a>
         </li>
         <?php endfor; ?>
         <li class="page-item <?= $page >= $totalPages ? 'disabled' : '' ?>">

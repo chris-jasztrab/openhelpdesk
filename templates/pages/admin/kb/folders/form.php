@@ -54,7 +54,7 @@ $action = $isEdit ? "/admin/kb/folders/{$editing['id']}/edit" : '/admin/kb/folde
             <hr class="my-4">
 
             <div class="d-flex gap-2">
-                <button type="submit" class="btn text-white" style="background:#4f46e5;">
+                <button type="submit" class="btn text-white" style="background:var(--ld-primary);">
                     <i class="bi bi-check-lg me-1"></i><?= $isEdit ? 'Update Folder' : 'Create Folder' ?>
                 </button>
                 <a href="/admin/kb/folders" class="btn btn-outline-secondary">Cancel</a>

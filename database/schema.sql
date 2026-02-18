@@ -63,6 +63,7 @@ CREATE TABLE IF NOT EXISTS `tickets` (
     `status`       ENUM('open','in_progress','pending','resolved','closed') NOT NULL DEFAULT 'open',
     `priority_id`  INT UNSIGNED DEFAULT NULL,
     `assigned_to`  INT UNSIGNED DEFAULT NULL,
+    `group_id`     INT UNSIGNED DEFAULT NULL,
     `first_response_due_at` DATETIME DEFAULT NULL,
     `resolution_due_at`     DATETIME DEFAULT NULL,
     `first_responded_at`    DATETIME DEFAULT NULL,
@@ -73,7 +74,8 @@ CREATE TABLE IF NOT EXISTS `tickets` (
     FOREIGN KEY (`type_id`)     REFERENCES `ticket_types`(`id`) ON DELETE SET NULL,
     FOREIGN KEY (`location_id`) REFERENCES `locations`(`id`) ON DELETE SET NULL,
     FOREIGN KEY (`priority_id`) REFERENCES `ticket_priorities`(`id`) ON DELETE SET NULL,
-    FOREIGN KEY (`assigned_to`) REFERENCES `users`(`id`) ON DELETE SET NULL
+    FOREIGN KEY (`assigned_to`) REFERENCES `users`(`id`) ON DELETE SET NULL,
+    FOREIGN KEY (`group_id`)    REFERENCES `groups`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Ticket tags (hashtags)
@@ -235,4 +237,17 @@ CREATE TABLE IF NOT EXISTS `saved_filters` (
 CREATE TABLE IF NOT EXISTS `settings` (
     `setting_key`   VARCHAR(100) NOT NULL PRIMARY KEY,
     `setting_value` TEXT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Automations (rule-based ticket automation)
+CREATE TABLE IF NOT EXISTS `automations` (
+    `id`            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `name`          VARCHAR(255) NOT NULL,
+    `trigger_event` VARCHAR(50)  NOT NULL,
+    `conditions`    JSON         NOT NULL,
+    `actions`       JSON         NOT NULL,
+    `is_enabled`    TINYINT(1)   NOT NULL DEFAULT 1,
+    `sort_order`    INT UNSIGNED NOT NULL DEFAULT 0,
+    `created_at`    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`    TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

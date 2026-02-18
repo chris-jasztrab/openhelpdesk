@@ -1,8 +1,13 @@
 <nav class="navbar navbar-expand-lg navbar-dark sticky-top" style="height:var(--ld-navbar-height,56px);">
     <div class="container-fluid">
+        <?php $brandLogo = getSetting('branding_logo', ''); $brandName = getSetting('branding_app_name', 'LocalDesk'); ?>
         <a class="navbar-brand d-flex align-items-center gap-2" href="/">
-            <i class="bi bi-headset fs-4"></i>
-            <span>LocalDesk</span>
+            <?php if ($brandLogo && file_exists(ROOT_DIR . '/public/uploads/branding/' . $brandLogo)): ?>
+                <img src="/uploads/branding/<?= e($brandLogo) ?>" alt="<?= e($brandName) ?>" style="height:32px;">
+            <?php else: ?>
+                <i class="bi bi-headset fs-4"></i>
+            <?php endif; ?>
+            <span><?= e($brandName) ?></span>
         </a>
 
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">

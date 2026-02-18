@@ -125,7 +125,7 @@ $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-p
                         <input type="file" class="form-control" name="attachments[]" multiple>
                         <div class="form-text">Max <?= UPLOAD_MAX_SIZE / 1024 / 1024 ?>MB per file</div>
                     </div>
-                    <button type="submit" class="btn text-white" style="background:#4f46e5;">
+                    <button type="submit" class="btn text-white" style="background:var(--ld-primary);">
                         <i class="bi bi-send me-1"></i>Post Comment
                     </button>
                 </form>

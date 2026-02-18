@@ -7,6 +7,8 @@ $settingsNav = [
     ['label' => 'Priorities',     'url' => '/admin/priorities',              'icon' => 'bi-flag'],
     ['label' => 'Ticket Types',   'url' => '/admin/types',                   'icon' => 'bi-tags'],
     ['label' => 'Groups',         'url' => '/admin/groups',                  'icon' => 'bi-people-fill'],
+    ['label' => 'Branding',       'url' => '/admin/settings/branding',       'icon' => 'bi-palette'],
+    ['label' => 'Automations',    'url' => '/admin/settings/automations',    'icon' => 'bi-lightning'],
     ['label' => 'Import Tickets', 'url' => '/admin/settings/import',         'icon' => 'bi-cloud-upload'],
     ['label' => 'Danger Zone',   'url' => '/admin/settings/danger-zone',    'icon' => 'bi-exclamation-triangle'],
 ];

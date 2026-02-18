@@ -8,7 +8,8 @@
       "Bash(\"C:/xampp/mysql/bin/mysql.exe\":*)",
       "Bash(composer update:*)",
       "Bash(php -l:*)",
-      "Bash(php:*)"
+      "Bash(php:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": [],
