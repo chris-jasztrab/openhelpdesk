@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="en">
+<?php $userTheme = Auth::check() ? getSetting('ui_theme:' . Auth::id(), 'light') : 'light'; ?>
+<html lang="en" data-bs-theme="<?= e($userTheme) ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -52,6 +53,16 @@
         .ld-search-item { transition: background .1s ease; }
         .ld-search-item:hover { background: #f1f5f9; }
         .ld-search-group + .ld-search-group { border-top: 1px solid #e2e8f0; margin-top: .25rem; padding-top: .25rem; }
+
+        /* Dark mode overrides */
+        [data-bs-theme="dark"] body { background-color: #1a1d21; }
+        [data-bs-theme="dark"] .stat-card { box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+        [data-bs-theme="dark"] .ld-search-tab { color: #adb5bd; }
+        [data-bs-theme="dark"] .ld-search-tab:hover { color: #dee2e6; }
+        [data-bs-theme="dark"] .ld-search-item:hover { background: #2b3035; }
+        [data-bs-theme="dark"] .ld-search-group + .ld-search-group { border-top-color: #373b3e; }
+        [data-bs-theme="dark"] .table-light { --bs-table-bg: #2b3035; --bs-table-color: #dee2e6; }
+        [data-bs-theme="dark"] .shadow-sm { box-shadow: 0 .125rem .25rem rgba(0,0,0,.3) !important; }
     </style>
 </head>
 <body>

@@ -12,6 +12,12 @@ All notable changes to LocalDesk will be documented in this file.
 - Password change with current password verification, minimum 8 characters, and confirmation matching
 - Session is refreshed on save so the navbar reflects name changes immediately
 
+### Dark Mode / Light Mode
+- Per-user theme preference (light or dark) selectable from the My Profile page
+- Leverages Bootstrap 5.3 native `data-bs-theme` attribute for automatic component theming
+- Custom dark mode overrides for sidebar, search dropdown, mention dropdown, stat cards, and table headers
+- Theme preference stored per-user in the settings table and applied on every page load
+
 ### Ticket Export
 - CSV export of tickets from the admin ticket list
 - Export respects all active filters: status, priority, type, location, agent, group, search, and date range

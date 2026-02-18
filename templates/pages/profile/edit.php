@@ -71,6 +71,31 @@ $breadcrumbs = [
                 </div>
             </div>
 
+            <!-- Appearance -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-transparent fw-semibold">
+                    <i class="bi bi-moon-stars me-1"></i>Appearance
+                </div>
+                <div class="card-body">
+                    <div class="d-flex gap-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="theme" id="themeLight"
+                                   value="light" <?= ($theme ?? 'light') === 'light' ? 'checked' : '' ?>>
+                            <label class="form-check-label" for="themeLight">
+                                <i class="bi bi-sun me-1"></i>Light Mode
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="theme" id="themeDark"
+                                   value="dark" <?= ($theme ?? 'light') === 'dark' ? 'checked' : '' ?>>
+                            <label class="form-check-label" for="themeDark">
+                                <i class="bi bi-moon me-1"></i>Dark Mode
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <button type="submit" class="btn text-white px-4" style="background:var(--ld-primary);">
                 <i class="bi bi-check-lg me-1"></i>Save Changes
             </button>

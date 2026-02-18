@@ -345,7 +345,8 @@ $router->get('/profile', function () {
         redirect('/login');
     }
 
-    render('profile/edit', ['user' => $user]);
+    $theme = getSetting('ui_theme:' . Auth::id(), 'light');
+    render('profile/edit', ['user' => $user, 'theme' => $theme]);
 });
 
 $router->post('/profile', function () {
@@ -403,6 +404,10 @@ $router->post('/profile', function () {
         $stmt = $db->prepare('UPDATE users SET first_name = ?, last_name = ? WHERE id = ?');
         $stmt->execute([$fn, $ln, $userId]);
     }
+
+    // Save theme preference
+    $theme = in_array($_POST['theme'] ?? '', ['light', 'dark'], true) ? $_POST['theme'] : 'light';
+    setSetting('ui_theme:' . $userId, $theme);
 
     // Refresh session so navbar reflects changes immediately
     $_SESSION['user']['first_name'] = $fn;
