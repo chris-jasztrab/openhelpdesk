@@ -6,6 +6,14 @@ All notable changes to LocalDesk will be documented in this file.
 
 ## Unreleased
 - Need to work on Dark Mode/Light mode. Dark Mode has text issues.
+- Work on outgoing email templates.
+- Profile Avatars
+- Ticket Builder
+- If this then that on tickets. eg. If select something in a drop down then show other options.
+- Knowledgebase Import Function
+- Ability to merge tickets.
+- Office 365 SSO Login.
+- Login with your Office 365 credentials.
 
 
 ### User Profile
