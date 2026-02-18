@@ -594,53 +594,21 @@ $router->get('/admin/tickets', function () {
     $db = Database::connect();
 
     // Read filter params
-    $fStatus   = trim($_GET['status'] ?? '');
-    $fPriority = trim($_GET['priority'] ?? '');
-    $fType     = trim($_GET['type'] ?? '');
-    $fLocation = trim($_GET['location'] ?? '');
-    $fAgent    = trim($_GET['agent'] ?? '');
-    $fGroup    = trim($_GET['group'] ?? '');
-    $fSearch   = trim($_GET['q'] ?? '');
+    $filters = [
+        'status'    => trim($_GET['status'] ?? ''),
+        'priority'  => trim($_GET['priority'] ?? ''),
+        'type'      => trim($_GET['type'] ?? ''),
+        'location'  => trim($_GET['location'] ?? ''),
+        'agent'     => trim($_GET['agent'] ?? ''),
+        'group'     => trim($_GET['group'] ?? ''),
+        'q'         => trim($_GET['q'] ?? ''),
+        'date_from' => trim($_GET['date_from'] ?? ''),
+        'date_to'   => trim($_GET['date_to'] ?? ''),
+    ];
 
-    $where  = [];
-    $params = [];
-
-    if ($fStatus !== '') {
-        $where[]  = 't.status = ?';
-        $params[] = $fStatus;
-    }
-    if ($fPriority !== '') {
-        $where[]  = 't.priority_id = ?';
-        $params[] = (int) $fPriority;
-    }
-    if ($fType !== '') {
-        $where[]  = 't.type_id = ?';
-        $params[] = (int) $fType;
-    }
-    if ($fLocation !== '') {
-        $where[]  = 't.location_id = ?';
-        $params[] = (int) $fLocation;
-    }
-    if ($fAgent !== '') {
-        if ($fAgent === 'unassigned') {
-            $where[] = 't.assigned_to IS NULL';
-        } else {
-            $where[]  = 't.assigned_to = ?';
-            $params[] = (int) $fAgent;
-        }
-    }
-    if ($fGroup !== '') {
-        if ($fGroup === 'none') {
-            $where[] = 't.group_id IS NULL';
-        } else {
-            $where[]  = 't.group_id = ?';
-            $params[] = (int) $fGroup;
-        }
-    }
-    if ($fSearch !== '') {
-        $where[]  = 't.subject LIKE ?';
-        $params[] = '%' . $fSearch . '%';
-    }
+    $filterResult = buildTicketFilterQuery($filters);
+    $whereClause  = $filterResult['where'];
+    $params       = $filterResult['params'];
 
     $sql = "SELECT t.*,
                 tp.name AS priority_name, tp.color AS priority_color,
@@ -656,8 +624,6 @@ $router->get('/admin/tickets', function () {
          LEFT JOIN users c             ON t.created_by   = c.id
          LEFT JOIN users a             ON t.assigned_to  = a.id
          LEFT JOIN `groups` g          ON t.group_id     = g.id";
-
-    $whereClause = !empty($where) ? ' WHERE ' . implode(' AND ', $where) : '';
 
     // Count total matching tickets
     $countSql = "SELECT COUNT(*) FROM tickets t" . $whereClause;
@@ -702,16 +668,6 @@ $router->get('/admin/tickets', function () {
     $agents     = $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin') ORDER BY first_name")->fetchAll();
     $groups     = $db->query('SELECT * FROM `groups` ORDER BY sort_order, name')->fetchAll();
 
-    $filters = [
-        'status'   => $fStatus,
-        'priority' => $fPriority,
-        'type'     => $fType,
-        'location' => $fLocation,
-        'agent'    => $fAgent,
-        'group'    => $fGroup,
-        'q'        => $fSearch,
-    ];
-
     // Load saved filters (own + shared)
     $sfStmt = $db->prepare(
         "SELECT sf.*, CONCAT(u.first_name, ' ', u.last_name) AS owner_name
@@ -739,6 +695,120 @@ $router->get('/admin/tickets', function () {
         'dir'            => strtolower($dir),
         'visibleColumns' => getUserColumns(Auth::id()),
     ]);
+});
+
+/* ── Export Tickets (CSV) ─────────────────────────────────────────── */
+
+$router->get('/admin/tickets/export', function () {
+    Auth::requireRole('admin');
+    $db = Database::connect();
+
+    // Build filters from query params
+    $filters = [
+        'status'    => trim($_GET['status'] ?? ''),
+        'priority'  => trim($_GET['priority'] ?? ''),
+        'type'      => trim($_GET['type'] ?? ''),
+        'location'  => trim($_GET['location'] ?? ''),
+        'agent'     => trim($_GET['agent'] ?? ''),
+        'group'     => trim($_GET['group'] ?? ''),
+        'q'         => trim($_GET['q'] ?? ''),
+        'date_from' => trim($_GET['date_from'] ?? ''),
+        'date_to'   => trim($_GET['date_to'] ?? ''),
+    ];
+
+    $filterResult = buildTicketFilterQuery($filters);
+    $whereClause  = $filterResult['where'];
+    $params       = $filterResult['params'];
+
+    // Sorting
+    $sortableColumns = [
+        'id'         => 't.id',
+        'subject'    => 't.subject',
+        'status'     => 't.status',
+        'priority'   => 'tp.sort_order',
+        'type'       => 'tt.name',
+        'agent'      => 'a.first_name',
+        'creator'    => 'c.first_name',
+        'group'      => 'g.name',
+        'location'   => 'l.name',
+        'created_at' => 't.created_at',
+        'due_date'   => 't.due_date',
+    ];
+    $sort     = $_GET['sort'] ?? 'created_at';
+    $dir      = strtolower($_GET['dir'] ?? 'desc') === 'asc' ? 'ASC' : 'DESC';
+    $orderCol = $sortableColumns[$sort] ?? 't.created_at';
+
+    $sql = "SELECT t.*,
+                tp.name AS priority_name,
+                l.name  AS location_name,
+                tt.name AS type_name,
+                g.name  AS group_name,
+                CONCAT(c.first_name, ' ', c.last_name) AS creator_name,
+                CONCAT(a.first_name, ' ', a.last_name) AS agent_name,
+                (SELECT GROUP_CONCAT(tg.name SEPARATOR ', ')
+                 FROM ticket_tag tt2
+                 JOIN tags tg ON tt2.tag_id = tg.id
+                 WHERE tt2.ticket_id = t.id) AS tag_list
+         FROM tickets t
+         LEFT JOIN ticket_priorities tp ON t.priority_id = tp.id
+         LEFT JOIN ticket_types tt     ON t.type_id     = tt.id
+         LEFT JOIN locations l         ON t.location_id  = l.id
+         LEFT JOIN users c             ON t.created_by   = c.id
+         LEFT JOIN users a             ON t.assigned_to  = a.id
+         LEFT JOIN `groups` g          ON t.group_id     = g.id"
+         . $whereClause
+         . " ORDER BY {$orderCol} {$dir}";
+
+    $stmt = $db->prepare($sql);
+    $stmt->execute($params);
+
+    $statusLabels = [
+        'open'        => 'Open',
+        'in_progress' => 'In Progress',
+        'pending'     => 'Pending',
+        'resolved'    => 'Resolved',
+        'closed'      => 'Closed',
+    ];
+
+    $filename = 'tickets-export-' . date('Y-m-d') . '.csv';
+
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+
+    $out = fopen('php://output', 'w');
+
+    // BOM for Excel UTF-8 compatibility
+    fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
+
+    // Header row
+    fputcsv($out, [
+        'ID', 'Subject', 'Status', 'Priority', 'Type', 'Location',
+        'Group', 'Assigned To', 'Created By', 'Tags',
+        'Created', 'Due Date', 'SLA State',
+    ]);
+
+    while ($row = $stmt->fetch()) {
+        fputcsv($out, [
+            $row['id'],
+            $row['subject'],
+            $statusLabels[$row['status']] ?? $row['status'],
+            $row['priority_name'] ?? '',
+            $row['type_name'] ?? '',
+            $row['location_name'] ?? '',
+            $row['group_name'] ?? '',
+            $row['agent_name'] ?? 'Unassigned',
+            $row['creator_name'] ?? '',
+            $row['tag_list'] ?? '',
+            $row['created_at'] ? date('Y-m-d H:i', strtotime($row['created_at'])) : '',
+            $row['due_date'] ? date('Y-m-d H:i', strtotime($row['due_date'])) : '',
+            $row['sla_state'] ?? '',
+        ]);
+    }
+
+    fclose($out);
+    exit;
 });
 
 /* ── Column Preferences (Admin) ───────────────────────────────────── */

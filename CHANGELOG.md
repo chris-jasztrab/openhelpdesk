@@ -6,6 +6,13 @@ All notable changes to LocalDesk will be documented in this file.
 
 ## Unreleased
 
+### Ticket Export
+- CSV export of tickets from the admin ticket list
+- Export respects all active filters: status, priority, type, location, agent, group, search, and date range
+- Date range filter (From/To) added to the admin ticket list filter bar
+- Export includes: ID, subject, status, priority, type, location, group, assigned agent, creator, tags, created date, due date, and SLA state
+- UTF-8 BOM for seamless Excel compatibility
+
 ### Branding Settings
 - Admin-configurable branding page under Settings > Branding
 - Custom logo upload (JPG, PNG, GIF, WEBP, SVG) displayed in the navbar

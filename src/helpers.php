@@ -599,6 +599,75 @@ function sortIcon(string $col, string $currentSort, string $currentDir): string
 }
 
 /**
+ * Build WHERE clause and bindings for ticket filtering.
+ * Returns ['where' => string, 'params' => array].
+ */
+function buildTicketFilterQuery(array $filters): array
+{
+    $where  = [];
+    $params = [];
+
+    $fStatus   = trim($filters['status'] ?? '');
+    $fPriority = trim($filters['priority'] ?? '');
+    $fType     = trim($filters['type'] ?? '');
+    $fLocation = trim($filters['location'] ?? '');
+    $fAgent    = trim($filters['agent'] ?? '');
+    $fGroup    = trim($filters['group'] ?? '');
+    $fSearch   = trim($filters['q'] ?? '');
+    $fDateFrom = trim($filters['date_from'] ?? '');
+    $fDateTo   = trim($filters['date_to'] ?? '');
+
+    if ($fStatus !== '') {
+        $where[]  = 't.status = ?';
+        $params[] = $fStatus;
+    }
+    if ($fPriority !== '') {
+        $where[]  = 't.priority_id = ?';
+        $params[] = (int) $fPriority;
+    }
+    if ($fType !== '') {
+        $where[]  = 't.type_id = ?';
+        $params[] = (int) $fType;
+    }
+    if ($fLocation !== '') {
+        $where[]  = 't.location_id = ?';
+        $params[] = (int) $fLocation;
+    }
+    if ($fAgent !== '') {
+        if ($fAgent === 'unassigned') {
+            $where[] = 't.assigned_to IS NULL';
+        } else {
+            $where[]  = 't.assigned_to = ?';
+            $params[] = (int) $fAgent;
+        }
+    }
+    if ($fGroup !== '') {
+        if ($fGroup === 'none') {
+            $where[] = 't.group_id IS NULL';
+        } else {
+            $where[]  = 't.group_id = ?';
+            $params[] = (int) $fGroup;
+        }
+    }
+    if ($fSearch !== '') {
+        $where[]  = 't.subject LIKE ?';
+        $params[] = '%' . $fSearch . '%';
+    }
+    if ($fDateFrom !== '') {
+        $where[]  = 't.created_at >= ?';
+        $params[] = $fDateFrom . ' 00:00:00';
+    }
+    if ($fDateTo !== '') {
+        $where[]  = 't.created_at <= ?';
+        $params[] = $fDateTo . ' 23:59:59';
+    }
+
+    $whereClause = !empty($where) ? ' WHERE ' . implode(' AND ', $where) : '';
+
+    return ['where' => $whereClause, 'params' => $params];
+}
+
+/**
  * Run all enabled automations for a given trigger event against a ticket.
  */
 function runAutomations(PDO $db, int $ticketId, string $triggerEvent): void

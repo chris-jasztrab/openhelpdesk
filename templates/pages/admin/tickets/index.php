@@ -17,7 +17,13 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
 ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="fw-bold mb-0">All Tickets</h2>
-    <span class="badge bg-secondary fs-6"><?= $totalTickets ?><?= $hasFilters ? ' filtered' : ' total' ?></span>
+    <div class="d-flex align-items-center gap-2">
+        <span class="badge bg-secondary fs-6"><?= $totalTickets ?><?= $hasFilters ? ' filtered' : ' total' ?></span>
+        <?php $exportParams = array_filter($filters, fn($v) => $v !== ''); if (!empty($sort)) { $exportParams['sort'] = $sort; $exportParams['dir'] = $dir; } ?>
+        <a href="/admin/tickets/export<?= !empty($exportParams) ? '?' . http_build_query($exportParams) : '' ?>" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-download me-1"></i>Export CSV
+        </a>
+    </div>
 </div>
 
 <!-- Filter Bar -->
@@ -84,6 +90,16 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                     <option value="<?= $grp['id'] ?>" <?= $filters['group'] == $grp['id'] ? 'selected' : '' ?>><?= e($grp['name']) ?></option>
                     <?php endforeach; ?>
                 </select>
+            </div>
+            <div class="col-md-auto" style="min-width:130px;">
+                <label class="form-label small text-muted mb-1">From</label>
+                <input type="date" class="form-control form-control-sm" name="date_from"
+                       value="<?= e($filters['date_from'] ?? '') ?>">
+            </div>
+            <div class="col-md-auto" style="min-width:130px;">
+                <label class="form-label small text-muted mb-1">To</label>
+                <input type="date" class="form-control form-control-sm" name="date_to"
+                       value="<?= e($filters['date_to'] ?? '') ?>">
             </div>
             <div class="col-md-auto d-flex gap-1">
                 <button type="submit" class="btn btn-sm text-white" style="background:var(--ld-primary);">
