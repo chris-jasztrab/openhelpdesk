@@ -330,6 +330,89 @@ $router->get('/logout', function () {
 });
 
 /* ------------------------------------------------------------------
+ * Profile (all authenticated users)
+ * ------------------------------------------------------------------ */
+
+$router->get('/profile', function () {
+    Auth::requireAuth();
+    $db   = Database::connect();
+    $stmt = $db->prepare('SELECT * FROM users WHERE id = ?');
+    $stmt->execute([Auth::id()]);
+    $user = $stmt->fetch();
+
+    if (!$user) {
+        Auth::logout();
+        redirect('/login');
+    }
+
+    render('profile/edit', ['user' => $user]);
+});
+
+$router->post('/profile', function () {
+    Auth::requireAuth();
+    verifyCsrf();
+
+    $fn = trim($_POST['first_name'] ?? '');
+    $ln = trim($_POST['last_name'] ?? '');
+
+    if ($fn === '' || $ln === '') {
+        flashInput($_POST);
+        flash('error', 'First name and last name are required.');
+        redirect('/profile');
+        return;
+    }
+
+    $db     = Database::connect();
+    $userId = Auth::id();
+
+    $currentPassword = $_POST['current_password'] ?? '';
+    $newPassword     = $_POST['new_password'] ?? '';
+    $confirmPassword = $_POST['confirm_password'] ?? '';
+
+    // Handle password change
+    if ($newPassword !== '' || $currentPassword !== '') {
+        // Fetch current hash
+        $stmt = $db->prepare('SELECT password FROM users WHERE id = ?');
+        $stmt->execute([$userId]);
+        $hash = $stmt->fetchColumn();
+
+        if (!password_verify($currentPassword, $hash)) {
+            flashInput($_POST);
+            flash('error', 'Current password is incorrect.');
+            redirect('/profile');
+            return;
+        }
+
+        if (strlen($newPassword) < 8) {
+            flashInput($_POST);
+            flash('error', 'New password must be at least 8 characters.');
+            redirect('/profile');
+            return;
+        }
+
+        if ($newPassword !== $confirmPassword) {
+            flashInput($_POST);
+            flash('error', 'New password and confirmation do not match.');
+            redirect('/profile');
+            return;
+        }
+
+        $stmt = $db->prepare('UPDATE users SET first_name = ?, last_name = ?, password = ? WHERE id = ?');
+        $stmt->execute([$fn, $ln, password_hash($newPassword, PASSWORD_DEFAULT), $userId]);
+    } else {
+        $stmt = $db->prepare('UPDATE users SET first_name = ?, last_name = ? WHERE id = ?');
+        $stmt->execute([$fn, $ln, $userId]);
+    }
+
+    // Refresh session so navbar reflects changes immediately
+    $_SESSION['user']['first_name'] = $fn;
+    $_SESSION['user']['last_name']  = $ln;
+
+    flash('success', 'Profile updated successfully.');
+    redirect('/profile');
+});
+
+/* ------------------------------------------------------------------
  * Portal (all authenticated users)
  * ------------------------------------------------------------------ */
 $router->get('/portal', function () {

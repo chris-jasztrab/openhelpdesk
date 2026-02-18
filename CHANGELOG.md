@@ -6,6 +6,12 @@ All notable changes to LocalDesk will be documented in this file.
 
 ## Unreleased
 
+### User Profile
+- "My Profile" page accessible from the navbar user dropdown for all authenticated users
+- Users can update their first name and last name
+- Password change with current password verification, minimum 8 characters, and confirmation matching
+- Session is refreshed on save so the navbar reflects name changes immediately
+
 ### Ticket Export
 - CSV export of tickets from the admin ticket list
 - Export respects all active filters: status, priority, type, location, agent, group, search, and date range
