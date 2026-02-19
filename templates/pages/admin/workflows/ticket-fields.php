@@ -112,7 +112,7 @@ $fieldTypeMeta = [
             <div class="card-header bg-white border-bottom py-2 px-3">
                 <span class="fw-semibold small text-uppercase" style="letter-spacing:.05em;font-size:.72rem;">Add Field</span>
             </div>
-            <div class="card-body p-2">
+            <div class="card-body p-2" id="fieldPalette">
                 <?php foreach ($fieldTypeMeta as $type => $meta): ?>
                 <div class="field-palette-card" data-type="<?= e($type) ?>" role="button" title="Add <?= e($meta['label']) ?>">
                     <i class="bi <?= e($meta['icon']) ?>"></i>
@@ -279,12 +279,45 @@ $fieldTypeMeta = [
 
     var fieldTypeMeta = <?= json_encode(array_map(fn($m) => ['label' => $m['label'], 'icon' => $m['icon']], $fieldTypeMeta)) ?>;
 
-    /* ─── Sortable ─── */
+    /* ─── Sortable palette (drag source, clone) ─── */
+    Sortable.create(document.getElementById('fieldPalette'), {
+        group:  { name: 'fields', pull: 'clone', put: false },
+        sort:   false,
+        animation: 100,
+    });
+
+    /* ─── Sortable canvas (reorder + receive drops from palette) ─── */
     var sortable = Sortable.create(canvas, {
-        handle: '.drag-handle',
+        handle:    '.drag-handle',
+        group:     { name: 'fields', pull: false, put: true },
         animation: 150,
-        filter: '.canvas-empty',
-        onEnd: function () { saveOrder(); }
+        filter:    '.canvas-empty',
+        onAdd: function (evt) {
+            // Fired when a palette card is dropped here
+            var type        = evt.item.dataset.type;
+            var insertedEl  = evt.item; // cloned palette card in canvas
+            if (!type) return;
+            fetch('/admin/workflows/ticket-fields/add', {
+                method:      'POST',
+                credentials: 'same-origin',
+                headers:     {'Content-Type': 'application/x-www-form-urlencoded'},
+                body:        'field_type=' + encodeURIComponent(type)
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (!data.success) { alert(data.error || 'Error adding field.'); insertedEl.remove(); return; }
+                var card = buildCard(data.field);
+                canvas.insertBefore(card, insertedEl);
+                insertedEl.remove();
+                updateCount();
+                openModal(data.field);
+            })
+            .catch(function () { insertedEl.remove(); });
+        },
+        onEnd: function (evt) {
+            // Only save order for internal canvas reorders (not palette drops)
+            if (evt.from === canvas) saveOrder();
+        }
     });
 
     function saveOrder() {
