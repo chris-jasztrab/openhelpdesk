@@ -313,46 +313,45 @@ $fieldTypeMeta = [
     }
 
     /* ─── Palette HTML5 drag → canvas drop ─── */
-    // Track what palette type is currently being dragged
+    // An invisible overlay sits on top of the canvas during palette drags.
+    // It has no SortableJS on it, so dragover/drop work without interference.
     var currentDragType = null;
+    canvas.style.position = 'relative';
+    var dropOverlay = document.createElement('div');
+    dropOverlay.style.cssText = 'position:absolute;inset:0;z-index:50;display:none;';
+    canvas.appendChild(dropOverlay);
+
+    dropOverlay.addEventListener('dragover', function (e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+        canvas.classList.add('canvas-drag-over');
+    });
+    dropOverlay.addEventListener('dragleave', function () {
+        canvas.classList.remove('canvas-drag-over');
+    });
+    dropOverlay.addEventListener('drop', function (e) {
+        e.preventDefault();
+        dropOverlay.style.display = 'none';
+        canvas.classList.remove('canvas-drag-over');
+        var type = currentDragType;
+        currentDragType = null;
+        if (type) doAddField(type);
+    });
 
     document.querySelectorAll('.field-palette-card').forEach(function (tile) {
         tile.addEventListener('dragstart', function (e) {
             currentDragType = tile.dataset.type;
             e.dataTransfer.setData('text/plain', tile.dataset.type);
             e.dataTransfer.effectAllowed = 'copy';
+            // Show overlay so the canvas can receive the drop
+            dropOverlay.style.display = 'block';
         });
         tile.addEventListener('dragend', function () {
+            dropOverlay.style.display = 'none';
             currentDragType = null;
             canvas.classList.remove('canvas-drag-over');
         });
     });
-
-    // Use capture phase (3rd arg = true) so these run BEFORE SortableJS's
-    // bubble-phase dragover handler, which otherwise prevents the drop event.
-    document.addEventListener('dragover', function (e) {
-        if (!currentDragType) return;
-        if (canvas === e.target || canvas.contains(e.target)) {
-            e.preventDefault();
-            e.stopPropagation();
-            e.dataTransfer.dropEffect = 'copy';
-            canvas.classList.add('canvas-drag-over');
-        } else {
-            canvas.classList.remove('canvas-drag-over');
-        }
-    }, true);
-
-    document.addEventListener('drop', function (e) {
-        if (!currentDragType) return;
-        if (canvas === e.target || canvas.contains(e.target)) {
-            e.preventDefault();
-            e.stopPropagation();
-            canvas.classList.remove('canvas-drag-over');
-            var type = currentDragType;
-            currentDragType = null;
-            doAddField(type);
-        }
-    }, true);
 
     function saveOrder() {
         var cards = canvas.querySelectorAll('.field-canvas-card');
