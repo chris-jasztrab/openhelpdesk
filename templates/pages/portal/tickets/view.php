@@ -43,6 +43,59 @@ $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-p
             </div>
         </div>
 
+        <?php if (!empty($customFields)): ?>
+        <?php
+            // Helper: resolve option ID to label
+            function resolveOptLabel(int $optId, array $opts): string {
+                foreach ($opts as $o) {
+                    if ((int) $o['id'] === $optId) return $o['label'];
+                }
+                return '';
+            }
+            $hasAnyValue = false;
+            foreach ($customFields as $cf) {
+                if (isset($fieldValues[$cf['id']]) && $fieldValues[$cf['id']] !== '') { $hasAnyValue = true; break; }
+            }
+        ?>
+        <?php if ($hasAnyValue): ?>
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white border-bottom">
+                <h5 class="mb-0 fw-semibold"><i class="bi bi-list-check me-2"></i>Additional Details</h5>
+            </div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                <?php foreach ($customFields as $cf):
+                    if (!isset($fieldValues[$cf['id']]) || $fieldValues[$cf['id']] === '') continue;
+                    $raw = $fieldValues[$cf['id']];
+                    $cfOpts = $fieldOptions[$cf['id']] ?? [];
+                    if ($cf['field_type'] === 'checkbox') {
+                        $display = $raw === '1' ? 'Yes' : 'No';
+                    } elseif ($cf['field_type'] === 'dropdown') {
+                        $display = resolveOptLabel((int) $raw, $cfOpts);
+                        if (!$display) $display = $raw;
+                    } elseif ($cf['field_type'] === 'dependent') {
+                        $dep = json_decode($raw, true) ?? [];
+                        $parts = [];
+                        foreach (['l1','l2','l3'] as $lk) {
+                            if (!empty($dep[$lk])) {
+                                $lbl = resolveOptLabel((int) $dep[$lk], $cfOpts);
+                                if ($lbl) $parts[] = $lbl;
+                            }
+                        }
+                        $display = implode(' › ', $parts);
+                    } else {
+                        $display = $raw;
+                    }
+                ?>
+                    <dt class="col-sm-4 text-muted fw-normal"><?= e($cf['label']) ?></dt>
+                    <dd class="col-sm-8"><?= e($display) ?></dd>
+                <?php endforeach; ?>
+                </dl>
+            </div>
+        </div>
+        <?php endif; ?>
+        <?php endif; ?>
+
         <?php if (!empty($attachments)): ?>
         <div class="card border-0 shadow-sm mb-4">
             <div class="card-header bg-white border-bottom">

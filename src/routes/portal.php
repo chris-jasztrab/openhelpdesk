@@ -124,6 +124,21 @@ $router->get('/portal/tickets/create', function () {
         }
     }
 
+    // Load visible custom form fields
+    $customFields = $db->query(
+        'SELECT * FROM ticket_form_fields WHERE is_visible = 1 ORDER BY sort_order'
+    )->fetchAll();
+    $fieldOptions = [];
+    foreach ($customFields as $f) {
+        if (in_array($f['field_type'], ['dropdown', 'dependent'], true)) {
+            $s = $db->prepare(
+                'SELECT * FROM ticket_form_field_options WHERE field_id = ? ORDER BY parent_option_id, sort_order'
+            );
+            $s->execute([$f['id']]);
+            $fieldOptions[$f['id']] = $s->fetchAll();
+        }
+    }
+
     render('portal/tickets/create', [
         'types'            => $types,
         'locations'        => $locations,
@@ -131,6 +146,8 @@ $router->get('/portal/tickets/create', function () {
         'tags'             => $tags,
         'userLocationId'   => $userLocationId,
         'userLocationName' => $userLocationName,
+        'customFields'     => $customFields,
+        'fieldOptions'     => $fieldOptions,
     ]);
 });
 
@@ -168,6 +185,27 @@ $router->post('/portal/tickets/create', function () {
         redirect('/portal/tickets/create');
     }
 
+    // Validate required custom fields
+    $visibleCustomFields = $db->query(
+        'SELECT * FROM ticket_form_fields WHERE is_visible = 1 ORDER BY sort_order'
+    )->fetchAll();
+    foreach ($visibleCustomFields as $cf) {
+        if (!$cf['is_required']) continue;
+        $key = 'field_' . $cf['id'];
+        if ($cf['field_type'] === 'dependent') {
+            $missing = empty($_POST[$key . '_l1']);
+        } elseif ($cf['field_type'] === 'checkbox') {
+            $missing = false; // checkboxes are never "missing"
+        } else {
+            $missing = !isset($_POST[$key]) || trim($_POST[$key]) === '';
+        }
+        if ($missing) {
+            flashInput($_POST);
+            flash('error', e($cf['label']) . ' is required.');
+            redirect('/portal/tickets/create');
+        }
+    }
+
     $stmt = $db->prepare(
         'INSERT INTO tickets (subject, description, browser_info, os_info, created_by, type_id, location_id, status, priority_id, assigned_to)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
@@ -201,6 +239,30 @@ $router->post('/portal/tickets/create', function () {
     $db->prepare(
         'INSERT INTO ticket_timeline (ticket_id, user_id, action, details) VALUES (?, ?, ?, ?)'
     )->execute([$ticketId, Auth::id(), 'created', 'Ticket created.']);
+
+    // Save custom field values
+    if (!empty($visibleCustomFields)) {
+        $cfSaveStmt = $db->prepare(
+            'INSERT INTO ticket_field_values (ticket_id, field_id, value) VALUES (?, ?, ?)
+             ON DUPLICATE KEY UPDATE value = VALUES(value)'
+        );
+        foreach ($visibleCustomFields as $cf) {
+            $key = 'field_' . $cf['id'];
+            if ($cf['field_type'] === 'dependent') {
+                $val = json_encode([
+                    'l1' => $_POST[$key . '_l1'] ?? null,
+                    'l2' => $_POST[$key . '_l2'] ?? null,
+                    'l3' => $_POST[$key . '_l3'] ?? null,
+                ]);
+            } elseif ($cf['field_type'] === 'checkbox') {
+                $val = isset($_POST[$key]) ? '1' : '0';
+            } else {
+                $val = $_POST[$key] ?? null;
+                if ($val === null || trim($val) === '') continue;
+            }
+            $cfSaveStmt->execute([$ticketId, $cf['id'], $val]);
+        }
+    }
 
     // Run automations for new ticket
     runAutomations($db, $ticketId, 'ticket_created');
@@ -346,7 +408,38 @@ $router->get('/portal/tickets/{id}', function (array $p) {
     $ccStmt->execute([$ticket['id']]);
     $ccUsers = $ccStmt->fetchAll();
 
-    render('portal/tickets/view', ['ticket' => $ticket, 'timeline' => $timeline, 'attachments' => $attachments, 'ccUsers' => $ccUsers]);
+    // Custom field values (visible fields only)
+    $customFields = $db->query(
+        'SELECT * FROM ticket_form_fields WHERE is_visible = 1 ORDER BY sort_order'
+    )->fetchAll();
+    $fieldValues  = [];
+    $fieldOptions = [];
+    if ($customFields) {
+        $fvStmt = $db->prepare('SELECT field_id, value FROM ticket_field_values WHERE ticket_id = ?');
+        $fvStmt->execute([$ticket['id']]);
+        foreach ($fvStmt->fetchAll() as $fv) {
+            $fieldValues[$fv['field_id']] = $fv['value'];
+        }
+        foreach ($customFields as $f) {
+            if (in_array($f['field_type'], ['dropdown', 'dependent'], true)) {
+                $s = $db->prepare(
+                    'SELECT * FROM ticket_form_field_options WHERE field_id = ? ORDER BY parent_option_id, sort_order'
+                );
+                $s->execute([$f['id']]);
+                $fieldOptions[$f['id']] = $s->fetchAll();
+            }
+        }
+    }
+
+    render('portal/tickets/view', [
+        'ticket'       => $ticket,
+        'timeline'     => $timeline,
+        'attachments'  => $attachments,
+        'ccUsers'      => $ccUsers,
+        'customFields' => $customFields,
+        'fieldValues'  => $fieldValues,
+        'fieldOptions' => $fieldOptions,
+    ]);
 });
 
 /* ==================================================================

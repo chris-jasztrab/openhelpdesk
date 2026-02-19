@@ -1031,7 +1031,28 @@ $router->get('/admin/tickets/{id}', function (array $p) {
 
     $groups = $db->query('SELECT * FROM `groups` ORDER BY sort_order, name')->fetchAll();
 
-    render('admin/tickets/view', ['ticket' => $ticket, 'timeline' => $timeline, 'agents' => $agents, 'priorities' => $priorities, 'attachments' => $attachments, 'ccUsers' => $ccUsers, 'groups' => $groups]);
+    // Custom form fields + stored values
+    $customFields = $db->query('SELECT * FROM ticket_form_fields ORDER BY sort_order')->fetchAll();
+    $fieldValues  = [];
+    $fieldOptions = [];
+    if ($customFields) {
+        $fvStmt = $db->prepare('SELECT field_id, value FROM ticket_field_values WHERE ticket_id = ?');
+        $fvStmt->execute([$ticket['id']]);
+        foreach ($fvStmt->fetchAll() as $fv) {
+            $fieldValues[$fv['field_id']] = $fv['value'];
+        }
+        foreach ($customFields as $f) {
+            if (in_array($f['field_type'], ['dropdown', 'dependent'], true)) {
+                $s = $db->prepare(
+                    'SELECT * FROM ticket_form_field_options WHERE field_id = ? ORDER BY parent_option_id, sort_order'
+                );
+                $s->execute([$f['id']]);
+                $fieldOptions[$f['id']] = $s->fetchAll();
+            }
+        }
+    }
+
+    render('admin/tickets/view', ['ticket' => $ticket, 'timeline' => $timeline, 'agents' => $agents, 'priorities' => $priorities, 'attachments' => $attachments, 'ccUsers' => $ccUsers, 'groups' => $groups, 'customFields' => $customFields, 'fieldValues' => $fieldValues, 'fieldOptions' => $fieldOptions]);
 });
 
 /* ==================================================================
@@ -1122,6 +1143,59 @@ $router->post('/admin/tickets/{id}/merge', function (array $p) {
 
     flash('success', "Ticket #{$sourceId} merged into #{$targetId}.");
     redirect("/admin/tickets/{$targetId}");
+});
+
+/* ==================================================================
+ * ADMIN – Save Custom Field Values on a Ticket
+ * ================================================================== */
+
+$router->post('/admin/tickets/{id}/fields', function (array $p) {
+    Auth::requireRole('admin');
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect("/admin/tickets/{$id}");
+    }
+
+    $db = Database::connect();
+    // Verify ticket exists
+    $t = $db->prepare('SELECT id FROM tickets WHERE id = ?');
+    $t->execute([$id]);
+    if (!$t->fetch()) {
+        flash('error', 'Ticket not found.');
+        redirect('/admin/tickets');
+    }
+
+    $fields = $db->query('SELECT * FROM ticket_form_fields ORDER BY sort_order')->fetchAll();
+    $saveStmt = $db->prepare(
+        'INSERT INTO ticket_field_values (ticket_id, field_id, value) VALUES (?, ?, ?)
+         ON DUPLICATE KEY UPDATE value = VALUES(value)'
+    );
+
+    foreach ($fields as $field) {
+        $key = 'field_' . $field['id'];
+        if ($field['field_type'] === 'dependent') {
+            $val = json_encode([
+                'l1' => $_POST[$key . '_l1'] ?? null,
+                'l2' => $_POST[$key . '_l2'] ?? null,
+                'l3' => $_POST[$key . '_l3'] ?? null,
+            ]);
+        } elseif ($field['field_type'] === 'checkbox') {
+            $val = isset($_POST[$key]) ? '1' : '0';
+        } else {
+            $val = $_POST[$key] ?? null;
+        }
+        if ($val === null || $val === '') {
+            // Delete stored value if cleared
+            $db->prepare('DELETE FROM ticket_field_values WHERE ticket_id = ? AND field_id = ?')
+               ->execute([$id, $field['id']]);
+            continue;
+        }
+        $saveStmt->execute([$id, $field['id'], $val]);
+    }
+
+    flash('success', 'Custom fields updated.');
+    redirect("/admin/tickets/{$id}");
 });
 
 /* ==================================================================
@@ -3413,6 +3487,212 @@ $router->get('/admin/reports/location', function () {
     unset($loc);
 
     render('admin/reports/location', compact('from', 'to', 'locations'));
+});
+
+/* ==================================================================
+ * ADMIN – Workflows: Ticket Fields Builder
+ * ================================================================== */
+
+// Builder page
+$router->get('/admin/workflows/ticket-fields', function () {
+    Auth::requireRole('admin');
+    $db = Database::connect();
+
+    $fields = $db->query('SELECT * FROM ticket_form_fields ORDER BY sort_order')->fetchAll();
+
+    // Load options for each field that needs them
+    $fieldOptions = [];
+    foreach ($fields as $f) {
+        if (in_array($f['field_type'], ['dropdown', 'dependent'], true)) {
+            $stmt = $db->prepare(
+                'SELECT * FROM ticket_form_field_options WHERE field_id = ? ORDER BY parent_option_id, sort_order'
+            );
+            $stmt->execute([$f['id']]);
+            $fieldOptions[$f['id']] = $stmt->fetchAll();
+        }
+    }
+
+    render('admin/workflows/ticket-fields', [
+        'layout'       => 'app',
+        'pageTitle'    => 'Ticket Fields',
+        'fields'       => $fields,
+        'fieldOptions' => $fieldOptions,
+    ]);
+});
+
+// Add a new field (AJAX)
+$router->post('/admin/workflows/ticket-fields/add', function () {
+    Auth::requireRole('admin');
+    header('Content-Type: application/json');
+
+    $allowed = ['text','textarea','checkbox','dropdown','date','number','decimal','dependent'];
+    $type    = $_POST['field_type'] ?? '';
+    if (!in_array($type, $allowed, true)) {
+        echo json_encode(['success' => false, 'error' => 'Invalid field type.']);
+        exit;
+    }
+
+    $db = Database::connect();
+    $maxOrder = (int) $db->query('SELECT COALESCE(MAX(sort_order),0) FROM ticket_form_fields')->fetchColumn();
+
+    $labelMap = [
+        'text'      => 'Text Field',
+        'textarea'  => 'Multi-line Text',
+        'checkbox'  => 'Checkbox',
+        'dropdown'  => 'Dropdown',
+        'date'      => 'Date',
+        'number'    => 'Number',
+        'decimal'   => 'Decimal',
+        'dependent' => 'Dependent Field',
+    ];
+
+    $stmt = $db->prepare(
+        'INSERT INTO ticket_form_fields (field_type, label, sort_order) VALUES (?, ?, ?)'
+    );
+    $stmt->execute([$type, $labelMap[$type], $maxOrder + 1]);
+    $newId = (int) $db->lastInsertId();
+
+    $field = $db->prepare('SELECT * FROM ticket_form_fields WHERE id = ?');
+    $field->execute([$newId]);
+
+    echo json_encode(['success' => true, 'field' => $field->fetch()]);
+    exit;
+});
+
+// Reorder fields (AJAX)
+$router->post('/admin/workflows/ticket-fields/reorder', function () {
+    Auth::requireRole('admin');
+    header('Content-Type: application/json');
+
+    $body  = json_decode(file_get_contents('php://input'), true);
+    $order = $body['order'] ?? [];
+
+    if (!is_array($order)) {
+        echo json_encode(['success' => false]);
+        exit;
+    }
+
+    $db   = Database::connect();
+    $stmt = $db->prepare('UPDATE ticket_form_fields SET sort_order = ? WHERE id = ?');
+    foreach ($order as $i => $fid) {
+        $stmt->execute([$i, (int) $fid]);
+    }
+
+    echo json_encode(['success' => true]);
+    exit;
+});
+
+// Get options for a field (AJAX, used to pre-load modal on edit)
+$router->get('/admin/workflows/ticket-fields/{id}/options', function (array $p) {
+    Auth::requireRole('admin');
+    header('Content-Type: application/json');
+
+    $id   = (int) $p['id'];
+    $db   = Database::connect();
+    $stmt = $db->prepare(
+        'SELECT * FROM ticket_form_field_options WHERE field_id = ? ORDER BY parent_option_id, sort_order'
+    );
+    $stmt->execute([$id]);
+    echo json_encode($stmt->fetchAll());
+    exit;
+});
+
+// Update field properties + options (AJAX)
+$router->post('/admin/workflows/ticket-fields/{id}/update', function (array $p) {
+    Auth::requireRole('admin');
+    header('Content-Type: application/json');
+
+    $id   = (int) $p['id'];
+    $body = json_decode(file_get_contents('php://input'), true);
+    if (!$body) {
+        echo json_encode(['success' => false, 'error' => 'Invalid JSON.']);
+        exit;
+    }
+
+    $label       = trim($body['label']       ?? '');
+    $placeholder = trim($body['placeholder'] ?? '');
+    $isRequired  = !empty($body['is_required']) ? 1 : 0;
+    $isVisible   = !empty($body['is_visible'])  ? 1 : 0;
+    $config      = isset($body['config'])  ? json_encode($body['config'])  : null;
+
+    if ($label === '') {
+        echo json_encode(['success' => false, 'error' => 'Label is required.']);
+        exit;
+    }
+
+    $db = Database::connect();
+
+    // Verify field exists
+    $check = $db->prepare('SELECT field_type FROM ticket_form_fields WHERE id = ?');
+    $check->execute([$id]);
+    $fieldType = $check->fetchColumn();
+    if (!$fieldType) {
+        echo json_encode(['success' => false, 'error' => 'Field not found.']);
+        exit;
+    }
+
+    $db->prepare(
+        'UPDATE ticket_form_fields SET label=?, placeholder=?, is_required=?, is_visible=?, config=?, updated_at=NOW() WHERE id=?'
+    )->execute([$label, $placeholder ?: null, $isRequired, $isVisible, $config, $id]);
+
+    // Replace options for dropdown / dependent fields
+    if (in_array($fieldType, ['dropdown', 'dependent'], true) && isset($body['options'])) {
+        $db->prepare('DELETE FROM ticket_form_field_options WHERE field_id = ?')->execute([$id]);
+
+        $insertOpt = $db->prepare(
+            'INSERT INTO ticket_form_field_options (field_id, parent_option_id, label, sort_order) VALUES (?, ?, ?, ?)'
+        );
+
+        if ($fieldType === 'dropdown') {
+            // Flat array of {label}
+            foreach ($body['options'] as $i => $opt) {
+                $optLabel = trim($opt['label'] ?? '');
+                if ($optLabel !== '') {
+                    $insertOpt->execute([$id, null, $optLabel, $i]);
+                }
+            }
+        } else {
+            // Nested tree for dependent: [{label, children:[{label, children:[{label}]}]}]
+            $sort1 = 0;
+            foreach ($body['options'] as $l1) {
+                $l1Label = trim($l1['label'] ?? '');
+                if ($l1Label === '') continue;
+                $insertOpt->execute([$id, null, $l1Label, $sort1++]);
+                $l1Id = (int) $db->lastInsertId();
+
+                $sort2 = 0;
+                foreach ($l1['children'] ?? [] as $l2) {
+                    $l2Label = trim($l2['label'] ?? '');
+                    if ($l2Label === '') continue;
+                    $insertOpt->execute([$id, $l1Id, $l2Label, $sort2++]);
+                    $l2Id = (int) $db->lastInsertId();
+
+                    $sort3 = 0;
+                    foreach ($l2['children'] ?? [] as $l3) {
+                        $l3Label = trim($l3['label'] ?? '');
+                        if ($l3Label === '') continue;
+                        $insertOpt->execute([$id, $l2Id, $l3Label, $sort3++]);
+                    }
+                }
+            }
+        }
+    }
+
+    echo json_encode(['success' => true]);
+    exit;
+});
+
+// Delete a field (AJAX)
+$router->post('/admin/workflows/ticket-fields/{id}/delete', function (array $p) {
+    Auth::requireRole('admin');
+    header('Content-Type: application/json');
+
+    $id = (int) $p['id'];
+    $db = Database::connect();
+    $db->prepare('DELETE FROM ticket_form_fields WHERE id = ?')->execute([$id]);
+
+    echo json_encode(['success' => true]);
+    exit;
 });
 
 /* ==================================================================

@@ -253,3 +253,40 @@ CREATE TABLE IF NOT EXISTS `automations` (
     `created_at`    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     `updated_at`    TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Custom ticket form fields (Workflows > Ticket Fields builder)
+CREATE TABLE IF NOT EXISTS `ticket_form_fields` (
+    `id`          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `field_type`  ENUM('text','textarea','checkbox','dropdown','date','number','decimal','dependent') NOT NULL,
+    `label`       VARCHAR(255) NOT NULL,
+    `placeholder` VARCHAR(255) DEFAULT NULL,
+    `config`      JSON DEFAULT NULL,
+    `is_required` TINYINT(1)   NOT NULL DEFAULT 0,
+    `is_visible`  TINYINT(1)   NOT NULL DEFAULT 1,
+    `sort_order`  INT UNSIGNED NOT NULL DEFAULT 0,
+    `created_at`  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Options for dropdown and dependent fields (self-referential for hierarchy)
+CREATE TABLE IF NOT EXISTS `ticket_form_field_options` (
+    `id`               INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `field_id`         INT UNSIGNED NOT NULL,
+    `parent_option_id` INT UNSIGNED DEFAULT NULL,
+    `label`            VARCHAR(255) NOT NULL,
+    `sort_order`       INT UNSIGNED NOT NULL DEFAULT 0,
+    FOREIGN KEY (`field_id`)         REFERENCES `ticket_form_fields`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`parent_option_id`) REFERENCES `ticket_form_field_options`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Custom field values stored per ticket
+CREATE TABLE IF NOT EXISTS `ticket_field_values` (
+    `id`         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `ticket_id`  INT UNSIGNED NOT NULL,
+    `field_id`   INT UNSIGNED NOT NULL,
+    `value`      TEXT DEFAULT NULL,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY `uq_ticket_field` (`ticket_id`, `field_id`),
+    FOREIGN KEY (`ticket_id`) REFERENCES `tickets`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`field_id`)  REFERENCES `ticket_form_fields`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

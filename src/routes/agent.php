@@ -382,7 +382,28 @@ $router->get('/agent/tickets/{id}', function (array $p) {
     // Groups for assignment dropdown
     $groups = $db->query('SELECT id, name FROM groups ORDER BY name')->fetchAll();
 
-    render('agent/tickets/view', ['ticket' => $ticket, 'timeline' => $timeline, 'agents' => $agents, 'priorities' => $priorities, 'attachments' => $attachments, 'ccUsers' => $ccUsers, 'groups' => $groups]);
+    // Custom form fields + stored values
+    $customFields = $db->query('SELECT * FROM ticket_form_fields ORDER BY sort_order')->fetchAll();
+    $fieldValues  = [];
+    $fieldOptions = [];
+    if ($customFields) {
+        $fvStmt = $db->prepare('SELECT field_id, value FROM ticket_field_values WHERE ticket_id = ?');
+        $fvStmt->execute([$ticket['id']]);
+        foreach ($fvStmt->fetchAll() as $fv) {
+            $fieldValues[$fv['field_id']] = $fv['value'];
+        }
+        foreach ($customFields as $f) {
+            if (in_array($f['field_type'], ['dropdown', 'dependent'], true)) {
+                $s = $db->prepare(
+                    'SELECT * FROM ticket_form_field_options WHERE field_id = ? ORDER BY parent_option_id, sort_order'
+                );
+                $s->execute([$f['id']]);
+                $fieldOptions[$f['id']] = $s->fetchAll();
+            }
+        }
+    }
+
+    render('agent/tickets/view', ['ticket' => $ticket, 'timeline' => $timeline, 'agents' => $agents, 'priorities' => $priorities, 'attachments' => $attachments, 'ccUsers' => $ccUsers, 'groups' => $groups, 'customFields' => $customFields, 'fieldValues' => $fieldValues, 'fieldOptions' => $fieldOptions]);
 });
 
 /* ==================================================================
@@ -473,6 +494,57 @@ $router->post('/agent/tickets/{id}/merge', function (array $p) {
 
     flash('success', "Ticket #{$sourceId} merged into #{$targetId}.");
     redirect("/agent/tickets/{$targetId}");
+});
+
+/* ==================================================================
+ * AGENT – Save Custom Field Values on a Ticket
+ * ================================================================== */
+
+$router->post('/agent/tickets/{id}/fields', function (array $p) {
+    Auth::requireRole('agent', 'admin');
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect("/agent/tickets/{$id}");
+    }
+
+    $db = Database::connect();
+    $t  = $db->prepare('SELECT id FROM tickets WHERE id = ?');
+    $t->execute([$id]);
+    if (!$t->fetch()) {
+        flash('error', 'Ticket not found.');
+        redirect('/agent/tickets');
+    }
+
+    $fields   = $db->query('SELECT * FROM ticket_form_fields ORDER BY sort_order')->fetchAll();
+    $saveStmt = $db->prepare(
+        'INSERT INTO ticket_field_values (ticket_id, field_id, value) VALUES (?, ?, ?)
+         ON DUPLICATE KEY UPDATE value = VALUES(value)'
+    );
+
+    foreach ($fields as $field) {
+        $key = 'field_' . $field['id'];
+        if ($field['field_type'] === 'dependent') {
+            $val = json_encode([
+                'l1' => $_POST[$key . '_l1'] ?? null,
+                'l2' => $_POST[$key . '_l2'] ?? null,
+                'l3' => $_POST[$key . '_l3'] ?? null,
+            ]);
+        } elseif ($field['field_type'] === 'checkbox') {
+            $val = isset($_POST[$key]) ? '1' : '0';
+        } else {
+            $val = $_POST[$key] ?? null;
+        }
+        if ($val === null || $val === '') {
+            $db->prepare('DELETE FROM ticket_field_values WHERE ticket_id = ? AND field_id = ?')
+               ->execute([$id, $field['id']]);
+            continue;
+        }
+        $saveStmt->execute([$id, $field['id'], $val]);
+    }
+
+    flash('success', 'Custom fields updated.');
+    redirect("/agent/tickets/{$id}");
 });
 
 /* ==================================================================

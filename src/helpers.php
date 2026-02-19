@@ -641,6 +641,7 @@ function adminSidebar(string $active = ''): array
         ['icon' => 'bi-ticket-detailed', 'label' => 'Tickets',    'url' => '/admin/tickets',    'key' => 'tickets'],
         ['icon' => 'bi-people',          'label' => 'Users',      'url' => '/admin/users',      'key' => 'users'],
         ['icon' => 'bi-book',            'label' => 'Knowledge Base', 'url' => '/admin/kb/categories', 'key' => 'kb'],
+        ['icon' => 'bi-diagram-3',       'label' => 'Workflows',    'url' => '/admin/workflows/ticket-fields', 'key' => 'workflows'],
         ['icon' => 'bi-sliders',         'label' => 'Settings',     'url' => '/admin/settings', 'key' => 'settings'],
         ['icon' => 'bi-bar-chart',       'label' => 'Reports',    'url' => '/admin/reports', 'key' => 'reports'],
     ]);
