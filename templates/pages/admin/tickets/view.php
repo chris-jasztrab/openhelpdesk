@@ -9,10 +9,19 @@ $breadcrumbs  = [
 ];
 $statusColors = ['open' => 'primary', 'in_progress' => 'warning', 'pending' => 'info', 'resolved' => 'success', 'closed' => 'secondary'];
 $statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 'Pending', 'resolved' => 'Resolved', 'closed' => 'Closed'];
-$actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-person-check text-primary', 'status_changed' => 'bi-arrow-repeat text-warning', 'priority_changed' => 'bi-flag text-danger', 'comment' => 'bi-chat-dots text-info', 'internal_note' => 'bi-lock text-secondary', 'sla_set' => 'bi-stopwatch text-primary', 'sla_paused' => 'bi-pause-circle text-warning', 'sla_resumed' => 'bi-play-circle text-success'];
+$actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-person-check text-primary', 'status_changed' => 'bi-arrow-repeat text-warning', 'priority_changed' => 'bi-flag text-danger', 'comment' => 'bi-chat-dots text-info', 'internal_note' => 'bi-lock text-secondary', 'sla_set' => 'bi-stopwatch text-primary', 'sla_paused' => 'bi-pause-circle text-warning', 'sla_resumed' => 'bi-play-circle text-success', 'merged' => 'bi-arrow-right-circle text-secondary'];
 $slaStateColors = ['on_track' => 'success', 'warning' => 'warning', 'breached' => 'danger'];
 $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' => 'Breached'];
 ?>
+<?php if ($ticket['merged_into_ticket_id']): ?>
+<div class="alert alert-warning d-flex align-items-center gap-2 mb-4" role="alert">
+    <i class="bi bi-arrow-right-circle-fill fs-5"></i>
+    <div>
+        This ticket was <strong>merged into <a href="/admin/tickets/<?= (int) $ticket['merged_into_ticket_id'] ?>">Ticket #<?= (int) $ticket['merged_into_ticket_id'] ?></a></strong> and is now closed. All further updates should be made on the master ticket.
+    </div>
+</div>
+<?php endif; ?>
+
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h2 class="fw-bold mb-1"><?= e($ticket['subject']) ?></h2>
@@ -20,6 +29,9 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
             <span class="badge bg-<?= $statusColors[$ticket['status']] ?? 'secondary' ?> fs-6">
                 <?= e($statusLabels[$ticket['status']] ?? $ticket['status']) ?>
             </span>
+            <?php if ($ticket['merged_into_ticket_id']): ?>
+            <span class="badge bg-secondary fs-6"><i class="bi bi-arrow-right-circle me-1"></i>Merged</span>
+            <?php endif; ?>
             <?php if ($ticket['priority_name']): ?>
             <span class="badge fs-6" style="background:<?= e($ticket['priority_color']) ?>;">
                 <?= e($ticket['priority_name']) ?>
@@ -33,9 +45,16 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
             <span class="text-muted">Ticket #<?= $ticket['id'] ?></span>
         </div>
     </div>
-    <a href="/admin/tickets" class="btn btn-outline-secondary">
-        <i class="bi bi-arrow-left me-1"></i>Back
-    </a>
+    <div class="d-flex gap-2">
+        <?php if (!$ticket['merged_into_ticket_id']): ?>
+        <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#mergeModal">
+            <i class="bi bi-arrow-right-circle me-1"></i>Merge
+        </button>
+        <?php endif; ?>
+        <a href="/admin/tickets" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Back
+        </a>
+    </div>
 </div>
 
 <div class="row g-4">
@@ -686,4 +705,114 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
 
     renderList();
 })();
+
+<?php if (!$ticket['merged_into_ticket_id']): ?>
+// Merge modal typeahead
+(function() {
+    var searchInput  = document.getElementById('mergeSearchInput');
+    var resultsEl    = document.getElementById('mergeResults');
+    var selectedEl   = document.getElementById('mergeSelectedPreview');
+    var targetInput  = document.getElementById('mergeTargetId');
+    var confirmBtn   = document.getElementById('mergeConfirmBtn');
+    var debounce     = null;
+    var ticketId     = <?= (int) $ticket['id'] ?>;
+    var baseUrl      = '/admin/tickets/search';
+
+    if (!searchInput) return;
+
+    function escHtml(s) {
+        var d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+    }
+
+    searchInput.addEventListener('input', function() {
+        clearTimeout(debounce);
+        var q = this.value.trim();
+        resultsEl.innerHTML = '';
+        resultsEl.style.display = 'none';
+        selectedEl.style.display = 'none';
+        targetInput.value = '';
+        confirmBtn.disabled = true;
+
+        if (q.length < 1) return;
+        debounce = setTimeout(function() {
+            fetch(baseUrl + '?q=' + encodeURIComponent(q) + '&exclude=' + ticketId)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (!data.length) {
+                        resultsEl.innerHTML = '<div class="px-3 py-2 text-muted small">No tickets found.</div>';
+                        resultsEl.style.display = 'block';
+                        return;
+                    }
+                    var html = '';
+                    var statusLabels = {open:'Open',in_progress:'In Progress',pending:'Pending',resolved:'Resolved',closed:'Closed'};
+                    data.forEach(function(t) {
+                        html += '<button type="button" class="list-group-item list-group-item-action px-3 py-2" data-id="' + t.id + '" data-subject="' + escHtml(t.subject) + '">'
+                              + '<div class="fw-semibold">#' + t.id + ' — ' + escHtml(t.subject) + '</div>'
+                              + '<small class="text-muted">' + escHtml(t.creator_name) + ' &middot; ' + escHtml(statusLabels[t.status] || t.status) + '</small>'
+                              + '</button>';
+                    });
+                    resultsEl.innerHTML = html;
+                    resultsEl.style.display = 'block';
+                    resultsEl.querySelectorAll('[data-id]').forEach(function(btn) {
+                        btn.addEventListener('click', function() {
+                            targetInput.value = this.dataset.id;
+                            selectedEl.textContent = 'Merging into: #' + this.dataset.id + ' — ' + this.dataset.subject;
+                            selectedEl.style.display = 'block';
+                            confirmBtn.disabled = false;
+                            resultsEl.style.display = 'none';
+                            searchInput.value = '#' + this.dataset.id + ' — ' + this.dataset.subject;
+                        });
+                    });
+                });
+        }, 300);
+    });
+
+    // Clear state when modal is closed
+    document.getElementById('mergeModal').addEventListener('hidden.bs.modal', function() {
+        searchInput.value = '';
+        resultsEl.innerHTML = '';
+        resultsEl.style.display = 'none';
+        selectedEl.style.display = 'none';
+        targetInput.value = '';
+        confirmBtn.disabled = true;
+    });
+})();
+<?php endif; ?>
 </script>
+
+<?php if (!$ticket['merged_into_ticket_id']): ?>
+<!-- Merge Modal -->
+<div class="modal fade" id="mergeModal" tabindex="-1" aria-labelledby="mergeModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="mergeModalLabel"><i class="bi bi-arrow-right-circle me-2"></i>Merge Ticket #<?= $ticket['id'] ?></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small mb-3">
+                    This ticket will be <strong>closed</strong> and linked to the master ticket. The original submitter and any CC'd users will be notified and will be able to follow the master ticket.
+                </p>
+                <div class="mb-3" style="position:relative;">
+                    <label class="form-label fw-semibold small">Search for master ticket</label>
+                    <input type="text" id="mergeSearchInput" class="form-control" placeholder="Type ticket # or subject..." autocomplete="off">
+                    <div id="mergeResults" class="list-group shadow-sm" style="display:none;position:absolute;z-index:1050;width:100%;max-height:240px;overflow-y:auto;"></div>
+                </div>
+                <div id="mergeSelectedPreview" class="alert alert-success py-2 small" style="display:none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="POST" action="/admin/tickets/<?= $ticket['id'] ?>/merge" class="d-inline">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="merge_into_id" id="mergeTargetId">
+                    <button type="submit" id="mergeConfirmBtn" class="btn btn-danger" disabled>
+                        <i class="bi bi-arrow-right-circle me-1"></i>Merge &amp; Close This Ticket
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>

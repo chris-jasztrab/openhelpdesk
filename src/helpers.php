@@ -532,6 +532,88 @@ function notifyCcUsers(PDO $db, int $ticketId, string $message, string $authorNa
     }
 }
 
+/**
+ * Email the creator (and CC'd users) of a source ticket that it was merged into a master ticket.
+ */
+function notifyTicketMerged(PDO $db, int $sourceId, int $targetId): void
+{
+    // Fetch source ticket and creator
+    $srcStmt = $db->prepare(
+        "SELECT t.subject, t.created_by, u.email, u.first_name, u.last_name
+         FROM tickets t
+         JOIN users u ON t.created_by = u.id
+         WHERE t.id = ?"
+    );
+    $srcStmt->execute([$sourceId]);
+    $src = $srcStmt->fetch();
+    if (!$src) return;
+
+    // Fetch target ticket subject
+    $tgtStmt = $db->prepare('SELECT subject FROM tickets WHERE id = ?');
+    $tgtStmt->execute([$targetId]);
+    $tgt = $tgtStmt->fetch();
+    if (!$tgt) return;
+
+    $appUrl    = env('APP_URL', 'http://localhost:8000');
+    $ticketUrl = $appUrl . '/portal/tickets/' . $targetId;
+
+    $emailHtml = renderEmail('ticket-merged', [
+        'sourceTicketId' => $sourceId,
+        'sourceSubject'  => $src['subject'],
+        'targetTicketId' => $targetId,
+        'targetSubject'  => $tgt['subject'],
+        'ticketUrl'      => $ticketUrl,
+    ]);
+
+    // Notify source ticket creator
+    sendMail(
+        $src['email'],
+        $src['first_name'] . ' ' . $src['last_name'],
+        '[Ticket #' . $sourceId . '] Your ticket has been merged',
+        $emailHtml,
+        '',
+        $targetId
+    );
+
+    // Notify CC'd users on the source ticket (skip creator)
+    $ccStmt = $db->prepare(
+        'SELECT u.id, u.first_name, u.last_name, u.email, u.role
+         FROM ticket_cc tc
+         JOIN users u ON tc.user_id = u.id
+         WHERE tc.ticket_id = ?'
+    );
+    $ccStmt->execute([$sourceId]);
+
+    $creatorId = (int) $src['created_by'];
+    foreach ($ccStmt->fetchAll() as $user) {
+        if ((int) $user['id'] === $creatorId) continue;
+
+        $prefix = match ($user['role']) {
+            'admin' => '/admin',
+            'agent' => '/agent',
+            default => '/portal',
+        };
+        $ccTicketUrl = $appUrl . $prefix . '/tickets/' . $targetId;
+
+        $ccHtml = renderEmail('ticket-merged', [
+            'sourceTicketId' => $sourceId,
+            'sourceSubject'  => $src['subject'],
+            'targetTicketId' => $targetId,
+            'targetSubject'  => $tgt['subject'],
+            'ticketUrl'      => $ccTicketUrl,
+        ]);
+
+        sendMail(
+            $user['email'],
+            $user['first_name'] . ' ' . $user['last_name'],
+            '[Ticket #' . $sourceId . '] Your ticket has been merged',
+            $ccHtml,
+            '',
+            $targetId
+        );
+    }
+}
+
 /* ── Name helpers ─────────────────────────────────────────────── */
 
 /**

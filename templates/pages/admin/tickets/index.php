@@ -288,6 +288,11 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                             <span class="badge bg-<?= $statusColors[$t['status']] ?? 'secondary' ?>">
                                 <?= e($statusLabels[$t['status']] ?? $t['status']) ?>
                             </span>
+                            <?php if ($t['merged_into_ticket_id']): ?>
+                            <a href="/admin/tickets/<?= (int) $t['merged_into_ticket_id'] ?>" class="badge bg-secondary text-decoration-none ms-1" title="Merged into #<?= (int) $t['merged_into_ticket_id'] ?>">
+                                <i class="bi bi-arrow-right-circle"></i> Merged
+                            </a>
+                            <?php endif; ?>
                         </td>
                         <?php endif; ?>
                         <?php if (in_array('priority', $visibleColumns)): ?>

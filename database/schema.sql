@@ -70,12 +70,14 @@ CREATE TABLE IF NOT EXISTS `tickets` (
     `sla_state`    ENUM('on_track','warning','breached') DEFAULT NULL,
     `sla_paused_at` DATETIME DEFAULT NULL,
     `updated_at`   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `merged_into_ticket_id` INT UNSIGNED DEFAULT NULL,
     FOREIGN KEY (`created_by`)  REFERENCES `users`(`id`),
     FOREIGN KEY (`type_id`)     REFERENCES `ticket_types`(`id`) ON DELETE SET NULL,
     FOREIGN KEY (`location_id`) REFERENCES `locations`(`id`) ON DELETE SET NULL,
     FOREIGN KEY (`priority_id`) REFERENCES `ticket_priorities`(`id`) ON DELETE SET NULL,
     FOREIGN KEY (`assigned_to`) REFERENCES `users`(`id`) ON DELETE SET NULL,
-    FOREIGN KEY (`group_id`)    REFERENCES `groups`(`id`) ON DELETE SET NULL
+    FOREIGN KEY (`group_id`)    REFERENCES `groups`(`id`) ON DELETE SET NULL,
+    FOREIGN KEY (`merged_into_ticket_id`) REFERENCES `tickets`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Ticket tags (hashtags)

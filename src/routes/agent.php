@@ -338,6 +338,144 @@ $router->get('/agent/tickets/{id}', function (array $p) {
 });
 
 /* ==================================================================
+ * AGENT – Ticket Search (JSON, for merge modal typeahead)
+ * ================================================================== */
+
+$router->get('/agent/tickets/search', function () {
+    Auth::requireRole('agent', 'admin');
+    $db      = Database::connect();
+    $q       = trim($_GET['q'] ?? '');
+    $exclude = (int) ($_GET['exclude'] ?? 0);
+
+    if ($q === '') {
+        header('Content-Type: application/json');
+        echo json_encode([]);
+        exit;
+    }
+
+    $params = [];
+    $idMatch = is_numeric($q) ? (int) $q : 0;
+
+    if ($idMatch > 0) {
+        $where = 't.id = ? AND t.merged_into_ticket_id IS NULL';
+        $params[] = $idMatch;
+    } else {
+        $where = 't.subject LIKE ? AND t.merged_into_ticket_id IS NULL';
+        $params[] = '%' . $q . '%';
+    }
+
+    if ($exclude > 0) {
+        $where .= ' AND t.id != ?';
+        $params[] = $exclude;
+    }
+
+    $stmt = $db->prepare(
+        "SELECT t.id, t.subject, t.status,
+                CONCAT(u.first_name, ' ', u.last_name) AS creator_name
+         FROM tickets t
+         JOIN users u ON t.created_by = u.id
+         WHERE {$where}
+         ORDER BY t.id DESC
+         LIMIT 10"
+    );
+    $stmt->execute($params);
+
+    header('Content-Type: application/json');
+    echo json_encode($stmt->fetchAll());
+    exit;
+});
+
+/* ==================================================================
+ * AGENT – Merge Ticket into Another
+ * ================================================================== */
+
+$router->post('/agent/tickets/{id}/merge', function (array $p) {
+    Auth::requireRole('agent', 'admin');
+    $sourceId = (int) $p['id'];
+
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect("/agent/tickets/{$sourceId}");
+    }
+
+    $targetId = (int) ($_POST['merge_into_id'] ?? 0);
+
+    if ($targetId === 0 || $targetId === $sourceId) {
+        flash('error', 'Please select a valid ticket to merge into.');
+        redirect("/agent/tickets/{$sourceId}");
+    }
+
+    $db = Database::connect();
+
+    // Validate source ticket (must exist and not already merged)
+    $src = $db->prepare('SELECT id, subject FROM tickets WHERE id = ? AND merged_into_ticket_id IS NULL');
+    $src->execute([$sourceId]);
+    $sourceTicket = $src->fetch();
+    if (!$sourceTicket) {
+        flash('error', 'Source ticket not found or already merged.');
+        redirect("/agent/tickets/{$sourceId}");
+    }
+
+    // Validate target ticket (must exist and not itself be merged)
+    $tgt = $db->prepare('SELECT id, subject FROM tickets WHERE id = ? AND merged_into_ticket_id IS NULL');
+    $tgt->execute([$targetId]);
+    $targetTicket = $tgt->fetch();
+    if (!$targetTicket) {
+        flash('error', 'Target ticket not found or is itself a merged ticket.');
+        redirect("/agent/tickets/{$sourceId}");
+    }
+
+    $db->beginTransaction();
+    try {
+        $actor = Auth::fullName();
+
+        // Copy CC users from source to target (skip duplicates)
+        $db->prepare(
+            'INSERT IGNORE INTO ticket_cc (ticket_id, user_id, added_by)
+             SELECT ?, user_id, ? FROM ticket_cc WHERE ticket_id = ?'
+        )->execute([$targetId, Auth::id(), $sourceId]);
+
+        // Copy tags from source to target (skip duplicates)
+        $db->prepare(
+            'INSERT IGNORE INTO ticket_tag_map (ticket_id, tag_id)
+             SELECT ?, tag_id FROM ticket_tag_map WHERE ticket_id = ?'
+        )->execute([$targetId, $sourceId]);
+
+        // Timeline entry on master ticket
+        $db->prepare(
+            'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
+        )->execute([
+            $targetId, Auth::id(), 'merged',
+            "Ticket #{$sourceId} ({$sourceTicket['subject']}) was merged into this ticket by {$actor}",
+        ]);
+
+        // Timeline entry on source ticket
+        $db->prepare(
+            'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
+        )->execute([
+            $sourceId, Auth::id(), 'merged',
+            "This ticket was merged into #{$targetId} ({$targetTicket['subject']}) by {$actor}",
+        ]);
+
+        // Close source ticket and set merged_into_ticket_id
+        $db->prepare(
+            'UPDATE tickets SET status = ?, merged_into_ticket_id = ? WHERE id = ?'
+        )->execute(['closed', $targetId, $sourceId]);
+
+        $db->commit();
+    } catch (\Throwable $e) {
+        $db->rollBack();
+        flash('error', 'Merge failed. Please try again.');
+        redirect("/agent/tickets/{$sourceId}");
+    }
+
+    notifyTicketMerged($db, $sourceId, $targetId);
+
+    flash('success', "Ticket #{$sourceId} merged into #{$targetId}.");
+    redirect("/agent/tickets/{$targetId}");
+});
+
+/* ==================================================================
  * AGENT – Add Comment / Internal Note to Ticket
  * ================================================================== */
 

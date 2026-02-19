@@ -15,8 +15,9 @@ $router->get('/portal/tickets', function () {
     $fPriority = trim($_GET['priority'] ?? '');
     $fSearch   = trim($_GET['q'] ?? '');
 
-    $where  = ['t.created_by = ?'];
-    $params = [Auth::id()];
+    // Show tickets the user created (not merged away) plus any master tickets their merged tickets point to
+    $where  = ['(t.created_by = ? AND t.merged_into_ticket_id IS NULL) OR t.id IN (SELECT DISTINCT merged_into_ticket_id FROM tickets WHERE created_by = ? AND merged_into_ticket_id IS NOT NULL)'];
+    $params = [Auth::id(), Auth::id()];
 
     if ($fStatus !== '') {
         $where[]  = 't.status = ?';
@@ -271,7 +272,17 @@ $router->post('/portal/tickets/create', function () {
 
 $router->get('/portal/tickets/{id}', function (array $p) {
     Auth::requireAuth();
-    $db = Database::connect();
+    $db  = Database::connect();
+    $uid = Auth::id();
+    $tid = (int) $p['id'];
+
+    // If this is the user's own ticket and it was merged, redirect to the master ticket
+    $mergedCheck = $db->prepare('SELECT merged_into_ticket_id FROM tickets WHERE id = ? AND created_by = ?');
+    $mergedCheck->execute([$tid, $uid]);
+    $mergedRow = $mergedCheck->fetch();
+    if ($mergedRow && $mergedRow['merged_into_ticket_id']) {
+        redirect('/portal/tickets/' . (int) $mergedRow['merged_into_ticket_id']);
+    }
 
     $stmt = $db->prepare(
         "SELECT t.*,
@@ -284,9 +295,10 @@ $router->get('/portal/tickets/{id}', function (array $p) {
          LEFT JOIN ticket_types tt     ON t.type_id     = tt.id
          LEFT JOIN locations l         ON t.location_id  = l.id
          LEFT JOIN users a             ON t.assigned_to  = a.id
-         WHERE t.id = ? AND t.created_by = ?"
+         WHERE t.id = ?
+           AND (t.created_by = ? OR t.id IN (SELECT DISTINCT merged_into_ticket_id FROM tickets WHERE created_by = ? AND merged_into_ticket_id IS NOT NULL))"
     );
-    $stmt->execute([(int) $p['id'], Auth::id()]);
+    $stmt->execute([$tid, $uid, $uid]);
     $ticket = $stmt->fetch();
     if (!$ticket) {
         flash('error', 'Ticket not found.');
@@ -357,9 +369,13 @@ $router->post('/portal/tickets/{id}/comment', function (array $p) {
 
     $db = Database::connect();
 
-    // Verify ownership
-    $stmt = $db->prepare('SELECT id FROM tickets WHERE id = ? AND created_by = ?');
-    $stmt->execute([$id, Auth::id()]);
+    // Verify ownership (own ticket or a master ticket one of their tickets was merged into)
+    $uid = Auth::id();
+    $stmt = $db->prepare(
+        'SELECT id FROM tickets WHERE id = ?
+         AND (created_by = ? OR id IN (SELECT DISTINCT merged_into_ticket_id FROM tickets WHERE created_by = ? AND merged_into_ticket_id IS NOT NULL))'
+    );
+    $stmt->execute([$id, $uid, $uid]);
     if (!$stmt->fetch()) {
         flash('error', 'Ticket not found.');
         redirect('/portal/tickets');
