@@ -388,6 +388,41 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
     </div>
 </div>
 
+<?php if (!$ticket['merged_into_ticket_id']): ?>
+<!-- Merge Modal -->
+<div class="modal fade" id="mergeModal" tabindex="-1" aria-labelledby="mergeModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="mergeModalLabel"><i class="bi bi-arrow-right-circle me-2"></i>Merge Ticket #<?= $ticket['id'] ?></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small mb-3">
+                    This ticket will be <strong>closed</strong> and linked to the master ticket. The original submitter and any CC'd users will be notified and will be able to follow the master ticket.
+                </p>
+                <div class="mb-3" style="position:relative;">
+                    <label class="form-label fw-semibold small">Search for master ticket</label>
+                    <input type="text" id="mergeSearchInput" class="form-control" placeholder="Type ticket # or subject..." autocomplete="off">
+                    <div id="mergeResults" class="list-group shadow-sm" style="display:none;position:absolute;z-index:1050;width:100%;max-height:240px;overflow-y:auto;"></div>
+                </div>
+                <div id="mergeSelectedPreview" class="alert alert-success py-2 small" style="display:none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="POST" action="/admin/tickets/<?= $ticket['id'] ?>/merge" class="d-inline">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="merge_into_id" id="mergeTargetId">
+                    <button type="submit" id="mergeConfirmBtn" class="btn btn-danger" disabled>
+                        <i class="bi bi-arrow-right-circle me-1"></i>Merge &amp; Close This Ticket
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <script>
 (function() {
     var textarea = document.getElementById('commentMessage');
@@ -781,38 +816,3 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
 })();
 <?php endif; ?>
 </script>
-
-<?php if (!$ticket['merged_into_ticket_id']): ?>
-<!-- Merge Modal -->
-<div class="modal fade" id="mergeModal" tabindex="-1" aria-labelledby="mergeModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="mergeModalLabel"><i class="bi bi-arrow-right-circle me-2"></i>Merge Ticket #<?= $ticket['id'] ?></h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <p class="text-muted small mb-3">
-                    This ticket will be <strong>closed</strong> and linked to the master ticket. The original submitter and any CC'd users will be notified and will be able to follow the master ticket.
-                </p>
-                <div class="mb-3" style="position:relative;">
-                    <label class="form-label fw-semibold small">Search for master ticket</label>
-                    <input type="text" id="mergeSearchInput" class="form-control" placeholder="Type ticket # or subject..." autocomplete="off">
-                    <div id="mergeResults" class="list-group shadow-sm" style="display:none;position:absolute;z-index:1050;width:100%;max-height:240px;overflow-y:auto;"></div>
-                </div>
-                <div id="mergeSelectedPreview" class="alert alert-success py-2 small" style="display:none;"></div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                <form method="POST" action="/admin/tickets/<?= $ticket['id'] ?>/merge" class="d-inline">
-                    <?= csrfField() ?>
-                    <input type="hidden" name="merge_into_id" id="mergeTargetId">
-                    <button type="submit" id="mergeConfirmBtn" class="btn btn-danger" disabled>
-                        <i class="bi bi-arrow-right-circle me-1"></i>Merge &amp; Close This Ticket
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-<?php endif; ?>
