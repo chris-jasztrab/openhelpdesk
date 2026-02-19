@@ -129,6 +129,7 @@
         [data-bs-theme="dark"] .stat-card { box-shadow: 0 1px 3px rgba(0,0,0,.3); }
         [data-bs-theme="dark"] .ld-search-tab { color: #adb5bd; }
         [data-bs-theme="dark"] .ld-search-tab:hover { color: #dee2e6; }
+        [data-bs-theme="dark"] .ld-search-item { color: var(--bs-body-color) !important; }
         [data-bs-theme="dark"] .ld-search-item:hover { background: #2b3035; }
         [data-bs-theme="dark"] .ld-search-group + .ld-search-group { border-top-color: #373b3e; }
         [data-bs-theme="dark"] .mention-dropdown { background: #212529; border-color: #373b3e; }
@@ -137,6 +138,18 @@
         [data-bs-theme="dark"] .mention-dropdown .mention-hint { color: #6c757d; }
         [data-bs-theme="dark"] .table-light { --bs-table-bg: #2b3035; --bs-table-color: #dee2e6; }
         [data-bs-theme="dark"] .shadow-sm { box-shadow: 0 .125rem .25rem rgba(0,0,0,.3) !important; }
+        /* bg-white is not theme-adaptive — fix card headers, dropdowns, and other bg-white elements */
+        [data-bs-theme="dark"] .bg-white { background-color: var(--bs-secondary-bg) !important; }
+        /* Ensure form inputs don't inherit the bg-white override (Bootstrap handles them natively) */
+        [data-bs-theme="dark"] input.bg-white,
+        [data-bs-theme="dark"] textarea.bg-white,
+        [data-bs-theme="dark"] select.bg-white { background-color: var(--bs-body-bg) !important; }
+        /* Tag/KB badges using bg-light need a readable border in dark mode */
+        [data-bs-theme="dark"] .badge.bg-light { border-color: #495057 !important; }
+        /* Hardcoded light backgrounds in filter/stat areas */
+        [data-bs-theme="dark"] .bg-f8fafc,
+        [data-bs-theme="dark"] [style*="background:#f8fafc"],
+        [data-bs-theme="dark"] [style*="background-color:#f8fafc"] { background-color: var(--bs-tertiary-bg) !important; }
     </style>
 </head>
 <body>
