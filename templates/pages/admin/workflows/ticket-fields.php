@@ -101,7 +101,7 @@ $fieldTypeMeta = [
         border-radius: .375rem;
         background: rgba(79, 70, 229, .04);
     }
-    .field-palette-card { cursor: grab; }
+    .field-palette-card { cursor: grab; touch-action: none; }
     .field-palette-card:active { cursor: grabbing; }
 </style>
 
@@ -312,73 +312,82 @@ $fieldTypeMeta = [
         });
     }
 
-    /* ─── Custom pointer-drag: palette → canvas ───────────────────────────
-       Uses mousedown/mousemove/mouseup to avoid all HTML5 Drag API +
-       SortableJS interference.  A ghost element follows the cursor.
-       On mouseup over the canvas the field is added.
+    /* ─── Pointer-capture drag: palette → canvas ──────────────────────────
+       Uses the Pointer Events API + setPointerCapture so the tile receives
+       ALL pointer events even when the cursor leaves it.  This bypasses both
+       the HTML5 Drag API and any SortableJS interference.
+       Click (no movement) and drag are both handled here; the separate
+       click listener below is removed.
     ──────────────────────────────────────────────────────────────────── */
-    var pdGhost     = null;    // floating ghost div
-    var pdType      = null;    // field type being dragged
-    var pdStartX    = 0;
-    var pdStartY    = 0;
-    var pdDragging  = false;
-    var PD_THRESH   = 6;       // px before drag starts
-
     document.querySelectorAll('.field-palette-card').forEach(function (tile) {
-        tile.addEventListener('mousedown', function (e) {
+        var tileType  = tile.dataset.type;
+        var ghost     = null;
+        var startX    = 0;
+        var startY    = 0;
+        var dragging  = false;
+
+        tile.addEventListener('pointerdown', function (e) {
             if (e.button !== 0) return;
-            pdType   = tile.dataset.type;
-            pdStartX = e.clientX;
-            pdStartY = e.clientY;
-            pdDragging = false;
+            e.preventDefault();                 // prevent text-select / browser drag
+            tile.setPointerCapture(e.pointerId); // all future events routed here
+            startX   = e.clientX;
+            startY   = e.clientY;
+            dragging = false;
+            ghost    = null;
         });
-    });
 
-    document.addEventListener('mousemove', function (e) {
-        if (!pdType) return;
+        tile.addEventListener('pointermove', function (e) {
+            if (!tile.hasPointerCapture(e.pointerId)) return;
+            var dx = e.clientX - startX;
+            var dy = e.clientY - startY;
 
-        var dx = e.clientX - pdStartX;
-        var dy = e.clientY - pdStartY;
+            if (!dragging && Math.sqrt(dx * dx + dy * dy) > 6) {
+                dragging = true;
+                ghost = document.createElement('div');
+                ghost.className = 'field-palette-card';
+                ghost.style.cssText =
+                    'position:fixed;z-index:9999;pointer-events:none;opacity:.85;' +
+                    'min-width:140px;box-shadow:0 4px 16px rgba(0,0,0,.18);margin:0;';
+                ghost.innerHTML = tile.innerHTML;
+                document.body.appendChild(ghost);
+            }
 
-        if (!pdDragging && Math.sqrt(dx * dx + dy * dy) > PD_THRESH) {
-            pdDragging = true;
-            // Build ghost from the matching tile
-            var tile = document.querySelector('.field-palette-card[data-type="' + pdType + '"]');
-            pdGhost = document.createElement('div');
-            pdGhost.className = 'field-palette-card';
-            pdGhost.style.cssText = 'position:fixed;z-index:9999;pointer-events:none;opacity:.85;' +
-                'min-width:140px;box-shadow:0 4px 16px rgba(0,0,0,.18);margin:0;';
-            pdGhost.innerHTML = tile.innerHTML;
-            document.body.appendChild(pdGhost);
+            if (ghost) {
+                ghost.style.left = (e.clientX - 70) + 'px';
+                ghost.style.top  = (e.clientY - 18) + 'px';
+                var r = canvas.getBoundingClientRect();
+                canvas.classList.toggle('canvas-drag-over',
+                    e.clientX >= r.left && e.clientX <= r.right &&
+                    e.clientY >= r.top  && e.clientY <= r.bottom);
+            }
+        });
+
+        function finishDrag(e) {
+            if (!tile.hasPointerCapture(e.pointerId)) return;
+            if (ghost) { ghost.remove(); ghost = null; }
+            canvas.classList.remove('canvas-drag-over');
+
+            if (dragging) {
+                // Drag: add only if released over canvas
+                var r = canvas.getBoundingClientRect();
+                if (e.clientX >= r.left && e.clientX <= r.right &&
+                    e.clientY >= r.top  && e.clientY <= r.bottom) {
+                    doAddField(tileType);
+                }
+            } else {
+                // No movement = click
+                doAddField(tileType);
+            }
+            dragging = false;
         }
 
-        if (pdGhost) {
-            pdGhost.style.left = (e.clientX - 70) + 'px';
-            pdGhost.style.top  = (e.clientY - 18) + 'px';
-
-            var r = canvas.getBoundingClientRect();
-            var over = e.clientX >= r.left && e.clientX <= r.right &&
-                       e.clientY >= r.top  && e.clientY <= r.bottom;
-            canvas.classList.toggle('canvas-drag-over', over);
-        }
-    });
-
-    document.addEventListener('mouseup', function (e) {
-        if (!pdType) return;
-
-        if (pdGhost) { pdGhost.remove(); pdGhost = null; }
-        canvas.classList.remove('canvas-drag-over');
-
-        if (pdDragging) {
-            var r = canvas.getBoundingClientRect();
-            var over = e.clientX >= r.left && e.clientX <= r.right &&
-                       e.clientY >= r.top  && e.clientY <= r.bottom;
-            if (over) doAddField(pdType);
-        }
-        // Non-drag clicks are handled by the click listener below
-
-        pdType     = null;
-        pdDragging = false;
+        tile.addEventListener('pointerup',     finishDrag);
+        tile.addEventListener('pointercancel', function (e) {
+            if (!tile.hasPointerCapture(e.pointerId)) return;
+            if (ghost) { ghost.remove(); ghost = null; }
+            canvas.classList.remove('canvas-drag-over');
+            dragging = false;
+        });
     });
 
     function saveOrder() {
@@ -430,13 +439,6 @@ $fieldTypeMeta = [
     }
 
     function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
-
-    /* ─── Add field from palette (click) ─── */
-    document.querySelectorAll('.field-palette-card').forEach(function (tile) {
-        tile.addEventListener('click', function () {
-            doAddField(tile.dataset.type);
-        });
-    });
 
     /* ─── Delete field ─── */
     canvas.addEventListener('click', function (e) {
