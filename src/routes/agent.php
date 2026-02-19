@@ -10,6 +10,21 @@ $router->get('/agent/tickets', function () {
     Auth::requireRole('agent', 'admin');
     $db = Database::connect();
 
+    // Auto-apply default filter when visiting the bare URL (no query params, not an explicit reset)
+    if (empty($_GET)) {
+        $defStmt = $db->prepare(
+            'SELECT filters FROM saved_filters WHERE user_id = ? AND is_default = 1 LIMIT 1'
+        );
+        $defStmt->execute([Auth::id()]);
+        $defaultFilter = $defStmt->fetchColumn();
+        if ($defaultFilter) {
+            $filterData = json_decode($defaultFilter, true) ?: [];
+            if ($filterData) {
+                redirect('/agent/tickets?' . http_build_query($filterData));
+            }
+        }
+    }
+
     // Read filter params
     $fStatus   = trim($_GET['status'] ?? '');
     $fPriority = trim($_GET['priority'] ?? '');
@@ -253,6 +268,37 @@ $router->post('/agent/tickets/filters/{id}/toggle-share', function (array $p) {
     $newShared = $filter['is_shared'] ? 0 : 1;
     $db->prepare('UPDATE saved_filters SET is_shared = ? WHERE id = ?')->execute([$newShared, $id]);
     flash('success', $newShared ? 'Filter is now shared.' : 'Filter is now private.');
+    redirect('/agent/tickets');
+});
+
+$router->post('/agent/tickets/filters/{id}/toggle-default', function (array $p) {
+    Auth::requireRole('agent', 'admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/agent/tickets');
+    }
+
+    $id = (int) $p['id'];
+    $db = Database::connect();
+
+    $stmt = $db->prepare('SELECT * FROM saved_filters WHERE id = ? AND user_id = ?');
+    $stmt->execute([$id, Auth::id()]);
+    $filter = $stmt->fetch();
+    if (!$filter) {
+        flash('error', 'Filter not found or access denied.');
+        redirect('/agent/tickets');
+    }
+
+    if ($filter['is_default']) {
+        // Unset default
+        $db->prepare('UPDATE saved_filters SET is_default = 0 WHERE id = ?')->execute([$id]);
+        flash('success', 'Default filter removed.');
+    } else {
+        // Clear any existing default for this user, then set this one
+        $db->prepare('UPDATE saved_filters SET is_default = 0 WHERE user_id = ?')->execute([Auth::id()]);
+        $db->prepare('UPDATE saved_filters SET is_default = 1 WHERE id = ?')->execute([$id]);
+        flash('success', '"' . e($filter['name']) . '" is now your default filter.');
+    }
     redirect('/agent/tickets');
 });
 

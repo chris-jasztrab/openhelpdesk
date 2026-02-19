@@ -91,7 +91,7 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                     <i class="bi bi-funnel me-1"></i>Filter
                 </button>
                 <?php if ($hasFilters): ?>
-                <a href="/agent/tickets" class="btn btn-sm btn-outline-secondary">
+                <a href="/agent/tickets?reset=1" class="btn btn-sm btn-outline-secondary">
                     <i class="bi bi-x-lg"></i>
                 </a>
                 <?php endif; ?>
@@ -119,6 +119,9 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
            class="btn <?= $isActive ? 'text-white' : 'btn-outline-secondary' ?>"
            <?= $isActive ? 'style="background:var(--ld-primary);"' : '' ?>
            title="<?= $isOwner ? '' : 'Shared by ' . e($sf['owner_name']) ?>">
+            <?php if ($sf['is_default'] && $isOwner): ?>
+                <i class="bi bi-star-fill text-warning me-1" title="Default filter"></i>
+            <?php endif; ?>
             <?php if ($sf['is_shared'] && !$isOwner): ?>
                 <i class="bi bi-people-fill me-1" title="Shared by <?= e($sf['owner_name']) ?>"></i>
             <?php elseif ($sf['is_shared'] && $isOwner): ?>
@@ -133,6 +136,15 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
             <span class="visually-hidden">Options</span>
         </button>
         <ul class="dropdown-menu dropdown-menu-end">
+            <li>
+                <form method="POST" action="/agent/tickets/filters/<?= $sf['id'] ?>/toggle-default" class="d-inline">
+                    <?= csrfField() ?>
+                    <button type="submit" class="dropdown-item">
+                        <i class="bi bi-star<?= $sf['is_default'] ? '-fill text-warning' : '' ?> me-2"></i>
+                        <?= $sf['is_default'] ? 'Remove Default' : 'Set as Default' ?>
+                    </button>
+                </form>
+            </li>
             <li>
                 <form method="POST" action="/agent/tickets/filters/<?= $sf['id'] ?>/toggle-share" class="d-inline">
                     <?= csrfField() ?>
