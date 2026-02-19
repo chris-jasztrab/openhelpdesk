@@ -256,6 +256,54 @@ $router->post('/agent/tickets/filters/{id}/toggle-share', function (array $p) {
     redirect('/agent/tickets');
 });
 
+/* ==================================================================
+ * AGENT – Ticket Search (JSON, for merge modal typeahead)
+ * ================================================================== */
+
+$router->get('/agent/tickets/search', function () {
+    Auth::requireRole('agent', 'admin');
+    $db      = Database::connect();
+    $q       = trim($_GET['q'] ?? '');
+    $exclude = (int) ($_GET['exclude'] ?? 0);
+
+    if ($q === '') {
+        header('Content-Type: application/json');
+        echo json_encode([]);
+        exit;
+    }
+
+    $params = [];
+    $idMatch = is_numeric($q) ? (int) $q : 0;
+
+    if ($idMatch > 0) {
+        $where = 't.id = ? AND t.merged_into_ticket_id IS NULL';
+        $params[] = $idMatch;
+    } else {
+        $where = 't.subject LIKE ? AND t.merged_into_ticket_id IS NULL';
+        $params[] = '%' . $q . '%';
+    }
+
+    if ($exclude > 0) {
+        $where .= ' AND t.id != ?';
+        $params[] = $exclude;
+    }
+
+    $stmt = $db->prepare(
+        "SELECT t.id, t.subject, t.status,
+                CONCAT(u.first_name, ' ', u.last_name) AS creator_name
+         FROM tickets t
+         JOIN users u ON t.created_by = u.id
+         WHERE {$where}
+         ORDER BY t.id DESC
+         LIMIT 10"
+    );
+    $stmt->execute($params);
+
+    header('Content-Type: application/json');
+    echo json_encode($stmt->fetchAll());
+    exit;
+});
+
 $router->get('/agent/tickets/{id}', function (array $p) {
     Auth::requireRole('agent', 'admin');
     $db = Database::connect();
@@ -335,54 +383,6 @@ $router->get('/agent/tickets/{id}', function (array $p) {
     $groups = $db->query('SELECT id, name FROM groups ORDER BY name')->fetchAll();
 
     render('agent/tickets/view', ['ticket' => $ticket, 'timeline' => $timeline, 'agents' => $agents, 'priorities' => $priorities, 'attachments' => $attachments, 'ccUsers' => $ccUsers, 'groups' => $groups]);
-});
-
-/* ==================================================================
- * AGENT – Ticket Search (JSON, for merge modal typeahead)
- * ================================================================== */
-
-$router->get('/agent/tickets/search', function () {
-    Auth::requireRole('agent', 'admin');
-    $db      = Database::connect();
-    $q       = trim($_GET['q'] ?? '');
-    $exclude = (int) ($_GET['exclude'] ?? 0);
-
-    if ($q === '') {
-        header('Content-Type: application/json');
-        echo json_encode([]);
-        exit;
-    }
-
-    $params = [];
-    $idMatch = is_numeric($q) ? (int) $q : 0;
-
-    if ($idMatch > 0) {
-        $where = 't.id = ? AND t.merged_into_ticket_id IS NULL';
-        $params[] = $idMatch;
-    } else {
-        $where = 't.subject LIKE ? AND t.merged_into_ticket_id IS NULL';
-        $params[] = '%' . $q . '%';
-    }
-
-    if ($exclude > 0) {
-        $where .= ' AND t.id != ?';
-        $params[] = $exclude;
-    }
-
-    $stmt = $db->prepare(
-        "SELECT t.id, t.subject, t.status,
-                CONCAT(u.first_name, ' ', u.last_name) AS creator_name
-         FROM tickets t
-         JOIN users u ON t.created_by = u.id
-         WHERE {$where}
-         ORDER BY t.id DESC
-         LIMIT 10"
-    );
-    $stmt->execute($params);
-
-    header('Content-Type: application/json');
-    echo json_encode($stmt->fetchAll());
-    exit;
 });
 
 /* ==================================================================
