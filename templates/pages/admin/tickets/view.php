@@ -549,10 +549,15 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
 <?php endif; ?>
 
 <script>
-// Restore Back button to previously visited ticket list URL (with filters)
+// Restore Back button and breadcrumb link to the previously visited ticket list URL (with filters)
 (function() {
     var saved = sessionStorage.getItem('adminTicketListUrl');
-    if (saved) document.getElementById('backBtn').href = saved;
+    if (!saved) return;
+    var backBtn = document.getElementById('backBtn');
+    if (backBtn) backBtn.href = saved;
+    document.querySelectorAll('.breadcrumb-item a').forEach(function (a) {
+        if (a.getAttribute('href') === '/admin/tickets') a.href = saved;
+    });
 })();
 
 (function() {
