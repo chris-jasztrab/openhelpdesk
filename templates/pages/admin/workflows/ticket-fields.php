@@ -313,35 +313,46 @@ $fieldTypeMeta = [
     }
 
     /* ─── Palette HTML5 drag → canvas drop ─── */
+    // Track what palette type is currently being dragged
+    var currentDragType = null;
+
     document.querySelectorAll('.field-palette-card').forEach(function (tile) {
         tile.addEventListener('dragstart', function (e) {
+            currentDragType = tile.dataset.type;
             e.dataTransfer.setData('text/plain', tile.dataset.type);
             e.dataTransfer.effectAllowed = 'copy';
         });
         tile.addEventListener('dragend', function () {
+            currentDragType = null;
             canvas.classList.remove('canvas-drag-over');
         });
     });
 
-    canvas.addEventListener('dragover', function (e) {
-        if (e.dataTransfer.types.indexOf('text/plain') !== -1) {
+    // Use capture phase (3rd arg = true) so these run BEFORE SortableJS's
+    // bubble-phase dragover handler, which otherwise prevents the drop event.
+    document.addEventListener('dragover', function (e) {
+        if (!currentDragType) return;
+        if (canvas === e.target || canvas.contains(e.target)) {
             e.preventDefault();
+            e.stopPropagation();
             e.dataTransfer.dropEffect = 'copy';
             canvas.classList.add('canvas-drag-over');
-        }
-    });
-    canvas.addEventListener('dragleave', function (e) {
-        if (!canvas.contains(e.relatedTarget)) {
+        } else {
             canvas.classList.remove('canvas-drag-over');
         }
-    });
-    canvas.addEventListener('drop', function (e) {
-        e.preventDefault();
-        canvas.classList.remove('canvas-drag-over');
-        var type = e.dataTransfer.getData('text/plain');
-        if (!type) return;
-        doAddField(type);
-    });
+    }, true);
+
+    document.addEventListener('drop', function (e) {
+        if (!currentDragType) return;
+        if (canvas === e.target || canvas.contains(e.target)) {
+            e.preventDefault();
+            e.stopPropagation();
+            canvas.classList.remove('canvas-drag-over');
+            var type = currentDragType;
+            currentDragType = null;
+            doAddField(type);
+        }
+    }, true);
 
     function saveOrder() {
         var cards = canvas.querySelectorAll('.field-canvas-card');
