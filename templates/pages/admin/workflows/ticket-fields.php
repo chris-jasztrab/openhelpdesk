@@ -121,7 +121,7 @@ $fieldTypeMeta = [
             </div>
             <div class="card-body p-2" id="fieldPalette">
                 <?php foreach ($fieldTypeMeta as $type => $meta): ?>
-                <div class="field-palette-card" draggable="true" data-type="<?= e($type) ?>" role="button" title="Drag onto canvas or click to add <?= e($meta['label']) ?>">
+                <div class="field-palette-card" data-type="<?= e($type) ?>" role="button" title="Drag onto canvas or click to add <?= e($meta['label']) ?>">
                     <i class="bi <?= e($meta['icon']) ?>"></i>
                     <span><?= e($meta['label']) ?></span>
                 </div>
@@ -312,45 +312,73 @@ $fieldTypeMeta = [
         });
     }
 
-    /* ─── Palette HTML5 drag → canvas drop ─── */
-    // An invisible overlay sits on top of the canvas during palette drags.
-    // It has no SortableJS on it, so dragover/drop work without interference.
-    var currentDragType = null;
-    canvas.style.position = 'relative';
-    var dropOverlay = document.createElement('div');
-    dropOverlay.style.cssText = 'position:absolute;inset:0;z-index:50;display:none;';
-    canvas.appendChild(dropOverlay);
-
-    dropOverlay.addEventListener('dragover', function (e) {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'copy';
-        canvas.classList.add('canvas-drag-over');
-    });
-    dropOverlay.addEventListener('dragleave', function () {
-        canvas.classList.remove('canvas-drag-over');
-    });
-    dropOverlay.addEventListener('drop', function (e) {
-        e.preventDefault();
-        dropOverlay.style.display = 'none';
-        canvas.classList.remove('canvas-drag-over');
-        var type = currentDragType;
-        currentDragType = null;
-        if (type) doAddField(type);
-    });
+    /* ─── Custom pointer-drag: palette → canvas ───────────────────────────
+       Uses mousedown/mousemove/mouseup to avoid all HTML5 Drag API +
+       SortableJS interference.  A ghost element follows the cursor.
+       On mouseup over the canvas the field is added.
+    ──────────────────────────────────────────────────────────────────── */
+    var pdGhost     = null;    // floating ghost div
+    var pdType      = null;    // field type being dragged
+    var pdStartX    = 0;
+    var pdStartY    = 0;
+    var pdDragging  = false;
+    var PD_THRESH   = 6;       // px before drag starts
 
     document.querySelectorAll('.field-palette-card').forEach(function (tile) {
-        tile.addEventListener('dragstart', function (e) {
-            currentDragType = tile.dataset.type;
-            e.dataTransfer.setData('text/plain', tile.dataset.type);
-            e.dataTransfer.effectAllowed = 'copy';
-            // Show overlay so the canvas can receive the drop
-            dropOverlay.style.display = 'block';
+        tile.addEventListener('mousedown', function (e) {
+            if (e.button !== 0) return;
+            pdType   = tile.dataset.type;
+            pdStartX = e.clientX;
+            pdStartY = e.clientY;
+            pdDragging = false;
         });
-        tile.addEventListener('dragend', function () {
-            dropOverlay.style.display = 'none';
-            currentDragType = null;
-            canvas.classList.remove('canvas-drag-over');
-        });
+    });
+
+    document.addEventListener('mousemove', function (e) {
+        if (!pdType) return;
+
+        var dx = e.clientX - pdStartX;
+        var dy = e.clientY - pdStartY;
+
+        if (!pdDragging && Math.sqrt(dx * dx + dy * dy) > PD_THRESH) {
+            pdDragging = true;
+            // Build ghost from the matching tile
+            var tile = document.querySelector('.field-palette-card[data-type="' + pdType + '"]');
+            pdGhost = document.createElement('div');
+            pdGhost.className = 'field-palette-card';
+            pdGhost.style.cssText = 'position:fixed;z-index:9999;pointer-events:none;opacity:.85;' +
+                'min-width:140px;box-shadow:0 4px 16px rgba(0,0,0,.18);margin:0;';
+            pdGhost.innerHTML = tile.innerHTML;
+            document.body.appendChild(pdGhost);
+        }
+
+        if (pdGhost) {
+            pdGhost.style.left = (e.clientX - 70) + 'px';
+            pdGhost.style.top  = (e.clientY - 18) + 'px';
+
+            var r = canvas.getBoundingClientRect();
+            var over = e.clientX >= r.left && e.clientX <= r.right &&
+                       e.clientY >= r.top  && e.clientY <= r.bottom;
+            canvas.classList.toggle('canvas-drag-over', over);
+        }
+    });
+
+    document.addEventListener('mouseup', function (e) {
+        if (!pdType) return;
+
+        if (pdGhost) { pdGhost.remove(); pdGhost = null; }
+        canvas.classList.remove('canvas-drag-over');
+
+        if (pdDragging) {
+            var r = canvas.getBoundingClientRect();
+            var over = e.clientX >= r.left && e.clientX <= r.right &&
+                       e.clientY >= r.top  && e.clientY <= r.bottom;
+            if (over) doAddField(pdType);
+        }
+        // Non-drag clicks are handled by the click listener below
+
+        pdType     = null;
+        pdDragging = false;
     });
 
     function saveOrder() {

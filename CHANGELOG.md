@@ -5,7 +5,6 @@ All notable changes to LocalDesk will be documented in this file.
 ---
 
 ## Unreleased
-- Need to work on Dark Mode/Light mode. Dark Mode has text issues.
 - Work on outgoing email templates.
 - Profile Avatars
 - Ticket Builder
