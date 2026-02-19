@@ -64,6 +64,8 @@
         [data-bs-theme="dark"] .ld-search-group + .ld-search-group { border-top-color: #373b3e; }
         [data-bs-theme="dark"] .table-light { --bs-table-bg: #2b3035; --bs-table-color: #dee2e6; }
         [data-bs-theme="dark"] .shadow-sm { box-shadow: 0 .125rem .25rem rgba(0,0,0,.3) !important; }
+        /* .text-dark is not theme-adaptive in Bootstrap 5.3 — override to readable body color */
+        [data-bs-theme="dark"] .text-dark { color: var(--bs-body-color) !important; }
         /* bg-white is not theme-adaptive — fix card headers, dropdowns, and other bg-white elements */
         [data-bs-theme="dark"] .bg-white { background-color: var(--bs-secondary-bg) !important; }
         [data-bs-theme="dark"] input.bg-white,
