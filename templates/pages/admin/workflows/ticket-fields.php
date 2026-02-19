@@ -96,6 +96,13 @@ $fieldTypeMeta = [
     [data-bs-theme="dark"] .field-canvas-card { background: var(--bs-secondary-bg); border-color: #373b3e; }
     [data-bs-theme="dark"] .opt-pill { background: #2b3035; border-color: #495057; }
     [data-bs-theme="dark"] .canvas-empty { border-color: #495057; }
+    #fieldCanvas.canvas-drag-over {
+        outline: 2px dashed var(--ld-primary);
+        border-radius: .375rem;
+        background: rgba(79, 70, 229, .04);
+    }
+    .field-palette-card { cursor: grab; }
+    .field-palette-card:active { cursor: grabbing; }
 </style>
 
 <div class="d-flex align-items-center justify-content-between mb-4">
@@ -114,7 +121,7 @@ $fieldTypeMeta = [
             </div>
             <div class="card-body p-2" id="fieldPalette">
                 <?php foreach ($fieldTypeMeta as $type => $meta): ?>
-                <div class="field-palette-card" data-type="<?= e($type) ?>" role="button" title="Add <?= e($meta['label']) ?>">
+                <div class="field-palette-card" draggable="true" data-type="<?= e($type) ?>" role="button" title="Drag onto canvas or click to add <?= e($meta['label']) ?>">
                     <i class="bi <?= e($meta['icon']) ?>"></i>
                     <span><?= e($meta['label']) ?></span>
                 </div>
@@ -279,45 +286,61 @@ $fieldTypeMeta = [
 
     var fieldTypeMeta = <?= json_encode(array_map(fn($m) => ['label' => $m['label'], 'icon' => $m['icon']], $fieldTypeMeta)) ?>;
 
-    /* ─── Sortable palette (drag source, clone) ─── */
-    Sortable.create(document.getElementById('fieldPalette'), {
-        group:  { name: 'fields', pull: 'clone', put: false },
-        sort:   false,
-        animation: 100,
-    });
-
-    /* ─── Sortable canvas (reorder + receive drops from palette) ─── */
+    /* ─── Sortable canvas (internal reorder only) ─── */
     var sortable = Sortable.create(canvas, {
         handle:    '.drag-handle',
-        group:     { name: 'fields', pull: false, put: true },
         animation: 150,
         filter:    '.canvas-empty',
-        onAdd: function (evt) {
-            // Fired when a palette card is dropped here
-            var type        = evt.item.dataset.type;
-            var insertedEl  = evt.item; // cloned palette card in canvas
-            if (!type) return;
-            fetch('/admin/workflows/ticket-fields/add', {
-                method:      'POST',
-                credentials: 'same-origin',
-                headers:     {'Content-Type': 'application/x-www-form-urlencoded'},
-                body:        'field_type=' + encodeURIComponent(type)
-            })
-            .then(function (r) { return r.json(); })
-            .then(function (data) {
-                if (!data.success) { alert(data.error || 'Error adding field.'); insertedEl.remove(); return; }
-                var card = buildCard(data.field);
-                canvas.insertBefore(card, insertedEl);
-                insertedEl.remove();
-                updateCount();
-                openModal(data.field);
-            })
-            .catch(function () { insertedEl.remove(); });
-        },
-        onEnd: function (evt) {
-            // Only save order for internal canvas reorders (not palette drops)
-            if (evt.from === canvas) saveOrder();
+        onEnd:     function () { saveOrder(); }
+    });
+
+    /* ─── Shared add-field function ─── */
+    function doAddField(type) {
+        fetch('/admin/workflows/ticket-fields/add', {
+            method:      'POST',
+            credentials: 'same-origin',
+            headers:     {'Content-Type': 'application/x-www-form-urlencoded'},
+            body:        'field_type=' + encodeURIComponent(type)
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (!data.success) { alert(data.error || 'Error adding field.'); return; }
+            var card = buildCard(data.field);
+            canvas.appendChild(card);
+            updateCount();
+            openModal(data.field);
+        });
+    }
+
+    /* ─── Palette HTML5 drag → canvas drop ─── */
+    document.querySelectorAll('.field-palette-card').forEach(function (tile) {
+        tile.addEventListener('dragstart', function (e) {
+            e.dataTransfer.setData('text/plain', tile.dataset.type);
+            e.dataTransfer.effectAllowed = 'copy';
+        });
+        tile.addEventListener('dragend', function () {
+            canvas.classList.remove('canvas-drag-over');
+        });
+    });
+
+    canvas.addEventListener('dragover', function (e) {
+        if (e.dataTransfer.types.indexOf('text/plain') !== -1) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+            canvas.classList.add('canvas-drag-over');
         }
+    });
+    canvas.addEventListener('dragleave', function (e) {
+        if (!canvas.contains(e.relatedTarget)) {
+            canvas.classList.remove('canvas-drag-over');
+        }
+    });
+    canvas.addEventListener('drop', function (e) {
+        e.preventDefault();
+        canvas.classList.remove('canvas-drag-over');
+        var type = e.dataTransfer.getData('text/plain');
+        if (!type) return;
+        doAddField(type);
     });
 
     function saveOrder() {
@@ -370,25 +393,10 @@ $fieldTypeMeta = [
 
     function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
-    /* ─── Add field from palette ─── */
+    /* ─── Add field from palette (click) ─── */
     document.querySelectorAll('.field-palette-card').forEach(function (tile) {
         tile.addEventListener('click', function () {
-            var type = tile.dataset.type;
-            fetch('/admin/workflows/ticket-fields/add', {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                body: 'field_type=' + encodeURIComponent(type)
-            })
-            .then(function (r) { return r.json(); })
-            .then(function (data) {
-                if (!data.success) { alert(data.error || 'Error adding field.'); return; }
-                var card = buildCard(data.field);
-                canvas.appendChild(card);
-                updateCount();
-                // Immediately open edit modal for the new field
-                openModal(data.field);
-            });
+            doAddField(tile.dataset.type);
         });
     });
 
