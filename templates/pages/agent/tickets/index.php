@@ -347,6 +347,8 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
     </div>
 </div>
 
+<script>sessionStorage.setItem('agentTicketListUrl', window.location.href);</script>
+
 <?php if ($totalPages > 1): ?>
 <?php
     $pagerParams = array_filter($filters, fn($v) => $v !== '');

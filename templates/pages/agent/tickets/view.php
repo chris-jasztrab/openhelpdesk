@@ -51,7 +51,7 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
             <i class="bi bi-arrow-right-circle me-1"></i>Merge
         </button>
         <?php endif; ?>
-        <a href="/agent/tickets" class="btn btn-outline-secondary">
+        <a href="/agent/tickets" class="btn btn-outline-secondary" id="backBtn">
             <i class="bi bi-arrow-left me-1"></i>Back
         </a>
     </div>
@@ -422,6 +422,12 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
 <?php endif; ?>
 
 <script>
+// Restore Back button to previously visited ticket list URL (with filters)
+(function() {
+    var saved = sessionStorage.getItem('agentTicketListUrl');
+    if (saved) document.getElementById('backBtn').href = saved;
+})();
+
 (function() {
     var textarea = document.getElementById('commentMessage');
     var dropdown = document.getElementById('mentionDropdown');

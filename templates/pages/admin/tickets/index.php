@@ -358,6 +358,8 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
     </div>
 </div>
 
+<script>sessionStorage.setItem('adminTicketListUrl', window.location.href);</script>
+
 <?php if ($totalPages > 1): ?>
 <?php
     // Build base query string preserving filters and sort
