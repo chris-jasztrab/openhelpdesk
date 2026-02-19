@@ -400,7 +400,7 @@ document.addEventListener('DOMContentLoaded', function () {
     list.addEventListener('click', function (e) {
         var btn = e.target.closest('.delete-field-btn');
         if (!btn) return;
-        if (!confirm('Delete this field? Any stored values will be removed.')) return;
+        if (!confirm('Remove this field from the form?\n\nThe field will no longer appear on new or existing tickets, but historical values submitted by users will be preserved.')) return;
         var id  = btn.dataset.fieldId;
         var row = list.querySelector('[data-field-id="' + id + '"]');
         fetch('/admin/workflows/ticket-fields/' + id + '/delete', {

@@ -126,7 +126,7 @@ $router->get('/portal/tickets/create', function () {
 
     // Load visible custom form fields
     $customFields = $db->query(
-        'SELECT * FROM ticket_form_fields WHERE is_visible = 1 ORDER BY sort_order'
+        'SELECT * FROM ticket_form_fields WHERE is_visible = 1 AND deleted_at IS NULL ORDER BY sort_order'
     )->fetchAll();
     $fieldOptions = [];
     foreach ($customFields as $f) {
@@ -187,7 +187,7 @@ $router->post('/portal/tickets/create', function () {
 
     // Validate required custom fields
     $visibleCustomFields = $db->query(
-        'SELECT * FROM ticket_form_fields WHERE is_visible = 1 ORDER BY sort_order'
+        'SELECT * FROM ticket_form_fields WHERE is_visible = 1 AND deleted_at IS NULL ORDER BY sort_order'
     )->fetchAll();
     foreach ($visibleCustomFields as $cf) {
         if (!$cf['is_required']) continue;
@@ -410,7 +410,7 @@ $router->get('/portal/tickets/{id}', function (array $p) {
 
     // Custom field values (visible fields only)
     $customFields = $db->query(
-        'SELECT * FROM ticket_form_fields WHERE is_visible = 1 ORDER BY sort_order'
+        'SELECT * FROM ticket_form_fields WHERE is_visible = 1 AND deleted_at IS NULL ORDER BY sort_order'
     )->fetchAll();
     $fieldValues  = [];
     $fieldOptions = [];

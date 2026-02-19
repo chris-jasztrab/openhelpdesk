@@ -383,7 +383,7 @@ $router->get('/agent/tickets/{id}', function (array $p) {
     $groups = $db->query('SELECT id, name FROM groups ORDER BY name')->fetchAll();
 
     // Custom form fields + stored values
-    $customFields = $db->query('SELECT * FROM ticket_form_fields ORDER BY sort_order')->fetchAll();
+    $customFields = $db->query('SELECT * FROM ticket_form_fields WHERE deleted_at IS NULL ORDER BY sort_order')->fetchAll();
     $fieldValues  = [];
     $fieldOptions = [];
     if ($customFields) {
@@ -516,7 +516,7 @@ $router->post('/agent/tickets/{id}/fields', function (array $p) {
         redirect('/agent/tickets');
     }
 
-    $fields   = $db->query('SELECT * FROM ticket_form_fields ORDER BY sort_order')->fetchAll();
+    $fields   = $db->query('SELECT * FROM ticket_form_fields WHERE deleted_at IS NULL ORDER BY sort_order')->fetchAll();
     $saveStmt = $db->prepare(
         'INSERT INTO ticket_field_values (ticket_id, field_id, value) VALUES (?, ?, ?)
          ON DUPLICATE KEY UPDATE value = VALUES(value)'

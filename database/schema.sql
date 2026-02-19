@@ -265,7 +265,8 @@ CREATE TABLE IF NOT EXISTS `ticket_form_fields` (
     `is_visible`  TINYINT(1)   NOT NULL DEFAULT 1,
     `sort_order`  INT UNSIGNED NOT NULL DEFAULT 0,
     `created_at`  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    `updated_at`  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    `updated_at`  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `deleted_at`  TIMESTAMP NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Options for dropdown and dependent fields (self-referential for hierarchy)

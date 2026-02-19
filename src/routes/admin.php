@@ -1032,7 +1032,7 @@ $router->get('/admin/tickets/{id}', function (array $p) {
     $groups = $db->query('SELECT * FROM `groups` ORDER BY sort_order, name')->fetchAll();
 
     // Custom form fields + stored values
-    $customFields = $db->query('SELECT * FROM ticket_form_fields ORDER BY sort_order')->fetchAll();
+    $customFields = $db->query('SELECT * FROM ticket_form_fields WHERE deleted_at IS NULL ORDER BY sort_order')->fetchAll();
     $fieldValues  = [];
     $fieldOptions = [];
     if ($customFields) {
@@ -1166,7 +1166,7 @@ $router->post('/admin/tickets/{id}/fields', function (array $p) {
         redirect('/admin/tickets');
     }
 
-    $fields = $db->query('SELECT * FROM ticket_form_fields ORDER BY sort_order')->fetchAll();
+    $fields = $db->query('SELECT * FROM ticket_form_fields WHERE deleted_at IS NULL ORDER BY sort_order')->fetchAll();
     $saveStmt = $db->prepare(
         'INSERT INTO ticket_field_values (ticket_id, field_id, value) VALUES (?, ?, ?)
          ON DUPLICATE KEY UPDATE value = VALUES(value)'
@@ -3498,7 +3498,7 @@ $router->get('/admin/workflows/ticket-fields', function () {
     Auth::requireRole('admin');
     $db = Database::connect();
 
-    $fields = $db->query('SELECT * FROM ticket_form_fields ORDER BY sort_order')->fetchAll();
+    $fields = $db->query('SELECT * FROM ticket_form_fields WHERE deleted_at IS NULL ORDER BY sort_order')->fetchAll();
 
     // Load options for each field that needs them
     $fieldOptions = [];
@@ -3533,7 +3533,7 @@ $router->post('/admin/workflows/ticket-fields/add', function () {
     }
 
     $db = Database::connect();
-    $maxOrder = (int) $db->query('SELECT COALESCE(MAX(sort_order),0) FROM ticket_form_fields')->fetchColumn();
+    $maxOrder = (int) $db->query('SELECT COALESCE(MAX(sort_order),0) FROM ticket_form_fields WHERE deleted_at IS NULL')->fetchColumn();
 
     $labelMap = [
         'text'      => 'Text Field',
@@ -3622,8 +3622,8 @@ $router->post('/admin/workflows/ticket-fields/{id}/update', function (array $p) 
 
     $db = Database::connect();
 
-    // Verify field exists
-    $check = $db->prepare('SELECT field_type FROM ticket_form_fields WHERE id = ?');
+    // Verify field exists and is not deleted
+    $check = $db->prepare('SELECT field_type FROM ticket_form_fields WHERE id = ? AND deleted_at IS NULL');
     $check->execute([$id]);
     $fieldType = $check->fetchColumn();
     if (!$fieldType) {
@@ -3689,7 +3689,7 @@ $router->post('/admin/workflows/ticket-fields/{id}/delete', function (array $p) 
 
     $id = (int) $p['id'];
     $db = Database::connect();
-    $db->prepare('DELETE FROM ticket_form_fields WHERE id = ?')->execute([$id]);
+    $db->prepare('UPDATE ticket_form_fields SET deleted_at = NOW() WHERE id = ? AND deleted_at IS NULL')->execute([$id]);
 
     echo json_encode(['success' => true]);
     exit;
