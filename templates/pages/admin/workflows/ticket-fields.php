@@ -308,7 +308,7 @@ $systemFieldsBottom = [
 
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 <script>
-(function () {
+document.addEventListener('DOMContentLoaded', function () {
     var list       = document.getElementById('customFieldList');
     var countBadge = document.getElementById('fieldCountBadge');
     var modal      = new bootstrap.Modal(document.getElementById('fieldModal'));
@@ -628,5 +628,5 @@ $systemFieldsBottom = [
     });
 
     updateCount();
-})();
+});
 </script>
