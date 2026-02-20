@@ -47,8 +47,8 @@ $breadcrumbs  = [
 
             <div class="row g-3 mb-3">
                 <div class="col-md-6">
-                    <label for="type_id" class="form-label fw-semibold">Ticket Type</label>
-                    <select class="form-select" id="type_id" name="type_id">
+                    <label for="type_id" class="form-label fw-semibold">Ticket Type <span class="text-danger">*</span></label>
+                    <select class="form-select" id="type_id" name="type_id" required>
                         <option value="">— Select type —</option>
                         <?php foreach ($types as $t): ?>
                         <option value="<?= $t['id'] ?>" <?= old('type_id') == $t['id'] ? 'selected' : '' ?>>

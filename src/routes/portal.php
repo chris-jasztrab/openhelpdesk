@@ -179,9 +179,9 @@ $router->post('/portal/tickets/create', function () {
     // Assignment is handled by agents/admins, not portal users
     $assignedTo = null;
 
-    if ($subject === '' || $description === '') {
+    if ($subject === '' || $description === '' || $typeId === null) {
         flashInput($_POST);
-        flash('error', 'Subject and description are required.');
+        flash('error', 'Subject, description, and ticket type are required.');
         redirect('/portal/tickets/create');
     }
 
