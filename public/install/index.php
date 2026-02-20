@@ -273,12 +273,13 @@ function handleInstall(): void
         ]);
         $messages[] = ['ok', 'Administrator account created.'];
 
-        // 6. Store SMTP settings (if provided)
+        // 6. Store SMTP settings (if provided) + initial app settings
+        $settingStmt = $pdo->prepare(
+            'INSERT INTO settings (setting_key, setting_value) VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)'
+        );
+
         if (!empty($data['smtp_host'])) {
-            $settingStmt = $pdo->prepare(
-                'INSERT INTO settings (setting_key, setting_value) VALUES (?, ?)
-                 ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)'
-            );
             $smtpKeys = ['smtp_host', 'smtp_port', 'smtp_encryption', 'smtp_username', 'smtp_password', 'mail_from_address', 'mail_from_name'];
             foreach ($smtpKeys as $key) {
                 if (isset($data[$key]) && $data[$key] !== '') {
@@ -287,6 +288,12 @@ function handleInstall(): void
             }
             $messages[] = ['ok', 'Mail server settings saved.'];
         }
+
+        // Seed app name from installer into branding settings
+        $settingStmt->execute(['branding_app_name', $data['app_name'] ?? 'LocalDesk']);
+
+        // Flag to trigger the first-login onboarding tour
+        $settingStmt->execute(['show_onboarding', '1']);
 
         // 7. Create storage directories
         @mkdir(INSTALL_ROOT . '/storage/attachments/', 0755, true);

@@ -606,6 +606,7 @@ $router->get('/admin', function () {
         'totalUsers'     => $totalUsers,
         'totalAgents'    => $totalAgents,
         'recentActivity' => $recentActivity,
+        'showOnboarding' => getSetting('show_onboarding', '0') === '1',
     ]);
 });
 

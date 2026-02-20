@@ -3,6 +3,68 @@
 declare(strict_types=1);
 
 /* ==================================================================
+ * ADMIN – Onboarding
+ * ================================================================== */
+
+$router->post('/admin/onboarding/dismiss', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        redirect('/admin');
+    }
+    setSetting('show_onboarding', '0');
+    redirect('/admin');
+});
+
+/* ==================================================================
+ * ADMIN – Documentation
+ * ================================================================== */
+
+$validDocPages = [
+    'getting-started', 'tickets', 'users', 'email',
+    'sla', 'automations', 'branding', 'portal', 'import', 'kb',
+];
+
+$router->get('/admin/docs', function () {
+    Auth::requireRole('admin');
+    render('admin/docs/index', [
+        'sidebarItems' => adminSidebar('docs'),
+        'layout'       => 'app',
+        'pageTitle'    => 'Documentation',
+        'breadcrumbs'  => [['label' => 'Admin', 'url' => '/admin'], ['label' => 'Docs']],
+    ]);
+});
+
+$router->get('/admin/docs/{page}', function (array $p) use ($validDocPages) {
+    Auth::requireRole('admin');
+    $page = $p['page'] ?? '';
+    if (!in_array($page, $validDocPages, true)) {
+        redirect('/admin/docs');
+    }
+    $titles = [
+        'getting-started' => 'Getting Started',
+        'tickets'         => 'Tickets',
+        'users'           => 'Users & Roles',
+        'email'           => 'Email & Notifications',
+        'sla'             => 'SLA Policies',
+        'automations'     => 'Automations',
+        'branding'        => 'Branding',
+        'portal'          => 'Portal',
+        'import'          => 'Importing Tickets',
+        'kb'              => 'Knowledge Base',
+    ];
+    render('admin/docs/' . $page, [
+        'sidebarItems' => adminSidebar('docs'),
+        'layout'       => 'app',
+        'pageTitle'    => 'Docs: ' . ($titles[$page] ?? $page),
+        'breadcrumbs'  => [
+            ['label' => 'Admin', 'url' => '/admin'],
+            ['label' => 'Docs',  'url' => '/admin/docs'],
+            ['label' => $titles[$page] ?? $page],
+        ],
+    ]);
+});
+
+/* ==================================================================
  * ADMIN – User Management
  * ================================================================== */
 

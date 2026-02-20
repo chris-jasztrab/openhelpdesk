@@ -766,6 +766,7 @@ function adminSidebar(string $active = ''): array
         ['icon' => 'bi-diagram-3',       'label' => 'Workflows',    'url' => '/admin/workflows/ticket-fields', 'key' => 'workflows'],
         ['icon' => 'bi-sliders',         'label' => 'Settings',     'url' => '/admin/settings', 'key' => 'settings'],
         ['icon' => 'bi-bar-chart',       'label' => 'Reports',    'url' => '/admin/reports', 'key' => 'reports'],
+        ['icon' => 'bi-question-circle', 'label' => 'Docs',       'url' => '/admin/docs',    'key' => 'docs'],
     ]);
 }
 

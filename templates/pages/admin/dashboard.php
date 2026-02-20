@@ -19,6 +19,9 @@ $actionIcons = [
     'first_response'   => 'bi-reply text-success',
 ];
 ?>
+<?php if (!empty($showOnboarding)): ?>
+<?php require ROOT_DIR . '/templates/partials/onboarding-tour.php'; ?>
+<?php endif; ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h2 class="fw-bold mb-1">Admin Dashboard</h2>
