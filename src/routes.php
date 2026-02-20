@@ -538,21 +538,41 @@ $router->post('/notifications/read-all', function () {
  * ------------------------------------------------------------------ */
 $router->get('/agent', function () {
     Auth::requireRole('agent', 'admin');
-    $db = Database::connect();
+    $db      = Database::connect();
     $agentId = Auth::id();
 
-    $unassigned = (int) $db->query("SELECT COUNT(*) FROM tickets WHERE assigned_to IS NULL AND status IN ('open','in_progress','pending')")->fetchColumn();
+    // Group-based visibility: agents in groups only see those groups' tickets.
+    $groupRestriction = '';
+    $groupParams      = [];
+    if (Auth::role() === 'agent') {
+        $gStmt = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
+        $gStmt->execute([$agentId]);
+        $agentGroupIds = array_map('intval', $gStmt->fetchAll(PDO::FETCH_COLUMN));
+        if (!empty($agentGroupIds)) {
+            $placeholders     = implode(',', array_fill(0, count($agentGroupIds), '?'));
+            $groupRestriction = " AND group_id IN ($placeholders)";
+            $groupParams      = $agentGroupIds;
+        }
+    }
 
-    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets WHERE assigned_to = ? AND status IN ('open','in_progress','pending')");
-    $stmt->execute([$agentId]);
+    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets WHERE assigned_to IS NULL AND status IN ('open','in_progress','pending')" . $groupRestriction);
+    $stmt->execute($groupParams);
+    $unassigned = (int) $stmt->fetchColumn();
+
+    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets WHERE assigned_to = ? AND status IN ('open','in_progress','pending')" . $groupRestriction);
+    $stmt->execute(array_merge([$agentId], $groupParams));
     $myTickets = (int) $stmt->fetchColumn();
 
-    $pending = (int) $db->query("SELECT COUNT(*) FROM tickets WHERE status = 'pending'")->fetchColumn();
+    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets WHERE status = 'pending'" . $groupRestriction);
+    $stmt->execute($groupParams);
+    $pending = (int) $stmt->fetchColumn();
 
-    $resolvedToday = (int) $db->query("SELECT COUNT(*) FROM tickets WHERE status = 'resolved' AND DATE(updated_at) = CURDATE()")->fetchColumn();
+    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets WHERE status = 'resolved' AND DATE(updated_at) = CURDATE()" . $groupRestriction);
+    $stmt->execute($groupParams);
+    $resolvedToday = (int) $stmt->fetchColumn();
 
     // Recent tickets (open/in_progress/pending, newest first)
-    $recent = $db->query(
+    $stmt = $db->prepare(
         "SELECT t.id, t.subject, t.status, t.created_at,
                 tp.name AS priority_name, tp.color AS priority_color,
                 CONCAT(c.first_name, ' ', c.last_name) AS creator_name,
@@ -561,10 +581,12 @@ $router->get('/agent', function () {
          LEFT JOIN ticket_priorities tp ON t.priority_id = tp.id
          LEFT JOIN users c ON t.created_by = c.id
          LEFT JOIN users a ON t.assigned_to = a.id
-         WHERE t.status IN ('open','in_progress','pending')
+         WHERE t.status IN ('open','in_progress','pending')" . $groupRestriction . "
          ORDER BY t.created_at DESC
          LIMIT 10"
-    )->fetchAll();
+    );
+    $stmt->execute($groupParams);
+    $recent = $stmt->fetchAll();
 
     render('agent/dashboard', [
         'unassigned'    => $unassigned,
