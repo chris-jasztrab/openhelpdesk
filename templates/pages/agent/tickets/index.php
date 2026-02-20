@@ -20,6 +20,14 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
     <span class="badge bg-secondary fs-6"><?= $totalTickets ?><?= $hasFilters ? ' filtered' : ' total' ?></span>
 </div>
 
+<?php if (!empty($groupRestricted)): ?>
+<div class="alert alert-info py-2 small mb-3">
+    <i class="bi bi-people me-1"></i>
+    Showing tickets assigned to your group<?= count($groups) !== 1 ? 's' : '' ?>:
+    <strong><?= implode(', ', array_column($groups, 'name')) ?></strong>
+</div>
+<?php endif; ?>
+
 <!-- Filter Bar -->
 <div class="card border-0 shadow-sm mb-3">
     <div class="card-body py-3">

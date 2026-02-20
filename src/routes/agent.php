@@ -77,6 +77,21 @@ $router->get('/agent/tickets', function () {
         $params[] = '%' . $fSearch . '%';
     }
 
+    // Group-based visibility: agents who belong to groups can only see those groups' tickets.
+    // Agents in no groups, and all admins, see all tickets.
+    $agentGroupIds = [];
+    if (Auth::role() === 'agent') {
+        $gStmt = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
+        $gStmt->execute([Auth::id()]);
+        $agentGroupIds = array_map('intval', $gStmt->fetchAll(PDO::FETCH_COLUMN));
+
+        if (!empty($agentGroupIds)) {
+            $placeholders = implode(',', array_fill(0, count($agentGroupIds), '?'));
+            $where[]      = 't.group_id IN (' . $placeholders . ')';
+            $params       = array_merge($params, $agentGroupIds);
+        }
+    }
+
     $sql = "SELECT t.*,
                 tp.name AS priority_name, tp.color AS priority_color,
                 l.name  AS location_name,
@@ -135,7 +150,14 @@ $router->get('/agent/tickets', function () {
     $types      = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
     $locations  = $db->query('SELECT * FROM locations ORDER BY name')->fetchAll();
     $agents     = $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin') ORDER BY first_name")->fetchAll();
-    $groups     = $db->query('SELECT * FROM `groups` ORDER BY sort_order, name')->fetchAll();
+    if (!empty($agentGroupIds)) {
+        $placeholders = implode(',', array_fill(0, count($agentGroupIds), '?'));
+        $gDropStmt = $db->prepare("SELECT * FROM `groups` WHERE id IN ($placeholders) ORDER BY sort_order, name");
+        $gDropStmt->execute($agentGroupIds);
+        $groups = $gDropStmt->fetchAll();
+    } else {
+        $groups = $db->query('SELECT * FROM `groups` ORDER BY sort_order, name')->fetchAll();
+    }
 
     $filters = [
         'status'   => $fStatus,
@@ -159,20 +181,21 @@ $router->get('/agent/tickets', function () {
     $savedFilters = $sfStmt->fetchAll();
 
     render('agent/tickets/index', [
-        'tickets'        => $tickets,
-        'priorities'     => $priorities,
-        'types'          => $types,
-        'locations'      => $locations,
-        'agents'         => $agents,
-        'groups'         => $groups,
-        'filters'        => $filters,
-        'savedFilters'   => $savedFilters,
-        'page'           => $page,
-        'totalPages'     => $totalPages,
-        'totalTickets'   => $totalTickets,
-        'sort'           => $sort,
-        'dir'            => strtolower($dir),
-        'visibleColumns' => getUserColumns(Auth::id()),
+        'tickets'         => $tickets,
+        'priorities'      => $priorities,
+        'types'           => $types,
+        'locations'       => $locations,
+        'agents'          => $agents,
+        'groups'          => $groups,
+        'filters'         => $filters,
+        'savedFilters'    => $savedFilters,
+        'page'            => $page,
+        'totalPages'      => $totalPages,
+        'totalTickets'    => $totalTickets,
+        'sort'            => $sort,
+        'dir'             => strtolower($dir),
+        'visibleColumns'  => getUserColumns(Auth::id()),
+        'groupRestricted' => !empty($agentGroupIds),
     ]);
 });
 
