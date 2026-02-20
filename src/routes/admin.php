@@ -2818,12 +2818,16 @@ $router->post('/admin/settings/import-kb/confirm', function () {
 $router->get('/admin/settings/branding', function () {
     Auth::requireRole('admin');
     render('admin/settings/branding', [
-        'appName'      => getSetting('branding_app_name', 'LocalDesk'),
-        'primaryColor' => getSetting('branding_primary_color', '#4f46e5'),
-        'primaryHover' => getSetting('branding_primary_hover', '#4338ca'),
-        'navbarStart'  => getSetting('branding_navbar_start', '#1e1b4b'),
-        'navbarEnd'    => getSetting('branding_navbar_end', '#312e81'),
-        'logo'         => getSetting('branding_logo', ''),
+        'appName'             => getSetting('branding_app_name', 'LocalDesk'),
+        'primaryColor'        => getSetting('branding_primary_color', '#4f46e5'),
+        'primaryHover'        => getSetting('branding_primary_hover', '#4338ca'),
+        'navbarStart'         => getSetting('branding_navbar_start', '#1e1b4b'),
+        'navbarEnd'           => getSetting('branding_navbar_end', '#312e81'),
+        'logo'                => getSetting('branding_logo', ''),
+        'timelineNoteBg'      => getSetting('branding_timeline_note_bg',      '#fefce8'),
+        'timelineNoteAccent'  => getSetting('branding_timeline_note_accent',  '#ca8a04'),
+        'timelineSystemBg'    => getSetting('branding_timeline_system_bg',    '#eff6ff'),
+        'timelineSystemAccent'=> getSetting('branding_timeline_system_accent','#3b82f6'),
     ]);
 });
 
@@ -2831,15 +2835,20 @@ $router->post('/admin/settings/branding', function () {
     Auth::requireRole('admin');
     verifyCsrf();
 
-    $appName      = trim($_POST['app_name'] ?? 'LocalDesk');
-    $primaryColor = trim($_POST['primary_color'] ?? '#4f46e5');
-    $primaryHover = trim($_POST['primary_hover'] ?? '#4338ca');
-    $navbarStart  = trim($_POST['navbar_start'] ?? '#1e1b4b');
-    $navbarEnd    = trim($_POST['navbar_end'] ?? '#312e81');
+    $appName              = trim($_POST['app_name'] ?? 'LocalDesk');
+    $primaryColor         = trim($_POST['primary_color'] ?? '#4f46e5');
+    $primaryHover         = trim($_POST['primary_hover'] ?? '#4338ca');
+    $navbarStart          = trim($_POST['navbar_start'] ?? '#1e1b4b');
+    $navbarEnd            = trim($_POST['navbar_end'] ?? '#312e81');
+    $timelineNoteBg       = trim($_POST['timeline_note_bg']       ?? '#fefce8');
+    $timelineNoteAccent   = trim($_POST['timeline_note_accent']   ?? '#ca8a04');
+    $timelineSystemBg     = trim($_POST['timeline_system_bg']     ?? '#eff6ff');
+    $timelineSystemAccent = trim($_POST['timeline_system_accent'] ?? '#3b82f6');
 
     // Validate hex colors
     $colorPattern = '/^#[0-9a-fA-F]{6}$/';
-    foreach ([$primaryColor, $primaryHover, $navbarStart, $navbarEnd] as $color) {
+    foreach ([$primaryColor, $primaryHover, $navbarStart, $navbarEnd,
+              $timelineNoteBg, $timelineNoteAccent, $timelineSystemBg, $timelineSystemAccent] as $color) {
         if (!preg_match($colorPattern, $color)) {
             flash('error', 'Invalid color format. Use hex colors like #4f46e5.');
             redirect('/admin/settings/branding');
@@ -2903,6 +2912,10 @@ $router->post('/admin/settings/branding', function () {
     setSetting('branding_primary_hover', $primaryHover);
     setSetting('branding_navbar_start', $navbarStart);
     setSetting('branding_navbar_end', $navbarEnd);
+    setSetting('branding_timeline_note_bg',       $timelineNoteBg);
+    setSetting('branding_timeline_note_accent',   $timelineNoteAccent);
+    setSetting('branding_timeline_system_bg',     $timelineSystemBg);
+    setSetting('branding_timeline_system_accent', $timelineSystemAccent);
 
     flash('success', 'Branding settings updated successfully.');
     redirect('/admin/settings/branding');

@@ -117,6 +117,85 @@ $breadcrumbs  = [
                 </div>
             </div>
 
+            <!-- Timeline Colors -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-transparent fw-semibold">
+                    <i class="bi bi-clock-history me-1"></i>Timeline Colors
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        Customise the highlight colors for internal notes (added by agents) and system automation entries (SLA changes, auto-assignments, etc.).
+                    </p>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Internal Note Background</label>
+                            <div class="input-group">
+                                <input type="color" class="form-control form-control-color" id="timelineNoteBgPicker"
+                                       value="<?= e($timelineNoteBg) ?>" title="Pick color">
+                                <input type="text" class="form-control" id="timelineNoteBg" name="timeline_note_bg"
+                                       value="<?= e($timelineNoteBg) ?>" pattern="^#[0-9a-fA-F]{6}$" required>
+                            </div>
+                            <div class="form-text">Row background for internal agent notes.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Internal Note Accent</label>
+                            <div class="input-group">
+                                <input type="color" class="form-control form-control-color" id="timelineNoteAccentPicker"
+                                       value="<?= e($timelineNoteAccent) ?>" title="Pick color">
+                                <input type="text" class="form-control" id="timelineNoteAccent" name="timeline_note_accent"
+                                       value="<?= e($timelineNoteAccent) ?>" pattern="^#[0-9a-fA-F]{6}$" required>
+                            </div>
+                            <div class="form-text">Left border and icon color for internal notes.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">System Entry Background</label>
+                            <div class="input-group">
+                                <input type="color" class="form-control form-control-color" id="timelineSystemBgPicker"
+                                       value="<?= e($timelineSystemBg) ?>" title="Pick color">
+                                <input type="text" class="form-control" id="timelineSystemBg" name="timeline_system_bg"
+                                       value="<?= e($timelineSystemBg) ?>" pattern="^#[0-9a-fA-F]{6}$" required>
+                            </div>
+                            <div class="form-text">Row background for automated system entries.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">System Entry Accent</label>
+                            <div class="input-group">
+                                <input type="color" class="form-control form-control-color" id="timelineSystemAccentPicker"
+                                       value="<?= e($timelineSystemAccent) ?>" title="Pick color">
+                                <input type="text" class="form-control" id="timelineSystemAccent" name="timeline_system_accent"
+                                       value="<?= e($timelineSystemAccent) ?>" pattern="^#[0-9a-fA-F]{6}$" required>
+                            </div>
+                            <div class="form-text">Left border color for automated system entries.</div>
+                        </div>
+                    </div>
+
+                    <!-- Timeline preview -->
+                    <div class="mt-4 border rounded overflow-hidden" style="font-size:.875rem;">
+                        <div class="px-3 py-2 border-bottom bg-white fw-semibold text-muted small">Preview</div>
+                        <div class="px-3 py-2 border-bottom" id="previewNoteRow"
+                             style="background:<?= e($timelineNoteBg) ?>; border-left:3px solid <?= e($timelineNoteAccent) ?> !important;">
+                            <i class="bi bi-lock-fill me-2" id="previewNoteIcon" style="color:<?= e($timelineNoteAccent) ?>;"></i>
+                            <strong>Agent Name</strong> <span class="text-muted ms-1">Internal Note</span>
+                            <span class="badge ms-1 small" id="previewNoteBadge" style="background:<?= e($timelineNoteAccent) ?>; color:#fff;">Internal</span>
+                        </div>
+                        <div class="px-3 py-2 border-bottom" id="previewSystemRow"
+                             style="background:<?= e($timelineSystemBg) ?>; border-left:3px solid <?= e($timelineSystemAccent) ?> !important;">
+                            <i class="bi bi-stopwatch me-2" style="color:#6c757d;"></i>
+                            <strong>System</strong> <span class="text-muted ms-1">SLA Set</span>
+                        </div>
+                        <div class="px-3 py-2">
+                            <i class="bi bi-chat-dots text-info me-2"></i>
+                            <strong>Alex Johnson</strong> <span class="text-muted ms-1">Comment</span>
+                        </div>
+                    </div>
+
+                    <hr>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="resetTimelineDefaults">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i>Reset Timeline to Defaults
+                    </button>
+                </div>
+            </div>
+
             <button type="submit" class="btn text-white px-4" style="background:var(--ld-primary);">
                 <i class="bi bi-check-lg me-1"></i>Save Branding
             </button>
@@ -179,10 +258,14 @@ $breadcrumbs  = [
 (function () {
     // Sync color pickers with text inputs
     var pairs = [
-        ['primaryColorPicker', 'primaryColor'],
-        ['primaryHoverPicker', 'primaryHover'],
-        ['navbarStartPicker',  'navbarStart'],
-        ['navbarEndPicker',    'navbarEnd']
+        ['primaryColorPicker',        'primaryColor'],
+        ['primaryHoverPicker',        'primaryHover'],
+        ['navbarStartPicker',         'navbarStart'],
+        ['navbarEndPicker',           'navbarEnd'],
+        ['timelineNoteBgPicker',      'timelineNoteBg'],
+        ['timelineNoteAccentPicker',  'timelineNoteAccent'],
+        ['timelineSystemBgPicker',    'timelineSystemBg'],
+        ['timelineSystemAccentPicker','timelineSystemAccent'],
     ];
 
     pairs.forEach(function (pair) {
@@ -193,11 +276,13 @@ $breadcrumbs  = [
         picker.addEventListener('input', function () {
             text.value = picker.value;
             updatePreview();
+            updateTimelinePreview();
         });
         text.addEventListener('input', function () {
             if (/^#[0-9a-fA-F]{6}$/.test(text.value)) {
                 picker.value = text.value;
                 updatePreview();
+                updateTimelinePreview();
             }
         });
     });
@@ -233,9 +318,9 @@ $breadcrumbs  = [
     });
 
     function updatePreview() {
-        var primary    = document.getElementById('primaryColor').value;
-        var navStart   = document.getElementById('navbarStart').value;
-        var navEnd     = document.getElementById('navbarEnd').value;
+        var primary  = document.getElementById('primaryColor').value;
+        var navStart = document.getElementById('navbarStart').value;
+        var navEnd   = document.getElementById('navbarEnd').value;
 
         document.getElementById('previewNavbar').style.background =
             'linear-gradient(135deg, ' + navStart + ' 0%, ' + navEnd + ' 100%)';
@@ -245,7 +330,30 @@ $breadcrumbs  = [
             'linear-gradient(135deg, ' + navStart + ' 0%, ' + navEnd + ' 50%, ' + primary + ' 100%)';
     }
 
-    // Reset to defaults
+    function updateTimelinePreview() {
+        var noteBg      = document.getElementById('timelineNoteBg').value;
+        var noteAccent  = document.getElementById('timelineNoteAccent').value;
+        var systemBg    = document.getElementById('timelineSystemBg').value;
+        var systemAccent= document.getElementById('timelineSystemAccent').value;
+
+        var noteRow = document.getElementById('previewNoteRow');
+        if (noteRow) {
+            noteRow.style.background   = noteBg;
+            noteRow.style.borderLeft   = '3px solid ' + noteAccent;
+        }
+        var noteIcon = document.getElementById('previewNoteIcon');
+        if (noteIcon) noteIcon.style.color = noteAccent;
+        var noteBadge = document.getElementById('previewNoteBadge');
+        if (noteBadge) noteBadge.style.background = noteAccent;
+
+        var systemRow = document.getElementById('previewSystemRow');
+        if (systemRow) {
+            systemRow.style.background = systemBg;
+            systemRow.style.borderLeft = '3px solid ' + systemAccent;
+        }
+    }
+
+    // Reset main colors to defaults
     document.getElementById('resetDefaults').addEventListener('click', function () {
         var defaults = {
             primaryColor: '#4f46e5',
@@ -260,6 +368,21 @@ $breadcrumbs  = [
         document.getElementById('appName').value = 'LocalDesk';
         document.getElementById('previewAppName').textContent = 'LocalDesk';
         updatePreview();
+    });
+
+    // Reset timeline colors to defaults
+    document.getElementById('resetTimelineDefaults').addEventListener('click', function () {
+        var defaults = {
+            timelineNoteBg:       '#fefce8',
+            timelineNoteAccent:   '#ca8a04',
+            timelineSystemBg:     '#eff6ff',
+            timelineSystemAccent: '#3b82f6'
+        };
+        for (var key in defaults) {
+            document.getElementById(key).value = defaults[key];
+            document.getElementById(key + 'Picker').value = defaults[key];
+        }
+        updateTimelinePreview();
     });
 })();
 </script>

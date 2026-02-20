@@ -13,6 +13,18 @@
             --ld-primary-hover: <?= e(getSetting('branding_primary_hover', '#4338ca')) ?>;
             --ld-sidebar-width: 64px;
             --ld-navbar-height: 56px;
+            --ld-timeline-note-bg:      <?= e(getSetting('branding_timeline_note_bg',      '#fefce8')) ?>;
+            --ld-timeline-note-accent:  <?= e(getSetting('branding_timeline_note_accent',  '#ca8a04')) ?>;
+            --ld-timeline-system-bg:    <?= e(getSetting('branding_timeline_system_bg',    '#eff6ff')) ?>;
+            --ld-timeline-system-accent:<?= e(getSetting('branding_timeline_system_accent','#3b82f6')) ?>;
+        }
+        .ld-timeline-note {
+            background-color: var(--ld-timeline-note-bg) !important;
+            border-left: 3px solid var(--ld-timeline-note-accent) !important;
+        }
+        .ld-timeline-system {
+            background-color: var(--ld-timeline-system-bg) !important;
+            border-left: 3px solid var(--ld-timeline-system-accent) !important;
         }
         body { background-color: #f1f5f9; overflow-x: hidden; }
         .navbar { background: linear-gradient(135deg, <?= e(getSetting('branding_navbar_start', '#1e1b4b')) ?> 0%, <?= e(getSetting('branding_navbar_end', '#312e81')) ?> 100%) !important; }

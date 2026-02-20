@@ -10,6 +10,7 @@ $breadcrumbs  = [
 $statusColors = ['open' => 'primary', 'in_progress' => 'warning', 'pending' => 'info', 'resolved' => 'success', 'closed' => 'secondary'];
 $statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 'Pending', 'resolved' => 'Resolved', 'closed' => 'Closed'];
 $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-person-check text-primary', 'status_changed' => 'bi-arrow-repeat text-warning', 'priority_changed' => 'bi-flag text-danger', 'comment' => 'bi-chat-dots text-info', 'internal_note' => 'bi-lock text-secondary', 'sla_set' => 'bi-stopwatch text-primary', 'sla_paused' => 'bi-pause-circle text-warning', 'sla_resumed' => 'bi-play-circle text-success', 'merged' => 'bi-arrow-right-circle text-secondary'];
+$actionLabels = ['created' => 'Created', 'assigned' => 'Assigned', 'status_changed' => 'Status Changed', 'priority_changed' => 'Priority Changed', 'comment' => 'Comment', 'internal_note' => 'Internal Note', 'sla_set' => 'SLA Set', 'sla_paused' => 'SLA Paused', 'sla_resumed' => 'SLA Resumed', 'merged' => 'Merged'];
 $slaStateColors = ['on_track' => 'success', 'warning' => 'warning', 'breached' => 'danger'];
 $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' => 'Breached'];
 ?>
@@ -236,12 +237,16 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
                 <div class="text-center py-4 text-muted">No timeline entries.</div>
                 <?php else: ?>
                 <div class="list-group list-group-flush">
-                    <?php foreach ($timeline as $entry): ?>
-                    <div class="list-group-item px-4 py-3 <?= $entry['is_internal'] ? 'bg-warning bg-opacity-10 border-start border-warning border-3' : '' ?>">
+                    <?php foreach ($timeline as $entry):
+                        $isNote   = $entry['is_internal'] && $entry['user_name'];
+                        $isSystem = $entry['is_internal'] && !$entry['user_name'];
+                        $tlClass  = $isNote ? 'ld-timeline-note' : ($isSystem ? 'ld-timeline-system' : '');
+                    ?>
+                    <div class="list-group-item px-4 py-3 <?= $tlClass ?>">
                         <div class="d-flex gap-3">
                             <div class="pt-1">
-                                <?php if ($entry['is_internal']): ?>
-                                <i class="bi bi-lock-fill text-warning fs-5"></i>
+                                <?php if ($isNote): ?>
+                                <i class="bi bi-lock-fill fs-5" style="color:var(--ld-timeline-note-accent);"></i>
                                 <?php else: ?>
                                 <i class="bi <?= $actionIcons[$entry['action']] ?? 'bi-circle text-muted' ?> fs-5"></i>
                                 <?php endif; ?>
@@ -250,9 +255,9 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
                                 <div class="d-flex justify-content-between">
                                     <div>
                                         <span class="fw-semibold"><?= e($entry['user_name'] ?: 'System') ?></span>
-                                        <span class="text-muted ms-1"><?= e(str_replace('_', ' ', ucfirst($entry['action']))) ?></span>
-                                        <?php if ($entry['is_internal']): ?>
-                                        <span class="badge bg-warning text-dark ms-1">Internal</span>
+                                        <span class="text-muted ms-1"><?= e($actionLabels[$entry['action']] ?? ucwords(str_replace('_', ' ', $entry['action']))) ?></span>
+                                        <?php if ($isNote): ?>
+                                        <span class="badge ms-1" style="background:var(--ld-timeline-note-accent); color:#fff;">Internal</span>
                                         <?php endif; ?>
                                     </div>
                                     <small class="text-muted"><?= date('M j, Y g:i A', strtotime($entry['created_at'])) ?></small>
