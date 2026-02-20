@@ -26,18 +26,38 @@ $breadcrumbs  = [
                     <i class="bi bi-image me-1"></i>Logo
                 </div>
                 <div class="card-body">
-                    <?php if ($logo && file_exists(ROOT_DIR . '/public/uploads/branding/' . $logo)): ?>
-                    <div class="mb-3">
+                    <!-- Hidden remove flag; toggled by the Remove button -->
+                    <input type="hidden" name="remove_logo" id="removeLogoFlag" value="0">
+
+                    <?php $hasLogo = $logo && file_exists(ROOT_DIR . '/public/uploads/branding/' . $logo); ?>
+
+                    <!-- Current logo row (hidden when removed) -->
+                    <div id="logoCurrentRow" class="mb-3" <?= $hasLogo ? '' : 'style="display:none;"' ?>>
                         <label class="form-label text-muted small">Current Logo</label>
-                        <div class="p-3 rounded" style="background:#1e1b4b; display:inline-block;">
-                            <img src="/uploads/branding/<?= e($logo) ?>" alt="Logo" style="height:40px;">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="p-3 rounded flex-shrink-0" style="background:#1e1b4b;">
+                                <?php if ($hasLogo): ?>
+                                <img id="logoCurrentImg" src="/uploads/branding/<?= e($logo) ?>" alt="Logo" style="height:40px;">
+                                <?php else: ?>
+                                <img id="logoCurrentImg" src="" alt="Logo" style="height:40px; display:none;">
+                                <?php endif; ?>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-danger" id="removeLogoBtn">
+                                <i class="bi bi-trash me-1"></i>Remove logo
+                            </button>
                         </div>
                     </div>
-                    <div class="form-check mb-3">
-                        <input class="form-check-input" type="checkbox" name="remove_logo" id="removeLogo" value="1">
-                        <label class="form-check-label" for="removeLogo">Remove current logo</label>
+
+                    <!-- Default fallback preview (shown when no logo / after removal) -->
+                    <div id="logoDefaultRow" class="mb-3" <?= $hasLogo ? 'style="display:none;"' : '' ?>>
+                        <label class="form-label text-muted small">Current Logo</label>
+                        <div class="p-3 rounded d-inline-flex align-items-center gap-2" style="background:#1e1b4b; color:#fff;">
+                            <i class="bi bi-headset fs-4"></i>
+                            <span class="fw-bold"><?= e($appName) ?></span>
+                        </div>
+                        <div class="form-text mt-1">Default — upload a logo to replace this.</div>
                     </div>
-                    <?php endif; ?>
+
                     <div>
                         <label for="logo" class="form-label">Upload New Logo</label>
                         <input type="file" class="form-control" id="logo" name="logo" accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml">
@@ -292,6 +312,24 @@ $breadcrumbs  = [
     appNameInput.addEventListener('input', function () {
         document.getElementById('previewAppName').textContent = appNameInput.value || 'LocalDesk';
     });
+
+    // Remove logo button
+    var removeLogoBtn  = document.getElementById('removeLogoBtn');
+    var removeLogoFlag = document.getElementById('removeLogoFlag');
+    var logoCurrentRow = document.getElementById('logoCurrentRow');
+    var logoDefaultRow = document.getElementById('logoDefaultRow');
+    if (removeLogoBtn) {
+        removeLogoBtn.addEventListener('click', function () {
+            removeLogoFlag.value = '1';
+            logoCurrentRow.style.display = 'none';
+            logoDefaultRow.style.display = '';
+            // Also revert the navbar preview to icon
+            var previewImg  = document.getElementById('previewLogoImg');
+            var previewIcon = document.getElementById('previewLogoIcon');
+            if (previewImg)  { previewImg.src = ''; previewImg.style.display = 'none'; }
+            if (previewIcon) previewIcon.style.display = '';
+        });
+    }
 
     // Logo file preview
     var logoInput = document.getElementById('logo');
