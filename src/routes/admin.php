@@ -1861,7 +1861,12 @@ $router->get('/admin/kb/articles/{id}/preview', function (array $p) {
 
 $router->get('/admin/settings', function () {
     Auth::requireRole('admin');
-    $keys = ['smtp_host', 'smtp_port', 'smtp_encryption', 'smtp_username', 'smtp_password', 'mail_from_address', 'mail_from_name'];
+    $keys = [
+        'smtp_host', 'smtp_port', 'smtp_encryption', 'smtp_username', 'smtp_password',
+        'mail_from_address', 'mail_from_name',
+        'imap_enabled', 'imap_reply_to', 'imap_host', 'imap_port', 'imap_encryption',
+        'imap_username', 'imap_password', 'imap_folder',
+    ];
     $settings = [];
     foreach ($keys as $k) {
         $settings[$k] = getSetting($k);
@@ -1896,6 +1901,40 @@ $router->post('/admin/settings', function () {
     }
 
     flash('success', 'Email settings saved.');
+    redirect('/admin/settings');
+});
+
+$router->post('/admin/settings/imap', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings');
+    }
+
+    $fields = [
+        'imap_enabled'     => isset($_POST['imap_enabled']) ? '1' : '0',
+        'imap_reply_to'    => trim($_POST['imap_reply_to'] ?? ''),
+        'imap_host'        => trim($_POST['imap_host'] ?? ''),
+        'imap_port'        => trim($_POST['imap_port'] ?? '993'),
+        'imap_encryption'  => in_array($_POST['imap_encryption'] ?? '', ['ssl', 'tls', 'none'], true) ? $_POST['imap_encryption'] : 'ssl',
+        'imap_username'    => trim($_POST['imap_username'] ?? ''),
+        'imap_folder'      => trim($_POST['imap_folder'] ?? 'INBOX') ?: 'INBOX',
+    ];
+
+    // Only update password if a new one was provided
+    $password = $_POST['imap_password'] ?? '';
+    if ($password !== '') {
+        $fields['imap_password'] = $password;
+    }
+
+    foreach ($fields as $key => $value) {
+        setSetting($key, $value);
+    }
+
+    // Ensure log directory exists
+    @mkdir(ROOT_DIR . '/storage/logs', 0755, true);
+
+    flash('success', 'Inbound mail settings saved.');
     redirect('/admin/settings');
 });
 
