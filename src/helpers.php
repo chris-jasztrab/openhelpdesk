@@ -530,11 +530,13 @@ function notifyTicketCreator(PDO $db, int $ticketId, string $message, string $au
     $ticketUrl = $appUrl . '/portal/tickets/' . $ticketId;
 
     $tpl = getEmailTpl('ticket-updated', [
-        'ticket_id' => $ticketId,
-        'subject'   => $row['subject'],
-        'message'   => $message,
-        'author'    => $authorName,
-        'user_name' => $row['first_name'] . ' ' . $row['last_name'],
+        'ticket_id'  => $ticketId,
+        'subject'    => $row['subject'],
+        'message'    => $message,
+        'author'     => $authorName,
+        'user_name'  => $row['first_name'] . ' ' . $row['last_name'],
+        'first_name' => $row['first_name'],
+        'last_name'  => $row['last_name'],
     ]);
 
     $emailHtml = renderEmail('ticket-updated', [
@@ -596,11 +598,13 @@ function notifyCcUsers(PDO $db, int $ticketId, string $message, string $authorNa
         $ticketUrl = $appUrl . $prefix . '/tickets/' . $ticketId;
 
         $tpl = getEmailTpl('ticket-updated', [
-            'ticket_id' => $ticketId,
-            'subject'   => $ticketRow['subject'],
-            'message'   => $message,
-            'author'    => $authorName,
-            'user_name' => $user['first_name'] . ' ' . $user['last_name'],
+            'ticket_id'  => $ticketId,
+            'subject'    => $ticketRow['subject'],
+            'message'    => $message,
+            'author'     => $authorName,
+            'user_name'  => $user['first_name'] . ' ' . $user['last_name'],
+            'first_name' => $user['first_name'],
+            'last_name'  => $user['last_name'],
         ]);
 
         $emailHtml = renderEmail('ticket-updated', [
@@ -659,7 +663,9 @@ function notifyTicketMerged(PDO $db, int $sourceId, int $targetId): void
 
     // Notify source ticket creator
     $tpl = getEmailTpl('ticket-merged', array_merge($mergedTokensBase, [
-        'user_name' => $src['first_name'] . ' ' . $src['last_name'],
+        'user_name'  => $src['first_name'] . ' ' . $src['last_name'],
+        'first_name' => $src['first_name'],
+        'last_name'  => $src['last_name'],
     ]));
 
     $emailHtml = renderEmail('ticket-merged', [
@@ -703,7 +709,9 @@ function notifyTicketMerged(PDO $db, int $sourceId, int $targetId): void
         $ccTicketUrl = $appUrl . $prefix . '/tickets/' . $targetId;
 
         $ccTpl = getEmailTpl('ticket-merged', array_merge($mergedTokensBase, [
-            'user_name' => $user['first_name'] . ' ' . $user['last_name'],
+            'user_name'  => $user['first_name'] . ' ' . $user['last_name'],
+            'first_name' => $user['first_name'],
+            'last_name'  => $user['last_name'],
         ]));
 
         $ccHtml = renderEmail('ticket-merged', [

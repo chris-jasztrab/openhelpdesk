@@ -297,12 +297,14 @@ $router->post('/portal/tickets/create', function () {
     }
 
     $tpl = getEmailTpl('ticket-created', [
-        'ticket_id' => $ticketId,
-        'subject'   => $subject,
-        'type'      => $typeName,
-        'location'  => $locationName,
-        'priority'  => $priorityName,
-        'user_name' => $creator['first_name'] . ' ' . $creator['last_name'],
+        'ticket_id'  => $ticketId,
+        'subject'    => $subject,
+        'type'       => $typeName,
+        'location'   => $locationName,
+        'priority'   => $priorityName,
+        'user_name'  => $creator['first_name'] . ' ' . $creator['last_name'],
+        'first_name' => $creator['first_name'],
+        'last_name'  => $creator['last_name'],
     ]);
 
     $emailHtml = renderEmail('ticket-created', [
