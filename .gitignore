@@ -10,3 +10,5 @@
 .DS_Store
 Thumbs.db
 export_sample.csv
+.VSCodeCounter/
+kb_articles.csv
