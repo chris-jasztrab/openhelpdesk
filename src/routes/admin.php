@@ -1864,8 +1864,8 @@ $router->get('/admin/settings', function () {
     $keys = [
         'smtp_host', 'smtp_port', 'smtp_encryption', 'smtp_username', 'smtp_password',
         'mail_from_address', 'mail_from_name',
-        'imap_enabled', 'imap_reply_to', 'imap_host', 'imap_port', 'imap_encryption',
-        'imap_username', 'imap_password', 'imap_folder',
+        'graph_enabled', 'graph_reply_to', 'graph_tenant_id', 'graph_client_id',
+        'graph_client_secret', 'graph_mailbox',
     ];
     $settings = [];
     foreach ($keys as $k) {
@@ -1904,7 +1904,7 @@ $router->post('/admin/settings', function () {
     redirect('/admin/settings');
 });
 
-$router->post('/admin/settings/imap', function () {
+$router->post('/admin/settings/graph', function () {
     Auth::requireRole('admin');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -1912,19 +1912,17 @@ $router->post('/admin/settings/imap', function () {
     }
 
     $fields = [
-        'imap_enabled'     => isset($_POST['imap_enabled']) ? '1' : '0',
-        'imap_reply_to'    => trim($_POST['imap_reply_to'] ?? ''),
-        'imap_host'        => trim($_POST['imap_host'] ?? ''),
-        'imap_port'        => trim($_POST['imap_port'] ?? '993'),
-        'imap_encryption'  => in_array($_POST['imap_encryption'] ?? '', ['ssl', 'tls', 'none'], true) ? $_POST['imap_encryption'] : 'ssl',
-        'imap_username'    => trim($_POST['imap_username'] ?? ''),
-        'imap_folder'      => trim($_POST['imap_folder'] ?? 'INBOX') ?: 'INBOX',
+        'graph_enabled'   => isset($_POST['graph_enabled']) ? '1' : '0',
+        'graph_reply_to'  => trim($_POST['graph_reply_to'] ?? ''),
+        'graph_tenant_id' => trim($_POST['graph_tenant_id'] ?? ''),
+        'graph_client_id' => trim($_POST['graph_client_id'] ?? ''),
+        'graph_mailbox'   => trim($_POST['graph_mailbox'] ?? ''),
     ];
 
-    // Only update password if a new one was provided
-    $password = $_POST['imap_password'] ?? '';
-    if ($password !== '') {
-        $fields['imap_password'] = $password;
+    // Only update client secret if a new one was provided
+    $secret = $_POST['graph_client_secret'] ?? '';
+    if ($secret !== '') {
+        $fields['graph_client_secret'] = $secret;
     }
 
     foreach ($fields as $key => $value) {
@@ -1936,6 +1934,11 @@ $router->post('/admin/settings/imap', function () {
 
     flash('success', 'Inbound mail settings saved.');
     redirect('/admin/settings');
+});
+
+$router->get('/admin/settings/email-reply-help', function () {
+    Auth::requireRole('admin');
+    render('admin/settings/email-reply-help', []);
 });
 
 $router->post('/admin/settings/test-email', function () {

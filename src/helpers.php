@@ -407,8 +407,8 @@ function sendMail(string $toEmail, string $toName, string $subject, string $html
         $mail->setFrom($fromAddr, $fromName);
         // If inbound reply processing is enabled and this is a ticket email,
         // set Reply-To to the dedicated reply inbox so replies are captured.
-        $replyToAddr = ($ticketId !== null && getSetting('imap_enabled') === '1')
-            ? getSetting('imap_reply_to')
+        $replyToAddr = ($ticketId !== null && getSetting('graph_enabled') === '1')
+            ? getSetting('graph_reply_to')
             : '';
         $mail->addReplyTo($replyToAddr !== '' ? $replyToAddr : $fromAddr, $fromName);
         $mail->addAddress($toEmail, $toName);
