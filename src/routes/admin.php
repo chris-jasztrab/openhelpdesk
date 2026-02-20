@@ -1906,17 +1906,17 @@ $router->post('/admin/settings/test-email', function () {
         redirect('/admin/settings');
     }
 
-    $user    = Auth::user();
-    $toEmail = $user['email'] ?? '';
-    if ($toEmail === '') {
-        flash('error', 'Your account has no email address set.');
+    $toEmail = trim($_POST['to_email'] ?? '');
+    if ($toEmail === '' || !filter_var($toEmail, FILTER_VALIDATE_EMAIL)) {
+        flash('error', 'Please enter a valid recipient email address.');
         redirect('/admin/settings');
     }
 
+    $user     = Auth::user();
     $htmlBody = '<h2>It works!</h2><p>This is a test email from <strong>LocalDesk</strong>. Your SMTP configuration is correct.</p>';
     $result   = sendMail(
         $toEmail,
-        $user['first_name'] . ' ' . $user['last_name'],
+        $toEmail,
         'LocalDesk – Test Email',
         $htmlBody,
         "It works!\n\nThis is a test email from LocalDesk. Your SMTP configuration is correct."

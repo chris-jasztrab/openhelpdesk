@@ -96,13 +96,14 @@ $breadcrumbs  = [
         <h5 class="mb-0 fw-semibold"><i class="bi bi-send me-2"></i>Test Email</h5>
     </div>
     <div class="card-body p-4">
-        <p class="text-muted mb-3">
-            Send a test email to <strong><?= e(Auth::user()['email'] ?? '') ?></strong> to verify your SMTP configuration.
-        </p>
-        <form method="POST" action="/admin/settings/test-email">
+        <p class="text-muted mb-3">Send a test email to verify your SMTP configuration.</p>
+        <form method="POST" action="/admin/settings/test-email" class="d-flex gap-2 align-items-start" style="max-width:420px;">
             <?= csrfField() ?>
-            <button type="submit" class="btn btn-outline-primary">
-                <i class="bi bi-envelope-arrow-up me-1"></i>Send Test Email
+            <input type="email" name="to_email" class="form-control" required
+                   value="<?= e(Auth::user()['email'] ?? '') ?>"
+                   placeholder="recipient@example.com">
+            <button type="submit" class="btn btn-outline-primary text-nowrap">
+                <i class="bi bi-envelope-arrow-up me-1"></i>Send
             </button>
         </form>
     </div>
