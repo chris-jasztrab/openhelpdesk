@@ -190,13 +190,14 @@ function getAccessToken(string $tenantId, string $clientId, string $clientSecret
  */
 function getUnreadMessages(string $token, string $mailbox): ?array
 {
-    // Encode the mailbox address for use in URL path
-    $encodedMailbox = rawurlencode($mailbox);
-    $url = "https://graph.microsoft.com/v1.0/users/{$encodedMailbox}/mailFolders/Inbox/messages"
-         . '?$filter=isRead eq false'
+    // Use the mailbox address directly — @ is valid in a URL path segment.
+    // OData query parameter values with spaces must be percent-encoded.
+    $url = 'https://graph.microsoft.com/v1.0/users/' . $mailbox
+         . '/mailFolders/Inbox/messages'
+         . '?$filter=isRead%20eq%20false'
          . '&$select=id,subject,from,body,bodyPreview'
          . '&$top=50'
-         . '&$orderby=receivedDateTime asc';
+         . '&$orderby=receivedDateTime%20asc';
 
     $response = curlGet($url, ["Authorization: Bearer {$token}"]);
     if ($response === null) {
@@ -217,9 +218,8 @@ function getUnreadMessages(string $token, string $mailbox): ?array
  */
 function markMessageRead(string $token, string $mailbox, string $messageId): void
 {
-    $encodedMailbox = rawurlencode($mailbox);
-    $encodedMsgId   = rawurlencode($messageId);
-    $url = "https://graph.microsoft.com/v1.0/users/{$encodedMailbox}/messages/{$encodedMsgId}";
+    // @ is valid in the URL path; message IDs may contain + and = which are safe to encode.
+    $url = 'https://graph.microsoft.com/v1.0/users/' . $mailbox . '/messages/' . rawurlencode($messageId);
 
     curlPatch($url, json_encode(['isRead' => true]), [
         "Authorization: Bearer {$token}",
