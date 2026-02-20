@@ -1871,7 +1871,11 @@ $router->get('/admin/settings', function () {
     foreach ($keys as $k) {
         $settings[$k] = getSetting($k);
     }
-    render('admin/settings/index', ['settings' => $settings]);
+    // Retrieve and clear any stored processor run output
+    $runOutput = $_SESSION['_processor_run'] ?? null;
+    unset($_SESSION['_processor_run']);
+
+    render('admin/settings/index', ['settings' => $settings, 'runOutput' => $runOutput]);
 });
 
 $router->post('/admin/settings', function () {
@@ -1939,6 +1943,29 @@ $router->post('/admin/settings/graph', function () {
 $router->get('/admin/settings/email-reply-help', function () {
     Auth::requireRole('admin');
     render('admin/settings/email-reply-help', []);
+});
+
+$router->post('/admin/settings/run-reply-processor', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings');
+    }
+
+    $script = ROOT_DIR . '/scripts/process-replies.php';
+    $cmd    = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($script) . ' 2>&1';
+
+    $outputLines = [];
+    $returnCode  = 0;
+    exec($cmd, $outputLines, $returnCode);
+
+    $_SESSION['_processor_run'] = [
+        'lines' => $outputLines,
+        'code'  => $returnCode,
+        'time'  => date('Y-m-d H:i:s'),
+    ];
+
+    redirect('/admin/settings');
 });
 
 $router->post('/admin/settings/test-email', function () {

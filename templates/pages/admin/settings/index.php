@@ -199,9 +199,38 @@ $breadcrumbs  = [
                 <code class="d-block bg-light border rounded p-2 small user-select-all">*/5 * * * * php <?= e(ROOT_DIR) ?>/scripts/process-replies.php &gt;&gt; <?= e(ROOT_DIR) ?>/storage/logs/graph-mail.log 2&gt;&amp;1</code>
             </div>
 
-            <button type="submit" class="btn text-white" style="background:var(--ld-primary);">
-                <i class="bi bi-check-lg me-1"></i>Save Inbound Settings
-            </button>
+            <div class="d-flex gap-2 align-items-center flex-wrap">
+                <button type="submit" class="btn text-white" style="background:var(--ld-primary);">
+                    <i class="bi bi-check-lg me-1"></i>Save Inbound Settings
+                </button>
+            </div>
         </form>
+
+        <!-- Run processor immediately -->
+        <hr class="my-4">
+        <div>
+            <h6 class="fw-semibold mb-1">Run Now</h6>
+            <p class="text-muted small mb-3">Execute the reply processor immediately without waiting for the cron schedule. Useful for testing your configuration.</p>
+            <form method="POST" action="/admin/settings/run-reply-processor">
+                <?= csrfField() ?>
+                <button type="submit" class="btn btn-outline-secondary">
+                    <i class="bi bi-play-circle me-1"></i>Run Now
+                </button>
+            </form>
+
+            <?php if (!empty($runOutput)): ?>
+            <div class="mt-3">
+                <div class="d-flex align-items-center justify-content-between mb-1">
+                    <span class="small fw-semibold text-muted">Last run: <?= e($runOutput['time']) ?></span>
+                    <?php if ($runOutput['code'] === 0): ?>
+                        <span class="badge bg-success">Exit 0 — OK</span>
+                    <?php else: ?>
+                        <span class="badge bg-danger">Exit <?= (int) $runOutput['code'] ?> — Error</span>
+                    <?php endif; ?>
+                </div>
+                <pre class="bg-dark text-light rounded p-3 small mb-0" style="max-height:300px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;"><?= e(implode("\n", $runOutput['lines'])) ?></pre>
+            </div>
+            <?php endif; ?>
+        </div>
     </div>
 </div>
