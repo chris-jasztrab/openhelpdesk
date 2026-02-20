@@ -106,7 +106,7 @@ $breadcrumbs  = [
         </div>
 
         <!-- Action buttons -->
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2 flex-wrap">
             <form method="POST" action="/admin/settings/import/confirm">
                 <?= csrfField() ?>
                 <button type="submit" class="btn text-white" style="background:var(--ld-primary);"
@@ -114,6 +114,9 @@ $breadcrumbs  = [
                     <i class="bi bi-check-lg me-1"></i>Confirm Import (<?= (int) $summary['total_tickets'] ?> tickets)
                 </button>
             </form>
+            <a href="/admin/settings/import/map" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i>Back to Mapping
+            </a>
             <a href="/admin/settings/import" class="btn btn-outline-secondary">
                 <i class="bi bi-x-lg me-1"></i>Cancel
             </a>

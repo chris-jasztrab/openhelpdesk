@@ -20,8 +20,8 @@ $breadcrumbs  = [
     </div>
     <div class="card-body p-4">
         <p class="text-muted mb-3">
-            Upload a CSV export from your previous ticketing system. The importer expects the standard Freshdesk export format
-            with columns such as Ticket ID, Subject, Status, Priority, Agent, Group, Created time, etc.
+            Upload a CSV export from your previous ticketing system. Any CSV format is supported — you will be able to
+            map your file's columns to the correct LocalDesk fields before the import runs.
         </p>
 
         <div class="alert alert-info d-flex align-items-start" role="alert">

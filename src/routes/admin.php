@@ -2195,123 +2195,199 @@ $router->post('/admin/settings/import/preview', function () {
         redirect('/admin/settings/import');
     }
 
-    // Read header row
+    // Read header row, strip BOM
     $header = fgetcsv($handle);
-    if (!$header || !in_array('Ticket ID', $header, true) || !in_array('Subject', $header, true)) {
+    if (!$header || count($header) < 2) {
         fclose($handle);
-        flash('error', 'Invalid CSV format. Expected Freshdesk export with "Ticket ID" and "Subject" columns.');
+        flash('error', 'The CSV file appears to be empty or has too few columns.');
+        redirect('/admin/settings/import');
+    }
+    $header = array_map(fn($h) => trim(preg_replace('/^\xEF\xBB\xBF/', '', $h)), $header);
+
+    // Read all data rows
+    $rawRows = [];
+    while (($csvRow = fgetcsv($handle)) !== false) {
+        if (count(array_filter($csvRow, fn($v) => trim($v) !== '')) === 0) {
+            continue; // skip blank rows
+        }
+        $row = [];
+        foreach ($header as $i => $col) {
+            $row[$col] = trim($csvRow[$i] ?? '');
+        }
+        $rawRows[] = $row;
+    }
+    fclose($handle);
+
+    if (empty($rawRows)) {
+        flash('error', 'No data rows found in the CSV file.');
         redirect('/admin/settings/import');
     }
 
-    // Build column index map
-    $colMap = array_flip($header);
+    $_SESSION['import_raw'] = ['headers' => $header, 'rows' => $rawRows];
+    unset($_SESSION['import_data'], $_SESSION['import_summary']);
+    redirect('/admin/settings/import/map');
+});
 
-    // Load existing data for lookups
+$router->get('/admin/settings/import/map', function () {
+    Auth::requireRole('admin');
+    $raw = $_SESSION['import_raw'] ?? null;
+    if (!$raw) {
+        flash('error', 'No import data found. Please upload a CSV file first.');
+        redirect('/admin/settings/import');
+    }
+
+    $headers = $raw['headers'];
+
+    $systemFields = [
+        ['key' => 'subject',      'label' => 'Subject',             'required' => true],
+        ['key' => 'description',  'label' => 'Description',         'required' => false],
+        ['key' => 'legacy_id',    'label' => 'Ticket ID (Legacy)',   'required' => false],
+        ['key' => 'email',        'label' => 'Submitter Email',      'required' => true],
+        ['key' => 'full_name',    'label' => 'Submitter Name',       'required' => false],
+        ['key' => 'status',       'label' => 'Status',               'required' => false],
+        ['key' => 'priority',     'label' => 'Priority',             'required' => false],
+        ['key' => 'agent',        'label' => 'Assigned Agent',       'required' => false],
+        ['key' => 'type',         'label' => 'Ticket Type',          'required' => false],
+        ['key' => 'location',     'label' => 'Location',             'required' => false],
+        ['key' => 'created_at',   'label' => 'Created Date',         'required' => false],
+        ['key' => 'due_date',     'label' => 'Due Date',             'required' => false],
+        ['key' => 'updated_at',   'label' => 'Last Updated',         'required' => false],
+        ['key' => 'responded_at', 'label' => 'First Response Date',  'required' => false],
+        ['key' => 'tags',         'label' => 'Tags',                 'required' => false],
+    ];
+
+    $aliases = [
+        'subject'     => ['subject', 'title', 'issue', 'summary', 'ticket subject'],
+        'description' => ['description', 'body', 'details', 'content', 'message', 'issue description'],
+        'legacy_id'   => ['ticket id', 'id', 'ticket_id', 'legacy id', '#', 'ticket number'],
+        'email'       => ['email', 'requester email', 'customer email', 'contact email', 'submitter email'],
+        'full_name'   => ['full name', 'full_name', 'name', 'customer name', 'requester name', 'submitter'],
+        'status'      => ['status', 'ticket status', 'state'],
+        'priority'    => ['priority', 'priority name', 'urgency'],
+        'agent'       => ['agent', 'assigned agent', 'assignee', 'agent name', 'assigned to'],
+        'type'        => ['type of ticket', 'type', 'ticket type', 'category', 'issue type'],
+        'location'    => ['location', 'department', 'branch', 'site', 'office'],
+        'created_at'  => ['created time', 'created_at', 'created date', 'date created', 'open date', 'created_time'],
+        'due_date'    => ['due by time', 'due_date', 'due date', 'deadline', 'due_by_time'],
+        'updated_at'  => ['last update time', 'updated_at', 'last updated', 'modified', 'last_update_time'],
+        'responded_at'=> ['initial response time', 'responded_at', 'first response', 'initial_response_time'],
+        'tags'        => ['tags', 'tag', 'labels', 'label'],
+    ];
+
+    $lowerHeaders = array_map('strtolower', $headers);
+    $autoMapping  = [];
+    foreach ($systemFields as $field) {
+        $autoMapping[$field['key']] = null;
+        $aliasList = $aliases[$field['key']] ?? [strtolower($field['label'])];
+        foreach ($aliasList as $alias) {
+            $idx = array_search($alias, $lowerHeaders, true);
+            if ($idx !== false) {
+                $autoMapping[$field['key']] = $headers[$idx];
+                break;
+            }
+        }
+    }
+
+    render('admin/settings/import-map', [
+        'headers'      => $headers,
+        'systemFields' => $systemFields,
+        'autoMapping'  => $autoMapping,
+        'sampleRows'   => array_slice($raw['rows'], 0, 3),
+    ]);
+});
+
+$router->post('/admin/settings/import/map', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/import');
+    }
+
+    $raw = $_SESSION['import_raw'] ?? null;
+    if (!$raw) {
+        flash('error', 'No import data found. Please upload a CSV file first.');
+        redirect('/admin/settings/import');
+    }
+
+    $userMapping = $_POST['mapping'] ?? [];
+    $subjectCol  = $userMapping['subject'] ?? '';
+    $emailCol    = $userMapping['email']   ?? '';
+
+    if ($subjectCol === '' || $emailCol === '') {
+        flash('error', 'Subject and Submitter Email are required. Please map them to a CSV column.');
+        redirect('/admin/settings/import/map');
+    }
+
+    // Normalize raw rows using the user-supplied mapping
+    $rows = [];
+    foreach ($raw['rows'] as $rawRow) {
+        $get = function (string $fieldKey) use ($rawRow, $userMapping): string {
+            $col = $userMapping[$fieldKey] ?? '';
+            return $col !== '' ? trim($rawRow[$col] ?? '') : '';
+        };
+
+        $subject = $get('subject');
+        $email   = strtolower($get('email'));
+        if ($subject === '' || $email === '') {
+            continue;
+        }
+
+        $statusRaw = strtolower($get('status'));
+        $statusMap = ['open' => 'open', 'closed' => 'closed', 'pending' => 'pending', 'resolved' => 'resolved'];
+
+        $rows[] = [
+            'legacy_id'      => $get('legacy_id'),
+            'subject'        => $subject,
+            'description'    => $get('description'),
+            'email'          => $email,
+            'submitter_name' => $get('full_name'),
+            'status'         => $statusMap[$statusRaw] ?? 'open',
+            'priority'       => $get('priority'),
+            'agent'          => $get('agent'),
+            'type'           => $get('type'),
+            'location'       => $get('location'),
+            'created_at'     => $get('created_at'),
+            'due_date'       => $get('due_date'),
+            'updated_at'     => $get('updated_at'),
+            'responded_at'   => $get('responded_at'),
+            'tags'           => $get('tags'),
+        ];
+    }
+
+    if (empty($rows)) {
+        flash('error', 'No valid rows found after applying the mapping. Ensure Subject and Submitter Email columns contain data.');
+        redirect('/admin/settings/import/map');
+    }
+
+    // Build summary using DB lookups
     $db = Database::connect();
-
     $existingUsers = [];
     foreach ($db->query("SELECT id, email, CONCAT(first_name, ' ', last_name) AS full_name FROM users")->fetchAll() as $u) {
         $existingUsers[strtolower($u['email'])] = $u;
         $existingUsers['name:' . strtolower($u['full_name'])] = $u;
     }
-
     $existingLocations = [];
     foreach ($db->query('SELECT id, name FROM locations')->fetchAll() as $l) {
         $existingLocations[strtolower($l['name'])] = $l['id'];
     }
 
-    $existingTypes = [];
-    foreach ($db->query('SELECT id, name FROM ticket_types')->fetchAll() as $t) {
-        $existingTypes[strtolower($t['name'])] = $t['id'];
-    }
-
-    $existingPriorities = [];
-    foreach ($db->query('SELECT id, name FROM ticket_priorities')->fetchAll() as $p) {
-        $existingPriorities[strtolower($p['name'])] = $p['id'];
-    }
-
-    // Parse all rows
-    $rows = [];
-    $newUserEmails = [];
-    $newAgentNames = [];
+    $newUserEmails    = [];
+    $newAgentNames    = [];
     $newLocationNames = [];
-
-    while (($csvRow = fgetcsv($handle)) !== false) {
-        if (count($csvRow) < count($header)) {
-            continue; // skip malformed rows
+    foreach ($rows as $row) {
+        if ($row['email'] !== '' && !isset($existingUsers[$row['email']])) {
+            $newUserEmails[$row['email']] = $row['submitter_name'];
         }
-
-        $data = [];
-        foreach ($colMap as $col => $idx) {
-            $data[$col] = trim($csvRow[$idx] ?? '');
+        if ($row['agent'] !== '' && $row['agent'] !== 'No Agent' && !isset($existingUsers['name:' . strtolower($row['agent'])])) {
+            $newAgentNames[strtolower($row['agent'])] = $row['agent'];
         }
-
-        $legacyId   = $data['Ticket ID'] ?? '';
-        $subject    = $data['Subject'] ?? '';
-        $status     = strtolower($data['Status'] ?? 'open');
-        $priority   = $data['Priority'] ?? '';
-        $agentName  = $data['Agent'] ?? '';
-        $createdAt  = $data['Created time'] ?? '';
-        $dueDate    = $data['Due by Time'] ?? '';
-        $updatedAt  = $data['Last update time'] ?? '';
-        $respondedAt = $data['Initial response time'] ?? '';
-        $typeName   = $data['Type of Ticket'] ?? '';
-        $location   = $data['Location'] ?? '';
-        $fullName   = $data['Full name'] ?? '';
-        $email      = strtolower(trim($data['Email'] ?? ''));
-        $tags       = $data['Tags'] ?? '';
-
-        if ($subject === '' || $legacyId === '') {
-            continue;
+        if ($row['location'] !== '' && !isset($existingLocations[strtolower($row['location'])])) {
+            $newLocationNames[strtolower($row['location'])] = $row['location'];
         }
-
-        // Normalize status
-        $statusMap = ['open' => 'open', 'closed' => 'closed', 'pending' => 'pending', 'resolved' => 'resolved'];
-        $status = $statusMap[$status] ?? 'open';
-
-        // Track new users (submitters)
-        if ($email !== '' && !isset($existingUsers[$email])) {
-            $newUserEmails[$email] = $fullName;
-        }
-
-        // Track new agents
-        if ($agentName !== '' && $agentName !== 'No Agent' && !isset($existingUsers['name:' . strtolower($agentName)])) {
-            $newAgentNames[strtolower($agentName)] = $agentName;
-        }
-
-        // Track new locations
-        if ($location !== '' && !isset($existingLocations[strtolower($location)])) {
-            $newLocationNames[strtolower($location)] = $location;
-        }
-
-        $rows[] = [
-            'legacy_id'     => $legacyId,
-            'subject'       => $subject,
-            'status'        => $status,
-            'priority'      => $priority,
-            'agent'         => $agentName,
-            'created_at'    => $createdAt,
-            'due_date'      => $dueDate,
-            'updated_at'    => $updatedAt,
-            'responded_at'  => $respondedAt,
-            'type'          => $typeName,
-            'location'      => $location,
-            'submitter_name'=> $fullName,
-            'email'         => $email,
-            'tags'          => $tags,
-        ];
-    }
-    fclose($handle);
-
-    if (empty($rows)) {
-        flash('error', 'No valid ticket rows found in the CSV file.');
-        redirect('/admin/settings/import');
     }
 
-    // Store in session for the confirm step
-    $_SESSION['import_data'] = $rows;
-
-    $summary = [
+    $_SESSION['import_data']    = $rows;
+    $_SESSION['import_summary'] = [
         'total_tickets'     => count($rows),
         'new_users'         => count($newUserEmails),
         'new_agents'        => count($newAgentNames),
@@ -2320,12 +2396,20 @@ $router->post('/admin/settings/import/preview', function () {
         'new_agent_list'    => array_values($newAgentNames),
         'new_location_list' => array_values($newLocationNames),
     ];
+    redirect('/admin/settings/import/preview');
+});
 
-    $previewRows = array_slice($rows, 0, 15);
-
+$router->get('/admin/settings/import/preview', function () {
+    Auth::requireRole('admin');
+    $rows    = $_SESSION['import_data']    ?? null;
+    $summary = $_SESSION['import_summary'] ?? null;
+    if (!$rows || !$summary) {
+        flash('error', 'No import data found. Please start the import again.');
+        redirect('/admin/settings/import');
+    }
     render('admin/settings/import-preview', [
         'summary'     => $summary,
-        'previewRows' => $previewRows,
+        'previewRows' => array_slice($rows, 0, 15),
     ]);
 });
 
@@ -2480,7 +2564,7 @@ $router->post('/admin/settings/import/confirm', function () {
             // --- Insert ticket ---
             $insertTicket->execute([
                 $row['subject'],
-                '(Imported from legacy system)',
+                $row['description'] !== '' ? $row['description'] : '(Imported from legacy system)',
                 $row['legacy_id'],
                 $creatorId,
                 $createdAt,
