@@ -4029,6 +4029,163 @@ $router->post('/admin/workflows/ticket-fields/{id}/delete', function (array $p) 
 });
 
 /* ==================================================================
+ * Backup
+ * ================================================================== */
+
+$router->get('/admin/settings/backup', function () {
+    Auth::requireRole('admin');
+    $backupDir = ROOT_DIR . '/storage/backups/';
+    @mkdir($backupDir, 0755, true);
+
+    $backups = [];
+    foreach (glob($backupDir . 'localdesk_backup_*.zip') ?: [] as $file) {
+        $backups[] = [
+            'name'    => basename($file),
+            'size'    => filesize($file),
+            'created' => filemtime($file),
+        ];
+    }
+    usort($backups, fn ($a, $b) => $b['created'] - $a['created']);
+
+    render('admin/settings/backup', [
+        'backups'      => $backups,
+        'zipAvailable' => class_exists('ZipArchive'),
+    ]);
+});
+
+$router->post('/admin/settings/backup/create', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/backup');
+    }
+
+    if (!class_exists('ZipArchive')) {
+        flash('error', 'ZipArchive PHP extension is not available on this server.');
+        redirect('/admin/settings/backup');
+    }
+
+    set_time_limit(300);
+
+    $db        = Database::connect();
+    $backupDir = ROOT_DIR . '/storage/backups/';
+    @mkdir($backupDir, 0755, true);
+
+    $filename = 'localdesk_backup_' . date('Ymd_His') . '.zip';
+    $zipPath  = $backupDir . $filename;
+
+    try {
+        $zip = new ZipArchive();
+        if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+            throw new RuntimeException('Could not create zip file. Check storage/backups/ is writable.');
+        }
+
+        // --- SQL dump ---
+        $tables = $db->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
+        $sql  = "-- LocalDesk Database Backup\n";
+        $sql .= "-- Generated: " . date('Y-m-d H:i:s') . "\n";
+        $sql .= "-- Tables: " . count($tables) . "\n";
+        $sql .= "-- ------------------------------------------------\n\n";
+        $sql .= "SET FOREIGN_KEY_CHECKS=0;\nSET SQL_MODE='NO_AUTO_VALUE_ON_ZERO';\n\n";
+
+        foreach ($tables as $table) {
+            $sql .= "-- ---- `$table` ----\n";
+            $sql .= "DROP TABLE IF EXISTS `$table`;\n";
+            $create = $db->query("SHOW CREATE TABLE `$table`")->fetch(PDO::FETCH_NUM);
+            $sql .= $create[1] . ";\n\n";
+
+            $rows = $db->query("SELECT * FROM `$table`")->fetchAll(PDO::FETCH_ASSOC);
+            if (!empty($rows)) {
+                $cols = implode(', ', array_map(fn ($c) => "`$c`", array_keys($rows[0])));
+                foreach (array_chunk($rows, 500) as $chunk) {
+                    $vals = [];
+                    foreach ($chunk as $row) {
+                        $rowVals = array_map(
+                            fn ($v) => $v === null ? 'NULL' : $db->quote((string) $v),
+                            $row
+                        );
+                        $vals[] = '(' . implode(', ', $rowVals) . ')';
+                    }
+                    $sql .= "INSERT INTO `$table` ($cols) VALUES\n" . implode(",\n", $vals) . ";\n";
+                }
+                $sql .= "\n";
+            }
+        }
+        $sql .= "SET FOREIGN_KEY_CHECKS=1;\n";
+        $zip->addFromString('database.sql', $sql);
+
+        // --- Uploaded files ---
+        $fileDirs = [
+            ROOT_DIR . '/storage/attachments/' => 'attachments',
+            ROOT_DIR . '/public/uploads/'      => 'uploads',
+        ];
+        foreach ($fileDirs as $dir => $zipPrefix) {
+            if (!is_dir($dir)) {
+                continue;
+            }
+            $it = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS),
+                RecursiveIteratorIterator::SELF_FIRST
+            );
+            foreach ($it as $entry) {
+                $rel = $zipPrefix . '/' . str_replace('\\', '/', substr($entry->getPathname(), strlen($dir)));
+                if ($entry->isDir()) {
+                    $zip->addEmptyDir($rel);
+                } else {
+                    $zip->addFile($entry->getPathname(), $rel);
+                }
+            }
+        }
+
+        $zip->close();
+        flash('success', "Backup created: $filename");
+    } catch (Exception $e) {
+        @unlink($zipPath);
+        flash('error', 'Backup failed: ' . $e->getMessage());
+    }
+
+    redirect('/admin/settings/backup');
+});
+
+$router->get('/admin/settings/backup/download/{file}', function (array $p) {
+    Auth::requireRole('admin');
+    $filename = $p['file'] ?? '';
+    if (!preg_match('/^localdesk_backup_\d{8}_\d{6}\.zip$/', $filename)) {
+        flash('error', 'Invalid backup filename.');
+        redirect('/admin/settings/backup');
+    }
+    $path = ROOT_DIR . '/storage/backups/' . $filename;
+    if (!file_exists($path)) {
+        flash('error', 'Backup file not found.');
+        redirect('/admin/settings/backup');
+    }
+    header('Content-Type: application/zip');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Content-Length: ' . filesize($path));
+    readfile($path);
+    exit;
+});
+
+$router->post('/admin/settings/backup/delete', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/backup');
+    }
+    $filename = $_POST['filename'] ?? '';
+    if (!preg_match('/^localdesk_backup_\d{8}_\d{6}\.zip$/', $filename)) {
+        flash('error', 'Invalid backup filename.');
+        redirect('/admin/settings/backup');
+    }
+    $path = ROOT_DIR . '/storage/backups/' . $filename;
+    if (file_exists($path)) {
+        unlink($path);
+        flash('success', 'Backup deleted.');
+    }
+    redirect('/admin/settings/backup');
+});
+
+/* ==================================================================
  * Avatar upload helper
  * ================================================================== */
 
