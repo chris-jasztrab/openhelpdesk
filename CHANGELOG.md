@@ -5,12 +5,15 @@ All notable changes to LocalDesk will be documented in this file.
 ---
 
 ## Unreleased
-- Work on outgoing email templates.
 - Profile Avatars
 - Ticket Builder
 - Office 365 SSO Login.
 - Login with your Office 365 credentials.
-
+- SLA reminders & escalation
+- Automatic ticket assignment
+- Custom reporting
+- Manage team dashboards
+- Custom satisfaction surveys
 
 ### Knowledge Base Import
 - CSV import tool for KB articles under Admin > Settings > Import KB
