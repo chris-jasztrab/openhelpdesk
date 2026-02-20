@@ -302,6 +302,7 @@ $router->post('/portal/tickets/create', function () {
         'type'      => $typeName,
         'location'  => $locationName,
         'priority'  => $priorityName,
+        'user_name' => $creator['first_name'] . ' ' . $creator['last_name'],
     ]);
 
     $emailHtml = renderEmail('ticket-created', [

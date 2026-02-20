@@ -11,6 +11,7 @@ $breadcrumbs  = [
 // Token definitions per template
 $tokenSets = [
     'ticket_created' => [
+        ['token' => '{{user_name}}',    'desc' => 'Full name of the email recipient'],
         ['token' => '{{ticket_id}}',    'desc' => 'Ticket number (e.g. 42)'],
         ['token' => '{{subject}}',      'desc' => 'Ticket subject line'],
         ['token' => '{{type}}',         'desc' => 'Ticket type (if set)'],
@@ -18,12 +19,14 @@ $tokenSets = [
         ['token' => '{{priority}}',     'desc' => 'Priority name (if set)'],
     ],
     'ticket_updated' => [
+        ['token' => '{{user_name}}',    'desc' => 'Full name of the email recipient'],
         ['token' => '{{ticket_id}}',    'desc' => 'Ticket number'],
         ['token' => '{{subject}}',      'desc' => 'Ticket subject line'],
         ['token' => '{{message}}',      'desc' => 'The new comment text'],
         ['token' => '{{author}}',       'desc' => 'Name of the person who commented'],
     ],
     'ticket_merged' => [
+        ['token' => '{{user_name}}',        'desc' => 'Full name of the email recipient'],
         ['token' => '{{source_ticket_id}}', 'desc' => 'Merged (closed) ticket number'],
         ['token' => '{{source_subject}}',   'desc' => 'Merged ticket subject'],
         ['token' => '{{target_ticket_id}}', 'desc' => 'Master ticket number'],
@@ -209,9 +212,9 @@ if (!array_key_exists($activeTab, $tabs)) {
                 <?php
                 $subjectTpl = $tplValues["email_subject_{$activeTab}"] ?? $defaults[$activeTab]['subject'];
                 $previewTokens = [
-                    'ticket_created' => ['ticket_id' => '42', 'subject' => 'Printer not working', 'type' => 'Hardware', 'location' => 'Main Branch', 'priority' => 'High'],
-                    'ticket_updated' => ['ticket_id' => '42', 'subject' => 'Printer not working', 'message' => 'We are looking into this.', 'author' => 'Jane Smith'],
-                    'ticket_merged'  => ['source_ticket_id' => '42', 'source_subject' => 'Printer not working', 'target_ticket_id' => '38', 'target_subject' => 'Office printer issues'],
+                    'ticket_created' => ['user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working', 'type' => 'Hardware', 'location' => 'Main Branch', 'priority' => 'High'],
+                    'ticket_updated' => ['user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working', 'message' => 'We are looking into this.', 'author' => 'Jane Smith'],
+                    'ticket_merged'  => ['user_name' => 'Alex Johnson', 'source_ticket_id' => '42', 'source_subject' => 'Printer not working', 'target_ticket_id' => '38', 'target_subject' => 'Office printer issues'],
                 ];
                 $preview = $subjectTpl;
                 foreach ($previewTokens[$activeTab] as $k => $v) {
