@@ -4147,9 +4147,9 @@ $router->post('/admin/settings/backup/create', function () {
     redirect('/admin/settings/backup');
 });
 
-$router->get('/admin/settings/backup/download/{file}', function (array $p) {
+$router->get('/admin/settings/backup/download', function () {
     Auth::requireRole('admin');
-    $filename = $p['file'] ?? '';
+    $filename = $_GET['file'] ?? '';
     if (!preg_match('/^localdesk_backup_\d{8}_\d{6}\.zip$/', $filename)) {
         flash('error', 'Invalid backup filename.');
         redirect('/admin/settings/backup');
@@ -4158,6 +4158,10 @@ $router->get('/admin/settings/backup/download/{file}', function (array $p) {
     if (!file_exists($path)) {
         flash('error', 'Backup file not found.');
         redirect('/admin/settings/backup');
+    }
+    // Clear any buffered output before streaming the file
+    while (ob_get_level()) {
+        ob_end_clean();
     }
     header('Content-Type: application/zip');
     header('Content-Disposition: attachment; filename="' . $filename . '"');

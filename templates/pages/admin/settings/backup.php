@@ -74,7 +74,7 @@ $breadcrumbs  = [
                             <td class="text-muted small"><?= date('M j, Y g:i a', $b['created']) ?></td>
                             <td class="text-muted small"><?= number_format($b['size'] / 1048576, 1) ?> MB</td>
                             <td class="text-end">
-                                <a href="/admin/settings/backup/download/<?= urlencode($b['name']) ?>"
+                                <a href="/admin/settings/backup/download?file=<?= urlencode($b['name']) ?>"
                                    class="btn btn-sm btn-outline-primary me-1">
                                     <i class="bi bi-download me-1"></i>Download
                                 </a>
