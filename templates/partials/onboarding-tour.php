@@ -208,38 +208,41 @@
     const totalSteps = 6;
     let current = 1;
 
-    const modal     = new bootstrap.Modal(document.getElementById('onboardingModal'), { backdrop: 'static' });
-    const prevBtn   = document.getElementById('tourPrev');
-    const nextBtn   = document.getElementById('tourNext');
-    const dismissF  = document.getElementById('tourDismissForm');
-    const dots      = document.querySelectorAll('.tour-dot');
-
-    <?php if ($autoShowTour ?? false): ?>modal.show();<?php endif; ?>
+    const modalEl = document.getElementById('onboardingModal');
+    const modal   = new bootstrap.Modal(modalEl, { backdrop: 'static', keyboard: false });
+    const prevBtn = document.getElementById('tourPrev');
+    const nextBtn = document.getElementById('tourNext');
+    const dismissF = document.getElementById('tourDismissForm');
+    const dots    = document.querySelectorAll('.tour-dot');
 
     function goTo(n) {
-        document.querySelector(`.tour-step[data-step="${current}"]`).classList.add('d-none');
+        // Hide all steps, then show the target
+        document.querySelectorAll('.tour-step').forEach(s => s.classList.add('d-none'));
         current = n;
-        document.querySelector(`.tour-step[data-step="${current}"]`).classList.remove('d-none');
+        document.querySelector('.tour-step[data-step="' + current + '"]').classList.remove('d-none');
 
-        // Update dots
+        // Dots
         dots.forEach(d => {
             d.style.background = parseInt(d.dataset.dot) === current ? 'var(--ld-primary)' : '#cbd5e1';
         });
 
-        // Prev button
-        prevBtn.style.setProperty('display', current > 1 ? '' : 'none', 'important');
-
-        // Next / dismiss toggle
+        // Prev / Next / Dismiss visibility
+        prevBtn.classList.toggle('invisible', current === 1);
         if (current === totalSteps) {
-            nextBtn.style.display = 'none';
+            nextBtn.classList.add('d-none');
             dismissF.classList.remove('d-none');
         } else {
-            nextBtn.style.display = '';
+            nextBtn.classList.remove('d-none');
             dismissF.classList.add('d-none');
         }
     }
 
+    // Always reset to step 1 when the modal opens
+    modalEl.addEventListener('show.bs.modal', () => goTo(1));
+
     nextBtn.addEventListener('click', () => { if (current < totalSteps) goTo(current + 1); });
     prevBtn.addEventListener('click', () => { if (current > 1) goTo(current - 1); });
+
+    <?php if ($autoShowTour ?? false): ?>modal.show();<?php endif; ?>
 })();
 </script>

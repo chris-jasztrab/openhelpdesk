@@ -2895,7 +2895,7 @@ $router->get('/admin/settings/branding', function () {
 
 $router->post('/admin/settings/branding', function () {
     Auth::requireRole('admin');
-    verifyCsrf();
+    verifyCsrf($_POST['_token'] ?? '');
 
     $appName              = trim($_POST['app_name'] ?? 'LocalDesk');
     $primaryColor         = trim($_POST['primary_color'] ?? '#4f46e5');

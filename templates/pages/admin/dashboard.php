@@ -26,10 +26,6 @@ $actionIcons = [
         <h2 class="fw-bold mb-1">Admin Dashboard</h2>
         <p class="text-muted mb-0">System overview</p>
     </div>
-    <button type="button" class="btn btn-outline-secondary btn-sm"
-            onclick="bootstrap.Modal.getOrCreateInstance(document.getElementById('onboardingModal')).show();">
-        <i class="bi bi-play-circle me-1"></i>Tour
-    </button>
 </div>
 
 <div class="row g-4 mb-4">
