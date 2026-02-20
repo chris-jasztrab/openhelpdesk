@@ -214,7 +214,7 @@
     const dismissF  = document.getElementById('tourDismissForm');
     const dots      = document.querySelectorAll('.tour-dot');
 
-    modal.show();
+    <?php if ($autoShowTour ?? false): ?>modal.show();<?php endif; ?>
 
     function goTo(n) {
         document.querySelector(`.tour-step[data-step="${current}"]`).classList.add('d-none');
