@@ -296,6 +296,14 @@ $router->post('/portal/tickets/create', function () {
         $priorityName = $pStmt->fetchColumn() ?: '';
     }
 
+    $tpl = getEmailTpl('ticket-created', [
+        'ticket_id' => $ticketId,
+        'subject'   => $subject,
+        'type'      => $typeName,
+        'location'  => $locationName,
+        'priority'  => $priorityName,
+    ]);
+
     $emailHtml = renderEmail('ticket-created', [
         'ticketId'     => $ticketId,
         'subject'      => $subject,
@@ -304,12 +312,15 @@ $router->post('/portal/tickets/create', function () {
         'locationName' => $locationName,
         'priorityName' => $priorityName,
         'ticketUrl'    => $ticketUrl,
+        'introText'    => $tpl['intro'],
+        'buttonLabel'  => $tpl['button'],
+        'footerText'   => $tpl['footer'],
     ]);
 
     sendMail(
         $creator['email'],
         $creator['first_name'] . ' ' . $creator['last_name'],
-        '[Ticket #' . $ticketId . '] ' . $subject,
+        $tpl['subject'],
         $emailHtml,
         '',
         $ticketId

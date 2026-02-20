@@ -1,0 +1,242 @@
+<?php
+$layout       = 'app';
+$pageTitle    = 'Email Templates';
+$sidebarItems = adminSidebar('settings');
+$breadcrumbs  = [
+    ['label' => 'Admin',    'url' => '/admin'],
+    ['label' => 'Settings', 'url' => '/admin/settings'],
+    ['label' => 'Email Templates'],
+];
+
+// Token definitions per template
+$tokenSets = [
+    'ticket_created' => [
+        ['token' => '{{ticket_id}}',    'desc' => 'Ticket number (e.g. 42)'],
+        ['token' => '{{subject}}',      'desc' => 'Ticket subject line'],
+        ['token' => '{{type}}',         'desc' => 'Ticket type (if set)'],
+        ['token' => '{{location}}',     'desc' => 'Location (if set)'],
+        ['token' => '{{priority}}',     'desc' => 'Priority name (if set)'],
+    ],
+    'ticket_updated' => [
+        ['token' => '{{ticket_id}}',    'desc' => 'Ticket number'],
+        ['token' => '{{subject}}',      'desc' => 'Ticket subject line'],
+        ['token' => '{{message}}',      'desc' => 'The new comment text'],
+        ['token' => '{{author}}',       'desc' => 'Name of the person who commented'],
+    ],
+    'ticket_merged' => [
+        ['token' => '{{source_ticket_id}}', 'desc' => 'Merged (closed) ticket number'],
+        ['token' => '{{source_subject}}',   'desc' => 'Merged ticket subject'],
+        ['token' => '{{target_ticket_id}}', 'desc' => 'Master ticket number'],
+        ['token' => '{{target_subject}}',   'desc' => 'Master ticket subject'],
+    ],
+];
+
+$defaults = [
+    'ticket_created' => [
+        'subject' => '[Ticket #{{ticket_id}}] {{subject}}',
+        'intro'   => 'Your ticket has been created and our team will review it shortly.',
+        'button'  => 'View Ticket',
+    ],
+    'ticket_updated' => [
+        'subject' => '[Ticket #{{ticket_id}}] Update: {{subject}}',
+        'intro'   => 'Your ticket has been updated.',
+        'button'  => 'View Ticket',
+    ],
+    'ticket_merged' => [
+        'subject' => '[Ticket #{{source_ticket_id}}] Your ticket has been merged',
+        'intro'   => 'Ticket #{{source_ticket_id}} has been consolidated with a related ticket. You can view updates and add comments on the master ticket.',
+        'button'  => 'View Master Ticket',
+    ],
+];
+
+$defaultFooter = 'This is an automated message from LocalDesk. Please do not reply directly to this email.';
+
+$tabs = [
+    'ticket_created' => ['label' => 'Ticket Created',  'icon' => 'bi-ticket-perforated'],
+    'ticket_updated' => ['label' => 'Ticket Updated',  'icon' => 'bi-chat-left-text'],
+    'ticket_merged'  => ['label' => 'Ticket Merged',   'icon' => 'bi-diagram-2'],
+];
+
+$activeTab = $_GET['tab'] ?? 'ticket_created';
+if (!array_key_exists($activeTab, $tabs)) {
+    $activeTab = 'ticket_created';
+}
+?>
+
+<div class="mb-4">
+    <h2 class="fw-bold mb-0">Email Templates</h2>
+    <p class="text-muted mt-1 mb-0">Customise the subject, intro message, and button label for each automated email. Use <code>{{tokens}}</code> to insert dynamic content.</p>
+</div>
+
+<?php require ROOT_DIR . '/templates/partials/settings-nav.php'; ?>
+
+<!-- Template tabs -->
+<ul class="nav nav-tabs mb-0" id="emailTabs">
+    <?php foreach ($tabs as $tKey => $tInfo): ?>
+    <li class="nav-item">
+        <a class="nav-link <?= $activeTab === $tKey ? 'active' : '' ?>"
+           href="?tab=<?= $tKey ?>">
+            <i class="bi <?= $tInfo['icon'] ?> me-1"></i><?= e($tInfo['label']) ?>
+        </a>
+    </li>
+    <?php endforeach; ?>
+    <li class="nav-item">
+        <a class="nav-link <?= $activeTab === 'shared' ? 'active' : '' ?>"
+           href="?tab=shared">
+            <i class="bi bi-layout-text-window me-1"></i>Shared Footer
+        </a>
+    </li>
+</ul>
+
+<?php if ($activeTab === 'shared'): ?>
+
+<!-- Shared footer -->
+<div class="card border-0 shadow-sm border-top-0" style="border-radius:0 0 .5rem .5rem;">
+    <div class="card-body p-4">
+        <p class="text-muted mb-4">
+            This footer text appears at the bottom of every outgoing ticket email.
+        </p>
+        <form method="POST" action="/admin/settings/email-templates">
+            <?= csrfField() ?>
+            <input type="hidden" name="tab" value="shared">
+
+            <div class="mb-4" style="max-width:640px;">
+                <label class="form-label fw-semibold">Footer Text</label>
+                <textarea class="form-control font-monospace" name="email_footer_text" rows="3"
+                    placeholder="<?= e($defaultFooter) ?>"><?= e($tplValues['email_footer_text'] ?? '') ?></textarea>
+                <div class="form-text">Leave blank to use the default: <em><?= e($defaultFooter) ?></em></div>
+            </div>
+
+            <button type="submit" class="btn text-white" style="background:var(--ld-primary);">
+                <i class="bi bi-check-lg me-1"></i>Save Footer
+            </button>
+            <?php if (!empty($tplValues['email_footer_text'])): ?>
+            <button type="submit" name="reset_footer" value="1" class="btn btn-outline-secondary ms-2">
+                <i class="bi bi-arrow-counterclockwise me-1"></i>Reset to Default
+            </button>
+            <?php endif; ?>
+        </form>
+    </div>
+</div>
+
+<?php else: ?>
+
+<!-- Per-template editor -->
+<div class="card border-0 shadow-sm border-top-0" style="border-radius:0 0 .5rem .5rem;">
+    <div class="card-body p-4">
+
+        <div class="row g-4">
+            <!-- Editor column -->
+            <div class="col-lg-8">
+                <form method="POST" action="/admin/settings/email-templates">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="tab" value="<?= e($activeTab) ?>">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Subject Line</label>
+                        <input type="text" class="form-control font-monospace"
+                               name="email_subject_<?= e($activeTab) ?>"
+                               value="<?= e($tplValues["email_subject_{$activeTab}"] ?? '') ?>"
+                               placeholder="<?= e($defaults[$activeTab]['subject']) ?>">
+                        <div class="form-text">Leave blank to use the default shown above as placeholder.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Intro Message</label>
+                        <textarea class="form-control" name="email_intro_<?= e($activeTab) ?>"
+                                  rows="3"
+                                  placeholder="<?= e($defaults[$activeTab]['intro']) ?>"><?= e($tplValues["email_intro_{$activeTab}"] ?? '') ?></textarea>
+                        <div class="form-text">
+                            Appears as the subtitle paragraph below the ticket heading. HTML is supported.
+                            Leave blank to use the default.
+                        </div>
+                    </div>
+
+                    <div class="mb-4" style="max-width:300px;">
+                        <label class="form-label fw-semibold">Button Label</label>
+                        <input type="text" class="form-control"
+                               name="email_button_<?= e($activeTab) ?>"
+                               value="<?= e($tplValues["email_button_{$activeTab}"] ?? '') ?>"
+                               placeholder="<?= e($defaults[$activeTab]['button']) ?>">
+                        <div class="form-text">Leave blank to use the default.</div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn text-white" style="background:var(--ld-primary);">
+                            <i class="bi bi-check-lg me-1"></i>Save Template
+                        </button>
+                        <?php
+                        $hasCustom = !empty($tplValues["email_subject_{$activeTab}"])
+                                  || !empty($tplValues["email_intro_{$activeTab}"])
+                                  || !empty($tplValues["email_button_{$activeTab}"]);
+                        ?>
+                        <?php if ($hasCustom): ?>
+                        <button type="submit" name="reset_template" value="<?= e($activeTab) ?>"
+                                class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-counterclockwise me-1"></i>Reset to Defaults
+                        </button>
+                        <?php endif; ?>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Token legend column -->
+            <div class="col-lg-4">
+                <div class="bg-light border rounded p-3">
+                    <h6 class="fw-semibold mb-2"><i class="bi bi-braces me-1"></i>Available Tokens</h6>
+                    <p class="text-muted small mb-3">Click a token to copy it. Tokens work in the Subject and Intro fields.</p>
+                    <div class="d-flex flex-column gap-2">
+                        <?php foreach ($tokenSets[$activeTab] as $tok): ?>
+                        <div class="d-flex align-items-start gap-2">
+                            <code class="token-chip bg-white border rounded px-2 py-1 small flex-shrink-0"
+                                  style="cursor:pointer; user-select:all;"
+                                  title="Click to copy"
+                                  onclick="copyToken(this)"><?= e($tok['token']) ?></code>
+                            <span class="text-muted small pt-1"><?= e($tok['desc']) ?></span>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <div class="mt-3 pt-3 border-top">
+                        <p class="text-muted small mb-0">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Tokens in the <strong>Intro</strong> field are automatically HTML-escaped, so
+                            they display safely even if a ticket subject contains special characters.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Live preview of subject -->
+                <?php
+                $subjectTpl = $tplValues["email_subject_{$activeTab}"] ?? $defaults[$activeTab]['subject'];
+                $previewTokens = [
+                    'ticket_created' => ['ticket_id' => '42', 'subject' => 'Printer not working', 'type' => 'Hardware', 'location' => 'Main Branch', 'priority' => 'High'],
+                    'ticket_updated' => ['ticket_id' => '42', 'subject' => 'Printer not working', 'message' => 'We are looking into this.', 'author' => 'Jane Smith'],
+                    'ticket_merged'  => ['source_ticket_id' => '42', 'source_subject' => 'Printer not working', 'target_ticket_id' => '38', 'target_subject' => 'Office printer issues'],
+                ];
+                $preview = $subjectTpl;
+                foreach ($previewTokens[$activeTab] as $k => $v) {
+                    $preview = str_replace('{{' . $k . '}}', $v, $preview);
+                }
+                ?>
+                <div class="mt-3 bg-white border rounded p-3">
+                    <div class="text-muted small fw-semibold mb-1">Subject preview</div>
+                    <div class="small text-break" style="font-family:monospace;"><?= e($preview) ?></div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<?php endif; ?>
+
+<script>
+function copyToken(el) {
+    const text = el.textContent.trim();
+    navigator.clipboard.writeText(text).then(() => {
+        const orig = el.style.background;
+        el.style.background = '#d1fae5';
+        setTimeout(() => { el.style.background = orig; }, 800);
+    });
+}
+</script>

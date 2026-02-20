@@ -432,6 +432,72 @@ function sendMail(string $toEmail, string $toName, string $subject, string $html
 }
 
 /**
+ * Replace {{token}} placeholders in a string with values from the given map.
+ */
+function applyEmailTokens(string $template, array $tokens): string
+{
+    foreach ($tokens as $key => $value) {
+        $template = str_replace('{{' . $key . '}}', (string) $value, $template);
+    }
+    return $template;
+}
+
+/**
+ * Resolve the customisable parts of an outgoing email (subject, intro text,
+ * button label, footer text) from admin settings, falling back to hard-coded
+ * defaults. Token values are HTML-escaped when placed into HTML fields.
+ *
+ * @param string $name       Template slug: 'ticket-created', 'ticket-updated', or 'ticket-merged'
+ * @param array  $rawTokens  Raw (unescaped) values keyed by token name (without braces)
+ */
+function getEmailTpl(string $name, array $rawTokens): array
+{
+    $key = str_replace('-', '_', $name); // e.g. 'ticket-created' → 'ticket_created'
+
+    $defaults = [
+        'ticket_created' => [
+            'subject' => '[Ticket #{{ticket_id}}] {{subject}}',
+            'intro'   => 'Your ticket has been created and our team will review it shortly.',
+            'button'  => 'View Ticket',
+        ],
+        'ticket_updated' => [
+            'subject' => '[Ticket #{{ticket_id}}] Update: {{subject}}',
+            'intro'   => 'Your ticket has been updated.',
+            'button'  => 'View Ticket',
+        ],
+        'ticket_merged' => [
+            'subject' => '[Ticket #{{source_ticket_id}}] Your ticket has been merged',
+            'intro'   => 'Ticket #{{source_ticket_id}} has been consolidated with a related ticket. You can view updates and add comments on the master ticket.',
+            'button'  => 'View Master Ticket',
+        ],
+    ];
+
+    $d = $defaults[$key] ?? ['subject' => '', 'intro' => '', 'button' => 'View Ticket'];
+
+    $subjectTpl = getSetting("email_subject_{$key}") ?: $d['subject'];
+    $introTpl   = getSetting("email_intro_{$key}")   ?: $d['intro'];
+    $button     = getSetting("email_button_{$key}")  ?: $d['button'];
+    $footer     = getSetting('email_footer_text')    ?: 'This is an automated message from LocalDesk. Please do not reply directly to this email.';
+
+    // Subject line: raw substitution (email headers are plain text)
+    $subject = applyEmailTokens($subjectTpl, $rawTokens);
+
+    // Intro text: the token VALUES going into HTML must be escaped
+    $safeTokens = [];
+    foreach ($rawTokens as $k => $v) {
+        $safeTokens[$k] = htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
+    }
+    $intro = applyEmailTokens($introTpl, $safeTokens);
+
+    return [
+        'subject' => $subject,
+        'intro'   => $intro,  // already HTML-safe
+        'button'  => htmlspecialchars($button, ENT_QUOTES, 'UTF-8'),
+        'footer'  => htmlspecialchars($footer, ENT_QUOTES, 'UTF-8'),
+    ];
+}
+
+/**
  * Render an email template and return the HTML string.
  */
 function renderEmail(string $template, array $data = []): string
@@ -463,18 +529,28 @@ function notifyTicketCreator(PDO $db, int $ticketId, string $message, string $au
     $appUrl    = env('APP_URL', 'http://localhost:8000');
     $ticketUrl = $appUrl . '/portal/tickets/' . $ticketId;
 
+    $tpl = getEmailTpl('ticket-updated', [
+        'ticket_id' => $ticketId,
+        'subject'   => $row['subject'],
+        'message'   => $message,
+        'author'    => $authorName,
+    ]);
+
     $emailHtml = renderEmail('ticket-updated', [
-        'ticketId'   => $ticketId,
-        'subject'    => $row['subject'],
-        'message'    => $message,
-        'authorName' => $authorName,
-        'ticketUrl'  => $ticketUrl,
+        'ticketId'    => $ticketId,
+        'subject'     => $row['subject'],
+        'message'     => $message,
+        'authorName'  => $authorName,
+        'ticketUrl'   => $ticketUrl,
+        'introText'   => $tpl['intro'],
+        'buttonLabel' => $tpl['button'],
+        'footerText'  => $tpl['footer'],
     ]);
 
     sendMail(
         $row['email'],
         $row['first_name'] . ' ' . $row['last_name'],
-        '[Ticket #' . $ticketId . '] Update: ' . $row['subject'],
+        $tpl['subject'],
         $emailHtml,
         '',
         $ticketId
@@ -518,18 +594,28 @@ function notifyCcUsers(PDO $db, int $ticketId, string $message, string $authorNa
         };
         $ticketUrl = $appUrl . $prefix . '/tickets/' . $ticketId;
 
+        $tpl = getEmailTpl('ticket-updated', [
+            'ticket_id' => $ticketId,
+            'subject'   => $ticketRow['subject'],
+            'message'   => $message,
+            'author'    => $authorName,
+        ]);
+
         $emailHtml = renderEmail('ticket-updated', [
-            'ticketId'   => $ticketId,
-            'subject'    => $ticketRow['subject'],
-            'message'    => $message,
-            'authorName' => $authorName,
-            'ticketUrl'  => $ticketUrl,
+            'ticketId'    => $ticketId,
+            'subject'     => $ticketRow['subject'],
+            'message'     => $message,
+            'authorName'  => $authorName,
+            'ticketUrl'   => $ticketUrl,
+            'introText'   => $tpl['intro'],
+            'buttonLabel' => $tpl['button'],
+            'footerText'  => $tpl['footer'],
         ]);
 
         sendMail(
             $user['email'],
             $user['first_name'] . ' ' . $user['last_name'],
-            '[Ticket #' . $ticketId . '] Update: ' . $ticketRow['subject'],
+            $tpl['subject'],
             $emailHtml,
             '',
             $ticketId
@@ -562,19 +648,29 @@ function notifyTicketMerged(PDO $db, int $sourceId, int $targetId): void
     $appUrl    = env('APP_URL', 'http://localhost:8000');
     $ticketUrl = $appUrl . '/portal/tickets/' . $targetId;
 
+    $tpl = getEmailTpl('ticket-merged', [
+        'source_ticket_id' => $sourceId,
+        'source_subject'   => $src['subject'],
+        'target_ticket_id' => $targetId,
+        'target_subject'   => $tgt['subject'],
+    ]);
+
     $emailHtml = renderEmail('ticket-merged', [
         'sourceTicketId' => $sourceId,
         'sourceSubject'  => $src['subject'],
         'targetTicketId' => $targetId,
         'targetSubject'  => $tgt['subject'],
         'ticketUrl'      => $ticketUrl,
+        'introText'      => $tpl['intro'],
+        'buttonLabel'    => $tpl['button'],
+        'footerText'     => $tpl['footer'],
     ]);
 
     // Notify source ticket creator
     sendMail(
         $src['email'],
         $src['first_name'] . ' ' . $src['last_name'],
-        '[Ticket #' . $sourceId . '] Your ticket has been merged',
+        $tpl['subject'],
         $emailHtml,
         '',
         $targetId
@@ -606,12 +702,15 @@ function notifyTicketMerged(PDO $db, int $sourceId, int $targetId): void
             'targetTicketId' => $targetId,
             'targetSubject'  => $tgt['subject'],
             'ticketUrl'      => $ccTicketUrl,
+            'introText'      => $tpl['intro'],
+            'buttonLabel'    => $tpl['button'],
+            'footerText'     => $tpl['footer'],
         ]);
 
         sendMail(
             $user['email'],
             $user['first_name'] . ' ' . $user['last_name'],
-            '[Ticket #' . $sourceId . '] Your ticket has been merged',
+            $tpl['subject'],
             $ccHtml,
             '',
             $targetId

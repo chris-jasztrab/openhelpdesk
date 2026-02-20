@@ -2001,6 +2001,65 @@ $router->post('/admin/settings/test-email', function () {
 });
 
 /* ==================================================================
+ * ADMIN – Email Templates
+ * ================================================================== */
+
+$router->get('/admin/settings/email-templates', function () {
+    Auth::requireRole('admin');
+
+    $keys = [
+        'email_subject_ticket_created', 'email_intro_ticket_created', 'email_button_ticket_created',
+        'email_subject_ticket_updated', 'email_intro_ticket_updated', 'email_button_ticket_updated',
+        'email_subject_ticket_merged',  'email_intro_ticket_merged',  'email_button_ticket_merged',
+        'email_footer_text',
+    ];
+    $tplValues = [];
+    foreach ($keys as $k) {
+        $tplValues[$k] = getSetting($k);
+    }
+
+    render('admin/settings/email-templates', ['tplValues' => $tplValues]);
+});
+
+$router->post('/admin/settings/email-templates', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/email-templates');
+    }
+
+    $tab = $_POST['tab'] ?? 'ticket_created';
+
+    // Reset buttons clear settings back to default (empty = use hardcoded default)
+    if (isset($_POST['reset_template']) && in_array($_POST['reset_template'], ['ticket_created', 'ticket_updated', 'ticket_merged'], true)) {
+        $tpl = $_POST['reset_template'];
+        setSetting("email_subject_{$tpl}", '');
+        setSetting("email_intro_{$tpl}", '');
+        setSetting("email_button_{$tpl}", '');
+        flash('success', 'Email template reset to defaults.');
+        redirect('/admin/settings/email-templates?tab=' . $tpl);
+    }
+
+    if (isset($_POST['reset_footer'])) {
+        setSetting('email_footer_text', '');
+        flash('success', 'Footer text reset to default.');
+        redirect('/admin/settings/email-templates?tab=shared');
+    }
+
+    if ($tab === 'shared') {
+        setSetting('email_footer_text', trim($_POST['email_footer_text'] ?? ''));
+        flash('success', 'Footer text saved.');
+    } elseif (in_array($tab, ['ticket_created', 'ticket_updated', 'ticket_merged'], true)) {
+        setSetting("email_subject_{$tab}", trim($_POST["email_subject_{$tab}"] ?? ''));
+        setSetting("email_intro_{$tab}",   trim($_POST["email_intro_{$tab}"]   ?? ''));
+        setSetting("email_button_{$tab}",  trim($_POST["email_button_{$tab}"]  ?? ''));
+        flash('success', 'Email template saved.');
+    }
+
+    redirect('/admin/settings/email-templates?tab=' . urlencode($tab));
+});
+
+/* ==================================================================
  * ADMIN – Business Hours Settings
  * ================================================================== */
 
