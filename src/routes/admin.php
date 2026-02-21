@@ -840,11 +840,13 @@ $router->get('/admin/tickets/export', function () {
     $stmt->execute($params);
 
     $statusLabels = [
-        'open'        => 'Open',
-        'in_progress' => 'In Progress',
-        'pending'     => 'Pending',
-        'resolved'    => 'Resolved',
-        'closed'      => 'Closed',
+        'open'                   => 'Open',
+        'in_progress'            => 'In Progress',
+        'pending'                => 'Pending',
+        'waiting_on_customer'    => 'Waiting on Customer',
+        'waiting_on_third_party' => 'Waiting on Third Party',
+        'resolved'               => 'Resolved',
+        'closed'                 => 'Closed',
     ];
 
     $filename = 'tickets-export-' . date('Y-m-d') . '.csv';
@@ -1398,7 +1400,7 @@ $router->post('/admin/tickets/{id}/update', function (array $p) {
 
     // Status change
     $newStatus = $_POST['status'] ?? '';
-    $validStatuses = ['open', 'in_progress', 'pending', 'resolved', 'closed'];
+    $validStatuses = ['open', 'in_progress', 'pending', 'waiting_on_customer', 'waiting_on_third_party', 'resolved', 'closed'];
     if ($newStatus !== '' && in_array($newStatus, $validStatuses, true) && $newStatus !== $ticket['status']) {
         $oldStatus = $ticket['status'];
         $db->prepare('UPDATE tickets SET status = ? WHERE id = ?')->execute([$newStatus, $id]);
@@ -1407,10 +1409,11 @@ $router->post('/admin/tickets/{id}/update', function (array $p) {
         )->execute([$id, Auth::id(), 'status_changed', "Status changed from {$oldStatus} to {$newStatus}"]);
         $changes[] = 'status';
 
-        // SLA: pause on pending, resume when leaving pending
-        if ($newStatus === 'pending') {
+        // SLA: pause on waiting statuses, resume when leaving them
+        $pausingStatuses = ['pending', 'waiting_on_customer', 'waiting_on_third_party'];
+        if (in_array($newStatus, $pausingStatuses, true)) {
             Sla::pause($db, $id);
-        } elseif ($oldStatus === 'pending') {
+        } elseif (in_array($oldStatus, $pausingStatuses, true)) {
             Sla::resume($db, $id);
         }
     }

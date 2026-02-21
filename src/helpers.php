@@ -992,15 +992,16 @@ function runAutomations(PDO $db, int $ticketId, string $triggerEvent): void
                     break;
 
                 case 'set_status':
-                    $validStatuses = ['open', 'in_progress', 'pending', 'resolved', 'closed'];
+                    $validStatuses = ['open', 'in_progress', 'pending', 'waiting_on_customer', 'waiting_on_third_party', 'resolved', 'closed'];
                     if (!in_array($val, $validStatuses, true)) {
                         break;
                     }
                     $oldStatus = $ticket['status'];
                     $db->prepare('UPDATE tickets SET status = ? WHERE id = ?')->execute([$val, $ticketId]);
-                    if ($val === 'pending') {
+                    $pausingStatuses = ['pending', 'waiting_on_customer', 'waiting_on_third_party'];
+                    if (in_array($val, $pausingStatuses, true)) {
                         Sla::pause($db, $ticketId);
-                    } elseif ($oldStatus === 'pending') {
+                    } elseif (in_array($oldStatus, $pausingStatuses, true)) {
                         Sla::resume($db, $ticketId);
                     }
                     $db->prepare(

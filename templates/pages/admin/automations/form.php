@@ -15,11 +15,13 @@ $action = $isEdit
     : '/admin/settings/automations/create';
 
 $statusOptions = [
-    'open'        => 'Open',
-    'in_progress' => 'In Progress',
-    'pending'     => 'Pending',
-    'resolved'    => 'Resolved',
-    'closed'      => 'Closed',
+    'open'                   => 'Open',
+    'in_progress'            => 'In Progress',
+    'pending'                => 'Pending',
+    'waiting_on_customer'    => 'Waiting on Customer',
+    'waiting_on_third_party' => 'Waiting on Third Party',
+    'resolved'               => 'Resolved',
+    'closed'                 => 'Closed',
 ];
 
 // Build JSON maps for JavaScript to populate value dropdowns

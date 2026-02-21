@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS `tickets` (
     `due_date`     DATE         DEFAULT NULL,
     `type_id`      INT UNSIGNED DEFAULT NULL,
     `location_id`  INT UNSIGNED DEFAULT NULL,
-    `status`       ENUM('open','in_progress','pending','resolved','closed') NOT NULL DEFAULT 'open',
+    `status`       ENUM('open','in_progress','pending','waiting_on_customer','waiting_on_third_party','resolved','closed') NOT NULL DEFAULT 'open',
     `priority_id`  INT UNSIGNED DEFAULT NULL,
     `assigned_to`  INT UNSIGNED DEFAULT NULL,
     `group_id`     INT UNSIGNED DEFAULT NULL,
