@@ -1055,9 +1055,11 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
                         var role = v.role.charAt(0).toUpperCase() + v.role.slice(1);
                         return '<strong>' + escHtml(v.first_name + ' ' + v.last_name) + '</strong> (' + role + ')';
                     }).join(', ');
-                    var count = viewers.length === 1 ? 'another person has' : viewers.length + ' other people have';
+                    var intro = initialCheck
+                        ? 'This ticket is currently also open by:'
+                        : 'This ticket was just opened up by:';
                     document.getElementById('presenceModalBody').innerHTML =
-                        '<p class="mb-1">This ticket is currently also open by ' + count + ':</p>' +
+                        '<p class="mb-1">' + intro + '</p>' +
                         '<p class="mb-0">' + names + '</p>' +
                         '<p class="mt-3 mb-0 text-muted small">Their changes will not appear on your screen until you refresh.</p>';
                     getModal().show();
