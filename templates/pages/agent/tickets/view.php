@@ -551,6 +551,22 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
 </div>
 <?php endif; ?>
 
+<!-- Presence Warning Modal -->
+<div class="modal fade" id="presenceModal" tabindex="-1" aria-labelledby="presenceModalLabel" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning-subtle">
+                <h5 class="modal-title" id="presenceModalLabel"><i class="bi bi-people-fill me-2"></i>Ticket Already Open</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="presenceModalBody"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Dismiss</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 // Restore Back button and breadcrumb link to the previously visited ticket list URL (with filters)
 (function() {
@@ -999,4 +1015,59 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
     });
 })();
 <?php endif; ?>
+
+// Ticket presence — concurrent viewer warning
+(function() {
+    var ticketId = <?= (int) $ticket['id'] ?>;
+    var pingUrl  = '/api/tickets/' + ticketId + '/presence';
+    var leaveUrl = '/api/tickets/' + ticketId + '/presence/leave';
+    var modal    = null;
+    var knownViewerIds = new Set();
+    var initialCheck   = true;
+
+    function escHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+    function getModal() {
+        if (!modal) modal = new bootstrap.Modal(document.getElementById('presenceModal'));
+        return modal;
+    }
+
+    function ping() { fetch(pingUrl, {method: 'POST'}).catch(function(){}); }
+
+    function checkPresence() {
+        fetch(pingUrl)
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                var viewers = data.viewers || [];
+                var hasNew = initialCheck
+                    ? viewers.length > 0
+                    : viewers.some(function(v) { return !knownViewerIds.has(v.id); });
+
+                if (hasNew && viewers.length > 0) {
+                    var names = viewers.map(function(v) {
+                        var role = v.role.charAt(0).toUpperCase() + v.role.slice(1);
+                        return '<strong>' + escHtml(v.first_name + ' ' + v.last_name) + '</strong> (' + role + ')';
+                    }).join(', ');
+                    var count = viewers.length === 1 ? 'another person has' : viewers.length + ' other people have';
+                    document.getElementById('presenceModalBody').innerHTML =
+                        '<p class="mb-1">This ticket is currently also open by ' + count + ':</p>' +
+                        '<p class="mb-0">' + names + '</p>' +
+                        '<p class="mt-3 mb-0 text-muted small">Their changes will not appear on your screen until you refresh.</p>';
+                    getModal().show();
+                }
+
+                knownViewerIds = new Set(viewers.map(function(v) { return v.id; }));
+                initialCheck = false;
+            })
+            .catch(function(){});
+    }
+
+    ping();
+    checkPresence();
+    setInterval(function() { ping(); checkPresence(); }, 20000);
+
+    window.addEventListener('beforeunload', function() {
+        navigator.sendBeacon(leaveUrl);
+    });
+})();
 </script>

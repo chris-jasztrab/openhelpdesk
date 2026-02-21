@@ -80,6 +80,16 @@ CREATE TABLE IF NOT EXISTS `tickets` (
     FOREIGN KEY (`merged_into_ticket_id`) REFERENCES `tickets`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Ticket presence (concurrent viewer tracking)
+CREATE TABLE IF NOT EXISTS `ticket_presence` (
+    `ticket_id` INT UNSIGNED NOT NULL,
+    `user_id`   INT UNSIGNED NOT NULL,
+    `last_seen` DATETIME NOT NULL,
+    PRIMARY KEY (`ticket_id`, `user_id`),
+    FOREIGN KEY (`ticket_id`) REFERENCES `tickets`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`user_id`)   REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Ticket tags (hashtags)
 CREATE TABLE IF NOT EXISTS `ticket_tags` (
     `id`         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

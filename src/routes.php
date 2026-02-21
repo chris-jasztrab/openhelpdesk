@@ -203,6 +203,68 @@ $router->get('/api/mention-search', function () {
 });
 
 /* ------------------------------------------------------------------
+ * Ticket Presence (Concurrent Viewer Tracking)
+ * ------------------------------------------------------------------ */
+
+// Register / refresh presence (ping every 20s)
+$router->post('/api/tickets/{id}/presence', function (array $p) {
+    Auth::requireAuth();
+    if (!in_array(Auth::role(), ['admin', 'agent'], true)) {
+        http_response_code(403);
+        header('Content-Type: application/json');
+        echo json_encode(['error' => 'Forbidden']);
+        exit;
+    }
+    $db = Database::connect();
+    $db->prepare(
+        'INSERT INTO ticket_presence (ticket_id, user_id, last_seen) VALUES (?, ?, NOW())
+         ON DUPLICATE KEY UPDATE last_seen = NOW()'
+    )->execute([(int) $p['id'], Auth::id()]);
+    header('Content-Type: application/json');
+    echo json_encode(['ok' => true]);
+    exit;
+});
+
+// Get other active viewers of a ticket
+$router->get('/api/tickets/{id}/presence', function (array $p) {
+    Auth::requireAuth();
+    if (!in_array(Auth::role(), ['admin', 'agent'], true)) {
+        http_response_code(403);
+        header('Content-Type: application/json');
+        echo json_encode(['error' => 'Forbidden']);
+        exit;
+    }
+    $db = Database::connect();
+    // Clean up stale records (older than 45 seconds)
+    $db->prepare(
+        'DELETE FROM ticket_presence WHERE last_seen < DATE_SUB(NOW(), INTERVAL 45 SECOND)'
+    )->execute();
+    // Return other current viewers (excluding self)
+    $stmt = $db->prepare(
+        'SELECT u.id, u.first_name, u.last_name, u.role
+         FROM ticket_presence tp
+         JOIN users u ON u.id = tp.user_id
+         WHERE tp.ticket_id = ? AND tp.user_id != ?'
+    );
+    $stmt->execute([(int) $p['id'], Auth::id()]);
+    header('Content-Type: application/json');
+    echo json_encode(['viewers' => $stmt->fetchAll()]);
+    exit;
+});
+
+// Remove presence on page leave (called via sendBeacon)
+$router->post('/api/tickets/{id}/presence/leave', function (array $p) {
+    Auth::requireAuth();
+    $db = Database::connect();
+    $db->prepare(
+        'DELETE FROM ticket_presence WHERE ticket_id = ? AND user_id = ?'
+    )->execute([(int) $p['id'], Auth::id()]);
+    header('Content-Type: application/json');
+    echo json_encode(['ok' => true]);
+    exit;
+});
+
+/* ------------------------------------------------------------------
  * Global Search (JSON API)
  * ------------------------------------------------------------------ */
 $router->get('/search', function () {
