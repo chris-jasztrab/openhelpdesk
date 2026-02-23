@@ -380,6 +380,17 @@ $router->post('/login', function () {
 
     if (Auth::attempt($email, $password)) {
         session_regenerate_id(true);
+        // Check if 2FA is required before completing login
+        $uid   = Auth::id();
+        $db    = Database::connect();
+        $tfRow = $db->prepare('SELECT totp_enabled FROM users WHERE id = ?');
+        $tfRow->execute([$uid]);
+        $tf = $tfRow->fetch();
+        if ($tf && $tf['totp_enabled']) {
+            unset($_SESSION['user']); // undo session set by Auth::attempt()
+            $_SESSION['2fa_pending'] = $uid;
+            redirect('/2fa');
+        }
         logAudit('login');
         redirect('/');
     }
@@ -391,6 +402,54 @@ $router->get('/logout', function () {
     logAudit('logout');
     Auth::logout();
     redirect('/login');
+});
+
+/* ------------------------------------------------------------------
+ * Two-Factor Authentication challenge
+ * ------------------------------------------------------------------ */
+$router->get('/2fa', function () {
+    if (Auth::check()) {
+        redirect('/');
+    }
+    if (empty($_SESSION['2fa_pending'])) {
+        redirect('/login');
+    }
+    render('2fa');
+});
+
+$router->post('/2fa', function () {
+    if (Auth::check()) {
+        redirect('/');
+    }
+    $uid = $_SESSION['2fa_pending'] ?? null;
+    if (!$uid) {
+        redirect('/login');
+    }
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        render('2fa', ['error' => 'Invalid request. Please try again.']);
+    }
+
+    $code = trim($_POST['code'] ?? '');
+    $db   = Database::connect();
+    $stmt = $db->prepare('SELECT * FROM users WHERE id = ? AND totp_enabled = 1');
+    $stmt->execute([(int) $uid]);
+    $u = $stmt->fetch();
+
+    if ($u && totpVerify($u['totp_secret'], $code)) {
+        unset($_SESSION['2fa_pending']);
+        $_SESSION['user'] = [
+            'id'         => (int) $u['id'],
+            'first_name' => $u['first_name'],
+            'last_name'  => $u['last_name'],
+            'email'      => $u['email'],
+            'role'       => $u['role'],
+            'avatar'     => $u['avatar'],
+        ];
+        logAudit('login');
+        redirect('/');
+    }
+
+    render('2fa', ['error' => 'Invalid code. Please try again.']);
 });
 
 /* ------------------------------------------------------------------
@@ -502,6 +561,98 @@ $router->post('/profile', function () {
     $_SESSION['user']['last_name']  = $ln;
 
     flash('success', 'Profile updated successfully.');
+    redirect('/profile');
+});
+
+/* ------------------------------------------------------------------
+ * 2FA Setup (admin / agent only)
+ * ------------------------------------------------------------------ */
+$router->get('/profile/2fa/setup', function () {
+    Auth::requireAuth();
+    if (!in_array(Auth::role(), ['admin', 'agent'], true)) {
+        redirect('/profile');
+    }
+
+    // Generate (or reuse if already in session from a failed verify attempt)
+    if (empty($_SESSION['totp_pending_secret'])) {
+        $_SESSION['totp_pending_secret'] = totpGenerateSecret();
+    }
+    $secret = $_SESSION['totp_pending_secret'];
+
+    $db   = Database::connect();
+    $stmt = $db->prepare('SELECT email, totp_enabled FROM users WHERE id = ?');
+    $stmt->execute([Auth::id()]);
+    $u = $stmt->fetch();
+
+    if ($u['totp_enabled']) {
+        flash('info', '2FA is already enabled on your account.');
+        redirect('/profile');
+    }
+
+    $uri   = totpGetUri($secret, $u['email']);
+    $qrUrl = totpGetQrUrl($uri);
+
+    render('profile/2fa-setup', ['secret' => $secret, 'qrUrl' => $qrUrl]);
+});
+
+$router->post('/profile/2fa/setup', function () {
+    Auth::requireAuth();
+    if (!in_array(Auth::role(), ['admin', 'agent'], true)) {
+        redirect('/profile');
+    }
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/profile/2fa/setup');
+    }
+
+    $secret = $_SESSION['totp_pending_secret'] ?? '';
+    if ($secret === '') {
+        flash('error', 'Setup session expired. Please try again.');
+        redirect('/profile/2fa/setup');
+    }
+
+    $code = trim($_POST['code'] ?? '');
+    if (!totpVerify($secret, $code)) {
+        flash('error', 'Invalid code. Make sure your authenticator app is synced and try again.');
+        redirect('/profile/2fa/setup');
+    }
+
+    $db = Database::connect();
+    $db->prepare('UPDATE users SET totp_secret = ?, totp_enabled = 1 WHERE id = ?')
+       ->execute([$secret, Auth::id()]);
+
+    unset($_SESSION['totp_pending_secret']);
+    logAudit('2fa.enable');
+    flash('success', 'Two-factor authentication has been enabled.');
+    redirect('/profile');
+});
+
+$router->post('/profile/2fa/disable', function () {
+    Auth::requireAuth();
+    if (!in_array(Auth::role(), ['admin', 'agent'], true)) {
+        redirect('/profile');
+    }
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/profile');
+    }
+
+    $code = trim($_POST['code'] ?? '');
+    $db   = Database::connect();
+    $stmt = $db->prepare('SELECT totp_secret, totp_enabled FROM users WHERE id = ?');
+    $stmt->execute([Auth::id()]);
+    $u = $stmt->fetch();
+
+    if (!$u || !$u['totp_enabled'] || !totpVerify($u['totp_secret'], $code)) {
+        flash('error', 'Invalid code. 2FA was not disabled.');
+        redirect('/profile');
+    }
+
+    $db->prepare('UPDATE users SET totp_secret = NULL, totp_enabled = 0 WHERE id = ?')
+       ->execute([Auth::id()]);
+
+    logAudit('2fa.disable');
+    flash('success', 'Two-factor authentication has been disabled.');
     redirect('/profile');
 });
 

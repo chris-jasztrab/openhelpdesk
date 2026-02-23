@@ -29,6 +29,8 @@ CREATE TABLE IF NOT EXISTS `users` (
     `notify_ticket_merged`    TINYINT(1)   NOT NULL DEFAULT 1,
     `notify_escalation`       TINYINT(1)   NOT NULL DEFAULT 1,
     `notify_csat`             TINYINT(1)   NOT NULL DEFAULT 1,
+    `totp_secret`             VARCHAR(64)  NULL     DEFAULT NULL,
+    `totp_enabled`            TINYINT(1)   NOT NULL DEFAULT 0,
     `created_at`  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     `updated_at`  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (`location_id`) REFERENCES `locations`(`id`) ON DELETE SET NULL

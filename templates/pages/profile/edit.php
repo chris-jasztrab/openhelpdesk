@@ -135,5 +135,58 @@ $breadcrumbs = [
                 <i class="bi bi-check-lg me-1"></i>Save Changes
             </button>
         </form>
+
+        <?php if (in_array($user['role'], ['admin', 'agent'], true)): ?>
+        <!-- Two-Factor Authentication -->
+        <div class="card border-0 shadow-sm mt-4">
+            <div class="card-header bg-transparent fw-semibold">
+                <i class="bi bi-shield-lock me-1"></i>Two-Factor Authentication
+            </div>
+            <div class="card-body">
+                <?php if ($user['totp_enabled']): ?>
+                    <div class="d-flex align-items-center gap-3 mb-3">
+                        <span class="badge bg-success fs-6 px-3 py-2">
+                            <i class="bi bi-shield-check me-1"></i>2FA is enabled
+                        </span>
+                    </div>
+                    <p class="text-muted small mb-3">
+                        Your account is protected with a time-based one-time password (TOTP) authenticator app.
+                        To disable 2FA, enter the 6-digit code from your authenticator app below.
+                    </p>
+                    <form method="POST" action="/profile/2fa/disable">
+                        <?= csrfField() ?>
+                        <div class="d-flex gap-2 align-items-end">
+                            <div>
+                                <label for="disableCode" class="form-label small fw-semibold mb-1">
+                                    Authenticator Code
+                                </label>
+                                <input type="text" class="form-control text-center fw-bold"
+                                       id="disableCode" name="code"
+                                       placeholder="000000"
+                                       maxlength="6"
+                                       inputmode="numeric"
+                                       pattern="\d{6}"
+                                       autocomplete="one-time-code"
+                                       required
+                                       style="letter-spacing:.3em;max-width:140px;">
+                            </div>
+                            <button type="submit" class="btn btn-outline-danger"
+                                    onclick="return confirm('Are you sure you want to disable 2FA?')">
+                                <i class="bi bi-shield-x me-1"></i>Disable 2FA
+                            </button>
+                        </div>
+                    </form>
+                <?php else: ?>
+                    <p class="text-muted small mb-3">
+                        Add an extra layer of security to your account by enabling two-factor authentication.
+                        You will be prompted for a 6-digit code from your authenticator app each time you sign in.
+                    </p>
+                    <a href="/profile/2fa/setup" class="btn text-white" style="background:var(--ld-primary);">
+                        <i class="bi bi-shield-plus me-1"></i>Set Up 2FA
+                    </a>
+                <?php endif; ?>
+            </div>
+        </div>
+        <?php endif; ?>
     </div>
 </div>

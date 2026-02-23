@@ -1072,6 +1072,89 @@ function splitFullName(string $name): array
     ];
 }
 
+/* ── TOTP (RFC 6238) ──────────────────────────────────────────── */
+
+/**
+ * Generate a random 16-character base32 secret for TOTP.
+ */
+function totpGenerateSecret(int $length = 16): string
+{
+    $alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    $bytes    = random_bytes($length);
+    $secret   = '';
+    for ($i = 0; $i < $length; $i++) {
+        $secret .= $alphabet[ord($bytes[$i]) & 31];
+    }
+    return $secret;
+}
+
+/**
+ * Decode a base32 string to raw bytes.
+ */
+function totpBase32Decode(string $base32): string
+{
+    static $alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    $base32 = strtoupper(rtrim($base32, '='));
+    $binary = '';
+    foreach (str_split($base32) as $char) {
+        $pos = strpos($alphabet, $char);
+        if ($pos === false) continue;
+        $binary .= str_pad(decbin($pos), 5, '0', STR_PAD_LEFT);
+    }
+    $bytes = '';
+    foreach (str_split($binary, 8) as $chunk) {
+        if (strlen($chunk) === 8) {
+            $bytes .= chr((int) bindec($chunk));
+        }
+    }
+    return $bytes;
+}
+
+/**
+ * Verify a 6-digit TOTP code. Allows ±$window time steps for clock drift.
+ */
+function totpVerify(string $secret, string $code, int $window = 1): bool
+{
+    if (!preg_match('/^\d{6}$/', $code)) {
+        return false;
+    }
+    $rawSecret = totpBase32Decode($secret);
+    $timeStep  = (int) floor(time() / 30);
+    for ($i = -$window; $i <= $window; $i++) {
+        $msg    = pack('J', $timeStep + $i);
+        $hmac   = hash_hmac('sha1', $msg, $rawSecret, true);
+        $offset = ord($hmac[19]) & 0x0f;
+        $otp    = (
+            ((ord($hmac[$offset])     & 0x7f) << 24) |
+            ((ord($hmac[$offset + 1]) & 0xff) << 16) |
+            ((ord($hmac[$offset + 2]) & 0xff) << 8)  |
+             (ord($hmac[$offset + 3]) & 0xff)
+        ) % 1_000_000;
+        if (str_pad((string) $otp, 6, '0', STR_PAD_LEFT) === $code) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Build the otpauth:// URI for a QR code.
+ */
+function totpGetUri(string $secret, string $email): string
+{
+    $appName = rawurlencode(getSetting('branding_app_name', 'LocalDesk'));
+    $email   = rawurlencode($email);
+    return "otpauth://totp/{$appName}:{$email}?secret={$secret}&issuer={$appName}&algorithm=SHA1&digits=6&period=30";
+}
+
+/**
+ * Return a URL to a QR code image for the given otpauth:// URI.
+ */
+function totpGetQrUrl(string $uri): string
+{
+    return 'https://api.qrserver.com/v1/create-qr-code/?data=' . rawurlencode($uri) . '&size=200x200&margin=4';
+}
+
 /* ── Audit log ────────────────────────────────────────────────── */
 
 /**

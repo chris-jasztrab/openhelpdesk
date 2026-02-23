@@ -59,15 +59,27 @@ $statusLabels = [
                         <?php if ($profileUser['created_at'] ?? null): ?>
                         <span><i class="bi bi-calendar3 me-1"></i>Member since <?= date('M j, Y', strtotime($profileUser['created_at'])) ?></span>
                         <?php endif; ?>
+                        <?php if ($profileUser['totp_enabled'] ?? false): ?>
+                        <span class="text-success"><i class="bi bi-shield-check me-1"></i>2FA enabled</span>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
 
             <!-- Actions -->
-            <div class="d-flex gap-2">
+            <div class="d-flex gap-2 flex-wrap">
                 <a href="/admin/users/<?= (int)$profileUser['id'] ?>/edit" class="btn text-white" style="background:var(--ld-primary);">
                     <i class="bi bi-pencil me-1"></i>Edit User
                 </a>
+                <?php if ($profileUser['totp_enabled'] ?? false): ?>
+                <form method="POST" action="/admin/users/<?= (int)$profileUser['id'] ?>/reset-2fa" class="d-inline"
+                      onsubmit="return confirm('Reset 2FA for this user? They will need to set it up again.')">
+                    <?= csrfField() ?>
+                    <button type="submit" class="btn btn-outline-warning">
+                        <i class="bi bi-shield-x me-1"></i>Reset 2FA
+                    </button>
+                </form>
+                <?php endif; ?>
                 <button type="button" class="btn btn-outline-secondary" onclick="history.back()">
                     <i class="bi bi-arrow-left me-1"></i>Back
                 </button>

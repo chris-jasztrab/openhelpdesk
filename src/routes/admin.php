@@ -328,6 +328,23 @@ $router->post('/admin/users/{id}/delete', function (array $p) {
     redirect('/admin/users');
 });
 
+$router->post('/admin/users/{id}/reset-2fa', function (array $p) {
+    Auth::requireRole('admin');
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect("/admin/users/{$id}");
+    }
+    $db   = Database::connect();
+    $stmt = $db->prepare('SELECT CONCAT(first_name, " ", last_name, " (", email, ")") FROM users WHERE id = ?');
+    $stmt->execute([$id]);
+    $name = $stmt->fetchColumn() ?: "id={$id}";
+    $db->prepare('UPDATE users SET totp_secret = NULL, totp_enabled = 0 WHERE id = ?')->execute([$id]);
+    logAudit('2fa.admin_reset', $id, 'user', $name);
+    flash('success', '2FA has been reset for this user.');
+    redirect("/admin/users/{$id}");
+});
+
 /* ==================================================================
  * ADMIN – Location Management
  * ================================================================== */
