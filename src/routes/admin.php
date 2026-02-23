@@ -3205,6 +3205,212 @@ function buildAutomationActions(array $post): array
 }
 
 /* ==================================================================
+ * ADMIN – Settings: Escalation Rules
+ * ================================================================== */
+
+$router->get('/admin/settings/escalations', function () {
+    Auth::requireRole('admin');
+    $db = Database::connect();
+    $rules = $db->query('SELECT * FROM escalation_rules ORDER BY sort_order, id')->fetchAll();
+    render('admin/settings/escalations/index', ['rules' => $rules]);
+});
+
+$router->get('/admin/settings/escalations/create', function () {
+    Auth::requireRole('admin');
+    $db      = Database::connect();
+    $refData = loadEscalationRefData($db);
+    render('admin/settings/escalations/form', $refData);
+});
+
+$router->post('/admin/settings/escalations/create', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/escalations');
+    }
+
+    $name = trim($_POST['name'] ?? '');
+    if ($name === '') {
+        flash('error', 'Rule name is required.');
+        redirect('/admin/settings/escalations/create');
+    }
+
+    $conditions    = buildEscalationConditions($_POST);
+    $actions       = buildEscalationActions($_POST);
+    $cooldown      = max(0, (int) ($_POST['cooldown_hours'] ?? 0));
+    $isEnabled     = isset($_POST['is_enabled']) ? 1 : 0;
+    $sortOrder     = max(0, (int) ($_POST['sort_order'] ?? 0));
+
+    if (empty($actions)) {
+        flash('error', 'At least one action is required.');
+        redirect('/admin/settings/escalations/create');
+    }
+
+    $db = Database::connect();
+    $db->prepare(
+        'INSERT INTO escalation_rules (name, conditions, actions, cooldown_hours, is_enabled, sort_order)
+         VALUES (?, ?, ?, ?, ?, ?)'
+    )->execute([$name, json_encode($conditions), json_encode($actions), $cooldown, $isEnabled, $sortOrder]);
+
+    flash('success', 'Escalation rule created.');
+    redirect('/admin/settings/escalations');
+});
+
+$router->get('/admin/settings/escalations/{id}/edit', function (array $p) {
+    Auth::requireRole('admin');
+    $db = Database::connect();
+    $stmt = $db->prepare('SELECT * FROM escalation_rules WHERE id = ?');
+    $stmt->execute([(int) $p['id']]);
+    $rule = $stmt->fetch();
+    if (!$rule) {
+        flash('error', 'Rule not found.');
+        redirect('/admin/settings/escalations');
+    }
+    $refData            = loadEscalationRefData($db);
+    $refData['editing'] = $rule;
+    $refData['editing']['conditions_decoded'] = json_decode($rule['conditions'], true) ?: [];
+    $refData['editing']['actions_decoded']    = json_decode($rule['actions'],    true) ?: [];
+    render('admin/settings/escalations/form', $refData);
+});
+
+$router->post('/admin/settings/escalations/{id}/edit', function (array $p) {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/escalations');
+    }
+
+    $db = Database::connect();
+    $stmt = $db->prepare('SELECT id FROM escalation_rules WHERE id = ?');
+    $stmt->execute([(int) $p['id']]);
+    if (!$stmt->fetch()) {
+        flash('error', 'Rule not found.');
+        redirect('/admin/settings/escalations');
+    }
+
+    $name = trim($_POST['name'] ?? '');
+    if ($name === '') {
+        flash('error', 'Rule name is required.');
+        redirect('/admin/settings/escalations/' . (int) $p['id'] . '/edit');
+    }
+
+    $conditions = buildEscalationConditions($_POST);
+    $actions    = buildEscalationActions($_POST);
+    $cooldown   = max(0, (int) ($_POST['cooldown_hours'] ?? 0));
+    $isEnabled  = isset($_POST['is_enabled']) ? 1 : 0;
+    $sortOrder  = max(0, (int) ($_POST['sort_order'] ?? 0));
+
+    if (empty($actions)) {
+        flash('error', 'At least one action is required.');
+        redirect('/admin/settings/escalations/' . (int) $p['id'] . '/edit');
+    }
+
+    $db->prepare(
+        'UPDATE escalation_rules SET name = ?, conditions = ?, actions = ?, cooldown_hours = ?, is_enabled = ?, sort_order = ? WHERE id = ?'
+    )->execute([$name, json_encode($conditions), json_encode($actions), $cooldown, $isEnabled, $sortOrder, (int) $p['id']]);
+
+    flash('success', 'Escalation rule updated.');
+    redirect('/admin/settings/escalations');
+});
+
+$router->post('/admin/settings/escalations/{id}/toggle', function (array $p) {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/escalations');
+    }
+    $db = Database::connect();
+    $db->prepare('UPDATE escalation_rules SET is_enabled = NOT is_enabled WHERE id = ?')
+       ->execute([(int) $p['id']]);
+    redirect('/admin/settings/escalations');
+});
+
+$router->post('/admin/settings/escalations/{id}/delete', function (array $p) {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/escalations');
+    }
+    $db = Database::connect();
+    $db->prepare('DELETE FROM escalation_rules WHERE id = ?')->execute([(int) $p['id']]);
+    flash('success', 'Escalation rule deleted.');
+    redirect('/admin/settings/escalations');
+});
+
+$router->post('/admin/settings/escalations/run-now', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/escalations');
+    }
+    $script = ROOT_DIR . '/scripts/process-escalations.php';
+    $cmd    = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($script) . ' 2>&1';
+    $outputLines = [];
+    $returnCode  = 0;
+    exec($cmd, $outputLines, $returnCode);
+    $_SESSION['_escalation_run'] = [
+        'lines' => $outputLines,
+        'code'  => $returnCode,
+        'time'  => date('Y-m-d H:i:s'),
+    ];
+    redirect('/admin/settings/escalations');
+});
+
+/* ── Escalation helper functions ─────────────────────────────────── */
+
+function loadEscalationRefData(PDO $db): array
+{
+    return [
+        'priorities' => $db->query('SELECT id, name FROM ticket_priorities ORDER BY sort_order')->fetchAll(),
+        'groups'     => $db->query('SELECT id, name FROM groups ORDER BY name')->fetchAll(),
+        'agents'     => $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin') ORDER BY first_name")->fetchAll(),
+        'allUsers'   => $db->query("SELECT id, first_name, last_name, email FROM users ORDER BY first_name")->fetchAll(),
+    ];
+}
+
+function buildEscalationConditions(array $post): array
+{
+    $conditions = [];
+    $fields     = $post['cond_field']    ?? [];
+    $operators  = $post['cond_operator'] ?? [];
+    $values     = $post['cond_value']    ?? [];
+
+    $validFields = ['sla_state', 'hours_open', 'hours_since_update', 'hours_in_status',
+                    'is_assigned', 'priority_id', 'status', 'group_id'];
+    $noValueOps  = ['is_empty', 'is_not_empty'];
+
+    for ($i = 0, $n = count($fields); $i < $n; $i++) {
+        $f = $fields[$i]    ?? '';
+        $o = $operators[$i] ?? 'equals';
+        $v = $values[$i]    ?? '';
+        if (!in_array($f, $validFields, true)) continue;
+        if (!in_array($o, $noValueOps, true) && $v === '') continue;
+        $conditions[] = ['field' => $f, 'operator' => $o, 'value' => $v];
+    }
+    return $conditions;
+}
+
+function buildEscalationActions(array $post): array
+{
+    $actions     = [];
+    $actionTypes = $post['act_type']  ?? [];
+    $actionVals  = $post['act_value'] ?? [];
+
+    $validActions    = ['set_priority', 'set_assigned_to', 'set_group', 'set_status',
+                        'notify_user', 'notify_assigned_agent', 'add_internal_note'];
+    $noValueRequired = ['notify_assigned_agent'];
+
+    for ($i = 0, $n = count($actionTypes); $i < $n; $i++) {
+        $a = $actionTypes[$i] ?? '';
+        $v = $actionVals[$i]  ?? '';
+        if (!in_array($a, $validActions, true)) continue;
+        if (!in_array($a, $noValueRequired, true) && $v === '') continue;
+        $actions[] = ['action' => $a, 'value' => $v];
+    }
+    return $actions;
+}
+
+/* ==================================================================
  * ADMIN – Settings: Danger Zone
  * ================================================================== */
 $router->get('/admin/settings/danger-zone', function () {

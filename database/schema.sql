@@ -303,6 +303,30 @@ CREATE TABLE IF NOT EXISTS `ticket_field_values` (
     FOREIGN KEY (`field_id`)  REFERENCES `ticket_form_fields`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Escalation rules — time-driven, evaluated by cron script
+CREATE TABLE IF NOT EXISTS `escalation_rules` (
+    `id`             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `name`           VARCHAR(255) NOT NULL,
+    `conditions`     JSON         NOT NULL,
+    `actions`        JSON         NOT NULL,
+    `cooldown_hours` INT UNSIGNED NOT NULL DEFAULT 0,
+    `is_enabled`     TINYINT(1)   NOT NULL DEFAULT 1,
+    `sort_order`     INT UNSIGNED NOT NULL DEFAULT 0,
+    `created_at`     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`     TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Tracks which escalation rules have already fired per ticket (dedup / cooldown)
+CREATE TABLE IF NOT EXISTS `escalation_log` (
+    `id`        INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `rule_id`   INT UNSIGNED NOT NULL,
+    `ticket_id` INT UNSIGNED NOT NULL,
+    `fired_at`  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    KEY `idx_rule_ticket` (`rule_id`, `ticket_id`),
+    FOREIGN KEY (`rule_id`)   REFERENCES `escalation_rules`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`ticket_id`) REFERENCES `tickets`(`id`)          ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Customer Satisfaction (CSAT) surveys — one per ticket, sent on resolution
 CREATE TABLE IF NOT EXISTS `csat_surveys` (
     `id`           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

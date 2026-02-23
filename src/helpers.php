@@ -736,6 +736,252 @@ function notifyTicketMerged(PDO $db, int $sourceId, int $targetId): void
     }
 }
 
+/* ── Escalation Rules ────────────────────────────────────────── */
+
+/**
+ * Evaluate a single escalation rule against a single ticket.
+ * Returns true if ALL conditions match, false otherwise.
+ */
+function evaluateEscalationConditions(\PDO $db, array $conditions, array $ticket): bool
+{
+    foreach ($conditions as $cond) {
+        $field    = $cond['field']    ?? '';
+        $operator = $cond['operator'] ?? 'equals';
+        $value    = $cond['value']    ?? '';
+
+        switch ($field) {
+            case 'sla_state':
+                $actual = $ticket['sla_state'] ?? '';
+                if ($operator === 'equals'     && $actual !== $value) return false;
+                if ($operator === 'not_equals' && $actual === $value) return false;
+                break;
+
+            case 'hours_open':
+                $stmt = $db->prepare('SELECT TIMESTAMPDIFF(HOUR, created_at, NOW()) FROM tickets WHERE id = ?');
+                $stmt->execute([(int) $ticket['id']]);
+                $hours = (int) $stmt->fetchColumn();
+                if ($operator === 'greater_than' && $hours <= (int) $value) return false;
+                break;
+
+            case 'hours_since_update':
+                $stmt = $db->prepare('SELECT TIMESTAMPDIFF(HOUR, updated_at, NOW()) FROM tickets WHERE id = ?');
+                $stmt->execute([(int) $ticket['id']]);
+                $hours = (int) $stmt->fetchColumn();
+                if ($operator === 'greater_than' && $hours <= (int) $value) return false;
+                break;
+
+            case 'hours_in_status':
+                $stmt = $db->prepare(
+                    'SELECT TIMESTAMPDIFF(HOUR, created_at, NOW()) FROM ticket_timeline
+                     WHERE ticket_id = ? AND action = \'status_changed\'
+                     ORDER BY created_at DESC LIMIT 1'
+                );
+                $stmt->execute([(int) $ticket['id']]);
+                $lastChange = $stmt->fetchColumn();
+                // If no status change exists, measure from ticket creation
+                if ($lastChange === false) {
+                    $stmt2 = $db->prepare('SELECT TIMESTAMPDIFF(HOUR, created_at, NOW()) FROM tickets WHERE id = ?');
+                    $stmt2->execute([(int) $ticket['id']]);
+                    $lastChange = (int) $stmt2->fetchColumn();
+                }
+                if ($operator === 'greater_than' && (int) $lastChange <= (int) $value) return false;
+                break;
+
+            case 'is_assigned':
+                $assigned = !empty($ticket['assigned_to']);
+                $wantYes  = $value === 'yes';
+                if ($operator === 'equals' && $assigned !== $wantYes) return false;
+                break;
+
+            case 'priority_id':
+                $actual = (string) ($ticket['priority_id'] ?? '');
+                if ($operator === 'equals'     && $actual !== $value) return false;
+                if ($operator === 'not_equals' && $actual === $value) return false;
+                break;
+
+            case 'status':
+                $actual = $ticket['status'] ?? '';
+                if ($operator === 'equals'     && $actual !== $value) return false;
+                if ($operator === 'not_equals' && $actual === $value) return false;
+                break;
+
+            case 'group_id':
+                $actual = (string) ($ticket['group_id'] ?? '');
+                if ($operator === 'equals'        && $actual !== $value)             return false;
+                if ($operator === 'not_equals'    && $actual === $value)             return false;
+                if ($operator === 'is_empty'      && !empty($ticket['group_id']))    return false;
+                if ($operator === 'is_not_empty'  && empty($ticket['group_id']))     return false;
+                break;
+
+            default:
+                return false;
+        }
+    }
+    return true;
+}
+
+/**
+ * Execute all actions for a matched escalation rule against a ticket.
+ * Adds per-action timeline entries. Handles notifications via email + in-app.
+ */
+function runEscalationRule(\PDO $db, array $rule, array $ticket): void
+{
+    $ticketId  = (int) $ticket['id'];
+    $ruleName  = $rule['name'];
+    $actions   = is_string($rule['actions']) ? json_decode($rule['actions'], true) : $rule['actions'];
+
+    // System user ID for timeline entries: use assigned agent or NULL
+    $systemUserId = null;
+
+    $appUrl     = env('APP_URL', 'http://localhost:8000');
+    $appName    = getSetting('app_name', 'LocalDesk');
+    $brandColor = getSetting('branding_primary_color', '#4f46e5');
+
+    // Add a parent timeline entry marking the escalation fired
+    $db->prepare(
+        'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, ?, ?, 1)'
+    )->execute([$ticketId, 'escalation_triggered', "Escalation rule \"{$ruleName}\" triggered"]);
+
+    $validStatuses = ['open', 'in_progress', 'pending', 'waiting_on_customer', 'waiting_on_third_party', 'resolved', 'closed'];
+    $pausingStatuses = ['pending', 'waiting_on_customer', 'waiting_on_third_party'];
+
+    foreach ($actions as $act) {
+        $actionType = $act['action'] ?? '';
+        $actionVal  = $act['value']  ?? '';
+
+        switch ($actionType) {
+            case 'set_priority':
+                $newPriority = $actionVal !== '' ? (int) $actionVal : null;
+                $db->prepare('UPDATE tickets SET priority_id = ? WHERE id = ?')->execute([$newPriority, $ticketId]);
+                $name = 'None';
+                if ($newPriority) {
+                    $s = $db->prepare('SELECT name FROM ticket_priorities WHERE id = ?');
+                    $s->execute([$newPriority]);
+                    $name = $s->fetchColumn() ?: 'None';
+                }
+                $db->prepare('INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, ?, ?, 1)')
+                   ->execute([$ticketId, 'priority_changed', "Priority set to {$name} by escalation rule"]);
+                if ($newPriority) {
+                    \Sla::onPriorityChanged($db, $ticketId, $newPriority);
+                }
+                break;
+
+            case 'set_assigned_to':
+                $newAssigned = $actionVal !== '' ? (int) $actionVal : null;
+                $db->prepare('UPDATE tickets SET assigned_to = ? WHERE id = ?')->execute([$newAssigned, $ticketId]);
+                $agentName = 'Unassigned';
+                if ($newAssigned) {
+                    $s = $db->prepare("SELECT CONCAT(first_name, ' ', last_name) FROM users WHERE id = ?");
+                    $s->execute([$newAssigned]);
+                    $agentName = $s->fetchColumn() ?: 'Unknown';
+                }
+                $db->prepare('INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, ?, ?, 1)')
+                   ->execute([$ticketId, 'assigned', "Assigned to {$agentName} by escalation rule"]);
+                break;
+
+            case 'set_group':
+                $newGroup = $actionVal !== '' ? (int) $actionVal : null;
+                $db->prepare('UPDATE tickets SET group_id = ? WHERE id = ?')->execute([$newGroup, $ticketId]);
+                $groupName = 'None';
+                if ($newGroup) {
+                    $s = $db->prepare('SELECT name FROM groups WHERE id = ?');
+                    $s->execute([$newGroup]);
+                    $groupName = $s->fetchColumn() ?: 'None';
+                }
+                $db->prepare('INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, ?, ?, 1)')
+                   ->execute([$ticketId, 'group_changed', "Group set to {$groupName} by escalation rule"]);
+                break;
+
+            case 'set_status':
+                if (!in_array($actionVal, $validStatuses, true)) break;
+                $oldStatus = $ticket['status'];
+                $db->prepare('UPDATE tickets SET status = ? WHERE id = ?')->execute([$actionVal, $ticketId]);
+                $db->prepare('INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, ?, ?, 1)')
+                   ->execute([$ticketId, 'status_changed', "Status changed from {$oldStatus} to {$actionVal} by escalation rule"]);
+                if (in_array($actionVal, $pausingStatuses, true)) {
+                    \Sla::pause($db, $ticketId);
+                } elseif (in_array($oldStatus, $pausingStatuses, true)) {
+                    \Sla::resume($db, $ticketId);
+                }
+                break;
+
+            case 'add_internal_note':
+                $note = trim($actionVal);
+                if ($note === '') break;
+                $db->prepare('INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, ?, ?, 1)')
+                   ->execute([$ticketId, 'comment', $note]);
+                break;
+
+            case 'notify_user':
+            case 'notify_assigned_agent':
+                // Resolve the target user
+                if ($actionType === 'notify_assigned_agent') {
+                    // Re-fetch assigned_to in case a previous action changed it
+                    $s = $db->prepare('SELECT assigned_to FROM tickets WHERE id = ?');
+                    $s->execute([$ticketId]);
+                    $targetUserId = (int) $s->fetchColumn();
+                } else {
+                    $targetUserId = (int) $actionVal;
+                }
+                if ($targetUserId <= 0) break;
+
+                $s = $db->prepare('SELECT id, first_name, last_name, email, role FROM users WHERE id = ?');
+                $s->execute([$targetUserId]);
+                $targetUser = $s->fetch();
+                if (!$targetUser) break;
+
+                // Fetch ticket subject for message
+                $s = $db->prepare('SELECT subject FROM tickets WHERE id = ?');
+                $s->execute([$ticketId]);
+                $subject = $s->fetchColumn() ?: "(Ticket #{$ticketId})";
+
+                $noteText = "Escalation alert: Rule \"{$ruleName}\" was triggered on this ticket.";
+
+                // Timeline entry for the notification
+                $db->prepare('INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, ?, ?, 1)')
+                   ->execute([$ticketId, 'escalation_notification', $noteText]);
+                $tlId = (int) $db->lastInsertId();
+
+                // In-app notification (requires a valid mentioned_by user; use first admin as system sender)
+                $s = $db->prepare("SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1");
+                $s->execute();
+                $systemSenderId = (int) $s->fetchColumn();
+                if ($systemSenderId > 0) {
+                    $db->prepare('INSERT INTO notifications (user_id, ticket_id, timeline_id, mentioned_by) VALUES (?, ?, ?, ?)')
+                       ->execute([$targetUserId, $ticketId, $tlId, $systemSenderId]);
+                }
+
+                // Email notification
+                $rolePrefix = match ($targetUser['role']) {
+                    'admin' => '/admin',
+                    'agent' => '/agent',
+                    default => '/portal',
+                };
+                $ticketUrl = $appUrl . $rolePrefix . '/tickets/' . $ticketId;
+
+                $emailHtml = renderEmail('escalation', [
+                    'ticketId'   => $ticketId,
+                    'subject'    => $subject,
+                    'ruleName'   => $ruleName,
+                    'firstName'  => $targetUser['first_name'],
+                    'ticketUrl'  => $ticketUrl,
+                    'brandColor' => $brandColor,
+                    'appName'    => $appName,
+                    'footerText' => 'This is an automated escalation alert from ' . $appName . '.',
+                ]);
+                sendMail(
+                    $targetUser['email'],
+                    $targetUser['first_name'] . ' ' . $targetUser['last_name'],
+                    "Escalation Alert: [Ticket #{$ticketId}] {$subject}",
+                    $emailHtml,
+                    '',
+                    $ticketId
+                );
+                break;
+        }
+    }
+}
+
 /* ── CSAT Survey ──────────────────────────────────────────────── */
 
 /**

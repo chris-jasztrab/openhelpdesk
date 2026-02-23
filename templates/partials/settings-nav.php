@@ -10,6 +10,7 @@ $settingsNav = [
     ['label' => 'Groups',         'url' => '/admin/groups',                  'icon' => 'bi-people-fill'],
     ['label' => 'Branding',       'url' => '/admin/settings/branding',       'icon' => 'bi-palette'],
     ['label' => 'Automations',    'url' => '/admin/settings/automations',    'icon' => 'bi-lightning'],
+    ['label' => 'Escalations',   'url' => '/admin/settings/escalations',   'icon' => 'bi-alarm'],
     ['label' => 'Import Tickets', 'url' => '/admin/settings/import',         'icon' => 'bi-cloud-upload'],
     ['label' => 'Import KB',      'url' => '/admin/settings/import-kb',      'icon' => 'bi-book'],
     ['label' => 'CSAT Surveys',  'url' => '/admin/settings/csat',           'icon' => 'bi-star'],
