@@ -205,7 +205,7 @@ $router->get('/admin/users/{id}', function (array $p) {
     $tStmt->execute([$uid]);
     $openTickets = $tStmt->fetchAll();
 
-    render('admin/users/view', ['user' => $user, 'openTickets' => $openTickets]);
+    render('admin/users/view', ['profileUser' => $user, 'openTickets' => $openTickets]);
 });
 
 $router->get('/admin/users/{id}/edit', function (array $p) {

@@ -1,21 +1,21 @@
 <?php
 $layout       = 'app';
-$pageTitle    = $user['first_name'] . ' ' . $user['last_name'];
+$pageTitle    = $profileUser['first_name'] . ' ' . $profileUser['last_name'];
 $sidebarItems = adminSidebar('users');
 $breadcrumbs  = [
     ['label' => 'Admin', 'url' => '/admin'],
     ['label' => 'Users',  'url' => '/admin/users'],
-    ['label' => $user['first_name'] . ' ' . $user['last_name']],
+    ['label' => $profileUser['first_name'] . ' ' . $profileUser['last_name']],
 ];
 
 $badgeColors = ['admin' => 'danger', 'agent' => 'primary', 'user' => 'secondary'];
-$bc = $badgeColors[$user['role']] ?? 'secondary';
+$bc = $badgeColors[$profileUser['role']] ?? 'secondary';
 
 $statusLabels = [
-    'open'                   => ['Open',               'primary'],
-    'in_progress'            => ['In Progress',        'warning'],
-    'pending'                => ['Pending',            'secondary'],
-    'waiting_on_customer'    => ['Waiting on Customer','info'],
+    'open'                   => ['Open',                'primary'],
+    'in_progress'            => ['In Progress',         'warning'],
+    'pending'                => ['Pending',             'secondary'],
+    'waiting_on_customer'    => ['Waiting on Customer', 'info'],
     'waiting_on_third_party' => ['Waiting on 3rd Party','info'],
 ];
 ?>
@@ -26,44 +26,46 @@ $statusLabels = [
         <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
             <div class="d-flex align-items-center gap-4">
                 <!-- Avatar -->
-                <?php if ($user['avatar']): ?>
-                    <img src="/uploads/avatars/<?= e($user['avatar']) ?>"
+                <?php if ($profileUser['avatar'] ?? null): ?>
+                    <img src="/uploads/avatars/<?= e($profileUser['avatar']) ?>"
                          class="rounded-circle" width="72" height="72" style="object-fit:cover;">
                 <?php else: ?>
                     <div class="rounded-circle bg-primary bg-opacity-10 text-primary d-flex align-items-center justify-content-center fw-bold"
                          style="width:72px;height:72px;font-size:1.5rem;">
-                        <?= strtoupper(mb_substr($user['first_name'], 0, 1) . mb_substr($user['last_name'], 0, 1)) ?>
+                        <?= strtoupper(mb_substr($profileUser['first_name'], 0, 1) . mb_substr($profileUser['last_name'], 0, 1)) ?>
                     </div>
                 <?php endif; ?>
 
                 <!-- Details -->
                 <div>
                     <h3 class="fw-bold mb-1">
-                        <?= e($user['first_name'] . ' ' . $user['last_name']) ?>
+                        <?= e($profileUser['first_name'] . ' ' . $profileUser['last_name']) ?>
                         <span class="badge bg-<?= $bc ?> ms-2 align-middle" style="font-size:.65rem;">
-                            <?= e(ucfirst($user['role'])) ?>
+                            <?= e(ucfirst($profileUser['role'])) ?>
                         </span>
                     </h3>
                     <div class="text-muted small mb-1">
-                        <i class="bi bi-envelope me-1"></i><?= e($user['email']) ?>
+                        <i class="bi bi-envelope me-1"></i><?= e($profileUser['email']) ?>
                     </div>
-                    <?php if ($user['work_phone']): ?>
+                    <?php if ($profileUser['work_phone'] ?? null): ?>
                     <div class="text-muted small mb-1">
-                        <i class="bi bi-telephone me-1"></i><?= e($user['work_phone']) ?>
+                        <i class="bi bi-telephone me-1"></i><?= e($profileUser['work_phone']) ?>
                     </div>
                     <?php endif; ?>
                     <div class="d-flex flex-wrap gap-3 mt-2 small text-muted">
-                        <?php if ($user['location_name']): ?>
-                        <span><i class="bi bi-geo-alt me-1"></i><?= e($user['location_name']) ?></span>
+                        <?php if ($profileUser['location_name'] ?? null): ?>
+                        <span><i class="bi bi-geo-alt me-1"></i><?= e($profileUser['location_name']) ?></span>
                         <?php endif; ?>
-                        <span><i class="bi bi-calendar3 me-1"></i>Member since <?= date('M j, Y', strtotime($user['created_at'])) ?></span>
+                        <?php if ($profileUser['created_at'] ?? null): ?>
+                        <span><i class="bi bi-calendar3 me-1"></i>Member since <?= date('M j, Y', strtotime($profileUser['created_at'])) ?></span>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
 
             <!-- Actions -->
             <div class="d-flex gap-2">
-                <a href="/admin/users/<?= $user['id'] ?>/edit" class="btn text-white" style="background:var(--ld-primary);">
+                <a href="/admin/users/<?= (int)$profileUser['id'] ?>/edit" class="btn text-white" style="background:var(--ld-primary);">
                     <i class="bi bi-pencil me-1"></i>Edit User
                 </a>
                 <a href="/admin/users" class="btn btn-outline-secondary">
@@ -106,14 +108,14 @@ $statusLabels = [
                     <?php foreach ($openTickets as $t):
                         [$statusLabel, $statusColor] = $statusLabels[$t['status']] ?? [ucfirst(str_replace('_', ' ', $t['status'])), 'secondary'];
                     ?>
-                    <tr style="cursor:pointer;" onclick="window.location='/admin/tickets/<?= $t['id'] ?>'">
-                        <td class="text-muted small fw-semibold">#<?= $t['id'] ?></td>
+                    <tr style="cursor:pointer;" onclick="window.location='/admin/tickets/<?= (int)$t['id'] ?>'">
+                        <td class="text-muted small fw-semibold">#<?= (int)$t['id'] ?></td>
                         <td class="fw-semibold"><?= e($t['subject']) ?></td>
                         <td>
                             <span class="badge bg-<?= $statusColor ?>"><?= $statusLabel ?></span>
                         </td>
                         <td>
-                            <?php if ($t['priority_name']): ?>
+                            <?php if ($t['priority_name'] ?? null): ?>
                                 <span class="badge" style="background:<?= e($t['priority_color'] ?: '#6c757d') ?>;">
                                     <?= e($t['priority_name']) ?>
                                 </span>
