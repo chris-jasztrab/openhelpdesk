@@ -149,6 +149,7 @@ $breadcrumbs  = [
         ['icon' => 'bi-graph-up',             'title' => 'Ticket Volume',      'desc' => 'Ticket creation trends over time by priority, type, and location.',      'url' => '/admin/reports/ticket-volume'],
         ['icon' => 'bi-arrow-repeat',         'title' => 'Ticket Lifecycle',   'desc' => 'Average time spent in each status stage and transition patterns.',       'url' => '/admin/reports/lifecycle'],
         ['icon' => 'bi-geo-alt',              'title' => 'By Location',        'desc' => 'Ticket volume and resolution rates compared across locations.',          'url' => '/admin/reports/location'],
+        ['icon' => 'bi-star',                 'title' => 'Satisfaction',       'desc' => 'CSAT survey results — response rates, average ratings, and feedback.',     'url' => '/admin/reports/csat'],
     ];
     foreach ($reportCards as $rc): ?>
     <div class="col-md-4">

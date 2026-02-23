@@ -484,6 +484,110 @@ $router->post('/profile', function () {
 });
 
 /* ------------------------------------------------------------------
+ * CSAT Survey (public — no login required)
+ * ------------------------------------------------------------------ */
+
+$router->get('/survey/{token}', function (array $p) {
+    $token = preg_replace('/[^a-f0-9]/', '', $p['token'] ?? '');
+    if (strlen($token) !== 64) {
+        http_response_code(404);
+        render('errors/404');
+        return;
+    }
+
+    $db   = Database::connect();
+    $stmt = $db->prepare(
+        'SELECT cs.*, t.subject, t.id AS ticket_id
+         FROM csat_surveys cs
+         JOIN tickets t ON cs.ticket_id = t.id
+         WHERE cs.token = ?'
+    );
+    $stmt->execute([$token]);
+    $survey = $stmt->fetch();
+
+    if (!$survey) {
+        http_response_code(404);
+        render('errors/404');
+        return;
+    }
+
+    $preselect = (int) ($_GET['r'] ?? 0);
+    if ($preselect < 1 || $preselect > 5) {
+        $preselect = 0;
+    }
+
+    render('survey/form', [
+        'survey'      => $survey,
+        'preselect'   => $preselect,
+        'alreadyDone' => $survey['responded_at'] !== null,
+        'appName'     => getSetting('app_name', 'LocalDesk'),
+        'brandColor'  => getSetting('branding_primary_color', '#4f46e5'),
+        'error'       => $_GET['error'] ?? '',
+    ]);
+});
+
+$router->post('/survey/{token}', function (array $p) {
+    $token = preg_replace('/[^a-f0-9]/', '', $p['token'] ?? '');
+    if (strlen($token) !== 64) {
+        http_response_code(404);
+        render('errors/404');
+        return;
+    }
+
+    $db   = Database::connect();
+    $stmt = $db->prepare('SELECT * FROM csat_surveys WHERE token = ?');
+    $stmt->execute([$token]);
+    $survey = $stmt->fetch();
+
+    if (!$survey || $survey['responded_at'] !== null) {
+        redirect('/survey/' . $token);
+        return;
+    }
+
+    $rating = (int) ($_POST['rating'] ?? 0);
+    if ($rating < 1 || $rating > 5) {
+        redirect('/survey/' . $token . '?error=rating');
+        return;
+    }
+
+    $comment = trim($_POST['comment'] ?? '');
+    if (mb_strlen($comment) > 2000) {
+        $comment = mb_substr($comment, 0, 2000);
+    }
+
+    $db->prepare(
+        'UPDATE csat_surveys SET rating = ?, comment = ?, responded_at = NOW() WHERE token = ?'
+    )->execute([$rating, $comment !== '' ? $comment : null, $token]);
+
+    redirect('/survey/' . $token . '/thanks');
+});
+
+$router->get('/survey/{token}/thanks', function (array $p) {
+    $token = preg_replace('/[^a-f0-9]/', '', $p['token'] ?? '');
+
+    $db   = Database::connect();
+    $stmt = $db->prepare(
+        'SELECT cs.rating, t.subject, t.id AS ticket_id
+         FROM csat_surveys cs JOIN tickets t ON cs.ticket_id = t.id
+         WHERE cs.token = ?'
+    );
+    $stmt->execute([$token]);
+    $survey = $stmt->fetch();
+
+    if (!$survey) {
+        http_response_code(404);
+        render('errors/404');
+        return;
+    }
+
+    render('survey/thanks', [
+        'survey'     => $survey,
+        'appName'    => getSetting('app_name', 'LocalDesk'),
+        'brandColor' => getSetting('branding_primary_color', '#4f46e5'),
+    ]);
+});
+
+/* ------------------------------------------------------------------
  * Portal (all authenticated users)
  * ------------------------------------------------------------------ */
 $router->get('/portal', function () {

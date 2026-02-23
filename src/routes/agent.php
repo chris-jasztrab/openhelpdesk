@@ -717,6 +717,12 @@ $router->post('/agent/tickets/{id}/update', function (array $p) {
         )->execute([$id, Auth::id(), 'status_changed', "Status changed from {$oldStatus} to {$newStatus}"]);
         $changes[] = 'status';
 
+        // CSAT survey trigger
+        $csatTrigger = getSetting('csat_trigger_status', 'resolved');
+        if ($newStatus === $csatTrigger) {
+            sendCsatSurvey($db, $id);
+        }
+
         $pausingStatuses = ['pending', 'waiting_on_customer', 'waiting_on_third_party'];
         if (in_array($newStatus, $pausingStatuses, true)) {
             Sla::pause($db, $id);

@@ -736,6 +736,67 @@ function notifyTicketMerged(PDO $db, int $sourceId, int $targetId): void
     }
 }
 
+/* ── CSAT Survey ──────────────────────────────────────────────── */
+
+/**
+ * Create a CSAT survey record and send the rating email to the ticket creator.
+ * Silently skips if CSAT is disabled, email not configured, or survey already sent.
+ */
+function sendCsatSurvey(\PDO $db, int $ticketId): void
+{
+    if (getSetting('csat_enabled') !== '1') {
+        return;
+    }
+
+    // Don't send twice for the same ticket
+    $exists = $db->prepare('SELECT id FROM csat_surveys WHERE ticket_id = ?');
+    $exists->execute([$ticketId]);
+    if ($exists->fetchColumn()) {
+        return;
+    }
+
+    // Fetch ticket subject + creator details
+    $stmt = $db->prepare(
+        'SELECT t.subject, u.id AS user_id, u.email, u.first_name, u.last_name
+         FROM tickets t
+         JOIN users u ON t.created_by = u.id
+         WHERE t.id = ?'
+    );
+    $stmt->execute([$ticketId]);
+    $row = $stmt->fetch();
+    if (!$row || empty($row['email'])) {
+        return;
+    }
+
+    $token = bin2hex(random_bytes(32));
+    $db->prepare('INSERT INTO csat_surveys (ticket_id, user_id, token) VALUES (?, ?, ?)')
+       ->execute([$ticketId, (int) $row['user_id'], $token]);
+
+    $appUrl     = env('APP_URL', 'http://localhost:8000');
+    $surveyUrl  = $appUrl . '/survey/' . $token;
+    $brandColor = getSetting('branding_primary_color', '#4f46e5');
+    $appName    = getSetting('app_name', 'LocalDesk');
+
+    $emailHtml = renderEmail('csat-survey', [
+        'ticketId'   => $ticketId,
+        'subject'    => $row['subject'],
+        'firstName'  => $row['first_name'],
+        'surveyUrl'  => $surveyUrl,
+        'brandColor' => $brandColor,
+        'appName'    => $appName,
+        'footerText' => 'This is an automated message from ' . $appName . '. Please do not reply to this email.',
+    ]);
+
+    sendMail(
+        $row['email'],
+        $row['first_name'] . ' ' . $row['last_name'],
+        'How did we do? — [Ticket #' . $ticketId . '] ' . $row['subject'],
+        $emailHtml,
+        '',
+        $ticketId
+    );
+}
+
 /* ── Name helpers ─────────────────────────────────────────────── */
 
 /**

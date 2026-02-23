@@ -8,6 +8,7 @@ $reportsNav = [
     ['label' => 'Ticket Volume',      'url' => '/admin/reports/ticket-volume',     'icon' => 'bi-graph-up'],
     ['label' => 'Ticket Lifecycle',   'url' => '/admin/reports/lifecycle',         'icon' => 'bi-arrow-repeat'],
     ['label' => 'By Location',        'url' => '/admin/reports/location',          'icon' => 'bi-geo-alt'],
+    ['label' => 'Satisfaction',       'url' => '/admin/reports/csat',              'icon' => 'bi-star'],
 ];
 $currentPath = currentPath();
 ?>

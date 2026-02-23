@@ -302,3 +302,19 @@ CREATE TABLE IF NOT EXISTS `ticket_field_values` (
     FOREIGN KEY (`ticket_id`) REFERENCES `tickets`(`id`) ON DELETE CASCADE,
     FOREIGN KEY (`field_id`)  REFERENCES `ticket_form_fields`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Customer Satisfaction (CSAT) surveys — one per ticket, sent on resolution
+CREATE TABLE IF NOT EXISTS `csat_surveys` (
+    `id`           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `ticket_id`    INT UNSIGNED NOT NULL,
+    `user_id`      INT UNSIGNED NOT NULL,
+    `token`        VARCHAR(64)  NOT NULL,
+    `rating`       TINYINT UNSIGNED DEFAULT NULL,
+    `comment`      TEXT DEFAULT NULL,
+    `sent_at`      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `responded_at` TIMESTAMP NULL DEFAULT NULL,
+    UNIQUE KEY `uq_csat_ticket` (`ticket_id`),
+    UNIQUE KEY `uq_csat_token`  (`token`),
+    FOREIGN KEY (`ticket_id`) REFERENCES `tickets`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`user_id`)   REFERENCES `users`(`id`)   ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

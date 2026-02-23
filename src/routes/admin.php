@@ -3825,6 +3825,92 @@ $router->get('/admin/reports/location', function () {
     render('admin/reports/location', compact('from', 'to', 'locations'));
 });
 
+/* ── CSAT Satisfaction Report ─────────────────────────────────────── */
+
+$router->get('/admin/reports/csat', function () {
+    Auth::requireRole('admin');
+    $db = Database::connect();
+    [$from, $to] = reportDateRange();
+    $toEnd = $to . ' 23:59:59';
+
+    $stmt = $db->prepare('SELECT COUNT(*) FROM csat_surveys WHERE sent_at BETWEEN ? AND ?');
+    $stmt->execute([$from, $toEnd]);
+    $totalSent = (int) $stmt->fetchColumn();
+
+    $stmt = $db->prepare('SELECT COUNT(*) FROM csat_surveys WHERE sent_at BETWEEN ? AND ? AND responded_at IS NOT NULL');
+    $stmt->execute([$from, $toEnd]);
+    $totalResponded = (int) $stmt->fetchColumn();
+
+    $responseRate = $totalSent > 0 ? round($totalResponded / $totalSent * 100) : 0;
+
+    $stmt = $db->prepare('SELECT AVG(rating) FROM csat_surveys WHERE sent_at BETWEEN ? AND ? AND rating IS NOT NULL');
+    $stmt->execute([$from, $toEnd]);
+    $avgRating = round((float) $stmt->fetchColumn(), 1);
+
+    // Distribution: count per star rating
+    $stmt = $db->prepare(
+        'SELECT rating, COUNT(*) AS cnt
+         FROM csat_surveys
+         WHERE sent_at BETWEEN ? AND ? AND rating IS NOT NULL
+         GROUP BY rating ORDER BY rating'
+    );
+    $stmt->execute([$from, $toEnd]);
+    $rawDist = $stmt->fetchAll();
+    $distribution = array_fill(1, 5, 0);
+    foreach ($rawDist as $row) {
+        $distribution[(int) $row['rating']] = (int) $row['cnt'];
+    }
+
+    // Responses table
+    $stmt = $db->prepare(
+        "SELECT cs.rating, cs.comment, cs.responded_at,
+                cs.ticket_id, t.subject,
+                CONCAT(u.first_name, ' ', u.last_name) AS user_name
+         FROM csat_surveys cs
+         JOIN tickets t ON cs.ticket_id = t.id
+         JOIN users u   ON cs.user_id   = u.id
+         WHERE cs.sent_at BETWEEN ? AND ? AND cs.responded_at IS NOT NULL
+         ORDER BY cs.responded_at DESC
+         LIMIT 200"
+    );
+    $stmt->execute([$from, $toEnd]);
+    $responses = $stmt->fetchAll();
+
+    render('admin/reports/csat', compact(
+        'from', 'to', 'totalSent', 'totalResponded', 'responseRate',
+        'avgRating', 'distribution', 'responses'
+    ));
+});
+
+/* ==================================================================
+ * ADMIN – CSAT Settings
+ * ================================================================== */
+
+$router->get('/admin/settings/csat', function () {
+    Auth::requireRole('admin');
+    $settings = [
+        'csat_enabled'        => getSetting('csat_enabled', '0'),
+        'csat_trigger_status' => getSetting('csat_trigger_status', 'resolved'),
+    ];
+    render('admin/settings/csat', compact('settings'));
+});
+
+$router->post('/admin/settings/csat', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/csat');
+    }
+
+    setSetting('csat_enabled', isset($_POST['csat_enabled']) ? '1' : '0');
+    $trigger = in_array($_POST['csat_trigger_status'] ?? '', ['resolved', 'closed'], true)
+        ? $_POST['csat_trigger_status'] : 'resolved';
+    setSetting('csat_trigger_status', $trigger);
+
+    flash('success', 'CSAT settings saved.');
+    redirect('/admin/settings/csat');
+});
+
 /* ==================================================================
  * ADMIN – Workflows: Ticket Fields Builder
  * ================================================================== */
