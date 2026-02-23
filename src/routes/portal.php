@@ -139,6 +139,16 @@ $router->get('/portal/tickets/create', function () {
         }
     }
 
+    // Shared ticket templates for the template picker
+    $sharedTemplates = $db->query(
+        'SELECT t.*, tp.name AS type_name, pri.name AS priority_name
+         FROM ticket_templates t
+         LEFT JOIN ticket_types tp ON t.type_id = tp.id
+         LEFT JOIN ticket_priorities pri ON t.priority_id = pri.id
+         WHERE t.is_shared = 1
+         ORDER BY t.name'
+    )->fetchAll();
+
     render('portal/tickets/create', [
         'types'            => $types,
         'locations'        => $locations,
@@ -148,6 +158,7 @@ $router->get('/portal/tickets/create', function () {
         'userLocationName' => $userLocationName,
         'customFields'     => $customFields,
         'fieldOptions'     => $fieldOptions,
+        'sharedTemplates'  => $sharedTemplates,
     ]);
 });
 

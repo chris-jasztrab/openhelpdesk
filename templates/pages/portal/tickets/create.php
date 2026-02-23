@@ -15,6 +15,61 @@ $breadcrumbs  = [
     </a>
 </div>
 
+<?php if (!empty($sharedTemplates)): ?>
+<?php
+$tplData = [];
+foreach ($sharedTemplates as $t) {
+    $tplData[$t['id']] = [
+        'subject'     => $t['subject'],
+        'body'        => $t['body'],
+        'type_id'     => $t['type_id'],
+        'priority_id' => $t['priority_id'],
+    ];
+}
+?>
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body py-3">
+        <label for="portalTemplateSelect" class="form-label fw-semibold small mb-1">
+            <i class="bi bi-collection me-1 text-muted"></i>Start from a Template <span class="text-muted fw-normal">(optional)</span>
+        </label>
+        <select id="portalTemplateSelect" class="form-select">
+            <option value="">— Select a template to pre-fill the form —</option>
+            <?php foreach ($sharedTemplates as $t): ?>
+                <option value="<?= (int)$t['id'] ?>">
+                    <?= e($t['name']) ?>
+                    <?= $t['type_name'] ? '— ' . e($t['type_name']) : '' ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
+        <div id="templateUsedBadge" class="mt-2" style="display:none;">
+            <span class="badge bg-info text-dark">
+                <i class="bi bi-collection me-1"></i><span id="templateUsedName"></span>
+                applied — you can still edit any field below.
+            </span>
+        </div>
+    </div>
+</div>
+<script>
+const PORTAL_TEMPLATES = <?= json_encode($tplData, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+const PORTAL_TEMPLATE_NAMES = <?= json_encode(array_column($sharedTemplates, 'name', 'id'), JSON_HEX_TAG) ?>;
+document.getElementById('portalTemplateSelect').addEventListener('change', function () {
+    const tpl = PORTAL_TEMPLATES[this.value];
+    if (!tpl) { document.getElementById('templateUsedBadge').style.display = 'none'; return; }
+    if (tpl.subject)     document.getElementById('subject').value     = tpl.subject;
+    if (tpl.body)        document.getElementById('description').value = tpl.body;
+    if (tpl.type_id)     document.getElementById('type_id').value     = tpl.type_id;
+    if (tpl.priority_id) {
+        const priSel = document.getElementById('priority_id');
+        if (priSel) priSel.value = tpl.priority_id;
+    }
+    document.getElementById('templateUsedName').textContent = PORTAL_TEMPLATE_NAMES[this.value] || '';
+    document.getElementById('templateUsedBadge').style.display = '';
+    // Scroll to form
+    document.getElementById('subject').scrollIntoView({ behavior: 'smooth', block: 'center' });
+});
+</script>
+<?php endif; ?>
+
 <div class="card border-0 shadow-sm">
     <div class="card-body p-4">
         <form method="POST" action="/portal/tickets/create" enctype="multipart/form-data">

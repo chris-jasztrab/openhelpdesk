@@ -143,7 +143,7 @@ $breadcrumbs = [
                 <i class="bi bi-shield-lock me-1"></i>Two-Factor Authentication
             </div>
             <div class="card-body">
-                <?php if ($user['totp_enabled']): ?>
+                <?php if ($user['totp_enabled'] ?? false): ?>
                     <div class="d-flex align-items-center gap-3 mb-3">
                         <span class="badge bg-success fs-6 px-3 py-2">
                             <i class="bi bi-shield-check me-1"></i>2FA is enabled

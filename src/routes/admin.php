@@ -709,6 +709,141 @@ $router->post('/admin/groups/{id}/delete', function (array $p) {
 });
 
 /* ==================================================================
+ * ADMIN – Ticket Templates
+ * ================================================================== */
+
+$router->get('/admin/ticket-templates', function () {
+    Auth::requireRole('admin', 'agent');
+    $db = Database::connect();
+    $templates = $db->query(
+        "SELECT t.*,
+                CONCAT(u.first_name, ' ', u.last_name) AS creator_name,
+                tp.name  AS type_name,
+                pri.name AS priority_name
+         FROM ticket_templates t
+         LEFT JOIN users             u   ON t.created_by  = u.id
+         LEFT JOIN ticket_types      tp  ON t.type_id     = tp.id
+         LEFT JOIN ticket_priorities pri ON t.priority_id = pri.id
+         ORDER BY t.name"
+    )->fetchAll();
+    render('admin/ticket-templates/index', ['templates' => $templates]);
+});
+
+$router->get('/admin/ticket-templates/create', function () {
+    Auth::requireRole('admin', 'agent');
+    $db         = Database::connect();
+    $types      = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
+    $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
+    render('admin/ticket-templates/form', ['types' => $types, 'priorities' => $priorities]);
+});
+
+$router->post('/admin/ticket-templates/create', function () {
+    Auth::requireRole('admin', 'agent');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/ticket-templates/create');
+    }
+    $name     = trim($_POST['name'] ?? '');
+    $desc     = trim($_POST['description'] ?? '');
+    $subject  = trim($_POST['subject'] ?? '');
+    $body     = trim($_POST['body'] ?? '');
+    $typeId   = !empty($_POST['type_id'])     ? (int) $_POST['type_id']     : null;
+    $priId    = !empty($_POST['priority_id']) ? (int) $_POST['priority_id'] : null;
+    $isShared = !empty($_POST['is_shared'])   ? 1 : 0;
+
+    if ($name === '') {
+        flash('error', 'Template name is required.');
+        flashInput($_POST);
+        redirect('/admin/ticket-templates/create');
+    }
+
+    $db = Database::connect();
+    $db->prepare(
+        'INSERT INTO ticket_templates (name, description, subject, body, type_id, priority_id, is_shared, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    )->execute([$name, $desc ?: null, $subject, $body, $typeId, $priId, $isShared, Auth::id()]);
+
+    flash('success', 'Template created.');
+    redirect('/admin/ticket-templates');
+});
+
+$router->get('/admin/ticket-templates/{id}/edit', function (array $p) {
+    Auth::requireRole('admin', 'agent');
+    $db   = Database::connect();
+    $tpl  = $db->prepare('SELECT * FROM ticket_templates WHERE id = ?');
+    $tpl->execute([(int) $p['id']]);
+    $editing = $tpl->fetch();
+    if (!$editing) {
+        flash('error', 'Template not found.');
+        redirect('/admin/ticket-templates');
+    }
+    // Only creator or admin may edit
+    if (Auth::role() !== 'admin' && $editing['created_by'] !== Auth::id()) {
+        flash('error', 'You can only edit your own templates.');
+        redirect('/admin/ticket-templates');
+    }
+    $types      = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
+    $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
+    render('admin/ticket-templates/form', ['editing' => $editing, 'types' => $types, 'priorities' => $priorities]);
+});
+
+$router->post('/admin/ticket-templates/{id}/edit', function (array $p) {
+    Auth::requireRole('admin', 'agent');
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect("/admin/ticket-templates/{$id}/edit");
+    }
+    $db  = Database::connect();
+    $tpl = $db->prepare('SELECT * FROM ticket_templates WHERE id = ?');
+    $tpl->execute([$id]);
+    $existing = $tpl->fetch();
+    if (!$existing || (Auth::role() !== 'admin' && $existing['created_by'] !== Auth::id())) {
+        flash('error', 'Not found or insufficient permissions.');
+        redirect('/admin/ticket-templates');
+    }
+    $name     = trim($_POST['name'] ?? '');
+    $desc     = trim($_POST['description'] ?? '');
+    $subject  = trim($_POST['subject'] ?? '');
+    $body     = trim($_POST['body'] ?? '');
+    $typeId   = !empty($_POST['type_id'])     ? (int) $_POST['type_id']     : null;
+    $priId    = !empty($_POST['priority_id']) ? (int) $_POST['priority_id'] : null;
+    $isShared = !empty($_POST['is_shared'])   ? 1 : 0;
+
+    if ($name === '') {
+        flash('error', 'Template name is required.');
+        flashInput($_POST);
+        redirect("/admin/ticket-templates/{$id}/edit");
+    }
+    $db->prepare(
+        'UPDATE ticket_templates SET name=?, description=?, subject=?, body=?, type_id=?, priority_id=?, is_shared=? WHERE id=?'
+    )->execute([$name, $desc ?: null, $subject, $body, $typeId, $priId, $isShared, $id]);
+
+    flash('success', 'Template updated.');
+    redirect('/admin/ticket-templates');
+});
+
+$router->post('/admin/ticket-templates/{id}/delete', function (array $p) {
+    Auth::requireRole('admin', 'agent');
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/ticket-templates');
+    }
+    $db  = Database::connect();
+    $tpl = $db->prepare('SELECT created_by FROM ticket_templates WHERE id = ?');
+    $tpl->execute([$id]);
+    $existing = $tpl->fetch();
+    if (!$existing || (Auth::role() !== 'admin' && $existing['created_by'] !== Auth::id())) {
+        flash('error', 'Not found or insufficient permissions.');
+        redirect('/admin/ticket-templates');
+    }
+    $db->prepare('DELETE FROM ticket_templates WHERE id = ?')->execute([$id]);
+    flash('success', 'Template deleted.');
+    redirect('/admin/ticket-templates');
+});
+
+/* ==================================================================
  * ADMIN – Ticket Viewing
  * ================================================================== */
 
@@ -1123,6 +1258,102 @@ $router->get('/admin/tickets/search', function () {
     header('Content-Type: application/json');
     echo json_encode($stmt->fetchAll());
     exit;
+});
+
+$router->get('/admin/tickets/create', function () {
+    Auth::requireRole('admin', 'agent');
+    $db         = Database::connect();
+    $types      = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
+    $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
+    $locations  = $db->query('SELECT * FROM locations ORDER BY name')->fetchAll();
+    $groups     = $db->query('SELECT * FROM `groups` ORDER BY sort_order, name')->fetchAll();
+    $agents     = $db->query(
+        "SELECT id, first_name, last_name, email FROM users
+         WHERE role IN ('admin','agent') ORDER BY first_name, last_name"
+    )->fetchAll();
+    $templates  = $db->query(
+        'SELECT * FROM ticket_templates ORDER BY name'
+    )->fetchAll();
+    render('admin/tickets/create', [
+        'types'      => $types,
+        'priorities' => $priorities,
+        'locations'  => $locations,
+        'groups'     => $groups,
+        'agents'     => $agents,
+        'templates'  => $templates,
+        'isAgent'    => false,
+    ]);
+});
+
+$router->post('/admin/tickets/create', function () {
+    Auth::requireRole('admin', 'agent');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/tickets/create');
+    }
+
+    $subject    = trim($_POST['subject'] ?? '');
+    $desc       = trim($_POST['description'] ?? '');
+    $typeId     = !empty($_POST['type_id'])      ? (int) $_POST['type_id']      : null;
+    $priId      = !empty($_POST['priority_id'])  ? (int) $_POST['priority_id']  : null;
+    $locationId = !empty($_POST['location_id'])  ? (int) $_POST['location_id']  : null;
+    $assignedTo = !empty($_POST['assigned_to'])  ? (int) $_POST['assigned_to']  : null;
+    $groupId    = !empty($_POST['group_id'])      ? (int) $_POST['group_id']     : null;
+    $status     = $_POST['status'] ?? 'open';
+    $dueDate    = trim($_POST['due_date'] ?? '') ?: null;
+    $tagNames   = $_POST['tags'] ?? [];
+    // Admin can create on behalf of another user
+    $onBehalf   = !empty($_POST['on_behalf_of_id']) ? (int) $_POST['on_behalf_of_id'] : null;
+    $createdBy  = (Auth::role() === 'admin' && $onBehalf) ? $onBehalf : Auth::id();
+
+    $validStatuses = ['open','in_progress','pending','waiting_on_customer','waiting_on_third_party','resolved','closed'];
+    if (!in_array($status, $validStatuses, true)) {
+        $status = 'open';
+    }
+
+    if ($subject === '' || $desc === '') {
+        flashInput($_POST);
+        flash('error', 'Subject and description are required.');
+        $redirectBase = Auth::role() === 'agent' ? '/agent' : '/admin';
+        redirect("{$redirectBase}/tickets/create");
+    }
+
+    $db = Database::connect();
+    $db->prepare(
+        'INSERT INTO tickets (subject, description, created_by, type_id, location_id, status, priority_id, assigned_to, group_id, due_date)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    )->execute([$subject, $desc, $createdBy, $typeId, $locationId, $status, $priId, $assignedTo, $groupId, $dueDate]);
+    $ticketId = (int) $db->lastInsertId();
+
+    // Tags
+    if (!empty($tagNames)) {
+        $findTag   = $db->prepare('SELECT id FROM ticket_tags WHERE name = ?');
+        $createTag = $db->prepare('INSERT INTO ticket_tags (name) VALUES (?)');
+        $mapStmt   = $db->prepare('INSERT INTO ticket_tag_map (ticket_id, tag_id) VALUES (?, ?)');
+        foreach ($tagNames as $rawName) {
+            $name = trim(preg_replace('/[^a-zA-Z0-9_\-\s]/', '', strtolower($rawName)));
+            if ($name === '') continue;
+            $findTag->execute([$name]);
+            $tagId = $findTag->fetchColumn();
+            if (!$tagId) {
+                $createTag->execute([$name]);
+                $tagId = (int) $db->lastInsertId();
+            }
+            $mapStmt->execute([$ticketId, (int) $tagId]);
+        }
+    }
+
+    // Timeline
+    $db->prepare(
+        'INSERT INTO ticket_timeline (ticket_id, user_id, action, details) VALUES (?, ?, ?, ?)'
+    )->execute([$ticketId, Auth::id(), 'created', 'Ticket created by ' . Auth::fullName() . '.']);
+
+    // Automations
+    runAutomations($db, $ticketId, 'ticket_created');
+
+    flash('success', 'Ticket #' . $ticketId . ' created.');
+    $redirectBase = Auth::role() === 'agent' ? '/agent' : '/admin';
+    redirect("{$redirectBase}/tickets/{$ticketId}");
 });
 
 $router->get('/admin/tickets/{id}', function (array $p) {

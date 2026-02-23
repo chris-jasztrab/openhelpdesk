@@ -17,7 +17,15 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
 ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="fw-bold mb-0">Tickets</h2>
-    <span class="badge bg-secondary fs-6"><?= $totalTickets ?><?= $hasFilters ? ' filtered' : ' total' ?></span>
+    <div class="d-flex align-items-center gap-2">
+        <span class="badge bg-secondary fs-6"><?= $totalTickets ?><?= $hasFilters ? ' filtered' : ' total' ?></span>
+        <a href="/admin/ticket-templates" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-collection me-1"></i>Templates
+        </a>
+        <a href="/agent/tickets/create" class="btn btn-sm text-white" style="background:var(--ld-primary);">
+            <i class="bi bi-plus-lg me-1"></i>New Ticket
+        </a>
+    </div>
 </div>
 
 <?php if (!empty($groupRestricted)): ?>

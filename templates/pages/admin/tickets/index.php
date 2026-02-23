@@ -23,6 +23,12 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
         <a href="/admin/tickets/export<?= !empty($exportParams) ? '?' . http_build_query($exportParams) : '' ?>" class="btn btn-sm btn-outline-secondary">
             <i class="bi bi-download me-1"></i>Export CSV
         </a>
+        <a href="/admin/ticket-templates" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-collection me-1"></i>Templates
+        </a>
+        <a href="/admin/tickets/create" class="btn btn-sm text-white" style="background:var(--ld-primary);">
+            <i class="bi bi-plus-lg me-1"></i>New Ticket
+        </a>
     </div>
 </div>
 

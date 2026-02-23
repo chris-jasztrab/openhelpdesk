@@ -373,6 +373,30 @@ $router->get('/agent/tickets/search', function () {
     exit;
 });
 
+$router->get('/agent/tickets/create', function () {
+    Auth::requireRole('agent', 'admin');
+    $db         = Database::connect();
+    $types      = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
+    $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
+    $locations  = $db->query('SELECT * FROM locations ORDER BY name')->fetchAll();
+    $groups     = $db->query('SELECT * FROM `groups` ORDER BY sort_order, name')->fetchAll();
+    $agents     = $db->query(
+        "SELECT id, first_name, last_name, email FROM users
+         WHERE role IN ('admin','agent') ORDER BY first_name, last_name"
+    )->fetchAll();
+    $templates  = $db->query('SELECT * FROM ticket_templates ORDER BY name')->fetchAll();
+    render('admin/tickets/create', [
+        'types'      => $types,
+        'priorities' => $priorities,
+        'locations'  => $locations,
+        'groups'     => $groups,
+        'agents'     => $agents,
+        'templates'  => $templates,
+        'isAgent'    => true,
+        'formAction' => '/admin/tickets/create',
+    ]);
+});
+
 $router->get('/agent/tickets/{id}', function (array $p) {
     Auth::requireRole('agent', 'admin');
     $db = Database::connect();
