@@ -1072,6 +1072,32 @@ function splitFullName(string $name): array
     ];
 }
 
+/* ── Audit log ────────────────────────────────────────────────── */
+
+/**
+ * Record an admin audit event. Silently swallows all errors so that
+ * a logging failure never breaks the main request.
+ */
+function logAudit(string $action, ?int $targetId = null, ?string $targetType = null, ?string $detail = null): void
+{
+    try {
+        $db = Database::connect();
+        $db->prepare(
+            'INSERT INTO audit_log (user_id, action, target_type, target_id, detail, ip_address)
+             VALUES (?, ?, ?, ?, ?, ?)'
+        )->execute([
+            Auth::id(),
+            $action,
+            $targetType,
+            $targetId,
+            $detail,
+            $_SERVER['REMOTE_ADDR'] ?? null,
+        ]);
+    } catch (\Throwable $e) {
+        // Never let audit logging break the application
+    }
+}
+
 /* ── Sidebar helpers ──────────────────────────────────────────── */
 
 function adminSidebar(string $active = ''): array
@@ -1084,6 +1110,7 @@ function adminSidebar(string $active = ''): array
         ['icon' => 'bi-diagram-3',       'label' => 'Workflows',    'url' => '/admin/workflows/ticket-fields', 'key' => 'workflows'],
         ['icon' => 'bi-sliders',         'label' => 'Settings',     'url' => '/admin/settings', 'key' => 'settings'],
         ['icon' => 'bi-bar-chart',       'label' => 'Reports',    'url' => '/admin/reports', 'key' => 'reports'],
+        ['icon' => 'bi-shield-check',    'label' => 'Audit Log',  'url' => '/admin/audit-log', 'key' => 'audit-log'],
         ['icon' => 'bi-question-circle', 'label' => 'Docs',       'url' => '/admin/docs',    'key' => 'docs'],
     ]);
 }

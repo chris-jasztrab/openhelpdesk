@@ -380,6 +380,7 @@ $router->post('/login', function () {
 
     if (Auth::attempt($email, $password)) {
         session_regenerate_id(true);
+        logAudit('login');
         redirect('/');
     }
 
@@ -387,6 +388,7 @@ $router->post('/login', function () {
 });
 
 $router->get('/logout', function () {
+    logAudit('logout');
     Auth::logout();
     redirect('/login');
 });

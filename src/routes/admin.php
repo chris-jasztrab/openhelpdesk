@@ -160,6 +160,8 @@ $router->post('/admin/users/create', function () {
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $stmt->execute([$fn, $ln, $email, password_hash($password, PASSWORD_DEFAULT), $role, $avatar, $phone, $locId]);
+        $newId = (int) $db->lastInsertId();
+        logAudit('user.create', $newId, 'user', "{$fn} {$ln} ({$email}), role={$role}");
         flash('success', 'User created successfully.');
     } catch (PDOException $e) {
         flash('error', str_contains($e->getMessage(), 'Duplicate entry')
@@ -268,6 +270,7 @@ $router->post('/admin/users/{id}/edit', function (array $p) {
             );
             $stmt->execute([$fn, $ln, $email, $role, $avatar, $phone, $locId, $id]);
         }
+        logAudit('user.update', $id, 'user', "{$fn} {$ln} ({$email}), role={$role}");
         flash('success', 'User updated successfully.');
     } catch (PDOException $e) {
         flash('error', str_contains($e->getMessage(), 'Duplicate entry')
@@ -316,7 +319,11 @@ $router->post('/admin/users/{id}/delete', function (array $p) {
     if ($file && file_exists(ROOT_DIR . '/public/uploads/avatars/' . $file)) {
         unlink(ROOT_DIR . '/public/uploads/avatars/' . $file);
     }
+    $nameStmt = $db->prepare('SELECT CONCAT(first_name, " ", last_name, " (", email, ")") FROM users WHERE id = ?');
+    $nameStmt->execute([$id]);
+    $deletedName = $nameStmt->fetchColumn() ?: "id={$id}";
     $db->prepare('DELETE FROM users WHERE id = ?')->execute([$id]);
+    logAudit('user.delete', $id, 'user', $deletedName);
     flash('success', 'User deleted.');
     redirect('/admin/users');
 });
@@ -5051,6 +5058,94 @@ $router->post('/admin/settings/backup/delete', function () {
         flash('success', 'Backup deleted.');
     }
     redirect('/admin/settings/backup');
+});
+
+/* ==================================================================
+ * Audit Log
+ * ================================================================== */
+
+$router->get('/admin/audit-log', function () {
+    Auth::requireRole('admin');
+    $db = Database::connect();
+
+    // Filters
+    $filterUser   = isset($_GET['user_id'])  ? (int) $_GET['user_id']  : null;
+    $filterAction = trim($_GET['action']     ?? '');
+    $filterFrom   = trim($_GET['from']       ?? '');
+    $filterTo     = trim($_GET['to']         ?? '');
+    $page         = max(1, (int) ($_GET['page'] ?? 1));
+    $perPage      = 50;
+    $offset       = ($page - 1) * $perPage;
+
+    // Build WHERE clause
+    $where  = [];
+    $params = [];
+
+    if ($filterUser) {
+        $where[]  = 'al.user_id = ?';
+        $params[] = $filterUser;
+    }
+    if ($filterAction !== '') {
+        $where[]  = 'al.action = ?';
+        $params[] = $filterAction;
+    }
+    if ($filterFrom !== '') {
+        $where[]  = 'al.created_at >= ?';
+        $params[] = $filterFrom . ' 00:00:00';
+    }
+    if ($filterTo !== '') {
+        $where[]  = 'al.created_at <= ?';
+        $params[] = $filterTo . ' 23:59:59';
+    }
+
+    $whereSQL = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
+
+    // Total count
+    $countStmt = $db->prepare("SELECT COUNT(*) FROM audit_log al {$whereSQL}");
+    $countStmt->execute($params);
+    $total     = (int) $countStmt->fetchColumn();
+    $totalPages = (int) ceil($total / $perPage);
+
+    // Rows
+    $rowsStmt = $db->prepare(
+        "SELECT al.*,
+                CONCAT(u.first_name, ' ', u.last_name) AS actor_name
+         FROM audit_log al
+         LEFT JOIN users u ON al.user_id = u.id
+         {$whereSQL}
+         ORDER BY al.created_at DESC
+         LIMIT {$perPage} OFFSET {$offset}"
+    );
+    $rowsStmt->execute($params);
+    $entries = $rowsStmt->fetchAll();
+
+    // List of users for filter dropdown (those who have audit entries)
+    $actorList = $db->query(
+        "SELECT DISTINCT al.user_id,
+                CONCAT(u.first_name, ' ', u.last_name) AS name
+         FROM audit_log al
+         JOIN users u ON al.user_id = u.id
+         ORDER BY name"
+    )->fetchAll();
+
+    // Distinct action types for filter dropdown
+    $actionList = $db->query(
+        "SELECT DISTINCT action FROM audit_log ORDER BY action"
+    )->fetchAll(\PDO::FETCH_COLUMN);
+
+    render('admin/audit-log/index', [
+        'entries'      => $entries,
+        'actorList'    => $actorList,
+        'actionList'   => $actionList,
+        'filterUser'   => $filterUser,
+        'filterAction' => $filterAction,
+        'filterFrom'   => $filterFrom,
+        'filterTo'     => $filterTo,
+        'total'        => $total,
+        'page'         => $page,
+        'totalPages'   => $totalPages,
+        'perPage'      => $perPage,
+    ]);
 });
 
 /* ==================================================================

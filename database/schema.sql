@@ -390,3 +390,19 @@ CREATE TABLE IF NOT EXISTS `kb_article_revisions` (
     FOREIGN KEY (`article_id`) REFERENCES `kb_articles`(`id`) ON DELETE CASCADE,
     FOREIGN KEY (`edited_by`)  REFERENCES `users`(`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Admin audit log
+CREATE TABLE IF NOT EXISTS `audit_log` (
+    `id`          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `user_id`     INT UNSIGNED NULL DEFAULT NULL,
+    `action`      VARCHAR(100) NOT NULL,
+    `target_type` VARCHAR(50)  NULL DEFAULT NULL,
+    `target_id`   INT UNSIGNED NULL DEFAULT NULL,
+    `detail`      TEXT         NULL DEFAULT NULL,
+    `ip_address`  VARCHAR(45)  NULL DEFAULT NULL,
+    `created_at`  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    KEY `idx_audit_user`   (`user_id`),
+    KEY `idx_audit_action` (`action`),
+    KEY `idx_audit_created`(`created_at`),
+    FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
