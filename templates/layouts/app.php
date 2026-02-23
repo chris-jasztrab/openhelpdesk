@@ -168,7 +168,7 @@
         /* Filter slide-out panel */
         .filter-panel {
             position: fixed;
-            left: var(--ld-sidebar-width);
+            left: 0;
             top: var(--ld-navbar-height);
             bottom: 0;
             width: 280px;
@@ -180,7 +180,7 @@
             transform: translateX(-100%);
             transition: transform .25s ease;
         }
-        .filter-panel.open { transform: translateX(0); }
+        .filter-panel.open { transform: translateX(var(--ld-sidebar-width)); }
         .filter-panel-header {
             padding: .875rem 1rem;
             border-bottom: 1px solid #e2e8f0;
