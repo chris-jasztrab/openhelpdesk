@@ -19,6 +19,32 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
     <h2 class="fw-bold mb-0">All Tickets</h2>
     <div class="d-flex align-items-center gap-2">
         <span class="badge bg-secondary fs-6"><?= $totalTickets ?><?= $hasFilters ? ' filtered' : ' total' ?></span>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="filterPanelBtn" onclick="filterPanelToggle()">
+            <i class="bi bi-funnel me-1"></i>Filters
+            <?php if ($hasFilters): ?><span class="badge bg-primary rounded-pill ms-1"><?= count($hasFilters) ?></span><?php endif; ?>
+        </button>
+        <div class="dropdown">
+            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                <i class="bi bi-layout-three-columns me-1"></i>Columns
+            </button>
+            <div class="dropdown-menu dropdown-menu-end p-3" style="min-width:200px;">
+                <form method="POST" action="/admin/tickets/columns">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="_redirect" value="<?= e($currentUrl) ?>">
+                    <h6 class="dropdown-header px-0 pt-0">Visible Columns</h6>
+                    <?php foreach ($allColumns as $colKey => $colLabel): ?>
+                    <div class="form-check mb-1">
+                        <input class="form-check-input" type="checkbox" name="columns[]"
+                               value="<?= $colKey ?>" id="col_<?= $colKey ?>"
+                               <?= in_array($colKey, $visibleColumns) ? 'checked' : '' ?>>
+                        <label class="form-check-label small" for="col_<?= $colKey ?>"><?= e($colLabel) ?></label>
+                    </div>
+                    <?php endforeach; ?>
+                    <hr class="my-2">
+                    <button type="submit" class="btn btn-sm text-white w-100" style="background:var(--ld-primary);">Apply</button>
+                </form>
+            </div>
+        </div>
         <?php $exportParams = array_filter($filters, fn($v) => $v !== ''); if (!empty($sort)) { $exportParams['sort'] = $sort; $exportParams['dir'] = $dir; } ?>
         <a href="/admin/tickets/export<?= !empty($exportParams) ? '?' . http_build_query($exportParams) : '' ?>" class="btn btn-sm btn-outline-secondary">
             <i class="bi bi-download me-1"></i>Export CSV
@@ -32,17 +58,24 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
     </div>
 </div>
 
-<!-- Filter Bar -->
-<div class="card border-0 shadow-sm mb-3">
-    <div class="card-body py-3">
-        <form method="GET" action="/admin/tickets" class="row g-2 align-items-end">
-            <div class="col-md">
-                <label class="form-label small text-muted mb-1">Search</label>
+<!-- Filter Panel Backdrop -->
+<div class="filter-panel-backdrop" id="filterPanelBackdrop" onclick="filterPanelClose()"></div>
+
+<!-- Filter Panel -->
+<div class="filter-panel" id="filterPanel">
+    <div class="filter-panel-header">
+        <span class="fw-semibold"><i class="bi bi-funnel me-1"></i>Filters</span>
+        <button type="button" class="btn-close" onclick="filterPanelClose()" aria-label="Close"></button>
+    </div>
+    <div class="filter-panel-body">
+        <form method="GET" action="/admin/tickets">
+            <div class="mb-3">
+                <label class="form-label small fw-semibold mb-1">Search</label>
                 <input type="text" class="form-control form-control-sm" name="q"
                        value="<?= e($filters['q']) ?>" placeholder="Search subject...">
             </div>
-            <div class="col-md-auto" style="min-width:130px;">
-                <label class="form-label small text-muted mb-1">Status</label>
+            <div class="mb-3">
+                <label class="form-label small fw-semibold mb-1">Status</label>
                 <select class="form-select form-select-sm" name="status">
                     <option value="">All Statuses</option>
                     <?php foreach ($statusLabels as $val => $label): ?>
@@ -50,8 +83,8 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div class="col-md-auto" style="min-width:120px;">
-                <label class="form-label small text-muted mb-1">Priority</label>
+            <div class="mb-3">
+                <label class="form-label small fw-semibold mb-1">Priority</label>
                 <select class="form-select form-select-sm" name="priority">
                     <option value="">All Priorities</option>
                     <?php foreach ($priorities as $p): ?>
@@ -59,8 +92,8 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div class="col-md-auto" style="min-width:130px;">
-                <label class="form-label small text-muted mb-1">Type</label>
+            <div class="mb-3">
+                <label class="form-label small fw-semibold mb-1">Type</label>
                 <select class="form-select form-select-sm" name="type">
                     <option value="">All Types</option>
                     <?php foreach ($types as $tp): ?>
@@ -68,8 +101,8 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div class="col-md-auto" style="min-width:130px;">
-                <label class="form-label small text-muted mb-1">Location</label>
+            <div class="mb-3">
+                <label class="form-label small fw-semibold mb-1">Location</label>
                 <select class="form-select form-select-sm" name="location">
                     <option value="">All Locations</option>
                     <?php foreach ($locations as $loc): ?>
@@ -77,8 +110,8 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div class="col-md-auto" style="min-width:140px;">
-                <label class="form-label small text-muted mb-1">Agent</label>
+            <div class="mb-3">
+                <label class="form-label small fw-semibold mb-1">Agent</label>
                 <select class="form-select form-select-sm" name="agent">
                     <option value="">All Agents</option>
                     <option value="unassigned" <?= $filters['agent'] === 'unassigned' ? 'selected' : '' ?>>Unassigned</option>
@@ -87,8 +120,8 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div class="col-md-auto" style="min-width:130px;">
-                <label class="form-label small text-muted mb-1">Group</label>
+            <div class="mb-3">
+                <label class="form-label small fw-semibold mb-1">Group</label>
                 <select class="form-select form-select-sm" name="group">
                     <option value="">All Groups</option>
                     <option value="none" <?= $filters['group'] === 'none' ? 'selected' : '' ?>>No Group</option>
@@ -97,127 +130,106 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div class="col-md-auto" style="min-width:130px;">
-                <label class="form-label small text-muted mb-1">From</label>
-                <input type="date" class="form-control form-control-sm" name="date_from"
-                       value="<?= e($filters['date_from'] ?? '') ?>">
+            <div class="row g-2 mb-3">
+                <div class="col-6">
+                    <label class="form-label small fw-semibold mb-1">From</label>
+                    <input type="date" class="form-control form-control-sm" name="date_from"
+                           value="<?= e($filters['date_from'] ?? '') ?>">
+                </div>
+                <div class="col-6">
+                    <label class="form-label small fw-semibold mb-1">To</label>
+                    <input type="date" class="form-control form-control-sm" name="date_to"
+                           value="<?= e($filters['date_to'] ?? '') ?>">
+                </div>
             </div>
-            <div class="col-md-auto" style="min-width:130px;">
-                <label class="form-label small text-muted mb-1">To</label>
-                <input type="date" class="form-control form-control-sm" name="date_to"
-                       value="<?= e($filters['date_to'] ?? '') ?>">
-            </div>
-            <div class="col-md-auto d-flex gap-1">
-                <button type="submit" class="btn btn-sm text-white" style="background:var(--ld-primary);">
-                    <i class="bi bi-funnel me-1"></i>Filter
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-sm text-white flex-grow-1" style="background:var(--ld-primary);">
+                    <i class="bi bi-funnel me-1"></i>Apply
                 </button>
-                <?php if ($hasFilters): ?>
-                <a href="/admin/tickets?reset=1" class="btn btn-sm btn-outline-secondary" title="Clear filters">
-                    <i class="bi bi-x-lg"></i>
+                <a href="/admin/tickets?reset=1" class="btn btn-sm btn-outline-secondary" title="Clear all filters">
+                    <i class="bi bi-x-lg me-1"></i>Clear
                 </a>
-                <?php endif; ?>
             </div>
         </form>
-    </div>
-</div>
 
-<!-- Saved Filters & Column Chooser -->
-<div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
-    <span class="text-muted small"><i class="bi bi-bookmark me-1"></i>Saved:</span>
-    <?php foreach ($savedFilters as $sf):
-        $sfData  = json_decode($sf['filters'], true) ?: [];
-        $sfUrl   = '/admin/tickets' . ($sfData ? '?' . http_build_query($sfData) : '');
-        $isOwner = ((int) $sf['user_id'] === Auth::id());
-        // Check if this saved filter matches the current filters
-        $isActive = true;
-        foreach (['status','priority','type','location','agent','group','q'] as $fk) {
-            $saved   = (string) ($sfData[$fk] ?? '');
-            $current = (string) ($filters[$fk] ?? '');
-            if ($saved !== $current) { $isActive = false; break; }
-        }
-    ?>
-    <div class="btn-group btn-group-sm">
-        <a href="<?= e($sfUrl) ?>"
-           class="btn <?= $isActive ? 'text-white' : 'btn-outline-secondary' ?>"
-           <?= $isActive ? 'style="background:var(--ld-primary);"' : '' ?>
-           title="<?= $isOwner ? ($sf['is_default'] ? 'Default filter' : '') : 'Shared by ' . e($sf['owner_name']) ?>">
-            <?php if ($sf['is_default'] && $isOwner): ?>
-                <i class="bi bi-star-fill me-1 text-warning" title="Your default filter"></i>
-            <?php elseif ($sf['is_shared'] && !$isOwner): ?>
-                <i class="bi bi-people-fill me-1" title="Shared by <?= e($sf['owner_name']) ?>"></i>
-            <?php elseif ($sf['is_shared'] && $isOwner): ?>
-                <i class="bi bi-share me-1" title="Shared"></i>
-            <?php endif; ?>
-            <?= e($sf['name']) ?>
-        </a>
-        <?php if ($isOwner): ?>
-        <button type="button" class="btn <?= $isActive ? 'text-white border-start' : 'btn-outline-secondary' ?> dropdown-toggle dropdown-toggle-split"
-                <?= $isActive ? 'style="background:#4338ca;"' : '' ?>
-                data-bs-toggle="dropdown" aria-expanded="false">
-            <span class="visually-hidden">Options</span>
-        </button>
-        <ul class="dropdown-menu dropdown-menu-end">
-            <li>
-                <form method="POST" action="/admin/tickets/filters/<?= $sf['id'] ?>/toggle-default" class="d-inline">
-                    <?= csrfField() ?>
-                    <button type="submit" class="dropdown-item">
-                        <i class="bi bi-star<?= $sf['is_default'] ? '-fill text-warning' : '' ?> me-2"></i>
-                        <?= $sf['is_default'] ? 'Remove Default' : 'Set as Default' ?>
-                    </button>
-                </form>
-            </li>
-            <li>
-                <form method="POST" action="/admin/tickets/filters/<?= $sf['id'] ?>/toggle-share" class="d-inline">
-                    <?= csrfField() ?>
-                    <button type="submit" class="dropdown-item">
-                        <i class="bi bi-<?= $sf['is_shared'] ? 'lock-fill' : 'people' ?> me-2"></i>
-                        <?= $sf['is_shared'] ? 'Make Private' : 'Share with Team' ?>
-                    </button>
-                </form>
-            </li>
-            <li><hr class="dropdown-divider"></li>
-            <li>
-                <form method="POST" action="/admin/tickets/filters/<?= $sf['id'] ?>/delete"
-                      onsubmit="return confirm('Delete this saved filter?')">
-                    <?= csrfField() ?>
-                    <button type="submit" class="dropdown-item text-danger">
-                        <i class="bi bi-trash me-2"></i>Delete
-                    </button>
-                </form>
-            </li>
-        </ul>
-        <?php endif; ?>
-    </div>
-    <?php endforeach; ?>
-
-    <?php if ($hasFilters): ?>
-    <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#saveFilterModal">
-        <i class="bi bi-bookmark-plus me-1"></i>Save Current Filter
-    </button>
-    <?php endif; ?>
-
-    <!-- Column Chooser -->
-    <div class="dropdown ms-auto">
-        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
-            <i class="bi bi-layout-three-columns me-1"></i>Columns
-        </button>
-        <div class="dropdown-menu dropdown-menu-end p-3" style="min-width:200px;">
-            <form method="POST" action="/admin/tickets/columns">
-                <?= csrfField() ?>
-                <input type="hidden" name="_redirect" value="<?= e($currentUrl) ?>">
-                <h6 class="dropdown-header px-0 pt-0">Visible Columns</h6>
-                <?php foreach ($allColumns as $colKey => $colLabel): ?>
-                <div class="form-check mb-1">
-                    <input class="form-check-input" type="checkbox" name="columns[]"
-                           value="<?= $colKey ?>" id="col_<?= $colKey ?>"
-                           <?= in_array($colKey, $visibleColumns) ? 'checked' : '' ?>>
-                    <label class="form-check-label small" for="col_<?= $colKey ?>"><?= e($colLabel) ?></label>
-                </div>
-                <?php endforeach; ?>
-                <hr class="my-2">
-                <button type="submit" class="btn btn-sm text-white w-100" style="background:var(--ld-primary);">Apply</button>
-            </form>
+        <!-- Saved Filters -->
+        <hr class="my-3">
+        <div class="small fw-semibold mb-2"><i class="bi bi-bookmark me-1"></i>Saved Filters</div>
+        <?php if (empty($savedFilters)): ?>
+        <p class="text-muted small">No saved filters yet.</p>
+        <?php else: ?>
+        <div class="d-flex flex-column gap-1 mb-2">
+            <?php foreach ($savedFilters as $sf):
+                $sfData  = json_decode($sf['filters'], true) ?: [];
+                $sfUrl   = '/admin/tickets' . ($sfData ? '?' . http_build_query($sfData) : '');
+                $isOwner = ((int) $sf['user_id'] === Auth::id());
+                $isActive = true;
+                foreach (['status','priority','type','location','agent','group','q'] as $fk) {
+                    $saved   = (string) ($sfData[$fk] ?? '');
+                    $current = (string) ($filters[$fk] ?? '');
+                    if ($saved !== $current) { $isActive = false; break; }
+                }
+            ?>
+            <div class="btn-group btn-group-sm">
+                <a href="<?= e($sfUrl) ?>"
+                   class="btn text-start <?= $isActive ? 'text-white' : 'btn-outline-secondary' ?>"
+                   style="<?= $isActive ? 'background:var(--ld-primary);' : '' ?>overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+                   title="<?= $isOwner ? ($sf['is_default'] ? 'Default filter' : '') : 'Shared by ' . e($sf['owner_name']) ?>">
+                    <?php if ($sf['is_default'] && $isOwner): ?>
+                        <i class="bi bi-star-fill me-1 text-warning"></i>
+                    <?php elseif ($sf['is_shared'] && !$isOwner): ?>
+                        <i class="bi bi-people-fill me-1"></i>
+                    <?php elseif ($sf['is_shared'] && $isOwner): ?>
+                        <i class="bi bi-share me-1"></i>
+                    <?php endif; ?>
+                    <?= e($sf['name']) ?>
+                </a>
+                <?php if ($isOwner): ?>
+                <button type="button" class="btn <?= $isActive ? 'text-white border-start' : 'btn-outline-secondary' ?> dropdown-toggle dropdown-toggle-split"
+                        <?= $isActive ? 'style="background:#4338ca;"' : '' ?>
+                        data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="visually-hidden">Options</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li>
+                        <form method="POST" action="/admin/tickets/filters/<?= $sf['id'] ?>/toggle-default" class="d-inline">
+                            <?= csrfField() ?>
+                            <button type="submit" class="dropdown-item">
+                                <i class="bi bi-star<?= $sf['is_default'] ? '-fill text-warning' : '' ?> me-2"></i>
+                                <?= $sf['is_default'] ? 'Remove Default' : 'Set as Default' ?>
+                            </button>
+                        </form>
+                    </li>
+                    <li>
+                        <form method="POST" action="/admin/tickets/filters/<?= $sf['id'] ?>/toggle-share" class="d-inline">
+                            <?= csrfField() ?>
+                            <button type="submit" class="dropdown-item">
+                                <i class="bi bi-<?= $sf['is_shared'] ? 'lock-fill' : 'people' ?> me-2"></i>
+                                <?= $sf['is_shared'] ? 'Make Private' : 'Share with Team' ?>
+                            </button>
+                        </form>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <form method="POST" action="/admin/tickets/filters/<?= $sf['id'] ?>/delete"
+                              onsubmit="return confirm('Delete this saved filter?')">
+                            <?= csrfField() ?>
+                            <button type="submit" class="dropdown-item text-danger">
+                                <i class="bi bi-trash me-2"></i>Delete
+                            </button>
+                        </form>
+                    </li>
+                </ul>
+                <?php endif; ?>
+            </div>
+            <?php endforeach; ?>
         </div>
+        <?php endif; ?>
+        <?php if ($hasFilters): ?>
+        <button type="button" class="btn btn-sm btn-outline-primary w-100 mt-1" data-bs-toggle="modal" data-bs-target="#saveFilterModal">
+            <i class="bi bi-bookmark-plus me-1"></i>Save Current Filter
+        </button>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -375,7 +387,26 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
     </div>
 </div>
 
-<script>sessionStorage.setItem('adminTicketListUrl', window.location.href);</script>
+<script>
+sessionStorage.setItem('adminTicketListUrl', window.location.href);
+(function () {
+    function filterPanelOpen() {
+        document.getElementById('filterPanel').classList.add('open');
+        document.getElementById('filterPanelBackdrop').classList.add('open');
+        sessionStorage.setItem('adminFilterPanelOpen', '1');
+    }
+    function filterPanelClose() {
+        document.getElementById('filterPanel').classList.remove('open');
+        document.getElementById('filterPanelBackdrop').classList.remove('open');
+        sessionStorage.setItem('adminFilterPanelOpen', '0');
+    }
+    window.filterPanelToggle = function () {
+        document.getElementById('filterPanel').classList.contains('open') ? filterPanelClose() : filterPanelOpen();
+    };
+    window.filterPanelClose = filterPanelClose;
+    if (sessionStorage.getItem('adminFilterPanelOpen') === '1') filterPanelOpen();
+})();
+</script>
 
 <?php if ($totalPages > 1): ?>
 <?php

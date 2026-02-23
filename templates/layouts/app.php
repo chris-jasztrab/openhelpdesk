@@ -164,6 +164,51 @@
         [data-bs-theme="dark"] .bg-f8fafc,
         [data-bs-theme="dark"] [style*="background:#f8fafc"],
         [data-bs-theme="dark"] [style*="background-color:#f8fafc"] { background-color: var(--bs-tertiary-bg) !important; }
+
+        /* Filter slide-out panel */
+        .filter-panel {
+            position: fixed;
+            left: var(--ld-sidebar-width);
+            top: var(--ld-navbar-height);
+            bottom: 0;
+            width: 280px;
+            background: #ffffff;
+            border-right: 1px solid #e2e8f0;
+            z-index: 150;
+            display: flex;
+            flex-direction: column;
+            transform: translateX(-100%);
+            transition: transform .25s ease;
+        }
+        .filter-panel.open { transform: translateX(0); }
+        .filter-panel-header {
+            padding: .875rem 1rem;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+        .filter-panel-body {
+            padding: 1rem;
+            overflow-y: auto;
+            flex: 1;
+        }
+        .filter-panel-backdrop {
+            position: fixed;
+            left: var(--ld-sidebar-width);
+            top: var(--ld-navbar-height);
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,.2);
+            z-index: 149;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .25s ease;
+        }
+        .filter-panel-backdrop.open { opacity: 1; pointer-events: auto; }
+        [data-bs-theme="dark"] .filter-panel { background: #212529; border-right-color: #373b3e; }
+        [data-bs-theme="dark"] .filter-panel-header { border-bottom-color: #373b3e; }
     </style>
 </head>
 <body>
