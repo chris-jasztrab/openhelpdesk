@@ -171,6 +171,43 @@ $router->post('/admin/users/create', function () {
     redirect('/admin/users');
 });
 
+$router->get('/admin/users/{id}', function (array $p) {
+    Auth::requireRole('admin');
+    $db  = Database::connect();
+    $uid = (int) $p['id'];
+
+    $stmt = $db->prepare(
+        'SELECT u.*, l.name AS location_name
+         FROM users u LEFT JOIN locations l ON u.location_id = l.id
+         WHERE u.id = ?'
+    );
+    $stmt->execute([$uid]);
+    $user = $stmt->fetch();
+    if (!$user) {
+        flash('error', 'User not found.');
+        redirect('/admin/users');
+    }
+
+    // Open (non-resolved/closed) tickets submitted by this user
+    $tStmt = $db->prepare(
+        "SELECT t.id, t.subject, t.status, t.created_at,
+                tp.name AS priority_name, tp.color AS priority_color,
+                tt.name AS type_name,
+                CONCAT(a.first_name, ' ', a.last_name) AS assigned_name
+         FROM tickets t
+         LEFT JOIN ticket_priorities tp ON t.priority_id = tp.id
+         LEFT JOIN ticket_types     tt ON t.type_id     = tt.id
+         LEFT JOIN users             a  ON t.assigned_to = a.id
+         WHERE t.created_by = ?
+           AND t.status NOT IN ('resolved', 'closed')
+         ORDER BY t.created_at DESC"
+    );
+    $tStmt->execute([$uid]);
+    $openTickets = $tStmt->fetchAll();
+
+    render('admin/users/view', ['user' => $user, 'openTickets' => $openTickets]);
+});
+
 $router->get('/admin/users/{id}/edit', function (array $p) {
     Auth::requireRole('admin');
     $db   = Database::connect();

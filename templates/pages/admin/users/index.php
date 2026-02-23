@@ -80,7 +80,7 @@ if ($locFilter !== '')  $filterParams['location'] = $locFilter;
                 <tr><td colspan="8" class="text-center py-4 text-muted">No users found.</td></tr>
                 <?php else: ?>
                     <?php foreach ($users as $u): ?>
-                    <tr>
+                    <tr style="cursor:pointer;" onclick="window.location='/admin/users/<?= $u['id'] ?>'">
                         <td>
                             <?php if ($u['avatar']): ?>
                                 <img src="/uploads/avatars/<?= e($u['avatar']) ?>" class="rounded-circle" width="36" height="36" style="object-fit:cover;">
@@ -90,7 +90,11 @@ if ($locFilter !== '')  $filterParams['location'] = $locFilter;
                                 </div>
                             <?php endif; ?>
                         </td>
-                        <td class="fw-semibold"><?= e($u['first_name'] . ' ' . $u['last_name']) ?></td>
+                        <td class="fw-semibold">
+                            <a href="/admin/users/<?= $u['id'] ?>" class="text-decoration-none text-dark">
+                                <?= e($u['first_name'] . ' ' . $u['last_name']) ?>
+                            </a>
+                        </td>
                         <td><span class="text-muted"><?= e($u['email']) ?></span></td>
                         <td>
                             <?php

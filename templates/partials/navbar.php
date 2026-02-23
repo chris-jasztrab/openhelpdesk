@@ -209,7 +209,7 @@
             html += '<div class="px-2 py-1 text-muted small fw-semibold text-uppercase" style="font-size:.7rem;letter-spacing:.05em;">Contacts</div>';
             var badgeColors = { admin: 'danger', agent: 'primary', user: 'secondary' };
             data.contacts.forEach(function (u) {
-                var href = role === 'admin' ? '/admin/users/' + u.id + '/edit' : '#';
+                var href = role === 'admin' ? '/admin/users/' + u.id : '#';
                 html += '<a href="' + href + '" class="ld-search-item d-flex align-items-center gap-2 px-2 py-2 rounded text-decoration-none text-dark">';
                 html += '<i class="bi bi-person text-muted"></i>';
                 html += '<div class="flex-grow-1 text-truncate">';
