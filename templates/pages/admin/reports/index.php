@@ -150,6 +150,10 @@ $breadcrumbs  = [
         ['icon' => 'bi-arrow-repeat',         'title' => 'Ticket Lifecycle',   'desc' => 'Average time spent in each status stage and transition patterns.',       'url' => '/admin/reports/lifecycle'],
         ['icon' => 'bi-geo-alt',              'title' => 'By Location',        'desc' => 'Ticket volume and resolution rates compared across locations.',          'url' => '/admin/reports/location'],
         ['icon' => 'bi-star',                 'title' => 'Satisfaction',       'desc' => 'CSAT survey results — response rates, average ratings, and feedback.',     'url' => '/admin/reports/csat'],
+        ['icon' => 'bi-people',               'title' => 'Agent Workload',     'desc' => 'Visual heatmap of open tickets per agent, broken down by status and SLA.',  'url' => '/admin/reports/workload'],
+        ['icon' => 'bi-graph-up-arrow',       'title' => 'Ticket Trends',      'desc' => 'Multi-line volume trend over time, drilled down by type or location.',      'url' => '/admin/reports/trends'],
+        ['icon' => 'bi-patch-check',          'title' => 'FCR Rate',           'desc' => 'First-contact resolution rate — tickets resolved without back-and-forth.',   'url' => '/admin/reports/fcr'],
+        ['icon' => 'bi-sliders',              'title' => 'Custom Builder',     'desc' => 'Pick any metric and group-by combination to build a custom report.',         'url' => '/admin/reports/custom'],
     ];
     foreach ($reportCards as $rc): ?>
     <div class="col-md-4">

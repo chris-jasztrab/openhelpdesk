@@ -4118,6 +4118,425 @@ $router->post('/admin/settings/csat', function () {
 });
 
 /* ==================================================================
+ * ADMIN – Report: Agent Workload Heatmap
+ * ================================================================== */
+
+$router->get('/admin/reports/workload', function () {
+    Auth::requireRole('admin');
+    $db = Database::connect();
+
+    $stmt = $db->query(
+        "SELECT COALESCE(CONCAT(u.first_name,' ',u.last_name),'Unassigned') AS agent_name,
+                u.id AS agent_id,
+                COUNT(t.id) AS open_total,
+                SUM(CASE WHEN t.sla_state='breached' THEN 1 ELSE 0 END) AS breached_count,
+                SUM(CASE WHEN t.status='open' THEN 1 ELSE 0 END) AS open_count,
+                SUM(CASE WHEN t.status='in_progress' THEN 1 ELSE 0 END) AS in_progress_count,
+                SUM(CASE WHEN t.status='pending' THEN 1 ELSE 0 END) AS pending_count,
+                SUM(CASE WHEN t.status IN ('waiting_on_customer','waiting_on_third_party') THEN 1 ELSE 0 END) AS waiting_count
+         FROM tickets t
+         LEFT JOIN users u ON t.assigned_to = u.id
+         WHERE t.status NOT IN ('resolved','closed')
+         GROUP BY u.id, u.first_name, u.last_name
+         ORDER BY open_total DESC"
+    );
+    $agents  = $stmt->fetchAll();
+    $maxLoad = !empty($agents) ? (int) $agents[0]['open_total'] : 1;
+
+    render('admin/reports/workload', compact('agents', 'maxLoad'));
+});
+
+/* ==================================================================
+ * ADMIN – Report: Ticket Trends
+ * ================================================================== */
+
+$router->get('/admin/reports/trends', function () {
+    Auth::requireRole('admin');
+    $db      = Database::connect();
+    [$from, $to] = reportDateRange();
+    $toEnd   = $to . ' 23:59:59';
+    $groupBy = in_array($_GET['group_by'] ?? '', ['type', 'location'], true)
+        ? $_GET['group_by'] : 'type';
+
+    if ($groupBy === 'type') {
+        $stmt = $db->prepare(
+            "SELECT DATE(t.created_at) AS day,
+                    COALESCE(tt.name,'Untyped') AS segment,
+                    COUNT(t.id) AS cnt
+             FROM tickets t
+             LEFT JOIN ticket_types tt ON t.type_id = tt.id
+             WHERE t.created_at BETWEEN ? AND ?
+             GROUP BY day, segment
+             ORDER BY day, segment"
+        );
+    } else {
+        $stmt = $db->prepare(
+            "SELECT DATE(t.created_at) AS day,
+                    COALESCE(l.name,'No Location') AS segment,
+                    COUNT(t.id) AS cnt
+             FROM tickets t
+             LEFT JOIN locations l ON t.location_id = l.id
+             WHERE t.created_at BETWEEN ? AND ?
+             GROUP BY day, segment
+             ORDER BY day, segment"
+        );
+    }
+    $stmt->execute([$from, $toEnd]);
+    $rows = $stmt->fetchAll();
+
+    // Pivot: labels (dates) + datasets (one per segment)
+    $labelSet   = [];
+    $segmentSet = [];
+    $matrix     = [];
+    foreach ($rows as $row) {
+        $d = date('M j', strtotime($row['day']));
+        $labelSet[$d]               = true;
+        $segmentSet[$row['segment']] = true;
+        $matrix[$d][$row['segment']] = (int) $row['cnt'];
+    }
+    $labels   = array_keys($labelSet);
+    $segments = array_keys($segmentSet);
+
+    $palette = ['#4f46e5','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#84cc16','#f97316'];
+    $datasets = [];
+    foreach ($segments as $i => $seg) {
+        $data = [];
+        foreach ($labels as $lbl) {
+            $data[] = $matrix[$lbl][$seg] ?? 0;
+        }
+        $datasets[] = [
+            'label'           => $seg,
+            'data'            => $data,
+            'borderColor'     => $palette[$i % count($palette)],
+            'backgroundColor' => $palette[$i % count($palette)] . '22',
+            'fill'            => false,
+            'tension'         => 0.3,
+        ];
+    }
+
+    render('admin/reports/trends', compact('from', 'to', 'groupBy', 'labels', 'datasets'));
+});
+
+/* ==================================================================
+ * ADMIN – Report: First Contact Resolution (FCR)
+ * ================================================================== */
+
+$router->get('/admin/reports/fcr', function () {
+    Auth::requireRole('admin');
+    $db = Database::connect();
+    [$from, $to] = reportDateRange();
+    $toEnd = $to . ' 23:59:59';
+
+    // Overall FCR
+    $stmt = $db->prepare(
+        "SELECT COUNT(*) AS total_resolved,
+                SUM(CASE WHEN reply_count <= 1 THEN 1 ELSE 0 END) AS fcr_count
+         FROM (
+             SELECT t.id,
+                 (SELECT COUNT(*) FROM ticket_timeline tl
+                  WHERE tl.ticket_id = t.id AND tl.action = 'reply_sent') AS reply_count
+             FROM tickets t
+             WHERE t.status IN ('resolved','closed')
+               AND t.created_at BETWEEN ? AND ?
+         ) sub"
+    );
+    $stmt->execute([$from, $toEnd]);
+    $overall = $stmt->fetch();
+    $overallFcr = [
+        'total'   => (int) $overall['total_resolved'],
+        'fcr'     => (int) $overall['fcr_count'],
+        'pct'     => $overall['total_resolved'] > 0
+            ? round($overall['fcr_count'] / $overall['total_resolved'] * 100)
+            : 0,
+    ];
+
+    // FCR by agent
+    $stmt = $db->prepare(
+        "SELECT CONCAT(u.first_name,' ',u.last_name) AS agent_name,
+                COUNT(*) AS total_resolved,
+                SUM(CASE WHEN reply_count <= 1 THEN 1 ELSE 0 END) AS fcr_count
+         FROM (
+             SELECT t.id, t.assigned_to,
+                 (SELECT COUNT(*) FROM ticket_timeline tl
+                  WHERE tl.ticket_id = t.id AND tl.action = 'reply_sent') AS reply_count
+             FROM tickets t
+             WHERE t.status IN ('resolved','closed')
+               AND t.created_at BETWEEN ? AND ?
+         ) sub
+         LEFT JOIN users u ON sub.assigned_to = u.id
+         GROUP BY sub.assigned_to, u.first_name, u.last_name
+         ORDER BY total_resolved DESC"
+    );
+    $stmt->execute([$from, $toEnd]);
+    $fcrByAgent = $stmt->fetchAll();
+    foreach ($fcrByAgent as &$a) {
+        $a['agent_name'] = $a['agent_name'] ?? 'Unassigned';
+        $a['fcr_pct']    = $a['total_resolved'] > 0
+            ? round($a['fcr_count'] / $a['total_resolved'] * 100) : 0;
+    }
+    unset($a);
+
+    // FCR by type
+    $stmt = $db->prepare(
+        "SELECT COALESCE(tt.name,'Untyped') AS type_name,
+                COUNT(*) AS total_resolved,
+                SUM(CASE WHEN reply_count <= 1 THEN 1 ELSE 0 END) AS fcr_count
+         FROM (
+             SELECT t.id, t.type_id,
+                 (SELECT COUNT(*) FROM ticket_timeline tl
+                  WHERE tl.ticket_id = t.id AND tl.action = 'reply_sent') AS reply_count
+             FROM tickets t
+             WHERE t.status IN ('resolved','closed')
+               AND t.created_at BETWEEN ? AND ?
+         ) sub
+         LEFT JOIN ticket_types tt ON sub.type_id = tt.id
+         GROUP BY sub.type_id, tt.name
+         ORDER BY total_resolved DESC"
+    );
+    $stmt->execute([$from, $toEnd]);
+    $fcrByType = $stmt->fetchAll();
+    foreach ($fcrByType as &$r) {
+        $r['fcr_pct'] = $r['total_resolved'] > 0
+            ? round($r['fcr_count'] / $r['total_resolved'] * 100) : 0;
+    }
+    unset($r);
+
+    // Weekly trend
+    $stmt = $db->prepare(
+        "SELECT DATE_FORMAT(sub.created_at,'%Y-%u') AS week_key,
+                DATE_FORMAT(MIN(sub.created_at),'%b %e') AS week_label,
+                COUNT(*) AS total_resolved,
+                SUM(CASE WHEN reply_count <= 1 THEN 1 ELSE 0 END) AS fcr_count
+         FROM (
+             SELECT t.id, t.created_at,
+                 (SELECT COUNT(*) FROM ticket_timeline tl
+                  WHERE tl.ticket_id = t.id AND tl.action = 'reply_sent') AS reply_count
+             FROM tickets t
+             WHERE t.status IN ('resolved','closed')
+               AND t.created_at BETWEEN ? AND ?
+         ) sub
+         GROUP BY week_key
+         ORDER BY week_key"
+    );
+    $stmt->execute([$from, $toEnd]);
+    $weeklyFcr = $stmt->fetchAll();
+    foreach ($weeklyFcr as &$w) {
+        $w['fcr_pct'] = $w['total_resolved'] > 0
+            ? round($w['fcr_count'] / $w['total_resolved'] * 100) : 0;
+    }
+    unset($w);
+
+    render('admin/reports/fcr', compact('from', 'to', 'overallFcr', 'fcrByAgent', 'fcrByType', 'weeklyFcr'));
+});
+
+/* ==================================================================
+ * ADMIN – Report: Custom Report Builder
+ * ================================================================== */
+
+$router->get('/admin/reports/custom', function () {
+    Auth::requireRole('admin');
+    $db = Database::connect();
+    [$from, $to] = reportDateRange();
+    $toEnd = $to . ' 23:59:59';
+
+    $metricOptions = [
+        'ticket_count'       => 'Ticket Count',
+        'avg_first_response' => 'Avg First Response Time',
+        'avg_resolution'     => 'Avg Resolution Time',
+        'sla_compliance'     => 'SLA Compliance %',
+    ];
+    $groupByOptions = [
+        'agent'    => 'Agent',
+        'type'     => 'Ticket Type',
+        'location' => 'Location',
+        'priority' => 'Priority',
+        'status'   => 'Status',
+    ];
+
+    $metric  = array_key_exists($_GET['metric'] ?? '', $metricOptions)  ? $_GET['metric']   : null;
+    $groupBy = array_key_exists($_GET['group_by'] ?? '', $groupByOptions) ? $_GET['group_by'] : null;
+    $rows    = [];
+    $metricLabel = $metric ? $metricOptions[$metric] : '';
+
+    if ($metric && $groupBy) {
+        // Group-by label and JOIN expressions (whitelisted)
+        $groupConfig = [
+            'agent'    => ['label' => "COALESCE(CONCAT(u.first_name,' ',u.last_name),'Unassigned')",
+                           'join'  => "LEFT JOIN users u ON t.assigned_to = u.id",
+                           'group' => 'u.id, u.first_name, u.last_name'],
+            'type'     => ['label' => "COALESCE(tt.name,'Untyped')",
+                           'join'  => "LEFT JOIN ticket_types tt ON t.type_id = tt.id",
+                           'group' => 'tt.id, tt.name'],
+            'location' => ['label' => "COALESCE(l.name,'No Location')",
+                           'join'  => "LEFT JOIN locations l ON t.location_id = l.id",
+                           'group' => 'l.id, l.name'],
+            'priority' => ['label' => "COALESCE(tp.name,'None')",
+                           'join'  => "LEFT JOIN ticket_priorities tp ON t.priority_id = tp.id",
+                           'group' => 'tp.id, tp.name, tp.sort_order'],
+            'status'   => ['label' => 't.status',
+                           'join'  => '',
+                           'group' => 't.status'],
+        ];
+
+        $gc  = $groupConfig[$groupBy];
+        $lbl = $gc['label'];
+        $jn  = $gc['join'];
+        $grp = $gc['group'];
+        $ord = $groupBy === 'priority' ? 'tp.sort_order, grp_label' : 'value DESC';
+
+        $metricSql = match ($metric) {
+            'ticket_count'       => 'COUNT(t.id)',
+            'avg_first_response' => 'ROUND(AVG(CASE WHEN t.first_responded_at IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, t.created_at, t.first_responded_at) END), 1)',
+            'avg_resolution'     => 'ROUND(AVG((SELECT TIMESTAMPDIFF(MINUTE, t.created_at, tl.created_at) FROM ticket_timeline tl WHERE tl.ticket_id = t.id AND tl.action = \'status_changed\' AND tl.details LIKE \'%→ Resolved%\' ORDER BY tl.created_at DESC LIMIT 1)), 1)',
+            'sla_compliance'     => 'ROUND(SUM(CASE WHEN t.first_response_due_at IS NOT NULL AND t.sla_state != \'breached\' THEN 1 ELSE 0 END) / NULLIF(SUM(CASE WHEN t.first_response_due_at IS NOT NULL THEN 1 ELSE 0 END),0) * 100, 1)',
+        };
+
+        $sql = "SELECT {$lbl} AS grp_label, {$metricSql} AS value
+                FROM tickets t
+                {$jn}
+                WHERE t.created_at BETWEEN ? AND ?
+                GROUP BY {$grp}
+                ORDER BY {$ord}";
+
+        $stmt = $db->prepare($sql);
+        $stmt->execute([$from, $toEnd]);
+        $rawRows = $stmt->fetchAll();
+
+        foreach ($rawRows as $row) {
+            $displayVal = $row['value'] ?? 0;
+            if (in_array($metric, ['avg_first_response', 'avg_resolution'], true) && $displayVal !== null) {
+                $displayVal = formatMinutes((float) $displayVal);
+            } elseif ($metric === 'sla_compliance') {
+                $displayVal = ($displayVal ?? 0) . '%';
+            }
+            $rows[] = ['label' => $row['grp_label'], 'raw' => $row['value'] ?? 0, 'display' => $displayVal];
+        }
+    }
+
+    render('admin/reports/custom', compact(
+        'from', 'to', 'metric', 'groupBy', 'rows',
+        'metricLabel', 'metricOptions', 'groupByOptions'
+    ));
+});
+
+/* ==================================================================
+ * ADMIN – Settings: Scheduled Reports
+ * ================================================================== */
+
+$router->get('/admin/settings/scheduled-reports', function () {
+    Auth::requireRole('admin');
+    $db      = Database::connect();
+    $reports = $db->query('SELECT * FROM scheduled_reports ORDER BY name')->fetchAll();
+    render('admin/settings/scheduled-reports', compact('reports'));
+});
+
+$router->get('/admin/settings/scheduled-reports/create', function () {
+    Auth::requireRole('admin');
+    $report = null;
+    render('admin/settings/scheduled-reports-form', compact('report'));
+});
+
+$router->post('/admin/settings/scheduled-reports/create', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/scheduled-reports');
+    }
+    $db         = Database::connect();
+    $name       = trim($_POST['name'] ?? '');
+    $reportType = in_array($_POST['report_type'] ?? '', ['overview','agent_performance','ticket_volume','fcr'], true)
+        ? $_POST['report_type'] : 'overview';
+    $frequency  = in_array($_POST['frequency'] ?? '', ['weekly','monthly'], true)
+        ? $_POST['frequency'] : 'weekly';
+    $sendDay    = max(0, min(31, (int)($_POST['send_day'] ?? 1)));
+    $rawEmails  = trim($_POST['recipients'] ?? '');
+    $recipients = array_filter(array_map('trim', explode("\n", $rawEmails)));
+    $enabled    = isset($_POST['is_enabled']) ? 1 : 0;
+
+    if (empty($name) || empty($recipients)) {
+        flash('error', 'Name and at least one recipient are required.');
+        redirect('/admin/settings/scheduled-reports/create');
+    }
+
+    $db->prepare(
+        'INSERT INTO scheduled_reports (name, report_type, recipients, frequency, send_day, is_enabled)
+         VALUES (?, ?, ?, ?, ?, ?)'
+    )->execute([$name, $reportType, json_encode(array_values($recipients)), $frequency, $sendDay, $enabled]);
+
+    flash('success', "Scheduled report \"{$name}\" created.");
+    redirect('/admin/settings/scheduled-reports');
+});
+
+$router->get('/admin/settings/scheduled-reports/{id}/edit', function (array $vars) {
+    Auth::requireRole('admin');
+    $db     = Database::connect();
+    $stmt   = $db->prepare('SELECT * FROM scheduled_reports WHERE id = ?');
+    $stmt->execute([(int)$vars['id']]);
+    $report = $stmt->fetch();
+    if (!$report) { http_response_code(404); echo 'Not found'; exit; }
+    render('admin/settings/scheduled-reports-form', compact('report'));
+});
+
+$router->post('/admin/settings/scheduled-reports/{id}/edit', function (array $vars) {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/scheduled-reports');
+    }
+    $db         = Database::connect();
+    $id         = (int)$vars['id'];
+    $name       = trim($_POST['name'] ?? '');
+    $reportType = in_array($_POST['report_type'] ?? '', ['overview','agent_performance','ticket_volume','fcr'], true)
+        ? $_POST['report_type'] : 'overview';
+    $frequency  = in_array($_POST['frequency'] ?? '', ['weekly','monthly'], true)
+        ? $_POST['frequency'] : 'weekly';
+    $sendDay    = max(0, min(31, (int)($_POST['send_day'] ?? 1)));
+    $rawEmails  = trim($_POST['recipients'] ?? '');
+    $recipients = array_filter(array_map('trim', explode("\n", $rawEmails)));
+    $enabled    = isset($_POST['is_enabled']) ? 1 : 0;
+
+    if (empty($name) || empty($recipients)) {
+        flash('error', 'Name and at least one recipient are required.');
+        redirect("/admin/settings/scheduled-reports/{$id}/edit");
+    }
+
+    $db->prepare(
+        'UPDATE scheduled_reports SET name=?, report_type=?, recipients=?, frequency=?, send_day=?, is_enabled=? WHERE id=?'
+    )->execute([$name, $reportType, json_encode(array_values($recipients)), $frequency, $sendDay, $enabled, $id]);
+
+    flash('success', "Scheduled report \"{$name}\" updated.");
+    redirect('/admin/settings/scheduled-reports');
+});
+
+$router->post('/admin/settings/scheduled-reports/{id}/delete', function (array $vars) {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/scheduled-reports');
+    }
+    $db = Database::connect();
+    $db->prepare('DELETE FROM scheduled_reports WHERE id = ?')->execute([(int)$vars['id']]);
+    flash('success', 'Scheduled report deleted.');
+    redirect('/admin/settings/scheduled-reports');
+});
+
+$router->post('/admin/settings/scheduled-reports/{id}/toggle', function (array $vars) {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/scheduled-reports');
+    }
+    $db   = Database::connect();
+    $stmt = $db->prepare('SELECT is_enabled FROM scheduled_reports WHERE id = ?');
+    $stmt->execute([(int)$vars['id']]);
+    $row  = $stmt->fetch();
+    if (!$row) { redirect('/admin/settings/scheduled-reports'); }
+    $db->prepare('UPDATE scheduled_reports SET is_enabled = ? WHERE id = ?')
+       ->execute([$row['is_enabled'] ? 0 : 1, (int)$vars['id']]);
+    redirect('/admin/settings/scheduled-reports');
+});
+
+/* ==================================================================
  * ADMIN – Workflows: Ticket Fields Builder
  * ================================================================== */
 
