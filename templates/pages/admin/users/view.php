@@ -68,9 +68,9 @@ $statusLabels = [
                 <a href="/admin/users/<?= (int)$profileUser['id'] ?>/edit" class="btn text-white" style="background:var(--ld-primary);">
                     <i class="bi bi-pencil me-1"></i>Edit User
                 </a>
-                <a href="/admin/users" class="btn btn-outline-secondary">
+                <button type="button" class="btn btn-outline-secondary" onclick="history.back()">
                     <i class="bi bi-arrow-left me-1"></i>Back
-                </a>
+                </button>
             </div>
         </div>
     </div>
