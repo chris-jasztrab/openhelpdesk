@@ -32,12 +32,13 @@ $breadcrumbs  = [
                     <th>Slug</th>
                     <th>Description</th>
                     <th>Order</th>
-                    <th style="width:110px">Actions</th>
+                    <th>Public</th>
+                    <th style="width:130px">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($categories)): ?>
-                <tr><td colspan="5" class="text-center py-4 text-muted">No categories yet.</td></tr>
+                <tr><td colspan="6" class="text-center py-4 text-muted">No categories yet.</td></tr>
                 <?php else: ?>
                     <?php foreach ($categories as $cat): ?>
                     <tr>
@@ -45,8 +46,18 @@ $breadcrumbs  = [
                             <i class="bi bi-collection text-muted me-1"></i><?= e($cat['name']) ?>
                         </td>
                         <td class="text-muted small"><?= e($cat['slug']) ?></td>
-                        <td class="text-muted small" style="max-width:300px;"><?= e($cat['description'] ? mb_strimwidth($cat['description'], 0, 80, '...') : '—') ?></td>
+                        <td class="text-muted small" style="max-width:260px;"><?= e($cat['description'] ? mb_strimwidth($cat['description'], 0, 80, '...') : '—') ?></td>
                         <td class="text-muted"><?= (int) $cat['sort_order'] ?></td>
+                        <td>
+                            <?php if ($cat['is_public']): ?>
+                                <a href="/kb/<?= e($cat['slug']) ?>" target="_blank"
+                                   class="badge bg-success text-decoration-none" title="View public page">
+                                    <i class="bi bi-globe2 me-1"></i>Public
+                                </a>
+                            <?php else: ?>
+                                <span class="badge bg-secondary">Private</span>
+                            <?php endif; ?>
+                        </td>
                         <td>
                             <div class="d-flex gap-1">
                                 <a href="/admin/kb/categories/<?= $cat['id'] ?>/edit" class="btn btn-sm btn-outline-primary" title="Edit">

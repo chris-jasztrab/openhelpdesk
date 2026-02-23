@@ -624,6 +624,228 @@ $router->get('/portal', function () {
     ]);
 });
 
+/* ==================================================================
+ * PUBLIC KNOWLEDGE BASE  (no authentication required)
+ * ================================================================== */
+
+/** Return a guest-session KB token (32-char hex), create once per session. */
+function kbSessionId(): string
+{
+    if (empty($_SESSION['_kb_sid'])) {
+        $_SESSION['_kb_sid'] = bin2hex(random_bytes(16));
+    }
+    return $_SESSION['_kb_sid'];
+}
+
+// GET /kb  — list all is_public categories
+$router->get('/kb', function () {
+    $db   = Database::connect();
+    $cats = $db->query(
+        "SELECT c.*,
+                COUNT(DISTINCT a.id) AS article_count
+         FROM kb_categories c
+         LEFT JOIN kb_folders f  ON f.category_id = c.id
+         LEFT JOIN kb_articles a ON a.folder_id = f.id AND a.status = 'published'
+         WHERE c.is_public = 1
+         GROUP BY c.id
+         ORDER BY c.sort_order, c.name"
+    )->fetchAll();
+
+    $layout    = 'public';
+    $pageTitle = 'Help Center';
+    render('kb/index', compact('cats', 'layout', 'pageTitle'));
+});
+
+// GET /kb/search  — JSON live-search across public articles
+$router->get('/kb/search', function () {
+    header('Content-Type: application/json');
+    $q    = trim($_GET['q'] ?? '');
+    if (strlen($q) < 2) { echo json_encode([]); exit; }
+    $like = '%' . $q . '%';
+    $db   = Database::connect();
+    $stmt = $db->prepare(
+        "SELECT a.title, a.slug
+         FROM kb_articles a
+         LEFT JOIN kb_folders f     ON a.folder_id   = f.id
+         LEFT JOIN kb_categories c  ON f.category_id = c.id
+         WHERE a.status = 'published' AND c.is_public = 1
+           AND (a.title LIKE ? OR a.body_markdown LIKE ?)
+         LIMIT 8"
+    );
+    $stmt->execute([$like, $like]);
+    echo json_encode($stmt->fetchAll());
+    exit;
+});
+
+// GET /kb/articles/{slug}  — single public article (MUST come before /{cat_slug})
+$router->get('/kb/articles/{slug}', function (array $p) {
+    $db   = Database::connect();
+    $stmt = $db->prepare(
+        "SELECT a.*, f.name AS folder_name, f.slug AS folder_slug,
+                c.name AS category_name, c.slug AS category_slug, c.is_public
+         FROM kb_articles a
+         LEFT JOIN kb_folders f    ON a.folder_id   = f.id
+         LEFT JOIN kb_categories c ON f.category_id = c.id
+         WHERE a.slug = ? AND a.status = 'published'"
+    );
+    $stmt->execute([$p['slug']]);
+    $article = $stmt->fetch();
+    if (!$article || !$article['is_public']) {
+        http_response_code(404);
+        render('errors/404', ['layout' => 'public', 'pageTitle' => 'Not Found']);
+        exit;
+    }
+    $article['body_html'] = renderMarkdown($article['body_markdown']);
+
+    // Feedback counts
+    $fc = $db->prepare(
+        "SELECT SUM(CASE WHEN rating =  1 THEN 1 ELSE 0 END) AS helpful,
+                SUM(CASE WHEN rating = -1 THEN 1 ELSE 0 END) AS not_helpful
+         FROM kb_article_ratings WHERE article_id = ?"
+    );
+    $fc->execute([$article['id']]);
+    $counts = $fc->fetch();
+
+    // Guest vote check (session-based)
+    $myVote = $_SESSION['kb_voted'][$article['id']] ?? null;
+
+    $feedback = [
+        'helpful'     => (int)($counts['helpful']     ?? 0),
+        'not_helpful' => (int)($counts['not_helpful'] ?? 0),
+        'my_vote'     => $myVote,
+    ];
+
+    $layout    = 'public';
+    $pageTitle = $article['title'];
+    render('kb/article', compact('article', 'feedback', 'layout', 'pageTitle'));
+});
+
+// POST /kb/articles/{slug}/feedback  — guest feedback vote
+$router->post('/kb/articles/{slug}/feedback', function (array $p) {
+    header('Content-Type: application/json');
+
+    $rating = (int)($_POST['rating'] ?? 0);
+    if (!in_array($rating, [1, -1], true)) {
+        echo json_encode(['status' => 'error', 'message' => 'Invalid rating.']);
+        exit;
+    }
+
+    $db   = Database::connect();
+    $stmt = $db->prepare('SELECT id FROM kb_articles WHERE slug = ? AND status = ?');
+    $stmt->execute([$p['slug'], 'published']);
+    $article = $stmt->fetch();
+    if (!$article) {
+        echo json_encode(['status' => 'error', 'message' => 'Article not found.']);
+        exit;
+    }
+    $articleId = (int)$article['id'];
+
+    // Check session-based dedup
+    if (isset($_SESSION['kb_voted'][$articleId])) {
+        $fc = $db->prepare(
+            "SELECT SUM(CASE WHEN rating =  1 THEN 1 ELSE 0 END) AS helpful,
+                    SUM(CASE WHEN rating = -1 THEN 1 ELSE 0 END) AS not_helpful
+             FROM kb_article_ratings WHERE article_id = ?"
+        );
+        $fc->execute([$articleId]);
+        $counts = $fc->fetch();
+        echo json_encode([
+            'status'      => 'already_voted',
+            'helpful'     => (int)($counts['helpful']     ?? 0),
+            'not_helpful' => (int)($counts['not_helpful'] ?? 0),
+        ]);
+        exit;
+    }
+
+    $sid = kbSessionId();
+    try {
+        $db->prepare(
+            'INSERT INTO kb_article_ratings (article_id, session_id, rating) VALUES (?, ?, ?)'
+        )->execute([$articleId, $sid, $rating]);
+    } catch (\Throwable $e) {
+        echo json_encode(['status' => 'error', 'message' => 'Could not save vote.']);
+        exit;
+    }
+
+    $_SESSION['kb_voted'][$articleId] = $rating;
+
+    $fc = $db->prepare(
+        "SELECT SUM(CASE WHEN rating =  1 THEN 1 ELSE 0 END) AS helpful,
+                SUM(CASE WHEN rating = -1 THEN 1 ELSE 0 END) AS not_helpful
+         FROM kb_article_ratings WHERE article_id = ?"
+    );
+    $fc->execute([$articleId]);
+    $counts = $fc->fetch();
+
+    echo json_encode([
+        'status'      => 'ok',
+        'helpful'     => (int)($counts['helpful']     ?? 0),
+        'not_helpful' => (int)($counts['not_helpful'] ?? 0),
+    ]);
+    exit;
+});
+
+// GET /kb/{cat_slug}  — public category page (folders list)
+$router->get('/kb/{cat_slug}', function (array $p) {
+    $db      = Database::connect();
+    $catStmt = $db->prepare('SELECT * FROM kb_categories WHERE slug = ? AND is_public = 1');
+    $catStmt->execute([$p['cat_slug']]);
+    $category = $catStmt->fetch();
+    if (!$category) {
+        http_response_code(404);
+        render('errors/404', ['layout' => 'public', 'pageTitle' => 'Not Found']);
+        exit;
+    }
+
+    $folders = $db->prepare(
+        "SELECT f.*, COUNT(a.id) AS article_count
+         FROM kb_folders f
+         LEFT JOIN kb_articles a ON a.folder_id = f.id AND a.status = 'published'
+         WHERE f.category_id = ?
+         GROUP BY f.id ORDER BY f.sort_order, f.name"
+    );
+    $folders->execute([$category['id']]);
+    $folders = $folders->fetchAll();
+
+    $layout    = 'public';
+    $pageTitle = $category['name'];
+    render('kb/category', compact('category', 'folders', 'layout', 'pageTitle'));
+});
+
+// GET /kb/{cat_slug}/{folder_slug}  — public folder (article list)
+$router->get('/kb/{cat_slug}/{folder_slug}', function (array $p) {
+    $db      = Database::connect();
+    $catStmt = $db->prepare('SELECT * FROM kb_categories WHERE slug = ? AND is_public = 1');
+    $catStmt->execute([$p['cat_slug']]);
+    $category = $catStmt->fetch();
+    if (!$category) {
+        http_response_code(404);
+        render('errors/404', ['layout' => 'public', 'pageTitle' => 'Not Found']);
+        exit;
+    }
+
+    $folStmt = $db->prepare('SELECT * FROM kb_folders WHERE slug = ? AND category_id = ?');
+    $folStmt->execute([$p['folder_slug'], $category['id']]);
+    $folder = $folStmt->fetch();
+    if (!$folder) {
+        http_response_code(404);
+        render('errors/404', ['layout' => 'public', 'pageTitle' => 'Not Found']);
+        exit;
+    }
+
+    $artStmt = $db->prepare(
+        "SELECT id, title, slug, created_at FROM kb_articles
+         WHERE folder_id = ? AND status = 'published'
+         ORDER BY sort_order, title"
+    );
+    $artStmt->execute([$folder['id']]);
+    $articles = $artStmt->fetchAll();
+
+    $layout    = 'public';
+    $pageTitle = $folder['name'];
+    render('kb/folder', compact('category', 'folder', 'articles', 'layout', 'pageTitle'));
+});
+
 require ROOT_DIR . '/src/routes/portal.php';
 
 /* ------------------------------------------------------------------

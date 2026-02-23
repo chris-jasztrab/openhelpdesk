@@ -568,7 +568,82 @@ $router->get('/portal/kb/articles/{slug}', function (array $p) {
         redirect('/portal/kb');
     }
     $article['body_html'] = renderMarkdown($article['body_markdown']);
-    render('portal/kb/article', ['article' => $article]);
+
+    // Feedback counts
+    $fc = $db->prepare(
+        "SELECT
+            SUM(CASE WHEN rating =  1 THEN 1 ELSE 0 END) AS helpful,
+            SUM(CASE WHEN rating = -1 THEN 1 ELSE 0 END) AS not_helpful
+         FROM kb_article_ratings WHERE article_id = ?"
+    );
+    $fc->execute([$article['id']]);
+    $counts = $fc->fetch();
+
+    // Current user's vote
+    $vq = $db->prepare(
+        'SELECT rating FROM kb_article_ratings WHERE article_id = ? AND user_id = ?'
+    );
+    $vq->execute([$article['id'], Auth::id()]);
+    $myVote = $vq->fetchColumn() ?: null;
+
+    $feedback = [
+        'helpful'     => (int)($counts['helpful']     ?? 0),
+        'not_helpful' => (int)($counts['not_helpful'] ?? 0),
+        'my_vote'     => $myVote !== null ? (int)$myVote : null,
+    ];
+
+    render('portal/kb/article', ['article' => $article, 'feedback' => $feedback]);
+});
+
+$router->post('/portal/kb/articles/{slug}/feedback', function (array $p) {
+    Auth::requireAuth();
+    header('Content-Type: application/json');
+
+    $rating = (int)($_POST['rating'] ?? 0);
+    if (!in_array($rating, [1, -1], true)) {
+        echo json_encode(['status' => 'error', 'message' => 'Invalid rating.']);
+        exit;
+    }
+
+    $db   = Database::connect();
+    $stmt = $db->prepare('SELECT id FROM kb_articles WHERE slug = ? AND status = ?');
+    $stmt->execute([$p['slug'], 'published']);
+    $article = $stmt->fetch();
+    if (!$article) {
+        echo json_encode(['status' => 'error', 'message' => 'Article not found.']);
+        exit;
+    }
+    $articleId = (int)$article['id'];
+    $userId    = Auth::id();
+
+    // Upsert — UNIQUE(article_id, user_id) prevents double-votes
+    try {
+        $db->prepare(
+            'INSERT INTO kb_article_ratings (article_id, user_id, rating)
+             VALUES (?, ?, ?)
+             ON DUPLICATE KEY UPDATE rating = VALUES(rating)'
+        )->execute([$articleId, $userId, $rating]);
+    } catch (\Throwable $e) {
+        echo json_encode(['status' => 'error', 'message' => 'Could not save vote.']);
+        exit;
+    }
+
+    // Return updated counts
+    $fc = $db->prepare(
+        "SELECT
+            SUM(CASE WHEN rating =  1 THEN 1 ELSE 0 END) AS helpful,
+            SUM(CASE WHEN rating = -1 THEN 1 ELSE 0 END) AS not_helpful
+         FROM kb_article_ratings WHERE article_id = ?"
+    );
+    $fc->execute([$articleId]);
+    $counts = $fc->fetch();
+
+    echo json_encode([
+        'status'      => 'ok',
+        'helpful'     => (int)($counts['helpful']     ?? 0),
+        'not_helpful' => (int)($counts['not_helpful'] ?? 0),
+    ]);
+    exit;
 });
 
 $router->get('/portal/kb/{slug}/{folder_slug}', function (array $p) {

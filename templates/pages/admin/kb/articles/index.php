@@ -69,6 +69,9 @@ $breadcrumbs  = [
                                 <a href="/admin/kb/articles/<?= $a['id'] ?>/edit" class="btn btn-sm btn-outline-primary" title="Edit">
                                     <i class="bi bi-pencil"></i>
                                 </a>
+                                <a href="/admin/kb/articles/<?= $a['id'] ?>/history" class="btn btn-sm btn-outline-secondary" title="History">
+                                    <i class="bi bi-clock-history"></i>
+                                </a>
                                 <form method="POST" action="/admin/kb/articles/<?= $a['id'] ?>/delete" class="d-inline"
                                       onsubmit="return confirm('Delete this article?')">
                                     <?= csrfField() ?>

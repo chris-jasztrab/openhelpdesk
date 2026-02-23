@@ -39,6 +39,17 @@ $action = $isEdit ? "/admin/kb/categories/{$editing['id']}/edit" : '/admin/kb/ca
                        value="<?= e(old('sort_order', (string) ($editing['sort_order'] ?? '0'))) ?>" style="max-width:120px;">
             </div>
 
+            <div class="mb-3">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" name="is_public" id="isPublic" value="1"
+                           <?= !empty($editing['is_public']) ? 'checked' : '' ?>>
+                    <label class="form-check-label fw-semibold" for="isPublic">
+                        Public (visible without login at <code>/kb/…</code>)
+                    </label>
+                </div>
+                <div class="form-text">When enabled, this category and its published articles will be accessible to anyone without signing in.</div>
+            </div>
+
             <hr class="my-4">
 
             <div class="d-flex gap-2">

@@ -1599,8 +1599,9 @@ $router->post('/admin/kb/categories/create', function () {
     if ($existing->fetch()) {
         $slug .= '-' . time();
     }
-    $db->prepare('INSERT INTO kb_categories (name, slug, description, sort_order) VALUES (?, ?, ?, ?)')
-        ->execute([$name, $slug, $desc, $order]);
+    $isPublic = isset($_POST['is_public']) ? 1 : 0;
+    $db->prepare('INSERT INTO kb_categories (name, slug, description, is_public, sort_order) VALUES (?, ?, ?, ?, ?)')
+        ->execute([$name, $slug, $desc, $isPublic, $order]);
     flash('success', 'Category created.');
     redirect('/admin/kb/categories');
 });
@@ -1639,8 +1640,9 @@ $router->post('/admin/kb/categories/{id}/edit', function (array $p) {
     if ($existing->fetch()) {
         $slug .= '-' . time();
     }
-    $db->prepare('UPDATE kb_categories SET name=?, slug=?, description=?, sort_order=? WHERE id=?')
-        ->execute([$name, $slug, $desc, $order, $id]);
+    $isPublic = isset($_POST['is_public']) ? 1 : 0;
+    $db->prepare('UPDATE kb_categories SET name=?, slug=?, description=?, is_public=?, sort_order=? WHERE id=?')
+        ->execute([$name, $slug, $desc, $isPublic, $order, $id]);
     flash('success', 'Category updated.');
     redirect('/admin/kb/categories');
 });
@@ -1819,6 +1821,10 @@ $router->post('/admin/kb/articles/create', function () {
     $db->prepare(
         'INSERT INTO kb_articles (folder_id, title, slug, body_markdown, status, published_at, created_by, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
     )->execute([$folderId, $title, $slug, $body, $status, $publishedAt, Auth::id(), $order]);
+    $newId = (int) $db->lastInsertId();
+    // Save initial revision
+    $db->prepare('INSERT INTO kb_article_revisions (article_id, title, body_markdown, edited_by) VALUES (?, ?, ?, ?)')
+       ->execute([$newId, $title, $body, Auth::id()]);
     flash('success', 'Article created.');
     redirect('/admin/kb/articles');
 });
@@ -1881,6 +1887,15 @@ $router->post('/admin/kb/articles/{id}/edit', function (array $p) {
         $publishedAt = null;
     }
 
+    // Save revision snapshot before overwriting
+    $snap = $db->prepare('SELECT title, body_markdown FROM kb_articles WHERE id = ?');
+    $snap->execute([$id]);
+    $snapRow = $snap->fetch();
+    if ($snapRow) {
+        $db->prepare('INSERT INTO kb_article_revisions (article_id, title, body_markdown, edited_by) VALUES (?, ?, ?, ?)')
+           ->execute([$id, $snapRow['title'], $snapRow['body_markdown'], Auth::id()]);
+    }
+
     $db->prepare(
         'UPDATE kb_articles SET folder_id=?, title=?, slug=?, body_markdown=?, status=?, published_at=?, sort_order=? WHERE id=?'
     )->execute([$folderId, $title, $slug, $body, $status, $publishedAt, $order, $id]);
@@ -1918,6 +1933,104 @@ $router->get('/admin/kb/articles/{id}/preview', function (array $p) {
     }
     $article['body_html'] = renderMarkdown($article['body_markdown']);
     render('admin/kb/articles/preview', ['article' => $article]);
+});
+
+/* ==================================================================
+ * ADMIN – KB Article Version History
+ * ================================================================== */
+
+$router->get('/admin/kb/articles/{id}/history', function (array $p) {
+    Auth::requireRole('admin');
+    $db      = Database::connect();
+    $id      = (int) $p['id'];
+    $stmt    = $db->prepare('SELECT * FROM kb_articles WHERE id = ?');
+    $stmt->execute([$id]);
+    $article = $stmt->fetch();
+    if (!$article) {
+        flash('error', 'Article not found.');
+        redirect('/admin/kb/articles');
+    }
+    $revStmt = $db->prepare(
+        "SELECT r.*, CONCAT(u.first_name, ' ', u.last_name) AS editor_name
+         FROM kb_article_revisions r
+         LEFT JOIN users u ON r.edited_by = u.id
+         WHERE r.article_id = ?
+         ORDER BY r.created_at DESC"
+    );
+    $revStmt->execute([$id]);
+    $revisions = $revStmt->fetchAll();
+    render('admin/kb/articles/history', compact('article', 'revisions'));
+});
+
+$router->get('/admin/kb/articles/{id}/history/{rid}', function (array $p) {
+    Auth::requireRole('admin');
+    $db      = Database::connect();
+    $id      = (int) $p['id'];
+    $rid     = (int) $p['rid'];
+
+    $artStmt = $db->prepare('SELECT * FROM kb_articles WHERE id = ?');
+    $artStmt->execute([$id]);
+    $article = $artStmt->fetch();
+    if (!$article) {
+        flash('error', 'Article not found.');
+        redirect('/admin/kb/articles');
+    }
+
+    $revStmt = $db->prepare(
+        "SELECT r.*, CONCAT(u.first_name, ' ', u.last_name) AS editor_name
+         FROM kb_article_revisions r
+         LEFT JOIN users u ON r.edited_by = u.id
+         WHERE r.id = ? AND r.article_id = ?"
+    );
+    $revStmt->execute([$rid, $id]);
+    $revision = $revStmt->fetch();
+    if (!$revision) {
+        flash('error', 'Revision not found.');
+        redirect("/admin/kb/articles/{$id}/history");
+    }
+
+    // LCS-based line diff (revision body vs current body)
+    $computeDiff = function (string $old, string $new): array {
+        $a = explode("\n", $old);
+        $b = explode("\n", $new);
+        $m = count($a);
+        $n = count($b);
+        if ($m > 800 || $n > 800) {
+            return [['type' => 'too_large']];
+        }
+        // Build LCS table
+        $dp = [];
+        for ($i = 0; $i <= $m; $i++) {
+            $dp[$i] = array_fill(0, $n + 1, 0);
+        }
+        for ($i = 1; $i <= $m; $i++) {
+            for ($j = 1; $j <= $n; $j++) {
+                $dp[$i][$j] = $a[$i-1] === $b[$j-1]
+                    ? $dp[$i-1][$j-1] + 1
+                    : max($dp[$i-1][$j], $dp[$i][$j-1]);
+            }
+        }
+        // Traceback
+        $diff = [];
+        $i = $m; $j = $n;
+        while ($i > 0 || $j > 0) {
+            if ($i > 0 && $j > 0 && $a[$i-1] === $b[$j-1]) {
+                array_unshift($diff, ['type' => 'eq', 'line' => $a[$i-1]]);
+                $i--; $j--;
+            } elseif ($j > 0 && ($i === 0 || $dp[$i][$j-1] >= $dp[$i-1][$j])) {
+                array_unshift($diff, ['type' => 'add', 'line' => $b[$j-1]]);
+                $j--;
+            } else {
+                array_unshift($diff, ['type' => 'del', 'line' => $a[$i-1]]);
+                $i--;
+            }
+        }
+        return $diff;
+    };
+
+    $diff = $computeDiff($revision['body_markdown'], $article['body_markdown']);
+
+    render('admin/kb/articles/diff', compact('article', 'revision', 'diff'));
 });
 
 /* ==================================================================

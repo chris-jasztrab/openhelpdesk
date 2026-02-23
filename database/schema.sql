@@ -153,6 +153,7 @@ CREATE TABLE IF NOT EXISTS `kb_categories` (
     `name`        VARCHAR(255) NOT NULL,
     `slug`        VARCHAR(255) NOT NULL UNIQUE,
     `description` TEXT,
+    `is_public`   TINYINT(1)   NOT NULL DEFAULT 0,
     `sort_order`  INT UNSIGNED NOT NULL DEFAULT 0,
     `created_at`  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     `updated_at`  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -355,4 +356,31 @@ CREATE TABLE IF NOT EXISTS `scheduled_reports` (
     `is_enabled`   TINYINT(1) NOT NULL DEFAULT 1,
     `created_at`   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     `updated_at`   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- KB article ratings (thumbs up/down feedback per article)
+CREATE TABLE IF NOT EXISTS `kb_article_ratings` (
+    `id`         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `article_id` INT UNSIGNED NOT NULL,
+    `user_id`    INT UNSIGNED NULL DEFAULT NULL,
+    `session_id` VARCHAR(64)  NULL DEFAULT NULL,
+    `rating`     TINYINT(1)   NOT NULL COMMENT '1=helpful, -1=not helpful',
+    `created_at` TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY `uq_rating_user`    (`article_id`, `user_id`),
+    KEY        `idx_rating_session`(`article_id`, `session_id`),
+    FOREIGN KEY (`article_id`) REFERENCES `kb_articles`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`user_id`)    REFERENCES `users`(`id`)       ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- KB article version history (snapshot before each edit)
+CREATE TABLE IF NOT EXISTS `kb_article_revisions` (
+    `id`            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `article_id`    INT UNSIGNED NOT NULL,
+    `title`         VARCHAR(255) NOT NULL,
+    `body_markdown` LONGTEXT     NOT NULL,
+    `edited_by`     INT UNSIGNED NOT NULL,
+    `created_at`    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    KEY `idx_rev_article` (`article_id`),
+    FOREIGN KEY (`article_id`) REFERENCES `kb_articles`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`edited_by`)  REFERENCES `users`(`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
