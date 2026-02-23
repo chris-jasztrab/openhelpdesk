@@ -475,6 +475,26 @@ $router->post('/profile', function () {
     $theme = in_array($_POST['theme'] ?? '', ['light', 'dark'], true) ? $_POST['theme'] : 'light';
     setSetting('ui_theme:' . $userId, $theme);
 
+    // Save notification preferences
+    $db->prepare(
+        'UPDATE users SET
+            notify_ticket_created = ?,
+            notify_ticket_updated = ?,
+            notify_ticket_cc      = ?,
+            notify_ticket_merged  = ?,
+            notify_escalation     = ?,
+            notify_csat           = ?
+         WHERE id = ?'
+    )->execute([
+        isset($_POST['notify_ticket_created']) ? 1 : 0,
+        isset($_POST['notify_ticket_updated']) ? 1 : 0,
+        isset($_POST['notify_ticket_cc'])      ? 1 : 0,
+        isset($_POST['notify_ticket_merged'])  ? 1 : 0,
+        isset($_POST['notify_escalation'])     ? 1 : 0,
+        isset($_POST['notify_csat'])           ? 1 : 0,
+        $userId,
+    ]);
+
     // Refresh session so navbar reflects changes immediately
     $_SESSION['user']['first_name'] = $fn;
     $_SESSION['user']['last_name']  = $ln;

@@ -320,14 +320,19 @@ $router->post('/portal/tickets/create', function () {
         'footerText'   => $tpl['footer'],
     ]);
 
-    sendMail(
-        $creator['email'],
-        $creator['first_name'] . ' ' . $creator['last_name'],
-        $tpl['subject'],
-        $emailHtml,
-        '',
-        $ticketId
-    );
+    // Only send if user hasn't opted out of ticket-created emails
+    $notifyPref = $db->prepare('SELECT notify_ticket_created FROM users WHERE id = ?');
+    $notifyPref->execute([Auth::id()]);
+    if ((bool)($notifyPref->fetchColumn() ?? 1)) {
+        sendMail(
+            $creator['email'],
+            $creator['first_name'] . ' ' . $creator['last_name'],
+            $tpl['subject'],
+            $emailHtml,
+            '',
+            $ticketId
+        );
+    }
 
     // Initialize SLA timers if priority is set and SLA is configured
     if ($priorityId) {

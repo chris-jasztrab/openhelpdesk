@@ -96,6 +96,41 @@ $breadcrumbs = [
                 </div>
             </div>
 
+            <!-- Notification Preferences -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-transparent fw-semibold">
+                    <i class="bi bi-bell me-1"></i>Email Notifications
+                </div>
+                <div class="card-body pb-1">
+                    <p class="text-muted small mb-3">Choose which events you want to receive emails about.</p>
+                    <?php
+                    $notifyOptions = [
+                        ['key' => 'notify_ticket_created', 'icon' => 'bi-ticket-detailed',     'label' => 'Ticket submitted',     'desc' => 'Confirmation email when you open a new ticket.'],
+                        ['key' => 'notify_ticket_updated', 'icon' => 'bi-chat-left-text',       'label' => 'Ticket reply',         'desc' => 'Email when someone replies to one of your tickets.'],
+                        ['key' => 'notify_ticket_cc',      'icon' => 'bi-person-lines-fill',    'label' => 'CC updates',           'desc' => "Email when a ticket you're CC'd on receives a reply or is merged."],
+                        ['key' => 'notify_ticket_merged',  'icon' => 'bi-arrows-collapse',      'label' => 'Ticket merged',        'desc' => 'Email when one of your tickets is merged into another.'],
+                        ['key' => 'notify_escalation',     'icon' => 'bi-exclamation-triangle', 'label' => 'Escalation alerts',   'desc' => 'Email when an escalation rule fires and targets you.'],
+                        ['key' => 'notify_csat',           'icon' => 'bi-star',                 'label' => 'Satisfaction surveys', 'desc' => 'Survey email after your ticket is resolved.'],
+                    ];
+                    foreach ($notifyOptions as $opt):
+                        $checked = ($user[$opt['key']] ?? 1) ? 'checked' : '';
+                    ?>
+                    <div class="d-flex align-items-start gap-3 py-2 border-bottom">
+                        <div class="form-check form-switch mb-0 pt-1">
+                            <input class="form-check-input" type="checkbox"
+                                   name="<?= $opt['key'] ?>" id="<?= $opt['key'] ?>" value="1" <?= $checked ?>>
+                        </div>
+                        <label class="mb-0 flex-grow-1" for="<?= $opt['key'] ?>" style="cursor:pointer;">
+                            <div class="fw-semibold small">
+                                <i class="bi <?= $opt['icon'] ?> me-1 text-muted"></i><?= $opt['label'] ?>
+                            </div>
+                            <div class="text-muted" style="font-size:.8rem;"><?= $opt['desc'] ?></div>
+                        </label>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+
             <button type="submit" class="btn text-white px-4" style="background:var(--ld-primary);">
                 <i class="bi bi-check-lg me-1"></i>Save Changes
             </button>

@@ -515,7 +515,7 @@ function renderEmail(string $template, array $data = []): string
 function notifyTicketCreator(PDO $db, int $ticketId, string $message, string $authorName): void
 {
     $stmt = $db->prepare(
-        "SELECT t.subject, t.created_by, u.email, u.first_name, u.last_name
+        "SELECT t.subject, t.created_by, u.email, u.first_name, u.last_name, u.notify_ticket_updated
          FROM tickets t
          JOIN users u ON t.created_by = u.id
          WHERE t.id = ?"
@@ -524,6 +524,9 @@ function notifyTicketCreator(PDO $db, int $ticketId, string $message, string $au
     $row = $stmt->fetch();
     if (!$row || (int) $row['created_by'] === Auth::id()) {
         return; // ticket not found or updater is the creator
+    }
+    if (!(bool)($row['notify_ticket_updated'] ?? 1)) {
+        return; // user opted out of ticket reply emails
     }
 
     $appUrl    = env('APP_URL', 'http://localhost:8000');
@@ -578,7 +581,7 @@ function notifyCcUsers(PDO $db, int $ticketId, string $message, string $authorNa
 
     // Fetch CC'd users
     $cc = $db->prepare(
-        'SELECT u.id, u.first_name, u.last_name, u.email, u.role
+        'SELECT u.id, u.first_name, u.last_name, u.email, u.role, u.notify_ticket_cc
          FROM ticket_cc tc
          JOIN users u ON tc.user_id = u.id
          WHERE tc.ticket_id = ?'
@@ -588,6 +591,7 @@ function notifyCcUsers(PDO $db, int $ticketId, string $message, string $authorNa
     foreach ($cc->fetchAll() as $user) {
         $uid = (int) $user['id'];
         if ($uid === $currentId || $uid === $creatorId) continue;
+        if (!(bool)($user['notify_ticket_cc'] ?? 1)) continue; // opted out
 
         // Build the correct URL based on role
         $prefix = match ($user['role']) {
@@ -636,7 +640,7 @@ function notifyTicketMerged(PDO $db, int $sourceId, int $targetId): void
 {
     // Fetch source ticket and creator
     $srcStmt = $db->prepare(
-        "SELECT t.subject, t.created_by, u.email, u.first_name, u.last_name
+        "SELECT t.subject, t.created_by, u.email, u.first_name, u.last_name, u.notify_ticket_merged
          FROM tickets t
          JOIN users u ON t.created_by = u.id
          WHERE t.id = ?"
@@ -662,35 +666,37 @@ function notifyTicketMerged(PDO $db, int $sourceId, int $targetId): void
     ];
 
     // Notify source ticket creator
-    $tpl = getEmailTpl('ticket-merged', array_merge($mergedTokensBase, [
-        'user_name'  => $src['first_name'] . ' ' . $src['last_name'],
-        'first_name' => $src['first_name'],
-        'last_name'  => $src['last_name'],
-    ]));
+    if ((bool)($src['notify_ticket_merged'] ?? 1)) {
+        $tpl = getEmailTpl('ticket-merged', array_merge($mergedTokensBase, [
+            'user_name'  => $src['first_name'] . ' ' . $src['last_name'],
+            'first_name' => $src['first_name'],
+            'last_name'  => $src['last_name'],
+        ]));
 
-    $emailHtml = renderEmail('ticket-merged', [
-        'sourceTicketId' => $sourceId,
-        'sourceSubject'  => $src['subject'],
-        'targetTicketId' => $targetId,
-        'targetSubject'  => $tgt['subject'],
-        'ticketUrl'      => $ticketUrl,
-        'introText'      => $tpl['intro'],
-        'buttonLabel'    => $tpl['button'],
-        'footerText'     => $tpl['footer'],
-    ]);
+        $emailHtml = renderEmail('ticket-merged', [
+            'sourceTicketId' => $sourceId,
+            'sourceSubject'  => $src['subject'],
+            'targetTicketId' => $targetId,
+            'targetSubject'  => $tgt['subject'],
+            'ticketUrl'      => $ticketUrl,
+            'introText'      => $tpl['intro'],
+            'buttonLabel'    => $tpl['button'],
+            'footerText'     => $tpl['footer'],
+        ]);
 
-    sendMail(
-        $src['email'],
-        $src['first_name'] . ' ' . $src['last_name'],
-        $tpl['subject'],
-        $emailHtml,
-        '',
-        $targetId
-    );
+        sendMail(
+            $src['email'],
+            $src['first_name'] . ' ' . $src['last_name'],
+            $tpl['subject'],
+            $emailHtml,
+            '',
+            $targetId
+        );
+    }
 
     // Notify CC'd users on the source ticket (skip creator)
     $ccStmt = $db->prepare(
-        'SELECT u.id, u.first_name, u.last_name, u.email, u.role
+        'SELECT u.id, u.first_name, u.last_name, u.email, u.role, u.notify_ticket_cc
          FROM ticket_cc tc
          JOIN users u ON tc.user_id = u.id
          WHERE tc.ticket_id = ?'
@@ -700,6 +706,7 @@ function notifyTicketMerged(PDO $db, int $sourceId, int $targetId): void
     $creatorId = (int) $src['created_by'];
     foreach ($ccStmt->fetchAll() as $user) {
         if ((int) $user['id'] === $creatorId) continue;
+        if (!(bool)($user['notify_ticket_cc'] ?? 1)) continue; // opted out
 
         $prefix = match ($user['role']) {
             'admin' => '/admin',
@@ -925,10 +932,11 @@ function runEscalationRule(\PDO $db, array $rule, array $ticket): void
                 }
                 if ($targetUserId <= 0) break;
 
-                $s = $db->prepare('SELECT id, first_name, last_name, email, role FROM users WHERE id = ?');
+                $s = $db->prepare('SELECT id, first_name, last_name, email, role, notify_escalation FROM users WHERE id = ?');
                 $s->execute([$targetUserId]);
                 $targetUser = $s->fetch();
                 if (!$targetUser) break;
+                if (!(bool)($targetUser['notify_escalation'] ?? 1)) break; // opted out
 
                 // Fetch ticket subject for message
                 $s = $db->prepare('SELECT subject FROM tickets WHERE id = ?');
@@ -1003,7 +1011,7 @@ function sendCsatSurvey(\PDO $db, int $ticketId): void
 
     // Fetch ticket subject + creator details
     $stmt = $db->prepare(
-        'SELECT t.subject, u.id AS user_id, u.email, u.first_name, u.last_name
+        'SELECT t.subject, u.id AS user_id, u.email, u.first_name, u.last_name, u.notify_csat
          FROM tickets t
          JOIN users u ON t.created_by = u.id
          WHERE t.id = ?'
@@ -1012,6 +1020,9 @@ function sendCsatSurvey(\PDO $db, int $ticketId): void
     $row = $stmt->fetch();
     if (!$row || empty($row['email'])) {
         return;
+    }
+    if (!(bool)($row['notify_csat'] ?? 1)) {
+        return; // user opted out of satisfaction surveys
     }
 
     $token = bin2hex(random_bytes(32));
