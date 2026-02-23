@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="tests/bootstrap.php"
+         colors="true"
+         failOnWarning="false"
+         stopOnFailure="false">
+
+    <testsuites>
+        <testsuite name="Feature">
+            <directory>tests/Feature</directory>
+        </testsuite>
+    </testsuites>
+
+    <php>
+        <!--
+            Override these with environment variables or edit here.
+            TEST_BASE_URL: URL the app is served at (e.g. php -S localhost:8000 -t public)
+        -->
+        <env name="TEST_BASE_URL" value="http://localhost:8000"/>
+    </php>
+
+</phpunit>
