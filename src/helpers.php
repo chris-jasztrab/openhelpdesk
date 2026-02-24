@@ -470,6 +470,10 @@ function getEmailTpl(string $name, array $rawTokens): array
             'intro'   => 'Ticket #{{source_ticket_id}} has been consolidated with a related ticket. You can view updates and add comments on the master ticket.',
             'button'  => 'View Master Ticket',
         ],
+        'csat_survey' => [
+            'subject' => 'How did we do? — [Ticket #{{ticket_id}}] {{subject}}',
+            'intro'   => 'Your ticket has been resolved. We\'d love to hear how we did — it only takes one click!',
+        ],
     ];
 
     $d = $defaults[$key] ?? ['subject' => '', 'intro' => '', 'button' => 'View Ticket'];
@@ -1034,6 +1038,14 @@ function sendCsatSurvey(\PDO $db, int $ticketId): void
     $brandColor = getSetting('branding_primary_color', '#4f46e5');
     $appName    = getSetting('app_name', 'LocalDesk');
 
+    $tpl = getEmailTpl('csat_survey', [
+        'ticket_id'  => $ticketId,
+        'subject'    => $row['subject'],
+        'first_name' => $row['first_name'],
+        'last_name'  => $row['last_name'],
+        'user_name'  => $row['first_name'] . ' ' . $row['last_name'],
+    ]);
+
     $emailHtml = renderEmail('csat-survey', [
         'ticketId'   => $ticketId,
         'subject'    => $row['subject'],
@@ -1041,13 +1053,14 @@ function sendCsatSurvey(\PDO $db, int $ticketId): void
         'surveyUrl'  => $surveyUrl,
         'brandColor' => $brandColor,
         'appName'    => $appName,
-        'footerText' => 'This is an automated message from ' . $appName . '. Please do not reply to this email.',
+        'introText'  => $tpl['intro'],
+        'footerText' => $tpl['footer'],
     ]);
 
     sendMail(
         $row['email'],
         $row['first_name'] . ' ' . $row['last_name'],
-        'How did we do? — [Ticket #' . $ticketId . '] ' . $row['subject'],
+        $tpl['subject'],
         $emailHtml,
         '',
         $ticketId

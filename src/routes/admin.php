@@ -2578,6 +2578,7 @@ $router->get('/admin/settings/email-templates', function () {
         'email_subject_ticket_created', 'email_intro_ticket_created', 'email_button_ticket_created',
         'email_subject_ticket_updated', 'email_intro_ticket_updated', 'email_button_ticket_updated',
         'email_subject_ticket_merged',  'email_intro_ticket_merged',  'email_button_ticket_merged',
+        'email_subject_csat_survey',    'email_intro_csat_survey',
         'email_footer_text',
     ];
     $tplValues = [];
@@ -2598,11 +2599,13 @@ $router->post('/admin/settings/email-templates', function () {
     $tab = $_POST['tab'] ?? 'ticket_created';
 
     // Reset buttons clear settings back to default (empty = use hardcoded default)
-    if (isset($_POST['reset_template']) && in_array($_POST['reset_template'], ['ticket_created', 'ticket_updated', 'ticket_merged'], true)) {
+    if (isset($_POST['reset_template']) && in_array($_POST['reset_template'], ['ticket_created', 'ticket_updated', 'ticket_merged', 'csat_survey'], true)) {
         $tpl = $_POST['reset_template'];
         setSetting("email_subject_{$tpl}", '');
         setSetting("email_intro_{$tpl}", '');
-        setSetting("email_button_{$tpl}", '');
+        if ($tpl !== 'csat_survey') {
+            setSetting("email_button_{$tpl}", '');
+        }
         flash('success', 'Email template reset to defaults.');
         redirect('/admin/settings/email-templates?tab=' . $tpl);
     }
@@ -2616,10 +2619,12 @@ $router->post('/admin/settings/email-templates', function () {
     if ($tab === 'shared') {
         setSetting('email_footer_text', trim($_POST['email_footer_text'] ?? ''));
         flash('success', 'Footer text saved.');
-    } elseif (in_array($tab, ['ticket_created', 'ticket_updated', 'ticket_merged'], true)) {
+    } elseif (in_array($tab, ['ticket_created', 'ticket_updated', 'ticket_merged', 'csat_survey'], true)) {
         setSetting("email_subject_{$tab}", trim($_POST["email_subject_{$tab}"] ?? ''));
         setSetting("email_intro_{$tab}",   trim($_POST["email_intro_{$tab}"]   ?? ''));
-        setSetting("email_button_{$tab}",  trim($_POST["email_button_{$tab}"]  ?? ''));
+        if ($tab !== 'csat_survey') {
+            setSetting("email_button_{$tab}",  trim($_POST["email_button_{$tab}"]  ?? ''));
+        }
         flash('success', 'Email template saved.');
     }
 

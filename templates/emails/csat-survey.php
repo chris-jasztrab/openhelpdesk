@@ -19,8 +19,7 @@
             <h2 style="margin:0 0 8px; font-size:18px; color:#1e293b;">How did we do?</h2>
             <p style="margin:0 0 4px; font-size:14px; color:#64748b;">Hi <?= htmlspecialchars($firstName, ENT_QUOTES, 'UTF-8') ?>,</p>
             <p style="margin:0 0 24px; font-size:14px; color:#64748b;">
-                Your ticket <strong>[#<?= (int) $ticketId ?>] <?= htmlspecialchars($subject, ENT_QUOTES, 'UTF-8') ?></strong>
-                has been resolved. We'd love to hear how we did — it only takes one click!
+                <?= $introText ?>
             </p>
 
             <!-- Star rating buttons -->

@@ -38,6 +38,13 @@ $tokenSets = [
         ['token' => '{{target_ticket_id}}', 'desc' => 'Master ticket number'],
         ['token' => '{{target_subject}}',   'desc' => 'Master ticket subject'],
     ],
+    'csat_survey' => [
+        ['token' => '{{first_name}}',   'desc' => 'Recipient\'s first name'],
+        ['token' => '{{last_name}}',    'desc' => 'Recipient\'s last name'],
+        ['token' => '{{user_name}}',    'desc' => 'Recipient\'s full name (first + last)'],
+        ['token' => '{{ticket_id}}',    'desc' => 'Ticket number'],
+        ['token' => '{{subject}}',      'desc' => 'Ticket subject line'],
+    ],
 ];
 
 $defaults = [
@@ -56,6 +63,10 @@ $defaults = [
         'intro'   => 'Ticket #{{source_ticket_id}} has been consolidated with a related ticket. You can view updates and add comments on the master ticket.',
         'button'  => 'View Master Ticket',
     ],
+    'csat_survey' => [
+        'subject' => 'How did we do? — [Ticket #{{ticket_id}}] {{subject}}',
+        'intro'   => 'Your ticket has been resolved. We\'d love to hear how we did — it only takes one click!',
+    ],
 ];
 
 $defaultFooter = 'This is an automated message from LocalDesk. Please do not reply directly to this email.';
@@ -64,10 +75,11 @@ $tabs = [
     'ticket_created' => ['label' => 'Ticket Created',  'icon' => 'bi-ticket-perforated'],
     'ticket_updated' => ['label' => 'Ticket Updated',  'icon' => 'bi-chat-left-text'],
     'ticket_merged'  => ['label' => 'Ticket Merged',   'icon' => 'bi-diagram-2'],
+    'csat_survey'    => ['label' => 'CSAT Survey',     'icon' => 'bi-star'],
 ];
 
 $activeTab = $_GET['tab'] ?? 'ticket_created';
-if (!array_key_exists($activeTab, $tabs)) {
+if (!array_key_exists($activeTab, $tabs) && $activeTab !== 'shared') {
     $activeTab = 'ticket_created';
 }
 ?>
@@ -161,6 +173,7 @@ if (!array_key_exists($activeTab, $tabs)) {
                         </div>
                     </div>
 
+                    <?php if ($activeTab !== 'csat_survey'): ?>
                     <div class="mb-4" style="max-width:300px;">
                         <label class="form-label fw-semibold">Button Label</label>
                         <input type="text" class="form-control"
@@ -169,6 +182,12 @@ if (!array_key_exists($activeTab, $tabs)) {
                                placeholder="<?= e($defaults[$activeTab]['button']) ?>">
                         <div class="form-text">Leave blank to use the default.</div>
                     </div>
+                    <?php else: ?>
+                    <div class="alert alert-info small mb-4">
+                        <i class="bi bi-info-circle me-1"></i>
+                        The CSAT survey email uses <strong>star rating buttons</strong> (1–5) instead of a single call-to-action button, so there is no button label to customise.
+                    </div>
+                    <?php endif; ?>
 
                     <div class="d-flex gap-2">
                         <button type="submit" class="btn text-white" style="background:var(--ld-primary);">
@@ -177,7 +196,7 @@ if (!array_key_exists($activeTab, $tabs)) {
                         <?php
                         $hasCustom = !empty($tplValues["email_subject_{$activeTab}"])
                                   || !empty($tplValues["email_intro_{$activeTab}"])
-                                  || !empty($tplValues["email_button_{$activeTab}"]);
+                                  || ($activeTab !== 'csat_survey' && !empty($tplValues["email_button_{$activeTab}"]));
                         ?>
                         <?php if ($hasCustom): ?>
                         <button type="submit" name="reset_template" value="<?= e($activeTab) ?>"
@@ -221,6 +240,7 @@ if (!array_key_exists($activeTab, $tabs)) {
                     'ticket_created' => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working', 'type' => 'Hardware', 'location' => 'Main Branch', 'priority' => 'High'],
                     'ticket_updated' => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working', 'message' => 'We are looking into this.', 'author' => 'Jane Smith'],
                     'ticket_merged'  => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'source_ticket_id' => '42', 'source_subject' => 'Printer not working', 'target_ticket_id' => '38', 'target_subject' => 'Office printer issues'],
+                    'csat_survey'    => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working'],
                 ];
                 $preview = $subjectTpl;
                 foreach ($previewTokens[$activeTab] as $k => $v) {
