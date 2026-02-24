@@ -12,7 +12,7 @@ $slaStateColors = ['on_track' => 'success', 'warning' => 'warning', 'breached' =
 $hasFilters = array_filter($filters, fn($v) => $v !== '');
 $sortParams = array_filter($filters, fn($v) => $v !== '');
 $allColumns = ticketColumnDefinitions();
-$colCount = 2 + count($visibleColumns); // id + subject + visible toggleable columns
+$colCount = 3 + count($visibleColumns); // checkbox + id + subject + visible toggleable columns
 $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : '');
 ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -262,10 +262,30 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
 </div>
 
 <div class="card border-0 shadow-sm">
-    <div class="table-responsive">
+    <!-- Bulk Action Bar (shown when tickets are selected) -->
+    <div id="bulkBar" style="display:none;background:#eef2ff;border-bottom:1px solid #d1d9f0;padding:.5rem .75rem;align-items:center;gap:.5rem;">
+        <span id="bulkCount" class="text-muted small fw-semibold me-1">0 selected</span>
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="bulkAction('assign')">
+            <i class="bi bi-person-check me-1"></i>Assign
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="bulkAction('close')">
+            <i class="bi bi-check-circle me-1"></i>Close
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="bulkAction('merge')">
+            <i class="bi bi-diagram-2 me-1"></i>Merge
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-danger" onclick="bulkAction('delete')">
+            <i class="bi bi-trash me-1"></i>Delete
+        </button>
+        <button type="button" class="btn btn-sm btn-link text-muted ms-auto p-0" onclick="clearSelection()" title="Clear selection">
+            <i class="bi bi-x-lg"></i>
+        </button>
+    </div>
+    <div style="overflow:auto;max-height:calc(100vh - 260px);">
         <table class="table table-hover align-middle mb-0">
-            <thead class="table-light">
+            <thead class="table-light" style="position:sticky;top:0;z-index:5;box-shadow:0 1px 2px rgba(0,0,0,.06);">
                 <tr>
+                    <th style="width:36px;"><input type="checkbox" id="selectAll" class="form-check-input" title="Select all"></th>
                     <th style="width:60px"><a href="<?= sortUrl('id', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark"># <?= sortIcon('id', $sort, $dir) ?></a></th>
                     <th><a href="<?= sortUrl('subject', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Subject <?= sortIcon('subject', $sort, $dir) ?></a></th>
                     <?php if (in_array('status', $visibleColumns)): ?>
@@ -306,6 +326,9 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                 <?php else: ?>
                     <?php foreach ($tickets as $t): ?>
                     <tr style="cursor:pointer;" onclick="window.location='/admin/tickets/<?= $t['id'] ?>'">
+                        <td onclick="event.stopPropagation()">
+                            <input type="checkbox" class="ticket-cb form-check-input" value="<?= $t['id'] ?>">
+                        </td>
                         <td class="text-muted fw-bold"><?= $t['id'] ?></td>
                         <td>
                             <a href="/admin/tickets/<?= $t['id'] ?>" class="text-decoration-none fw-semibold text-dark">
@@ -387,9 +410,41 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
     </div>
 </div>
 
+<!-- Bulk Actions Form (submitted programmatically) -->
+<form id="bulkForm" method="POST" action="/admin/tickets/bulk" class="d-none">
+    <?= csrfField() ?>
+    <input type="hidden" name="action" id="bulkActionInput">
+</form>
+
+<!-- Bulk Assign Modal -->
+<div class="modal fade" id="bulkAssignModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title fw-bold">Assign Tickets</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <label class="form-label small fw-semibold mb-1">Assign to</label>
+                <select id="bulkAssignAgent" class="form-select form-select-sm">
+                    <option value="">— Unassigned —</option>
+                    <?php foreach ($agents as $ag): ?>
+                    <option value="<?= $ag['id'] ?>"><?= e($ag['first_name'] . ' ' . $ag['last_name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-sm text-white" style="background:var(--ld-primary);" onclick="submitBulkAssign()">Assign</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 sessionStorage.setItem('adminTicketListUrl', window.location.href);
 (function () {
+    // ── Filter panel ─────────────────────────────────────────────────────────
     function filterPanelOpen() {
         document.getElementById('filterPanel').classList.add('open');
         document.getElementById('filterPanelBackdrop').classList.add('open');
@@ -405,6 +460,88 @@ sessionStorage.setItem('adminTicketListUrl', window.location.href);
     };
     window.filterPanelClose = filterPanelClose;
     if (sessionStorage.getItem('adminFilterPanelOpen') === '1') filterPanelOpen();
+
+    // ── Bulk selection ────────────────────────────────────────────────────────
+    var selectedIds = new Set();
+
+    function updateBulkBar() {
+        var bar = document.getElementById('bulkBar');
+        var cnt = document.getElementById('bulkCount');
+        if (selectedIds.size > 0) {
+            bar.style.display = 'flex';
+            cnt.textContent = selectedIds.size + ' selected';
+        } else {
+            bar.style.display = 'none';
+        }
+    }
+
+    document.getElementById('selectAll').addEventListener('change', function () {
+        var checked = this.checked;
+        document.querySelectorAll('.ticket-cb').forEach(function (cb) {
+            cb.checked = checked;
+            if (checked) { selectedIds.add(cb.value); } else { selectedIds.delete(cb.value); }
+        });
+        updateBulkBar();
+    });
+
+    document.addEventListener('change', function (e) {
+        if (!e.target.classList.contains('ticket-cb')) return;
+        if (e.target.checked) { selectedIds.add(e.target.value); } else { selectedIds.delete(e.target.value); }
+        var all     = document.querySelectorAll('.ticket-cb');
+        var numChk  = document.querySelectorAll('.ticket-cb:checked').length;
+        var sa      = document.getElementById('selectAll');
+        sa.checked       = all.length > 0 && numChk === all.length;
+        sa.indeterminate = numChk > 0 && numChk < all.length;
+        updateBulkBar();
+    });
+
+    window.bulkAction = function (action) {
+        if (selectedIds.size === 0) return;
+        if (action === 'assign') {
+            new bootstrap.Modal(document.getElementById('bulkAssignModal')).show();
+            return;
+        }
+        if (action === 'merge' && selectedIds.size < 2) {
+            alert('Select at least 2 tickets to merge.');
+            return;
+        }
+        if (action === 'delete' && !confirm('Delete ' + selectedIds.size + ' ticket(s)? This cannot be undone.')) return;
+        submitBulk(action, null);
+    };
+
+    window.submitBulkAssign = function () {
+        var agentId = document.getElementById('bulkAssignAgent').value;
+        var modal   = bootstrap.Modal.getInstance(document.getElementById('bulkAssignModal'));
+        if (modal) modal.hide();
+        submitBulk('assign', agentId);
+    };
+
+    function submitBulk(action, agentId) {
+        var form = document.getElementById('bulkForm');
+        document.getElementById('bulkActionInput').value = action;
+        form.querySelectorAll('input[name="ticket_ids[]"]').forEach(function (el) { el.remove(); });
+        selectedIds.forEach(function (id) {
+            var inp = document.createElement('input');
+            inp.type = 'hidden'; inp.name = 'ticket_ids[]'; inp.value = id;
+            form.appendChild(inp);
+        });
+        var ag = form.querySelector('input[name="assign_to"]');
+        if (agentId !== null) {
+            if (!ag) { ag = document.createElement('input'); ag.type = 'hidden'; ag.name = 'assign_to'; form.appendChild(ag); }
+            ag.value = agentId;
+        } else if (ag) {
+            ag.remove();
+        }
+        form.submit();
+    }
+
+    window.clearSelection = function () {
+        selectedIds.clear();
+        document.querySelectorAll('.ticket-cb').forEach(function (cb) { cb.checked = false; });
+        var sa = document.getElementById('selectAll');
+        sa.checked = false; sa.indeterminate = false;
+        updateBulkBar();
+    };
 })();
 </script>
 

@@ -1356,6 +1356,103 @@ $router->post('/admin/tickets/create', function () {
     redirect("{$redirectBase}/tickets/{$ticketId}");
 });
 
+$router->post('/admin/tickets/bulk', function () {
+    Auth::requireRole('admin', 'agent');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/tickets');
+    }
+
+    $action    = $_POST['action'] ?? '';
+    $rawIds    = $_POST['ticket_ids'] ?? [];
+    $ticketIds = array_values(array_unique(array_map('intval', (array) $rawIds)));
+    $ticketIds = array_filter($ticketIds, fn($id) => $id > 0);
+
+    if (empty($ticketIds)) {
+        flash('error', 'No tickets selected.');
+        redirect('/admin/tickets');
+    }
+
+    $db          = Database::connect();
+    $placeholders = implode(',', array_fill(0, count($ticketIds), '?'));
+
+    switch ($action) {
+        case 'close':
+            $db->prepare("UPDATE tickets SET status = 'closed' WHERE id IN ({$placeholders})")
+               ->execute($ticketIds);
+            flash('success', count($ticketIds) . ' ticket(s) closed.');
+            break;
+
+        case 'assign':
+            $assignTo = !empty($_POST['assign_to']) ? (int) $_POST['assign_to'] : null;
+            $db->prepare("UPDATE tickets SET assigned_to = ? WHERE id IN ({$placeholders})")
+               ->execute(array_merge([$assignTo], $ticketIds));
+            $label = $assignTo ? 'reassigned' : 'unassigned';
+            flash('success', count($ticketIds) . ' ticket(s) ' . $label . '.');
+            break;
+
+        case 'merge':
+            if (count($ticketIds) < 2) {
+                flash('error', 'Select at least 2 tickets to merge.');
+                redirect('/admin/tickets');
+            }
+            sort($ticketIds);
+            $targetId = array_shift($ticketIds); // lowest ID becomes the primary
+            $tgt = $db->prepare('SELECT id, subject FROM tickets WHERE id = ? AND merged_into_ticket_id IS NULL');
+            $tgt->execute([$targetId]);
+            $targetTicket = $tgt->fetch();
+            if (!$targetTicket) {
+                flash('error', 'Primary ticket not found or already merged.');
+                redirect('/admin/tickets');
+            }
+            $actor  = Auth::fullName();
+            $merged = 0;
+            foreach ($ticketIds as $sourceId) {
+                $src = $db->prepare('SELECT id, subject FROM tickets WHERE id = ? AND merged_into_ticket_id IS NULL');
+                $src->execute([$sourceId]);
+                $sourceTicket = $src->fetch();
+                if (!$sourceTicket) continue;
+                $db->beginTransaction();
+                try {
+                    $db->prepare('INSERT IGNORE INTO ticket_cc (ticket_id, user_id, added_by) SELECT ?, user_id, ? FROM ticket_cc WHERE ticket_id = ?')
+                       ->execute([$targetId, Auth::id(), $sourceId]);
+                    $db->prepare('INSERT IGNORE INTO ticket_tag_map (ticket_id, tag_id) SELECT ?, tag_id FROM ticket_tag_map WHERE ticket_id = ?')
+                       ->execute([$targetId, $sourceId]);
+                    $db->prepare('INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)')
+                       ->execute([$targetId, Auth::id(), 'merged', "Ticket #{$sourceId} ({$sourceTicket['subject']}) was merged into this ticket by {$actor}"]);
+                    $db->prepare('INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)')
+                       ->execute([$sourceId, Auth::id(), 'merged', "This ticket was merged into #{$targetId} ({$targetTicket['subject']}) by {$actor}"]);
+                    $db->prepare('UPDATE tickets SET status = ?, merged_into_ticket_id = ? WHERE id = ?')
+                       ->execute(['closed', $targetId, $sourceId]);
+                    $db->commit();
+                    notifyTicketMerged($db, $sourceId, $targetId);
+                    $merged++;
+                } catch (\Throwable $e) {
+                    $db->rollBack();
+                }
+            }
+            flash('success', "{$merged} ticket(s) merged into #{$targetId}.");
+            redirect("/admin/tickets/{$targetId}");
+
+        case 'delete':
+            Auth::requireRole('admin');
+            $files = $db->prepare("SELECT stored_name FROM ticket_attachments WHERE ticket_id IN ({$placeholders})");
+            $files->execute($ticketIds);
+            foreach ($files->fetchAll() as $f) {
+                $path = ATTACHMENT_STORAGE_PATH . $f['stored_name'];
+                if (file_exists($path)) unlink($path);
+            }
+            $db->prepare("DELETE FROM tickets WHERE id IN ({$placeholders})")->execute($ticketIds);
+            flash('success', count($ticketIds) . ' ticket(s) deleted.');
+            break;
+
+        default:
+            flash('error', 'Unknown action.');
+    }
+
+    redirect('/admin/tickets');
+});
+
 $router->get('/admin/tickets/{id}', function (array $p) {
     Auth::requireRole('admin');
     $db = Database::connect();
