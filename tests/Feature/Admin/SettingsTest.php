@@ -20,7 +20,7 @@ class SettingsTest extends TestCase
     {
         $r = $this->get($this->adminClient(), $path);
         $this->assertOk($r, " — $path");
-        $this->assertSee($keyword, $r, " — expected «$keyword» on $path");
+        $this->assertSee($keyword, $r, " — expected «{$keyword}» on {$path}");
     }
 
     public static function settingsPages(): array
