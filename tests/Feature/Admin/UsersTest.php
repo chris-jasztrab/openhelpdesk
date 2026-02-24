@@ -30,7 +30,7 @@ class UsersTest extends TestCase
     public function test_user_list_shows_create_button(): void
     {
         $r = $this->get($this->adminClient(), '/admin/users');
-        $this->assertSee('New User', $r);
+        $this->assertSee('Add User', $r);
     }
 
     // ── Create ────────────────────────────────────────────────────────────────
@@ -39,7 +39,7 @@ class UsersTest extends TestCase
     {
         $r = $this->get($this->adminClient(), '/admin/users/create');
         $this->assertOk($r);
-        $this->assertSee('New User', $r);
+        $this->assertSee('Add User', $r);
     }
 
     public function test_create_user_and_delete_it(): void
@@ -88,7 +88,7 @@ class UsersTest extends TestCase
         $this->assertTrue(
             str_contains($body, 'already') ||
             str_contains($body, 'exists') ||
-            str_contains($body, 'New User') ||
+            str_contains($body, 'Add User') ||
             $r->getStatusCode() === 302,
             'Expected error for duplicate email'
         );

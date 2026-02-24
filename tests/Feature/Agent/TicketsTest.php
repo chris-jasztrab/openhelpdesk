@@ -120,7 +120,7 @@ class TicketsTest extends TestCase
     public function test_view_ticket_shows_reply_form(): void
     {
         $r = $this->get($this->agentClient(), '/agent/tickets/' . DatabaseSeeder::$ticketId);
-        $this->assertSee('Reply', $r);
+        $this->assertSee('Add Comment', $r);
     }
 
     public function test_view_ticket_shows_sidebar_fields(): void

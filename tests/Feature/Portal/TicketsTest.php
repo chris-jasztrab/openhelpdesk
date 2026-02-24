@@ -95,7 +95,7 @@ class TicketsTest extends TestCase
     public function test_portal_ticket_view_shows_reply_form(): void
     {
         $r = $this->get($this->portalClient(), '/portal/tickets/' . DatabaseSeeder::$ticketId);
-        $this->assertSee('Reply', $r);
+        $this->assertSee('Add Comment', $r);
     }
 
     // ── Comment ───────────────────────────────────────────────────────────────

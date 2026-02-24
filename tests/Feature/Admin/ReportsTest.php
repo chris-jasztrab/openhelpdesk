@@ -58,7 +58,7 @@ class ReportsTest extends TestCase
     {
         $r = $this->get($this->adminClient(), '/admin/reports/csat');
         $this->assertOk($r);
-        $this->assertSee('CSAT', $r);
+        $this->assertSee('Satisfaction', $r);
     }
 
     // ── Role enforcement ──────────────────────────────────────────────────────
