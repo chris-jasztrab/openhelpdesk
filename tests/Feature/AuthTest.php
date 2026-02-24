@@ -24,7 +24,7 @@ class AuthTest extends TestCase
     public function test_login_page_contains_csrf_field(): void
     {
         $html = (string) $this->get($this->guestClient(), '/login')->getBody();
-        $this->assertMatchesRegularExpression('/name="_csrf"/', $html, 'Login form must contain a CSRF field');
+        $this->assertMatchesRegularExpression('/name="_token"/', $html, 'Login form must contain a CSRF field');
     }
 
     // ── Successful logins ─────────────────────────────────────────────────────
@@ -53,14 +53,14 @@ class AuthTest extends TestCase
 
     public function test_login_with_wrong_password_shows_error(): void
     {
-        $client   = $this->guestClient();
+        $client    = $this->guestClient();
         $loginHtml = (string) $this->get($client, '/login')->getBody();
-        preg_match('/name="_csrf"\s+value="([^"]+)"/i', $loginHtml, $m);
+        preg_match('/name="_token"\s+value="([^"]+)"/i', $loginHtml, $m);
         $csrf = $m[1] ?? '';
 
         $r = $client->post('/login', [
             'form_params' => [
-                '_csrf'    => $csrf,
+                '_token'   => $csrf,
                 'email'    => DatabaseSeeder::ADMIN_EMAIL,
                 'password' => 'wrong_password',
             ],
@@ -77,12 +77,12 @@ class AuthTest extends TestCase
     {
         $client    = $this->guestClient();
         $loginHtml = (string) $this->get($client, '/login')->getBody();
-        preg_match('/name="_csrf"\s+value="([^"]+)"/i', $loginHtml, $m);
+        preg_match('/name="_token"\s+value="([^"]+)"/i', $loginHtml, $m);
         $csrf = $m[1] ?? '';
 
         $r = $client->post('/login', [
             'form_params' => [
-                '_csrf'    => $csrf,
+                '_token'   => $csrf,
                 'email'    => 'nobody@nowhere.invalid',
                 'password' => 'irrelevant',
             ],
@@ -101,7 +101,7 @@ class AuthTest extends TestCase
             'form_params'     => [
                 'email'    => DatabaseSeeder::ADMIN_EMAIL,
                 'password' => DatabaseSeeder::TEST_PASSWORD,
-                // no _csrf
+                // no _token
             ],
             'allow_redirects' => false,
         ]);
@@ -132,12 +132,12 @@ class AuthTest extends TestCase
         ]);
 
         $loginHtml = (string) $client->get('/login')->getBody();
-        preg_match('/name="_csrf"\s+value="([^"]+)"/i', $loginHtml, $m);
+        preg_match('/name="_token"\s+value="([^"]+)"/i', $loginHtml, $m);
         $csrf = $m[1] ?? '';
 
         $client->post('/login', [
             'form_params' => [
-                '_csrf'    => $csrf,
+                '_token'   => $csrf,
                 'email'    => DatabaseSeeder::ADMIN_EMAIL,
                 'password' => DatabaseSeeder::TEST_PASSWORD,
             ],
@@ -159,9 +159,9 @@ class AuthTest extends TestCase
         ]);
 
         $loginHtml = (string) $client->get('/login')->getBody();
-        preg_match('/name="_csrf"\s+value="([^"]+)"/i', $loginHtml, $m);
+        preg_match('/name="_token"\s+value="([^"]+)"/i', $loginHtml, $m);
 
-        $client->post('/login', ['form_params' => ['_csrf' => $m[1] ?? '', 'email' => DatabaseSeeder::PORTAL_EMAIL, 'password' => DatabaseSeeder::TEST_PASSWORD]]);
+        $client->post('/login', ['form_params' => ['_token' => $m[1] ?? '', 'email' => DatabaseSeeder::PORTAL_EMAIL, 'password' => DatabaseSeeder::TEST_PASSWORD]]);
         $client->get('/logout');
 
         $r = $this->get($client, '/portal/tickets', false);

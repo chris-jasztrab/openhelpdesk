@@ -103,7 +103,7 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
         }
 
         return $client->post($path, [
-            'form_params'     => array_merge(['_csrf' => $csrf], $data),
+            'form_params'     => array_merge(['_token' => $csrf], $data),
             'allow_redirects' => $follow
                 ? ['max' => 5, 'strict' => false, 'referer' => true]
                 : false,
@@ -188,7 +188,7 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
         // 2. Log in
         $client->post('/login', [
             'form_params' => [
-                '_csrf'    => $csrf,
+                '_token'   => $csrf,
                 'email'    => $emails[$role],
                 'password' => DatabaseSeeder::TEST_PASSWORD,
             ],
@@ -203,11 +203,11 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
 
     private function extractCsrf(string $html): ?string
     {
-        // Handles both attribute orderings
-        if (preg_match('/name="_csrf"\s+value="([^"]+)"/i', $html, $m)) {
+        // Handles both attribute orderings (field is name="_token")
+        if (preg_match('/name="_token"\s+value="([^"]+)"/i', $html, $m)) {
             return $m[1];
         }
-        if (preg_match('/value="([^"]+)"\s+name="_csrf"/i', $html, $m)) {
+        if (preg_match('/value="([^"]+)"\s+name="_token"/i', $html, $m)) {
             return $m[1];
         }
         return null;
