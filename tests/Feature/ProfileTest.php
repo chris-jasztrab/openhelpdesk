@@ -83,7 +83,7 @@ class ProfileTest extends TestCase
             'first_name' => 'TestAdmin',
             'last_name'  => 'User',
             'theme'      => 'light',
-        ], role: 'admin');
+        ]);
 
         // Should redirect back or return 200 with success flash
         $code = $r->getStatusCode();
@@ -96,7 +96,7 @@ class ProfileTest extends TestCase
             'first_name' => 'TestAgent',
             'last_name'  => 'User',
             'theme'      => 'dark',
-        ], role: 'agent');
+        ]);
 
         $code = $r->getStatusCode();
         $this->assertTrue($code === 200 || $code === 302, "Expected 200 or redirect, got $code");
@@ -111,7 +111,7 @@ class ProfileTest extends TestCase
             'current_password' => 'this_is_wrong',
             'new_password'     => 'NewPass456!',
             'confirm_password' => 'NewPass456!',
-        ], role: 'portal');
+        ]);
 
         $body = (string) $r->getBody();
         // Should show an error or stay on profile page
@@ -139,13 +139,4 @@ class ProfileTest extends TestCase
         $this->assertOk($r);
     }
 
-    // Helper to pass role string through to post()
-    private function post(
-        \GuzzleHttp\Client $client,
-        string $path,
-        array $data,
-        string $role = ''
-    ): \Psr\Http\Message\ResponseInterface {
-        return parent::post($client, $path, $data);
-    }
 }
