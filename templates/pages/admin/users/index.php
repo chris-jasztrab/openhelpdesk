@@ -7,41 +7,53 @@ $breadcrumbs = [
     ['label' => 'Users'],
 ];
 $filterParams = [];
-if ($roleFilter !== '') $filterParams['role'] = $roleFilter;
+if ($roleFilter !== '') $filterParams['role']     = $roleFilter;
 if ($locFilter !== '')  $filterParams['location'] = $locFilter;
+if ($qFilter !== '')    $filterParams['q']        = $qFilter;
+$hasFilters = !empty($filterParams);
 ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="fw-bold mb-0">Users</h2>
     <div class="d-flex gap-2 align-items-center">
-        <span class="badge bg-secondary fs-6"><?= count($users) ?><?= (!empty($filterParams)) ? ' filtered' : ' total' ?></span>
-        <a href="/admin/users/create" class="btn text-white" style="background:var(--ld-primary);">
+        <span class="badge bg-secondary fs-6"><?= count($users) ?><?= $hasFilters ? ' filtered' : ' total' ?></span>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="filterPanelBtn" onclick="filterPanelToggle()">
+            <i class="bi bi-funnel me-1"></i>Filters
+            <?php if ($hasFilters): ?><span class="badge bg-primary rounded-pill ms-1"><?= count($filterParams) ?></span><?php endif; ?>
+        </button>
+        <a href="/admin/users/create" class="btn btn-sm text-white" style="background:var(--ld-primary);">
             <i class="bi bi-person-plus me-1"></i>Add User
         </a>
     </div>
 </div>
 
-<!-- Filter Bar -->
-<div class="card border-0 shadow-sm mb-3">
-    <div class="card-body py-3">
-        <div class="row g-2 align-items-end">
-            <div class="col-md-auto">
-                <label class="form-label small text-muted mb-1">Role</label>
-                <div class="d-flex gap-1">
-                    <a href="<?= e('/admin/users' . ($locFilter !== '' ? '?location=' . urlencode($locFilter) : '')) ?>"
-                       class="btn btn-sm <?= empty($roleFilter) ? 'text-white' : 'btn-outline-secondary' ?>" <?= empty($roleFilter) ? 'style="background:var(--ld-primary);"' : '' ?>>All</a>
-                    <?php
-                    $roleButtons = ['admin' => ['Admins', 'danger'], 'agent' => ['Agents', 'primary'], 'user' => ['Users', 'secondary']];
-                    foreach ($roleButtons as $rKey => [$rLabel, $rColor]):
-                        $rParams = $locFilter !== '' ? ['role' => $rKey, 'location' => $locFilter] : ['role' => $rKey];
-                    ?>
-                    <a href="<?= e('/admin/users?' . http_build_query($rParams)) ?>"
-                       class="btn btn-sm <?= $roleFilter === $rKey ? "btn-{$rColor}" : "btn-outline-{$rColor}" ?>"><?= $rLabel ?></a>
-                    <?php endforeach; ?>
-                </div>
+<!-- Filter Panel Backdrop -->
+<div class="filter-panel-backdrop" id="filterPanelBackdrop" onclick="filterPanelClose()"></div>
+
+<!-- Filter Panel -->
+<div class="filter-panel" id="filterPanel">
+    <div class="filter-panel-header">
+        <span class="fw-semibold"><i class="bi bi-funnel me-1"></i>Filters</span>
+        <button type="button" class="btn-close" onclick="filterPanelClose()" aria-label="Close"></button>
+    </div>
+    <div class="filter-panel-body">
+        <form method="GET" action="/admin/users">
+            <div class="mb-3">
+                <label class="form-label small fw-semibold mb-1">Search</label>
+                <input type="text" class="form-control form-control-sm" name="q"
+                       value="<?= e($qFilter) ?>" placeholder="Name or email…">
             </div>
-            <div class="col-md-auto" style="min-width:160px;">
-                <label class="form-label small text-muted mb-1">Location</label>
-                <select class="form-select form-select-sm" onchange="var p=new URLSearchParams(window.location.search);if(this.value)p.set('location',this.value);else p.delete('location');p.delete('page');window.location='/admin/users?'+p.toString();">
+            <div class="mb-3">
+                <label class="form-label small fw-semibold mb-1">Role</label>
+                <select class="form-select form-select-sm" name="role">
+                    <option value="">All Roles</option>
+                    <option value="admin"  <?= $roleFilter === 'admin'  ? 'selected' : '' ?>>Admin</option>
+                    <option value="agent"  <?= $roleFilter === 'agent'  ? 'selected' : '' ?>>Agent</option>
+                    <option value="user"   <?= $roleFilter === 'user'   ? 'selected' : '' ?>>User</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label small fw-semibold mb-1">Location</label>
+                <select class="form-select form-select-sm" name="location">
                     <option value="">All Locations</option>
                     <option value="none" <?= $locFilter === 'none' ? 'selected' : '' ?>>No Location</option>
                     <?php foreach ($locations as $loc): ?>
@@ -49,14 +61,15 @@ if ($locFilter !== '')  $filterParams['location'] = $locFilter;
                     <?php endforeach; ?>
                 </select>
             </div>
-            <?php if (!empty($filterParams)): ?>
-            <div class="col-md-auto">
-                <a href="/admin/users" class="btn btn-sm btn-outline-secondary">
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-sm text-white flex-grow-1" style="background:var(--ld-primary);">
+                    <i class="bi bi-funnel me-1"></i>Apply
+                </button>
+                <a href="/admin/users?reset=1" class="btn btn-sm btn-outline-secondary" title="Clear all filters">
                     <i class="bi bi-x-lg me-1"></i>Clear
                 </a>
             </div>
-            <?php endif; ?>
-        </div>
+        </form>
     </div>
 </div>
 
@@ -129,3 +142,23 @@ if ($locFilter !== '')  $filterParams['location'] = $locFilter;
         </table>
     </div>
 </div>
+
+<script>
+(function () {
+    function filterPanelOpen() {
+        document.getElementById('filterPanel').classList.add('open');
+        document.getElementById('filterPanelBackdrop').classList.add('open');
+        sessionStorage.setItem('adminUserFilterPanelOpen', '1');
+    }
+    function filterPanelClose() {
+        document.getElementById('filterPanel').classList.remove('open');
+        document.getElementById('filterPanelBackdrop').classList.remove('open');
+        sessionStorage.setItem('adminUserFilterPanelOpen', '0');
+    }
+    window.filterPanelToggle = function () {
+        document.getElementById('filterPanel').classList.contains('open') ? filterPanelClose() : filterPanelOpen();
+    };
+    window.filterPanelClose = filterPanelClose;
+    if (sessionStorage.getItem('adminUserFilterPanelOpen') === '1') filterPanelOpen();
+})();
+</script>

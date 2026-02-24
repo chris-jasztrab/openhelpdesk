@@ -71,8 +71,14 @@ $router->get('/admin/docs/{page}', function (array $p) use ($validDocPages) {
 $router->get('/admin/users', function () {
     Auth::requireRole('admin');
     $db   = Database::connect();
+
+    if (isset($_GET['reset'])) {
+        redirect('/admin/users');
+    }
+
     $role  = $_GET['role'] ?? '';
     $locId = trim($_GET['location'] ?? '');
+    $q     = trim($_GET['q'] ?? '');
 
     $sql    = 'SELECT u.*, l.name AS location_name FROM users u LEFT JOIN locations l ON u.location_id = l.id';
     $where  = [];
@@ -88,6 +94,11 @@ $router->get('/admin/users', function () {
             $where[]  = 'u.location_id = ?';
             $params[] = (int) $locId;
         }
+    }
+    if ($q !== '') {
+        $where[]  = "(CONCAT(u.first_name, ' ', u.last_name) LIKE ? OR u.email LIKE ?)";
+        $params[] = '%' . $q . '%';
+        $params[] = '%' . $q . '%';
     }
     if (!empty($where)) {
         $sql .= ' WHERE ' . implode(' AND ', $where);
@@ -117,6 +128,7 @@ $router->get('/admin/users', function () {
         'users'      => $users,
         'roleFilter' => $role,
         'locFilter'  => $locId,
+        'qFilter'    => $q,
         'locations'  => $locations,
         'sort'       => $sort,
         'dir'        => strtolower($dir),
