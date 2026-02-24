@@ -33,29 +33,23 @@ $statusOptions = [
 ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="fw-bold mb-0">New Ticket</h2>
-    <a href="<?= $isAgent ? '/agent/tickets' : '/admin/tickets' ?>" class="btn btn-outline-secondary">
-        <i class="bi bi-arrow-left me-1"></i>Back
-    </a>
+    <div class="d-flex align-items-center gap-2">
+        <?php if (!empty($templates)): ?>
+        <select id="templateSelect" class="form-select form-select-sm" style="width:auto;max-width:200px;" title="Start from a template">
+            <option value="">Template…</option>
+            <?php foreach ($templates as $tpl): ?>
+                <option value="<?= (int)$tpl['id'] ?>"><?= e($tpl['name']) ?></option>
+            <?php endforeach; ?>
+        </select>
+        <?php endif; ?>
+        <a href="<?= $isAgent ? '/agent/tickets' : '/admin/tickets' ?>" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Back
+        </a>
+    </div>
 </div>
 
 <div class="row justify-content-center">
     <div class="col-lg-8">
-
-        <?php if (!empty($templates)): ?>
-        <!-- Template Picker (subtle) -->
-        <div class="d-flex align-items-center gap-2 mb-3 text-muted small">
-            <i class="bi bi-collection"></i>
-            <label for="templateSelect" class="mb-0">Template:</label>
-            <select id="templateSelect" class="form-select form-select-sm w-auto" style="max-width:240px;">
-                <option value="">— none —</option>
-                <?php foreach ($templates as $tpl): ?>
-                    <option value="<?= (int)$tpl['id'] ?>">
-                        <?= e($tpl['name']) ?><?php if ($tpl['is_shared']): ?> (shared)<?php endif; ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <?php endif; ?>
 
         <form method="POST" action="<?= e($formAction) ?>">
             <?= csrfField() ?>
