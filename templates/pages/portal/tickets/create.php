@@ -8,15 +8,7 @@ $breadcrumbs  = [
     ['label' => 'New Ticket'],
 ];
 ?>
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2 class="fw-bold mb-0">New Ticket</h2>
-    <a href="/portal/tickets" class="btn btn-outline-secondary">
-        <i class="bi bi-arrow-left me-1"></i>Back
-    </a>
-</div>
-
-<?php if (!empty($sharedTemplates)): ?>
-<?php
+<?php if (!empty($sharedTemplates)):
 $tplData = [];
 foreach ($sharedTemplates as $t) {
     $tplData[$t['id']] = [
@@ -26,49 +18,23 @@ foreach ($sharedTemplates as $t) {
         'priority_id' => $t['priority_id'],
     ];
 }
-?>
-<div class="card border-0 shadow-sm mb-4">
-    <div class="card-body py-3">
-        <label for="portalTemplateSelect" class="form-label fw-semibold small mb-1">
-            <i class="bi bi-collection me-1 text-muted"></i>Start from a Template <span class="text-muted fw-normal">(optional)</span>
-        </label>
-        <select id="portalTemplateSelect" class="form-select">
-            <option value="">— Select a template to pre-fill the form —</option>
+endif; ?>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold mb-0">New Ticket</h2>
+    <div class="d-flex align-items-center gap-2">
+        <?php if (!empty($sharedTemplates)): ?>
+        <select id="portalTemplateSelect" class="form-select form-select-sm" style="width:auto;max-width:200px;" title="Start from a template">
+            <option value="">Template…</option>
             <?php foreach ($sharedTemplates as $t): ?>
-                <option value="<?= (int)$t['id'] ?>">
-                    <?= e($t['name']) ?>
-                    <?= $t['type_name'] ? '— ' . e($t['type_name']) : '' ?>
-                </option>
+                <option value="<?= (int)$t['id'] ?>"><?= e($t['name']) ?></option>
             <?php endforeach; ?>
         </select>
-        <div id="templateUsedBadge" class="mt-2" style="display:none;">
-            <span class="badge bg-info text-dark">
-                <i class="bi bi-collection me-1"></i><span id="templateUsedName"></span>
-                applied — you can still edit any field below.
-            </span>
-        </div>
+        <?php endif; ?>
+        <a href="/portal/tickets" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Back
+        </a>
     </div>
 </div>
-<script>
-const PORTAL_TEMPLATES = <?= json_encode($tplData, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-const PORTAL_TEMPLATE_NAMES = <?= json_encode(array_column($sharedTemplates, 'name', 'id'), JSON_HEX_TAG) ?>;
-document.getElementById('portalTemplateSelect').addEventListener('change', function () {
-    const tpl = PORTAL_TEMPLATES[this.value];
-    if (!tpl) { document.getElementById('templateUsedBadge').style.display = 'none'; return; }
-    if (tpl.subject)     document.getElementById('subject').value     = tpl.subject;
-    if (tpl.body)        document.getElementById('description').value = tpl.body;
-    if (tpl.type_id)     document.getElementById('type_id').value     = tpl.type_id;
-    if (tpl.priority_id) {
-        const priSel = document.getElementById('priority_id');
-        if (priSel) priSel.value = tpl.priority_id;
-    }
-    document.getElementById('templateUsedName').textContent = PORTAL_TEMPLATE_NAMES[this.value] || '';
-    document.getElementById('templateUsedBadge').style.display = '';
-    // Scroll to form
-    document.getElementById('subject').scrollIntoView({ behavior: 'smooth', block: 'center' });
-});
-</script>
-<?php endif; ?>
 
 <div class="card border-0 shadow-sm">
     <div class="card-body p-4">
@@ -272,6 +238,24 @@ document.getElementById('portalTemplateSelect').addEventListener('change', funct
 </div>
 
 <script>
+<?php if (!empty($sharedTemplates)): ?>
+// Template picker
+(function() {
+    const PORTAL_TEMPLATES = <?= json_encode($tplData, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    document.getElementById('portalTemplateSelect').addEventListener('change', function () {
+        const tpl = PORTAL_TEMPLATES[this.value];
+        if (!tpl) return;
+        if (tpl.subject)     document.getElementById('subject').value     = tpl.subject;
+        if (tpl.body)        document.getElementById('description').value = tpl.body;
+        if (tpl.type_id)     document.getElementById('type_id').value     = tpl.type_id;
+        if (tpl.priority_id) {
+            const priSel = document.getElementById('priority_id');
+            if (priSel) priSel.value = tpl.priority_id;
+        }
+        document.getElementById('subject').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+})();
+<?php endif; ?>
 // Auto-detect browser and OS info
 (function() {
     var ua = navigator.userAgent;
