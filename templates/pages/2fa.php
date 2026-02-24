@@ -4,7 +4,7 @@ $pageTitle = 'Two-Factor Authentication';
 ?>
 <div style="max-width:420px;width:100%;">
     <div class="text-center mb-4">
-        <h1 class="text-white fw-bold"><i class="bi bi-headset"></i> LocalDesk</h1>
+        <h1 class="text-white fw-bold"><i class="bi <?= e(getSetting('branding_navbar_icon', 'bi-headset')) ?>"></i> <?= e(getSetting('branding_app_name', 'LocalDesk')) ?></h1>
         <p class="text-white-50">Two-Factor Authentication</p>
     </div>
 

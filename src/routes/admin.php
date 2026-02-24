@@ -3396,6 +3396,7 @@ $router->get('/admin/settings/branding', function () {
         'navbarStart'         => getSetting('branding_navbar_start', '#1e1b4b'),
         'navbarEnd'           => getSetting('branding_navbar_end', '#312e81'),
         'logo'                => getSetting('branding_logo', ''),
+        'navbarIcon'          => getSetting('branding_navbar_icon', 'bi-headset'),
         'timelineNoteBg'      => getSetting('branding_timeline_note_bg',      '#fefce8'),
         'timelineNoteAccent'  => getSetting('branding_timeline_note_accent',  '#ca8a04'),
         'timelineSystemBg'    => getSetting('branding_timeline_system_bg',    '#eff6ff'),
@@ -3408,6 +3409,15 @@ $router->post('/admin/settings/branding', function () {
     verifyCsrf($_POST['_token'] ?? '');
 
     $appName              = trim($_POST['app_name'] ?? 'LocalDesk');
+    $navbarIconRaw        = trim($_POST['navbar_icon'] ?? 'bi-headset');
+    // Normalise: ensure it starts with bi- and only contains safe chars
+    if (!str_starts_with($navbarIconRaw, 'bi-')) {
+        $navbarIconRaw = 'bi-' . $navbarIconRaw;
+    }
+    $navbarIcon = 'bi-' . preg_replace('/[^a-zA-Z0-9\-]/', '', substr($navbarIconRaw, 3));
+    if ($navbarIcon === 'bi-') {
+        $navbarIcon = 'bi-headset';
+    }
     $primaryColor         = trim($_POST['primary_color'] ?? '#4f46e5');
     $primaryHover         = trim($_POST['primary_hover'] ?? '#4338ca');
     $navbarStart          = trim($_POST['navbar_start'] ?? '#1e1b4b');
@@ -3480,6 +3490,7 @@ $router->post('/admin/settings/branding', function () {
 
     // Save settings
     setSetting('branding_app_name', $appName);
+    setSetting('branding_navbar_icon', $navbarIcon);
     setSetting('branding_primary_color', $primaryColor);
     setSetting('branding_primary_hover', $primaryHover);
     setSetting('branding_navbar_start', $navbarStart);

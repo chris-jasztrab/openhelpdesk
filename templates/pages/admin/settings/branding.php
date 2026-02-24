@@ -52,10 +52,23 @@ $breadcrumbs  = [
                     <div id="logoDefaultRow" class="mb-3" <?= $hasLogo ? 'style="display:none;"' : '' ?>>
                         <label class="form-label text-muted small">Current Logo</label>
                         <div class="p-3 rounded d-inline-flex align-items-center gap-2" style="background:#1e1b4b; color:#fff;">
-                            <i class="bi bi-headset fs-4"></i>
+                            <i class="bi <?= e($navbarIcon) ?> fs-4" id="logoDefaultIcon"></i>
                             <span class="fw-bold"><?= e($appName) ?></span>
                         </div>
                         <div class="form-text mt-1">Default — upload a logo to replace this.</div>
+                    </div>
+
+                    <!-- Fallback Icon -->
+                    <div class="mb-3">
+                        <label for="navbarIcon" class="form-label">Fallback Icon <span class="text-muted fw-normal">(shown when no logo is uploaded)</span></label>
+                        <div class="input-group" style="max-width:320px;">
+                            <span class="input-group-text"><i class="bi <?= e($navbarIcon) ?>" id="navbarIconPreviewInput"></i></span>
+                            <input type="text" class="form-control font-monospace" id="navbarIconInput" name="navbar_icon"
+                                   value="<?= e($navbarIcon) ?>" placeholder="bi-headset">
+                        </div>
+                        <div class="form-text">
+                            Enter any <a href="https://icons.getbootstrap.com/" target="_blank" rel="noopener">Bootstrap Icon</a> class name, e.g. <code>bi-display</code>, <code>bi-laptop</code>, <code>bi-building</code>.
+                        </div>
                     </div>
 
                     <div>
@@ -235,7 +248,7 @@ $breadcrumbs  = [
                             <?php if ($logo && file_exists(ROOT_DIR . '/public/uploads/branding/' . $logo)): ?>
                                 <img id="previewLogoImg" src="/uploads/branding/<?= e($logo) ?>" alt="" style="height:24px;">
                             <?php else: ?>
-                                <i class="bi bi-headset" id="previewLogoIcon"></i>
+                                <i class="bi <?= e($navbarIcon) ?>" id="previewLogoIcon"></i>
                             <?php endif; ?>
                             <span class="fw-bold" id="previewAppName"><?= e($appName) ?></span>
                         </div>
@@ -311,6 +324,24 @@ $breadcrumbs  = [
     var appNameInput = document.getElementById('appName');
     appNameInput.addEventListener('input', function () {
         document.getElementById('previewAppName').textContent = appNameInput.value || 'LocalDesk';
+    });
+
+    // Navbar icon live preview
+    var navbarIconInput = document.getElementById('navbarIconInput');
+    navbarIconInput.addEventListener('input', function () {
+        var raw = this.value.trim();
+        if (!raw) raw = 'bi-headset';
+        if (!raw.startsWith('bi-')) raw = 'bi-' + raw;
+        // Update all three icon elements (input adornment, default row preview, navbar preview)
+        var previewInputIcon = document.getElementById('navbarIconPreviewInput');
+        var defaultIcon      = document.getElementById('logoDefaultIcon');
+        var previewLogoIcon  = document.getElementById('previewLogoIcon');
+        [previewInputIcon, defaultIcon, previewLogoIcon].forEach(function (el) {
+            if (!el) return;
+            // Strip existing bi-* classes and add new one
+            el.className = el.className.replace(/\bbi-[\w-]+\b/g, '').trim();
+            el.className += ' ' + raw;
+        });
     });
 
     // Remove logo button
