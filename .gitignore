@@ -13,3 +13,5 @@ export_sample.csv
 .VSCodeCounter/
 kb_articles.csv
 /storage/backups/*.zip
+.phpunit.result.cache
+test-results*.txt
