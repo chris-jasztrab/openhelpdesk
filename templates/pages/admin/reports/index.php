@@ -12,7 +12,6 @@ $breadcrumbs  = [
     <p class="text-muted mb-0">Overview of key metrics for the current period</p>
 </div>
 
-<?php require ROOT_DIR . '/templates/partials/reports-nav.php'; ?>
 
 <!-- Date range info -->
 <div class="d-flex align-items-center gap-2 mb-4 text-muted small">

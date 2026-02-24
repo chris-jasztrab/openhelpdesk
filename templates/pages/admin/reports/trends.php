@@ -13,7 +13,6 @@ $breadcrumbs  = [
     <p class="text-muted mb-0">Ticket Trends</p>
 </div>
 
-<?php require ROOT_DIR . '/templates/partials/reports-nav.php'; ?>
 
 <!-- Filters -->
 <form class="d-flex align-items-center gap-2 mb-4 flex-wrap">

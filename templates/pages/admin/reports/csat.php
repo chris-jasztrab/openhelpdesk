@@ -13,7 +13,6 @@ $breadcrumbs  = [
     <p class="text-muted mb-0">Customer satisfaction survey results</p>
 </div>
 
-<?php require ROOT_DIR . '/templates/partials/reports-nav.php'; ?>
 
 <!-- Date range filter -->
 <div class="d-flex align-items-center gap-2 mb-4 text-muted small">

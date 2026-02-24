@@ -13,7 +13,6 @@ $breadcrumbs  = [
     <p class="text-muted mb-0">Custom Report Builder</p>
 </div>
 
-<?php require ROOT_DIR . '/templates/partials/reports-nav.php'; ?>
 
 <!-- Builder form -->
 <div class="card border-0 shadow-sm mb-4">

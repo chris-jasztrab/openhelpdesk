@@ -13,7 +13,6 @@ $breadcrumbs  = [
     <p class="text-muted mb-0">Agent Performance</p>
 </div>
 
-<?php require ROOT_DIR . '/templates/partials/reports-nav.php'; ?>
 
 <!-- Date range filter -->
 <form class="d-flex align-items-center gap-2 mb-4">

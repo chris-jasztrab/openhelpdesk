@@ -13,7 +13,6 @@ $breadcrumbs  = [
     <p class="text-muted mb-0">Unresolved Tickets</p>
 </div>
 
-<?php require ROOT_DIR . '/templates/partials/reports-nav.php'; ?>
 
 <!-- Summary cards -->
 <div class="row g-4 mb-4">

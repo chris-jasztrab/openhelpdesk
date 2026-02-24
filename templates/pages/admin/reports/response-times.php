@@ -13,7 +13,6 @@ $breadcrumbs  = [
     <p class="text-muted mb-0">Resolution &amp; Response Times</p>
 </div>
 
-<?php require ROOT_DIR . '/templates/partials/reports-nav.php'; ?>
 
 <form class="d-flex align-items-center gap-2 mb-4">
     <i class="bi bi-calendar3 text-muted"></i>

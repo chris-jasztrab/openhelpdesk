@@ -13,7 +13,6 @@ $breadcrumbs  = [
     <p class="text-muted mb-0">Agent Workload Heatmap</p>
 </div>
 
-<?php require ROOT_DIR . '/templates/partials/reports-nav.php'; ?>
 
 <p class="text-muted small mb-4">
     <i class="bi bi-info-circle me-1"></i>
