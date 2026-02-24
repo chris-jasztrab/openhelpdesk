@@ -20,11 +20,11 @@ final class DatabaseSeeder
     public const TEST_PASSWORD = 'TestPass123!';
 
     // ── IDs set after seed() runs ─────────────────────────────────────────────
-    public static int $adminId;
-    public static int $agentId;
-    public static int $portalId;
-    public static int $ticketId;
-    public static int $templateId;
+    public static int $adminId    = 0;
+    public static int $agentId    = 0;
+    public static int $portalId   = 0;
+    public static int $ticketId   = 0;
+    public static int $templateId = 0;
 
     // ── Tracking which rows we actually inserted (for cleanup) ────────────────
     private static array $insertedUserIds     = [];
