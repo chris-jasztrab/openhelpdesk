@@ -42,22 +42,18 @@ $statusOptions = [
     <div class="col-lg-8">
 
         <?php if (!empty($templates)): ?>
-        <!-- Template Picker -->
-        <div class="card border-0 shadow-sm mb-4">
-            <div class="card-body py-3">
-                <label for="templateSelect" class="form-label fw-semibold small mb-1">
-                    <i class="bi bi-collection me-1 text-muted"></i>Start from a Template
-                </label>
-                <select id="templateSelect" class="form-select form-select-sm">
-                    <option value="">— No template —</option>
-                    <?php foreach ($templates as $tpl): ?>
-                        <option value="<?= (int)$tpl['id'] ?>">
-                            <?= e($tpl['name']) ?>
-                            <?php if ($tpl['is_shared']): ?>(shared)<?php endif; ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
+        <!-- Template Picker (subtle) -->
+        <div class="d-flex align-items-center gap-2 mb-3 text-muted small">
+            <i class="bi bi-collection"></i>
+            <label for="templateSelect" class="mb-0">Template:</label>
+            <select id="templateSelect" class="form-select form-select-sm w-auto" style="max-width:240px;">
+                <option value="">— none —</option>
+                <?php foreach ($templates as $tpl): ?>
+                    <option value="<?= (int)$tpl['id'] ?>">
+                        <?= e($tpl['name']) ?><?php if ($tpl['is_shared']): ?> (shared)<?php endif; ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
         </div>
         <?php endif; ?>
 
