@@ -167,9 +167,10 @@ $existingActions    = $isEdit ? ($editing['actions_decoded']    ?? []) : [];
         'set_assigned_to':       { label: 'Assign to (empty=unassign)', valueType: 'select_or_empty', opts: agentOpts },
         'set_group':             { label: 'Set group',              valueType: 'select',      opts: groupOpts },
         'set_status':            { label: 'Set status',             valueType: 'select',      opts: statusOpts },
-        'notify_user':           { label: 'Notify specific user',   valueType: 'user_search', opts: allUsers },
-        'notify_assigned_agent': { label: 'Notify assigned agent',  valueType: 'none' },
-        'add_internal_note':     { label: 'Add internal note',      valueType: 'textarea' },
+        'notify_user':           { label: 'Notify specific user',          valueType: 'user_search', opts: allUsers },
+        'notify_assigned_agent': { label: 'Notify assigned agent',         valueType: 'none' },
+        'notify_ticket_creator': { label: 'Send reminder email to customer', valueType: 'none' },
+        'add_internal_note':     { label: 'Add internal note',              valueType: 'textarea' },
     };
     var opLabels = {
         'equals':        'equals',

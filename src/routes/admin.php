@@ -3958,8 +3958,8 @@ function buildEscalationActions(array $post): array
     $actionVals  = $post['act_value'] ?? [];
 
     $validActions    = ['set_priority', 'set_assigned_to', 'set_group', 'set_status',
-                        'notify_user', 'notify_assigned_agent', 'add_internal_note'];
-    $noValueRequired = ['notify_assigned_agent'];
+                        'notify_user', 'notify_assigned_agent', 'notify_ticket_creator', 'add_internal_note'];
+    $noValueRequired = ['notify_assigned_agent', 'notify_ticket_creator'];
 
     for ($i = 0, $n = count($actionTypes); $i < $n; $i++) {
         $a = $actionTypes[$i] ?? '';

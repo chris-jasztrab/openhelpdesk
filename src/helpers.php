@@ -474,6 +474,11 @@ function getEmailTpl(string $name, array $rawTokens): array
             'subject' => 'How did we do? — [Ticket #{{ticket_id}}] {{subject}}',
             'intro'   => 'Your ticket has been resolved. We\'d love to hear how we did — it only takes one click!',
         ],
+        'ticket_reminder' => [
+            'subject' => 'Following up on your ticket [#{{ticket_id}}] {{subject}}',
+            'intro'   => 'We\'re still waiting to hear back from you on your support ticket. Please reply with an update so we can continue helping you.',
+            'button'  => 'View & Reply',
+        ],
     ];
 
     $d = $defaults[$key] ?? ['subject' => '', 'intro' => '', 'button' => 'View Ticket'];
@@ -989,6 +994,56 @@ function runEscalationRule(\PDO $db, array $rule, array $ticket): void
                     '',
                     $ticketId
                 );
+                break;
+
+            case 'notify_ticket_creator':
+                // Send a reminder email to the person who submitted the ticket
+                $s = $db->prepare(
+                    'SELECT t.subject, u.id AS user_id, u.first_name, u.last_name, u.email, u.notify_ticket_updated
+                     FROM tickets t
+                     JOIN users u ON t.created_by = u.id
+                     WHERE t.id = ?'
+                );
+                $s->execute([$ticketId]);
+                $creator = $s->fetch();
+                if (!$creator) break;
+                if (!(bool)($creator['notify_ticket_updated'] ?? 1)) break; // user opted out
+
+                $tpl        = getEmailTpl('ticket-reminder', [
+                    'ticket_id'  => $ticketId,
+                    'subject'    => $creator['subject'],
+                    'first_name' => $creator['first_name'],
+                    'last_name'  => $creator['last_name'],
+                    'user_name'  => $creator['first_name'] . ' ' . $creator['last_name'],
+                ]);
+                $ticketUrl  = $appUrl . '/portal/tickets/' . $ticketId;
+                $footerText = getSetting('email_footer_text') ?: 'This is an automated message from ' . $appName . '. Please do not reply directly to this email.';
+
+                $emailHtml = renderEmail('ticket-reminder', [
+                    'ticketId'    => $ticketId,
+                    'subject'     => $creator['subject'],
+                    'firstName'   => $creator['first_name'],
+                    'introText'   => $tpl['intro'],
+                    'buttonLabel' => $tpl['button'],
+                    'ticketUrl'   => $ticketUrl,
+                    'brandColor'  => $brandColor,
+                    'appName'     => $appName,
+                    'footerText'  => $footerText,
+                ]);
+
+                sendMail(
+                    $creator['email'],
+                    $creator['first_name'] . ' ' . $creator['last_name'],
+                    $tpl['subject'],
+                    $emailHtml,
+                    '',
+                    $ticketId
+                );
+
+                $db->prepare(
+                    'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, ?, ?, 1)'
+                )->execute([$ticketId, 'escalation_notification',
+                    "Reminder email sent to ticket creator ({$creator['email']}) by escalation rule \"{$ruleName}\"."]);
                 break;
         }
     }

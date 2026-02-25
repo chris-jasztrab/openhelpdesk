@@ -45,6 +45,13 @@ $tokenSets = [
         ['token' => '{{ticket_id}}',    'desc' => 'Ticket number'],
         ['token' => '{{subject}}',      'desc' => 'Ticket subject line'],
     ],
+    'ticket_reminder' => [
+        ['token' => '{{first_name}}',   'desc' => 'Recipient\'s first name'],
+        ['token' => '{{last_name}}',    'desc' => 'Recipient\'s last name'],
+        ['token' => '{{user_name}}',    'desc' => 'Recipient\'s full name (first + last)'],
+        ['token' => '{{ticket_id}}',    'desc' => 'Ticket number'],
+        ['token' => '{{subject}}',      'desc' => 'Ticket subject line'],
+    ],
 ];
 
 $defaults = [
@@ -67,15 +74,21 @@ $defaults = [
         'subject' => 'How did we do? — [Ticket #{{ticket_id}}] {{subject}}',
         'intro'   => 'Your ticket has been resolved. We\'d love to hear how we did — it only takes one click!',
     ],
+    'ticket_reminder' => [
+        'subject' => 'Following up on your ticket [#{{ticket_id}}] {{subject}}',
+        'intro'   => 'We\'re still waiting to hear back from you on your support ticket. Please reply with an update so we can continue helping you.',
+        'button'  => 'View & Reply',
+    ],
 ];
 
 $defaultFooter = 'This is an automated message from LocalDesk. Please do not reply directly to this email.';
 
 $tabs = [
-    'ticket_created' => ['label' => 'Ticket Created',  'icon' => 'bi-ticket-perforated'],
-    'ticket_updated' => ['label' => 'Ticket Updated',  'icon' => 'bi-chat-left-text'],
-    'ticket_merged'  => ['label' => 'Ticket Merged',   'icon' => 'bi-diagram-2'],
-    'csat_survey'    => ['label' => 'CSAT Survey',     'icon' => 'bi-star'],
+    'ticket_created'  => ['label' => 'Ticket Created',    'icon' => 'bi-ticket-perforated'],
+    'ticket_updated'  => ['label' => 'Ticket Updated',    'icon' => 'bi-chat-left-text'],
+    'ticket_merged'   => ['label' => 'Ticket Merged',     'icon' => 'bi-diagram-2'],
+    'csat_survey'     => ['label' => 'CSAT Survey',       'icon' => 'bi-star'],
+    'ticket_reminder' => ['label' => 'Customer Reminder', 'icon' => 'bi-clock-history'],
 ];
 
 $activeTab = $_GET['tab'] ?? 'ticket_created';
