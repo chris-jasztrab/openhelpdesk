@@ -57,6 +57,7 @@ class AccessControlTest extends TestCase
             ['/admin/tickets'],
             ['/admin/users'],
             ['/admin/settings'],
+            ['/admin/settings/danger-zone'],
             ['/admin/ticket-templates'],
             ['/admin/priorities'],
             ['/admin/types'],
@@ -96,6 +97,7 @@ class AccessControlTest extends TestCase
     {
         return [
             ['/admin/settings'],
+            ['/admin/settings/danger-zone'],
             ['/admin/users'],
             ['/admin/users/create'],
             ['/admin/priorities'],
@@ -140,6 +142,7 @@ class AccessControlTest extends TestCase
             ['/admin/tickets'],
             ['/admin/users'],
             ['/admin/settings'],
+            ['/admin/settings/danger-zone'],
             ['/admin/ticket-templates'],
             ['/admin/priorities'],
             ['/admin/types'],

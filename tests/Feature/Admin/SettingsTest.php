@@ -8,7 +8,8 @@ use Tests\Support\TestCase;
 
 /**
  * Admin settings pages — general, locations, priorities, types, groups,
- * business hours, branding, CSAT, automations, escalations, SLA, custom fields.
+ * business hours, branding, CSAT, automations, escalations, SLA, custom fields,
+ * danger zone.
  * All of these are admin-only and must return 403 for agents/portal users.
  */
 class SettingsTest extends TestCase
@@ -37,7 +38,38 @@ class SettingsTest extends TestCase
             ['/admin/settings/scheduled-reports',   'Scheduled'],
             ['/admin/settings/backup',              'Backup'],
             ['/admin/workflows/ticket-fields',      'Custom'],
+            ['/admin/settings/danger-zone',         'Danger Zone'],
         ];
+    }
+
+    // ── Branding-specific ─────────────────────────────────────────────────────
+
+    public function test_branding_page_shows_navbar_icon_field(): void
+    {
+        $r = $this->get($this->adminClient(), '/admin/settings/branding');
+        $this->assertSee('navbar_icon', $r, ' — navbar icon input must be present on branding page');
+    }
+
+    // ── Email templates-specific ──────────────────────────────────────────────
+
+    public function test_email_templates_page_shows_csat_template(): void
+    {
+        $r = $this->get($this->adminClient(), '/admin/settings/email-templates');
+        $this->assertSee('CSAT', $r, ' — CSAT Survey template must appear on email templates page');
+    }
+
+    public function test_email_templates_page_shows_customer_reminder_template(): void
+    {
+        $r = $this->get($this->adminClient(), '/admin/settings/email-templates');
+        $this->assertSee('Customer Reminder', $r, ' — Customer Reminder template must appear on email templates page');
+    }
+
+    // ── Danger zone-specific ──────────────────────────────────────────────────
+
+    public function test_danger_zone_shows_reset_button(): void
+    {
+        $r = $this->get($this->adminClient(), '/admin/settings/danger-zone');
+        $this->assertSee('Reset', $r, ' — Reset button must be present on danger zone page');
     }
 
     // ── Location CRUD ─────────────────────────────────────────────────────────
@@ -214,6 +246,7 @@ class SettingsTest extends TestCase
             ['/admin/settings/sla-policies'],
             ['/admin/settings/automations'],
             ['/admin/settings/escalations'],
+            ['/admin/settings/danger-zone'],
             ['/admin/locations'],
             ['/admin/priorities'],
             ['/admin/types'],

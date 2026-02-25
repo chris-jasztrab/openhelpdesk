@@ -117,10 +117,11 @@ class TicketsTest extends TestCase
         $this->assertSee('[TEST] Test Ticket', $r);
     }
 
-    public function test_view_ticket_shows_reply_form(): void
+    public function test_view_ticket_shows_reply_panel(): void
     {
         $r = $this->get($this->agentClient(), '/agent/tickets/' . DatabaseSeeder::$ticketId);
-        $this->assertSee('Add Comment', $r);
+        // The reply panel replaced the old "Add Comment" form with Reply/Forward/Add Note action buttons
+        $this->assertSee('Add Note', $r);
     }
 
     public function test_view_ticket_shows_sidebar_fields(): void

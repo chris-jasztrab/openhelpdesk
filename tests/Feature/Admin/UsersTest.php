@@ -21,6 +21,19 @@ class UsersTest extends TestCase
         $this->assertSee('Users', $r);
     }
 
+    public function test_user_list_has_filter_panel(): void
+    {
+        $r    = $this->get($this->adminClient(), '/admin/users');
+        $html = (string) $r->getBody();
+        $this->assertStringContainsString('filter-panel', $html, 'Slide-out filter panel HTML must be present on users list');
+    }
+
+    public function test_user_list_has_filter_button(): void
+    {
+        $r = $this->get($this->adminClient(), '/admin/users');
+        $this->assertSee('Filters', $r, ' — Filters button must appear on users list');
+    }
+
     public function test_user_list_contains_test_admin(): void
     {
         $r = $this->get($this->adminClient(), '/admin/users');
@@ -122,6 +135,14 @@ class UsersTest extends TestCase
         $r = $this->get($this->adminClient(), '/admin/users/' . DatabaseSeeder::$portalId . '/edit');
         $this->assertOk($r);
         $this->assertSee('Edit User', $r);
+    }
+
+    public function test_edit_user_form_shows_location_ticket_visibility_toggle(): void
+    {
+        $r    = $this->get($this->adminClient(), '/admin/users/' . DatabaseSeeder::$portalId . '/edit');
+        $html = (string) $r->getBody();
+        $this->assertStringContainsString('can_view_location_tickets', $html,
+            'Edit user form must include the can_view_location_tickets (Location Ticket Visibility) toggle');
     }
 
     public function test_edit_user_updates_successfully(): void

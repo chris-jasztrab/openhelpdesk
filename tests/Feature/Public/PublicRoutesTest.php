@@ -105,6 +105,26 @@ class PublicRoutesTest extends TestCase
         $this->assertSame(302, $r->getStatusCode());
     }
 
+    // ── Setup wizard ──────────────────────────────────────────────────────────
+
+    public function test_setup_redirects_to_login_when_users_exist(): void
+    {
+        // The test DB always has users, so /setup must not be accessible.
+        $r    = $this->get($this->guestClient(), '/setup', follow: false);
+        $code = $r->getStatusCode();
+        // Should redirect away (to /login), never render the wizard.
+        $this->assertSame(302, $code, '/setup should redirect when users already exist in the database');
+        $this->assertStringContainsString('login', strtolower($r->getHeaderLine('Location')));
+    }
+
+    public function test_authenticated_admin_redirected_from_setup(): void
+    {
+        // An already-logged-in admin hitting /setup should be redirected to /admin.
+        $r    = $this->get($this->adminClient(), '/setup', follow: false);
+        $code = $r->getStatusCode();
+        $this->assertSame(302, $code, 'Authenticated admin should be redirected away from /setup');
+    }
+
     // ── Notification endpoints (require auth) ─────────────────────────────────
 
     public function test_notifications_list_requires_auth(): void
