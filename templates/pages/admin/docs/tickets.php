@@ -36,10 +36,15 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
         <tr><td><span class="badge bg-warning text-dark">Open</span></td><td class="text-muted">Newly submitted; awaiting agent action.</td></tr>
         <tr><td><span class="badge bg-primary">In Progress</span></td><td class="text-muted">An agent is actively working on the ticket.</td></tr>
         <tr><td><span class="badge bg-info text-dark">Pending</span></td><td class="text-muted">Waiting on a response from the requester or a third party.</td></tr>
+        <tr><td><span class="badge" style="background:#7c3aed;">Waiting on Customer</span></td><td class="text-muted">A reply has been sent; waiting for the requester to respond. SLA timer pauses. Can trigger automated reminder emails via Escalation Rules.</td></tr>
+        <tr><td><span class="badge" style="background:#0369a1;">Waiting on Third Party</span></td><td class="text-muted">Work is blocked pending an external vendor or team. SLA timer pauses while in this state.</td></tr>
         <tr><td><span class="badge bg-success">Resolved</span></td><td class="text-muted">The issue has been addressed. The requester is notified.</td></tr>
         <tr><td><span class="badge bg-secondary">Closed</span></td><td class="text-muted">Fully closed. No further action expected.</td></tr>
     </tbody>
 </table>
+</div>
+<div class="alert alert-info small mt-3 mb-0"><i class="bi bi-info-circle me-2"></i>
+    When a ticket moves to <strong>Waiting on Customer</strong> or <strong>Waiting on Third Party</strong>, the SLA timer automatically pauses and resumes when the status changes to any other active status.
 </div>
 </div>
 </div>
@@ -55,12 +60,14 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-chat-dots text-primary me-2"></i>Replies &amp; Internal Notes</h5>
-<p class="text-muted mb-2">Within a ticket you can add two types of entries:</p>
+<p class="text-muted mb-2">The action buttons near the bottom of a ticket open the reply panel:</p>
 <ul class="text-muted mb-3">
-    <li><strong>Reply:</strong> Visible to the requester. Sends an email notification to the requester (if SMTP configured). Use this for all customer-facing communication.</li>
-    <li><strong>Internal Note:</strong> Visible only to agents and admins. Never sent to the requester. Use this for internal coordination, escalation notes, or context that should stay private.</li>
+    <li><strong>Reply</strong> — opens the reply panel in public mode. The message is visible to the requester and triggers an email notification (if SMTP is configured).</li>
+    <li><strong>Forward</strong> — opens the reply panel to forward ticket details to another party.</li>
+    <li><strong>Add Note</strong> — opens the reply panel in internal-note mode (highlighted background). The note is visible only to agents and admins and is never sent to the requester.</li>
 </ul>
-<p class="text-muted mb-0">Both types support file attachments. Attachments are stored in <code>storage/attachments/</code> and are served securely through the application.</p>
+<p class="text-muted mb-2">The <strong>Send</strong> button has a dropdown arrow on the right. Clicking the arrow lets you <strong>Send &amp; set status</strong> in a single action — for example, "Send &amp; Set as Resolved" closes the ticket immediately when the reply is posted. Available status options: Resolved, Closed, Pending, Waiting on Customer, Waiting on Third Party.</p>
+<p class="text-muted mb-0">Both replies and notes support file attachments. Attachments are stored in <code>storage/attachments/</code> and served securely through the application.</p>
 </div>
 </div>
 

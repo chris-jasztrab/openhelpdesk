@@ -104,5 +104,59 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 </div>
 </div>
 
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-header bg-white py-3">
+    <h5 class="fw-semibold mb-0"><i class="bi bi-alarm text-danger me-2"></i>Escalation Rules</h5>
+</div>
+<div class="card-body p-4">
+<p class="text-muted mb-3">Escalation Rules are <strong>time-based</strong> rules that fire when a ticket has been in a particular state for too long — for example, when a customer hasn't replied for several days. They complement event-based Automations.</p>
+<p class="text-muted mb-2">Manage escalation rules at <a href="/admin/settings/escalations"><strong>Admin → Settings → Escalation Rules</strong></a>.</p>
+
+<h6 class="fw-semibold mt-3 mb-2">How Escalation Rules Work</h6>
+<ol class="text-muted mb-3">
+    <li>A background cron job runs <code>scripts/process-escalations.php</code> periodically (e.g. every hour).</li>
+    <li>Each active rule is evaluated against every open ticket.</li>
+    <li>If the ticket's conditions are met <em>and</em> the rule has not already fired for that ticket, the defined actions are executed.</li>
+    <li>A log entry is created so the same rule doesn't fire again for the same ticket.</li>
+</ol>
+
+<h6 class="fw-semibold mt-3 mb-2">Available Conditions</h6>
+<div class="table-responsive mb-3">
+<table class="table table-sm mb-0">
+    <thead class="table-light"><tr><th>Condition</th><th>Description</th></tr></thead>
+    <tbody class="text-muted">
+        <tr><td><strong>Hours in status</strong></td><td>The ticket has been in the specified status for at least N hours.</td></tr>
+        <tr><td><strong>Status is</strong></td><td>The ticket's current status matches a specific value (e.g. Waiting on Customer).</td></tr>
+        <tr><td><strong>Priority is</strong></td><td>Matches tickets of a given priority.</td></tr>
+        <tr><td><strong>Assigned to</strong></td><td>Matches tickets assigned to a specific agent (or unassigned).</td></tr>
+    </tbody>
+</table>
+</div>
+
+<h6 class="fw-semibold mt-3 mb-2">Available Actions</h6>
+<ul class="text-muted mb-3">
+    <li><strong>Notify assigned agent</strong> — sends the assigned agent an escalation alert email with a link to the ticket.</li>
+    <li><strong>Notify ticket creator</strong> — sends the requester a customisable reminder email. This is the "Customer Reminder" template found under <a href="/admin/settings/email-templates"><strong>Admin → Settings → Email Templates</strong></a>.</li>
+    <li><strong>Set status</strong> — changes the ticket's status automatically.</li>
+    <li><strong>Set priority</strong> — bumps or lowers the priority.</li>
+    <li><strong>Assign to agent</strong> — reassigns the ticket to a specific agent.</li>
+    <li><strong>Add internal note</strong> — posts an internal note on the ticket documenting the escalation.</li>
+</ul>
+
+<h6 class="fw-semibold mt-3 mb-2">Customer Reminder Example</h6>
+<p class="text-muted mb-0">To send an automatic follow-up when a customer hasn't replied for 3 days:</p>
+<ol class="text-muted mb-0">
+    <li>Create a new escalation rule and give it a descriptive name (e.g. "3-Day Customer Follow-Up").</li>
+    <li>Add condition: <strong>Status is</strong> → <em>Waiting on Customer</em>.</li>
+    <li>Add condition: <strong>Hours in status ≥</strong> <em>72</em>.</li>
+    <li>Add action: <strong>Notify ticket creator</strong>.</li>
+    <li>Save and activate the rule.</li>
+</ol>
+<div class="alert alert-info small mt-3 mb-0"><i class="bi bi-info-circle me-2"></i>
+    The reminder email content can be customised at <a href="/admin/settings/email-templates" class="alert-link"><strong>Admin → Settings → Email Templates → Customer Reminder</strong></a>. Available tokens include <code>{{first_name}}</code>, <code>{{ticket_id}}</code>, and <code>{{subject}}</code>.
+</div>
+</div>
+</div>
+
 </div><!-- col -->
 </div><!-- row -->

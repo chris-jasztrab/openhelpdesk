@@ -73,5 +73,18 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 </div>
 </div>
 
+<div class="card border-danger border-opacity-50 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-exclamation-triangle text-danger me-2"></i>Resetting to a Fresh State</h5>
+<p class="text-muted mb-2">If you need to wipe all data and start over — for example, after an evaluation period or a major re-configuration — use the <strong>Reset to Fresh State</strong> button in the Danger Zone.</p>
+<ol class="text-muted mb-3">
+    <li>Go to <a href="/admin/settings/danger-zone"><strong>Admin → Settings → Danger Zone</strong></a>.</li>
+    <li>Click <strong>Reset Everything</strong>.</li>
+    <li>Type <code>RESET</code> in the confirmation box and submit.</li>
+</ol>
+<p class="text-muted mb-0">All users, tickets, KB articles, automations, escalations, SLA policies, settings and audit log entries are permanently deleted. You are logged out immediately and redirected to the <strong>Setup Wizard</strong> to create a new admin account and restore your helpdesk name. <strong>This action cannot be undone.</strong></p>
+</div>
+</div>
+
 </div><!-- col -->
 </div><!-- row -->

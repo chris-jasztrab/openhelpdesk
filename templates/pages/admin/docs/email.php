@@ -90,9 +90,45 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
     <li><strong>Agent reply</strong> — notification sent to the requester with the reply content.</li>
     <li><strong>Ticket resolved</strong> — notification sent to the requester.</li>
     <li><strong>Ticket assigned</strong> — notification sent to the assigned agent.</li>
+    <li><strong>Escalation alert</strong> — sent to the assigned agent when an escalation rule fires.</li>
+    <li><strong>Customer reminder</strong> — sent to the requester when an escalation rule with the "Notify ticket creator" action fires (e.g. after 3 days without a reply).</li>
     <li><strong>Welcome email</strong> — sent to new users created by an admin.</li>
     <li><strong>Password reset</strong> — sent when a user requests a password reset.</li>
 </ul>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-envelope-paper text-primary me-2"></i>Customisable Email Templates</h5>
+<p class="text-muted mb-2">The subject line, introductory message, button label and footer text for several system emails can be customised without editing code. Go to <a href="/admin/settings/email-templates"><strong>Admin → Settings → Email Templates</strong></a>.</p>
+<div class="table-responsive mb-3">
+<table class="table table-sm mb-0">
+    <thead class="table-light"><tr><th>Template</th><th>Sent when…</th></tr></thead>
+    <tbody class="text-muted">
+        <tr><td><strong>Ticket Created</strong></td><td>A new ticket is submitted by a portal user or created by an agent.</td></tr>
+        <tr><td><strong>Ticket Updated</strong></td><td>An agent posts a public reply on the ticket.</td></tr>
+        <tr><td><strong>Ticket Merged</strong></td><td>Two tickets are merged and the requester is notified.</td></tr>
+        <tr><td><strong>CSAT Survey</strong></td><td>A satisfaction survey is sent after a ticket is resolved/closed.</td></tr>
+        <tr><td><strong>Customer Reminder</strong></td><td>An escalation rule with the "Notify ticket creator" action fires (e.g. follow-up after no reply).</td></tr>
+    </tbody>
+</table>
+</div>
+<h6 class="fw-semibold mb-2">Using Tokens</h6>
+<p class="text-muted mb-2">Template fields support dynamic tokens that are replaced with live ticket data when the email is sent. Wrap tokens in double curly braces:</p>
+<div class="table-responsive mb-3">
+<table class="table table-sm mb-0">
+    <thead class="table-light"><tr><th>Token</th><th>Replaced with</th></tr></thead>
+    <tbody class="text-muted">
+        <tr><td><code>{{first_name}}</code></td><td>Recipient's first name</td></tr>
+        <tr><td><code>{{last_name}}</code></td><td>Recipient's last name</td></tr>
+        <tr><td><code>{{user_name}}</code></td><td>Recipient's full name</td></tr>
+        <tr><td><code>{{ticket_id}}</code></td><td>Ticket number</td></tr>
+        <tr><td><code>{{subject}}</code></td><td>Ticket subject line</td></tr>
+    </tbody>
+</table>
+</div>
+<p class="text-muted mb-0">Each template also has a <strong>Reset to default</strong> button to restore the original built-in content if needed.</p>
 </div>
 </div>
 
