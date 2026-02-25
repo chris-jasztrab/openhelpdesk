@@ -20,13 +20,17 @@ $settingsNav = [
 ];
 $currentPath = currentPath();
 ?>
-<ul class="nav nav-tabs mb-4">
-    <?php foreach ($settingsNav as $item): ?>
-    <li class="nav-item">
-        <a class="nav-link <?= ($currentPath === $item['url'] || str_starts_with($currentPath, $item['url'] . '/')) ? 'active' : '' ?>"
-           href="<?= e($item['url']) ?>">
-            <i class="bi <?= e($item['icon']) ?> me-1"></i><?= e($item['label']) ?>
-        </a>
-    </li>
-    <?php endforeach; ?>
-</ul>
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body py-2 px-3">
+        <nav class="nav flex-wrap gap-1">
+            <?php foreach ($settingsNav as $item): ?>
+            <?php $isActive = $currentPath === $item['url'] || str_starts_with($currentPath, $item['url'] . '/'); ?>
+            <a class="nav-link py-1 px-2 small rounded <?= $isActive ? 'fw-semibold' : 'text-muted' ?>"
+               href="<?= e($item['url']) ?>"
+               style="<?= $isActive ? 'background:var(--bs-secondary-bg);color:var(--ld-primary)!important;' : '' ?>">
+                <i class="bi <?= e($item['icon']) ?> me-1"></i><?= e($item['label']) ?>
+            </a>
+            <?php endforeach; ?>
+        </nav>
+    </div>
+</div>
