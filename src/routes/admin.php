@@ -3982,6 +3982,70 @@ $router->get('/admin/settings/danger-zone', function () {
     render('admin/settings/danger-zone', ['ticketCount' => $ticketCount]);
 });
 
+$router->post('/admin/settings/danger-zone/reset', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/danger-zone');
+    }
+
+    $db = Database::connect();
+
+    // Truncate all data tables in safe order (disable FK checks first)
+    $db->exec('SET FOREIGN_KEY_CHECKS = 0');
+
+    $tables = [
+        'escalation_log',
+        'csat_surveys',
+        'audit_log',
+        'notifications',
+        'ticket_field_values',
+        'ticket_form_field_options',
+        'ticket_form_fields',
+        'ticket_tag_map',
+        'ticket_tags',
+        'ticket_attachments',
+        'ticket_cc',
+        'ticket_presence',
+        'ticket_timeline',
+        'tickets',
+        'ticket_templates',
+        'saved_filters',
+        'group_user_map',
+        'groups',
+        'kb_article_ratings',
+        'kb_article_revisions',
+        'kb_articles',
+        'kb_folders',
+        'kb_categories',
+        'escalation_rules',
+        'scheduled_reports',
+        'automations',
+        'sla_policies',
+        'ticket_priorities',
+        'ticket_types',
+        'locations',
+        'settings',
+        'users',
+    ];
+
+    foreach ($tables as $table) {
+        $db->exec("TRUNCATE TABLE `{$table}`");
+    }
+
+    $db->exec('SET FOREIGN_KEY_CHECKS = 1');
+
+    // Destroy the current session so the admin is logged out
+    session_unset();
+    session_destroy();
+
+    // Start a fresh session and flag that setup is needed
+    session_start();
+    $_SESSION['setup_allowed'] = true;
+
+    redirect('/setup');
+});
+
 /* ==================================================================
  * Reports & Analytics
  * ================================================================== */

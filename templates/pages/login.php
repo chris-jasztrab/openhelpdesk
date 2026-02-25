@@ -10,6 +10,12 @@ $pageTitle = 'Sign In';
 
     <div class="card shadow-lg border-0" style="border-radius:1rem;">
         <div class="card-body p-4">
+            <?php if (!empty($_GET['setup'])): ?>
+            <div class="alert alert-success d-flex align-items-center" role="alert">
+                <i class="bi bi-check-circle-fill me-2"></i>
+                <span>Setup complete! Sign in with your new admin account.</span>
+            </div>
+            <?php endif; ?>
             <?php if (!empty($error)): ?>
             <div class="alert alert-danger d-flex align-items-center" role="alert">
                 <i class="bi bi-exclamation-triangle-fill me-2"></i>

@@ -405,6 +405,92 @@ $router->get('/logout', function () {
 });
 
 /* ------------------------------------------------------------------
+ * First-run Setup Wizard
+ * Accessible only when: no users exist OR a fresh reset was triggered.
+ * ------------------------------------------------------------------ */
+$router->get('/setup', function () {
+    if (Auth::check()) {
+        redirect('/admin');
+    }
+    $db        = Database::connect();
+    $userCount = (int) $db->query('SELECT COUNT(*) FROM users')->fetchColumn();
+    // Allow only if truly empty OR the reset flag is set
+    if ($userCount > 0 && empty($_SESSION['setup_allowed'])) {
+        redirect('/login');
+    }
+    $errors   = $_SESSION['setup_errors'] ?? [];
+    $formData = $_SESSION['setup_form']   ?? [];
+    unset($_SESSION['setup_errors'], $_SESSION['setup_form']);
+    render('setup/wizard', ['errors' => $errors, 'formData' => $formData]);
+});
+
+$router->post('/setup', function () {
+    if (Auth::check()) {
+        redirect('/admin');
+    }
+    $db        = Database::connect();
+    $userCount = (int) $db->query('SELECT COUNT(*) FROM users')->fetchColumn();
+    if ($userCount > 0 && empty($_SESSION['setup_allowed'])) {
+        redirect('/login');
+    }
+
+    $firstName = trim($_POST['first_name'] ?? '');
+    $lastName  = trim($_POST['last_name']  ?? '');
+    $email     = trim($_POST['email']      ?? '');
+    $password  = $_POST['password']        ?? '';
+    $confirm   = $_POST['password_confirm'] ?? '';
+    $appName   = trim($_POST['app_name']   ?? 'LocalDesk');
+
+    $errors = [];
+    if ($firstName === '') $errors[] = 'First name is required.';
+    if ($lastName  === '') $errors[] = 'Last name is required.';
+    if ($email     === '') $errors[] = 'Email address is required.';
+    elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = 'Please enter a valid email address.';
+    if (strlen($password) < 8) $errors[] = 'Password must be at least 8 characters.';
+    if ($password !== $confirm) $errors[] = 'Passwords do not match.';
+    if ($appName   === '') $appName = 'LocalDesk';
+
+    if (!empty($errors)) {
+        $_SESSION['setup_errors'] = $errors;
+        $_SESSION['setup_form']   = compact('firstName', 'lastName', 'email', 'appName');
+        redirect('/setup');
+    }
+
+    // Create admin user
+    $stmt = $db->prepare(
+        'INSERT INTO users (first_name, last_name, email, password, role) VALUES (?, ?, ?, ?, \'admin\')'
+    );
+    $stmt->execute([$firstName, $lastName, $email, password_hash($password, PASSWORD_DEFAULT)]);
+
+    // Seed default ticket priorities
+    $db->exec("INSERT IGNORE INTO ticket_priorities (name, color, sort_order) VALUES
+        ('Low',      '#198754', 1),
+        ('Medium',   '#ffc107', 2),
+        ('High',     '#fd7e14', 3),
+        ('Critical', '#dc3545', 4)");
+
+    // Seed default ticket types
+    $db->exec("INSERT IGNORE INTO ticket_types (name) VALUES
+        ('General'),
+        ('Technical'),
+        ('Billing'),
+        ('Other')");
+
+    // Restore app name and trigger onboarding tour
+    $settingStmt = $db->prepare(
+        'INSERT INTO settings (setting_key, setting_value) VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)'
+    );
+    $settingStmt->execute(['branding_app_name', $appName]);
+    $settingStmt->execute(['show_onboarding', '1']);
+
+    // Clear setup session flags
+    unset($_SESSION['setup_allowed'], $_SESSION['setup_errors'], $_SESSION['setup_form']);
+
+    redirect('/login?setup=1');
+});
+
+/* ------------------------------------------------------------------
  * Two-Factor Authentication challenge
  * ------------------------------------------------------------------ */
 $router->get('/2fa', function () {
