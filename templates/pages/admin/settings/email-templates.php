@@ -250,10 +250,11 @@ if (!array_key_exists($activeTab, $tabs) && $activeTab !== 'shared') {
                 <?php
                 $subjectTpl = $tplValues["email_subject_{$activeTab}"] ?? $defaults[$activeTab]['subject'];
                 $previewTokens = [
-                    'ticket_created' => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working', 'type' => 'Hardware', 'location' => 'Main Branch', 'priority' => 'High'],
-                    'ticket_updated' => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working', 'message' => 'We are looking into this.', 'author' => 'Jane Smith'],
-                    'ticket_merged'  => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'source_ticket_id' => '42', 'source_subject' => 'Printer not working', 'target_ticket_id' => '38', 'target_subject' => 'Office printer issues'],
-                    'csat_survey'    => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working'],
+                    'ticket_created'  => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working', 'type' => 'Hardware', 'location' => 'Main Branch', 'priority' => 'High'],
+                    'ticket_updated'  => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working', 'message' => 'We are looking into this.', 'author' => 'Jane Smith'],
+                    'ticket_merged'   => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'source_ticket_id' => '42', 'source_subject' => 'Printer not working', 'target_ticket_id' => '38', 'target_subject' => 'Office printer issues'],
+                    'csat_survey'     => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working'],
+                    'ticket_reminder' => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working'],
                 ];
                 $preview = $subjectTpl;
                 foreach ($previewTokens[$activeTab] as $k => $v) {
