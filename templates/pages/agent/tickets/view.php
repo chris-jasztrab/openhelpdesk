@@ -274,35 +274,62 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
             </div>
         </div>
 
-        <!-- Add Comment / Internal Note -->
-        <div class="card border-0 shadow-sm mt-4">
-            <div class="card-header bg-white border-bottom">
-                <h5 class="mb-0 fw-semibold"><i class="bi bi-chat-dots me-2"></i>Add Comment</h5>
-            </div>
-            <div class="card-body">
-                <form method="POST" action="/agent/tickets/<?= $ticket['id'] ?>/comment" enctype="multipart/form-data">
-                    <?= csrfField() ?>
-                    <div class="mb-3" style="position:relative;">
-                        <textarea class="form-control" name="message" id="commentMessage" rows="3" required
-                                  placeholder="Write a comment... Type @ to mention someone"></textarea>
-                        <div id="mentionDropdown" class="mention-dropdown" style="display:none;"></div>
-                    </div>
-                    <div class="mb-3">
-                        <input type="file" class="form-control" name="attachments[]" multiple>
-                        <div class="form-text">Max <?= UPLOAD_MAX_SIZE / 1024 / 1024 ?>MB per file</div>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" name="is_internal" value="1" id="isInternal">
-                            <label class="form-check-label" for="isInternal">
-                                <i class="bi bi-lock me-1"></i>Internal note <span class="text-muted">(not visible to the user)</span>
-                            </label>
+        <!-- Reply / Forward / Note action bar -->
+        <div class="d-flex gap-2 mt-4" id="replyActionBar">
+            <button type="button" class="btn btn-sm btn-outline-primary" id="btnReply">
+                <i class="bi bi-reply me-1"></i>Reply
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="btnForward">
+                <i class="bi bi-forward me-1"></i>Forward
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-warning" id="btnNote">
+                <i class="bi bi-lock me-1"></i>Add Note
+            </button>
+        </div>
+
+        <!-- Collapsible reply / note panel -->
+        <div id="replyBox" style="display:none;" class="mt-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header border-bottom d-flex align-items-center justify-content-between py-2 bg-white" id="replyBoxHeader">
+                    <span class="fw-semibold" id="replyBoxTitle"></span>
+                    <button type="button" class="btn-close" id="replyBoxClose" aria-label="Close"></button>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="/agent/tickets/<?= $ticket['id'] ?>/comment" enctype="multipart/form-data" id="replyForm">
+                        <?= csrfField() ?>
+                        <input type="hidden" name="is_internal" id="replyIsInternal" value="0">
+                        <input type="hidden" name="status_after" id="replyStatusAfter" value="">
+                        <div class="mb-3" style="position:relative;">
+                            <textarea class="form-control" name="message" id="commentMessage" rows="4" required
+                                      placeholder="Write a message... Type @ to mention someone"></textarea>
+                            <div id="mentionDropdown" class="mention-dropdown" style="display:none;"></div>
                         </div>
-                        <button type="submit" class="btn text-white" style="background:var(--ld-primary);">
-                            <i class="bi bi-send me-1"></i>Post
-                        </button>
-                    </div>
-                </form>
+                        <div class="mb-3">
+                            <input type="file" class="form-control" name="attachments[]" multiple>
+                            <div class="form-text">Max <?= UPLOAD_MAX_SIZE / 1024 / 1024 ?>MB per file</div>
+                        </div>
+                        <div class="d-flex justify-content-end">
+                            <div class="btn-group">
+                                <button type="submit" class="btn text-white" style="background:var(--ld-primary);">
+                                    <i class="bi bi-send me-1" id="replySubmitIcon"></i><span id="replySubmitLabel">Send Reply</span>
+                                </button>
+                                <button type="button" class="btn text-white dropdown-toggle dropdown-toggle-split"
+                                        style="background:var(--ld-primary);border-left:1px solid rgba(255,255,255,.3);"
+                                        data-bs-toggle="dropdown" aria-expanded="false">
+                                    <span class="visually-hidden">More send options</span>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><h6 class="dropdown-header small">Send &amp; change status to</h6></li>
+                                    <li><a class="dropdown-item reply-status-opt" href="#" data-status="resolved"><i class="bi bi-check-circle me-2 text-success"></i>Resolved</a></li>
+                                    <li><a class="dropdown-item reply-status-opt" href="#" data-status="closed"><i class="bi bi-x-circle me-2 text-secondary"></i>Closed</a></li>
+                                    <li><a class="dropdown-item reply-status-opt" href="#" data-status="pending"><i class="bi bi-pause-circle me-2 text-info"></i>Pending</a></li>
+                                    <li><a class="dropdown-item reply-status-opt" href="#" data-status="waiting_on_customer"><i class="bi bi-person-clock me-2 text-warning"></i>Waiting on Customer</a></li>
+                                    <li><a class="dropdown-item reply-status-opt" href="#" data-status="waiting_on_third_party"><i class="bi bi-building-check me-2"></i>Waiting on Third Party</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
@@ -1070,6 +1097,66 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
 
     window.addEventListener('beforeunload', function() {
         navigator.sendBeacon(leaveUrl);
+    });
+})();
+
+// Reply / Forward / Note panel
+(function() {
+    var box          = document.getElementById('replyBox');
+    var boxHeader    = document.getElementById('replyBoxHeader');
+    var titleEl      = document.getElementById('replyBoxTitle');
+    var isInternalEl = document.getElementById('replyIsInternal');
+    var statusAfterEl = document.getElementById('replyStatusAfter');
+    var submitLabel  = document.getElementById('replySubmitLabel');
+    var submitIcon   = document.getElementById('replySubmitIcon');
+    var closeBtn     = document.getElementById('replyBoxClose');
+    var textarea     = document.getElementById('commentMessage');
+    var btnReply     = document.getElementById('btnReply');
+    var btnForward   = document.getElementById('btnForward');
+    var btnNote      = document.getElementById('btnNote');
+    var currentMode  = null;
+
+    var modes = {
+        reply:   { title: '<i class="bi bi-reply me-2"></i>Reply',         internal: '0', label: 'Send Reply', icon: 'bi-send',    header: 'bg-white' },
+        forward: { title: '<i class="bi bi-forward me-2"></i>Forward',     internal: '0', label: 'Forward',    icon: 'bi-forward', header: 'bg-white' },
+        note:    { title: '<i class="bi bi-lock me-2"></i>Internal Note',  internal: '1', label: 'Add Note',   icon: 'bi-lock',    header: 'bg-warning-subtle' }
+    };
+
+    function openMode(mode) {
+        if (currentMode === mode && box.style.display !== 'none') { closePanel(); return; }
+        currentMode = mode;
+        var cfg = modes[mode];
+        titleEl.innerHTML    = cfg.title;
+        isInternalEl.value   = cfg.internal;
+        submitLabel.textContent = cfg.label;
+        submitIcon.className = 'bi ' + cfg.icon + ' me-1';
+        boxHeader.className  = 'card-header border-bottom d-flex align-items-center justify-content-between py-2 ' + cfg.header;
+        statusAfterEl.value  = '';
+        box.style.display    = '';
+        box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        setTimeout(function() { textarea.focus(); }, 80);
+        [btnReply, btnForward, btnNote].forEach(function(b) { b.classList.remove('active'); });
+        ({ reply: btnReply, forward: btnForward, note: btnNote })[mode].classList.add('active');
+    }
+
+    function closePanel() {
+        box.style.display = 'none';
+        currentMode = null;
+        statusAfterEl.value = '';
+        [btnReply, btnForward, btnNote].forEach(function(b) { b.classList.remove('active'); });
+    }
+
+    btnReply.addEventListener('click',   function() { openMode('reply'); });
+    btnForward.addEventListener('click', function() { openMode('forward'); });
+    btnNote.addEventListener('click',    function() { openMode('note'); });
+    closeBtn.addEventListener('click',   closePanel);
+
+    document.querySelectorAll('.reply-status-opt').forEach(function(el) {
+        el.addEventListener('click', function(e) {
+            e.preventDefault();
+            statusAfterEl.value = this.dataset.status;
+            document.getElementById('replyForm').submit();
+        });
     });
 })();
 </script>

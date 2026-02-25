@@ -788,6 +788,35 @@ $router->post('/agent/tickets/{id}/comment', function (array $p) {
     if (!empty($attachments)) {
         $base .= ' ' . count($attachments) . ' file(s) attached.';
     }
+
+    // Optional: change ticket status after posting
+    $statusAfter  = trim($_POST['status_after'] ?? '');
+    $validStatuses = ['open', 'in_progress', 'pending', 'waiting_on_customer', 'waiting_on_third_party', 'resolved', 'closed'];
+    if ($statusAfter !== '' && in_array($statusAfter, $validStatuses, true)) {
+        $csStmt = $db->prepare('SELECT status FROM tickets WHERE id = ?');
+        $csStmt->execute([$id]);
+        $currentTicket = $csStmt->fetch();
+        if ($currentTicket && $currentTicket['status'] !== $statusAfter) {
+            $oldStatus = $currentTicket['status'];
+            $db->prepare('UPDATE tickets SET status = ? WHERE id = ?')->execute([$statusAfter, $id]);
+            $db->prepare(
+                'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
+            )->execute([$id, Auth::id(), 'status_changed', "Status changed from {$oldStatus} to {$statusAfter}"]);
+            $csatTrigger = getSetting('csat_trigger_status', 'resolved');
+            if ($statusAfter === $csatTrigger) {
+                sendCsatSurvey($db, $id);
+            }
+            $pausingStatuses = ['pending', 'waiting_on_customer', 'waiting_on_third_party'];
+            if (in_array($statusAfter, $pausingStatuses, true)) {
+                Sla::pause($db, $id);
+            } elseif (in_array($oldStatus, $pausingStatuses, true)) {
+                Sla::resume($db, $id);
+            }
+            $statusLabelsMap = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 'Pending', 'waiting_on_customer' => 'Waiting on Customer', 'waiting_on_third_party' => 'Waiting on Third Party', 'resolved' => 'Resolved', 'closed' => 'Closed'];
+            $base .= ' Status set to ' . ($statusLabelsMap[$statusAfter] ?? $statusAfter) . '.';
+        }
+    }
+
     flash('success', $base);
     redirect("/agent/tickets/{$id}");
 });
