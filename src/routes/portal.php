@@ -15,9 +15,25 @@ $router->get('/portal/tickets', function () {
     $fPriority = trim($_GET['priority'] ?? '');
     $fSearch   = trim($_GET['q'] ?? '');
 
-    // Show tickets the user created (not merged away) plus any master tickets their merged tickets point to
-    $where  = ['(t.created_by = ? AND t.merged_into_ticket_id IS NULL) OR t.id IN (SELECT DISTINCT merged_into_ticket_id FROM tickets WHERE created_by = ? AND merged_into_ticket_id IS NOT NULL)'];
-    $params = [Auth::id(), Auth::id()];
+    $uid = Auth::id();
+
+    // Check if this user has location-ticket visibility enabled
+    $permStmt = $db->prepare('SELECT can_view_location_tickets, location_id FROM users WHERE id = ?');
+    $permStmt->execute([$uid]);
+    $userPerms = $permStmt->fetch();
+
+    // Base: own tickets (not merged away) plus master tickets whose merged child belongs to this user
+    $ownCond = '(t.created_by = ? AND t.merged_into_ticket_id IS NULL)
+                OR t.id IN (SELECT DISTINCT merged_into_ticket_id FROM tickets WHERE created_by = ? AND merged_into_ticket_id IS NOT NULL)';
+
+    if ($userPerms['can_view_location_tickets'] && $userPerms['location_id']) {
+        // Also show all non-merged tickets at the user's location
+        $where  = ['(' . $ownCond . ' OR (t.location_id = ? AND t.merged_into_ticket_id IS NULL))'];
+        $params = [$uid, $uid, (int) $userPerms['location_id']];
+    } else {
+        $where  = ['(' . $ownCond . ')'];
+        $params = [$uid, $uid];
+    }
 
     if ($fStatus !== '') {
         $where[]  = 't.status = ?';
@@ -376,6 +392,18 @@ $router->get('/portal/tickets/{id}', function (array $p) {
         redirect('/portal/tickets/' . (int) $mergedRow['merged_into_ticket_id']);
     }
 
+    // Check location-ticket visibility permission
+    $permStmt = $db->prepare('SELECT can_view_location_tickets, location_id FROM users WHERE id = ?');
+    $permStmt->execute([$uid]);
+    $userPerms = $permStmt->fetch();
+
+    $accessCond   = '(t.created_by = ? OR t.id IN (SELECT DISTINCT merged_into_ticket_id FROM tickets WHERE created_by = ? AND merged_into_ticket_id IS NOT NULL))';
+    $accessParams = [$tid, $uid, $uid];
+    if ($userPerms['can_view_location_tickets'] && $userPerms['location_id']) {
+        $accessCond   = '(' . $accessCond . ' OR t.location_id = ?)';
+        $accessParams[] = (int) $userPerms['location_id'];
+    }
+
     $stmt = $db->prepare(
         "SELECT t.*,
                 tp.name AS priority_name, tp.color AS priority_color,
@@ -387,10 +415,9 @@ $router->get('/portal/tickets/{id}', function (array $p) {
          LEFT JOIN ticket_types tt     ON t.type_id     = tt.id
          LEFT JOIN locations l         ON t.location_id  = l.id
          LEFT JOIN users a             ON t.assigned_to  = a.id
-         WHERE t.id = ?
-           AND (t.created_by = ? OR t.id IN (SELECT DISTINCT merged_into_ticket_id FROM tickets WHERE created_by = ? AND merged_into_ticket_id IS NOT NULL))"
+         WHERE t.id = ? AND {$accessCond}"
     );
-    $stmt->execute([$tid, $uid, $uid]);
+    $stmt->execute($accessParams);
     $ticket = $stmt->fetch();
     if (!$ticket) {
         flash('error', 'Ticket not found.');
@@ -492,13 +519,21 @@ $router->post('/portal/tickets/{id}/comment', function (array $p) {
 
     $db = Database::connect();
 
-    // Verify ownership (own ticket or a master ticket one of their tickets was merged into)
-    $uid = Auth::id();
-    $stmt = $db->prepare(
-        'SELECT id FROM tickets WHERE id = ?
-         AND (created_by = ? OR id IN (SELECT DISTINCT merged_into_ticket_id FROM tickets WHERE created_by = ? AND merged_into_ticket_id IS NOT NULL))'
-    );
-    $stmt->execute([$id, $uid, $uid]);
+    // Verify access: own ticket, merged master, or location-visible ticket
+    $uid      = Auth::id();
+    $permStmt = $db->prepare('SELECT can_view_location_tickets, location_id FROM users WHERE id = ?');
+    $permStmt->execute([$uid]);
+    $userPerms = $permStmt->fetch();
+
+    $accessCond   = '(created_by = ? OR id IN (SELECT DISTINCT merged_into_ticket_id FROM tickets WHERE created_by = ? AND merged_into_ticket_id IS NOT NULL))';
+    $accessParams = [$id, $uid, $uid];
+    if ($userPerms['can_view_location_tickets'] && $userPerms['location_id']) {
+        $accessCond   = '(' . $accessCond . ' OR location_id = ?)';
+        $accessParams[] = (int) $userPerms['location_id'];
+    }
+
+    $stmt = $db->prepare("SELECT id FROM tickets WHERE id = ? AND {$accessCond}");
+    $stmt->execute($accessParams);
     if (!$stmt->fetch()) {
         flash('error', 'Ticket not found.');
         redirect('/portal/tickets');

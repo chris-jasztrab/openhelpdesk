@@ -148,13 +148,14 @@ $router->post('/admin/users/create', function () {
         redirect('/admin/users/create');
     }
 
-    $fn       = trim($_POST['first_name'] ?? '');
-    $ln       = trim($_POST['last_name'] ?? '');
-    $email    = trim($_POST['email'] ?? '');
-    $password = $_POST['password'] ?? '';
-    $role     = $_POST['role'] ?? 'user';
-    $phone    = trim($_POST['work_phone'] ?? '');
-    $locId    = !empty($_POST['location_id']) ? (int) $_POST['location_id'] : null;
+    $fn              = trim($_POST['first_name'] ?? '');
+    $ln              = trim($_POST['last_name'] ?? '');
+    $email           = trim($_POST['email'] ?? '');
+    $password        = $_POST['password'] ?? '';
+    $role            = $_POST['role'] ?? 'user';
+    $phone           = trim($_POST['work_phone'] ?? '');
+    $locId           = !empty($_POST['location_id']) ? (int) $_POST['location_id'] : null;
+    $canViewLocTix   = !empty($_POST['can_view_location_tickets']) ? 1 : 0;
 
     if ($fn === '' || $ln === '' || $email === '' || $password === '') {
         flashInput($_POST);
@@ -168,10 +169,10 @@ $router->post('/admin/users/create', function () {
     $db = Database::connect();
     try {
         $stmt = $db->prepare(
-            'INSERT INTO users (first_name, last_name, email, password, role, avatar, work_phone, location_id)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+            'INSERT INTO users (first_name, last_name, email, password, role, avatar, work_phone, location_id, can_view_location_tickets)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
-        $stmt->execute([$fn, $ln, $email, password_hash($password, PASSWORD_DEFAULT), $role, $avatar, $phone, $locId]);
+        $stmt->execute([$fn, $ln, $email, password_hash($password, PASSWORD_DEFAULT), $role, $avatar, $phone, $locId, $canViewLocTix]);
         $newId = (int) $db->lastInsertId();
         logAudit('user.create', $newId, 'user', "{$fn} {$ln} ({$email}), role={$role}");
         flash('success', 'User created successfully.');
@@ -244,12 +245,13 @@ $router->post('/admin/users/{id}/edit', function (array $p) {
         redirect("/admin/users/{$id}/edit");
     }
 
-    $fn    = trim($_POST['first_name'] ?? '');
-    $ln    = trim($_POST['last_name'] ?? '');
-    $email = trim($_POST['email'] ?? '');
-    $role  = $_POST['role'] ?? 'user';
-    $phone = trim($_POST['work_phone'] ?? '');
-    $locId = !empty($_POST['location_id']) ? (int) $_POST['location_id'] : null;
+    $fn            = trim($_POST['first_name'] ?? '');
+    $ln            = trim($_POST['last_name'] ?? '');
+    $email         = trim($_POST['email'] ?? '');
+    $role          = $_POST['role'] ?? 'user';
+    $phone         = trim($_POST['work_phone'] ?? '');
+    $locId         = !empty($_POST['location_id']) ? (int) $_POST['location_id'] : null;
+    $canViewLocTix = !empty($_POST['can_view_location_tickets']) ? 1 : 0;
 
     if ($fn === '' || $ln === '' || $email === '') {
         flashInput($_POST);
@@ -273,14 +275,14 @@ $router->post('/admin/users/{id}/edit', function (array $p) {
     try {
         if ($password !== '') {
             $stmt = $db->prepare(
-                'UPDATE users SET first_name=?, last_name=?, email=?, password=?, role=?, avatar=?, work_phone=?, location_id=? WHERE id=?'
+                'UPDATE users SET first_name=?, last_name=?, email=?, password=?, role=?, avatar=?, work_phone=?, location_id=?, can_view_location_tickets=? WHERE id=?'
             );
-            $stmt->execute([$fn, $ln, $email, password_hash($password, PASSWORD_DEFAULT), $role, $avatar, $phone, $locId, $id]);
+            $stmt->execute([$fn, $ln, $email, password_hash($password, PASSWORD_DEFAULT), $role, $avatar, $phone, $locId, $canViewLocTix, $id]);
         } else {
             $stmt = $db->prepare(
-                'UPDATE users SET first_name=?, last_name=?, email=?, role=?, avatar=?, work_phone=?, location_id=? WHERE id=?'
+                'UPDATE users SET first_name=?, last_name=?, email=?, role=?, avatar=?, work_phone=?, location_id=?, can_view_location_tickets=? WHERE id=?'
             );
-            $stmt->execute([$fn, $ln, $email, $role, $avatar, $phone, $locId, $id]);
+            $stmt->execute([$fn, $ln, $email, $role, $avatar, $phone, $locId, $canViewLocTix, $id]);
         }
         logAudit('user.update', $id, 'user', "{$fn} {$ln} ({$email}), role={$role}");
         flash('success', 'User updated successfully.');

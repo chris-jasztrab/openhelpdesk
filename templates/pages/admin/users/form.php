@@ -89,6 +89,19 @@ $action = $isEdit ? "/admin/users/{$editing['id']}/edit" : '/admin/users/create'
                     </select>
                 </div>
 
+                <!-- Location Ticket Visibility -->
+                <div class="col-12">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch"
+                               id="can_view_location_tickets" name="can_view_location_tickets" value="1"
+                               <?= !empty(old('can_view_location_tickets', $editing['can_view_location_tickets'] ?? 0)) ? 'checked' : '' ?>>
+                        <label class="form-check-label fw-semibold" for="can_view_location_tickets">
+                            Location Ticket Visibility
+                        </label>
+                    </div>
+                    <div class="form-text">When enabled, this user can view all tickets assigned to their location — even if they are not an agent or admin.</div>
+                </div>
+
                 <!-- Avatar -->
                 <div class="col-md-6">
                     <label for="avatar" class="form-label fw-semibold">Avatar Image</label>
