@@ -80,6 +80,11 @@ $statusLabels = [
                     </button>
                 </form>
                 <?php endif; ?>
+                <?php if ($profileUser['id'] !== Auth::id()): ?>
+                <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteUserModal">
+                    <i class="bi bi-trash me-1"></i>Delete User
+                </button>
+                <?php endif; ?>
                 <button type="button" class="btn btn-outline-secondary" onclick="history.back()">
                     <i class="bi bi-arrow-left me-1"></i>Back
                 </button>
@@ -87,6 +92,230 @@ $statusLabels = [
         </div>
     </div>
 </div>
+
+<!-- Delete User Modal -->
+<?php if ($profileUser['id'] !== Auth::id()):
+    $hasAssociated = ($createdCount + $assignedCount + $kbCount) > 0;
+?>
+<div class="modal fade" id="deleteUserModal" tabindex="-1" aria-labelledby="deleteUserModalLabel">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white border-0">
+                <h5 class="modal-title fw-semibold" id="deleteUserModalLabel">
+                    <i class="bi bi-trash me-2"></i>Delete User
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/admin/users/<?= (int)$profileUser['id'] ?>/delete" id="deleteUserForm">
+                <?= csrfField() ?>
+                <input type="hidden" name="transfer_to" id="transferToInput" value="">
+
+                <!-- Step 1: info + optional transfer -->
+                <div id="delStep1">
+                    <div class="modal-body">
+                        <p class="mb-3">You are about to permanently delete
+                            <strong><?= e($profileUser['first_name'] . ' ' . $profileUser['last_name']) ?></strong>.
+                            This action cannot be undone.
+                        </p>
+
+                        <?php if ($hasAssociated): ?>
+                        <div class="alert alert-warning small mb-3">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                            <strong>This user has associated records that must be transferred:</strong>
+                            <ul class="mb-0 mt-1">
+                                <?php if ($createdCount > 0): ?>
+                                <li><?= $createdCount ?> ticket<?= $createdCount !== 1 ? 's' : '' ?> they submitted</li>
+                                <?php endif; ?>
+                                <?php if ($assignedCount > 0): ?>
+                                <li><?= $assignedCount ?> ticket<?= $assignedCount !== 1 ? 's' : '' ?> assigned to them</li>
+                                <?php endif; ?>
+                                <?php if ($kbCount > 0): ?>
+                                <li><?= $kbCount ?> KB article<?= $kbCount !== 1 ? 's' : '' ?> they authored</li>
+                                <?php endif; ?>
+                            </ul>
+                        </div>
+                        <label class="form-label fw-semibold">Transfer records to:</label>
+                        <div class="position-relative mb-2">
+                            <input type="text" id="transferSearch" class="form-control"
+                                   placeholder="Search by name or email…" autocomplete="off">
+                            <div id="transferDropdown"
+                                 class="list-group position-absolute w-100 shadow-sm"
+                                 style="z-index:1100;display:none;max-height:200px;overflow-y:auto;"></div>
+                        </div>
+                        <div id="selectedTransferUserDiv" style="display:none;" class="mb-1">
+                            <span class="badge bg-primary fs-6 fw-normal py-2 px-3"
+                                  id="selectedTransferUserBadge"></span>
+                            <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2"
+                                    id="clearTransferBtn">
+                                <i class="bi bi-x-circle me-1"></i>Remove
+                            </button>
+                        </div>
+                        <?php else: ?>
+                        <p class="text-muted small mb-0">
+                            This user has no tickets or KB articles and can be safely deleted.
+                        </p>
+                        <?php endif; ?>
+                    </div>
+                    <div class="modal-footer border-0 pt-0">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-danger" id="delStep1Btn"
+                                <?= $hasAssociated ? 'disabled' : '' ?>>
+                            Continue
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Step 2: confirmation -->
+                <div id="delStep2" style="display:none;">
+                    <div class="modal-body">
+                        <div class="alert alert-danger mb-0">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                            <span id="delConfirmText"></span>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-0 pt-0">
+                        <button type="button" class="btn btn-secondary" id="delBackBtn">Back</button>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-trash me-1"></i>Confirm &amp; Delete
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    var hasAssociated = <?= $hasAssociated ? 'true' : 'false' ?>;
+    var userName      = <?= json_encode($profileUser['first_name'] . ' ' . $profileUser['last_name']) ?>;
+    var userId        = <?= (int) $profileUser['id'] ?>;
+    var selectedUser  = null;
+
+    var step1        = document.getElementById('delStep1');
+    var step2        = document.getElementById('delStep2');
+    var step1Btn     = document.getElementById('delStep1Btn');
+    var backBtn      = document.getElementById('delBackBtn');
+    var confirmTxt   = document.getElementById('delConfirmText');
+    var transferInput = document.getElementById('transferToInput');
+    var searchInput   = document.getElementById('transferSearch');
+    var dropdown      = document.getElementById('transferDropdown');
+    var selectedDiv   = document.getElementById('selectedTransferUserDiv');
+    var selectedBadge = document.getElementById('selectedTransferUserBadge');
+    var clearBtn      = document.getElementById('clearTransferBtn');
+
+    // Auto-open when URL contains ?delete=1
+    if (window.location.search.indexOf('delete=1') !== -1) {
+        new bootstrap.Modal(document.getElementById('deleteUserModal')).show();
+        history.replaceState({}, '', window.location.pathname);
+    }
+
+    // ── Autocomplete ──────────────────────────────────────────────────────────
+    if (hasAssociated && searchInput) {
+        var debounce;
+        searchInput.addEventListener('input', function () {
+            clearTimeout(debounce);
+            var q = this.value.trim();
+            if (q.length < 1) { dropdown.style.display = 'none'; return; }
+            debounce = setTimeout(function () {
+                fetch('/api/user-search?q=' + encodeURIComponent(q))
+                    .then(function (r) { return r.json(); })
+                    .then(function (users) {
+                        dropdown.innerHTML = '';
+                        users = users.filter(function (u) { return parseInt(u.id) !== userId; });
+                        if (!users.length) {
+                            dropdown.innerHTML = '<div class="list-group-item text-muted small">No users found.</div>';
+                        } else {
+                            users.forEach(function (u) {
+                                var btn = document.createElement('button');
+                                btn.type = 'button';
+                                btn.className = 'list-group-item list-group-item-action small py-2';
+                                btn.innerHTML = '<strong>' + esc(u.first_name + ' ' + u.last_name) + '</strong>'
+                                    + ' <span class="text-muted">— ' + esc(u.email) + '</span>'
+                                    + ' <span class="badge bg-' + roleBadge(u.role) + ' ms-1">' + esc(u.role) + '</span>';
+                                btn.addEventListener('click', function () { selectUser(u); });
+                                dropdown.appendChild(btn);
+                            });
+                        }
+                        dropdown.style.display = 'block';
+                    });
+            }, 250);
+        });
+
+        document.addEventListener('click', function (e) {
+            if (searchInput && !searchInput.contains(e.target) && !dropdown.contains(e.target)) {
+                dropdown.style.display = 'none';
+            }
+        });
+    }
+
+    function selectUser(u) {
+        selectedUser = u;
+        transferInput.value = u.id;
+        searchInput.value = '';
+        searchInput.style.display = 'none';
+        dropdown.style.display = 'none';
+        selectedBadge.textContent = u.first_name + ' ' + u.last_name + ' (' + u.email + ')';
+        selectedDiv.style.display = '';
+        step1Btn.disabled = false;
+    }
+
+    if (clearBtn) {
+        clearBtn.addEventListener('click', function () {
+            selectedUser = null;
+            transferInput.value = '';
+            searchInput.value = '';
+            searchInput.style.display = '';
+            selectedDiv.style.display = 'none';
+            if (hasAssociated) step1Btn.disabled = true;
+        });
+    }
+
+    // ── Step navigation ───────────────────────────────────────────────────────
+    if (step1Btn) {
+        step1Btn.addEventListener('click', function () {
+            var msg = 'Permanently delete <strong>' + esc(userName) + '</strong>?';
+            if (selectedUser) {
+                msg += ' Their tickets and KB articles will be transferred to <strong>'
+                    + esc(selectedUser.first_name + ' ' + selectedUser.last_name) + '</strong>.';
+            }
+            confirmTxt.innerHTML = msg;
+            step1.style.display = 'none';
+            step2.style.display = '';
+        });
+    }
+
+    if (backBtn) {
+        backBtn.addEventListener('click', function () {
+            step1.style.display = '';
+            step2.style.display = 'none';
+        });
+    }
+
+    // Reset on modal close
+    document.getElementById('deleteUserModal').addEventListener('hidden.bs.modal', function () {
+        step1.style.display = '';
+        step2.style.display = 'none';
+        if (hasAssociated && searchInput) {
+            selectedUser = null;
+            transferInput.value = '';
+            searchInput.value = '';
+            searchInput.style.display = '';
+            if (dropdown) dropdown.style.display = 'none';
+            if (selectedDiv) selectedDiv.style.display = 'none';
+            step1Btn.disabled = true;
+        }
+    });
+
+    function esc(str) {
+        return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function roleBadge(role) {
+        return role === 'admin' ? 'danger' : role === 'agent' ? 'primary' : 'secondary';
+    }
+})();
+</script>
+<?php endif; ?>
 
 <!-- Open tickets -->
 <h5 class="fw-semibold mb-3">

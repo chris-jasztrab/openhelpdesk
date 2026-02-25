@@ -128,6 +128,51 @@ class UsersTest extends TestCase
         $this->assertSee('Edit User', $r);
     }
 
+    public function test_view_user_shows_delete_button_for_other_users(): void
+    {
+        // Admin can delete the portal test user (not themselves)
+        $r = $this->get($this->adminClient(), '/admin/users/' . DatabaseSeeder::$portalId);
+        $this->assertSee('Delete User', $r);
+    }
+
+    public function test_view_user_does_not_show_delete_button_for_self(): void
+    {
+        // Admin should not see a Delete button on their own profile
+        $r    = $this->get($this->adminClient(), '/admin/users/' . DatabaseSeeder::$adminId);
+        $html = (string) $r->getBody();
+        $this->assertStringNotContainsString('deleteUserModal', $html,
+            'Delete modal must not appear on the admin\'s own profile');
+    }
+
+    public function test_delete_page_param_triggers_modal_markup(): void
+    {
+        // ?delete=1 is a UI hint; the page should still load 200 and include the modal
+        $r = $this->get($this->adminClient(), '/admin/users/' . DatabaseSeeder::$portalId . '?delete=1');
+        $this->assertOk($r);
+        $html = (string) $r->getBody();
+        $this->assertStringContainsString('deleteUserModal', $html);
+    }
+
+    public function test_delete_user_with_tickets_redirects_to_view_when_no_transfer(): void
+    {
+        // The seeded portal user created the test ticket, so posting without transfer_to
+        // must redirect back to the view page rather than deleting.
+        $r = $this->post(
+            $this->adminClient(),
+            '/admin/users/' . DatabaseSeeder::$portalId . '/delete',
+            []
+        );
+        $code = $r->getStatusCode();
+        // Either 302 redirect back to view page, or 200 with error — never a successful deletion
+        $this->assertTrue($code === 200 || $code === 302, "Expected 200/302, got $code");
+
+        // User must still exist in the DB
+        $db   = \Database::connect();
+        $stmt = $db->prepare('SELECT id FROM users WHERE id = ?');
+        $stmt->execute([DatabaseSeeder::$portalId]);
+        $this->assertNotFalse($stmt->fetch(), 'Portal user should not have been deleted without a transfer target');
+    }
+
     // ── Edit ──────────────────────────────────────────────────────────────────
 
     public function test_edit_user_form_loads(): void

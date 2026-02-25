@@ -220,7 +220,26 @@ $router->get('/admin/users/{id}', function (array $p) {
     $tStmt->execute([$uid]);
     $openTickets = $tStmt->fetchAll();
 
-    render('admin/users/view', ['profileUser' => $user, 'openTickets' => $openTickets]);
+    // Counts needed for the delete/transfer modal
+    $cStmt = $db->prepare('SELECT COUNT(*) FROM tickets WHERE created_by = ?');
+    $cStmt->execute([$uid]);
+    $createdCount = (int) $cStmt->fetchColumn();
+
+    $aStmt = $db->prepare('SELECT COUNT(*) FROM tickets WHERE assigned_to = ?');
+    $aStmt->execute([$uid]);
+    $assignedCount = (int) $aStmt->fetchColumn();
+
+    $kbStmt = $db->prepare('SELECT COUNT(*) FROM kb_articles WHERE created_by = ?');
+    $kbStmt->execute([$uid]);
+    $kbCount = (int) $kbStmt->fetchColumn();
+
+    render('admin/users/view', [
+        'profileUser'   => $user,
+        'openTickets'   => $openTickets,
+        'createdCount'  => $createdCount,
+        'assignedCount' => $assignedCount,
+        'kbCount'       => $kbCount,
+    ]);
 });
 
 $router->get('/admin/users/{id}/edit', function (array $p) {
@@ -309,21 +328,46 @@ $router->post('/admin/users/{id}/delete', function (array $p) {
     }
     $db = Database::connect();
 
-    // Check for records that would prevent deletion
-    $ticketCount = $db->prepare('SELECT COUNT(*) FROM tickets WHERE created_by = ?');
-    $ticketCount->execute([$id]);
-    $tickets = (int) $ticketCount->fetchColumn();
+    $transferTo = !empty($_POST['transfer_to']) ? (int) $_POST['transfer_to'] : null;
 
-    $kbCount = $db->prepare('SELECT COUNT(*) FROM kb_articles WHERE created_by = ?');
-    $kbCount->execute([$id]);
-    $kbArticles = (int) $kbCount->fetchColumn();
+    // Count records associated with this user
+    $cStmt = $db->prepare('SELECT COUNT(*) FROM tickets WHERE created_by = ?');
+    $cStmt->execute([$id]);
+    $createdCount = (int) $cStmt->fetchColumn();
 
-    if ($tickets > 0 || $kbArticles > 0) {
-        $parts = [];
-        if ($tickets > 0) $parts[] = $tickets . ' ticket' . ($tickets > 1 ? 's' : '');
-        if ($kbArticles > 0) $parts[] = $kbArticles . ' KB article' . ($kbArticles > 1 ? 's' : '');
-        flash('error', 'Cannot delete this user because they have ' . implode(' and ', $parts) . '. Reassign or remove those records first.');
-        redirect('/admin/users');
+    $aStmt = $db->prepare('SELECT COUNT(*) FROM tickets WHERE assigned_to = ?');
+    $aStmt->execute([$id]);
+    $assignedCount = (int) $aStmt->fetchColumn();
+
+    $kbStmt = $db->prepare('SELECT COUNT(*) FROM kb_articles WHERE created_by = ?');
+    $kbStmt->execute([$id]);
+    $kbCount = (int) $kbStmt->fetchColumn();
+
+    $hasAssociated = $createdCount > 0 || $assignedCount > 0 || $kbCount > 0;
+
+    // If there are associated records a transfer target is required
+    if ($hasAssociated && $transferTo === null) {
+        flash('error', 'This user has associated tickets or KB articles. Select a user to transfer them to before deleting.');
+        redirect("/admin/users/{$id}?delete=1");
+    }
+
+    // Validate and perform transfer
+    if ($transferTo !== null) {
+        $targetStmt = $db->prepare('SELECT id FROM users WHERE id = ? AND id != ?');
+        $targetStmt->execute([$transferTo, $id]);
+        if (!$targetStmt->fetch()) {
+            flash('error', 'Transfer target user not found.');
+            redirect("/admin/users/{$id}?delete=1");
+        }
+        if ($createdCount > 0) {
+            $db->prepare('UPDATE tickets SET created_by = ? WHERE created_by = ?')->execute([$transferTo, $id]);
+        }
+        if ($assignedCount > 0) {
+            $db->prepare('UPDATE tickets SET assigned_to = ? WHERE assigned_to = ?')->execute([$transferTo, $id]);
+        }
+        if ($kbCount > 0) {
+            $db->prepare('UPDATE kb_articles SET created_by = ? WHERE created_by = ?')->execute([$transferTo, $id]);
+        }
     }
 
     // Remove avatar file
@@ -333,12 +377,19 @@ $router->post('/admin/users/{id}/delete', function (array $p) {
     if ($file && file_exists(ROOT_DIR . '/public/uploads/avatars/' . $file)) {
         unlink(ROOT_DIR . '/public/uploads/avatars/' . $file);
     }
+
     $nameStmt = $db->prepare('SELECT CONCAT(first_name, " ", last_name, " (", email, ")") FROM users WHERE id = ?');
     $nameStmt->execute([$id]);
     $deletedName = $nameStmt->fetchColumn() ?: "id={$id}";
+
     $db->prepare('DELETE FROM users WHERE id = ?')->execute([$id]);
     logAudit('user.delete', $id, 'user', $deletedName);
-    flash('success', 'User deleted.');
+
+    if ($transferTo !== null) {
+        flash('success', "User \"{$deletedName}\" was deleted and their records were transferred successfully.");
+    } else {
+        flash('success', "User \"{$deletedName}\" was deleted.");
+    }
     redirect('/admin/users');
 });
 

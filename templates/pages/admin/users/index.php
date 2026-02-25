@@ -125,13 +125,11 @@ $hasFilters = !empty($filterParams);
                                     <i class="bi bi-pencil"></i>
                                 </a>
                                 <?php if ($u['id'] !== Auth::id()): ?>
-                                <form method="POST" action="/admin/users/<?= $u['id'] ?>/delete" class="d-inline"
-                                      onsubmit="return confirm('Delete this user?')">
-                                    <?= csrfField() ?>
-                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </form>
+                                <a href="/admin/users/<?= $u['id'] ?>?delete=1"
+                                   class="btn btn-sm btn-outline-danger" title="Delete"
+                                   onclick="event.stopPropagation()">
+                                    <i class="bi bi-trash"></i>
+                                </a>
                                 <?php endif; ?>
                             </div>
                         </td>
