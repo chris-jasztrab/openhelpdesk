@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS `users` (
     `password`    VARCHAR(255) NOT NULL,
     `role`        ENUM('admin', 'agent', 'user') NOT NULL DEFAULT 'user',
     `avatar`      VARCHAR(255) DEFAULT NULL,
+    `azure_oid`   VARCHAR(128) NULL DEFAULT NULL,
     `work_phone`              VARCHAR(50)  DEFAULT NULL,
     `location_id`             INT UNSIGNED DEFAULT NULL,
     `notify_ticket_created`   TINYINT(1)   NOT NULL DEFAULT 1,
@@ -34,7 +35,8 @@ CREATE TABLE IF NOT EXISTS `users` (
     `can_view_location_tickets` TINYINT(1) NOT NULL DEFAULT 0,
     `created_at`  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     `updated_at`  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (`location_id`) REFERENCES `locations`(`id`) ON DELETE SET NULL
+    FOREIGN KEY (`location_id`) REFERENCES `locations`(`id`) ON DELETE SET NULL,
+    UNIQUE KEY `uq_azure_oid` (`azure_oid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Ticket priorities

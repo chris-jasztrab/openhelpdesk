@@ -50,6 +50,40 @@ $pageTitle = 'Sign In';
                     <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
                 </button>
             </form>
+
+            <?php if (getSetting('sso_enabled', '0') === '1'): ?>
+            <div class="d-flex align-items-center gap-2 my-3">
+                <hr class="flex-grow-1 m-0">
+                <span class="text-muted small px-1">or</span>
+                <hr class="flex-grow-1 m-0">
+            </div>
+            <a href="/auth/microsoft"
+               class="btn btn-outline-secondary w-100 d-flex align-items-center justify-content-center gap-2 py-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 21 21" aria-hidden="true">
+                    <rect x="1"  y="1"  width="9" height="9" fill="#f25022"/>
+                    <rect x="11" y="1"  width="9" height="9" fill="#7fba00"/>
+                    <rect x="1"  y="11" width="9" height="9" fill="#00a4ef"/>
+                    <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+                </svg>
+                Sign in with Microsoft 365
+            </a>
+            <?php endif; ?>
+
+            <?php if (!empty($_GET['sso_error'])): ?>
+            <div class="alert alert-danger d-flex align-items-center mt-3 mb-0 py-2 small" role="alert">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                <span>
+                    <?= match($_GET['sso_error']) {
+                        'disabled'     => 'SSO is not currently enabled.',
+                        'state'        => 'Sign-in session expired. Please try again.',
+                        'token'        => 'Could not complete sign-in with Microsoft. Please try again.',
+                        'graph'        => 'Could not retrieve your account details from Microsoft. Please try again.',
+                        'denied'       => 'Sign-in was cancelled or access was denied.',
+                        default        => 'An error occurred during Microsoft sign-in. Please try again.',
+                    } ?>
+                </span>
+            </div>
+            <?php endif; ?>
         </div>
     </div>
 

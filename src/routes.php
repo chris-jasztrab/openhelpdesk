@@ -346,6 +346,20 @@ $router->get('/search', function () {
  * ------------------------------------------------------------------ */
 $router->get('/', function () {
     if (Auth::check()) {
+        // Location prompt: redirect to picker when needed
+        $locationPrompt = getSetting('sso_location_prompt', 'sso_only');
+        if (!empty($_SESSION['sso_needs_location']) ||
+            ($locationPrompt === 'all' && Auth::role() !== 'admin')) {
+            $uid = Auth::id();
+            $row = Database::connect()
+                ->prepare('SELECT location_id FROM users WHERE id = ?');
+            $row->execute([$uid]);
+            $locId = $row->fetchColumn();
+            if (empty($locId)) {
+                redirect('/sso/pick-location');
+            }
+            unset($_SESSION['sso_needs_location']);
+        }
         match (Auth::role()) {
             'admin' => redirect('/admin'),
             'agent' => redirect('/agent'),
@@ -402,6 +416,238 @@ $router->get('/logout', function () {
     logAudit('logout');
     Auth::logout();
     redirect('/login');
+});
+
+/* ------------------------------------------------------------------
+ * Microsoft 365 SSO – OAuth 2.0 Authorization Code Flow
+ * ------------------------------------------------------------------ */
+
+function ssoHttpPost(string $url, array $fields): ?array
+{
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => http_build_query($fields),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 15,
+        CURLOPT_HTTPHEADER     => ['Content-Type: application/x-www-form-urlencoded'],
+        CURLOPT_SSL_VERIFYPEER => true,
+    ]);
+    $body = curl_exec($ch);
+    curl_close($ch);
+    if ($body === false) {
+        return null;
+    }
+    $data = json_decode($body, true);
+    return is_array($data) ? $data : null;
+}
+
+function ssoHttpGet(string $url, string $token): ?array
+{
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 15,
+        CURLOPT_HTTPHEADER     => ['Authorization: Bearer ' . $token],
+        CURLOPT_SSL_VERIFYPEER => true,
+    ]);
+    $body = curl_exec($ch);
+    curl_close($ch);
+    if ($body === false) {
+        return null;
+    }
+    $data = json_decode($body, true);
+    return is_array($data) ? $data : null;
+}
+
+function ssoSetSessionUser(array $user): void
+{
+    $_SESSION['user'] = [
+        'id'          => $user['id'],
+        'first_name'  => $user['first_name'],
+        'last_name'   => $user['last_name'],
+        'email'       => $user['email'],
+        'role'        => $user['role'],
+        'avatar'      => $user['avatar'] ?? null,
+        'location_id' => $user['location_id'] ?? null,
+    ];
+}
+
+// Initiate Microsoft SSO – redirect user to Microsoft login
+$router->get('/auth/microsoft', function () {
+    if (getSetting('sso_enabled', '0') !== '1') {
+        redirect('/login?sso_error=disabled');
+    }
+
+    $state = bin2hex(random_bytes(16));
+    $_SESSION['sso_state'] = $state;
+
+    $tenantId    = getSetting('sso_tenant_id');
+    $clientId    = getSetting('sso_client_id');
+    $redirectUri = rtrim(env('APP_URL', ''), '/') . '/auth/microsoft/callback';
+
+    $params = http_build_query([
+        'client_id'     => $clientId,
+        'response_type' => 'code',
+        'redirect_uri'  => $redirectUri,
+        'scope'         => 'openid email profile User.Read',
+        'state'         => $state,
+        'response_mode' => 'query',
+    ]);
+
+    redirect("https://login.microsoftonline.com/{$tenantId}/oauth2/v2.0/authorize?{$params}");
+});
+
+// Microsoft OAuth callback – exchange code, look up / create user, log in
+$router->get('/auth/microsoft/callback', function () {
+    // 1. Verify state (CSRF guard on OAuth flow)
+    $state = $_GET['state'] ?? '';
+    if ($state === '' || $state !== ($_SESSION['sso_state'] ?? '')) {
+        unset($_SESSION['sso_state']);
+        redirect('/login?sso_error=state');
+    }
+    unset($_SESSION['sso_state']);
+
+    // 2. Check for user-denied / consent errors
+    if (!empty($_GET['error'])) {
+        redirect('/login?sso_error=denied');
+    }
+
+    $code = $_GET['code'] ?? '';
+    if ($code === '') {
+        redirect('/login?sso_error=token');
+    }
+
+    $tenantId     = getSetting('sso_tenant_id');
+    $clientId     = getSetting('sso_client_id');
+    $clientSecret = getSetting('sso_client_secret');
+    $redirectUri  = rtrim(env('APP_URL', ''), '/') . '/auth/microsoft/callback';
+
+    // 3. Exchange code for access token
+    $tokens = ssoHttpPost(
+        "https://login.microsoftonline.com/{$tenantId}/oauth2/v2.0/token",
+        [
+            'grant_type'    => 'authorization_code',
+            'client_id'     => $clientId,
+            'client_secret' => $clientSecret,
+            'code'          => $code,
+            'redirect_uri'  => $redirectUri,
+        ]
+    );
+
+    if (empty($tokens['access_token'])) {
+        redirect('/login?sso_error=token');
+    }
+
+    // 4. Fetch user profile from Microsoft Graph
+    $me = ssoHttpGet('https://graph.microsoft.com/v1.0/me', $tokens['access_token']);
+
+    if (empty($me['id'])) {
+        redirect('/login?sso_error=graph');
+    }
+
+    $oid       = $me['id'];
+    $email     = $me['mail'] ?? $me['userPrincipalName'] ?? '';
+    $parts     = explode(' ', trim($me['displayName'] ?? 'SSO User'));
+    $firstName = $me['givenName'] ?? $parts[0];
+    $lastName  = $me['surname']   ?? (count($parts) > 1 ? implode(' ', array_slice($parts, 1)) : 'User');
+
+    if ($email === '') {
+        redirect('/login?sso_error=graph');
+    }
+
+    $db   = Database::connect();
+    $user = null;
+
+    // 5. Look up by Azure OID first, then by email
+    $stmt = $db->prepare('SELECT * FROM users WHERE azure_oid = ? LIMIT 1');
+    $stmt->execute([$oid]);
+    $user = $stmt->fetch() ?: null;
+
+    if (!$user) {
+        $stmt = $db->prepare('SELECT * FROM users WHERE email = ? LIMIT 1');
+        $stmt->execute([$email]);
+        $user = $stmt->fetch() ?: null;
+        if ($user) {
+            // Link OID to the existing password-login account
+            $db->prepare('UPDATE users SET azure_oid = ? WHERE id = ?')
+               ->execute([$oid, $user['id']]);
+            $user['azure_oid'] = $oid;
+        }
+    }
+
+    $isBrandNew = false;
+
+    // 6. Auto-create account if no match found
+    if (!$user) {
+        $db->prepare(
+            'INSERT INTO users (first_name, last_name, email, azure_oid, password, role)
+             VALUES (?, ?, ?, ?, \'\', \'user\')'
+        )->execute([$firstName, $lastName, $email, $oid]);
+
+        $newId = (int) $db->lastInsertId();
+        $stmt  = $db->prepare('SELECT * FROM users WHERE id = ?');
+        $stmt->execute([$newId]);
+        $user       = $stmt->fetch();
+        $isBrandNew = true;
+    }
+
+    // 7. Log in
+    session_regenerate_id(true);
+    ssoSetSessionUser($user);
+    logAudit('login');
+
+    // 8. Redirect to location picker when needed
+    $locationPrompt = getSetting('sso_location_prompt', 'sso_only');
+    if (empty($user['location_id']) && ($isBrandNew || $locationPrompt === 'all')) {
+        $_SESSION['sso_needs_location'] = true;
+    }
+
+    redirect('/');
+});
+
+// Show location picker
+$router->get('/sso/pick-location', function () {
+    Auth::requireAuth();
+
+    if (!empty(Auth::user()['location_id'])) {
+        redirect('/');
+    }
+
+    $locations = Database::connect()
+        ->query('SELECT id, name, address FROM locations ORDER BY name')
+        ->fetchAll();
+
+    render('sso-pick-location', ['locations' => $locations]);
+});
+
+// Save location choice
+$router->post('/sso/pick-location', function () {
+    Auth::requireAuth();
+
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        redirect('/sso/pick-location');
+    }
+
+    $locationId = (int) ($_POST['location_id'] ?? 0);
+    $db         = Database::connect();
+
+    if ($locationId > 0) {
+        $loc = $db->prepare('SELECT id FROM locations WHERE id = ?');
+        $loc->execute([$locationId]);
+        if (!$loc->fetch()) {
+            render('sso-pick-location', [
+                'locations' => $db->query('SELECT id, name, address FROM locations ORDER BY name')->fetchAll(),
+                'error'     => 'Please select a valid ' . label('location.singular', 'location') . '.',
+            ]);
+        }
+        $db->prepare('UPDATE users SET location_id = ? WHERE id = ?')
+           ->execute([$locationId, Auth::id()]);
+        $_SESSION['user']['location_id'] = $locationId;
+    }
+
+    unset($_SESSION['sso_needs_location']);
+    redirect('/');
 });
 
 /* ------------------------------------------------------------------

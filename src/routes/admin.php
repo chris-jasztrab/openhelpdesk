@@ -3,6 +3,59 @@
 declare(strict_types=1);
 
 /* ==================================================================
+ * ADMIN – SSO Settings
+ * ================================================================== */
+
+$router->get('/admin/settings/sso', function () {
+    Auth::requireRole('admin');
+    render('admin/settings/sso', [
+        'ssoEnabled'        => getSetting('sso_enabled',        '0'),
+        'ssoTenantId'       => getSetting('sso_tenant_id',      ''),
+        'ssoClientId'       => getSetting('sso_client_id',      ''),
+        'ssoClientSecret'   => getSetting('sso_client_secret',  ''),
+        'ssoLocationPrompt' => getSetting('sso_location_prompt','sso_only'),
+    ]);
+});
+
+$router->post('/admin/settings/sso', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        redirect('/admin/settings/sso');
+    }
+
+    $enabled        = isset($_POST['sso_enabled'])       ? '1' : '0';
+    $tenantId       = trim($_POST['sso_tenant_id']       ?? '');
+    $clientId       = trim($_POST['sso_client_id']       ?? '');
+    $clientSecret   = $_POST['sso_client_secret']        ?? '';
+    $locationPrompt = in_array($_POST['sso_location_prompt'] ?? '', ['sso_only', 'all'], true)
+                        ? $_POST['sso_location_prompt']
+                        : 'sso_only';
+
+    if ($enabled === '1' && ($tenantId === '' || $clientId === '')) {
+        flash('error', 'Tenant ID and Client ID are required to enable SSO.');
+        redirect('/admin/settings/sso');
+    }
+
+    setSetting('sso_enabled',        $enabled);
+    setSetting('sso_tenant_id',      $tenantId);
+    setSetting('sso_client_id',      $clientId);
+    setSetting('sso_location_prompt', $locationPrompt);
+
+    // Only overwrite the secret if a new value was provided
+    if ($clientSecret !== '') {
+        setSetting('sso_client_secret', $clientSecret);
+    }
+
+    flash('success', 'SSO settings saved successfully.');
+    redirect('/admin/settings/sso');
+});
+
+$router->get('/admin/settings/sso/help', function () {
+    Auth::requireRole('admin');
+    render('admin/settings/sso-help');
+});
+
+/* ==================================================================
  * ADMIN – Onboarding
  * ================================================================== */
 
