@@ -3600,6 +3600,123 @@ $router->post('/admin/settings/branding', function () {
 });
 
 /* ==================================================================
+ * ADMIN – Settings: Labels
+ * ================================================================== */
+
+$router->get('/admin/settings/labels', function () {
+    Auth::requireRole('admin');
+    render('admin/settings/labels');
+});
+
+$router->get('/admin/settings/labels/download', function () {
+    Auth::requireRole('admin');
+    $defaultFile = ROOT_DIR . '/config/labels.default.json';
+    $defaults    = is_file($defaultFile)
+        ? (json_decode(file_get_contents($defaultFile), true) ?: [])
+        : [];
+    $custom  = json_decode(getSetting('custom_labels', '{}'), true) ?: [];
+    $merged  = array_merge($defaults, $custom);
+
+    // Remove the internal readme key from the download
+    unset($merged['_readme']);
+    $merged = array_merge(
+        ['_readme' => 'Edit the values (right-hand side) only. Keys must stay exactly as written. Re-upload to apply.'],
+        $merged
+    );
+
+    header('Content-Type: application/json; charset=utf-8');
+    header('Content-Disposition: attachment; filename="labels.json"');
+    echo json_encode($merged, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    exit;
+});
+
+$router->post('/admin/settings/labels/upload', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/labels');
+    }
+
+    if (empty($_FILES['labels_file']['tmp_name']) || $_FILES['labels_file']['error'] !== UPLOAD_ERR_OK) {
+        flash('error', 'Please select a valid JSON file.');
+        redirect('/admin/settings/labels');
+    }
+
+    if ($_FILES['labels_file']['size'] > 512 * 1024) {
+        flash('error', 'File is too large. Maximum 512 KB.');
+        redirect('/admin/settings/labels');
+    }
+
+    $raw = file_get_contents($_FILES['labels_file']['tmp_name']);
+    $uploaded = json_decode($raw, true);
+
+    if ($uploaded === null) {
+        $_SESSION['label_upload_errors']  = ['The file is not valid JSON: ' . json_last_error_msg()];
+        $_SESSION['label_upload_preview'] = $raw;
+        redirect('/admin/settings/labels');
+    }
+
+    // Load known keys from the default file
+    $defaultFile = ROOT_DIR . '/config/labels.default.json';
+    $defaults    = is_file($defaultFile)
+        ? (json_decode(file_get_contents($defaultFile), true) ?: [])
+        : [];
+
+    $errors   = [];
+    $custom   = [];
+
+    foreach ($uploaded as $key => $value) {
+        if ($key === '_readme') {
+            continue;
+        }
+        if (!array_key_exists($key, $defaults)) {
+            $errors[] = "Unknown key: \"$key\" — only keys from the default template are allowed.";
+            continue;
+        }
+        if (!is_string($value)) {
+            $errors[] = "Key \"$key\" must have a string value.";
+            continue;
+        }
+        if (trim($value) === '') {
+            $errors[] = "Key \"$key\" has an empty value — provide a non-empty string.";
+            continue;
+        }
+        // Only store keys that differ from the default
+        if ($value !== $defaults[$key]) {
+            $custom[$key] = $value;
+        }
+    }
+
+    if (!empty($errors)) {
+        $_SESSION['label_upload_errors']  = $errors;
+        $_SESSION['label_upload_preview'] = json_encode($uploaded, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        redirect('/admin/settings/labels');
+    }
+
+    setSetting('custom_labels', json_encode($custom));
+    redirect('/admin/settings/labels?saved=1');
+});
+
+$router->post('/admin/settings/labels/reset', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/labels');
+    }
+    setSetting('custom_labels', '{}');
+    redirect('/admin/settings/labels?reset=1');
+});
+
+/* ==================================================================
+ * ADMIN – Settings: Cron Jobs
+ * ================================================================== */
+
+$router->get('/admin/settings/cron-jobs', function () {
+    Auth::requireRole('admin');
+    render('admin/settings/cron-jobs');
+});
+
+/* ==================================================================
  * ADMIN – Settings: Automations
  * ================================================================== */
 

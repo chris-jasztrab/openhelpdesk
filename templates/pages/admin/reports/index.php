@@ -1,19 +1,21 @@
 <?php
-$layout              = 'app';
-$pageTitle           = 'Reports';
-$scheduleReportType  = 'overview';
-$scheduleReportTitle = 'Overview';
-$sidebarItems        = adminSidebar('reports');
+$layout       = 'app';
+$pageTitle    = 'Reports';
+$sidebarItems = adminSidebar('reports');
 $breadcrumbs  = [
     ['label' => 'Admin', 'url' => '/admin'],
     ['label' => 'Reports'],
 ];
 ?>
-<div class="mb-4">
-    <h2 class="fw-bold mb-1">Reports &amp; Analytics</h2>
-    <p class="text-muted mb-0">Overview of key metrics for the current period</p>
+<div class="d-flex align-items-start justify-content-between mb-4">
+    <div>
+        <h2 class="fw-bold mb-1">Reports &amp; Analytics</h2>
+        <p class="text-muted mb-0">Overview of key metrics for the current period</p>
+    </div>
+    <a href="/admin/settings/scheduled-reports" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-envelope-paper me-1"></i>Scheduled Reports
+    </a>
 </div>
-
 
 <!-- Date range info -->
 <div class="d-flex align-items-center gap-2 mb-4 text-muted small">
@@ -24,12 +26,8 @@ $breadcrumbs  = [
         <span>to</span>
         <input type="date" name="to" value="<?= e($to) ?>" class="form-control form-control-sm" style="width:auto;">
         <button type="submit" class="btn btn-sm text-white" style="background:var(--ld-primary);">Apply</button>
-        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#scheduleReportModal">
-            <i class="bi bi-calendar-plus me-1"></i>Schedule
-        </button>
     </form>
 </div>
-<?php require ROOT_DIR . '/templates/partials/schedule-report-modal.php'; ?>
 
 <!-- KPI Cards -->
 <div class="row g-4 mb-4">

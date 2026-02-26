@@ -317,6 +317,22 @@ function setSetting(string $key, string $value): void
     )->execute([$key, $value]);
 }
 
+/* ── Label helpers ────────────────────────────────────────────── */
+
+function label(string $key, string $default = ''): string
+{
+    static $labels = null;
+    if ($labels === null) {
+        $defaultFile = ROOT_DIR . '/config/labels.default.json';
+        $defaults    = is_file($defaultFile)
+            ? (json_decode(file_get_contents($defaultFile), true) ?: [])
+            : [];
+        $custom      = json_decode(getSetting('custom_labels', '{}'), true) ?: [];
+        $labels      = array_merge($defaults, $custom);
+    }
+    return $labels[$key] ?? ($default !== '' ? $default : $key);
+}
+
 /* ── User column preference helpers ──────────────────────────── */
 
 /**
@@ -1254,34 +1270,34 @@ function logAudit(string $action, ?int $targetId = null, ?string $targetType = n
 function adminSidebar(string $active = ''): array
 {
     return array_map(fn($item) => array_merge($item, ['active' => $item['key'] === $active]), [
-        ['icon' => 'bi-speedometer2',    'label' => 'Dashboard',  'url' => '/admin',            'key' => 'dashboard'],
-        ['icon' => 'bi-ticket-detailed', 'label' => 'Tickets',    'url' => '/admin/tickets',    'key' => 'tickets'],
-        ['icon' => 'bi-people',          'label' => 'Users',      'url' => '/admin/users',      'key' => 'users'],
-        ['icon' => 'bi-book',            'label' => 'Knowledge Base', 'url' => '/admin/kb/categories', 'key' => 'kb'],
-        ['icon' => 'bi-diagram-3',       'label' => 'Workflows',    'url' => '/admin/workflows/ticket-fields', 'key' => 'workflows'],
-        ['icon' => 'bi-sliders',         'label' => 'Settings',     'url' => '/admin/settings', 'key' => 'settings'],
-        ['icon' => 'bi-bar-chart',       'label' => 'Reports',    'url' => '/admin/reports', 'key' => 'reports'],
-        ['icon' => 'bi-shield-check',    'label' => 'Audit Log',  'url' => '/admin/audit-log', 'key' => 'audit-log'],
-        ['icon' => 'bi-question-circle', 'label' => 'Docs',       'url' => '/admin/docs',    'key' => 'docs'],
+        ['icon' => 'bi-speedometer2',    'label' => label('nav.dashboard'),     'url' => '/admin',            'key' => 'dashboard'],
+        ['icon' => 'bi-ticket-detailed', 'label' => label('nav.tickets'),       'url' => '/admin/tickets',    'key' => 'tickets'],
+        ['icon' => 'bi-people',          'label' => label('nav.users'),         'url' => '/admin/users',      'key' => 'users'],
+        ['icon' => 'bi-book',            'label' => label('nav.knowledge_base'), 'url' => '/admin/kb/categories', 'key' => 'kb'],
+        ['icon' => 'bi-diagram-3',       'label' => label('nav.workflows'),     'url' => '/admin/workflows/ticket-fields', 'key' => 'workflows'],
+        ['icon' => 'bi-sliders',         'label' => label('nav.settings'),      'url' => '/admin/settings',   'key' => 'settings'],
+        ['icon' => 'bi-bar-chart',       'label' => label('nav.reports'),       'url' => '/admin/reports',    'key' => 'reports'],
+        ['icon' => 'bi-shield-check',    'label' => label('nav.audit_log'),     'url' => '/admin/audit-log',  'key' => 'audit-log'],
+        ['icon' => 'bi-question-circle', 'label' => label('nav.docs'),          'url' => '/admin/docs',       'key' => 'docs'],
     ]);
 }
 
 function portalSidebar(string $active = ''): array
 {
     return array_map(fn($item) => array_merge($item, ['active' => $item['key'] === $active]), [
-        ['icon' => 'bi-speedometer2',    'label' => 'Dashboard',  'url' => '/portal',            'key' => 'dashboard'],
-        ['icon' => 'bi-ticket-detailed', 'label' => 'My Tickets', 'url' => '/portal/tickets',    'key' => 'tickets'],
-        ['icon' => 'bi-book',            'label' => 'Knowledge Base', 'url' => '/portal/kb',        'key' => 'kb'],
+        ['icon' => 'bi-speedometer2',    'label' => label('portal.nav.dashboard'),     'url' => '/portal',         'key' => 'dashboard'],
+        ['icon' => 'bi-ticket-detailed', 'label' => label('portal.nav.my_tickets'),    'url' => '/portal/tickets', 'key' => 'tickets'],
+        ['icon' => 'bi-book',            'label' => label('portal.nav.knowledge_base'), 'url' => '/portal/kb',     'key' => 'kb'],
     ]);
 }
 
 function agentSidebar(string $active = ''): array
 {
     return array_map(fn($item) => array_merge($item, ['active' => $item['key'] === $active]), [
-        ['icon' => 'bi-speedometer2',    'label' => 'Dashboard',     'url' => '/agent',          'key' => 'dashboard'],
-        ['icon' => 'bi-ticket-detailed', 'label' => 'Tickets',       'url' => '/agent/tickets',  'key' => 'tickets'],
-        ['icon' => 'bi-book',            'label' => 'Knowledge Base', 'url' => '/portal/kb',          'key' => 'kb'],
-        ['icon' => 'bi-people',          'label' => 'Customers',      'url' => '#', 'badge' => 'Soon', 'key' => 'customers'],
+        ['icon' => 'bi-speedometer2',    'label' => label('agent.nav.dashboard'),      'url' => '/agent',          'key' => 'dashboard'],
+        ['icon' => 'bi-ticket-detailed', 'label' => label('agent.nav.tickets'),        'url' => '/agent/tickets',  'key' => 'tickets'],
+        ['icon' => 'bi-book',            'label' => label('agent.nav.knowledge_base'),  'url' => '/portal/kb',      'key' => 'kb'],
+        ['icon' => 'bi-people',          'label' => label('agent.nav.customers'),       'url' => '#', 'badge' => 'Soon', 'key' => 'customers'],
     ]);
 }
 
