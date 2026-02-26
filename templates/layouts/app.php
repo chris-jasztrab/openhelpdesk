@@ -209,10 +209,76 @@
         .filter-panel-backdrop.open { opacity: 1; pointer-events: auto; }
         [data-bs-theme="dark"] .filter-panel { background: #212529; border-right-color: #373b3e; }
         [data-bs-theme="dark"] .filter-panel-header { border-bottom-color: #373b3e; }
+
+        /* Tour resume pill */
+        #ld-tour-resume {
+            position: fixed;
+            top: calc(var(--ld-navbar-height) + 12px);
+            right: 16px;
+            z-index: 1039;
+            background: var(--ld-primary);
+            color: #fff;
+            border-radius: 50px;
+            padding: 6px 14px 6px 8px;
+            font-size: .8rem;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            box-shadow: 0 4px 14px rgba(79,70,229,.45);
+            transition: transform .15s ease, box-shadow .15s ease;
+        }
+        #ld-tour-resume:hover {
+            color: #fff;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(79,70,229,.55);
+        }
+        .ld-tour-pulse-wrap {
+            position: relative;
+            width: 10px;
+            height: 10px;
+            flex-shrink: 0;
+        }
+        .ld-tour-pulse-wrap::before,
+        .ld-tour-pulse-wrap::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            background: #fff;
+        }
+        .ld-tour-pulse-wrap::before {
+            opacity: .35;
+            animation: ld-tour-ping 1.4s cubic-bezier(0,0,.2,1) infinite;
+        }
+        .ld-tour-pulse-wrap::after {
+            transform: scale(.7);
+        }
+        @keyframes ld-tour-ping {
+            0%   { transform: scale(1);   opacity: .35; }
+            75%, 100% { transform: scale(2.2); opacity: 0; }
+        }
     </style>
 </head>
 <body>
     <?php require ROOT_DIR . '/templates/partials/navbar.php'; ?>
+
+    <?php if (Auth::role() === 'admin' && getSetting('show_onboarding', '0') === '1'): ?>
+    <a href="/admin?tour=1" id="ld-tour-resume" title="Continue setup tour">
+        <span class="ld-tour-pulse-wrap"></span>
+        <span id="ld-tour-resume-label">Setup Tour</span>
+    </a>
+    <script>
+    (function () {
+        var step = parseInt(localStorage.getItem('ld_tour_step') || '0', 10);
+        if (step > 1) {
+            document.getElementById('ld-tour-resume-label').textContent = 'Resume Tour (step ' + step + '/6)';
+            document.getElementById('ld-tour-resume').href = '/admin?tour=1&step=' + step;
+        }
+    })();
+    </script>
+    <?php endif; ?>
 
     <!-- Sidebar -->
     <aside class="sidebar">

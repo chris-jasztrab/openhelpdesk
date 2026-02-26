@@ -203,9 +203,10 @@
 <script>
 // Defer until Bootstrap is ready (Bootstrap JS loads after page content)
 document.addEventListener('DOMContentLoaded', function () {
-    var autoShow = <?= ($autoShowTour ?? false) ? 'true' : 'false' ?>;
+    var autoShow   = <?= ($autoShowTour ?? false) ? 'true' : 'false' ?>;
+    var resumeStep = <?= isset($_GET['step']) ? (int)$_GET['step'] : 0 ?>;
     var totalSteps = 6;
-    var current = 1;
+    var current    = 1;
 
     var modalEl  = document.getElementById('onboardingModal');
     var modal    = new bootstrap.Modal(modalEl, { backdrop: 'static', keyboard: false });
@@ -216,7 +217,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function goTo(n) {
         document.querySelectorAll('.tour-step').forEach(function (s) { s.classList.add('d-none'); });
-        current = n;
+        current = Math.min(Math.max(n, 1), totalSteps);
         document.querySelector('.tour-step[data-step="' + current + '"]').classList.remove('d-none');
 
         dots.forEach(function (d) {
@@ -232,9 +233,30 @@ document.addEventListener('DOMContentLoaded', function () {
             nextBtn.classList.remove('d-none');
             dismissF.classList.add('d-none');
         }
+
+        // Persist step so the resume pill can show the right step number
+        localStorage.setItem('ld_tour_step', current);
     }
 
-    modalEl.addEventListener('show.bs.modal', function () { goTo(1); });
+    // Save step when user clicks an action link and navigates away
+    modalEl.addEventListener('click', function (e) {
+        var link = e.target.closest('a[href]');
+        if (link && !link.closest('#tourDismissForm')) {
+            localStorage.setItem('ld_tour_step', current);
+        }
+    });
+
+    // Clear step when tour is dismissed
+    dismissF.addEventListener('submit', function () {
+        localStorage.removeItem('ld_tour_step');
+    });
+
+    // On open: jump to resume step if provided, otherwise step 1
+    modalEl.addEventListener('show.bs.modal', function () {
+        var start = resumeStep > 1 ? resumeStep : 1;
+        goTo(start);
+    });
+
     nextBtn.addEventListener('click', function () { if (current < totalSteps) goTo(current + 1); });
     prevBtn.addEventListener('click', function () { if (current > 1) goTo(current - 1); });
 
