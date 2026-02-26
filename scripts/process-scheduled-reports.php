@@ -48,18 +48,23 @@ logLine(count($reports) . ' enabled report schedule(s) loaded.');
 $totalSent = 0;
 $today     = (int) date('w'); // 0=Sun … 6=Sat (day of week)
 $todayDom  = (int) date('j'); // 1–31 (day of month)
+$todayDate = date('Y-m-d');
 
 foreach ($reports as $report) {
-    $id        = (int) $report['id'];
-    $name      = $report['name'];
-    $type      = $report['report_type'];
-    $frequency = $report['frequency'];
-    $sendDay   = (int) $report['send_day'];
-    $lastSent  = $report['last_sent_at'];
+    $id             = (int) $report['id'];
+    $name           = $report['name'];
+    $type           = $report['report_type'];
+    $frequency      = $report['frequency'];
+    $sendDay        = $report['send_day'] !== null ? (int) $report['send_day'] : null;
+    $dateRangeDays  = max(1, (int) ($report['date_range_days'] ?? 30));
+    $lastSent       = $report['last_sent_at'];
 
     // ── Due check ────────────────────────────────────────────────────
     $isDue = false;
-    if ($frequency === 'weekly') {
+    if ($frequency === 'daily') {
+        $lastSentDate = $lastSent ? date('Y-m-d', strtotime($lastSent)) : null;
+        $isDue        = ($lastSentDate !== $todayDate);
+    } elseif ($frequency === 'weekly') {
         $dayMatch  = ($today === $sendDay);
         $notRecent = ($lastSent === null || strtotime($lastSent) < strtotime('-6 days'));
         $isDue     = $dayMatch && $notRecent;
@@ -83,10 +88,10 @@ foreach ($reports as $report) {
     }
 
     // ── Build report data ─────────────────────────────────────────────
-    $from    = date('Y-m-d', strtotime('-30 days'));
-    $to      = date('Y-m-d');
-    $toEnd   = $to . ' 23:59:59';
-    $stats   = [];
+    $from  = date('Y-m-d', strtotime("-{$dateRangeDays} days"));
+    $to    = $todayDate;
+    $toEnd = $to . ' 23:59:59';
+    $stats = [];
 
     try {
         switch ($type) {
@@ -131,9 +136,7 @@ foreach ($reports as $report) {
 
             case 'ticket_volume':
                 $stmt = $db->prepare(
-                    "SELECT COUNT(*) AS total,
-                            SUM(CASE WHEN DATE(created_at) = CURDATE() THEN 1 ELSE 0 END) AS today_count
-                     FROM tickets WHERE created_at BETWEEN ? AND ?"
+                    "SELECT COUNT(*) AS total FROM tickets WHERE created_at BETWEEN ? AND ?"
                 );
                 $stmt->execute([$from, $toEnd]);
                 $d = $stmt->fetch();
@@ -150,6 +153,174 @@ foreach ($reports as $report) {
                 foreach ($types as $t) {
                     $stats["Type: {$t['name']}"] = (int) $t['cnt'];
                 }
+                break;
+
+            case 'response_times':
+                $stmt = $db->prepare(
+                    "SELECT
+                        AVG(TIMESTAMPDIFF(MINUTE, t.created_at, first_reply.replied_at)) AS avg_first_reply_min,
+                        AVG(CASE WHEN t.resolved_at IS NOT NULL
+                            THEN TIMESTAMPDIFF(MINUTE, t.created_at, t.resolved_at) END) AS avg_resolve_min
+                     FROM tickets t
+                     LEFT JOIN (
+                         SELECT ticket_id, MIN(created_at) AS replied_at
+                         FROM ticket_timeline WHERE action = 'reply_sent'
+                         GROUP BY ticket_id
+                     ) first_reply ON first_reply.ticket_id = t.id
+                     WHERE t.created_at BETWEEN ? AND ?"
+                );
+                $stmt->execute([$from, $toEnd]);
+                $d = $stmt->fetch();
+                $frt = $d['avg_first_reply_min'] !== null
+                    ? round((float) $d['avg_first_reply_min'] / 60, 1) . ' hrs' : 'N/A';
+                $rt  = $d['avg_resolve_min'] !== null
+                    ? round((float) $d['avg_resolve_min'] / 60, 1) . ' hrs' : 'N/A';
+                $stats = [
+                    'Period'                => "{$from} to {$to}",
+                    'Avg First Reply Time'  => $frt,
+                    'Avg Resolution Time'   => $rt,
+                ];
+                break;
+
+            case 'sla':
+                $stmt = $db->prepare(
+                    "SELECT COUNT(*) AS total,
+                            SUM(CASE WHEN sla_state = 'breached' THEN 1 ELSE 0 END) AS breached,
+                            SUM(CASE WHEN sla_state != 'breached' AND sla_state IS NOT NULL THEN 1 ELSE 0 END) AS compliant
+                     FROM tickets WHERE created_at BETWEEN ? AND ?"
+                );
+                $stmt->execute([$from, $toEnd]);
+                $d = $stmt->fetch();
+                $total    = (int) $d['total'];
+                $breached = (int) $d['breached'];
+                $pct = $total > 0 ? round((($total - $breached) / $total) * 100) : 0;
+                $stats = [
+                    'Period'           => "{$from} to {$to}",
+                    'Total Tickets'    => $total,
+                    'SLA Compliant'    => (int) $d['compliant'],
+                    'SLA Breached'     => $breached,
+                    'Compliance Rate'  => "{$pct}%",
+                ];
+                break;
+
+            case 'unresolved':
+                $stmt = $db->prepare(
+                    "SELECT
+                        COUNT(*) AS total,
+                        SUM(CASE WHEN TIMESTAMPDIFF(HOUR, created_at, NOW()) < 24 THEN 1 ELSE 0 END) AS lt_24h,
+                        SUM(CASE WHEN TIMESTAMPDIFF(DAY,  created_at, NOW()) BETWEEN 1  AND 7  THEN 1 ELSE 0 END) AS d1_7,
+                        SUM(CASE WHEN TIMESTAMPDIFF(DAY,  created_at, NOW()) BETWEEN 8  AND 30 THEN 1 ELSE 0 END) AS d8_30,
+                        SUM(CASE WHEN TIMESTAMPDIFF(DAY,  created_at, NOW()) > 30 THEN 1 ELSE 0 END) AS gt_30d
+                     FROM tickets WHERE status NOT IN ('resolved','closed')"
+                );
+                $stmt->execute();
+                $d = $stmt->fetch();
+                $stats = [
+                    'Total Unresolved' => (int) $d['total'],
+                    'Under 24 hours'   => (int) $d['lt_24h'],
+                    '1–7 days old'     => (int) $d['d1_7'],
+                    '8–30 days old'    => (int) $d['d8_30'],
+                    'Over 30 days old' => (int) $d['gt_30d'],
+                ];
+                break;
+
+            case 'lifecycle':
+                $stmt = $db->prepare(
+                    "SELECT
+                        COUNT(*) AS created,
+                        SUM(CASE WHEN status IN ('resolved','closed') THEN 1 ELSE 0 END) AS closed_count,
+                        AVG(CASE WHEN resolved_at IS NOT NULL
+                            THEN TIMESTAMPDIFF(HOUR, created_at, resolved_at) END) AS avg_hours
+                     FROM tickets WHERE created_at BETWEEN ? AND ?"
+                );
+                $stmt->execute([$from, $toEnd]);
+                $d = $stmt->fetch();
+                $stats = [
+                    'Period'               => "{$from} to {$to}",
+                    'Tickets Created'      => (int) $d['created'],
+                    'Tickets Resolved'     => (int) $d['closed_count'],
+                    'Avg Resolution Time'  => $d['avg_hours'] !== null
+                        ? round((float) $d['avg_hours'], 1) . ' hrs' : 'N/A',
+                ];
+                break;
+
+            case 'location':
+                $stmt = $db->prepare(
+                    "SELECT COALESCE(l.name, 'No Location') AS location_name, COUNT(t.id) AS cnt
+                     FROM tickets t
+                     LEFT JOIN locations l ON t.location_id = l.id
+                     WHERE t.created_at BETWEEN ? AND ?
+                     GROUP BY l.id, l.name
+                     ORDER BY cnt DESC
+                     LIMIT 8"
+                );
+                $stmt->execute([$from, $toEnd]);
+                $rows = $stmt->fetchAll();
+                $stats['Period'] = "{$from} to {$to}";
+                foreach ($rows as $r) {
+                    $stats[$r['location_name']] = (int) $r['cnt'];
+                }
+                break;
+
+            case 'csat':
+                $stmt = $db->prepare(
+                    "SELECT COUNT(*) AS sent,
+                            SUM(CASE WHEN rating IS NOT NULL THEN 1 ELSE 0 END) AS responded,
+                            AVG(rating) AS avg_rating
+                     FROM csat_surveys
+                     WHERE sent_at BETWEEN ? AND ?"
+                );
+                $stmt->execute([$from, $toEnd]);
+                $d = $stmt->fetch();
+                $responseRate = (int) $d['sent'] > 0
+                    ? round(((int) $d['responded'] / (int) $d['sent']) * 100) : 0;
+                $stats = [
+                    'Period'           => "{$from} to {$to}",
+                    'Surveys Sent'     => (int) $d['sent'],
+                    'Responses'        => (int) $d['responded'],
+                    'Response Rate'    => "{$responseRate}%",
+                    'Average Rating'   => $d['avg_rating'] !== null
+                        ? round((float) $d['avg_rating'], 1) . ' / 5' : 'N/A',
+                ];
+                break;
+
+            case 'workload':
+                $stmt = $db->prepare(
+                    "SELECT CONCAT(u.first_name,' ',u.last_name) AS agent_name,
+                            COUNT(t.id) AS open_count
+                     FROM users u
+                     LEFT JOIN tickets t ON t.assigned_to = u.id
+                         AND t.status NOT IN ('resolved','closed')
+                     WHERE u.role IN ('admin','agent')
+                     GROUP BY u.id, u.first_name, u.last_name
+                     ORDER BY open_count DESC"
+                );
+                $stmt->execute();
+                $agents = $stmt->fetchAll();
+                $stats['As of'] = $todayDate;
+                foreach ($agents as $a) {
+                    $stats[$a['agent_name']] = (int) $a['open_count'] . ' open tickets';
+                }
+                break;
+
+            case 'trends':
+                // Compare this period vs previous period of same length
+                $prevFrom = date('Y-m-d', strtotime("-{$dateRangeDays} days", strtotime($from)));
+                $prevTo   = date('Y-m-d', strtotime('-1 day', strtotime($from)));
+                $stmtCur  = $db->prepare("SELECT COUNT(*) FROM tickets WHERE created_at BETWEEN ? AND ?");
+                $stmtCur->execute([$from, $toEnd]);
+                $curCount = (int) $stmtCur->fetchColumn();
+                $stmtPrev = $db->prepare("SELECT COUNT(*) FROM tickets WHERE created_at BETWEEN ? AND ?");
+                $stmtPrev->execute([$prevFrom, $prevTo . ' 23:59:59']);
+                $prevCount = (int) $stmtPrev->fetchColumn();
+                $diff = $curCount - $prevCount;
+                $pct  = $prevCount > 0 ? round(abs($diff) / $prevCount * 100) : 0;
+                $trend = $diff >= 0 ? "+{$diff} ({$pct}% increase)" : "{$diff} ({$pct}% decrease)";
+                $stats = [
+                    'Current Period'  => "{$from} to {$to}: {$curCount} tickets",
+                    'Previous Period' => "{$prevFrom} to {$prevTo}: {$prevCount} tickets",
+                    'Change'          => $trend,
+                ];
                 break;
 
             case 'fcr':
@@ -175,6 +346,10 @@ foreach ($reports as $report) {
                     'FCR Rate'       => "{$pct}%",
                 ];
                 break;
+
+            default:
+                logLine("Unknown report type \"{$type}\" for \"{$name}\". Skipping.");
+                continue 2;
         }
     } catch (\Throwable $e) {
         logLine("ERROR building data for \"{$name}\": " . $e->getMessage());
@@ -190,13 +365,26 @@ foreach ($reports as $report) {
         'overview'          => 'Overview',
         'agent_performance' => 'Agent Performance',
         'ticket_volume'     => 'Ticket Volume',
+        'response_times'    => 'Response Times',
+        'sla'               => 'SLA Compliance',
+        'unresolved'        => 'Unresolved Tickets',
+        'lifecycle'         => 'Ticket Lifecycle',
+        'location'          => 'By Location',
+        'csat'              => 'CSAT / Satisfaction',
+        'workload'          => 'Agent Workload',
+        'trends'            => 'Ticket Trends',
         'fcr'               => 'FCR Rate',
     ];
 
+    $typeLabel   = $typeLabels[$type] ?? $type;
+    $periodLabel = in_array($type, ['unresolved', 'workload'], true)
+        ? "As of {$to}"
+        : "Previous {$dateRangeDays} days ({$from} to {$to})";
+
     $html = renderEmail('scheduled-report', [
         'appName'     => $appName,
-        'reportName'  => $typeLabels[$type] ?? $type,
-        'periodLabel' => "{$from} to {$to}",
+        'reportName'  => $typeLabel,
+        'periodLabel' => $periodLabel,
         'frequency'   => ucfirst($frequency),
         'stats'       => $stats,
         'brandColor'  => $brandColor,
@@ -206,7 +394,7 @@ foreach ($reports as $report) {
 
     // ── Send to each recipient ────────────────────────────────────────
     $sent = 0;
-    $subject = "[{$appName}] {$typeLabels[$type] ?? $type} — {$frequency} report";
+    $subject = "[{$appName}] {$typeLabel} - {$frequency} report";
     foreach ($recipients as $email) {
         $email = trim($email);
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {

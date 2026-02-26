@@ -1,7 +1,9 @@
 <?php
-$layout       = 'app';
-$pageTitle    = 'Satisfaction Report';
-$sidebarItems = adminSidebar('reports');
+$layout              = 'app';
+$pageTitle           = 'Satisfaction Report';
+$scheduleReportType  = 'csat';
+$scheduleReportTitle = 'CSAT / Satisfaction';
+$sidebarItems        = adminSidebar('reports');
 $breadcrumbs  = [
     ['label' => 'Admin', 'url' => '/admin'],
     ['label' => 'Reports', 'url' => '/admin/reports'],
@@ -23,8 +25,12 @@ $breadcrumbs  = [
         <span>to</span>
         <input type="date" name="to" value="<?= e($to) ?>" class="form-control form-control-sm" style="width:auto;">
         <button type="submit" class="btn btn-sm text-white" style="background:var(--ld-primary);">Apply</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#scheduleReportModal">
+            <i class="bi bi-calendar-plus me-1"></i>Schedule
+        </button>
     </form>
 </div>
+<?php require ROOT_DIR . '/templates/partials/schedule-report-modal.php'; ?>
 
 <!-- KPI Cards -->
 <div class="row g-4 mb-4">

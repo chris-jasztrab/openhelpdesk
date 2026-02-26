@@ -8,10 +8,18 @@ $breadcrumbs  = [
     ['label' => 'Scheduled Reports'],
 ];
 $typeLabels = [
-    'overview'           => 'Overview',
-    'agent_performance'  => 'Agent Performance',
-    'ticket_volume'      => 'Ticket Volume',
-    'fcr'                => 'FCR Rate',
+    'overview'          => 'Overview',
+    'agent_performance' => 'Agent Performance',
+    'ticket_volume'     => 'Ticket Volume',
+    'response_times'    => 'Response Times',
+    'sla'               => 'SLA Compliance',
+    'unresolved'        => 'Unresolved Tickets',
+    'lifecycle'         => 'Ticket Lifecycle',
+    'location'          => 'By Location',
+    'csat'              => 'CSAT / Satisfaction',
+    'workload'          => 'Agent Workload',
+    'trends'            => 'Ticket Trends',
+    'fcr'               => 'FCR Rate',
 ];
 ?>
 <div class="mb-4">
@@ -24,7 +32,7 @@ $typeLabels = [
     <div>
         <h5 class="fw-semibold mb-1"><i class="bi bi-envelope-paper me-2"></i>Scheduled Reports</h5>
         <p class="text-muted mb-0" style="font-size:.875rem;">
-            Automatically email report summaries to managers on a weekly or monthly cadence.
+            Automatically email report summaries to managers on a daily, weekly, or monthly cadence.
         </p>
     </div>
     <a href="/admin/settings/scheduled-reports/create" class="btn text-white btn-sm" style="background:var(--ld-primary);">
@@ -53,6 +61,7 @@ $typeLabels = [
                     <th>Recipients</th>
                     <th>Frequency</th>
                     <th>Send Day</th>
+                    <th>Date Range</th>
                     <th>Last Sent</th>
                     <th style="width:80px;">Enabled</th>
                     <th style="width:120px;"></th>
@@ -62,9 +71,14 @@ $typeLabels = [
             <?php foreach ($reports as $report):
                 $recipients = json_decode($report['recipients'], true) ?: [];
                 $dayLabels  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-                $sendDayDisplay = $report['frequency'] === 'weekly'
-                    ? ($dayLabels[(int)$report['send_day']] ?? $report['send_day'])
-                    : 'Day ' . $report['send_day'];
+                if ($report['frequency'] === 'daily') {
+                    $sendDayDisplay = '—';
+                } elseif ($report['frequency'] === 'weekly') {
+                    $sendDayDisplay = $dayLabels[(int)$report['send_day']] ?? $report['send_day'];
+                } else {
+                    $sendDayDisplay = 'Day ' . $report['send_day'];
+                }
+                $dateRangeDays = (int)($report['date_range_days'] ?? 30);
             ?>
             <tr class="<?= $report['is_enabled'] ? '' : 'opacity-50' ?>">
                 <td class="fw-semibold"><?= e($report['name']) ?></td>
@@ -79,6 +93,7 @@ $typeLabels = [
                 </td>
                 <td class="text-capitalize"><?= e($report['frequency']) ?></td>
                 <td><?= e($sendDayDisplay) ?></td>
+                <td class="text-muted small">Prev. <?= $dateRangeDays ?>d</td>
                 <td class="text-muted small">
                     <?= $report['last_sent_at'] ? date('M j, Y', strtotime($report['last_sent_at'])) : '—' ?>
                 </td>
@@ -125,8 +140,8 @@ $typeLabels = [
             */30 * * * * php <?= e(ROOT_DIR) ?>/scripts/process-scheduled-reports.php &gt;&gt; <?= e(ROOT_DIR) ?>/storage/logs/scheduled-reports.log 2&gt;&amp;1
         </code>
         <p class="text-muted small mt-3 mb-0">
-            Reports are sent on the configured day of week (weekly) or day of month (monthly).
-            The script is idempotent — running it multiple times on the same day will not re-send.
+            Daily reports run once per day, weekly on the configured day of week, monthly on the configured day of month.
+            The script is idempotent — running it multiple times on the same day will not re-send a daily report.
         </p>
     </div>
 </div>

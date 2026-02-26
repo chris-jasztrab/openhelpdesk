@@ -1,6 +1,8 @@
 <?php
-$layout       = 'app';
-$pageTitle    = 'First Contact Resolution – Reports';
+$layout              = 'app';
+$pageTitle           = 'First Contact Resolution – Reports';
+$scheduleReportType  = 'fcr';
+$scheduleReportTitle = 'First Contact Resolution';
 $sidebarItems = adminSidebar('reports');
 $breadcrumbs  = [
     ['label' => 'Admin', 'url' => '/admin'],
@@ -21,7 +23,11 @@ $breadcrumbs  = [
     <span class="text-muted">to</span>
     <input type="date" name="to" value="<?= e($to) ?>" class="form-control form-control-sm" style="width:auto;">
     <button type="submit" class="btn btn-sm text-white" style="background:var(--ld-primary);">Apply</button>
+    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#scheduleReportModal">
+        <i class="bi bi-calendar-plus me-1"></i>Schedule
+    </button>
 </form>
+<?php require ROOT_DIR . '/templates/partials/schedule-report-modal.php'; ?>
 
 <div class="alert alert-light border small mb-4">
     <i class="bi bi-info-circle me-1"></i>

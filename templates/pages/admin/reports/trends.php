@@ -1,7 +1,9 @@
 <?php
-$layout       = 'app';
-$pageTitle    = 'Ticket Trends – Reports';
-$sidebarItems = adminSidebar('reports');
+$layout              = 'app';
+$pageTitle           = 'Ticket Trends – Reports';
+$scheduleReportType  = 'trends';
+$scheduleReportTitle = 'Ticket Trends';
+$sidebarItems        = adminSidebar('reports');
 $breadcrumbs  = [
     ['label' => 'Admin', 'url' => '/admin'],
     ['label' => 'Reports', 'url' => '/admin/reports'],
@@ -22,6 +24,9 @@ $breadcrumbs  = [
     <input type="date" name="to" value="<?= e($to) ?>" class="form-control form-control-sm" style="width:auto;">
     <input type="hidden" name="group_by" value="<?= e($groupBy) ?>">
     <button type="submit" class="btn btn-sm text-white" style="background:var(--ld-primary);">Apply</button>
+    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#scheduleReportModal">
+        <i class="bi bi-calendar-plus me-1"></i>Schedule
+    </button>
     <div class="ms-2 d-flex gap-1">
         <a href="?from=<?= urlencode($from) ?>&to=<?= urlencode($to) ?>&group_by=type"
            class="btn btn-sm <?= $groupBy === 'type' ? 'btn-primary' : 'btn-outline-secondary' ?>">
@@ -72,3 +77,4 @@ new Chart(document.getElementById('trendsChart'), {
 });
 </script>
 <?php endif; ?>
+<?php require ROOT_DIR . '/templates/partials/schedule-report-modal.php'; ?>

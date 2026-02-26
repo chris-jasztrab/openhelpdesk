@@ -218,8 +218,11 @@ $statusLabels = [
             var q = this.value.trim();
             if (q.length < 1) { dropdown.style.display = 'none'; return; }
             debounce = setTimeout(function () {
-                fetch('/api/user-search?q=' + encodeURIComponent(q))
-                    .then(function (r) { return r.json(); })
+                fetch('/api/user-search?q=' + encodeURIComponent(q), { credentials: 'same-origin' })
+                    .then(function (r) {
+                        if (!r.ok) { throw new Error('HTTP ' + r.status); }
+                        return r.json();
+                    })
                     .then(function (users) {
                         dropdown.innerHTML = '';
                         users = users.filter(function (u) { return parseInt(u.id) !== userId; });
@@ -237,6 +240,10 @@ $statusLabels = [
                                 dropdown.appendChild(btn);
                             });
                         }
+                        dropdown.style.display = 'block';
+                    })
+                    .catch(function () {
+                        dropdown.innerHTML = '<div class="list-group-item text-muted small">Search unavailable. Please try again.</div>';
                         dropdown.style.display = 'block';
                     });
             }, 250);

@@ -353,18 +353,19 @@ CREATE TABLE IF NOT EXISTS `csat_surveys` (
     FOREIGN KEY (`user_id`)   REFERENCES `users`(`id`)   ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Scheduled report emails — sent to managers on a weekly/monthly cadence
+-- Scheduled report emails — sent on a daily/weekly/monthly cadence
 CREATE TABLE IF NOT EXISTS `scheduled_reports` (
-    `id`           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    `name`         VARCHAR(255) NOT NULL,
-    `report_type`  ENUM('overview','agent_performance','ticket_volume','fcr') NOT NULL DEFAULT 'overview',
-    `recipients`   JSON NOT NULL,
-    `frequency`    ENUM('weekly','monthly') NOT NULL DEFAULT 'weekly',
-    `send_day`     TINYINT UNSIGNED NOT NULL DEFAULT 1,
-    `last_sent_at` TIMESTAMP NULL DEFAULT NULL,
-    `is_enabled`   TINYINT(1) NOT NULL DEFAULT 1,
-    `created_at`   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    `updated_at`   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    `id`               INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `name`             VARCHAR(255) NOT NULL,
+    `report_type`      VARCHAR(50) NOT NULL DEFAULT 'overview',
+    `recipients`       JSON NOT NULL,
+    `frequency`        ENUM('daily','weekly','monthly') NOT NULL DEFAULT 'weekly',
+    `send_day`         TINYINT UNSIGNED NULL DEFAULT NULL,
+    `date_range_days`  SMALLINT UNSIGNED NOT NULL DEFAULT 30,
+    `last_sent_at`     TIMESTAMP NULL DEFAULT NULL,
+    `is_enabled`       TINYINT(1) NOT NULL DEFAULT 1,
+    `created_at`       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`       TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- KB article ratings (thumbs up/down feedback per article)

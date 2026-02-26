@@ -13,7 +13,22 @@ $action = $isEdit
     ? '/admin/settings/scheduled-reports/' . (int)$report['id'] . '/edit'
     : '/admin/settings/scheduled-reports/create';
 
-$recipients = $isEdit ? implode("\n", json_decode($report['recipients'], true) ?: []) : '';
+$recipients      = $isEdit ? implode("\n", json_decode($report['recipients'], true) ?: []) : '';
+$dateRangeDays   = (int) ($report['date_range_days'] ?? 30);
+$allReportTypes  = [
+    'overview'          => 'Overview',
+    'agent_performance' => 'Agent Performance',
+    'ticket_volume'     => 'Ticket Volume',
+    'response_times'    => 'Response Times',
+    'sla'               => 'SLA Compliance',
+    'unresolved'        => 'Unresolved Tickets',
+    'lifecycle'         => 'Ticket Lifecycle',
+    'location'          => 'By Location',
+    'csat'              => 'CSAT / Satisfaction',
+    'workload'          => 'Agent Workload',
+    'trends'            => 'Ticket Trends',
+    'fcr'               => 'FCR Rate',
+];
 ?>
 <div class="mb-4">
     <h2 class="fw-bold mb-0">Settings</h2>
@@ -44,7 +59,7 @@ $recipients = $isEdit ? implode("\n", json_decode($report['recipients'], true) ?
                 <div class="col-md-6">
                     <label class="form-label fw-semibold">Report Type</label>
                     <select name="report_type" class="form-select">
-                        <?php foreach (['overview' => 'Overview', 'agent_performance' => 'Agent Performance', 'ticket_volume' => 'Ticket Volume', 'fcr' => 'FCR Rate'] as $val => $lbl): ?>
+                        <?php foreach ($allReportTypes as $val => $lbl): ?>
                         <option value="<?= $val ?>" <?= ($report['report_type'] ?? 'overview') === $val ? 'selected' : '' ?>><?= $lbl ?></option>
                         <?php endforeach; ?>
                     </select>
@@ -65,6 +80,11 @@ $recipients = $isEdit ? implode("\n", json_decode($report['recipients'], true) ?
                     <label class="form-label fw-semibold">Frequency</label>
                     <div class="d-flex gap-3">
                         <div class="form-check">
+                            <input class="form-check-input" type="radio" name="frequency" id="freqDaily"
+                                   value="daily" <?= ($report['frequency'] ?? '') === 'daily' ? 'checked' : '' ?>>
+                            <label class="form-check-label" for="freqDaily">Daily</label>
+                        </div>
+                        <div class="form-check">
                             <input class="form-check-input" type="radio" name="frequency" id="freqWeekly"
                                    value="weekly" <?= ($report['frequency'] ?? 'weekly') === 'weekly' ? 'checked' : '' ?>>
                             <label class="form-check-label" for="freqWeekly">Weekly</label>
@@ -77,13 +97,33 @@ $recipients = $isEdit ? implode("\n", json_decode($report['recipients'], true) ?
                     </div>
                 </div>
 
-                <!-- Send Day -->
-                <div class="col-md-6">
+                <!-- Send Day (hidden for daily) -->
+                <div class="col-md-6" id="sendDayCol">
                     <label class="form-label fw-semibold" for="sendDaySelect">Send Day</label>
                     <select name="send_day" id="sendDaySelect" class="form-select">
                         <!-- Options populated/swapped by JS based on frequency -->
                     </select>
                     <div class="form-text">Day of week (weekly) or day of month (monthly) to send.</div>
+                </div>
+
+                <!-- Date Range -->
+                <div class="col-12">
+                    <label class="form-label fw-semibold">Report Date Range</label>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="text-muted small text-nowrap">Previous</span>
+                        <input type="number" name="date_range_days" id="dateRangeDays"
+                               class="form-control form-control-sm" style="width:90px;"
+                               min="1" max="365" value="<?= $dateRangeDays ?>" required>
+                        <span class="text-muted small">days</span>
+                    </div>
+                    <div class="d-flex gap-1 mt-2">
+                        <button type="button" class="btn btn-sm btn-outline-secondary day-preset" data-days="7">7 days</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary day-preset" data-days="14">14 days</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary day-preset" data-days="30">30 days</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary day-preset" data-days="60">60 days</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary day-preset" data-days="90">90 days</button>
+                    </div>
+                    <div class="form-text">The email will summarize data from this many days leading up to the send date.</div>
                 </div>
 
                 <!-- Recipients -->
@@ -111,11 +151,17 @@ $recipients = $isEdit ? implode("\n", json_decode($report['recipients'], true) ?
     const weekDays  = [{v:1,l:'Monday'},{v:2,l:'Tuesday'},{v:3,l:'Wednesday'},
                        {v:4,l:'Thursday'},{v:5,l:'Friday'},{v:6,l:'Saturday'},{v:0,l:'Sunday'}];
     const monthDays = Array.from({length:28}, (_,i) => ({v:i+1, l:'Day '+(i+1)}));
-    const sel       = document.getElementById('sendDaySelect');
-    const savedDay  = <?= (int)($report['send_day'] ?? 1) ?>;
-    const savedFreq = <?= json_encode($report['frequency'] ?? 'weekly') ?>;
+    const sel        = document.getElementById('sendDaySelect');
+    const sendDayCol = document.getElementById('sendDayCol');
+    const savedDay   = <?= (int)($report['send_day'] ?? 1) ?>;
+    const savedFreq  = <?= json_encode($report['frequency'] ?? 'weekly') ?>;
 
     function populate(freq) {
+        if (freq === 'daily') {
+            sendDayCol.style.display = 'none';
+            return;
+        }
+        sendDayCol.style.display = '';
         const opts = freq === 'weekly' ? weekDays : monthDays;
         sel.innerHTML = '';
         opts.forEach(o => {
@@ -129,6 +175,22 @@ $recipients = $isEdit ? implode("\n", json_decode($report['recipients'], true) ?
 
     document.querySelectorAll('input[name="frequency"]').forEach(r => {
         r.addEventListener('change', () => populate(r.value));
+    });
+
+    // Date range preset buttons
+    const daysInput = document.getElementById('dateRangeDays');
+    document.querySelectorAll('.day-preset').forEach(btn => {
+        if (parseInt(btn.dataset.days) === <?= $dateRangeDays ?>) btn.classList.add('active');
+        btn.addEventListener('click', () => {
+            daysInput.value = btn.dataset.days;
+            document.querySelectorAll('.day-preset').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        });
+    });
+    daysInput.addEventListener('input', () => {
+        document.querySelectorAll('.day-preset').forEach(b => {
+            b.classList.toggle('active', b.dataset.days === daysInput.value);
+        });
     });
 
     // Init

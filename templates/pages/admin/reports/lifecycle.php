@@ -1,6 +1,8 @@
 <?php
-$layout       = 'app';
-$pageTitle    = 'Ticket Lifecycle – Reports';
+$layout              = 'app';
+$pageTitle           = 'Ticket Lifecycle – Reports';
+$scheduleReportType  = 'lifecycle';
+$scheduleReportTitle = 'Ticket Lifecycle';
 $sidebarItems = adminSidebar('reports');
 $breadcrumbs  = [
     ['label' => 'Admin', 'url' => '/admin'],
@@ -20,7 +22,11 @@ $breadcrumbs  = [
     <span class="text-muted">to</span>
     <input type="date" name="to" value="<?= e($to) ?>" class="form-control form-control-sm" style="width:auto;">
     <button type="submit" class="btn btn-sm text-white" style="background:var(--ld-primary);">Apply</button>
+    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#scheduleReportModal">
+        <i class="bi bi-calendar-plus me-1"></i>Schedule
+    </button>
 </form>
+<?php require ROOT_DIR . '/templates/partials/schedule-report-modal.php'; ?>
 
 <!-- Average time per status -->
 <div class="card border-0 shadow-sm mb-4">

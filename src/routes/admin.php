@@ -5119,16 +5119,19 @@ $router->post('/admin/settings/scheduled-reports/create', function () {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/scheduled-reports');
     }
-    $db         = Database::connect();
-    $name       = trim($_POST['name'] ?? '');
-    $reportType = in_array($_POST['report_type'] ?? '', ['overview','agent_performance','ticket_volume','fcr'], true)
+    $db             = Database::connect();
+    $name           = trim($_POST['name'] ?? '');
+    $allowedTypes   = ['overview','agent_performance','ticket_volume','response_times','sla',
+                       'unresolved','lifecycle','location','csat','workload','trends','fcr'];
+    $reportType     = in_array($_POST['report_type'] ?? '', $allowedTypes, true)
         ? $_POST['report_type'] : 'overview';
-    $frequency  = in_array($_POST['frequency'] ?? '', ['weekly','monthly'], true)
+    $frequency      = in_array($_POST['frequency'] ?? '', ['daily','weekly','monthly'], true)
         ? $_POST['frequency'] : 'weekly';
-    $sendDay    = max(0, min(31, (int)($_POST['send_day'] ?? 1)));
-    $rawEmails  = trim($_POST['recipients'] ?? '');
-    $recipients = array_filter(array_map('trim', explode("\n", $rawEmails)));
-    $enabled    = isset($_POST['is_enabled']) ? 1 : 0;
+    $sendDay        = $frequency === 'daily' ? null : max(0, min(31, (int)($_POST['send_day'] ?? 1)));
+    $dateRangeDays  = max(1, min(365, (int)($_POST['date_range_days'] ?? 30)));
+    $rawEmails      = trim($_POST['recipients'] ?? '');
+    $recipients     = array_filter(array_map('trim', explode("\n", $rawEmails)));
+    $enabled        = isset($_POST['is_enabled']) ? 1 : 0;
 
     if (empty($name) || empty($recipients)) {
         flash('error', 'Name and at least one recipient are required.');
@@ -5136,9 +5139,9 @@ $router->post('/admin/settings/scheduled-reports/create', function () {
     }
 
     $db->prepare(
-        'INSERT INTO scheduled_reports (name, report_type, recipients, frequency, send_day, is_enabled)
-         VALUES (?, ?, ?, ?, ?, ?)'
-    )->execute([$name, $reportType, json_encode(array_values($recipients)), $frequency, $sendDay, $enabled]);
+        'INSERT INTO scheduled_reports (name, report_type, recipients, frequency, send_day, date_range_days, is_enabled)
+         VALUES (?, ?, ?, ?, ?, ?, ?)'
+    )->execute([$name, $reportType, json_encode(array_values($recipients)), $frequency, $sendDay, $dateRangeDays, $enabled]);
 
     flash('success', "Scheduled report \"{$name}\" created.");
     redirect('/admin/settings/scheduled-reports');
@@ -5160,17 +5163,20 @@ $router->post('/admin/settings/scheduled-reports/{id}/edit', function (array $va
         flash('error', 'Invalid request.');
         redirect('/admin/settings/scheduled-reports');
     }
-    $db         = Database::connect();
-    $id         = (int)$vars['id'];
-    $name       = trim($_POST['name'] ?? '');
-    $reportType = in_array($_POST['report_type'] ?? '', ['overview','agent_performance','ticket_volume','fcr'], true)
+    $db             = Database::connect();
+    $id             = (int)$vars['id'];
+    $name           = trim($_POST['name'] ?? '');
+    $allowedTypes   = ['overview','agent_performance','ticket_volume','response_times','sla',
+                       'unresolved','lifecycle','location','csat','workload','trends','fcr'];
+    $reportType     = in_array($_POST['report_type'] ?? '', $allowedTypes, true)
         ? $_POST['report_type'] : 'overview';
-    $frequency  = in_array($_POST['frequency'] ?? '', ['weekly','monthly'], true)
+    $frequency      = in_array($_POST['frequency'] ?? '', ['daily','weekly','monthly'], true)
         ? $_POST['frequency'] : 'weekly';
-    $sendDay    = max(0, min(31, (int)($_POST['send_day'] ?? 1)));
-    $rawEmails  = trim($_POST['recipients'] ?? '');
-    $recipients = array_filter(array_map('trim', explode("\n", $rawEmails)));
-    $enabled    = isset($_POST['is_enabled']) ? 1 : 0;
+    $sendDay        = $frequency === 'daily' ? null : max(0, min(31, (int)($_POST['send_day'] ?? 1)));
+    $dateRangeDays  = max(1, min(365, (int)($_POST['date_range_days'] ?? 30)));
+    $rawEmails      = trim($_POST['recipients'] ?? '');
+    $recipients     = array_filter(array_map('trim', explode("\n", $rawEmails)));
+    $enabled        = isset($_POST['is_enabled']) ? 1 : 0;
 
     if (empty($name) || empty($recipients)) {
         flash('error', 'Name and at least one recipient are required.');
@@ -5178,8 +5184,8 @@ $router->post('/admin/settings/scheduled-reports/{id}/edit', function (array $va
     }
 
     $db->prepare(
-        'UPDATE scheduled_reports SET name=?, report_type=?, recipients=?, frequency=?, send_day=?, is_enabled=? WHERE id=?'
-    )->execute([$name, $reportType, json_encode(array_values($recipients)), $frequency, $sendDay, $enabled, $id]);
+        'UPDATE scheduled_reports SET name=?, report_type=?, recipients=?, frequency=?, send_day=?, date_range_days=?, is_enabled=? WHERE id=?'
+    )->execute([$name, $reportType, json_encode(array_values($recipients)), $frequency, $sendDay, $dateRangeDays, $enabled, $id]);
 
     flash('success', "Scheduled report \"{$name}\" updated.");
     redirect('/admin/settings/scheduled-reports');
