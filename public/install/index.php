@@ -1074,6 +1074,34 @@ function renderResultPage(array $messages, ?string $fatalError, string $appUrl):
     </div>
 
     <?php if ($success): ?>
+    <div class="card mb-4">
+        <div class="card-header fw-semibold">
+            <i class="bi bi-list-check me-1"></i>Next Steps
+        </div>
+        <div class="card-body">
+            <p class="text-muted small mb-3">After logging in, complete these steps to get LocalDesk fully operational:</p>
+
+            <h6 class="fw-semibold mb-2"><i class="bi bi-clock-history me-1 text-primary"></i>Set Up Background Tasks (Cron Jobs)</h6>
+            <p class="text-muted small mb-2">LocalDesk requires several background scripts for SLA tracking, email replies, escalations, and scheduled reports. Add these to your server's crontab:</p>
+            <div class="bg-light rounded p-2 mb-2" style="font-family:monospace; font-size:.8rem; word-break:break-all;">
+                <div>*/5 * * * * php <?= htmlspecialchars(INSTALL_ROOT, ENT_QUOTES, 'UTF-8') ?>/public/sla-cron.php</div>
+                <div>*/5 * * * * php <?= htmlspecialchars(INSTALL_ROOT, ENT_QUOTES, 'UTF-8') ?>/scripts/process-replies.php</div>
+                <div>*/15 * * * * php <?= htmlspecialchars(INSTALL_ROOT, ENT_QUOTES, 'UTF-8') ?>/scripts/process-escalations.php</div>
+                <div>*/30 * * * * php <?= htmlspecialchars(INSTALL_ROOT, ENT_QUOTES, 'UTF-8') ?>/scripts/process-scheduled-reports.php</div>
+            </div>
+            <p class="text-muted small mb-3">View full cron job details at <strong>Admin → Settings → Cron Jobs</strong> after logging in.</p>
+
+            <hr class="my-3">
+
+            <ul class="list-unstyled mb-0 small">
+                <li class="mb-2"><i class="bi bi-arrow-right-circle text-primary me-2"></i>Create <strong>Ticket Types</strong> at <strong>Admin → Ticket Types</strong></li>
+                <li class="mb-2"><i class="bi bi-arrow-right-circle text-primary me-2"></i>Define <strong>SLA Policies</strong> at <strong>Admin → Settings → SLA Policies</strong></li>
+                <li class="mb-2"><i class="bi bi-arrow-right-circle text-primary me-2"></i>Set up <strong>Business Hours</strong> at <strong>Admin → Settings → Business Hours</strong></li>
+                <li class="mb-0"><i class="bi bi-arrow-right-circle text-primary me-2"></i>Customise labels &amp; terminology at <strong>Admin → Settings → Labels</strong></li>
+            </ul>
+        </div>
+    </div>
+
     <div class="alert alert-warning">
         <i class="bi bi-shield-exclamation me-2"></i>
         <strong>Security reminder:</strong> Delete or restrict access to the <code>/install/</code> directory before going live.
