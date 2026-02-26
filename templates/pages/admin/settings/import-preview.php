@@ -43,7 +43,7 @@ $breadcrumbs  = [
             <div class="col-md-3">
                 <div class="border rounded p-3 text-center">
                     <div class="fs-3 fw-bold text-warning"><?= (int) $summary['new_locations'] ?></div>
-                    <div class="text-muted small">New Locations to Create</div>
+                    <div class="text-muted small">New <?= label('location.plural') ?> to Create</div>
                 </div>
             </div>
         </div>
@@ -54,7 +54,7 @@ $breadcrumbs  = [
             <div>
                 <strong>The following will be auto-created:</strong>
                 <?php if (!empty($summary['new_location_list'])): ?>
-                    <div class="mt-2"><strong>Locations:</strong> <?= e(implode(', ', $summary['new_location_list'])) ?></div>
+                    <div class="mt-2"><strong><?= label('location.plural') ?>:</strong> <?= e(implode(', ', $summary['new_location_list'])) ?></div>
                 <?php endif; ?>
                 <?php if (!empty($summary['new_agent_list'])): ?>
                     <div class="mt-1"><strong>Agents:</strong> <?= e(implode(', ', $summary['new_agent_list'])) ?></div>
@@ -81,7 +81,7 @@ $breadcrumbs  = [
                         <th>Status</th>
                         <th>Priority</th>
                         <th>Type</th>
-                        <th>Location</th>
+                        <th><?= label('location.singular') ?></th>
                         <th>Agent</th>
                         <th>Submitter</th>
                         <th>Created</th>

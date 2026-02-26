@@ -153,7 +153,7 @@ $existingActions    = $isEdit ? ($editing['actions'] ?? []) : [];
 
     var fieldLabels = {
         type_id: 'Ticket Type', priority_id: 'Priority', status: 'Status',
-        location_id: 'Location', group_id: 'Group', assigned_to: 'Assigned To'
+        location_id: '<?= label("location.singular") ?>', group_id: 'Group', assigned_to: 'Assigned To'
     };
     var operatorLabels = {
         equals: 'is', not_equals: 'is not', is_empty: 'is empty', is_not_empty: 'is not empty'

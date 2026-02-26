@@ -79,7 +79,7 @@ endif; ?>
                     </select>
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label fw-semibold">Location</label>
+                    <label class="form-label fw-semibold"><?= label('location.singular') ?></label>
                     <input type="text" class="form-control" value="<?= e($userLocationName ?: 'Not set') ?>" readonly disabled>
                 </div>
             </div>

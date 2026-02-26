@@ -377,7 +377,7 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
                         <?php endif; ?>
                     </dd>
 
-                    <dt class="text-muted small">Location</dt>
+                    <dt class="text-muted small"><?= label('location.singular') ?></dt>
                     <dd><?= e($ticket['location_name'] ?? 'Not set') ?></dd>
 
                     <dt class="text-muted small">Created</dt>

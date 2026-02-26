@@ -1,11 +1,11 @@
 <?php
 $layout       = 'app';
-$pageTitle    = 'Locations – Settings';
+$pageTitle    = label('location.plural') . ' – Settings';
 $sidebarItems = adminSidebar('settings');
 $breadcrumbs  = [
     ['label' => 'Admin', 'url' => '/admin'],
     ['label' => 'Settings', 'url' => '/admin/settings'],
-    ['label' => 'Locations'],
+    ['label' => label('location.plural')],
 ];
 ?>
 <div class="mb-4">
@@ -15,9 +15,9 @@ $breadcrumbs  = [
 <?php require ROOT_DIR . '/templates/partials/settings-nav.php'; ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h5 class="fw-bold mb-0">Locations</h5>
+    <h5 class="fw-bold mb-0"><?= label('location.plural') ?></h5>
     <a href="/admin/locations/create" class="btn text-white" style="background:var(--ld-primary);">
-        <i class="bi bi-geo-alt me-1"></i>Add Location
+        <i class="bi bi-geo-alt me-1"></i>Add <?= label('location.singular') ?>
     </a>
 </div>
 
@@ -35,7 +35,7 @@ $breadcrumbs  = [
             </thead>
             <tbody>
                 <?php if (empty($locations)): ?>
-                <tr><td colspan="5" class="text-center py-4 text-muted">No locations found.</td></tr>
+                <tr><td colspan="5" class="text-center py-4 text-muted">No <?= label('location.plural', 'locations') ?> found.</td></tr>
                 <?php else: ?>
                     <?php foreach ($locations as $loc): ?>
                     <tr>

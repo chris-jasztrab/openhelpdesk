@@ -18,7 +18,7 @@ $systemFieldsTop = [
     ['label' => 'Subject',      'icon' => 'bi-input-cursor-text', 'badge' => 'Required'],
     ['label' => 'Description',  'icon' => 'bi-textarea-t',        'badge' => 'Required'],
     ['label' => 'Ticket Type',  'icon' => 'bi-tag',               'badge' => 'Required'],
-    ['label' => 'Location',     'icon' => 'bi-geo-alt',           'badge' => 'Auto'],
+    ['label' => label('location.singular'), 'icon' => 'bi-geo-alt',           'badge' => 'Auto'],
     ['label' => 'Priority',     'icon' => 'bi-flag',              'badge' => 'Optional'],
     ['label' => 'Tags',         'icon' => 'bi-hash',              'badge' => 'Optional'],
 ];

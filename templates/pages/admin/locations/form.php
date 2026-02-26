@@ -1,18 +1,18 @@
 <?php
 $isEdit       = !empty($editing);
 $layout       = 'app';
-$pageTitle    = $isEdit ? 'Edit Location' : 'Add Location';
+$pageTitle    = $isEdit ? ('Edit ' . label('location.singular')) : ('Add ' . label('location.singular'));
 $sidebarItems = adminSidebar('settings');
 $breadcrumbs  = [
     ['label' => 'Admin', 'url' => '/admin'],
     ['label' => 'Settings', 'url' => '/admin/settings'],
-    ['label' => 'Locations', 'url' => '/admin/locations'],
+    ['label' => label('location.plural'), 'url' => '/admin/locations'],
     ['label' => $isEdit ? 'Edit' : 'Add'],
 ];
 $action = $isEdit ? "/admin/locations/{$editing['id']}/edit" : '/admin/locations/create';
 ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2 class="fw-bold mb-0"><?= $isEdit ? 'Edit Location' : 'Add Location' ?></h2>
+    <h2 class="fw-bold mb-0"><?= $isEdit ? ('Edit ' . label('location.singular')) : ('Add ' . label('location.singular')) ?></h2>
     <a href="/admin/locations" class="btn btn-outline-secondary">
         <i class="bi bi-arrow-left me-1"></i>Back
     </a>
@@ -24,7 +24,7 @@ $action = $isEdit ? "/admin/locations/{$editing['id']}/edit" : '/admin/locations
             <?= csrfField() ?>
 
             <div class="mb-3">
-                <label for="name" class="form-label fw-semibold">Location Name <span class="text-danger">*</span></label>
+                <label for="name" class="form-label fw-semibold"><?= label('location.singular') ?> Name <span class="text-danger">*</span></label>
                 <input type="text" class="form-control" id="name" name="name"
                        value="<?= e(old('name', $editing['name'] ?? '')) ?>" required>
             </div>
@@ -43,7 +43,7 @@ $action = $isEdit ? "/admin/locations/{$editing['id']}/edit" : '/admin/locations
 
             <div class="d-flex gap-2">
                 <button type="submit" class="btn text-white" style="background:var(--ld-primary);">
-                    <i class="bi bi-check-lg me-1"></i><?= $isEdit ? 'Update Location' : 'Create Location' ?>
+                    <i class="bi bi-check-lg me-1"></i><?= $isEdit ? ('Update ' . label('location.singular')) : ('Create ' . label('location.singular')) ?>
                 </button>
                 <a href="/admin/locations" class="btn btn-outline-secondary">Cancel</a>
             </div>

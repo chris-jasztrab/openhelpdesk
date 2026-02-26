@@ -52,10 +52,10 @@ $hasFilters = !empty($filterParams);
                 </select>
             </div>
             <div class="mb-3">
-                <label class="form-label small fw-semibold mb-1">Location</label>
+                <label class="form-label small fw-semibold mb-1"><?= label('location.singular') ?></label>
                 <select class="form-select form-select-sm" name="location">
-                    <option value="">All Locations</option>
-                    <option value="none" <?= $locFilter === 'none' ? 'selected' : '' ?>>No Location</option>
+                    <option value=""><?= 'All ' . label('location.plural') ?></option>
+                    <option value="none" <?= $locFilter === 'none' ? 'selected' : '' ?>>No <?= label('location.singular') ?></option>
                     <?php foreach ($locations as $loc): ?>
                     <option value="<?= $loc['id'] ?>" <?= $locFilter == $loc['id'] ? 'selected' : '' ?>><?= e($loc['name']) ?></option>
                     <?php endforeach; ?>
@@ -83,7 +83,7 @@ $hasFilters = !empty($filterParams);
                     <th><a href="<?= sortUrl('email', $sort, $dir, $filterParams, '/admin/users') ?>" class="text-decoration-none text-dark">Email <?= sortIcon('email', $sort, $dir) ?></a></th>
                     <th><a href="<?= sortUrl('role', $sort, $dir, $filterParams, '/admin/users') ?>" class="text-decoration-none text-dark">Role <?= sortIcon('role', $sort, $dir) ?></a></th>
                     <th>Phone</th>
-                    <th><a href="<?= sortUrl('location', $sort, $dir, $filterParams, '/admin/users') ?>" class="text-decoration-none text-dark">Location <?= sortIcon('location', $sort, $dir) ?></a></th>
+                    <th><a href="<?= sortUrl('location', $sort, $dir, $filterParams, '/admin/users') ?>" class="text-decoration-none text-dark"><?= label('location.singular') ?> <?= sortIcon('location', $sort, $dir) ?></a></th>
                     <th><a href="<?= sortUrl('created_at', $sort, $dir, $filterParams, '/admin/users') ?>" class="text-decoration-none text-dark">Created <?= sortIcon('created_at', $sort, $dir) ?></a></th>
                     <th style="width:110px">Actions</th>
                 </tr>

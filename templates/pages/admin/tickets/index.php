@@ -102,9 +102,9 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                 </select>
             </div>
             <div class="mb-3">
-                <label class="form-label small fw-semibold mb-1">Location</label>
+                <label class="form-label small fw-semibold mb-1"><?= label('location.singular') ?></label>
                 <select class="form-select form-select-sm" name="location">
-                    <option value="">All Locations</option>
+                    <option value=""><?= 'All ' . label('location.plural') ?></option>
                     <?php foreach ($locations as $loc): ?>
                     <option value="<?= $loc['id'] ?>" <?= $filters['location'] == $loc['id'] ? 'selected' : '' ?>><?= e($loc['name']) ?></option>
                     <?php endforeach; ?>
@@ -307,7 +307,7 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                     <th><a href="<?= sortUrl('creator', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Created By <?= sortIcon('creator', $sort, $dir) ?></a></th>
                     <?php endif; ?>
                     <?php if (in_array('location', $visibleColumns)): ?>
-                    <th><a href="<?= sortUrl('location', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Location <?= sortIcon('location', $sort, $dir) ?></a></th>
+                    <th><a href="<?= sortUrl('location', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark"><?= label('location.singular') ?> <?= sortIcon('location', $sort, $dir) ?></a></th>
                     <?php endif; ?>
                     <?php if (in_array('sla', $visibleColumns)): ?>
                     <th>SLA</th>

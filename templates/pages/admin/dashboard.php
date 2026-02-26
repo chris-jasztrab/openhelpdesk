@@ -134,7 +134,7 @@ $actionIcons = [
                         <i class="bi bi-person-plus me-2"></i>Add User
                     </a>
                     <a href="/admin/locations" class="btn btn-outline-secondary btn-sm text-start">
-                        <i class="bi bi-geo-alt me-2"></i>Manage Locations
+                        <i class="bi bi-geo-alt me-2"></i>Manage <?= label('location.plural') ?>
                     </a>
                     <a href="/admin/priorities" class="btn btn-outline-secondary btn-sm text-start">
                         <i class="bi bi-flag me-2"></i>Manage Priorities

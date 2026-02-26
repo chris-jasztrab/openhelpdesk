@@ -78,7 +78,7 @@ $breadcrumbs  = [
     <!-- By Location -->
     <div class="col-md-4">
         <div class="card border-0 shadow-sm h-100">
-            <div class="card-header bg-white border-bottom"><h6 class="mb-0 fw-semibold">By Location</h6></div>
+            <div class="card-header bg-white border-bottom"><h6 class="mb-0 fw-semibold">By <?= label('location.singular') ?></h6></div>
             <div class="card-body">
                 <?php if (empty($byLocation)): ?>
                     <p class="text-muted text-center py-3 mb-0">No data.</p>
@@ -98,7 +98,7 @@ $breadcrumbs  = [
 <!-- By Location bar chart -->
 <div class="card border-0 shadow-sm">
     <div class="card-header bg-white border-bottom">
-        <h5 class="mb-0 fw-semibold"><i class="bi bi-bar-chart me-2"></i>Tickets by Location</h5>
+        <h5 class="mb-0 fw-semibold"><i class="bi bi-bar-chart me-2"></i>Tickets by <?= label('location.singular') ?></h5>
     </div>
     <div class="card-body">
         <canvas id="locationChart" height="80"></canvas>

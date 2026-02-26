@@ -40,7 +40,7 @@
                             <?php endif; ?>
                             <?php if (!empty($locationName)): ?>
                             <tr>
-                                <td style="padding:4px 0; color:#64748b; vertical-align:top;">Location</td>
+                                <td style="padding:4px 0; color:#64748b; vertical-align:top;"><?= label('location.singular') ?></td>
                                 <td style="padding:4px 0;"><?= htmlspecialchars($locationName, ENT_QUOTES, 'UTF-8') ?></td>
                             </tr>
                             <?php endif; ?>

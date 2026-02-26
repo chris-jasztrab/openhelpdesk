@@ -18,7 +18,7 @@ $fieldLabels = [
     'type_id'     => 'Type',
     'priority_id' => 'Priority',
     'status'      => 'Status',
-    'location_id' => 'Location',
+    'location_id' => label('location.singular'),
     'group_id'    => 'Group',
     'assigned_to' => 'Assigned To',
 ];

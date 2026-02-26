@@ -75,7 +75,7 @@ $action = $isEdit ? "/admin/users/{$editing['id']}/edit" : '/admin/users/create'
 
                 <!-- Location -->
                 <div class="col-md-4">
-                    <label for="location_id" class="form-label fw-semibold">Assigned Location</label>
+                    <label for="location_id" class="form-label fw-semibold">Assigned <?= label('location.singular') ?></label>
                     <select class="form-select" id="location_id" name="location_id">
                         <option value="">— None —</option>
                         <?php
@@ -89,17 +89,17 @@ $action = $isEdit ? "/admin/users/{$editing['id']}/edit" : '/admin/users/create'
                     </select>
                 </div>
 
-                <!-- Location Ticket Visibility -->
+                <!-- <?= label('location.singular') ?> Ticket Visibility -->
                 <div class="col-12">
                     <div class="form-check form-switch">
                         <input class="form-check-input" type="checkbox" role="switch"
                                id="can_view_location_tickets" name="can_view_location_tickets" value="1"
                                <?= !empty(old('can_view_location_tickets', $editing['can_view_location_tickets'] ?? 0)) ? 'checked' : '' ?>>
                         <label class="form-check-label fw-semibold" for="can_view_location_tickets">
-                            Location Ticket Visibility
+                            <?= label('location.singular') ?> Ticket Visibility
                         </label>
                     </div>
-                    <div class="form-text">When enabled, this user can view all tickets assigned to their location — even if they are not an agent or admin.</div>
+                    <div class="form-text">When enabled, this user can view all tickets assigned to their <?= label('location.singular', 'location') ?> — even if they are not an agent or admin.</div>
                 </div>
 
                 <!-- Avatar -->

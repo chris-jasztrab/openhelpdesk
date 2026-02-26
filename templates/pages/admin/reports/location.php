@@ -2,7 +2,7 @@
 $layout              = 'app';
 $pageTitle           = 'Location Report – Reports';
 $scheduleReportType  = 'location';
-$scheduleReportTitle = 'By Location';
+$scheduleReportTitle = 'By ' . label('location.singular');
 $sidebarItems = adminSidebar('reports');
 $breadcrumbs  = [
     ['label' => 'Admin', 'url' => '/admin'],
@@ -12,7 +12,7 @@ $breadcrumbs  = [
 ?>
 <div class="mb-4">
     <h2 class="fw-bold mb-1">Reports &amp; Analytics</h2>
-    <p class="text-muted mb-0">By Location</p>
+    <p class="text-muted mb-0">By <?= label('location.singular') ?></p>
 </div>
 
 
@@ -31,7 +31,7 @@ $breadcrumbs  = [
 <!-- Chart -->
 <div class="card border-0 shadow-sm mb-4">
     <div class="card-header bg-white border-bottom">
-        <h5 class="mb-0 fw-semibold"><i class="bi bi-bar-chart me-2"></i>Tickets by Location</h5>
+        <h5 class="mb-0 fw-semibold"><i class="bi bi-bar-chart me-2"></i>Tickets by <?= label('location.singular') ?></h5>
     </div>
     <div class="card-body">
         <canvas id="locChart" height="80"></canvas>
@@ -41,13 +41,13 @@ $breadcrumbs  = [
 <!-- Table -->
 <div class="card border-0 shadow-sm">
     <div class="card-header bg-white border-bottom">
-        <h5 class="mb-0 fw-semibold"><i class="bi bi-table me-2"></i>Location Breakdown</h5>
+        <h5 class="mb-0 fw-semibold"><i class="bi bi-table me-2"></i><?= label('location.singular') ?> Breakdown</h5>
     </div>
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
             <thead class="table-light">
                 <tr>
-                    <th>Location</th>
+                    <th><?= label('location.singular') ?></th>
                     <th class="text-center">Total Tickets</th>
                     <th class="text-center">Open</th>
                     <th class="text-center">Resolved</th>

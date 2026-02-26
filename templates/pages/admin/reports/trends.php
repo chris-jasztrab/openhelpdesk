@@ -51,7 +51,7 @@ $breadcrumbs  = [
     <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between">
         <h5 class="mb-0 fw-semibold">
             <i class="bi bi-graph-up me-2"></i>
-            Tickets by <?= $groupBy === 'location' ? 'Location' : 'Type' ?> Over Time
+            Tickets by <?= $groupBy === 'location' ? label('location.singular') : 'Type' ?> Over Time
         </h5>
         <span class="badge bg-light text-muted border"><?= $from ?> – <?= $to ?></span>
     </div>

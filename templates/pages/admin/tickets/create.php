@@ -122,7 +122,7 @@ $statusOptions = [
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label for="location_id" class="form-label fw-semibold">Location</label>
+                            <label for="location_id" class="form-label fw-semibold"><?= label('location.singular') ?></label>
                             <select class="form-select" id="location_id" name="location_id">
                                 <option value="">— None —</option>
                                 <?php foreach ($locations as $loc): ?>
