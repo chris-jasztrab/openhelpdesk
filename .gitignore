@@ -1,4 +1,5 @@
 .env
+/vendor/
 /public/uploads/avatars/*
 !/public/uploads/avatars/.gitkeep
 *.log
