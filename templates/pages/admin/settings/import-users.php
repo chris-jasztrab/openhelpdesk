@@ -39,6 +39,20 @@ $breadcrumbs  = [
             </div>
         </div>
 
+        <div class="mb-4 p-3 bg-light rounded border">
+            <div class="fw-semibold mb-1"><i class="bi bi-download me-1"></i>Sample CSV</div>
+            <p class="text-muted small mb-2">
+                Not sure about the format? Download this sample file to see the expected columns,
+                then fill it in with your data.
+            </p>
+            <a href="/samples/import-users-sample.csv" download class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-file-earmark-spreadsheet me-1"></i>Download sample-users.csv
+            </a>
+            <div class="mt-2">
+                <code class="small text-muted">email, first_name, last_name, role, work_phone, location</code>
+            </div>
+        </div>
+
         <form method="POST" action="/admin/settings/import-users/preview" enctype="multipart/form-data">
             <?= csrfField() ?>
 

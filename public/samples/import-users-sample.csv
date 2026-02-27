@@ -1,0 +1,5 @@
+email,first_name,last_name,role,work_phone,location
+jane.smith@example.com,Jane,Smith,agent,519-555-0101,Main Branch
+john.doe@example.com,John,Doe,user,519-555-0102,Main Branch
+alice.jones@example.com,Alice,Jones,admin,519-555-0103,Downtown Branch
+bob.brown@example.com,Bob,Brown,user,,
