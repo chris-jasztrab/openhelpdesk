@@ -125,13 +125,11 @@ $router->get('/portal/tickets/create', function () {
     $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
     $tags       = $db->query('SELECT * FROM ticket_tags ORDER BY name')->fetchAll();
 
-    // Determine the user's location (from profile, or first location as fallback)
+    // Determine the user's location from their profile
     $userStmt = $db->prepare('SELECT location_id FROM users WHERE id = ?');
     $userStmt->execute([Auth::id()]);
-    $userLocationId = $userStmt->fetchColumn() ?: null;
-    if (!$userLocationId && !empty($locations)) {
-        $userLocationId = $locations[0]['id'];
-    }
+    $userLocationId  = $userStmt->fetchColumn() ?: null;
+    $userHasNoLocation = ($userLocationId === null || $userLocationId === false);
     $userLocationName = '';
     foreach ($locations as $loc) {
         if ((int) $loc['id'] === (int) $userLocationId) {
@@ -166,15 +164,16 @@ $router->get('/portal/tickets/create', function () {
     )->fetchAll();
 
     render('portal/tickets/create', [
-        'types'            => $types,
-        'locations'        => $locations,
-        'priorities'       => $priorities,
-        'tags'             => $tags,
-        'userLocationId'   => $userLocationId,
-        'userLocationName' => $userLocationName,
-        'customFields'     => $customFields,
-        'fieldOptions'     => $fieldOptions,
-        'sharedTemplates'  => $sharedTemplates,
+        'types'             => $types,
+        'locations'         => $locations,
+        'priorities'        => $priorities,
+        'tags'              => $tags,
+        'userLocationId'    => $userLocationId,
+        'userLocationName'  => $userLocationName,
+        'userHasNoLocation' => $userHasNoLocation,
+        'customFields'      => $customFields,
+        'fieldOptions'      => $fieldOptions,
+        'sharedTemplates'   => $sharedTemplates,
     ]);
 });
 
@@ -193,14 +192,24 @@ $router->post('/portal/tickets/create', function () {
     $osInfo      = trim($_POST['os_info'] ?? '');
     $tagNames    = $_POST['tags'] ?? [];
 
-    // Auto-assign location from user profile (fallback to first location)
+    // Determine location: use profile location, or save the user's chosen location
     $db = Database::connect();
     $userLocStmt = $db->prepare('SELECT location_id FROM users WHERE id = ?');
     $userLocStmt->execute([Auth::id()]);
     $locationId = $userLocStmt->fetchColumn() ?: null;
     if (!$locationId) {
-        $firstLoc = $db->query('SELECT id FROM locations ORDER BY name LIMIT 1')->fetchColumn();
-        $locationId = $firstLoc ?: null;
+        $chosenLocId = !empty($_POST['location_id']) ? (int) $_POST['location_id'] : null;
+        if ($chosenLocId) {
+            // Validate the chosen location exists
+            $locCheck = $db->prepare('SELECT id FROM locations WHERE id = ?');
+            $locCheck->execute([$chosenLocId]);
+            if ($locCheck->fetchColumn()) {
+                $locationId = $chosenLocId;
+                // Save to user profile so future tickets pre-fill this location
+                $db->prepare('UPDATE users SET location_id = ? WHERE id = ?')
+                   ->execute([$locationId, Auth::id()]);
+            }
+        }
     }
 
     // Assignment is handled by agents/admins, not portal users
