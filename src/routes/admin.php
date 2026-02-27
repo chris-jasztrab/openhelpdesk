@@ -3417,6 +3417,317 @@ $router->post('/admin/settings/import/confirm', function () {
 });
 
 /* ==================================================================
+ * ADMIN – Import Users from CSV
+ * ================================================================== */
+
+$router->get('/admin/settings/import-users', function () {
+    Auth::requireRole('admin');
+    render('admin/settings/import-users');
+});
+
+$router->post('/admin/settings/import-users/preview', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/import-users');
+    }
+
+    if (empty($_FILES['csv_file']['tmp_name']) || $_FILES['csv_file']['error'] !== UPLOAD_ERR_OK) {
+        flash('error', 'Please select a valid CSV file.');
+        redirect('/admin/settings/import-users');
+    }
+    if ($_FILES['csv_file']['size'] > 10 * 1024 * 1024) {
+        flash('error', 'File is too large. Maximum 10 MB.');
+        redirect('/admin/settings/import-users');
+    }
+
+    $handle = fopen($_FILES['csv_file']['tmp_name'], 'r');
+    if (!$handle) {
+        flash('error', 'Could not read the uploaded file.');
+        redirect('/admin/settings/import-users');
+    }
+
+    $header = fgetcsv($handle);
+    if (!$header || count($header) < 1) {
+        fclose($handle);
+        flash('error', 'The CSV file appears to be empty or has no columns.');
+        redirect('/admin/settings/import-users');
+    }
+    $header = array_map(fn($h) => trim(preg_replace('/^\xEF\xBB\xBF/', '', $h)), $header);
+
+    $rawRows = [];
+    while (($csvRow = fgetcsv($handle)) !== false) {
+        if (count(array_filter($csvRow, fn($v) => trim($v) !== '')) === 0) {
+            continue;
+        }
+        $row = [];
+        foreach ($header as $i => $col) {
+            $row[$col] = trim($csvRow[$i] ?? '');
+        }
+        $rawRows[] = $row;
+    }
+    fclose($handle);
+
+    if (empty($rawRows)) {
+        flash('error', 'No data rows found in the CSV file.');
+        redirect('/admin/settings/import-users');
+    }
+
+    $_SESSION['user_import_raw'] = ['headers' => $header, 'rows' => $rawRows];
+    unset($_SESSION['user_import_data'], $_SESSION['user_import_summary']);
+    redirect('/admin/settings/import-users/map');
+});
+
+$router->get('/admin/settings/import-users/map', function () {
+    Auth::requireRole('admin');
+    $raw = $_SESSION['user_import_raw'] ?? null;
+    if (!$raw) {
+        flash('error', 'No import data found. Please upload a CSV file first.');
+        redirect('/admin/settings/import-users');
+    }
+
+    $headers = $raw['headers'];
+
+    $systemFields = [
+        ['key' => 'email',      'label' => 'Email Address',  'required' => true,  'hint' => 'Required'],
+        ['key' => 'full_name',  'label' => 'Full Name',       'required' => false, 'hint' => 'Used if First/Last Name not mapped'],
+        ['key' => 'first_name', 'label' => 'First Name',      'required' => false, 'hint' => null],
+        ['key' => 'last_name',  'label' => 'Last Name',       'required' => false, 'hint' => null],
+        ['key' => 'role',       'label' => 'Role',             'required' => false, 'hint' => 'user / agent / admin'],
+        ['key' => 'work_phone', 'label' => 'Work Phone',      'required' => false, 'hint' => null],
+        ['key' => 'location',   'label' => label('location.singular'), 'required' => false, 'hint' => 'Matched by name; created if missing'],
+    ];
+
+    $aliases = [
+        'email'      => ['email', 'email address', 'e-mail', 'user email', 'work email', 'mail'],
+        'full_name'  => ['full name', 'full_name', 'name', 'display name', 'contact name'],
+        'first_name' => ['first name', 'first_name', 'given name', 'firstname', 'first'],
+        'last_name'  => ['last name', 'last_name', 'surname', 'family name', 'lastname', 'last'],
+        'role'       => ['role', 'user role', 'account type', 'type', 'access level'],
+        'work_phone' => ['phone', 'work phone', 'telephone', 'work_phone', 'phone number', 'tel'],
+        'location'   => ['location', 'branch', 'department', 'site', 'office'],
+    ];
+
+    $lowerHeaders = array_map('strtolower', $headers);
+    $autoMapping  = [];
+    foreach ($systemFields as $field) {
+        $autoMapping[$field['key']] = null;
+        $aliasList = $aliases[$field['key']] ?? [strtolower($field['label'])];
+        foreach ($aliasList as $alias) {
+            $idx = array_search($alias, $lowerHeaders, true);
+            if ($idx !== false) {
+                $autoMapping[$field['key']] = $headers[$idx];
+                break;
+            }
+        }
+    }
+
+    render('admin/settings/import-users-map', [
+        'headers'      => $headers,
+        'systemFields' => $systemFields,
+        'autoMapping'  => $autoMapping,
+        'sampleRows'   => array_slice($raw['rows'], 0, 3),
+    ]);
+});
+
+$router->post('/admin/settings/import-users/map', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/import-users');
+    }
+
+    $raw = $_SESSION['user_import_raw'] ?? null;
+    if (!$raw) {
+        flash('error', 'No import data found. Please upload a CSV file first.');
+        redirect('/admin/settings/import-users');
+    }
+
+    $userMapping = $_POST['mapping'] ?? [];
+    $emailCol    = $userMapping['email'] ?? '';
+
+    if ($emailCol === '') {
+        flash('error', 'Email Address is required. Please map it to a CSV column.');
+        redirect('/admin/settings/import-users/map');
+    }
+
+    $db = Database::connect();
+    $existingEmails = [];
+    foreach ($db->query('SELECT LOWER(email) AS email FROM users')->fetchAll(PDO::FETCH_COLUMN) as $e) {
+        $existingEmails[$e] = true;
+    }
+    $existingLocations = [];
+    foreach ($db->query('SELECT id, name FROM locations')->fetchAll() as $l) {
+        $existingLocations[strtolower($l['name'])] = $l['id'];
+    }
+
+    $validRoles = ['user', 'agent', 'admin'];
+    $rows = [];
+    $duplicateEmails  = [];
+    $newLocationNames = [];
+
+    foreach ($raw['rows'] as $rawRow) {
+        $get = function (string $fieldKey) use ($rawRow, $userMapping): string {
+            $col = $userMapping[$fieldKey] ?? '';
+            return $col !== '' ? trim($rawRow[$col] ?? '') : '';
+        };
+
+        $email = strtolower($get('email'));
+        if ($email === '') {
+            continue;
+        }
+
+        $isDuplicate = isset($existingEmails[$email]);
+        if ($isDuplicate) {
+            $duplicateEmails[$email] = true;
+        }
+
+        // Resolve name: prefer first_name + last_name, fall back to full_name split
+        $firstName = $get('first_name');
+        $lastName  = $get('last_name');
+        $fullName  = $get('full_name');
+        if ($firstName === '' && $lastName === '' && $fullName !== '') {
+            [$firstName, $lastName] = splitFullName($fullName);
+        }
+
+        $roleRaw = strtolower($get('role'));
+        $role    = in_array($roleRaw, $validRoles, true) ? $roleRaw : 'user';
+
+        $location = $get('location');
+        if ($location !== '' && !isset($existingLocations[strtolower($location)])) {
+            $newLocationNames[strtolower($location)] = $location;
+        }
+
+        $rows[] = [
+            'email'        => $email,
+            'first_name'   => $firstName,
+            'last_name'    => $lastName,
+            'role'         => $role,
+            'work_phone'   => $get('work_phone'),
+            'location'     => $location,
+            'is_duplicate' => $isDuplicate,
+        ];
+    }
+
+    if (empty($rows)) {
+        flash('error', 'No valid rows found after applying the mapping. Ensure the Email column contains data.');
+        redirect('/admin/settings/import-users/map');
+    }
+
+    $newCount = count(array_filter($rows, fn($r) => !$r['is_duplicate']));
+
+    $_SESSION['user_import_data']    = $rows;
+    $_SESSION['user_import_summary'] = [
+        'total_rows'       => count($rows),
+        'new_users'        => $newCount,
+        'duplicates'       => count($duplicateEmails),
+        'new_locations'    => count($newLocationNames),
+        'duplicate_list'   => array_keys($duplicateEmails),
+        'new_location_list'=> array_values($newLocationNames),
+    ];
+    redirect('/admin/settings/import-users/preview');
+});
+
+$router->get('/admin/settings/import-users/preview', function () {
+    Auth::requireRole('admin');
+    $rows    = $_SESSION['user_import_data']    ?? null;
+    $summary = $_SESSION['user_import_summary'] ?? null;
+    if (!$rows || !$summary) {
+        flash('error', 'No import data found. Please start the import again.');
+        redirect('/admin/settings/import-users');
+    }
+    render('admin/settings/import-users-preview', [
+        'summary'     => $summary,
+        'previewRows' => array_slice($rows, 0, 15),
+    ]);
+});
+
+$router->post('/admin/settings/import-users/confirm', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/import-users');
+    }
+
+    $rows = $_SESSION['user_import_data'] ?? [];
+    unset($_SESSION['user_import_data'], $_SESSION['user_import_summary']);
+
+    if (empty($rows)) {
+        flash('error', 'No import data found. Please upload the CSV again.');
+        redirect('/admin/settings/import-users');
+    }
+
+    $db = Database::connect();
+
+    $existingEmails = [];
+    foreach ($db->query('SELECT LOWER(email) AS email FROM users')->fetchAll(PDO::FETCH_COLUMN) as $e) {
+        $existingEmails[$e] = true;
+    }
+    $existingLocations = [];
+    foreach ($db->query('SELECT id, name FROM locations')->fetchAll() as $l) {
+        $existingLocations[strtolower($l['name'])] = (int) $l['id'];
+    }
+
+    $imported = 0;
+    $skipped  = 0;
+    $randomPassword = password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT);
+
+    $db->beginTransaction();
+    try {
+        $insertUser = $db->prepare(
+            'INSERT INTO users (first_name, last_name, email, password, role, work_phone, location_id) VALUES (?, ?, ?, ?, ?, ?, ?)'
+        );
+        $insertLocation = $db->prepare('INSERT INTO locations (name) VALUES (?)');
+
+        foreach ($rows as $row) {
+            $email = $row['email'];
+            if ($email === '' || isset($existingEmails[$email])) {
+                $skipped++;
+                continue;
+            }
+
+            // Resolve location
+            $locationId = null;
+            if ($row['location'] !== '') {
+                $locKey = strtolower($row['location']);
+                if (isset($existingLocations[$locKey])) {
+                    $locationId = $existingLocations[$locKey];
+                } else {
+                    $insertLocation->execute([$row['location']]);
+                    $locationId = (int) $db->lastInsertId();
+                    $existingLocations[$locKey] = $locationId;
+                }
+            }
+
+            $insertUser->execute([
+                $row['first_name'],
+                $row['last_name'],
+                $email,
+                $randomPassword,
+                $row['role'],
+                $row['work_phone'] !== '' ? $row['work_phone'] : null,
+                $locationId,
+            ]);
+            $existingEmails[$email] = true;
+            $imported++;
+        }
+
+        $db->commit();
+    } catch (PDOException $e) {
+        $db->rollBack();
+        flash('error', 'Import failed: ' . $e->getMessage());
+        redirect('/admin/settings/import-users');
+    }
+
+    $msg = "Successfully imported {$imported} user(s).";
+    if ($skipped > 0) {
+        $msg .= " {$skipped} row(s) skipped (duplicate email or missing email).";
+    }
+    flash('success', $msg);
+    redirect('/admin/users');
+});
+
+/* ==================================================================
  * ADMIN – Settings: Import KB Articles
  * ================================================================== */
 

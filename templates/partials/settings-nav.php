@@ -16,6 +16,7 @@ $settingsNav = [
     ['label' => 'Labels',         'url' => '/admin/settings/labels',         'icon' => 'bi-translate'],
     ['label' => 'Cron Jobs',      'url' => '/admin/settings/cron-jobs',      'icon' => 'bi-clock-history'],
     ['label' => 'Import Tickets', 'url' => '/admin/settings/import',         'icon' => 'bi-cloud-upload'],
+    ['label' => 'Import Users',   'url' => '/admin/settings/import-users',   'icon' => 'bi-person-plus'],
     ['label' => 'Import KB',      'url' => '/admin/settings/import-kb',      'icon' => 'bi-book'],
     ['label' => 'CSAT Surveys',  'url' => '/admin/settings/csat',           'icon' => 'bi-star'],
     ['label' => 'Backup',        'url' => '/admin/settings/backup',         'icon' => 'bi-archive'],
