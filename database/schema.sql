@@ -129,6 +129,16 @@ CREATE TABLE IF NOT EXISTS `ticket_cc` (
     FOREIGN KEY (`added_by`)  REFERENCES `users`(`id`)   ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Ticket watchers (agents/admins who subscribe to ticket updates)
+CREATE TABLE IF NOT EXISTS `ticket_watchers` (
+    `ticket_id`  INT UNSIGNED NOT NULL,
+    `user_id`    INT UNSIGNED NOT NULL,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`ticket_id`, `user_id`),
+    FOREIGN KEY (`ticket_id`) REFERENCES `tickets`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`user_id`)   REFERENCES `users`(`id`)   ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Ticket timeline (audit trail of all changes)
 CREATE TABLE IF NOT EXISTS `ticket_timeline` (
     `id`          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

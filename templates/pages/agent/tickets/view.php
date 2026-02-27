@@ -47,6 +47,13 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
         </div>
     </div>
     <div class="d-flex gap-2">
+        <form method="POST" action="/agent/tickets/<?= (int) $ticket['id'] ?>/watch">
+            <?= csrfField() ?>
+            <button type="submit" class="btn <?= $isWatching ? 'btn-primary' : 'btn-outline-secondary' ?>"
+                    title="<?= $isWatching ? 'Stop watching this ticket' : 'Watch this ticket to receive email updates' ?>">
+                <i class="bi <?= $isWatching ? 'bi-eye-fill' : 'bi-eye' ?> me-1"></i><?= $isWatching ? 'Watching' : 'Watch' ?>
+            </button>
+        </form>
         <?php if (!$ticket['merged_into_ticket_id']): ?>
         <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#mergeModal">
             <i class="bi bi-arrow-right-circle me-1"></i>Merge

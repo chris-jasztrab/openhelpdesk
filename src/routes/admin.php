@@ -1669,7 +1669,40 @@ $router->get('/admin/tickets/{id}', function (array $p) {
         }
     }
 
-    render('admin/tickets/view', ['ticket' => $ticket, 'timeline' => $timeline, 'agents' => $agents, 'priorities' => $priorities, 'attachments' => $attachments, 'ccUsers' => $ccUsers, 'groups' => $groups, 'customFields' => $customFields, 'fieldValues' => $fieldValues, 'fieldOptions' => $fieldOptions]);
+    // Is the current user watching this ticket?
+    $watchStmt = $db->prepare('SELECT 1 FROM ticket_watchers WHERE ticket_id = ? AND user_id = ?');
+    $watchStmt->execute([$ticket['id'], Auth::id()]);
+    $isWatching = (bool) $watchStmt->fetchColumn();
+
+    render('admin/tickets/view', ['ticket' => $ticket, 'timeline' => $timeline, 'agents' => $agents, 'priorities' => $priorities, 'attachments' => $attachments, 'ccUsers' => $ccUsers, 'groups' => $groups, 'customFields' => $customFields, 'fieldValues' => $fieldValues, 'fieldOptions' => $fieldOptions, 'isWatching' => $isWatching]);
+});
+
+/* ==================================================================
+ * ADMIN – Watch / Unwatch Ticket
+ * ================================================================== */
+
+$router->post('/admin/tickets/{id}/watch', function (array $p) {
+    Auth::requireRole('admin');
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        redirect("/admin/tickets/{$id}");
+    }
+    $db = Database::connect();
+    $check = $db->prepare('SELECT id FROM tickets WHERE id = ?');
+    $check->execute([$id]);
+    if (!$check->fetch()) {
+        redirect('/admin/tickets');
+    }
+    $existing = $db->prepare('SELECT 1 FROM ticket_watchers WHERE ticket_id = ? AND user_id = ?');
+    $existing->execute([$id, Auth::id()]);
+    if ($existing->fetchColumn()) {
+        $db->prepare('DELETE FROM ticket_watchers WHERE ticket_id = ? AND user_id = ?')
+           ->execute([$id, Auth::id()]);
+    } else {
+        $db->prepare('INSERT IGNORE INTO ticket_watchers (ticket_id, user_id) VALUES (?, ?)')
+           ->execute([$id, Auth::id()]);
+    }
+    redirect("/admin/tickets/{$id}");
 });
 
 /* ==================================================================
@@ -1861,6 +1894,7 @@ $router->post('/admin/tickets/{id}/comment', function (array $p) {
     if (!$isInternal) {
         notifyTicketCreator($db, $id, $message, Auth::fullName());
         notifyCcUsers($db, $id, $message, Auth::fullName());
+        notifyWatchers($db, $id, $message, Auth::fullName());
 
         // SLA: record first response if this is the first agent/admin public reply
         $ticket = $db->prepare('SELECT created_by, first_responded_at FROM tickets WHERE id = ?');

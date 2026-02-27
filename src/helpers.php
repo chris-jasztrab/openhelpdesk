@@ -712,6 +712,74 @@ function notifyCcUsers(PDO $db, int $ticketId, string $message, string $authorNa
 }
 
 /**
+ * Email all watchers of a ticket about a new public comment.
+ * Skips the comment author, the ticket creator (notified separately),
+ * and any CC'd users (notified separately).
+ */
+function notifyWatchers(PDO $db, int $ticketId, string $message, string $authorName): void
+{
+    $ticketStmt = $db->prepare('SELECT subject, created_by FROM tickets WHERE id = ?');
+    $ticketStmt->execute([$ticketId]);
+    $ticketRow = $ticketStmt->fetch();
+    if (!$ticketRow) return;
+
+    $creatorId = (int) $ticketRow['created_by'];
+    $currentId = Auth::id();
+
+    // Collect CC'd user IDs to avoid double-notifying
+    $ccStmt = $db->prepare('SELECT user_id FROM ticket_cc WHERE ticket_id = ?');
+    $ccStmt->execute([$ticketId]);
+    $ccIdList = array_map('intval', array_column($ccStmt->fetchAll(), 'user_id'));
+
+    $stmt = $db->prepare(
+        "SELECT u.id, u.first_name, u.last_name, u.email, u.role
+         FROM ticket_watchers tw
+         JOIN users u ON tw.user_id = u.id
+         WHERE tw.ticket_id = ? AND u.role IN ('agent','admin')"
+    );
+    $stmt->execute([$ticketId]);
+
+    foreach ($stmt->fetchAll() as $user) {
+        $uid = (int) $user['id'];
+        if ($uid === $currentId || $uid === $creatorId) continue;
+        if (in_array($uid, $ccIdList, true)) continue;
+
+        $prefix    = $user['role'] === 'admin' ? '/admin' : '/agent';
+        $ticketUrl = appUrl() . $prefix . '/tickets/' . $ticketId;
+
+        $tpl = getEmailTpl('ticket-updated', [
+            'ticket_id'  => $ticketId,
+            'subject'    => $ticketRow['subject'],
+            'message'    => $message,
+            'author'     => $authorName,
+            'user_name'  => $user['first_name'] . ' ' . $user['last_name'],
+            'first_name' => $user['first_name'],
+            'last_name'  => $user['last_name'],
+        ]);
+
+        $emailHtml = renderEmail('ticket-updated', [
+            'ticketId'    => $ticketId,
+            'subject'     => $ticketRow['subject'],
+            'message'     => $message,
+            'authorName'  => $authorName,
+            'ticketUrl'   => $ticketUrl,
+            'introText'   => $tpl['intro'],
+            'buttonLabel' => $tpl['button'],
+            'footerText'  => $tpl['footer'],
+        ]);
+
+        sendMail(
+            $user['email'],
+            $user['first_name'] . ' ' . $user['last_name'],
+            $tpl['subject'],
+            $emailHtml,
+            '',
+            $ticketId
+        );
+    }
+}
+
+/**
  * Email the creator (and CC'd users) of a source ticket that it was merged into a master ticket.
  */
 function notifyTicketMerged(PDO $db, int $sourceId, int $targetId): void
