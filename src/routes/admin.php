@@ -2701,7 +2701,7 @@ $router->post('/admin/settings/test-email', function () {
     $result   = sendMail(
         $toEmail,
         $toEmail,
-        'LocalDesk – Test Email',
+        'LocalDesk - Test Email',
         $htmlBody,
         "It works!\n\nThis is a test email from LocalDesk. Your SMTP configuration is correct."
     );

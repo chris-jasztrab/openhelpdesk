@@ -422,6 +422,7 @@ function sendMail(string $toEmail, string $toName, string $subject, string $html
     $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
     try {
         $mail->isSMTP();
+        $mail->CharSet    = \PHPMailer\PHPMailer\PHPMailer::CHARSET_UTF8;
         $mail->Host       = $host;
         $mail->Port       = $port;
         $mail->Timeout    = 15; // seconds — prevents indefinite hangs on unreachable hosts
