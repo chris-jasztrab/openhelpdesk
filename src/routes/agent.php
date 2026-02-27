@@ -708,6 +708,141 @@ $router->post('/agent/tickets/{id}/merge', function (array $p) {
 });
 
 /* ==================================================================
+ * AGENT – Split Ticket
+ * ================================================================== */
+
+$router->get('/agent/tickets/{id}/split', function (array $p) {
+    Auth::requireRole('agent', 'admin');
+    $db = Database::connect();
+
+    $stmt = $db->prepare(
+        "SELECT t.*, l.name AS location_name, tt.name AS type_name,
+                CONCAT(c.first_name, ' ', c.last_name) AS creator_name
+         FROM tickets t
+         LEFT JOIN ticket_types tt ON t.type_id = tt.id
+         LEFT JOIN locations l     ON t.location_id = l.id
+         LEFT JOIN users c         ON t.created_by = c.id
+         WHERE t.id = ? AND t.merged_into_ticket_id IS NULL"
+    );
+    $stmt->execute([(int) $p['id']]);
+    $ticket = $stmt->fetch();
+    if (!$ticket) {
+        flash('error', 'Ticket not found or already merged.');
+        redirect('/agent/tickets');
+    }
+
+    // Public comments only
+    $commentsStmt = $db->prepare(
+        "SELECT tl.*, CONCAT(u.first_name, ' ', u.last_name) AS user_name
+         FROM ticket_timeline tl
+         LEFT JOIN users u ON tl.user_id = u.id
+         WHERE tl.ticket_id = ? AND tl.action = 'comment' AND tl.is_internal = 0
+         ORDER BY tl.created_at ASC"
+    );
+    $commentsStmt->execute([$ticket['id']]);
+    $comments = $commentsStmt->fetchAll();
+
+    $agents     = $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin') ORDER BY first_name")->fetchAll();
+    $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
+    $types      = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
+    $groups     = $db->query('SELECT * FROM `groups` ORDER BY sort_order, name')->fetchAll();
+
+    render('agent/tickets/split', compact('ticket', 'comments', 'agents', 'priorities', 'types', 'groups'));
+});
+
+$router->post('/agent/tickets/{id}/split', function (array $p) {
+    Auth::requireRole('agent', 'admin');
+    $sourceId = (int) $p['id'];
+
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect("/agent/tickets/{$sourceId}/split");
+    }
+
+    $subject  = trim($_POST['subject'] ?? '');
+    $desc     = trim($_POST['description'] ?? '');
+    $typeId   = ($_POST['type_id'] ?? '') !== '' ? (int) $_POST['type_id'] : null;
+    $priId    = ($_POST['priority_id'] ?? '') !== '' ? (int) $_POST['priority_id'] : null;
+    $assignTo = ($_POST['assigned_to'] ?? '') !== '' ? (int) $_POST['assigned_to'] : null;
+    $groupId  = ($_POST['group_id'] ?? '') !== '' ? (int) $_POST['group_id'] : null;
+    $moveIds  = array_filter(array_map('intval', (array) ($_POST['move_comments'] ?? [])));
+
+    if ($subject === '') {
+        flash('error', 'Subject is required for the new ticket.');
+        redirect("/agent/tickets/{$sourceId}/split");
+    }
+
+    $db = Database::connect();
+
+    $src = $db->prepare('SELECT * FROM tickets WHERE id = ? AND merged_into_ticket_id IS NULL');
+    $src->execute([$sourceId]);
+    $sourceTicket = $src->fetch();
+    if (!$sourceTicket) {
+        flash('error', 'Source ticket not found or already merged.');
+        redirect('/agent/tickets');
+    }
+
+    $newId = null;
+    $db->beginTransaction();
+    try {
+        $actor = Auth::fullName();
+
+        // Create new ticket (inherit location from source)
+        $db->prepare(
+            'INSERT INTO tickets (subject, description, created_by, type_id, location_id, status, priority_id, assigned_to, group_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        )->execute([$subject, $desc, Auth::id(), $typeId, $sourceTicket['location_id'], 'open', $priId, $assignTo, $groupId]);
+        $newId = (int) $db->lastInsertId();
+
+        // Timeline entry on new ticket
+        $db->prepare(
+            'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
+        )->execute([
+            $newId, Auth::id(), 'split',
+            "This ticket was created by splitting Ticket #{$sourceId} ({$sourceTicket['subject']}) by {$actor}.",
+        ]);
+
+        // Move selected comments to new ticket
+        $moved = 0;
+        if ($moveIds) {
+            $placeholders = implode(',', array_fill(0, count($moveIds), '?'));
+            $verifyStmt = $db->prepare(
+                "SELECT id FROM ticket_timeline WHERE id IN ({$placeholders}) AND ticket_id = ? AND action = 'comment' AND is_internal = 0"
+            );
+            $verifyStmt->execute(array_merge(array_values($moveIds), [$sourceId]));
+            $validIds = $verifyStmt->fetchAll(PDO::FETCH_COLUMN);
+
+            if ($validIds) {
+                $ph2 = implode(',', array_fill(0, count($validIds), '?'));
+                $db->prepare("UPDATE ticket_timeline SET ticket_id = ? WHERE id IN ({$ph2})")
+                   ->execute(array_merge([$newId], $validIds));
+                $db->prepare("UPDATE ticket_attachments SET ticket_id = ? WHERE timeline_id IN ({$ph2})")
+                   ->execute(array_merge([$newId], $validIds));
+                $moved = count($validIds);
+            }
+        }
+
+        // Timeline entry on source ticket
+        $moveLine = $moved > 0 ? " {$moved} comment(s) moved to new ticket." : '';
+        $db->prepare(
+            'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
+        )->execute([
+            $sourceId, Auth::id(), 'split',
+            "Ticket split: new Ticket #{$newId} (\"{$subject}\") created by {$actor}.{$moveLine}",
+        ]);
+
+        $db->commit();
+    } catch (\Throwable $e) {
+        $db->rollBack();
+        flash('error', 'Split failed. Please try again.');
+        redirect("/agent/tickets/{$sourceId}/split");
+    }
+
+    flash('success', "Ticket #{$sourceId} split — new Ticket #{$newId} created.");
+    redirect("/agent/tickets/{$newId}");
+});
+
+/* ==================================================================
  * AGENT – Save Custom Field Values on a Ticket
  * ================================================================== */
 
