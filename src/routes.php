@@ -484,7 +484,7 @@ $router->get('/auth/microsoft', function () {
 
     $tenantId    = getSetting('sso_tenant_id');
     $clientId    = getSetting('sso_client_id');
-    $redirectUri = rtrim(env('APP_URL', ''), '/') . '/auth/microsoft/callback';
+    $redirectUri = appUrl() . '/auth/microsoft/callback';
 
     $params = http_build_query([
         'client_id'     => $clientId,

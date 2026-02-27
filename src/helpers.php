@@ -41,6 +41,32 @@ function env(string $key, string $default = ''): string
     return $_ENV[$key] ?? (getenv($key) ?: $default);
 }
 
+/**
+ * Return the application base URL with the correct scheme.
+ * Detects HTTPS from the live request (including reverse-proxy headers)
+ * so the value is accurate even when APP_URL still says http://.
+ */
+function appUrl(): string
+{
+    // Detect scheme from the current request
+    $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || ($_SERVER['SERVER_PORT'] ?? 80) == 443
+        || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https')
+        || (($_SERVER['HTTP_X_FORWARDED_SSL']   ?? '') === 'on');
+
+    $scheme = $isHttps ? 'https' : 'http';
+
+    // If APP_URL is configured, just fix its scheme and return it
+    $appUrl = env('APP_URL', '');
+    if ($appUrl !== '') {
+        return preg_replace('#^https?://#', $scheme . '://', rtrim($appUrl, '/'));
+    }
+
+    // Fall back to building the URL from server variables
+    $host = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost';
+    return $scheme . '://' . $host;
+}
+
 function redirect(string $url, int $status = 302): never
 {
     header("Location: {$url}", true, $status);

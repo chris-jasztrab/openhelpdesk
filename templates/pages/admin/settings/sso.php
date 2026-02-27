@@ -7,7 +7,7 @@ $breadcrumbs  = [
     ['label' => 'Settings', 'url' => '/admin/settings'],
     ['label' => 'SSO / Microsoft 365'],
 ];
-$redirectUri = rtrim(env('APP_URL', ''), '/') . '/auth/microsoft/callback';
+$redirectUri = appUrl() . '/auth/microsoft/callback';
 ?>
 <div class="mb-4">
     <h2 class="fw-bold mb-0">Settings</h2>
