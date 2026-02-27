@@ -166,36 +166,99 @@ cp .env.example .env
 # 3. Seed the database (creates DB, applies schema, inserts sample data)
 php database/seed.php
 
-# 4. Start the development server
-php -S localhost:8000 -t public
+# 4. Configure your web server (see platform instructions below)
 ```
 
-Visit **http://localhost:8000** and log in with one of the seed accounts below.
+Then visit your configured site URL and log in with one of the seed accounts below.
 
-### Apache Setup (Production)
+---
 
-Enable `mod_rewrite`:
+## Web Server Configuration
+
+The `DocumentRoot` (or equivalent) must point to the **`public/`** subdirectory, not the project root. URL rewriting must be enabled so that all requests are routed through `public/index.php`.
+
+### XAMPP (Windows)
+
+1. Open `C:\xampp\apache\conf\extra\httpd-vhosts.conf` and add:
+
+   ```apache
+   <VirtualHost *:80>
+       ServerName localdesk.test
+       DocumentRoot "C:/xampp/htdocs/localdesk/public"
+
+       <Directory "C:/xampp/htdocs/localdesk/public">
+           AllowOverride All
+           Require all granted
+       </Directory>
+   </VirtualHost>
+   ```
+
+2. Add `127.0.0.1 localdesk.test` to `C:\Windows\System32\drivers\etc\hosts`.
+3. Restart Apache from the XAMPP Control Panel.
+4. Make sure `mod_rewrite` is enabled — in `httpd.conf` the line `LoadModule rewrite_module modules/mod_rewrite.so` must be uncommented.
+5. Set `APP_URL=http://localdesk.test` in your `.env` file.
+
+### LAMP Stack (Ubuntu / Debian)
+
+Enable `mod_rewrite` and create a virtual host:
 
 ```bash
 sudo a2enmod rewrite
 sudo systemctl restart apache2
 ```
 
-Virtual host configuration:
+```bash
+sudo nano /etc/apache2/sites-available/localdesk.conf
+```
 
 ```apache
 <VirtualHost *:80>
     ServerName localdesk.example.com
-    DocumentRoot /path/to/localdesk/public
+    DocumentRoot /var/www/localdesk/public
 
-    <Directory /path/to/localdesk/public>
+    <Directory /var/www/localdesk/public>
         AllowOverride All
         Require all granted
     </Directory>
 </VirtualHost>
 ```
 
-`DocumentRoot` must point to the `/public` directory. `mod_rewrite` is required for URL routing.
+```bash
+sudo a2ensite localdesk.conf
+sudo systemctl reload apache2
+```
+
+Set `APP_URL=http://localdesk.example.com` in your `.env` file.
+
+### Windows IIS
+
+1. Install the **URL Rewrite** module from the IIS website (required for routing).
+2. Install **PHP** via the Web Platform Installer or manually, and register it with IIS as a FastCGI handler.
+3. In **IIS Manager**, create a new site pointing its **Physical path** to the `public\` subdirectory of the project.
+4. The `public\.htaccess` rules are not read by IIS. Create a `web.config` file inside `public\` with equivalent rewrite rules:
+
+   ```xml
+   <?xml version="1.0" encoding="UTF-8"?>
+   <configuration>
+     <system.webServer>
+       <rewrite>
+         <rules>
+           <rule name="LocalDesk Front Controller" stopProcessing="true">
+             <match url="^(.*)$" />
+             <conditions>
+               <add input="{REQUEST_FILENAME}" matchType="IsFile" negate="true" />
+               <add input="{REQUEST_FILENAME}" matchType="IsDirectory" negate="true" />
+             </conditions>
+             <action type="Rewrite" url="index.php" />
+           </rule>
+         </rules>
+       </rewrite>
+     </system.webServer>
+   </configuration>
+   ```
+
+5. Ensure the IIS application pool identity has **read/write** access to the `storage\` directory.
+6. Set `APP_URL` in your `.env` to match the IIS site binding URL.
 
 ## Default Accounts (seed only)
 
