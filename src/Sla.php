@@ -25,6 +25,17 @@ class Sla
     }
 
     /**
+     * Return Y-m-d strings for all holidays marked as excluded from SLA.
+     *
+     * @return string[]
+     */
+    public static function getExcludedDates(PDO $db): array
+    {
+        $stmt = $db->query("SELECT holiday_date FROM holidays WHERE exclude_from_sla = 1");
+        return $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    }
+
+    /**
      * Add business minutes to a starting datetime, skipping non-business time.
      *
      * @param DateTimeImmutable $start    Start time (will be converted to business TZ)
@@ -33,7 +44,7 @@ class Sla
      * @param array             $schedule Weekly schedule (mon-sun => [start, end] or null)
      * @return DateTimeImmutable The resulting datetime in the business timezone
      */
-    public static function addBusinessMinutes(DateTimeImmutable $start, int $minutes, string $tz, array $schedule): DateTimeImmutable
+    public static function addBusinessMinutes(DateTimeImmutable $start, int $minutes, string $tz, array $schedule, array $excludedDates = []): DateTimeImmutable
     {
         $timezone = new DateTimeZone($tz);
         $current = $start->setTimezone($timezone);
@@ -46,6 +57,13 @@ class Sla
         while ($remaining > 0 && $iteration < $maxIterations) {
             $iteration++;
             $dayKey = strtolower(substr($current->format('D'), 0, 3)); // mon, tue, etc.
+
+            // Holiday/closed day — skip to next day without consuming SLA minutes
+            if (in_array($current->format('Y-m-d'), $excludedDates, true)) {
+                $current = $current->modify('+1 day')->setTime(0, 0, 0);
+                continue;
+            }
+
             $daySchedule = $schedule[$dayKey] ?? null;
 
             // Non-business day — skip to next day
@@ -208,9 +226,10 @@ class Sla
             return; // No SLA policy for this priority
         }
 
+        $excluded = self::getExcludedDates($db);
         $now = new DateTimeImmutable('now', new DateTimeZone($biz['tz']));
-        $responseDue = self::addBusinessMinutes($now, (int) $sla['first_response_minutes'], $biz['tz'], $biz['schedule']);
-        $resolutionDue = self::addBusinessMinutes($now, (int) $sla['resolution_minutes'], $biz['tz'], $biz['schedule']);
+        $responseDue = self::addBusinessMinutes($now, (int) $sla['first_response_minutes'], $biz['tz'], $biz['schedule'], $excluded);
+        $resolutionDue = self::addBusinessMinutes($now, (int) $sla['resolution_minutes'], $biz['tz'], $biz['schedule'], $excluded);
 
         $db->prepare(
             'UPDATE tickets SET first_response_due_at = ?, resolution_due_at = ?, sla_state = ? WHERE id = ?'
@@ -268,11 +287,12 @@ class Sla
             return;
         }
 
+        $excluded = self::getExcludedDates($db);
         $pausedAt = new DateTimeImmutable($ticket['sla_paused_at'], new DateTimeZone($biz['tz']));
         $now = new DateTimeImmutable('now', new DateTimeZone($biz['tz']));
 
-        // Calculate paused business minutes
-        $pausedMinutes = self::countBusinessMinutes($pausedAt, $now, $biz['tz'], $biz['schedule']);
+        // Calculate paused business minutes (holidays are excluded — they don't count as paused time either)
+        $pausedMinutes = self::countBusinessMinutes($pausedAt, $now, $biz['tz'], $biz['schedule'], $excluded);
 
         // Extend due dates
         $updates = [];
@@ -331,9 +351,10 @@ class Sla
             return;
         }
 
+        $excluded = self::getExcludedDates($db);
         $createdAt = new DateTimeImmutable($ticket['created_at'], new DateTimeZone($biz['tz']));
-        $responseDue = self::addBusinessMinutes($createdAt, (int) $sla['first_response_minutes'], $biz['tz'], $biz['schedule']);
-        $resolutionDue = self::addBusinessMinutes($createdAt, (int) $sla['resolution_minutes'], $biz['tz'], $biz['schedule']);
+        $responseDue = self::addBusinessMinutes($createdAt, (int) $sla['first_response_minutes'], $biz['tz'], $biz['schedule'], $excluded);
+        $resolutionDue = self::addBusinessMinutes($createdAt, (int) $sla['resolution_minutes'], $biz['tz'], $biz['schedule'], $excluded);
 
         $db->prepare(
             'UPDATE tickets SET first_response_due_at = ?, resolution_due_at = ? WHERE id = ?'
@@ -360,7 +381,7 @@ class Sla
     /**
      * Count business minutes between two datetimes.
      */
-    public static function countBusinessMinutes(DateTimeImmutable $from, DateTimeImmutable $to, string $tz, array $schedule): int
+    public static function countBusinessMinutes(DateTimeImmutable $from, DateTimeImmutable $to, string $tz, array $schedule, array $excludedDates = []): int
     {
         $timezone = new DateTimeZone($tz);
         $current = $from->setTimezone($timezone);
@@ -373,6 +394,13 @@ class Sla
         while ($current < $end && $iteration < $maxIterations) {
             $iteration++;
             $dayKey = strtolower(substr($current->format('D'), 0, 3));
+
+            // Holiday/closed day — skip without counting minutes
+            if (in_array($current->format('Y-m-d'), $excludedDates, true)) {
+                $current = $current->modify('+1 day')->setTime(0, 0, 0);
+                continue;
+            }
+
             $daySchedule = $schedule[$dayKey] ?? null;
 
             if ($daySchedule === null || !is_array($daySchedule) || count($daySchedule) < 2) {

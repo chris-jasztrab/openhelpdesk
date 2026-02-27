@@ -226,6 +226,17 @@ CREATE TABLE IF NOT EXISTS `sla_policies` (
     FOREIGN KEY (`priority_id`) REFERENCES `ticket_priorities`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Holidays / closed days (optional SLA exclusion per date)
+CREATE TABLE IF NOT EXISTS `holidays` (
+    `id`               INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `holiday_date`     DATE NOT NULL,
+    `name`             VARCHAR(255) NOT NULL DEFAULT '',
+    `exclude_from_sla` TINYINT(1) NOT NULL DEFAULT 1,
+    `created_at`       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY `uq_holiday_date` (`holiday_date`),
+    KEY `idx_holiday_date` (`holiday_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Groups (organizational groups for agents/admins)
 CREATE TABLE IF NOT EXISTS `groups` (
     `id`          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

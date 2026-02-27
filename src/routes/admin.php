@@ -2821,6 +2821,87 @@ $router->post('/admin/settings/business-hours', function () {
 });
 
 /* ==================================================================
+ * ADMIN – Holidays / Closed Days Settings
+ * ================================================================== */
+
+$router->get('/admin/settings/holidays', function () {
+    Auth::requireRole('admin');
+    $db = Database::connect();
+    $holidays = $db->query('SELECT * FROM holidays ORDER BY holiday_date ASC')->fetchAll();
+    render('admin/settings/holidays', ['holidays' => $holidays]);
+});
+
+$router->post('/admin/settings/holidays', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/holidays');
+    }
+
+    $dateStr = trim($_POST['holiday_date'] ?? '');
+    $name    = trim($_POST['name'] ?? '');
+    $exclude = isset($_POST['exclude_from_sla']) ? 1 : 0;
+
+    $parsed = DateTime::createFromFormat('Y-m-d', $dateStr);
+    if (!$parsed || $parsed->format('Y-m-d') !== $dateStr) {
+        flash('error', 'Please enter a valid date.');
+        redirect('/admin/settings/holidays');
+    }
+    if ($name === '') {
+        flash('error', 'Please enter a name for the holiday.');
+        redirect('/admin/settings/holidays');
+    }
+
+    $db = Database::connect();
+    try {
+        $db->prepare('INSERT INTO holidays (holiday_date, name, exclude_from_sla) VALUES (?, ?, ?)')
+           ->execute([$dateStr, $name, $exclude]);
+    } catch (PDOException $e) {
+        if ($e->getCode() === '23000') {
+            flash('error', 'A holiday is already defined for that date.');
+        } else {
+            flash('error', 'Could not save holiday.');
+        }
+        redirect('/admin/settings/holidays');
+    }
+
+    Sla::recalculateAll($db);
+    flash('success', 'Holiday added.');
+    redirect('/admin/settings/holidays');
+});
+
+$router->post('/admin/settings/holidays/delete', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/holidays');
+    }
+
+    $id = (int) ($_POST['id'] ?? 0);
+    $db = Database::connect();
+    $db->prepare('DELETE FROM holidays WHERE id = ?')->execute([$id]);
+
+    Sla::recalculateAll($db);
+    flash('success', 'Holiday removed.');
+    redirect('/admin/settings/holidays');
+});
+
+$router->post('/admin/settings/holidays/toggle', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/holidays');
+    }
+
+    $id = (int) ($_POST['id'] ?? 0);
+    $db = Database::connect();
+    $db->prepare('UPDATE holidays SET exclude_from_sla = 1 - exclude_from_sla WHERE id = ?')->execute([$id]);
+
+    Sla::recalculateAll($db);
+    redirect('/admin/settings/holidays');
+});
+
+/* ==================================================================
  * ADMIN – SLA Policy Settings
  * ================================================================== */
 

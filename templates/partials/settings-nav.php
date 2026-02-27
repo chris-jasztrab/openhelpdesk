@@ -4,6 +4,7 @@ $settingsNav = [
     ['label' => 'Email Templates',   'url' => '/admin/settings/email-templates',        'icon' => 'bi-pencil-square'],
     ['label' => 'Business Hours',    'url' => '/admin/settings/business-hours',         'icon' => 'bi-clock'],
     ['label' => 'SLA Policies',   'url' => '/admin/settings/sla-policies',   'icon' => 'bi-stopwatch'],
+    ['label' => 'Holidays',       'url' => '/admin/settings/holidays',        'icon' => 'bi-calendar-x'],
     ['label' => label('location.plural'),      'url' => '/admin/locations',               'icon' => 'bi-geo-alt'],
     ['label' => 'Priorities',     'url' => '/admin/priorities',              'icon' => 'bi-flag'],
     ['label' => 'Ticket Types',   'url' => '/admin/types',                   'icon' => 'bi-tags'],
