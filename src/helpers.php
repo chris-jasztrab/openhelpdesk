@@ -413,6 +413,7 @@ function sendMail(string $toEmail, string $toName, string $subject, string $html
         $mail->isSMTP();
         $mail->Host       = $host;
         $mail->Port       = $port;
+        $mail->Timeout    = 15; // seconds — prevents indefinite hangs on unreachable hosts
         $mail->SMTPSecure = $encryption === 'none' ? '' : $encryption;
         if ($username !== '') {
             $mail->SMTPAuth = true;
