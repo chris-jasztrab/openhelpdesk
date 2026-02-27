@@ -98,9 +98,94 @@ foreach ($messages as $msg) {
     }
 
     if ($ticketId === null) {
-        logMsg('WARN', '  No ticket ID found in subject, skipping.');
+        // ── Email-to-Ticket: create a new ticket from this inbound email ─────────
+        if (getSetting('email_to_ticket_enabled') !== '1') {
+            logMsg('WARN', '  No ticket ID in subject; email-to-ticket disabled — skipping.');
+            markMessageRead($accessToken, $mailbox, $msgId);
+            $skipped++;
+            continue;
+        }
+
+        logMsg('INFO', '  No ticket ID found — creating new ticket from inbound email.');
+
+        // Find sender in users table
+        $userStmt = $db->prepare('SELECT id, first_name, last_name, email FROM users WHERE LOWER(email) = ?');
+        $userStmt->execute([$fromAddr]);
+        $senderUser = $userStmt->fetch();
+
+        if (!$senderUser) {
+            if (getSetting('email_to_ticket_auto_create_users') !== '1') {
+                logMsg('WARN', "  Sender {$fromAddr} is not a registered user; auto-create disabled — skipping.");
+                markMessageRead($accessToken, $mailbox, $msgId);
+                $skipped++;
+                continue;
+            }
+
+            // Auto-create a portal user for this sender
+            [$firstName, $lastName] = parseEmailName($fromName, $fromAddr);
+            $hashedPw = password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT);
+            $db->prepare('INSERT INTO users (first_name, last_name, email, password, role) VALUES (?, ?, ?, ?, ?)')
+               ->execute([$firstName, $lastName, $fromAddr, $hashedPw, 'user']);
+            $newUserId = (int) $db->lastInsertId();
+            $senderUser = ['id' => $newUserId, 'first_name' => $firstName, 'last_name' => $lastName, 'email' => $fromAddr];
+            logMsg('INFO', "  Auto-created user #{$newUserId} ({$fromAddr}).");
+        }
+
+        $ticketSubject = trim($subject) !== '' ? trim($subject) : '(No Subject)';
+        $body          = trim(extractGraphBody($msg));
+        if ($body === '') {
+            $body = '(No message body)';
+        }
+
+        $typeId     = getSetting('email_to_ticket_default_type_id') !== '' ? (int) getSetting('email_to_ticket_default_type_id') : null;
+        $priorityId = getSetting('email_to_ticket_default_priority_id') !== '' ? (int) getSetting('email_to_ticket_default_priority_id') : null;
+
+        // Create the ticket
+        $db->prepare(
+            'INSERT INTO tickets (subject, description, created_by, type_id, status, priority_id) VALUES (?, ?, ?, ?, ?, ?)'
+        )->execute([$ticketSubject, $body, $senderUser['id'], $typeId, 'open', $priorityId]);
+        $newTicketId = (int) $db->lastInsertId();
+
+        // Timeline entry
+        $db->prepare(
+            'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
+        )->execute([$newTicketId, $senderUser['id'], 'created', 'Ticket created via inbound email.']);
+
+        logMsg('INFO', "  Created Ticket #{$newTicketId} (subject: \"{$ticketSubject}\").");
+
+        // Send ticket-created confirmation email to sender
+        $fullName  = trim($senderUser['first_name'] . ' ' . $senderUser['last_name']) ?: $fromAddr;
+        $ticketUrl = appUrl() . '/portal/tickets/' . $newTicketId;
+
+        $tpl = getEmailTpl('ticket-created', [
+            'ticket_id'  => $newTicketId,
+            'subject'    => $ticketSubject,
+            'type'       => '',
+            'location'   => '',
+            'priority'   => '',
+            'user_name'  => $fullName,
+            'first_name' => $senderUser['first_name'],
+            'last_name'  => $senderUser['last_name'],
+        ]);
+
+        $emailHtml = renderEmail('ticket-created', [
+            'ticketId'     => $newTicketId,
+            'subject'      => $ticketSubject,
+            'description'  => $body,
+            'typeName'     => '',
+            'locationName' => '',
+            'priorityName' => '',
+            'ticketUrl'    => $ticketUrl,
+            'introText'    => $tpl['intro'],
+            'buttonLabel'  => $tpl['button'],
+            'footerText'   => $tpl['footer'],
+        ]);
+
+        sendMail($fromAddr, $fullName, $tpl['subject'], $emailHtml, '', $newTicketId);
+        logMsg('INFO', "  Confirmation email sent to {$fromAddr}.");
+
         markMessageRead($accessToken, $mailbox, $msgId);
-        $skipped++;
+        $processed++;
         continue;
     }
 
@@ -161,6 +246,23 @@ logMsg('INFO', "Done. Processed: {$processed}, Skipped: {$skipped}.");
 exit(0);
 
 // ─── Helper functions ─────────────────────────────────────────────────────────
+
+/**
+ * Split a display name / email address into [first_name, last_name].
+ */
+function parseEmailName(string $fromName, string $fromAddr): array
+{
+    $name = trim($fromName);
+    // If the display name is just the email address, use the local part
+    if (strtolower($name) === strtolower($fromAddr) || $name === '') {
+        $name = strstr($fromAddr, '@', true);
+    }
+    if (str_contains($name, ' ')) {
+        $parts = explode(' ', $name, 2);
+        return [trim($parts[0]), trim($parts[1])];
+    }
+    return [$name !== '' ? $name : 'Unknown', ''];
+}
 
 /**
  * Request an OAuth2 access token using the Client Credentials grant.

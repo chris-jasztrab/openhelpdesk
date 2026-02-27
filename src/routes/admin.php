@@ -2749,6 +2749,8 @@ $router->get('/admin/settings', function () {
         'mail_from_address', 'mail_from_name', 'smtp_debug',
         'graph_enabled', 'graph_reply_to', 'graph_tenant_id', 'graph_client_id',
         'graph_client_secret', 'graph_mailbox',
+        'email_to_ticket_enabled', 'email_to_ticket_auto_create_users',
+        'email_to_ticket_default_type_id', 'email_to_ticket_default_priority_id',
     ];
     $settings = [];
     foreach ($keys as $k) {
@@ -2758,7 +2760,11 @@ $router->get('/admin/settings', function () {
     $runOutput = $_SESSION['_processor_run'] ?? null;
     unset($_SESSION['_processor_run']);
 
-    render('admin/settings/index', ['settings' => $settings, 'runOutput' => $runOutput]);
+    $db         = Database::connect();
+    $types      = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
+    $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
+
+    render('admin/settings/index', ['settings' => $settings, 'runOutput' => $runOutput, 'types' => $types, 'priorities' => $priorities]);
 });
 
 $router->post('/admin/settings', function () {
@@ -2821,6 +2827,28 @@ $router->post('/admin/settings/graph', function () {
     @mkdir(ROOT_DIR . '/storage/logs', 0755, true);
 
     flash('success', 'Inbound mail settings saved.');
+    redirect('/admin/settings');
+});
+
+$router->post('/admin/settings/email-to-ticket', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings');
+    }
+
+    $fields = [
+        'email_to_ticket_enabled'            => isset($_POST['email_to_ticket_enabled']) ? '1' : '0',
+        'email_to_ticket_auto_create_users'  => isset($_POST['email_to_ticket_auto_create_users']) ? '1' : '0',
+        'email_to_ticket_default_type_id'    => trim($_POST['email_to_ticket_default_type_id'] ?? ''),
+        'email_to_ticket_default_priority_id' => trim($_POST['email_to_ticket_default_priority_id'] ?? ''),
+    ];
+
+    foreach ($fields as $key => $value) {
+        setSetting($key, $value);
+    }
+
+    flash('success', 'Email-to-Ticket settings saved.');
     redirect('/admin/settings');
 });
 

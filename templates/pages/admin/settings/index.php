@@ -125,6 +125,83 @@ $breadcrumbs  = [
     </div>
 </div>
 
+<!-- Email-to-Ticket -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white py-3">
+        <h5 class="mb-0 fw-semibold"><i class="bi bi-envelope-plus me-2"></i>Email-to-Ticket</h5>
+    </div>
+    <div class="card-body p-4">
+        <p class="text-muted mb-3">
+            When enabled, emails sent to the helpdesk mailbox that are <strong>not</strong> replies to existing
+            tickets automatically become new tickets. Uses the same Microsoft Graph mailbox configured below —
+            enable <em>Inbound Mail</em> first.
+        </p>
+
+        <form method="POST" action="/admin/settings/email-to-ticket">
+            <?= csrfField() ?>
+
+            <div class="mb-3">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch"
+                           id="email_to_ticket_enabled" name="email_to_ticket_enabled" value="1"
+                           <?= ($settings['email_to_ticket_enabled'] ?? '0') === '1' ? 'checked' : '' ?>>
+                    <label class="form-check-label fw-semibold" for="email_to_ticket_enabled">
+                        Enable Email-to-Ticket
+                    </label>
+                </div>
+                <div class="form-text">Inbound emails without a ticket reference in the subject will create a new ticket.</div>
+            </div>
+
+            <div class="mb-4">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch"
+                           id="email_to_ticket_auto_create_users" name="email_to_ticket_auto_create_users" value="1"
+                           <?= ($settings['email_to_ticket_auto_create_users'] ?? '0') === '1' ? 'checked' : '' ?>>
+                    <label class="form-check-label fw-semibold" for="email_to_ticket_auto_create_users">
+                        Auto-create user accounts
+                    </label>
+                </div>
+                <div class="form-text">If the sender's email is not a registered user, automatically create a portal account for them. If disabled, emails from unknown senders are skipped.</div>
+            </div>
+
+            <hr class="my-4">
+
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    <label for="email_to_ticket_default_type_id" class="form-label fw-semibold">Default Ticket Type</label>
+                    <select class="form-select" id="email_to_ticket_default_type_id" name="email_to_ticket_default_type_id">
+                        <option value="">— Unclassified —</option>
+                        <?php foreach ($types as $t): ?>
+                        <option value="<?= (int) $t['id'] ?>"
+                                <?= ($settings['email_to_ticket_default_type_id'] == $t['id']) ? 'selected' : '' ?>>
+                            <?= e($t['name']) ?>
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <div class="form-text">Applied to all tickets created via email.</div>
+                </div>
+                <div class="col-md-6">
+                    <label for="email_to_ticket_default_priority_id" class="form-label fw-semibold">Default Priority</label>
+                    <select class="form-select" id="email_to_ticket_default_priority_id" name="email_to_ticket_default_priority_id">
+                        <option value="">— None —</option>
+                        <?php foreach ($priorities as $pri): ?>
+                        <option value="<?= (int) $pri['id'] ?>"
+                                <?= ($settings['email_to_ticket_default_priority_id'] == $pri['id']) ? 'selected' : '' ?>>
+                            <?= e($pri['name']) ?>
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <div class="form-text">Applied to all tickets created via email.</div>
+                </div>
+            </div>
+
+            <button type="submit" class="btn text-white" style="background:var(--ld-primary);">
+                <i class="bi bi-check-lg me-1"></i>Save Email-to-Ticket Settings
+            </button>
+        </form>
+    </div>
+</div>
+
 <!-- Inbound Mail / Reply Processing (Microsoft Graph API) -->
 <div class="card border-0 shadow-sm">
     <div class="card-header bg-white py-3 d-flex align-items-center justify-content-between">
