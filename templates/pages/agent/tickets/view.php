@@ -235,14 +235,18 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
             <div class="card-body p-0">
                 <?php if (empty($timeline)): ?>
                 <div class="text-center py-4 text-muted">No timeline entries.</div>
-                <?php else: ?>
+                <?php else:
+                $tlHidden = max(0, count($timeline) - 10);
+                ?>
                 <div class="list-group list-group-flush">
-                    <?php foreach ($timeline as $entry):
+                    <?php foreach ($timeline as $tlIdx => $entry):
+                        $isOlder  = $tlIdx < $tlHidden;
                         $isNote   = $entry['is_internal'] && $entry['user_name'];
                         $isSystem = $entry['is_internal'] && !$entry['user_name'];
                         $tlClass  = $isNote ? 'ld-timeline-note' : ($isSystem ? 'ld-timeline-system' : '');
                     ?>
-                    <div class="list-group-item px-4 py-3 <?= $tlClass ?>">
+                    <div class="list-group-item px-4 py-3 <?= $tlClass ?><?= $isOlder ? ' timeline-older-item' : '' ?>"
+                         <?= $isOlder ? 'style="display:none;"' : '' ?>>
                         <div class="d-flex gap-3">
                             <div class="pt-1">
                                 <?php if ($isNote): ?>
@@ -269,6 +273,30 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
                         </div>
                     </div>
                     <?php endforeach; ?>
+                    <?php if ($tlHidden > 0): ?>
+                    <div class="list-group-item px-3 py-2 text-center bg-light border-top-0" id="timeline-expand-row">
+                        <button type="button" class="btn btn-link btn-sm text-muted text-decoration-none" id="timeline-expand-btn">
+                            <i class="bi bi-chevron-up me-1" id="timeline-expand-icon"></i>
+                            <span id="timeline-expand-label">Show <?= $tlHidden ?> older update<?= $tlHidden !== 1 ? 's' : '' ?></span>
+                        </button>
+                    </div>
+                    <script>
+                    (function() {
+                        var btn      = document.getElementById('timeline-expand-btn');
+                        var icon     = document.getElementById('timeline-expand-icon');
+                        var label    = document.getElementById('timeline-expand-label');
+                        var items    = document.querySelectorAll('.timeline-older-item');
+                        var n        = <?= $tlHidden ?>;
+                        var expanded = false;
+                        btn.addEventListener('click', function() {
+                            expanded = !expanded;
+                            items.forEach(function(el) { el.style.display = expanded ? '' : 'none'; });
+                            icon.className    = expanded ? 'bi bi-chevron-down me-1' : 'bi bi-chevron-up me-1';
+                            label.textContent = expanded ? 'Show fewer updates' : 'Show ' + n + ' older update' + (n !== 1 ? 's' : '');
+                        });
+                    })();
+                    </script>
+                    <?php endif; ?>
                 </div>
                 <?php endif; ?>
             </div>

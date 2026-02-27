@@ -134,10 +134,15 @@ $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-p
             <div class="card-body p-0">
                 <?php if (empty($timeline)): ?>
                 <div class="text-center py-4 text-muted">No timeline entries.</div>
-                <?php else: ?>
+                <?php else:
+                $tlHidden = max(0, count($timeline) - 10);
+                ?>
                 <div class="list-group list-group-flush">
-                    <?php foreach ($timeline as $entry): ?>
-                    <div class="list-group-item px-4 py-3">
+                    <?php foreach ($timeline as $tlIdx => $entry):
+                        $isOlder = $tlIdx < $tlHidden;
+                    ?>
+                    <div class="list-group-item px-4 py-3<?= $isOlder ? ' timeline-older-item' : '' ?>"
+                         <?= $isOlder ? 'style="display:none;"' : '' ?>>
                         <div class="d-flex gap-3">
                             <div class="pt-1">
                                 <i class="bi <?= $actionIcons[$entry['action']] ?? 'bi-circle text-muted' ?> fs-5"></i>
@@ -157,6 +162,30 @@ $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-p
                         </div>
                     </div>
                     <?php endforeach; ?>
+                    <?php if ($tlHidden > 0): ?>
+                    <div class="list-group-item px-3 py-2 text-center bg-light border-top-0" id="timeline-expand-row">
+                        <button type="button" class="btn btn-link btn-sm text-muted text-decoration-none" id="timeline-expand-btn">
+                            <i class="bi bi-chevron-up me-1" id="timeline-expand-icon"></i>
+                            <span id="timeline-expand-label">Show <?= $tlHidden ?> older update<?= $tlHidden !== 1 ? 's' : '' ?></span>
+                        </button>
+                    </div>
+                    <script>
+                    (function() {
+                        var btn      = document.getElementById('timeline-expand-btn');
+                        var icon     = document.getElementById('timeline-expand-icon');
+                        var label    = document.getElementById('timeline-expand-label');
+                        var items    = document.querySelectorAll('.timeline-older-item');
+                        var n        = <?= $tlHidden ?>;
+                        var expanded = false;
+                        btn.addEventListener('click', function() {
+                            expanded = !expanded;
+                            items.forEach(function(el) { el.style.display = expanded ? '' : 'none'; });
+                            icon.className    = expanded ? 'bi bi-chevron-down me-1' : 'bi bi-chevron-up me-1';
+                            label.textContent = expanded ? 'Show fewer updates' : 'Show ' + n + ' older update' + (n !== 1 ? 's' : '');
+                        });
+                    })();
+                    </script>
+                    <?php endif; ?>
                 </div>
                 <?php endif; ?>
             </div>
