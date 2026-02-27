@@ -139,7 +139,7 @@ $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-p
                 ?>
                 <div class="list-group list-group-flush">
                     <?php foreach ($timeline as $tlIdx => $entry):
-                        $isOlder = $tlIdx < $tlHidden;
+                        $isOlder = $tlIdx >= 10;
                     ?>
                     <div class="list-group-item px-4 py-3<?= $isOlder ? ' timeline-older-item' : '' ?>"
                          <?= $isOlder ? 'style="display:none;"' : '' ?>>

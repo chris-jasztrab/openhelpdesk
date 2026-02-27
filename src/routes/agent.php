@@ -525,7 +525,7 @@ $router->get('/agent/tickets/{id}', function (array $p) {
          FROM ticket_timeline tl
          LEFT JOIN users u ON tl.user_id = u.id
          WHERE tl.ticket_id = ?
-         ORDER BY tl.created_at ASC"
+         ORDER BY tl.created_at DESC"
     );
     $tl->execute([$ticket['id']]);
     $timeline = $tl->fetchAll();

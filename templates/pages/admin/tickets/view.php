@@ -242,7 +242,7 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
                 ?>
                 <div class="list-group list-group-flush">
                     <?php foreach ($timeline as $tlIdx => $entry):
-                        $isOlder  = $tlIdx < $tlHidden;
+                        $isOlder  = $tlIdx >= 10;
                         $isNote   = $entry['is_internal'] && $entry['user_name'];
                         $isSystem = $entry['is_internal'] && !$entry['user_name'];
                         $tlClass  = $isNote ? 'ld-timeline-note' : ($isSystem ? 'ld-timeline-system' : '');
