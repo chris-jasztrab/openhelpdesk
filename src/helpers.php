@@ -1350,7 +1350,6 @@ function agentSidebar(string $active = ''): array
         ['icon' => 'bi-speedometer2',    'label' => label('agent.nav.dashboard'),      'url' => '/agent',          'key' => 'dashboard'],
         ['icon' => 'bi-ticket-detailed', 'label' => label('agent.nav.tickets'),        'url' => '/agent/tickets',  'key' => 'tickets'],
         ['icon' => 'bi-book',            'label' => label('agent.nav.knowledge_base'),  'url' => '/portal/kb',      'key' => 'kb'],
-        ['icon' => 'bi-people',          'label' => label('agent.nav.customers'),       'url' => '#', 'badge' => 'Soon', 'key' => 'customers'],
     ]);
 }
 
