@@ -114,6 +114,12 @@ $commonTimezones = [
                 </div>
             </div>
 
+            <div class="mb-4 text-muted small">
+                <i class="bi bi-calendar-x me-1"></i>
+                Need to mark specific days as closed?
+                <a href="/admin/settings/holidays" class="text-decoration-none fw-semibold">Configure Holidays</a>
+            </div>
+
             <hr class="my-4">
 
             <button type="submit" class="btn text-white" style="background:var(--ld-primary);">
