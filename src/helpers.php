@@ -408,6 +408,17 @@ function sendMail(string $toEmail, string $toName, string $subject, string $html
         ? sprintf('<ticket-%d-%d@%s>', $ticketId, time(), $domain)
         : sprintf('<localdesk-%s@%s>', bin2hex(random_bytes(12)), $domain);
 
+    // SMTP debug log — captures full SMTP conversation to storage/logs/smtp.log
+    $smtpLogDir  = ROOT_DIR . '/storage/logs';
+    $smtpLogFile = $smtpLogDir . '/smtp.log';
+    if (!is_dir($smtpLogDir)) {
+        mkdir($smtpLogDir, 0755, true);
+    }
+    $smtpDebugEnabled = getSetting('smtp_debug', '0') === '1';
+    $logEntry = sprintf("[%s] sendMail() to=%s host=%s port=%d enc=%s\n",
+        date('Y-m-d H:i:s'), $toEmail, $host, $port, $encryption);
+    file_put_contents($smtpLogFile, $logEntry, FILE_APPEND | LOCK_EX);
+
     $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
     try {
         $mail->isSMTP();
@@ -419,6 +430,15 @@ function sendMail(string $toEmail, string $toName, string $subject, string $html
             $mail->SMTPAuth = true;
             $mail->Username = $username;
             $mail->Password = $password;
+        }
+
+        if ($smtpDebugEnabled) {
+            $mail->SMTPDebug  = \PHPMailer\PHPMailer\SMTP::DEBUG_SERVER;
+            $mail->Debugoutput = function (string $str, int $level) use ($smtpLogFile): void {
+                file_put_contents($smtpLogFile,
+                    '[' . date('H:i:s') . '][L' . $level . '] ' . trim($str) . "\n",
+                    FILE_APPEND | LOCK_EX);
+            };
         }
 
         $mail->setFrom($fromAddr, $fromName);
@@ -441,8 +461,13 @@ function sendMail(string $toEmail, string $toName, string $subject, string $html
         $mail->AltBody = $textBody ?: strip_tags($htmlBody);
 
         $mail->send();
+        file_put_contents($smtpLogFile,
+            '[' . date('H:i:s') . '] SUCCESS messageId=' . $messageId . "\n",
+            FILE_APPEND | LOCK_EX);
         return $messageId;
     } catch (\PHPMailer\PHPMailer\Exception $e) {
+        $err = '[' . date('H:i:s') . '] ERROR ' . $mail->ErrorInfo . "\n";
+        file_put_contents($smtpLogFile, $err, FILE_APPEND | LOCK_EX);
         error_log('LocalDesk mail error: ' . $mail->ErrorInfo);
         return false;
     }

@@ -2577,7 +2577,7 @@ $router->get('/admin/settings', function () {
     Auth::requireRole('admin');
     $keys = [
         'smtp_host', 'smtp_port', 'smtp_encryption', 'smtp_username', 'smtp_password',
-        'mail_from_address', 'mail_from_name',
+        'mail_from_address', 'mail_from_name', 'smtp_debug',
         'graph_enabled', 'graph_reply_to', 'graph_tenant_id', 'graph_client_id',
         'graph_client_secret', 'graph_mailbox',
     ];
@@ -2606,6 +2606,7 @@ $router->post('/admin/settings', function () {
         'smtp_username'    => trim($_POST['smtp_username'] ?? ''),
         'mail_from_address' => trim($_POST['mail_from_address'] ?? ''),
         'mail_from_name'   => trim($_POST['mail_from_name'] ?? ''),
+        'smtp_debug'       => isset($_POST['smtp_debug']) ? '1' : '0',
     ];
 
     // Only update password if a new one was provided (don't blank it on save)

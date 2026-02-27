@@ -83,6 +83,22 @@ $breadcrumbs  = [
 
             <hr class="my-4">
 
+            <div class="mb-4">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch"
+                           id="smtp_debug" name="smtp_debug" value="1"
+                           <?= ($settings['smtp_debug'] ?? '0') === '1' ? 'checked' : '' ?>>
+                    <label class="form-check-label fw-semibold" for="smtp_debug">
+                        SMTP Debug Logging
+                    </label>
+                </div>
+                <div class="form-text">
+                    When enabled, every outgoing mail attempt is logged in full detail to
+                    <code>storage/logs/smtp.log</code> — useful for diagnosing connection issues.
+                    Disable once SMTP is working correctly.
+                </div>
+            </div>
+
             <button type="submit" class="btn text-white" style="background:var(--ld-primary);">
                 <i class="bi bi-check-lg me-1"></i>Save Settings
             </button>
