@@ -1,3 +1,13 @@
+# Increase upload limits for large CSV imports (Apache + mod_php only)
+<IfModule mod_php.c>
+    php_value upload_max_filesize 64M
+    php_value post_max_size 66M
+</IfModule>
+<IfModule mod_php8.c>
+    php_value upload_max_filesize 64M
+    php_value post_max_size 66M
+</IfModule>
+
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteBase /
