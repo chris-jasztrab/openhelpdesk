@@ -3486,7 +3486,7 @@ $router->post('/admin/settings/import/map', function () {
     // Build DB lookups for summary stats
     $db = Database::connect();
     $existingUsers = [];
-    foreach ($db->query("SELECT id, email, CONCAT(first_name, ' ', last_name) AS full_name FROM users")->fetchAll() as $u) {
+    foreach ($db->query("SELECT id, email, TRIM(CONCAT(first_name, ' ', last_name)) AS full_name FROM users")->fetchAll() as $u) {
         $existingUsers[strtolower($u['email'])] = true;
         $existingUsers['name:' . strtolower($u['full_name'])] = true;
     }
@@ -3677,7 +3677,7 @@ $router->post('/admin/settings/import/confirm', function () {
 
     // Load all lookups
     $existingUsers = [];
-    foreach ($db->query("SELECT id, email, CONCAT(first_name, ' ', last_name) AS full_name FROM users")->fetchAll() as $u) {
+    foreach ($db->query("SELECT id, email, TRIM(CONCAT(first_name, ' ', last_name)) AS full_name FROM users")->fetchAll() as $u) {
         $existingUsers[strtolower($u['email'])] = (int) $u['id'];
         $existingUsers['name:' . strtolower($u['full_name'])] = (int) $u['id'];
     }
@@ -3787,12 +3787,16 @@ $router->post('/admin/settings/import/confirm', function () {
             $agentId   = null;
             $agentName = $row['agent'];
             if ($agentName !== '' && $agentName !== 'No Agent') {
-                $agentKey = 'name:' . strtolower($agentName);
+                $agentKey   = 'name:' . strtolower($agentName);
+                $agentEmail = strtolower(str_replace(' ', '.', $agentName)) . '@imported.local';
                 if (isset($existingUsers[$agentKey])) {
                     $agentId = $existingUsers[$agentKey];
+                } elseif (isset($existingUsers[$agentEmail])) {
+                    // Match by generated email — covers re-imports where TRIM mismatch occurred
+                    $agentId = $existingUsers[$agentEmail];
+                    $existingUsers[$agentKey] = $agentId;
                 } else {
-                    $nameParts  = splitFullName($agentName);
-                    $agentEmail = strtolower(str_replace(' ', '.', $agentName)) . '@imported.local';
+                    $nameParts = splitFullName($agentName);
                     $insertUser->execute([$nameParts[0], $nameParts[1], $agentEmail, $randomPassword, 'agent', null]);
                     $agentId = (int) $db->lastInsertId();
                     $existingUsers[$agentKey]  = $agentId;
