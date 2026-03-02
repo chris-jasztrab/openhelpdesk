@@ -2,6 +2,13 @@
 
 All notable changes to LocalDesk will be documented in this file.
 
+Follows [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`
+- **MAJOR** — breaking changes
+- **MINOR** — new backwards-compatible features
+- **PATCH** — backwards-compatible bug fixes
+
+To release a new version: update `config/version.php`, add a dated entry below under `## Unreleased`, then move it to a new versioned section.
+
 ---
 
 ## Unreleased
@@ -14,9 +21,7 @@ Planned features not yet implemented:
 
 ---
 
-## Post-1.0.0 Updates
-
-Features added after the initial release, in reverse chronological order.
+## 1.1.0 — 2026-03-02
 
 ### Bulk Ticket Actions
 - Checkbox column on admin and agent ticket list pages for multi-select

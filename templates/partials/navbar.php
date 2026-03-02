@@ -97,6 +97,8 @@
                         <?php endif; ?>
                         <li><a class="dropdown-item" href="/profile"><i class="bi bi-person-circle me-2"></i>My Profile</a></li>
                         <li><a class="dropdown-item text-danger" href="/logout"><i class="bi bi-box-arrow-right me-2"></i>Sign Out</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><span class="dropdown-item-text text-muted" style="font-size:.7rem;">v<?= APP_VERSION ?></span></li>
                     </ul>
                 </li>
             </ul>

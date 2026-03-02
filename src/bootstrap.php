@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once ROOT_DIR . '/vendor/autoload.php';
+require_once ROOT_DIR . '/config/version.php';
 require_once ROOT_DIR . '/src/helpers.php';
 require_once ROOT_DIR . '/src/Database.php';
 require_once ROOT_DIR . '/src/Auth.php';
