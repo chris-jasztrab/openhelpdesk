@@ -104,6 +104,46 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-people text-primary me-2"></i>Groups &amp; Agent Ticket Visibility</h5>
+<p class="text-muted mb-2">Groups are optional teams that agents can belong to (e.g. IT Support, Facilities, HR). They serve two purposes: routing tickets to the right team, and controlling which tickets each agent can see.</p>
+
+<h6 class="fw-semibold mt-3 mb-2">How visibility works</h6>
+<div class="table-responsive mb-3">
+<table class="table table-sm mb-0">
+    <thead class="table-light"><tr><th>Agent's group membership</th><th>Tickets visible</th></tr></thead>
+    <tbody>
+        <tr>
+            <td class="text-muted">Belongs to one or more groups</td>
+            <td class="text-muted">Only tickets assigned to those groups</td>
+        </tr>
+        <tr>
+            <td class="text-muted">Belongs to no groups</td>
+            <td class="text-muted">All tickets (unrestricted)</td>
+        </tr>
+        <tr>
+            <td class="text-muted">Admin (any group membership)</td>
+            <td class="text-muted">Always all tickets</td>
+        </tr>
+    </tbody>
+</table>
+</div>
+
+<div class="alert alert-info small mb-3"><i class="bi bi-info-circle me-2"></i>
+    This is automatic — there is no separate toggle to enable or disable it. An agent's visibility is determined entirely by whether they belong to any groups.
+</div>
+
+<h6 class="fw-semibold mb-2">Managing groups</h6>
+<ol class="text-muted mb-0">
+    <li>Go to <a href="/admin/groups"><strong>Admin → Settings → Groups</strong></a>.</li>
+    <li>Create a group and add agents as members.</li>
+    <li>When creating or editing a ticket, assign it to a group so the right agents can see it.</li>
+    <li>To give an agent unrestricted access to all tickets without making them an admin, remove them from all groups.</li>
+</ol>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-shield-lock text-primary me-2"></i>Profile &amp; Password</h5>
 <p class="text-muted mb-2">Any logged-in user can update their own profile and password from the profile menu (top-right avatar). Agents and admins can also update their display name and email from their profile page.</p>
 <div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
