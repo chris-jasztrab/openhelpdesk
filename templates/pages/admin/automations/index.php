@@ -13,7 +13,24 @@ $triggerLabels = [
     'ticket_updated' => 'Ticket Updated',
 ];
 
-// Build lookup maps for readable condition/action summaries
+$statusOptions = [
+    'open'                   => 'Open',
+    'in_progress'            => 'In Progress',
+    'pending'                => 'Pending',
+    'waiting_on_customer'    => 'Waiting on Customer',
+    'waiting_on_third_party' => 'Waiting on Third Party',
+    'resolved'               => 'Resolved',
+    'closed'                 => 'Closed',
+];
+
+// Build value-lookup maps so condition summaries show names, not IDs
+$valueLookup = ['status' => $statusOptions];
+foreach ($types      as $r) $valueLookup['type_id'][(string)$r['id']]     = $r['name'];
+foreach ($priorities as $r) $valueLookup['priority_id'][(string)$r['id']] = $r['name'];
+foreach ($locations  as $r) $valueLookup['location_id'][(string)$r['id']] = $r['name'];
+foreach ($groups     as $r) $valueLookup['group_id'][(string)$r['id']]    = $r['name'];
+foreach ($agents     as $r) $valueLookup['assigned_to'][(string)$r['id']] = $r['first_name'] . ' ' . $r['last_name'];
+
 $fieldLabels = [
     'type_id'     => 'Type',
     'priority_id' => 'Priority',
@@ -36,6 +53,54 @@ $actionLabels = [
     'add_tag'         => 'Add tag',
     'add_cc'          => 'CC user',
 ];
+
+/**
+ * Render a single condition as a readable string.
+ */
+$renderCond = function (array $c) use ($fieldLabels, $operatorLabels, $valueLookup): string {
+    $field    = $fieldLabels[$c['field'] ?? '']    ?? ($c['field']    ?? '?');
+    $op       = $operatorLabels[$c['operator'] ?? ''] ?? ($c['operator'] ?? '?');
+    $rawVal   = (string) ($c['value'] ?? '');
+    $val      = $valueLookup[$c['field'] ?? ''][$rawVal] ?? $rawVal;
+    $noValue  = in_array($c['operator'] ?? '', ['is_empty', 'is_not_empty'], true);
+    return '<span class="fw-semibold">' . e($field) . '</span> '
+         . '<span class="text-muted">' . e($op) . '</span>'
+         . (!$noValue ? ' <span class="text-body">' . e($val) . '</span>' : '');
+};
+
+/**
+ * Render the full conditions block — handles v1 (flat array) and v2 (groups).
+ */
+$renderConditions = function (array $conditions) use ($renderCond): string {
+    if (empty($conditions)) {
+        return '<em class="text-muted">Always</em>';
+    }
+
+    // v1 backward compat: flat indexed array
+    if (isset($conditions[0]['field'])) {
+        $conditions = ['groups' => [['match' => 'all', 'conditions' => $conditions]]];
+    }
+
+    $groups = $conditions['groups'] ?? [];
+    if (empty($groups)) {
+        return '<em class="text-muted">Always</em>';
+    }
+
+    $groupParts = [];
+    foreach ($groups as $group) {
+        $matchMode = ($group['match'] ?? 'all') === 'any' ? 'any' : 'all';
+        $connector = $matchMode === 'any'
+            ? ' <span class="badge bg-warning text-dark" style="font-size:.65rem;">OR</span> '
+            : ' <span class="badge bg-info text-dark" style="font-size:.65rem;">AND</span> ';
+
+        $condParts = array_map($renderCond, $group['conditions'] ?? []);
+        $inner     = implode($connector, $condParts);
+        $groupParts[] = count($condParts) > 1 ? '(' . $inner . ')' : $inner;
+    }
+
+    $separator = ' <span class="badge bg-danger" style="font-size:.65rem;vertical-align:middle;">OR</span> ';
+    return implode($separator, $groupParts);
+};
 ?>
 <div class="mb-4">
     <h2 class="fw-bold mb-0">Settings</h2>
@@ -80,14 +145,8 @@ $actionLabels = [
                                 <?= e($triggerLabels[$auto['trigger_event']] ?? $auto['trigger_event']) ?>
                             </span>
                         </td>
-                        <td class="small text-muted" style="max-width:250px;">
-                            <?php if (empty($conditions)): ?>
-                                <em>Always</em>
-                            <?php else: ?>
-                                <?php foreach ($conditions as $c): ?>
-                                    <div><?= e($fieldLabels[$c['field']] ?? $c['field']) ?> <?= e($operatorLabels[$c['operator']] ?? $c['operator']) ?><?= !in_array($c['operator'], ['is_empty', 'is_not_empty']) ? ' ' . e($c['value']) : '' ?></div>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
+                        <td class="small" style="max-width:280px;">
+                            <?= $renderConditions($conditions) ?>
                         </td>
                         <td class="small" style="max-width:250px;">
                             <?php foreach ($actions as $a): ?>

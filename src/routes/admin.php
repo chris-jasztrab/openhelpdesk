@@ -4659,7 +4659,8 @@ $router->get('/admin/settings/automations', function () {
     Auth::requireRole('admin');
     $db = Database::connect();
     $automations = $db->query('SELECT * FROM automations ORDER BY sort_order, id')->fetchAll();
-    render('admin/automations/index', ['automations' => $automations]);
+    $refData     = loadAutomationRefData($db);
+    render('admin/automations/index', array_merge(['automations' => $automations], $refData));
 });
 
 $router->get('/admin/settings/automations/create', function () {
@@ -4825,27 +4826,37 @@ function loadAutomationRefData(PDO $db): array
 }
 
 /**
- * Build conditions array from POST data.
+ * Build conditions structure from POST data (v2 group format).
+ * Accepts a JSON blob submitted by the group-based condition builder.
  */
 function buildAutomationConditions(array $post): array
 {
-    $conditions = [];
-    $fields    = $post['cond_field'] ?? [];
-    $operators = $post['cond_operator'] ?? [];
-    $values    = $post['cond_value'] ?? [];
+    $raw = json_decode($post['conditions_json'] ?? '{}', true);
+    if (!is_array($raw) || empty($raw['groups'])) {
+        return ['v' => 2, 'groups' => []];
+    }
 
     $validFields    = ['type_id', 'priority_id', 'status', 'location_id', 'group_id', 'assigned_to'];
     $validOperators = ['equals', 'not_equals', 'is_empty', 'is_not_empty'];
 
-    for ($i = 0, $n = count($fields); $i < $n; $i++) {
-        $f = $fields[$i] ?? '';
-        $o = $operators[$i] ?? '';
-        $v = $values[$i] ?? '';
-        if (in_array($f, $validFields, true) && in_array($o, $validOperators, true)) {
-            $conditions[] = ['field' => $f, 'operator' => $o, 'value' => $v];
+    $groups = [];
+    foreach ($raw['groups'] as $rg) {
+        $gMatch = ($rg['match'] ?? 'all') === 'any' ? 'any' : 'all';
+        $conds  = [];
+        foreach ($rg['conditions'] ?? [] as $c) {
+            $f = $c['field']    ?? '';
+            $o = $c['operator'] ?? '';
+            $v = $c['value']    ?? '';
+            if (in_array($f, $validFields, true) && in_array($o, $validOperators, true)) {
+                $conds[] = ['field' => $f, 'operator' => $o, 'value' => $v];
+            }
+        }
+        if (!empty($conds)) {
+            $groups[] = ['match' => $gMatch, 'conditions' => $conds];
         }
     }
-    return $conditions;
+
+    return ['v' => 2, 'groups' => $groups];
 }
 
 /**

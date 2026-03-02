@@ -1507,6 +1507,58 @@ function buildTicketFilterQuery(array $filters): array
 }
 
 /**
+ * Evaluate a single automation condition against a ticket row.
+ */
+function evalAutomationCondition(array $cond, array $ticket): bool
+{
+    $actual = $ticket[$cond['field'] ?? ''] ?? null;
+    return match ($cond['operator'] ?? '') {
+        'equals'       => (string) $actual === (string) ($cond['value'] ?? ''),
+        'not_equals'   => (string) $actual !== (string) ($cond['value'] ?? ''),
+        'is_empty'     => $actual === null || $actual === '',
+        'is_not_empty' => $actual !== null && $actual !== '',
+        default        => false,
+    };
+}
+
+/**
+ * Evaluate the conditions block of an automation against a ticket.
+ *
+ * Supports v2 (group-based: OR between groups, ALL/ANY within each group)
+ * and v1 (flat array, treated as a single ALL group for backward compatibility).
+ */
+function evalAutomationConditions(array $conditions, array $ticket): bool
+{
+    // v1 backward compat: flat indexed array of condition objects
+    if (isset($conditions[0]['field'])) {
+        $conditions = ['groups' => [['match' => 'all', 'conditions' => $conditions]]];
+    }
+
+    $groups = $conditions['groups'] ?? [];
+    if (empty($groups)) {
+        return true; // no conditions — always fires
+    }
+
+    // OR between groups: automation fires if any single group passes
+    foreach ($groups as $group) {
+        $anyMatch = ($group['match'] ?? 'all') === 'any';
+        $groupPasses = !$anyMatch; // 'all' starts true, 'any' starts false
+        foreach ($group['conditions'] as $cond) {
+            $result = evalAutomationCondition($cond, $ticket);
+            if ($anyMatch) {
+                if ($result) { $groupPasses = true; break; }
+            } else {
+                if (!$result) { $groupPasses = false; break; }
+            }
+        }
+        if ($groupPasses) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
  * Run all enabled automations for a given trigger event against a ticket.
  */
 function runAutomations(PDO $db, int $ticketId, string $triggerEvent): void
@@ -1533,43 +1585,7 @@ function runAutomations(PDO $db, int $ticketId, string $triggerEvent): void
         $conditions = json_decode($auto['conditions'], true) ?: [];
         $actions    = json_decode($auto['actions'], true) ?: [];
 
-        // Evaluate all conditions (AND logic)
-        $match = true;
-        foreach ($conditions as $cond) {
-            $field    = $cond['field'] ?? '';
-            $operator = $cond['operator'] ?? '';
-            $value    = $cond['value'] ?? '';
-            $actual   = $ticket[$field] ?? null;
-
-            switch ($operator) {
-                case 'equals':
-                    if ((string) $actual !== (string) $value) {
-                        $match = false;
-                    }
-                    break;
-                case 'not_equals':
-                    if ((string) $actual === (string) $value) {
-                        $match = false;
-                    }
-                    break;
-                case 'is_empty':
-                    if ($actual !== null && $actual !== '') {
-                        $match = false;
-                    }
-                    break;
-                case 'is_not_empty':
-                    if ($actual === null || $actual === '') {
-                        $match = false;
-                    }
-                    break;
-                default:
-                    $match = false;
-            }
-
-            if (!$match) {
-                break;
-            }
-        }
+        $match = evalAutomationConditions($conditions, $ticket);
 
         if (!$match) {
             continue;
