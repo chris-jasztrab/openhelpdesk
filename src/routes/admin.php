@@ -3284,16 +3284,21 @@ $router->post('/admin/settings/import/preview', function () {
 
     // Save file to disk — avoids storing large CSV data in the PHP session
     $storageDir = ROOT_DIR . '/storage/imports/';
-    if (!is_dir($storageDir)) {
-        mkdir($storageDir, 0755, true);
+    if (!is_dir($storageDir) && !mkdir($storageDir, 0755, true) && !is_dir($storageDir)) {
+        flash('error', 'Import directory could not be created. On the server run: mkdir -p storage/imports && chmod -R 775 storage/');
+        redirect('/admin/settings/import');
+    }
+    if (!is_writable($storageDir)) {
+        flash('error', 'Import directory is not writable. On the server run: chmod -R 775 storage/ && chown -R www-data:www-data storage/');
+        redirect('/admin/settings/import');
     }
     $importId   = bin2hex(random_bytes(16));
     $importPath = $storageDir . $importId . '.csv';
     $tmpPath    = $_FILES['csv_file']['tmp_name'];
-    // move_uploaded_file() can fail when destination is on a network/OneDrive path;
+    // move_uploaded_file() can fail when destination is on a network path;
     // fall back to copy() in that case.
     if (!move_uploaded_file($tmpPath, $importPath) && !copy($tmpPath, $importPath)) {
-        flash('error', 'Could not save the uploaded file.');
+        flash('error', 'Could not save the uploaded file to storage/imports/. Check web server write permissions.');
         redirect('/admin/settings/import');
     }
 
