@@ -24,6 +24,17 @@ $breadcrumbs  = [
     </a>
 </div>
 
+<!-- Personal responses callout for admins -->
+<div class="alert alert-light border d-flex align-items-center justify-content-between mb-4 py-2 px-3">
+    <div class="small">
+        <i class="bi bi-person-circle me-1 text-muted"></i>
+        Want to create responses only you can see?
+    </div>
+    <a href="/agent/canned-responses" class="btn btn-sm btn-outline-primary">
+        <i class="bi bi-person-lines-fill me-1"></i>My Personal Responses
+    </a>
+</div>
+
 <?php if (empty($responses)): ?>
 <div class="card border-0 shadow-sm">
     <div class="card-body text-center py-5 text-muted">

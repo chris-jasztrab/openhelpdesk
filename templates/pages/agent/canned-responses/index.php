@@ -17,8 +17,6 @@ $breadcrumbs  = [
     </a>
 </div>
 
-<?php flashMessages() ?>
-
 <!-- My Personal Responses -->
 <h6 class="fw-semibold text-muted text-uppercase small mb-2">My Responses</h6>
 <?php if (empty($myResponses)): ?>
