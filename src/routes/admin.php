@@ -3267,17 +3267,36 @@ $router->post('/admin/settings/import/preview', function () {
     }
 
     // Validate upload
-    if (empty($_FILES['csv_file']['tmp_name']) || $_FILES['csv_file']['error'] !== UPLOAD_ERR_OK) {
-        flash('error', 'Please select a valid CSV file.');
+    $uploadErr = $_FILES['csv_file']['error'] ?? UPLOAD_ERR_NO_FILE;
+    if ($uploadErr !== UPLOAD_ERR_OK) {
+        $errMsg = match ($uploadErr) {
+            UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE => 'The file exceeds the allowed upload size. Check your server upload limits.',
+            UPLOAD_ERR_NO_FILE => 'No file was uploaded.',
+            default => 'Upload error (code ' . $uploadErr . ').',
+        };
+        flash('error', $errMsg);
         redirect('/admin/settings/import');
     }
-    if ($_FILES['csv_file']['size'] > 10 * 1024 * 1024) {
-        flash('error', 'File is too large. Maximum 10 MB.');
+    if ($_FILES['csv_file']['size'] > 64 * 1024 * 1024) {
+        flash('error', 'File is too large. Maximum 64 MB.');
         redirect('/admin/settings/import');
     }
 
-    $handle = fopen($_FILES['csv_file']['tmp_name'], 'r');
+    // Save file to disk — avoids storing large CSV data in the PHP session
+    $storageDir = ROOT_DIR . '/storage/imports/';
+    if (!is_dir($storageDir)) {
+        mkdir($storageDir, 0755, true);
+    }
+    $importId   = bin2hex(random_bytes(16));
+    $importPath = $storageDir . $importId . '.csv';
+    if (!move_uploaded_file($_FILES['csv_file']['tmp_name'], $importPath)) {
+        flash('error', 'Could not save the uploaded file.');
+        redirect('/admin/settings/import');
+    }
+
+    $handle = fopen($importPath, 'r');
     if (!$handle) {
+        @unlink($importPath);
         flash('error', 'Could not read the uploaded file.');
         redirect('/admin/settings/import');
     }
@@ -3301,44 +3320,57 @@ $router->post('/admin/settings/import/preview', function () {
     $header = fgetcsv($handle, 0, $delimiter);
     if (!$header || count($header) < 2) {
         fclose($handle);
+        @unlink($importPath);
         flash('error', 'The CSV file appears to be empty or has too few columns. Ensure the file has a header row and uses comma, tab, or semicolon as its delimiter.');
         redirect('/admin/settings/import');
     }
     $header = array_map(fn($h) => trim(preg_replace('/^\xEF\xBB\xBF/', '', $h)), $header);
 
-    // Read all data rows
-    $rawRows = [];
-    while (($csvRow = fgetcsv($handle, 0, $delimiter)) !== false) {
+    // Read up to 3 sample rows for the column-mapping preview
+    $sampleRows = [];
+    $hasData    = false;
+    while (count($sampleRows) < 3 && ($csvRow = fgetcsv($handle, 0, $delimiter)) !== false) {
         if (count(array_filter($csvRow, fn($v) => trim($v) !== '')) === 0) {
-            continue; // skip blank rows
+            continue;
         }
         $row = [];
         foreach ($header as $i => $col) {
             $row[$col] = trim($csvRow[$i] ?? '');
         }
-        $rawRows[] = $row;
+        $sampleRows[] = $row;
+        $hasData = true;
     }
     fclose($handle);
 
-    if (empty($rawRows)) {
+    if (!$hasData) {
+        @unlink($importPath);
         flash('error', 'No data rows found in the CSV file.');
         redirect('/admin/settings/import');
     }
 
-    $_SESSION['import_raw'] = ['headers' => $header, 'rows' => $rawRows];
-    unset($_SESSION['import_data'], $_SESSION['import_summary']);
+    // Clean up any previous import file still on disk
+    if (!empty($_SESSION['import_file']) && file_exists($_SESSION['import_file'])) {
+        @unlink($_SESSION['import_file']);
+    }
+
+    unset($_SESSION['import_raw'], $_SESSION['import_data'], $_SESSION['import_summary'], $_SESSION['import_mapping']);
+    $_SESSION['import_file']        = $importPath;
+    $_SESSION['import_delimiter']   = $delimiter;
+    $_SESSION['import_headers']     = $header;
+    $_SESSION['import_sample_rows'] = $sampleRows;
+
     redirect('/admin/settings/import/map');
 });
 
 $router->get('/admin/settings/import/map', function () {
     Auth::requireRole('admin');
-    $raw = $_SESSION['import_raw'] ?? null;
-    if (!$raw) {
+    if (empty($_SESSION['import_headers'])) {
         flash('error', 'No import data found. Please upload a CSV file first.');
         redirect('/admin/settings/import');
     }
 
-    $headers = $raw['headers'];
+    $headers    = $_SESSION['import_headers'];
+    $sampleRows = $_SESSION['import_sample_rows'] ?? [];
 
     $systemFields = [
         ['key' => 'subject',      'label' => 'Subject',             'required' => true],
@@ -3397,7 +3429,7 @@ $router->get('/admin/settings/import/map', function () {
         'headers'      => $headers,
         'systemFields' => $systemFields,
         'autoMapping'  => $autoMapping,
-        'sampleRows'   => array_slice($raw['rows'], 0, 3),
+        'sampleRows'   => $sampleRows,
     ]);
 });
 
@@ -3408,8 +3440,7 @@ $router->post('/admin/settings/import/map', function () {
         redirect('/admin/settings/import');
     }
 
-    $raw = $_SESSION['import_raw'] ?? null;
-    if (!$raw) {
+    if (empty($_SESSION['import_file']) || !file_exists($_SESSION['import_file'])) {
         flash('error', 'No import data found. Please upload a CSV file first.');
         redirect('/admin/settings/import');
     }
@@ -3423,9 +3454,43 @@ $router->post('/admin/settings/import/map', function () {
         redirect('/admin/settings/import/map');
     }
 
-    // Normalize raw rows using the user-supplied mapping
-    $rows = [];
-    foreach ($raw['rows'] as $rawRow) {
+    $importPath  = $_SESSION['import_file'];
+    $delimiter   = $_SESSION['import_delimiter'] ?? ',';
+    $fileHeaders = $_SESSION['import_headers'] ?? [];
+
+    $handle = fopen($importPath, 'r');
+    if (!$handle) {
+        flash('error', 'Could not read the import file. Please upload again.');
+        redirect('/admin/settings/import');
+    }
+    fgetcsv($handle, 0, $delimiter); // skip header row
+
+    // Build DB lookups for summary stats
+    $db = Database::connect();
+    $existingUsers = [];
+    foreach ($db->query("SELECT id, email, CONCAT(first_name, ' ', last_name) AS full_name FROM users")->fetchAll() as $u) {
+        $existingUsers[strtolower($u['email'])] = true;
+        $existingUsers['name:' . strtolower($u['full_name'])] = true;
+    }
+    $existingLocations = [];
+    foreach ($db->query('SELECT id, name FROM locations')->fetchAll() as $l) {
+        $existingLocations[strtolower($l['name'])] = true;
+    }
+
+    $totalRows        = 0;
+    $newUserEmails    = [];
+    $newAgentNames    = [];
+    $newLocationNames = [];
+
+    // Stream the file row-by-row — never load all rows into memory
+    while (($csvRow = fgetcsv($handle, 0, $delimiter)) !== false) {
+        if (count(array_filter($csvRow, fn($v) => trim($v) !== '')) === 0) {
+            continue;
+        }
+        $rawRow = [];
+        foreach ($fileHeaders as $i => $col) {
+            $rawRow[$col] = trim($csvRow[$i] ?? '');
+        }
         $get = function (string $fieldKey) use ($rawRow, $userMapping): string {
             $col = $userMapping[$fieldKey] ?? '';
             return $col !== '' ? trim($rawRow[$col] ?? '') : '';
@@ -3436,76 +3501,30 @@ $router->post('/admin/settings/import/map', function () {
         if ($subject === '' || $email === '') {
             continue;
         }
+        $totalRows++;
 
-        $statusRaw = strtolower($get('status'));
-        $statusMap = [
-            'open'                   => 'open',
-            'new'                    => 'open',
-            'closed'                 => 'closed',
-            'pending'                => 'pending',
-            'resolved'               => 'resolved',
-            'in progress'            => 'in_progress',
-            'in_progress'            => 'in_progress',
-            'waiting'                => 'waiting_on_customer',
-            'waiting on customer'    => 'waiting_on_customer',
-            'waiting on third party' => 'waiting_on_third_party',
-        ];
-
-        $rows[] = [
-            'legacy_id'      => $get('legacy_id'),
-            'subject'        => $subject,
-            'description'    => $get('description'),
-            'email'          => $email,
-            'submitter_name' => $get('full_name'),
-            'status'         => $statusMap[$statusRaw] ?? 'open',
-            'priority'       => $get('priority'),
-            'agent'          => $get('agent'),
-            'group'          => $get('group'),
-            'type'           => $get('type'),
-            'location'       => $get('location'),
-            'created_at'     => $get('created_at'),
-            'due_date'       => $get('due_date'),
-            'updated_at'     => $get('updated_at'),
-            'responded_at'   => $get('responded_at'),
-            'tags'           => $get('tags'),
-        ];
+        if (!isset($existingUsers[$email])) {
+            $newUserEmails[$email] = $get('full_name');
+        }
+        $agent = $get('agent');
+        if ($agent !== '' && $agent !== 'No Agent' && !isset($existingUsers['name:' . strtolower($agent)])) {
+            $newAgentNames[strtolower($agent)] = $agent;
+        }
+        $location = $get('location');
+        if ($location !== '' && !isset($existingLocations[strtolower($location)])) {
+            $newLocationNames[strtolower($location)] = $location;
+        }
     }
+    fclose($handle);
 
-    if (empty($rows)) {
+    if ($totalRows === 0) {
         flash('error', 'No valid rows found after applying the mapping. Ensure Subject and Submitter Email columns contain data.');
         redirect('/admin/settings/import/map');
     }
 
-    // Build summary using DB lookups
-    $db = Database::connect();
-    $existingUsers = [];
-    foreach ($db->query("SELECT id, email, CONCAT(first_name, ' ', last_name) AS full_name FROM users")->fetchAll() as $u) {
-        $existingUsers[strtolower($u['email'])] = $u;
-        $existingUsers['name:' . strtolower($u['full_name'])] = $u;
-    }
-    $existingLocations = [];
-    foreach ($db->query('SELECT id, name FROM locations')->fetchAll() as $l) {
-        $existingLocations[strtolower($l['name'])] = $l['id'];
-    }
-
-    $newUserEmails    = [];
-    $newAgentNames    = [];
-    $newLocationNames = [];
-    foreach ($rows as $row) {
-        if ($row['email'] !== '' && !isset($existingUsers[$row['email']])) {
-            $newUserEmails[$row['email']] = $row['submitter_name'];
-        }
-        if ($row['agent'] !== '' && $row['agent'] !== 'No Agent' && !isset($existingUsers['name:' . strtolower($row['agent'])])) {
-            $newAgentNames[strtolower($row['agent'])] = $row['agent'];
-        }
-        if ($row['location'] !== '' && !isset($existingLocations[strtolower($row['location'])])) {
-            $newLocationNames[strtolower($row['location'])] = $row['location'];
-        }
-    }
-
-    $_SESSION['import_data']    = $rows;
+    $_SESSION['import_mapping'] = $userMapping;
     $_SESSION['import_summary'] = [
-        'total_tickets'     => count($rows),
+        'total_tickets'     => $totalRows,
         'new_users'         => count($newUserEmails),
         'new_agents'        => count($newAgentNames),
         'new_locations'     => count($newLocationNames),
@@ -3513,20 +3532,77 @@ $router->post('/admin/settings/import/map', function () {
         'new_agent_list'    => array_values($newAgentNames),
         'new_location_list' => array_values($newLocationNames),
     ];
+    unset($_SESSION['import_data']);
     redirect('/admin/settings/import/preview');
 });
 
 $router->get('/admin/settings/import/preview', function () {
     Auth::requireRole('admin');
-    $rows    = $_SESSION['import_data']    ?? null;
     $summary = $_SESSION['import_summary'] ?? null;
-    if (!$rows || !$summary) {
+    if (!$summary || empty($_SESSION['import_file'])) {
         flash('error', 'No import data found. Please start the import again.');
         redirect('/admin/settings/import');
     }
+
+    // Stream up to 15 preview rows from disk — no row data stored in session
+    $previewRows = [];
+    $importPath  = $_SESSION['import_file'];
+    $delimiter   = $_SESSION['import_delimiter'] ?? ',';
+    $fileHeaders = $_SESSION['import_headers'] ?? [];
+    $userMapping = $_SESSION['import_mapping'] ?? [];
+    $statusMap   = [
+        'open' => 'open', 'new' => 'open', 'closed' => 'closed',
+        'pending' => 'pending', 'resolved' => 'resolved',
+        'in progress' => 'in_progress', 'in_progress' => 'in_progress',
+        'waiting' => 'waiting_on_customer',
+        'waiting on customer' => 'waiting_on_customer',
+        'waiting on third party' => 'waiting_on_third_party',
+    ];
+
+    if (file_exists($importPath) && !empty($fileHeaders)) {
+        $handle = fopen($importPath, 'r');
+        if ($handle) {
+            fgetcsv($handle, 0, $delimiter); // skip header row
+            while (count($previewRows) < 15 && ($csvRow = fgetcsv($handle, 0, $delimiter)) !== false) {
+                if (count(array_filter($csvRow, fn($v) => trim($v) !== '')) === 0) continue;
+                $rawRow = [];
+                foreach ($fileHeaders as $i => $col) {
+                    $rawRow[$col] = trim($csvRow[$i] ?? '');
+                }
+                $get = function (string $k) use ($rawRow, $userMapping): string {
+                    $col = $userMapping[$k] ?? '';
+                    return $col !== '' ? trim($rawRow[$col] ?? '') : '';
+                };
+                $subject = $get('subject');
+                $email   = strtolower($get('email'));
+                if ($subject === '' || $email === '') continue;
+                $statusRaw   = strtolower($get('status'));
+                $previewRows[] = [
+                    'legacy_id'      => $get('legacy_id'),
+                    'subject'        => $subject,
+                    'description'    => $get('description'),
+                    'email'          => $email,
+                    'submitter_name' => $get('full_name'),
+                    'status'         => $statusMap[$statusRaw] ?? 'open',
+                    'priority'       => $get('priority'),
+                    'agent'          => $get('agent'),
+                    'group'          => $get('group'),
+                    'type'           => $get('type'),
+                    'location'       => $get('location'),
+                    'created_at'     => $get('created_at'),
+                    'due_date'       => $get('due_date'),
+                    'updated_at'     => $get('updated_at'),
+                    'responded_at'   => $get('responded_at'),
+                    'tags'           => $get('tags'),
+                ];
+            }
+            fclose($handle);
+        }
+    }
+
     render('admin/settings/import-preview', [
         'summary'     => $summary,
-        'previewRows' => array_slice($rows, 0, 15),
+        'previewRows' => $previewRows,
     ]);
 });
 
@@ -3537,43 +3613,72 @@ $router->post('/admin/settings/import/confirm', function () {
         redirect('/admin/settings/import');
     }
 
-    $rows = $_SESSION['import_data'] ?? [];
-    unset($_SESSION['import_data']);
+    $importPath  = $_SESSION['import_file'] ?? '';
+    $delimiter   = $_SESSION['import_delimiter'] ?? ',';
+    $fileHeaders = $_SESSION['import_headers'] ?? [];
+    $userMapping = $_SESSION['import_mapping'] ?? [];
 
-    if (empty($rows)) {
+    if ($importPath === '' || !file_exists($importPath) || empty($fileHeaders) || empty($userMapping)) {
         flash('error', 'No import data found. Please upload the CSV again.');
         redirect('/admin/settings/import');
     }
 
+    $handle = fopen($importPath, 'r');
+    if (!$handle) {
+        flash('error', 'Could not read the import file. Please upload again.');
+        redirect('/admin/settings/import');
+    }
+    fgetcsv($handle, 0, $delimiter); // skip header row
+
+    $statusMap = [
+        'open'                   => 'open',
+        'new'                    => 'open',
+        'closed'                 => 'closed',
+        'pending'                => 'pending',
+        'resolved'               => 'resolved',
+        'in progress'            => 'in_progress',
+        'in_progress'            => 'in_progress',
+        'waiting'                => 'waiting_on_customer',
+        'waiting on customer'    => 'waiting_on_customer',
+        'waiting on third party' => 'waiting_on_third_party',
+    ];
+
+    // Robust date parser — handles Freshdesk-style and ISO formats
+    $parseDateTime = function (string $raw): ?string {
+        if ($raw === '') return null;
+        $ts = strtotime($raw);
+        return ($ts !== false && $ts > 0) ? date('Y-m-d H:i:s', $ts) : null;
+    };
+    $parseDateOnly = function (string $raw): ?string {
+        if ($raw === '') return null;
+        $ts = strtotime($raw);
+        return ($ts !== false && $ts > 0) ? date('Y-m-d', $ts) : null;
+    };
+
     $db = Database::connect();
 
-    // Load lookups
+    // Load all lookups
     $existingUsers = [];
     foreach ($db->query("SELECT id, email, CONCAT(first_name, ' ', last_name) AS full_name FROM users")->fetchAll() as $u) {
         $existingUsers[strtolower($u['email'])] = (int) $u['id'];
         $existingUsers['name:' . strtolower($u['full_name'])] = (int) $u['id'];
     }
-
     $existingLocations = [];
     foreach ($db->query('SELECT id, name FROM locations')->fetchAll() as $l) {
         $existingLocations[strtolower($l['name'])] = (int) $l['id'];
     }
-
     $existingTypes = [];
     foreach ($db->query('SELECT id, name FROM ticket_types')->fetchAll() as $t) {
         $existingTypes[strtolower($t['name'])] = (int) $t['id'];
     }
-
     $existingGroups = [];
     foreach ($db->query('SELECT id, name FROM `groups`')->fetchAll() as $g) {
         $existingGroups[strtolower($g['name'])] = (int) $g['id'];
     }
-
     $existingPriorities = [];
     foreach ($db->query('SELECT id, name FROM ticket_priorities')->fetchAll() as $p) {
         $existingPriorities[strtolower($p['name'])] = (int) $p['id'];
     }
-
     $existingTags = [];
     foreach ($db->query('SELECT id, name FROM ticket_tags')->fetchAll() as $t) {
         $existingTags[strtolower($t['name'])] = (int) $t['id'];
@@ -3585,42 +3690,74 @@ $router->post('/admin/settings/import/confirm', function () {
 
     $db->beginTransaction();
     try {
-        // Prepared statements
         $insertUser = $db->prepare(
             'INSERT INTO users (first_name, last_name, email, password, role, location_id) VALUES (?, ?, ?, ?, ?, ?)'
         );
-        $insertLocation = $db->prepare(
-            'INSERT INTO locations (name) VALUES (?)'
-        );
-        $insertType = $db->prepare(
-            'INSERT INTO ticket_types (name, sort_order) VALUES (?, ?)'
-        );
-        $insertTicket = $db->prepare(
+        $insertLocation = $db->prepare('INSERT INTO locations (name) VALUES (?)');
+        $insertType     = $db->prepare('INSERT INTO ticket_types (name, sort_order) VALUES (?, ?)');
+        $insertTicket   = $db->prepare(
             'INSERT INTO tickets (subject, description, legacy_id, created_by, created_at, due_date, type_id, location_id, status, priority_id, assigned_to, group_id, first_responded_at, updated_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $insertTimeline = $db->prepare(
             'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal, created_at) VALUES (?, ?, ?, ?, 0, ?)'
         );
-        $insertTag = $db->prepare('INSERT INTO ticket_tags (name) VALUES (?)');
+        $insertTag    = $db->prepare('INSERT INTO ticket_tags (name) VALUES (?)');
         $insertTagMap = $db->prepare('INSERT INTO ticket_tag_map (ticket_id, tag_id) VALUES (?, ?)');
 
         $nextTypeOrder = (int) ($db->query('SELECT COALESCE(MAX(sort_order), 0) FROM ticket_types')->fetchColumn()) + 1;
 
-        foreach ($rows as $row) {
+        // Stream rows from disk — no large session data
+        while (($csvRow = fgetcsv($handle, 0, $delimiter)) !== false) {
+            if (count(array_filter($csvRow, fn($v) => trim($v) !== '')) === 0) continue;
+
+            $rawRow = [];
+            foreach ($fileHeaders as $i => $col) {
+                $rawRow[$col] = trim($csvRow[$i] ?? '');
+            }
+            $get = function (string $fieldKey) use ($rawRow, $userMapping): string {
+                $col = $userMapping[$fieldKey] ?? '';
+                return $col !== '' ? trim($rawRow[$col] ?? '') : '';
+            };
+
+            $subject = $get('subject');
+            $email   = strtolower($get('email'));
+            if ($subject === '' || $email === '') {
+                $skipped++;
+                continue;
+            }
+
+            $statusRaw = strtolower($get('status'));
+            $row = [
+                'legacy_id'      => $get('legacy_id'),
+                'subject'        => $subject,
+                'description'    => $get('description'),
+                'email'          => $email,
+                'submitter_name' => $get('full_name'),
+                'status'         => $statusMap[$statusRaw] ?? 'open',
+                'priority'       => $get('priority'),
+                'agent'          => $get('agent'),
+                'group'          => $get('group'),
+                'type'           => $get('type'),
+                'location'       => $get('location'),
+                'created_at'     => $get('created_at'),
+                'due_date'       => $get('due_date'),
+                'updated_at'     => $get('updated_at'),
+                'responded_at'   => $get('responded_at'),
+                'tags'           => $get('tags'),
+            ];
+
             // --- Resolve submitter ---
             $creatorId = null;
-            if ($row['email'] !== '') {
-                if (isset($existingUsers[$row['email']])) {
-                    $creatorId = $existingUsers[$row['email']];
-                } else {
-                    $nameParts = splitFullName($row['submitter_name']);
-                    $locId = $row['location'] !== '' ? ($existingLocations[strtolower($row['location'])] ?? null) : null;
-                    $insertUser->execute([$nameParts[0], $nameParts[1], $row['email'], $randomPassword, 'user', $locId]);
-                    $creatorId = (int) $db->lastInsertId();
-                    $existingUsers[$row['email']] = $creatorId;
-                    $existingUsers['name:' . strtolower($row['submitter_name'])] = $creatorId;
-                }
+            if (isset($existingUsers[$row['email']])) {
+                $creatorId = $existingUsers[$row['email']];
+            } else {
+                $nameParts = splitFullName($row['submitter_name']);
+                $locId = $row['location'] !== '' ? ($existingLocations[strtolower($row['location'])] ?? null) : null;
+                $insertUser->execute([$nameParts[0], $nameParts[1], $row['email'], $randomPassword, 'user', $locId]);
+                $creatorId = (int) $db->lastInsertId();
+                $existingUsers[$row['email']] = $creatorId;
+                $existingUsers['name:' . strtolower($row['submitter_name'])] = $creatorId;
             }
 
             if ($creatorId === null) {
@@ -3629,18 +3766,18 @@ $router->post('/admin/settings/import/confirm', function () {
             }
 
             // --- Resolve agent ---
-            $agentId = null;
+            $agentId   = null;
             $agentName = $row['agent'];
             if ($agentName !== '' && $agentName !== 'No Agent') {
                 $agentKey = 'name:' . strtolower($agentName);
                 if (isset($existingUsers[$agentKey])) {
                     $agentId = $existingUsers[$agentKey];
                 } else {
-                    $nameParts = splitFullName($agentName);
+                    $nameParts  = splitFullName($agentName);
                     $agentEmail = strtolower(str_replace(' ', '.', $agentName)) . '@imported.local';
                     $insertUser->execute([$nameParts[0], $nameParts[1], $agentEmail, $randomPassword, 'agent', null]);
                     $agentId = (int) $db->lastInsertId();
-                    $existingUsers[$agentKey] = $agentId;
+                    $existingUsers[$agentKey]  = $agentId;
                     $existingUsers[$agentEmail] = $agentId;
                 }
             }
@@ -3672,28 +3809,22 @@ $router->post('/admin/settings/import/confirm', function () {
             }
 
             // --- Resolve priority ---
-            $priorityId = null;
-            if ($row['priority'] !== '') {
-                $priorityId = $existingPriorities[strtolower($row['priority'])] ?? null;
-            }
+            $priorityId = $row['priority'] !== '' ? ($existingPriorities[strtolower($row['priority'])] ?? null) : null;
 
             // --- Resolve group ---
-            $groupId = null;
-            if (($row['group'] ?? '') !== '') {
-                $groupId = $existingGroups[strtolower($row['group'])] ?? null;
-            }
+            $groupId = ($row['group'] ?? '') !== '' ? ($existingGroups[strtolower($row['group'])] ?? null) : null;
 
-            // --- Parse dates ---
-            $createdAt   = $row['created_at'] !== '' ? $row['created_at'] : date('Y-m-d H:i:s');
-            $dueDate     = $row['due_date'] !== '' ? substr($row['due_date'], 0, 10) : null;
-            $updatedAt   = $row['updated_at'] !== '' ? $row['updated_at'] : $createdAt;
-            $respondedAt = $row['responded_at'] !== '' ? $row['responded_at'] : null;
+            // --- Parse dates robustly with strtotime() ---
+            $createdAt   = $parseDateTime($row['created_at']) ?? date('Y-m-d H:i:s');
+            $dueDate     = $parseDateOnly($row['due_date']);
+            $updatedAt   = $parseDateTime($row['updated_at']) ?? $createdAt;
+            $respondedAt = $parseDateTime($row['responded_at']);
 
             // --- Insert ticket ---
             $insertTicket->execute([
                 $row['subject'],
                 $row['description'] !== '' ? $row['description'] : '(Imported from legacy system)',
-                $row['legacy_id'],
+                $row['legacy_id'] !== '' ? $row['legacy_id'] : null,
                 $creatorId,
                 $createdAt,
                 $dueDate,
@@ -3728,16 +3859,29 @@ $router->post('/admin/settings/import/confirm', function () {
             $imported++;
         }
 
+        fclose($handle);
         $db->commit();
     } catch (PDOException $e) {
+        fclose($handle);
         $db->rollBack();
         flash('error', 'Import failed: ' . $e->getMessage());
         redirect('/admin/settings/import');
     }
 
+    // Clean up disk file and session import state
+    @unlink($importPath);
+    unset(
+        $_SESSION['import_file'],
+        $_SESSION['import_delimiter'],
+        $_SESSION['import_headers'],
+        $_SESSION['import_sample_rows'],
+        $_SESSION['import_mapping'],
+        $_SESSION['import_summary']
+    );
+
     $msg = "Successfully imported {$imported} ticket(s).";
     if ($skipped > 0) {
-        $msg .= " {$skipped} row(s) skipped (missing email).";
+        $msg .= " {$skipped} row(s) skipped (missing subject or email).";
     }
     flash('success', $msg);
     redirect('/admin/tickets');
