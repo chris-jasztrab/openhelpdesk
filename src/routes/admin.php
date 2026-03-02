@@ -3266,7 +3266,26 @@ $router->post('/admin/settings/sla-recalculate', function () {
 
 $router->get('/admin/settings/import', function () {
     Auth::requireRole('admin');
-    render('admin/settings/import');
+    $skippedFile = $_SESSION['import_skipped_file'] ?? null;
+    render('admin/settings/import', [
+        'hasSkippedDownload' => $skippedFile !== null && file_exists($skippedFile),
+    ]);
+});
+
+$router->get('/admin/settings/import/download-skipped', function () {
+    Auth::requireRole('admin');
+    $filePath = $_SESSION['import_skipped_file'] ?? '';
+    if ($filePath === '' || !file_exists($filePath)) {
+        flash('error', 'Skipped rows file not found or already downloaded.');
+        redirect('/admin/settings/import');
+    }
+    unset($_SESSION['import_skipped_file']);
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="import_skipped_rows.csv"');
+    header('Cache-Control: no-store');
+    readfile($filePath);
+    @unlink($filePath);
+    exit;
 });
 
 $router->post('/admin/settings/import/preview', function () {
@@ -3702,8 +3721,9 @@ $router->post('/admin/settings/import/confirm', function () {
         $existingTags[strtolower($t['name'])] = (int) $t['id'];
     }
 
-    $imported = 0;
-    $skipped  = 0;
+    $imported    = 0;
+    $skipped     = 0;
+    $skippedRows = []; // raw CSV rows that couldn't be imported, available for download
     $randomPassword = password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT);
 
     $db->beginTransaction();
@@ -3741,6 +3761,9 @@ $router->post('/admin/settings/import/confirm', function () {
             $subject = $get('subject');
             $email   = strtolower($get('email'));
             if ($subject === '' || $email === '') {
+                $reason = $subject === '' && $email === '' ? 'Missing subject and email'
+                        : ($subject === '' ? 'Missing subject' : 'Missing email');
+                $skippedRows[] = ['_reason' => $reason] + $rawRow;
                 $skipped++;
                 continue;
             }
@@ -3898,12 +3921,29 @@ $router->post('/admin/settings/import/confirm', function () {
         $_SESSION['import_headers'],
         $_SESSION['import_sample_rows'],
         $_SESSION['import_mapping'],
-        $_SESSION['import_summary']
+        $_SESSION['import_summary'],
+        $_SESSION['import_skipped_file']
     );
+
+    // Write skipped rows to a downloadable CSV if any were skipped
+    if (!empty($skippedRows)) {
+        $skippedPath = ROOT_DIR . '/storage/imports/' . bin2hex(random_bytes(8)) . '_skipped.csv';
+        $fp = fopen($skippedPath, 'w');
+        if ($fp) {
+            // Header: reason column first, then original CSV columns
+            $csvHeaders = array_keys($skippedRows[0]);
+            fputcsv($fp, array_map(fn($h) => $h === '_reason' ? 'Skipped Reason' : $h, $csvHeaders));
+            foreach ($skippedRows as $sr) {
+                fputcsv($fp, array_values($sr));
+            }
+            fclose($fp);
+            $_SESSION['import_skipped_file'] = $skippedPath;
+        }
+    }
 
     $msg = "Successfully imported {$imported} ticket(s).";
     if ($skipped > 0) {
-        $msg .= " {$skipped} row(s) skipped (missing subject or email).";
+        $msg .= " {$skipped} row(s) were skipped — see the import page to download them.";
     }
     flash('success', $msg);
     redirect('/admin/tickets');

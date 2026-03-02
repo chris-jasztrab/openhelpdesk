@@ -14,6 +14,23 @@ $breadcrumbs  = [
 
 <?php require ROOT_DIR . '/templates/partials/settings-nav.php'; ?>
 
+<?php if (!empty($hasSkippedDownload)): ?>
+<div class="card border-0 shadow-sm mb-4 border-start border-warning border-4">
+    <div class="card-body p-4 d-flex align-items-center justify-content-between gap-3">
+        <div>
+            <h6 class="fw-semibold mb-1"><i class="bi bi-exclamation-triangle text-warning me-2"></i>Skipped Rows Available</h6>
+            <p class="text-muted small mb-0">
+                Some rows from your last import were skipped due to missing subject or email. Download the CSV below,
+                correct the missing data, and re-upload to import those tickets.
+            </p>
+        </div>
+        <a href="/admin/settings/import/download-skipped" class="btn btn-warning text-white flex-shrink-0">
+            <i class="bi bi-download me-1"></i>Download Skipped Rows
+        </a>
+    </div>
+</div>
+<?php endif; ?>
+
 <div class="card border-0 shadow-sm mb-4">
     <div class="card-header bg-white py-3">
         <h5 class="mb-0 fw-semibold"><i class="bi bi-cloud-upload me-2"></i>Import Tickets from CSV</h5>
