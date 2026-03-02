@@ -27,6 +27,9 @@ if (env('APP_DEBUG', 'false') === 'true') {
     error_reporting(0);
 }
 
+// Run any pending database migrations automatically
+require ROOT_DIR . '/database/migrate.php';
+
 // Start session
 session_start();
 
