@@ -3282,18 +3282,33 @@ $router->post('/admin/settings/import/preview', function () {
         redirect('/admin/settings/import');
     }
 
-    // Read header row, strip BOM
-    $header = fgetcsv($handle);
+    // Auto-detect delimiter: read the first line and pick the most common candidate
+    $firstLine = fgets($handle);
+    rewind($handle);
+    $delimiter = ',';
+    if ($firstLine !== false) {
+        $counts = [
+            ','  => substr_count($firstLine, ','),
+            "\t" => substr_count($firstLine, "\t"),
+            ';'  => substr_count($firstLine, ';'),
+            '|'  => substr_count($firstLine, '|'),
+        ];
+        arsort($counts);
+        $delimiter = key($counts) ?: ',';
+    }
+
+    // Read header row, strip UTF-8 BOM
+    $header = fgetcsv($handle, 0, $delimiter);
     if (!$header || count($header) < 2) {
         fclose($handle);
-        flash('error', 'The CSV file appears to be empty or has too few columns.');
+        flash('error', 'The CSV file appears to be empty or has too few columns. Ensure the file has a header row and uses comma, tab, or semicolon as its delimiter.');
         redirect('/admin/settings/import');
     }
     $header = array_map(fn($h) => trim(preg_replace('/^\xEF\xBB\xBF/', '', $h)), $header);
 
     // Read all data rows
     $rawRows = [];
-    while (($csvRow = fgetcsv($handle)) !== false) {
+    while (($csvRow = fgetcsv($handle, 0, $delimiter)) !== false) {
         if (count(array_filter($csvRow, fn($v) => trim($v) !== '')) === 0) {
             continue; // skip blank rows
         }
@@ -3334,6 +3349,7 @@ $router->get('/admin/settings/import/map', function () {
         ['key' => 'status',       'label' => 'Status',               'required' => false],
         ['key' => 'priority',     'label' => 'Priority',             'required' => false],
         ['key' => 'agent',        'label' => 'Assigned Agent',       'required' => false],
+        ['key' => 'group',        'label' => 'Group',                'required' => false],
         ['key' => 'type',         'label' => 'Ticket Type',          'required' => false],
         ['key' => 'location',     'label' => 'Location',             'required' => false],
         ['key' => 'created_at',   'label' => 'Created Date',         'required' => false],
@@ -3348,10 +3364,12 @@ $router->get('/admin/settings/import/map', function () {
         'description' => ['description', 'body', 'details', 'content', 'message', 'issue description'],
         'legacy_id'   => ['ticket id', 'id', 'ticket_id', 'legacy id', '#', 'ticket number'],
         'email'       => ['email', 'requester email', 'customer email', 'contact email', 'submitter email'],
-        'full_name'   => ['full name', 'full_name', 'name', 'customer name', 'requester name', 'submitter'],
-        'status'      => ['status', 'ticket status', 'state'],
+        'full_name'   => ['full name', 'full_name', 'name', 'customer name', 'requester name', 'submitter',
+                          'submitted by (if using shared computer)', 'requester'],
+        'status'      => ['status', 'ticket status', 'state', 'resolution status'],
         'priority'    => ['priority', 'priority name', 'urgency'],
         'agent'       => ['agent', 'assigned agent', 'assignee', 'agent name', 'assigned to'],
+        'group'       => ['group', 'group name', 'team'],
         'type'        => ['type of ticket', 'type', 'ticket type', 'category', 'issue type'],
         'location'    => ['location', 'department', 'branch', 'site', 'office'],
         'created_at'  => ['created time', 'created_at', 'created date', 'date created', 'open date', 'created_time'],
@@ -3420,7 +3438,18 @@ $router->post('/admin/settings/import/map', function () {
         }
 
         $statusRaw = strtolower($get('status'));
-        $statusMap = ['open' => 'open', 'closed' => 'closed', 'pending' => 'pending', 'resolved' => 'resolved'];
+        $statusMap = [
+            'open'                   => 'open',
+            'new'                    => 'open',
+            'closed'                 => 'closed',
+            'pending'                => 'pending',
+            'resolved'               => 'resolved',
+            'in progress'            => 'in_progress',
+            'in_progress'            => 'in_progress',
+            'waiting'                => 'waiting_on_customer',
+            'waiting on customer'    => 'waiting_on_customer',
+            'waiting on third party' => 'waiting_on_third_party',
+        ];
 
         $rows[] = [
             'legacy_id'      => $get('legacy_id'),
@@ -3431,6 +3460,7 @@ $router->post('/admin/settings/import/map', function () {
             'status'         => $statusMap[$statusRaw] ?? 'open',
             'priority'       => $get('priority'),
             'agent'          => $get('agent'),
+            'group'          => $get('group'),
             'type'           => $get('type'),
             'location'       => $get('location'),
             'created_at'     => $get('created_at'),
@@ -3534,6 +3564,11 @@ $router->post('/admin/settings/import/confirm', function () {
         $existingTypes[strtolower($t['name'])] = (int) $t['id'];
     }
 
+    $existingGroups = [];
+    foreach ($db->query('SELECT id, name FROM `groups`')->fetchAll() as $g) {
+        $existingGroups[strtolower($g['name'])] = (int) $g['id'];
+    }
+
     $existingPriorities = [];
     foreach ($db->query('SELECT id, name FROM ticket_priorities')->fetchAll() as $p) {
         $existingPriorities[strtolower($p['name'])] = (int) $p['id'];
@@ -3561,8 +3596,8 @@ $router->post('/admin/settings/import/confirm', function () {
             'INSERT INTO ticket_types (name, sort_order) VALUES (?, ?)'
         );
         $insertTicket = $db->prepare(
-            'INSERT INTO tickets (subject, description, legacy_id, created_by, created_at, due_date, type_id, location_id, status, priority_id, assigned_to, first_responded_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            'INSERT INTO tickets (subject, description, legacy_id, created_by, created_at, due_date, type_id, location_id, status, priority_id, assigned_to, group_id, first_responded_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $insertTimeline = $db->prepare(
             'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal, created_at) VALUES (?, ?, ?, ?, 0, ?)'
@@ -3642,6 +3677,12 @@ $router->post('/admin/settings/import/confirm', function () {
                 $priorityId = $existingPriorities[strtolower($row['priority'])] ?? null;
             }
 
+            // --- Resolve group ---
+            $groupId = null;
+            if (($row['group'] ?? '') !== '') {
+                $groupId = $existingGroups[strtolower($row['group'])] ?? null;
+            }
+
             // --- Parse dates ---
             $createdAt   = $row['created_at'] !== '' ? $row['created_at'] : date('Y-m-d H:i:s');
             $dueDate     = $row['due_date'] !== '' ? substr($row['due_date'], 0, 10) : null;
@@ -3661,6 +3702,7 @@ $router->post('/admin/settings/import/confirm', function () {
                 $row['status'],
                 $priorityId,
                 $agentId,
+                $groupId,
                 $respondedAt,
                 $updatedAt,
             ]);
