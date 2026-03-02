@@ -329,7 +329,12 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
         <div id="replyBox" style="display:none;" class="mt-3">
             <div class="card border-0 shadow-sm">
                 <div class="card-header border-bottom d-flex align-items-center justify-content-between py-2 bg-white" id="replyBoxHeader">
-                    <span class="fw-semibold" id="replyBoxTitle"></span>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="fw-semibold" id="replyBoxTitle"></span>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="btnCanned" title="Insert canned response">
+                            <i class="bi bi-chat-square-text me-1"></i>Canned
+                        </button>
+                    </div>
                     <button type="button" class="btn-close" id="replyBoxClose" aria-label="Close"></button>
                 </div>
                 <div class="card-body">
@@ -367,6 +372,22 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
                             </div>
                         </div>
                     </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Canned Response Picker Modal -->
+    <div class="modal fade" id="cannedModal" tabindex="-1" aria-labelledby="cannedModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title fw-semibold" id="cannedModalLabel"><i class="bi bi-chat-square-text me-2"></i>Insert Canned Response</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-3">
+                    <input type="text" class="form-control mb-3" id="cannedSearch" placeholder="Search by title or content…" autocomplete="off">
+                    <div id="cannedList" style="max-height:360px;overflow-y:auto;"></div>
                 </div>
             </div>
         </div>
@@ -1196,5 +1217,111 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
             document.getElementById('replyForm').submit();
         });
     });
+})();
+</script>
+
+<script>
+/* ── Canned Response Picker ─────────────────────────────────────── */
+(function () {
+    var ctx = <?= json_encode([
+        'customer_first_name' => $ticket['creator_first_name'] ?? '',
+        'customer_last_name'  => $ticket['creator_last_name']  ?? '',
+        'customer_full_name'  => $ticket['creator_name']       ?? '',
+        'customer_email'      => $ticket['creator_email']      ?? '',
+        'ticket_id'           => '#' . $ticket['id'],
+        'ticket_subject'      => $ticket['subject']            ?? '',
+        'agent_first_name'    => Auth::user()['first_name']    ?? '',
+        'agent_full_name'     => Auth::fullName(),
+        'org_name'            => getSetting('app_name', 'LocalDesk'),
+    ]) ?>;
+
+    function resolveTokens(body) {
+        return body
+            .replace(/\{\{customer_first_name\}\}/g, ctx.customer_first_name)
+            .replace(/\{\{customer_last_name\}\}/g,  ctx.customer_last_name)
+            .replace(/\{\{customer_full_name\}\}/g,  ctx.customer_full_name)
+            .replace(/\{\{customer_email\}\}/g,      ctx.customer_email)
+            .replace(/\{\{ticket_id\}\}/g,           ctx.ticket_id)
+            .replace(/\{\{ticket_subject\}\}/g,      ctx.ticket_subject)
+            .replace(/\{\{agent_first_name\}\}/g,    ctx.agent_first_name)
+            .replace(/\{\{agent_full_name\}\}/g,     ctx.agent_full_name)
+            .replace(/\{\{org_name\}\}/g,            ctx.org_name);
+    }
+
+    var responses  = null;
+    var modal      = null;
+    var listEl     = document.getElementById('cannedList');
+    var searchEl   = document.getElementById('cannedSearch');
+    var btnCanned  = document.getElementById('btnCanned');
+
+    btnCanned.addEventListener('click', function () {
+        if (!modal) {
+            modal = new bootstrap.Modal(document.getElementById('cannedModal'));
+        }
+        searchEl.value = '';
+        if (responses === null) {
+            listEl.innerHTML = '<p class="text-muted text-center py-3 small">Loading…</p>';
+            fetch('/agent/canned-responses/json')
+                .then(function (r) { return r.json(); })
+                .then(function (data) { responses = data; renderList(''); });
+        } else {
+            renderList('');
+        }
+        modal.show();
+        setTimeout(function () { searchEl.focus(); }, 300);
+    });
+
+    searchEl.addEventListener('input', function () { renderList(this.value); });
+
+    function esc(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function renderList(query) {
+        if (!responses) return;
+        var q        = query.toLowerCase();
+        var filtered = responses.filter(function (r) {
+            return !q || r.title.toLowerCase().includes(q) || r.body.toLowerCase().includes(q);
+        });
+        if (!filtered.length) {
+            listEl.innerHTML = '<p class="text-muted text-center py-3 small">No matching responses.</p>';
+            return;
+        }
+        var personal = filtered.filter(function (r) { return !parseInt(r.is_global); });
+        var global   = filtered.filter(function (r) { return  parseInt(r.is_global); });
+        var html = '';
+        if (personal.length) {
+            html += '<p class="text-uppercase text-muted small fw-semibold mb-1 px-1">My Responses</p>';
+            html += '<div class="list-group list-group-flush mb-3">';
+            personal.forEach(function (r) { html += itemHtml(r); });
+            html += '</div>';
+        }
+        if (global.length) {
+            html += '<p class="text-uppercase text-muted small fw-semibold mb-1 px-1">Global</p>';
+            html += '<div class="list-group list-group-flush">';
+            global.forEach(function (r) { html += itemHtml(r); });
+            html += '</div>';
+        }
+        listEl.innerHTML = html;
+        listEl.querySelectorAll('.cr-item').forEach(function (el) {
+            el.addEventListener('click', function () {
+                var resolved = resolveTokens(this.dataset.body);
+                var ta    = document.getElementById('commentMessage');
+                var start = ta.selectionStart, end = ta.selectionEnd;
+                ta.value = ta.value.substring(0, start) + resolved + ta.value.substring(end);
+                ta.selectionStart = ta.selectionEnd = start + resolved.length;
+                ta.focus();
+                modal.hide();
+            });
+        });
+    }
+
+    function itemHtml(r) {
+        var preview = r.body.length > 120 ? r.body.substring(0, 120) + '…' : r.body;
+        return '<button type="button" class="list-group-item list-group-item-action cr-item px-3 py-2" data-body="' + esc(r.body) + '">'
+             + '<div class="fw-semibold small">' + esc(r.title) + '</div>'
+             + '<div class="text-muted" style="font-size:.8rem;white-space:pre-wrap;">' + esc(preview) + '</div>'
+             + '</button>';
+    }
 })();
 </script>

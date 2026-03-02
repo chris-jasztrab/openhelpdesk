@@ -491,6 +491,7 @@ $router->get('/agent/tickets/{id}', function (array $p) {
                 tp.name AS priority_name, tp.color AS priority_color,
                 l.name  AS location_name,
                 tt.name AS type_name,
+                c.first_name AS creator_first_name, c.last_name AS creator_last_name,
                 CONCAT(c.first_name, ' ', c.last_name) AS creator_name, c.email AS creator_email,
                 CONCAT(a.first_name, ' ', a.last_name) AS agent_name,
                 g.name AS group_name
@@ -1151,6 +1152,31 @@ $router->get('/agent/attachments/{id}/download', function (array $p) {
     header('Content-Disposition: attachment; filename="' . str_replace('"', '\\"', $att['original_name']) . '"');
     header('Content-Length: ' . $att['file_size']);
     readfile($filePath);
+    exit;
+});
+
+/* ==================================================================
+ * AGENT – Canned Responses JSON (used by ticket reply picker)
+ * ================================================================== */
+
+$router->get('/agent/canned-responses/json', function () {
+    Auth::requireRole('agent', 'admin');
+    $db  = Database::connect();
+    $uid = Auth::id();
+
+    $personal = $db->prepare(
+        'SELECT id, title, body, sort_order, 0 AS is_global FROM canned_responses
+          WHERE user_id = ? ORDER BY sort_order, title'
+    );
+    $personal->execute([$uid]);
+
+    $global = $db->query(
+        'SELECT id, title, body, sort_order, 1 AS is_global FROM canned_responses
+          WHERE user_id IS NULL ORDER BY sort_order, title'
+    )->fetchAll();
+
+    header('Content-Type: application/json');
+    echo json_encode(array_merge($personal->fetchAll(), $global));
     exit;
 });
 

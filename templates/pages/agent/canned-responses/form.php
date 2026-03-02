@@ -41,6 +41,29 @@ $breadcrumbs  = [
                           placeholder="Type your reply template here…"><?= e($isEdit ? $editing['body'] : old('body')) ?></textarea>
             </div>
 
+            <!-- Token Reference -->
+            <div class="mb-4">
+                <p class="small fw-semibold mb-2">Available tokens <span class="text-muted fw-normal">(click to insert at cursor)</span></p>
+                <div class="d-flex flex-wrap gap-1" id="tokenBar">
+                    <?php foreach ([
+                        '{{customer_first_name}}' => "Customer's first name",
+                        '{{customer_last_name}}'  => "Customer's last name",
+                        '{{customer_full_name}}'  => "Customer's full name",
+                        '{{customer_email}}'      => "Customer's email",
+                        '{{ticket_id}}'           => 'Ticket ID (e.g. #42)',
+                        '{{ticket_subject}}'      => 'Ticket subject',
+                        '{{agent_first_name}}'    => "Replying agent's first name",
+                        '{{agent_full_name}}'     => "Replying agent's full name",
+                        '{{org_name}}'            => 'Organisation name',
+                    ] as $token => $desc): ?>
+                    <button type="button" class="btn btn-sm btn-outline-secondary token-chip"
+                            data-token="<?= e($token) ?>" title="<?= e($desc) ?>">
+                        <?= e($token) ?>
+                    </button>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+
             <div class="mb-4" style="max-width:180px;">
                 <label for="sort_order" class="form-label fw-semibold">Sort Order</label>
                 <input type="number" class="form-control" id="sort_order" name="sort_order"
@@ -57,3 +80,15 @@ $breadcrumbs  = [
         </form>
     </div>
 </div>
+<script>
+document.querySelectorAll('#tokenBar .token-chip').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+        var ta    = document.getElementById('body');
+        var token = this.dataset.token;
+        var start = ta.selectionStart, end = ta.selectionEnd;
+        ta.value = ta.value.substring(0, start) + token + ta.value.substring(end);
+        ta.selectionStart = ta.selectionEnd = start + token.length;
+        ta.focus();
+    });
+});
+</script>
