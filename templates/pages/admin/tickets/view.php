@@ -81,131 +81,6 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
             </div>
         </div>
 
-        <?php if (!empty($customFields)): ?>
-        <!-- Custom Fields (editable) -->
-        <div class="card border-0 shadow-sm mb-4">
-            <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between">
-                <h5 class="mb-0 fw-semibold"><i class="bi bi-list-check me-2"></i>Custom Fields</h5>
-            </div>
-            <div class="card-body">
-                <form method="POST" action="/admin/tickets/<?= (int) $ticket['id'] ?>/fields">
-                    <?= csrfField() ?>
-                    <div class="row g-3">
-                    <?php foreach ($customFields as $cf):
-                        $cfKey  = 'field_' . $cf['id'];
-                        $cfVal  = $fieldValues[$cf['id']] ?? '';
-                        $cfOpts = $fieldOptions[$cf['id']] ?? [];
-                    ?>
-                    <div class="col-md-6">
-                        <label class="form-label small fw-medium">
-                            <?= e($cf['label']) ?>
-                            <?php if (!$cf['is_visible']): ?>
-                            <span class="badge bg-secondary ms-1" style="font-size:.6rem;">Hidden from portal</span>
-                            <?php endif; ?>
-                        </label>
-
-                        <?php if ($cf['field_type'] === 'text'): ?>
-                        <input type="text" class="form-control form-control-sm" name="<?= e($cfKey) ?>"
-                               placeholder="<?= e($cf['placeholder'] ?? '') ?>"
-                               value="<?= e($cfVal) ?>">
-
-                        <?php elseif ($cf['field_type'] === 'textarea'): ?>
-                        <textarea class="form-control form-control-sm" name="<?= e($cfKey) ?>" rows="2"
-                                  placeholder="<?= e($cf['placeholder'] ?? '') ?>"><?= e($cfVal) ?></textarea>
-
-                        <?php elseif ($cf['field_type'] === 'checkbox'): ?>
-                        <div class="form-check mt-1">
-                            <input class="form-check-input" type="checkbox" name="<?= e($cfKey) ?>" value="1"
-                                   id="admin_<?= e($cfKey) ?>" <?= $cfVal === '1' ? 'checked' : '' ?>>
-                            <label class="form-check-label" for="admin_<?= e($cfKey) ?>">Yes</label>
-                        </div>
-
-                        <?php elseif ($cf['field_type'] === 'dropdown'): ?>
-                        <select class="form-select form-select-sm" name="<?= e($cfKey) ?>">
-                            <option value="">— Select —</option>
-                            <?php foreach ($cfOpts as $opt): ?>
-                            <option value="<?= (int) $opt['id'] ?>" <?= (int) $cfVal === (int) $opt['id'] ? 'selected' : '' ?>>
-                                <?= e($opt['label']) ?>
-                            </option>
-                            <?php endforeach; ?>
-                        </select>
-
-                        <?php elseif ($cf['field_type'] === 'date'): ?>
-                        <input type="date" class="form-control form-control-sm" name="<?= e($cfKey) ?>"
-                               value="<?= e($cfVal) ?>">
-
-                        <?php elseif ($cf['field_type'] === 'number'): ?>
-                        <input type="number" step="1" class="form-control form-control-sm" name="<?= e($cfKey) ?>"
-                               placeholder="<?= e($cf['placeholder'] ?? '') ?>"
-                               value="<?= e($cfVal) ?>">
-
-                        <?php elseif ($cf['field_type'] === 'decimal'): ?>
-                        <input type="number" step="0.01" class="form-control form-control-sm" name="<?= e($cfKey) ?>"
-                               placeholder="<?= e($cf['placeholder'] ?? '') ?>"
-                               value="<?= e($cfVal) ?>">
-
-                        <?php elseif ($cf['field_type'] === 'dependent'):
-                            $config  = $cf['config'] ? (is_string($cf['config']) ? json_decode($cf['config'], true) : $cf['config']) : [];
-                            $levels  = (int) ($config['levels']   ?? 3);
-                            $l1Label = $config['l1_label'] ?? 'Category';
-                            $l2Label = $config['l2_label'] ?? 'Subcategory';
-                            $l3Label = $config['l3_label'] ?? 'Item';
-                            $dep     = $cfVal ? (json_decode($cfVal, true) ?? []) : [];
-                            $l1Opts  = array_filter($cfOpts, fn($o) => !$o['parent_option_id']);
-                            $selL1   = $dep['l1'] ?? null;
-                            $selL2   = $dep['l2'] ?? null;
-                            $selL3   = $dep['l3'] ?? null;
-                            $l2Opts  = array_filter($cfOpts, fn($o) => $o['parent_option_id'] && (int)$o['parent_option_id'] === (int)$selL1);
-                            $l3Opts  = array_filter($cfOpts, fn($o) => $o['parent_option_id'] && (int)$o['parent_option_id'] === (int)$selL2);
-                        ?>
-                        <div class="d-flex flex-column gap-1" id="adm_dep_<?= (int) $cf['id'] ?>">
-                            <select class="form-select form-select-sm adm-dep-l1" name="<?= e($cfKey) ?>_l1"
-                                    data-field="<?= (int) $cf['id'] ?>"
-                                    data-opts='<?= htmlspecialchars(json_encode(array_values($cfOpts)), ENT_QUOTES) ?>'>
-                                <option value=""><?= e($l1Label) ?>...</option>
-                                <?php foreach ($l1Opts as $opt): ?>
-                                <option value="<?= (int) $opt['id'] ?>" <?= (int)$selL1 === (int)$opt['id'] ? 'selected' : '' ?>>
-                                    <?= e($opt['label']) ?>
-                                </option>
-                                <?php endforeach; ?>
-                            </select>
-                            <select class="form-select form-select-sm adm-dep-l2" name="<?= e($cfKey) ?>_l2"
-                                    data-field="<?= (int) $cf['id'] ?>"
-                                    <?= !$selL1 ? 'style="display:none;"' : '' ?>>
-                                <option value=""><?= e($l2Label) ?>...</option>
-                                <?php foreach ($l2Opts as $opt): ?>
-                                <option value="<?= (int) $opt['id'] ?>" <?= (int)$selL2 === (int)$opt['id'] ? 'selected' : '' ?>>
-                                    <?= e($opt['label']) ?>
-                                </option>
-                                <?php endforeach; ?>
-                            </select>
-                            <?php if ($levels >= 3): ?>
-                            <select class="form-select form-select-sm adm-dep-l3" name="<?= e($cfKey) ?>_l3"
-                                    data-field="<?= (int) $cf['id'] ?>"
-                                    <?= !$selL2 ? 'style="display:none;"' : '' ?>>
-                                <option value=""><?= e($l3Label) ?>...</option>
-                                <?php foreach ($l3Opts as $opt): ?>
-                                <option value="<?= (int) $opt['id'] ?>" <?= (int)$selL3 === (int)$opt['id'] ? 'selected' : '' ?>>
-                                    <?= e($opt['label']) ?>
-                                </option>
-                                <?php endforeach; ?>
-                            </select>
-                            <?php endif; ?>
-                        </div>
-                        <?php endif; ?>
-                    </div>
-                    <?php endforeach; ?>
-                    </div>
-                    <div class="mt-3">
-                        <button type="submit" class="btn btn-sm btn-primary">
-                            <i class="bi bi-check2 me-1"></i>Save Custom Fields
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-        <?php endif; ?>
-
         <?php if (!empty($attachments)): ?>
         <div class="card border-0 shadow-sm mb-4">
             <div class="card-header bg-white border-bottom">
@@ -467,6 +342,131 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
                 </dl>
             </div>
         </div>
+
+        <!-- Custom Fields -->
+        <?php if (!empty($customFields)): ?>
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white border-bottom">
+                <h5 class="mb-0 fw-semibold"><i class="bi bi-list-check me-2"></i>Custom Fields</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="/admin/tickets/<?= (int) $ticket['id'] ?>/fields">
+                    <?= csrfField() ?>
+                    <div class="row g-2">
+                    <?php foreach ($customFields as $cf):
+                        $cfKey  = 'field_' . $cf['id'];
+                        $cfVal  = $fieldValues[$cf['id']] ?? '';
+                        $cfOpts = $fieldOptions[$cf['id']] ?? [];
+                    ?>
+                    <div class="col-12">
+                        <label class="form-label small fw-medium">
+                            <?= e($cf['label']) ?>
+                            <?php if (!$cf['is_visible']): ?>
+                            <span class="badge bg-secondary ms-1" style="font-size:.6rem;">Hidden from portal</span>
+                            <?php endif; ?>
+                        </label>
+
+                        <?php if ($cf['field_type'] === 'text'): ?>
+                        <input type="text" class="form-control form-control-sm" name="<?= e($cfKey) ?>"
+                               placeholder="<?= e($cf['placeholder'] ?? '') ?>"
+                               value="<?= e($cfVal) ?>">
+
+                        <?php elseif ($cf['field_type'] === 'textarea'): ?>
+                        <textarea class="form-control form-control-sm" name="<?= e($cfKey) ?>" rows="2"
+                                  placeholder="<?= e($cf['placeholder'] ?? '') ?>"><?= e($cfVal) ?></textarea>
+
+                        <?php elseif ($cf['field_type'] === 'checkbox'): ?>
+                        <div class="form-check mt-1">
+                            <input class="form-check-input" type="checkbox" name="<?= e($cfKey) ?>" value="1"
+                                   id="admin_<?= e($cfKey) ?>" <?= $cfVal === '1' ? 'checked' : '' ?>>
+                            <label class="form-check-label" for="admin_<?= e($cfKey) ?>">Yes</label>
+                        </div>
+
+                        <?php elseif ($cf['field_type'] === 'dropdown'): ?>
+                        <select class="form-select form-select-sm" name="<?= e($cfKey) ?>">
+                            <option value="">— Select —</option>
+                            <?php foreach ($cfOpts as $opt): ?>
+                            <option value="<?= (int) $opt['id'] ?>" <?= (int) $cfVal === (int) $opt['id'] ? 'selected' : '' ?>>
+                                <?= e($opt['label']) ?>
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+
+                        <?php elseif ($cf['field_type'] === 'date'): ?>
+                        <input type="date" class="form-control form-control-sm" name="<?= e($cfKey) ?>"
+                               value="<?= e($cfVal) ?>">
+
+                        <?php elseif ($cf['field_type'] === 'number'): ?>
+                        <input type="number" step="1" class="form-control form-control-sm" name="<?= e($cfKey) ?>"
+                               placeholder="<?= e($cf['placeholder'] ?? '') ?>"
+                               value="<?= e($cfVal) ?>">
+
+                        <?php elseif ($cf['field_type'] === 'decimal'): ?>
+                        <input type="number" step="0.01" class="form-control form-control-sm" name="<?= e($cfKey) ?>"
+                               placeholder="<?= e($cf['placeholder'] ?? '') ?>"
+                               value="<?= e($cfVal) ?>">
+
+                        <?php elseif ($cf['field_type'] === 'dependent'):
+                            $config  = $cf['config'] ? (is_string($cf['config']) ? json_decode($cf['config'], true) : $cf['config']) : [];
+                            $levels  = (int) ($config['levels']   ?? 3);
+                            $l1Label = $config['l1_label'] ?? 'Category';
+                            $l2Label = $config['l2_label'] ?? 'Subcategory';
+                            $l3Label = $config['l3_label'] ?? 'Item';
+                            $dep     = $cfVal ? (json_decode($cfVal, true) ?? []) : [];
+                            $l1Opts  = array_filter($cfOpts, fn($o) => !$o['parent_option_id']);
+                            $selL1   = $dep['l1'] ?? null;
+                            $selL2   = $dep['l2'] ?? null;
+                            $selL3   = $dep['l3'] ?? null;
+                            $l2Opts  = array_filter($cfOpts, fn($o) => $o['parent_option_id'] && (int)$o['parent_option_id'] === (int)$selL1);
+                            $l3Opts  = array_filter($cfOpts, fn($o) => $o['parent_option_id'] && (int)$o['parent_option_id'] === (int)$selL2);
+                        ?>
+                        <div class="d-flex flex-column gap-1" id="adm_dep_<?= (int) $cf['id'] ?>">
+                            <select class="form-select form-select-sm adm-dep-l1" name="<?= e($cfKey) ?>_l1"
+                                    data-field="<?= (int) $cf['id'] ?>"
+                                    data-opts='<?= htmlspecialchars(json_encode(array_values($cfOpts)), ENT_QUOTES) ?>'>
+                                <option value=""><?= e($l1Label) ?>...</option>
+                                <?php foreach ($l1Opts as $opt): ?>
+                                <option value="<?= (int) $opt['id'] ?>" <?= (int)$selL1 === (int)$opt['id'] ? 'selected' : '' ?>>
+                                    <?= e($opt['label']) ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <select class="form-select form-select-sm adm-dep-l2" name="<?= e($cfKey) ?>_l2"
+                                    data-field="<?= (int) $cf['id'] ?>"
+                                    <?= !$selL1 ? 'style="display:none;"' : '' ?>>
+                                <option value=""><?= e($l2Label) ?>...</option>
+                                <?php foreach ($l2Opts as $opt): ?>
+                                <option value="<?= (int) $opt['id'] ?>" <?= (int)$selL2 === (int)$opt['id'] ? 'selected' : '' ?>>
+                                    <?= e($opt['label']) ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <?php if ($levels >= 3): ?>
+                            <select class="form-select form-select-sm adm-dep-l3" name="<?= e($cfKey) ?>_l3"
+                                    data-field="<?= (int) $cf['id'] ?>"
+                                    <?= !$selL2 ? 'style="display:none;"' : '' ?>>
+                                <option value=""><?= e($l3Label) ?>...</option>
+                                <?php foreach ($l3Opts as $opt): ?>
+                                <option value="<?= (int) $opt['id'] ?>" <?= (int)$selL3 === (int)$opt['id'] ? 'selected' : '' ?>>
+                                    <?= e($opt['label']) ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <?php endif; ?>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                    <?php endforeach; ?>
+                    </div>
+                    <div class="mt-3">
+                        <button type="submit" class="btn btn-sm btn-primary">
+                            <i class="bi bi-check2 me-1"></i>Save Custom Fields
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <?php endif; ?>
 
         <!-- SLA Info -->
         <?php if ($ticket['sla_state']): ?>
