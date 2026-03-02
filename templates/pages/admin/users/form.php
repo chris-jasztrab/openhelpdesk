@@ -120,6 +120,27 @@ $action = $isEdit ? "/admin/users/{$editing['id']}/edit" : '/admin/users/create'
                 <?php endif; ?>
             </div>
 
+            <?php if ($isEdit && in_array($editing['role'] ?? '', ['agent', 'admin'])): ?>
+            <hr class="my-4">
+            <div>
+                <label class="form-label fw-semibold">Group Membership</label>
+                <?php if (!empty($userGroups)): ?>
+                    <div class="d-flex flex-wrap gap-2 mb-1">
+                        <?php foreach ($userGroups as $g): ?>
+                            <a href="/admin/groups/<?= $g['id'] ?>/edit" class="badge text-decoration-none"
+                               style="background:var(--ld-primary);font-size:.8rem;">
+                                <i class="bi bi-people me-1"></i><?= e($g['name']) ?>
+                            </a>
+                        <?php endforeach; ?>
+                    </div>
+                    <div class="form-text">This <?= $editing['role'] === 'admin' ? 'admin' : 'agent' ?> belongs to the groups shown above. Group membership controls which tickets they can see. Manage membership from <a href="/admin/groups">Admin → Settings → Groups</a>.</div>
+                <?php else: ?>
+                    <div class="text-muted small">Not a member of any groups — can see all tickets.</div>
+                    <div class="form-text">Assign this <?= $editing['role'] === 'admin' ? 'admin' : 'agent' ?> to groups from <a href="/admin/groups">Admin → Settings → Groups</a>.</div>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
+
             <hr class="my-4">
 
             <div class="d-flex gap-2">

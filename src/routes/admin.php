@@ -305,8 +305,18 @@ $router->get('/admin/users/{id}/edit', function (array $p) {
         flash('error', 'User not found.');
         redirect('/admin/users');
     }
-    $locations = $db->query('SELECT * FROM locations ORDER BY name')->fetchAll();
-    render('admin/users/form', ['locations' => $locations, 'editing' => $editing]);
+    $locations  = $db->query('SELECT * FROM locations ORDER BY name')->fetchAll();
+    $userGroups = [];
+    if (in_array($editing['role'], ['agent', 'admin'])) {
+        $gStmt = $db->prepare(
+            'SELECT g.id, g.name FROM `groups` g
+             JOIN group_user_map gum ON gum.group_id = g.id
+             WHERE gum.user_id = ? ORDER BY g.name'
+        );
+        $gStmt->execute([(int) $p['id']]);
+        $userGroups = $gStmt->fetchAll();
+    }
+    render('admin/users/form', ['locations' => $locations, 'editing' => $editing, 'userGroups' => $userGroups]);
 });
 
 $router->post('/admin/users/{id}/edit', function (array $p) {
