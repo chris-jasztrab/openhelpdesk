@@ -3289,7 +3289,10 @@ $router->post('/admin/settings/import/preview', function () {
     }
     $importId   = bin2hex(random_bytes(16));
     $importPath = $storageDir . $importId . '.csv';
-    if (!move_uploaded_file($_FILES['csv_file']['tmp_name'], $importPath)) {
+    $tmpPath    = $_FILES['csv_file']['tmp_name'];
+    // move_uploaded_file() can fail when destination is on a network/OneDrive path;
+    // fall back to copy() in that case.
+    if (!move_uploaded_file($tmpPath, $importPath) && !copy($tmpPath, $importPath)) {
         flash('error', 'Could not save the uploaded file.');
         redirect('/admin/settings/import');
     }
