@@ -139,6 +139,18 @@ CREATE TABLE IF NOT EXISTS `ticket_watchers` (
     FOREIGN KEY (`user_id`)   REFERENCES `users`(`id`)   ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Canned responses (saved reply snippets; user_id NULL = global admin-managed)
+CREATE TABLE IF NOT EXISTS `canned_responses` (
+    `id`         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `user_id`    INT UNSIGNED DEFAULT NULL COMMENT 'NULL = global; non-null = personal to that agent',
+    `title`      VARCHAR(255) NOT NULL,
+    `body`       TEXT NOT NULL,
+    `sort_order` INT UNSIGNED NOT NULL DEFAULT 0,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Ticket timeline (audit trail of all changes)
 CREATE TABLE IF NOT EXISTS `ticket_timeline` (
     `id`          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

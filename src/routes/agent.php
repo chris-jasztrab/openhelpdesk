@@ -1153,3 +1153,97 @@ $router->get('/agent/attachments/{id}/download', function (array $p) {
     readfile($filePath);
     exit;
 });
+
+/* ==================================================================
+ * AGENT – Personal Canned Responses
+ * ================================================================== */
+
+$router->get('/agent/canned-responses', function () {
+    Auth::requireRole('agent', 'admin');
+    $db = Database::connect();
+    $personal = $db->prepare(
+        'SELECT * FROM canned_responses WHERE user_id = ? ORDER BY sort_order, title'
+    );
+    $personal->execute([Auth::id()]);
+    $myResponses = $personal->fetchAll();
+
+    $global = $db->query(
+        'SELECT * FROM canned_responses WHERE user_id IS NULL ORDER BY sort_order, title'
+    )->fetchAll();
+
+    render('agent/canned-responses/index', ['myResponses' => $myResponses, 'globalResponses' => $global]);
+});
+
+$router->get('/agent/canned-responses/create', function () {
+    Auth::requireRole('agent', 'admin');
+    render('agent/canned-responses/form', ['editing' => null]);
+});
+
+$router->post('/agent/canned-responses/create', function () {
+    Auth::requireRole('agent', 'admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/agent/canned-responses/create');
+    }
+    $title = trim($_POST['title'] ?? '');
+    $body  = trim($_POST['body'] ?? '');
+    $order = (int) ($_POST['sort_order'] ?? 0);
+    if ($title === '' || $body === '') {
+        flashInput($_POST);
+        flash('error', 'Title and body are required.');
+        redirect('/agent/canned-responses/create');
+    }
+    Database::connect()->prepare(
+        'INSERT INTO canned_responses (user_id, title, body, sort_order) VALUES (?, ?, ?, ?)'
+    )->execute([Auth::id(), $title, $body, $order]);
+    flash('success', 'Canned response created.');
+    redirect('/agent/canned-responses');
+});
+
+$router->get('/agent/canned-responses/{id}/edit', function (array $p) {
+    Auth::requireRole('agent', 'admin');
+    $db = Database::connect();
+    $stmt = $db->prepare('SELECT * FROM canned_responses WHERE id = ? AND user_id = ?');
+    $stmt->execute([(int) $p['id'], Auth::id()]);
+    $editing = $stmt->fetch();
+    if (!$editing) {
+        flash('error', 'Canned response not found.');
+        redirect('/agent/canned-responses');
+    }
+    render('agent/canned-responses/form', ['editing' => $editing]);
+});
+
+$router->post('/agent/canned-responses/{id}/edit', function (array $p) {
+    Auth::requireRole('agent', 'admin');
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect("/agent/canned-responses/{$id}/edit");
+    }
+    $title = trim($_POST['title'] ?? '');
+    $body  = trim($_POST['body'] ?? '');
+    $order = (int) ($_POST['sort_order'] ?? 0);
+    if ($title === '' || $body === '') {
+        flashInput($_POST);
+        flash('error', 'Title and body are required.');
+        redirect("/agent/canned-responses/{$id}/edit");
+    }
+    Database::connect()->prepare(
+        'UPDATE canned_responses SET title = ?, body = ?, sort_order = ? WHERE id = ? AND user_id = ?'
+    )->execute([$title, $body, $order, $id, Auth::id()]);
+    flash('success', 'Canned response updated.');
+    redirect('/agent/canned-responses');
+});
+
+$router->post('/agent/canned-responses/{id}/delete', function (array $p) {
+    Auth::requireRole('agent', 'admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/agent/canned-responses');
+    }
+    Database::connect()->prepare(
+        'DELETE FROM canned_responses WHERE id = ? AND user_id = ?'
+    )->execute([(int) $p['id'], Auth::id()]);
+    flash('success', 'Canned response deleted.');
+    redirect('/agent/canned-responses');
+});

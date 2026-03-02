@@ -699,6 +699,93 @@ $router->post('/admin/types/{id}/delete', function (array $p) {
 });
 
 /* ==================================================================
+ * ADMIN – Canned Responses (global, admin-managed)
+ * ================================================================== */
+
+$router->get('/admin/settings/canned-responses', function () {
+    Auth::requireRole('admin');
+    $db = Database::connect();
+    $responses = $db->query(
+        'SELECT * FROM canned_responses WHERE user_id IS NULL ORDER BY sort_order, title'
+    )->fetchAll();
+    render('admin/settings/canned-responses/index', ['responses' => $responses]);
+});
+
+$router->get('/admin/settings/canned-responses/create', function () {
+    Auth::requireRole('admin');
+    render('admin/settings/canned-responses/form', ['editing' => null]);
+});
+
+$router->post('/admin/settings/canned-responses/create', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/canned-responses/create');
+    }
+    $title = trim($_POST['title'] ?? '');
+    $body  = trim($_POST['body'] ?? '');
+    $order = (int) ($_POST['sort_order'] ?? 0);
+    if ($title === '' || $body === '') {
+        flashInput($_POST);
+        flash('error', 'Title and body are required.');
+        redirect('/admin/settings/canned-responses/create');
+    }
+    Database::connect()->prepare(
+        'INSERT INTO canned_responses (user_id, title, body, sort_order) VALUES (NULL, ?, ?, ?)'
+    )->execute([$title, $body, $order]);
+    flash('success', 'Canned response created.');
+    redirect('/admin/settings/canned-responses');
+});
+
+$router->get('/admin/settings/canned-responses/{id}/edit', function (array $p) {
+    Auth::requireRole('admin');
+    $db = Database::connect();
+    $stmt = $db->prepare('SELECT * FROM canned_responses WHERE id = ? AND user_id IS NULL');
+    $stmt->execute([(int) $p['id']]);
+    $editing = $stmt->fetch();
+    if (!$editing) {
+        flash('error', 'Canned response not found.');
+        redirect('/admin/settings/canned-responses');
+    }
+    render('admin/settings/canned-responses/form', ['editing' => $editing]);
+});
+
+$router->post('/admin/settings/canned-responses/{id}/edit', function (array $p) {
+    Auth::requireRole('admin');
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect("/admin/settings/canned-responses/{$id}/edit");
+    }
+    $title = trim($_POST['title'] ?? '');
+    $body  = trim($_POST['body'] ?? '');
+    $order = (int) ($_POST['sort_order'] ?? 0);
+    if ($title === '' || $body === '') {
+        flashInput($_POST);
+        flash('error', 'Title and body are required.');
+        redirect("/admin/settings/canned-responses/{$id}/edit");
+    }
+    Database::connect()->prepare(
+        'UPDATE canned_responses SET title = ?, body = ?, sort_order = ? WHERE id = ? AND user_id IS NULL'
+    )->execute([$title, $body, $order, $id]);
+    flash('success', 'Canned response updated.');
+    redirect('/admin/settings/canned-responses');
+});
+
+$router->post('/admin/settings/canned-responses/{id}/delete', function (array $p) {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/canned-responses');
+    }
+    Database::connect()->prepare(
+        'DELETE FROM canned_responses WHERE id = ? AND user_id IS NULL'
+    )->execute([(int) $p['id']]);
+    flash('success', 'Canned response deleted.');
+    redirect('/admin/settings/canned-responses');
+});
+
+/* ==================================================================
  * ADMIN – Group Management
  * ================================================================== */
 
