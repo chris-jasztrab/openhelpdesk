@@ -214,11 +214,11 @@ $pdo->exec("INSERT INTO escalation_rules (name,conditions,actions,cooldown_hours
 // ── Automations ───────────────────────────────────────────────────
 $pdo->exec("INSERT INTO automations (name,trigger_event,conditions,actions,is_enabled,sort_order) VALUES
  ('Auto-assign IT tickets to IT group','ticket_created',
-  '[{\"field\":\"type_id\",\"op\":\"eq\",\"value\":\"1\"}]',
-  '[{\"type\":\"set_group\",\"value\":\"1\"}]',1,1),
+  '[{\"field\":\"type_id\",\"operator\":\"eq\",\"value\":\"1\"}]',
+  '[{\"action\":\"set_group\",\"value\":\"1\"}]',1,1),
  ('Auto-close resolved tickets after 7 days','ticket_updated',
-  '[{\"field\":\"status\",\"op\":\"eq\",\"value\":\"resolved\"},{\"field\":\"age_since_resolved_days\",\"op\":\"gte\",\"value\":\"7\"}]',
-  '[{\"type\":\"set_status\",\"value\":\"closed\"}]',1,2)");
+  '[{\"field\":\"status\",\"operator\":\"eq\",\"value\":\"resolved\"},{\"field\":\"age_since_resolved_days\",\"operator\":\"gte\",\"value\":\"7\"}]',
+  '[{\"action\":\"set_status\",\"value\":\"closed\"}]',1,2)");
 echo "[OK] Canned responses, templates, escalations, automations seeded.\n";
 
 // ── Knowledge Base ────────────────────────────────────────────────
