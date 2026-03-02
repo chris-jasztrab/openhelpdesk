@@ -28,61 +28,6 @@ $actionIcons = [
     </div>
 </div>
 
-<div class="row g-4 mb-4">
-    <div class="col-md-3">
-        <div class="card stat-card h-100">
-            <div class="card-body d-flex align-items-center gap-3">
-                <div class="stat-icon bg-primary bg-opacity-10 text-primary">
-                    <i class="bi bi-ticket-detailed"></i>
-                </div>
-                <div>
-                    <div class="text-muted small">Total Tickets</div>
-                    <div class="fs-4 fw-bold"><?= $totalTickets ?></div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card stat-card h-100">
-            <div class="card-body d-flex align-items-center gap-3">
-                <div class="stat-icon bg-warning bg-opacity-10 text-warning">
-                    <i class="bi bi-exclamation-circle"></i>
-                </div>
-                <div>
-                    <div class="text-muted small">Open Tickets</div>
-                    <div class="fs-4 fw-bold"><?= $openTickets ?></div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card stat-card h-100">
-            <div class="card-body d-flex align-items-center gap-3">
-                <div class="stat-icon bg-info bg-opacity-10 text-info">
-                    <i class="bi bi-people"></i>
-                </div>
-                <div>
-                    <div class="text-muted small">Users</div>
-                    <div class="fs-4 fw-bold"><?= $totalUsers ?></div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card stat-card h-100">
-            <div class="card-body d-flex align-items-center gap-3">
-                <div class="stat-icon bg-success bg-opacity-10 text-success">
-                    <i class="bi bi-headset"></i>
-                </div>
-                <div>
-                    <div class="text-muted small">Agents</div>
-                    <div class="fs-4 fw-bold"><?= $totalAgents ?></div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
 <div class="row g-4">
     <div class="col-lg-8">
         <div class="card border-0 shadow-sm">
