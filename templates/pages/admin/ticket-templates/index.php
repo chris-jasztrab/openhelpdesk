@@ -1,17 +1,23 @@
 <?php
+$isAgentView  = Auth::role() === 'agent';
+$ticketsUrl   = $isAgentView ? '/agent/tickets' : '/admin/tickets';
 $layout       = 'app';
 $pageTitle    = 'Ticket Templates';
-$sidebarItems = adminSidebar('tickets');
-$breadcrumbs  = [
-    ['label' => 'Admin', 'url' => '/admin'],
-    ['label' => 'Tickets', 'url' => '/admin/tickets'],
+$sidebarItems = $isAgentView ? agentSidebar('tickets') : adminSidebar('tickets');
+$breadcrumbs  = $isAgentView ? [
+    ['label' => 'Agent',     'url' => '/agent'],
+    ['label' => 'Tickets',   'url' => '/agent/tickets'],
+    ['label' => 'Templates'],
+] : [
+    ['label' => 'Admin',     'url' => '/admin'],
+    ['label' => 'Tickets',   'url' => '/admin/tickets'],
     ['label' => 'Templates'],
 ];
 ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="fw-bold mb-0">Ticket Templates</h2>
     <div class="d-flex gap-2">
-        <a href="/admin/tickets" class="btn btn-outline-secondary btn-sm">
+        <a href="<?= $ticketsUrl ?>" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-arrow-left me-1"></i>Back to Tickets
         </a>
         <a href="/admin/ticket-templates/create" class="btn btn-sm text-white" style="background:var(--ld-primary);">

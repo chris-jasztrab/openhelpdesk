@@ -1,11 +1,18 @@
 <?php
 $isEdit       = !empty($editing);
+$isAgentView  = Auth::role() === 'agent';
+$ticketsUrl   = $isAgentView ? '/agent/tickets' : '/admin/tickets';
 $layout       = 'app';
 $pageTitle    = $isEdit ? 'Edit Template' : 'New Template';
-$sidebarItems = adminSidebar('tickets');
-$breadcrumbs  = [
-    ['label' => 'Admin', 'url' => '/admin'],
-    ['label' => 'Tickets', 'url' => '/admin/tickets'],
+$sidebarItems = $isAgentView ? agentSidebar('tickets') : adminSidebar('tickets');
+$breadcrumbs  = $isAgentView ? [
+    ['label' => 'Agent',     'url' => '/agent'],
+    ['label' => 'Tickets',   'url' => '/agent/tickets'],
+    ['label' => 'Templates', 'url' => '/admin/ticket-templates'],
+    ['label' => $isEdit ? 'Edit' : 'New'],
+] : [
+    ['label' => 'Admin',     'url' => '/admin'],
+    ['label' => 'Tickets',   'url' => '/admin/tickets'],
     ['label' => 'Templates', 'url' => '/admin/ticket-templates'],
     ['label' => $isEdit ? 'Edit' : 'New'],
 ];
