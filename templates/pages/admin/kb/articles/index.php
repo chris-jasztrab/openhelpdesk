@@ -18,10 +18,10 @@ $breadcrumbs  = [
             <i class="bi bi-folder me-1"></i>Folders
         </a>
         <a href="/admin/kb/export" class="btn btn-outline-secondary">
-            <i class="bi bi-download me-1"></i>Export JSON
+            <i class="bi bi-download me-1"></i>Export CSV
         </a>
-        <a href="/admin/kb/import" class="btn btn-outline-secondary">
-            <i class="bi bi-upload me-1"></i>Import
+        <a href="/admin/settings/import-kb" class="btn btn-outline-secondary">
+            <i class="bi bi-upload me-1"></i>Import CSV
         </a>
         <a href="/admin/kb/articles/create" class="btn text-white" style="background:var(--ld-primary);">
             <i class="bi bi-plus-lg me-1"></i>Add Article

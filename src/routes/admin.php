@@ -2837,73 +2837,46 @@ $router->get('/admin/kb/articles/{id}/history/{rid}', function (array $p) {
 });
 
 /* ==================================================================
- * ADMIN – KB Export / Import (JSON)
+ * ADMIN – KB Export (CSV) / Import (JSON)
  * ================================================================== */
 
 $router->get('/admin/kb/export', function () {
     Auth::requireRole('admin');
     $db = Database::connect();
 
-    $categories  = $db->query(
-        'SELECT id, name, description, is_public, sort_order FROM kb_categories ORDER BY sort_order, name'
-    )->fetchAll();
-
-    $folderStmt  = $db->prepare(
-        'SELECT id, name, description, sort_order FROM kb_folders WHERE category_id = ? ORDER BY sort_order, name'
-    );
-    $articleStmt = $db->prepare(
-        'SELECT title, body_markdown, status, sort_order FROM kb_articles WHERE folder_id = ? ORDER BY sort_order, title'
+    $stmt = $db->query(
+        "SELECT a.title, a.body_markdown, c.name AS category, a.status
+         FROM kb_articles a
+         JOIN kb_folders f  ON a.folder_id     = f.id
+         JOIN kb_categories c ON f.category_id = c.id
+         ORDER BY c.sort_order, c.name, f.sort_order, f.name, a.sort_order, a.title"
     );
 
-    $export = [
-        'exported_at' => date('c'),
-        'version'     => '1',
-        'categories'  => [],
-    ];
+    $filename = 'kb-export-' . date('Y-m-d') . '.csv';
 
-    foreach ($categories as $cat) {
-        $folderStmt->execute([$cat['id']]);
-        $folders = $folderStmt->fetchAll();
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Pragma: no-cache');
+    header('Expires: 0');
 
-        $catData = [
-            'name'        => $cat['name'],
-            'description' => $cat['description'],
-            'is_public'   => (bool) $cat['is_public'],
-            'sort_order'  => (int)  $cat['sort_order'],
-            'folders'     => [],
-        ];
+    $out = fopen('php://output', 'w');
 
-        foreach ($folders as $folder) {
-            $articleStmt->execute([$folder['id']]);
-            $articles = $articleStmt->fetchAll();
+    // BOM for Excel UTF-8 compatibility
+    fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
 
-            $folderData = [
-                'name'        => $folder['name'],
-                'description' => $folder['description'],
-                'sort_order'  => (int) $folder['sort_order'],
-                'articles'    => [],
-            ];
+    fputcsv($out, ['title', 'body_markdown', 'category', 'status', 'tags']);
 
-            foreach ($articles as $article) {
-                $folderData['articles'][] = [
-                    'title'         => $article['title'],
-                    'body_markdown' => $article['body_markdown'],
-                    'status'        => $article['status'],
-                    'sort_order'    => (int) $article['sort_order'],
-                ];
-            }
-
-            $catData['folders'][] = $folderData;
-        }
-
-        $export['categories'][] = $catData;
+    while ($row = $stmt->fetch()) {
+        fputcsv($out, [
+            $row['title'],
+            $row['body_markdown'],
+            $row['category'],
+            $row['status'],
+            '', // tags — no tag field on KB articles
+        ]);
     }
 
-    $filename = 'kb-export-' . date('Y-m-d') . '.json';
-    header('Content-Type: application/json; charset=utf-8');
-    header('Content-Disposition: attachment; filename="' . $filename . '"');
-    header('Cache-Control: no-cache, no-store, must-revalidate');
-    echo json_encode($export, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    fclose($out);
     exit;
 });
 
