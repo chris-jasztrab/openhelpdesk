@@ -2861,9 +2861,6 @@ $router->get('/admin/kb/export', function () {
 
     $out = fopen('php://output', 'w');
 
-    // BOM for Excel UTF-8 compatibility
-    fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
-
     fputcsv($out, ['title', 'body_markdown', 'category', 'status', 'tags']);
 
     while ($row = $stmt->fetch()) {
@@ -4606,6 +4603,9 @@ $router->post('/admin/settings/import-kb/preview', function () {
     }
 
     $header = fgetcsv($handle);
+    if ($header) {
+        $header[0] = preg_replace('/^\xEF\xBB\xBF/', '', $header[0]); // strip UTF-8 BOM if present
+    }
     if (!$header || !in_array('title', $header) || !in_array('body_markdown', $header)) {
         fclose($handle);
         flash('error', 'CSV must contain "title" and "body_markdown" columns.');
