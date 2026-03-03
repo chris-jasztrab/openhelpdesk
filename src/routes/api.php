@@ -13,6 +13,7 @@ declare(strict_types=1);
  * ─────────────────────────────────────────────────────────────────────────────
  * POST /api/v1/auth/login              — Exchange credentials for a token
  * POST /api/v1/auth/logout             — Revoke the current token
+ * POST /api/v1/auth/rotate             — Issue a new token, invalidate the old one
  *
  * GET  /api/v1/me                      — Current user profile
  *
@@ -56,6 +57,9 @@ function _apiJson(mixed $data, int $status = 200): never
 /**
  * Validate the Authorization: Bearer <token> header.
  * Returns the authenticated user row; exits 401 if invalid.
+ *
+ * The raw bearer token is never stored on disk; only its SHA-256 digest
+ * lives in api_tokens.token_hash.
  */
 function _apiAuth(): array
 {
@@ -63,21 +67,21 @@ function _apiAuth(): array
     if (!preg_match('/^Bearer\s+(.+)$/i', $header, $m)) {
         _apiJson(['error' => 'Authorization: Bearer <token> header required'], 401);
     }
-    $token = trim($m[1]);
-    $db    = Database::connect();
-    $stmt  = $db->prepare(
+    $hash = hash('sha256', trim($m[1]));
+    $db   = Database::connect();
+    $stmt = $db->prepare(
         'SELECT u.id, u.first_name, u.last_name, u.email, u.role, u.avatar, u.location_id
            FROM users u
            JOIN api_tokens t ON t.user_id = u.id
-          WHERE t.token = ?
-            AND (t.expires_at IS NULL OR t.expires_at > NOW())'
+          WHERE t.token_hash = ?
+            AND t.expires_at > NOW()'
     );
-    $stmt->execute([$token]);
+    $stmt->execute([$hash]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$user) {
         _apiJson(['error' => 'Invalid or expired token'], 401);
     }
-    $db->prepare('UPDATE api_tokens SET last_used_at = NOW() WHERE token = ?')->execute([$token]);
+    $db->prepare('UPDATE api_tokens SET last_used_at = NOW() WHERE token_hash = ?')->execute([$hash]);
     return $user;
 }
 
@@ -208,10 +212,12 @@ $router->post('/api/v1/auth/login', function () {
         _apiJson(['error' => 'Invalid credentials'], 401);
     }
 
-    $token = bin2hex(random_bytes(32)); // 64-character hex string
+    $token     = bin2hex(random_bytes(32)); // 64-char hex — returned to client, never stored
+    $tokenHash = hash('sha256', $token);
+    $expiresAt = date('Y-m-d H:i:s', strtotime('+90 days'));
     $db->prepare(
-        'INSERT INTO api_tokens (user_id, token, device_name) VALUES (?, ?, ?)'
-    )->execute([$user['id'], $token, $device]);
+        'INSERT INTO api_tokens (user_id, token_hash, device_name, expires_at) VALUES (?, ?, ?, ?)'
+    )->execute([$user['id'], $tokenHash, $device, $expiresAt]);
 
     _apiJson([
         'token' => $token,
@@ -235,11 +241,53 @@ $router->post('/api/v1/auth/login', function () {
 $router->post('/api/v1/auth/logout', function () {
     $header = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
     if (preg_match('/^Bearer\s+(.+)$/i', $header, $m)) {
+        $hash = hash('sha256', trim($m[1]));
         Database::connect()
-            ->prepare('DELETE FROM api_tokens WHERE token = ?')
-            ->execute([trim($m[1])]);
+            ->prepare('DELETE FROM api_tokens WHERE token_hash = ?')
+            ->execute([$hash]);
     }
     _apiJson(['message' => 'Logged out']);
+});
+
+/**
+ * POST /api/v1/auth/rotate
+ *
+ * Issues a new token for the current session and immediately invalidates the
+ * old one. Clients should call this before the 90-day expiry to maintain
+ * an active session without re-entering credentials.
+ *
+ * Returns: { "token": "<new 64-char hex>", "expires_at": "<ISO datetime>" }
+ */
+$router->post('/api/v1/auth/rotate', function () {
+    $header = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+    if (!preg_match('/^Bearer\s+(.+)$/i', $header, $m)) {
+        _apiJson(['error' => 'Authorization: Bearer <token> header required'], 401);
+    }
+    $oldHash = hash('sha256', trim($m[1]));
+
+    $db   = Database::connect();
+    $stmt = $db->prepare(
+        'SELECT id, user_id FROM api_tokens
+          WHERE token_hash = ? AND expires_at > NOW()'
+    );
+    $stmt->execute([$oldHash]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$row) {
+        _apiJson(['error' => 'Invalid or expired token'], 401);
+    }
+
+    $newToken  = bin2hex(random_bytes(32));
+    $newHash   = hash('sha256', $newToken);
+    $expiresAt = date('Y-m-d H:i:s', strtotime('+90 days'));
+
+    // Swap old hash for new hash atomically — if the new token can't be
+    // inserted (e.g. hash collision), the old one is preserved.
+    $db->prepare(
+        'UPDATE api_tokens SET token_hash = ?, expires_at = ?, last_used_at = NOW()
+          WHERE id = ?'
+    )->execute([$newHash, $expiresAt, $row['id']]);
+
+    _apiJson(['token' => $newToken, 'expires_at' => $expiresAt]);
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
