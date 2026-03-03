@@ -1,9 +1,9 @@
 <?php
 /**
- * LocalDesk — Admin Password Rescue Script
+ * LocalDesk — Account Rescue Script
  *
  * DROP THIS FILE in the public/ directory of your LocalDesk installation,
- * visit  http://yoursite/rescue.php  in a browser, reset the password,
+ * visit  http://yoursite/rescue.php  in a browser, make your changes,
  * then DELETE THIS FILE immediately.
  *
  * This script is intentionally standalone — it does not use the app's
@@ -50,70 +50,103 @@ try {
     die('ERROR: Could not connect to database: ' . htmlspecialchars($e->getMessage()));
 }
 
+$validRoles = ['admin', 'agent', 'user'];
+
 // ── Handle POST ───────────────────────────────────────────────────────────────
-$message = '';
+$message     = '';
 $messageType = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $userId   = (int) ($_POST['user_id'] ?? 0);
+    $newRole  = $_POST['role']     ?? '';
     $password = $_POST['password'] ?? '';
     $confirm  = $_POST['confirm']  ?? '';
 
+    $errors = [];
+
     if ($userId <= 0) {
-        $message = 'Please select an admin account.';
-        $messageType = 'danger';
-    } elseif (strlen($password) < 8) {
-        $message = 'Password must be at least 8 characters.';
-        $messageType = 'danger';
-    } elseif ($password !== $confirm) {
-        $message = 'Passwords do not match.';
+        $errors[] = 'Please select an account.';
+    }
+    if (!in_array($newRole, $validRoles, true)) {
+        $errors[] = 'Please select a valid access level.';
+    }
+    if ($password !== '' && strlen($password) < 8) {
+        $errors[] = 'New password must be at least 8 characters.';
+    }
+    if ($password !== '' && $password !== $confirm) {
+        $errors[] = 'Passwords do not match.';
+    }
+
+    if ($errors) {
+        $message     = implode('<br>', $errors);
         $messageType = 'danger';
     } else {
-        // Verify the selected user is actually an admin
-        $stmt = $pdo->prepare('SELECT id, email, role FROM users WHERE id = ? AND role IN (\'admin\', \'agent\')');
+        $stmt = $pdo->prepare('SELECT id, first_name, last_name, email, role FROM users WHERE id = ?');
         $stmt->execute([$userId]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$user) {
-            $message = 'Invalid user selected.';
+            $message     = 'User not found.';
             $messageType = 'danger';
         } else {
-            $hash = password_hash($password, PASSWORD_DEFAULT);
-            $pdo->prepare('UPDATE users SET password = ? WHERE id = ?')->execute([$hash, $userId]);
-            $message = 'Password updated successfully for ' . htmlspecialchars($user['email']) . '. '
-                     . '<strong>Delete this file (rescue.php) now!</strong>';
+            $changes = [];
+
+            // Always update role
+            if ($newRole !== $user['role']) {
+                $pdo->prepare('UPDATE users SET role = ? WHERE id = ?')->execute([$newRole, $userId]);
+                $changes[] = 'access level changed to <strong>' . htmlspecialchars($newRole) . '</strong>';
+            }
+
+            // Update password only if provided
+            if ($password !== '') {
+                $hash = password_hash($password, PASSWORD_DEFAULT);
+                $pdo->prepare('UPDATE users SET password = ? WHERE id = ?')->execute([$hash, $userId]);
+                $changes[] = 'password reset';
+            }
+
+            if ($changes) {
+                $message = htmlspecialchars($user['first_name'] . ' ' . $user['last_name'])
+                         . ' &lt;' . htmlspecialchars($user['email']) . '&gt;: '
+                         . implode(', ', $changes) . '. '
+                         . '<strong>Delete rescue.php from your server now!</strong>';
+            } else {
+                $message = 'No changes were made (role was already ' . htmlspecialchars($newRole) . ' and no password was entered).';
+            }
             $messageType = 'success';
         }
     }
 }
 
-// ── Fetch admin/agent accounts ────────────────────────────────────────────────
-$admins = $pdo->query(
+// ── Fetch all accounts ────────────────────────────────────────────────────────
+$users = $pdo->query(
     "SELECT id, first_name, last_name, email, role
      FROM users
-     WHERE role IN ('admin', 'agent')
-     ORDER BY role = 'admin' DESC, first_name, last_name"
+     ORDER BY
+         FIELD(role, 'admin', 'agent', 'user'),
+         first_name, last_name"
 )->fetchAll(PDO::FETCH_ASSOC);
+
+$roleBadgeClass = ['admin' => 'danger', 'agent' => 'primary', 'user' => 'secondary'];
 
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>LocalDesk — Password Rescue</title>
+<title>LocalDesk — Account Rescue</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
 </head>
 <body class="bg-light">
-<div class="container py-5" style="max-width:480px;">
+<div class="container py-5" style="max-width:520px;">
 
     <div class="card border-danger shadow-sm">
         <div class="card-header bg-danger text-white fw-semibold">
-            &#128274; LocalDesk — Admin Password Rescue
+            &#128274; LocalDesk — Account Rescue
         </div>
         <div class="card-body">
 
             <div class="alert alert-warning small mb-4">
-                <strong>Security notice:</strong> This script grants unrestricted password reset access.
+                <strong>Security notice:</strong> This script grants unrestricted account access.
                 Delete <code>rescue.php</code> from your server immediately after use.
             </div>
 
@@ -121,17 +154,20 @@ $admins = $pdo->query(
             <div class="alert alert-<?= $messageType ?> small"><?= $message ?></div>
             <?php endif; ?>
 
-            <?php if (empty($admins)): ?>
-            <div class="alert alert-secondary small">No admin or agent accounts found in the database.</div>
+            <?php if (empty($users)): ?>
+            <div class="alert alert-secondary small">No accounts found in the database.</div>
             <?php else: ?>
 
             <form method="POST">
+
                 <div class="mb-3">
                     <label for="user_id" class="form-label fw-semibold small">Account</label>
-                    <select name="user_id" id="user_id" class="form-select" required>
+                    <select name="user_id" id="user_id" class="form-select" required onchange="syncRole(this)">
                         <option value="">— select account —</option>
-                        <?php foreach ($admins as $u): ?>
-                        <option value="<?= (int) $u['id'] ?>" <?= (isset($_POST['user_id']) && (int)$_POST['user_id'] === (int)$u['id']) ? 'selected' : '' ?>>
+                        <?php foreach ($users as $u): ?>
+                        <option value="<?= (int) $u['id'] ?>"
+                                data-role="<?= htmlspecialchars($u['role']) ?>"
+                                <?= (isset($_POST['user_id']) && (int)$_POST['user_id'] === (int)$u['id']) ? 'selected' : '' ?>>
                             <?= htmlspecialchars($u['first_name'] . ' ' . $u['last_name']) ?>
                             &lt;<?= htmlspecialchars($u['email']) ?>&gt;
                             [<?= htmlspecialchars($u['role']) ?>]
@@ -141,19 +177,39 @@ $admins = $pdo->query(
                 </div>
 
                 <div class="mb-3">
-                    <label for="password" class="form-label fw-semibold small">New Password</label>
+                    <label for="role" class="form-label fw-semibold small">Access Level</label>
+                    <select name="role" id="role" class="form-select" required>
+                        <?php
+                        $selectedRole = $_POST['role'] ?? '';
+                        foreach ($validRoles as $r):
+                        ?>
+                        <option value="<?= $r ?>" <?= $selectedRole === $r ? 'selected' : '' ?>>
+                            <?= ucfirst($r) ?>
+                            <?php if ($r === 'admin'): ?> — full access<?php endif; ?>
+                            <?php if ($r === 'agent'): ?> — can manage tickets<?php endif; ?>
+                            <?php if ($r === 'user'): ?>  — portal / self-service only<?php endif; ?>
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <hr class="my-4">
+                <p class="text-muted small mb-3">Leave password fields blank to keep the existing password.</p>
+
+                <div class="mb-3">
+                    <label for="password" class="form-label fw-semibold small">New Password <span class="text-muted fw-normal">(optional)</span></label>
                     <input type="password" name="password" id="password" class="form-control"
-                           minlength="8" required autocomplete="new-password">
-                    <div class="form-text">Minimum 8 characters.</div>
+                           autocomplete="new-password" placeholder="Leave blank to keep current password">
+                    <div class="form-text">Minimum 8 characters if changing.</div>
                 </div>
 
                 <div class="mb-4">
                     <label for="confirm" class="form-label fw-semibold small">Confirm Password</label>
                     <input type="password" name="confirm" id="confirm" class="form-control"
-                           minlength="8" required autocomplete="new-password">
+                           autocomplete="new-password" placeholder="Repeat new password">
                 </div>
 
-                <button type="submit" class="btn btn-danger w-100">Reset Password</button>
+                <button type="submit" class="btn btn-danger w-100">Save Changes</button>
             </form>
 
             <?php endif; ?>
@@ -161,9 +217,24 @@ $admins = $pdo->query(
     </div>
 
     <p class="text-center text-muted small mt-3">
-        After resetting, delete <code>rescue.php</code> from your server.
+        After making changes, delete <code>rescue.php</code> from your server.
     </p>
 
 </div>
+<script>
+// Pre-select the current role when an account is chosen
+function syncRole(sel) {
+    var opt = sel.options[sel.selectedIndex];
+    var role = opt.dataset.role;
+    if (role) {
+        document.getElementById('role').value = role;
+    }
+}
+// Run on page load if a user is already selected (e.g. after a failed POST)
+(function() {
+    var sel = document.getElementById('user_id');
+    if (sel && sel.value) syncRole(sel);
+})();
+</script>
 </body>
 </html>
