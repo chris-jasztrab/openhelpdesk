@@ -2837,6 +2837,342 @@ $router->get('/admin/kb/articles/{id}/history/{rid}', function (array $p) {
 });
 
 /* ==================================================================
+ * ADMIN – KB Export / Import (JSON)
+ * ================================================================== */
+
+$router->get('/admin/kb/export', function () {
+    Auth::requireRole('admin');
+    $db = Database::connect();
+
+    $categories  = $db->query(
+        'SELECT id, name, description, is_public, sort_order FROM kb_categories ORDER BY sort_order, name'
+    )->fetchAll();
+
+    $folderStmt  = $db->prepare(
+        'SELECT id, name, description, sort_order FROM kb_folders WHERE category_id = ? ORDER BY sort_order, name'
+    );
+    $articleStmt = $db->prepare(
+        'SELECT title, body_markdown, status, sort_order FROM kb_articles WHERE folder_id = ? ORDER BY sort_order, title'
+    );
+
+    $export = [
+        'exported_at' => date('c'),
+        'version'     => '1',
+        'categories'  => [],
+    ];
+
+    foreach ($categories as $cat) {
+        $folderStmt->execute([$cat['id']]);
+        $folders = $folderStmt->fetchAll();
+
+        $catData = [
+            'name'        => $cat['name'],
+            'description' => $cat['description'],
+            'is_public'   => (bool) $cat['is_public'],
+            'sort_order'  => (int)  $cat['sort_order'],
+            'folders'     => [],
+        ];
+
+        foreach ($folders as $folder) {
+            $articleStmt->execute([$folder['id']]);
+            $articles = $articleStmt->fetchAll();
+
+            $folderData = [
+                'name'        => $folder['name'],
+                'description' => $folder['description'],
+                'sort_order'  => (int) $folder['sort_order'],
+                'articles'    => [],
+            ];
+
+            foreach ($articles as $article) {
+                $folderData['articles'][] = [
+                    'title'         => $article['title'],
+                    'body_markdown' => $article['body_markdown'],
+                    'status'        => $article['status'],
+                    'sort_order'    => (int) $article['sort_order'],
+                ];
+            }
+
+            $catData['folders'][] = $folderData;
+        }
+
+        $export['categories'][] = $catData;
+    }
+
+    $filename = 'kb-export-' . date('Y-m-d') . '.json';
+    header('Content-Type: application/json; charset=utf-8');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Cache-Control: no-cache, no-store, must-revalidate');
+    echo json_encode($export, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    exit;
+});
+
+$router->get('/admin/kb/import', function () {
+    Auth::requireRole('admin');
+    render('admin/kb/import', [
+        'layout'       => 'app',
+        'pageTitle'    => 'Import Knowledge Base',
+        'sidebarItems' => adminSidebar('kb'),
+        'breadcrumbs'  => [
+            ['label' => 'Admin',          'url' => '/admin'],
+            ['label' => 'Knowledge Base', 'url' => '/admin/kb/articles'],
+            ['label' => 'Import'],
+        ],
+    ]);
+});
+
+$router->post('/admin/kb/import/preview', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/kb/import');
+        return;
+    }
+
+    if (empty($_FILES['json_file']['tmp_name']) || $_FILES['json_file']['error'] !== UPLOAD_ERR_OK) {
+        flash('error', 'Please upload a valid JSON file.');
+        redirect('/admin/kb/import');
+        return;
+    }
+
+    if ($_FILES['json_file']['size'] > 20 * 1024 * 1024) {
+        flash('error', 'File too large. Maximum 20 MB.');
+        redirect('/admin/kb/import');
+        return;
+    }
+
+    $raw = file_get_contents($_FILES['json_file']['tmp_name']);
+    if ($raw === false) {
+        flash('error', 'Unable to read file.');
+        redirect('/admin/kb/import');
+        return;
+    }
+
+    $data = json_decode($raw, true);
+    if (!is_array($data) || !isset($data['categories']) || !is_array($data['categories'])) {
+        flash('error', 'Invalid format. Please upload a JSON file exported from LocalDesk.');
+        redirect('/admin/kb/import');
+        return;
+    }
+
+    // Collect summary stats and build article preview
+    $totalCategories = 0;
+    $totalFolders    = 0;
+    $totalArticles   = 0;
+    $draftCount      = 0;
+    $publishedCount  = 0;
+    $previewArticles = [];
+
+    foreach ($data['categories'] as $cat) {
+        if (empty($cat['name'])) { continue; }
+        $totalCategories++;
+        foreach ($cat['folders'] ?? [] as $folder) {
+            if (empty($folder['name'])) { continue; }
+            $totalFolders++;
+            foreach ($folder['articles'] ?? [] as $article) {
+                if (empty($article['title']) || empty($article['body_markdown'])) { continue; }
+                $totalArticles++;
+                if (($article['status'] ?? 'draft') === 'published') {
+                    $publishedCount++;
+                } else {
+                    $draftCount++;
+                }
+                if (count($previewArticles) < 15) {
+                    $previewArticles[] = [
+                        'title'        => $article['title'],
+                        'category'     => $cat['name'],
+                        'folder'       => $folder['name'],
+                        'status'       => $article['status'] ?? 'draft',
+                        'body_preview' => mb_strimwidth($article['body_markdown'], 0, 80, '…'),
+                    ];
+                }
+            }
+        }
+    }
+
+    if ($totalArticles === 0) {
+        flash('error', 'No valid articles found in the JSON file.');
+        redirect('/admin/kb/import');
+        return;
+    }
+
+    // Check which categories already exist
+    $db = Database::connect();
+    $existingCatKeys = array_map('strtolower', $db->query('SELECT name FROM kb_categories')->fetchAll(PDO::FETCH_COLUMN));
+
+    $newCategories      = [];
+    $existingCategories = [];
+    foreach ($data['categories'] as $cat) {
+        if (empty($cat['name'])) { continue; }
+        if (in_array(strtolower($cat['name']), $existingCatKeys, true)) {
+            $existingCategories[] = $cat['name'];
+        } else {
+            $newCategories[] = $cat['name'];
+        }
+    }
+
+    $_SESSION['kb_json_import_data'] = $data;
+
+    render('admin/kb/import-preview', [
+        'layout'       => 'app',
+        'pageTitle'    => 'Preview KB Import',
+        'sidebarItems' => adminSidebar('kb'),
+        'breadcrumbs'  => [
+            ['label' => 'Admin',          'url' => '/admin'],
+            ['label' => 'Knowledge Base', 'url' => '/admin/kb/articles'],
+            ['label' => 'Import',         'url' => '/admin/kb/import'],
+            ['label' => 'Preview'],
+        ],
+        'summary' => [
+            'total_categories'   => $totalCategories,
+            'total_folders'      => $totalFolders,
+            'total_articles'     => $totalArticles,
+            'new_categories'     => $newCategories,
+            'existing_categories'=> $existingCategories,
+            'draft_count'        => $draftCount,
+            'published_count'    => $publishedCount,
+        ],
+        'previewArticles' => $previewArticles,
+    ]);
+});
+
+$router->post('/admin/kb/import/confirm', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/kb/import');
+        return;
+    }
+
+    $data = $_SESSION['kb_json_import_data'] ?? null;
+    unset($_SESSION['kb_json_import_data']);
+
+    if (!is_array($data) || empty($data['categories'])) {
+        flash('error', 'No import data found. Please upload the file again.');
+        redirect('/admin/kb/import');
+        return;
+    }
+
+    $db         = Database::connect();
+    $publishAll = !empty($_POST['publish_all']);
+
+    // Build lookup maps (find existing by name, case-insensitive)
+    $catLookup = [];
+    foreach ($db->query('SELECT id, name FROM kb_categories')->fetchAll() as $c) {
+        $catLookup[strtolower($c['name'])] = (int) $c['id'];
+    }
+    $folderLookup = [];
+    foreach ($db->query('SELECT id, category_id, name FROM kb_folders')->fetchAll() as $f) {
+        $folderLookup[(int) $f['category_id'] . ':' . strtolower($f['name'])] = (int) $f['id'];
+    }
+
+    $db->beginTransaction();
+    try {
+        $insertCat = $db->prepare(
+            'INSERT INTO kb_categories (name, slug, description, is_public, sort_order) VALUES (?, ?, ?, ?, ?)'
+        );
+        $insertFolder = $db->prepare(
+            'INSERT INTO kb_folders (category_id, name, slug, description, sort_order) VALUES (?, ?, ?, ?, ?)'
+        );
+        $insertArticle = $db->prepare(
+            'INSERT INTO kb_articles (folder_id, title, slug, body_markdown, status, published_at, created_by, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        );
+        $insertRevision = $db->prepare(
+            'INSERT INTO kb_article_revisions (article_id, title, body_markdown, edited_by) VALUES (?, ?, ?, ?)'
+        );
+        $checkCatSlug    = $db->prepare('SELECT id FROM kb_categories WHERE slug = ?');
+        $checkFolderSlug = $db->prepare('SELECT id FROM kb_folders WHERE slug = ?');
+        $checkArticleSlug = $db->prepare('SELECT id FROM kb_articles WHERE slug = ?');
+
+        $imported     = 0;
+        $nextCatOrder = (int) $db->query('SELECT COALESCE(MAX(sort_order),0) FROM kb_categories')->fetchColumn();
+
+        foreach ($data['categories'] as $cat) {
+            if (empty($cat['name'])) { continue; }
+            $catKey = strtolower($cat['name']);
+
+            // Find or create category
+            if (!isset($catLookup[$catKey])) {
+                $nextCatOrder++;
+                $catSlug = slugify($cat['name']);
+                $checkCatSlug->execute([$catSlug]);
+                if ($checkCatSlug->fetch()) {
+                    $catSlug .= '-' . substr(md5(uniqid('', true)), 0, 6);
+                }
+                $insertCat->execute([
+                    $cat['name'],
+                    $catSlug,
+                    $cat['description'] ?? null,
+                    (int) ($cat['is_public'] ?? 0),
+                    (int) ($cat['sort_order'] ?? $nextCatOrder),
+                ]);
+                $catLookup[$catKey] = (int) $db->lastInsertId();
+            }
+            $catId = $catLookup[$catKey];
+
+            foreach ($cat['folders'] ?? [] as $folder) {
+                if (empty($folder['name'])) { continue; }
+                $folderKey = $catId . ':' . strtolower($folder['name']);
+
+                // Find or create folder
+                if (!isset($folderLookup[$folderKey])) {
+                    $folderSlug = slugify($cat['name'] . '-' . $folder['name']);
+                    $checkFolderSlug->execute([$folderSlug]);
+                    if ($checkFolderSlug->fetch()) {
+                        $folderSlug .= '-' . substr(md5(uniqid('', true)), 0, 6);
+                    }
+                    $insertFolder->execute([
+                        $catId,
+                        $folder['name'],
+                        $folderSlug,
+                        $folder['description'] ?? null,
+                        (int) ($folder['sort_order'] ?? 0),
+                    ]);
+                    $folderLookup[$folderKey] = (int) $db->lastInsertId();
+                }
+                $folderId = $folderLookup[$folderKey];
+
+                foreach ($folder['articles'] ?? [] as $article) {
+                    if (empty($article['title']) || empty($article['body_markdown'])) { continue; }
+
+                    $slug = slugify($article['title']);
+                    $checkArticleSlug->execute([$slug]);
+                    if ($checkArticleSlug->fetch()) {
+                        $slug .= '-' . substr(md5(uniqid('', true)), 0, 6);
+                    }
+
+                    $status      = $publishAll ? 'published' : ($article['status'] ?? 'draft');
+                    $publishedAt = $status === 'published' ? date('Y-m-d H:i:s') : null;
+
+                    $insertArticle->execute([
+                        $folderId,
+                        $article['title'],
+                        $slug,
+                        $article['body_markdown'],
+                        $status,
+                        $publishedAt,
+                        Auth::id(),
+                        (int) ($article['sort_order'] ?? 0),
+                    ]);
+                    $articleId = (int) $db->lastInsertId();
+                    $insertRevision->execute([$articleId, $article['title'], $article['body_markdown'], Auth::id()]);
+
+                    $imported++;
+                }
+            }
+        }
+
+        $db->commit();
+        flash('success', "Successfully imported {$imported} KB article(s).");
+        redirect('/admin/kb/articles');
+    } catch (PDOException $e) {
+        $db->rollBack();
+        flash('error', 'Import failed: ' . $e->getMessage());
+        redirect('/admin/kb/import');
+    }
+});
+
+/* ==================================================================
  * ADMIN – Settings (Email / SMTP Configuration)
  * ================================================================== */
 
