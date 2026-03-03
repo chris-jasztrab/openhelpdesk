@@ -15,3 +15,6 @@ kb_articles.csv
 /storage/backups/*.zip
 .phpunit.result.cache
 test-results*.txt
+
+# Rescue script — never commit a live copy to the repo
+/public/rescue.php
