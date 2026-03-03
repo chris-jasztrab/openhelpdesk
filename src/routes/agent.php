@@ -2,6 +2,43 @@
 
 declare(strict_types=1);
 
+/**
+ * Enforce group-based visibility for individual agent ticket routes.
+ *
+ * Rules (mirrors _apiEnforceTicketAccess in api.php):
+ *   admin  → unrestricted
+ *   agent  → if the agent belongs to one or more groups, only tickets
+ *             whose group_id is in that set are accessible; tickets
+ *             with group_id = NULL are visible to all agents.
+ *             Agents with no group assignment are unrestricted.
+ *
+ * $ticket must contain group_id (int|null).
+ * Redirects to /agent/tickets with an error flash if access is denied.
+ */
+function _agentRequireTicketAccess(PDO $db, array $ticket): void
+{
+    if (Auth::role() !== 'agent') {
+        return; // admins: unrestricted
+    }
+
+    $gs = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
+    $gs->execute([Auth::id()]);
+    $agentGroups = array_map('intval', $gs->fetchAll(PDO::FETCH_COLUMN));
+
+    if (empty($agentGroups)) {
+        return; // agent not in any group: unrestricted
+    }
+
+    if ($ticket['group_id'] === null) {
+        return; // unassigned ticket: visible to all agents
+    }
+
+    if (!in_array((int) $ticket['group_id'], $agentGroups, true)) {
+        flash('error', 'You do not have access to this ticket.');
+        redirect('/agent/tickets');
+    }
+}
+
 /* ==================================================================
  * AGENT – Ticket Viewing
  * ================================================================== */
@@ -511,6 +548,8 @@ $router->get('/agent/tickets/{id}', function (array $p) {
         redirect('/agent/tickets');
     }
 
+    _agentRequireTicketAccess($db, $ticket);
+
     // Tags
     $tags = $db->prepare(
         'SELECT tt.name FROM ticket_tags tt
@@ -601,11 +640,13 @@ $router->post('/agent/tickets/{id}/watch', function (array $p) {
         redirect("/agent/tickets/{$id}");
     }
     $db = Database::connect();
-    $check = $db->prepare('SELECT id FROM tickets WHERE id = ?');
+    $check = $db->prepare('SELECT id, group_id FROM tickets WHERE id = ?');
     $check->execute([$id]);
-    if (!$check->fetch()) {
+    $watchTicket = $check->fetch();
+    if (!$watchTicket) {
         redirect('/agent/tickets');
     }
+    _agentRequireTicketAccess($db, $watchTicket);
     $existing = $db->prepare('SELECT 1 FROM ticket_watchers WHERE ticket_id = ? AND user_id = ?');
     $existing->execute([$id, Auth::id()]);
     if ($existing->fetchColumn()) {
@@ -641,22 +682,24 @@ $router->post('/agent/tickets/{id}/merge', function (array $p) {
     $db = Database::connect();
 
     // Validate source ticket (must exist and not already merged)
-    $src = $db->prepare('SELECT id, subject FROM tickets WHERE id = ? AND merged_into_ticket_id IS NULL');
+    $src = $db->prepare('SELECT id, subject, group_id FROM tickets WHERE id = ? AND merged_into_ticket_id IS NULL');
     $src->execute([$sourceId]);
     $sourceTicket = $src->fetch();
     if (!$sourceTicket) {
         flash('error', 'Source ticket not found or already merged.');
         redirect("/agent/tickets/{$sourceId}");
     }
+    _agentRequireTicketAccess($db, $sourceTicket);
 
     // Validate target ticket (must exist and not itself be merged)
-    $tgt = $db->prepare('SELECT id, subject FROM tickets WHERE id = ? AND merged_into_ticket_id IS NULL');
+    $tgt = $db->prepare('SELECT id, subject, group_id FROM tickets WHERE id = ? AND merged_into_ticket_id IS NULL');
     $tgt->execute([$targetId]);
     $targetTicket = $tgt->fetch();
     if (!$targetTicket) {
         flash('error', 'Target ticket not found or is itself a merged ticket.');
         redirect("/agent/tickets/{$sourceId}");
     }
+    _agentRequireTicketAccess($db, $targetTicket);
 
     $db->beginTransaction();
     try {
@@ -732,6 +775,8 @@ $router->get('/agent/tickets/{id}/split', function (array $p) {
         redirect('/agent/tickets');
     }
 
+    _agentRequireTicketAccess($db, $ticket);
+
     // Public comments only
     $commentsStmt = $db->prepare(
         "SELECT tl.*, CONCAT(u.first_name, ' ', u.last_name) AS user_name
@@ -782,6 +827,8 @@ $router->post('/agent/tickets/{id}/split', function (array $p) {
         flash('error', 'Source ticket not found or already merged.');
         redirect('/agent/tickets');
     }
+
+    _agentRequireTicketAccess($db, $sourceTicket);
 
     $newId = null;
     $db->beginTransaction();
@@ -856,12 +903,14 @@ $router->post('/agent/tickets/{id}/fields', function (array $p) {
     }
 
     $db = Database::connect();
-    $t  = $db->prepare('SELECT id FROM tickets WHERE id = ?');
+    $t  = $db->prepare('SELECT id, group_id FROM tickets WHERE id = ?');
     $t->execute([$id]);
-    if (!$t->fetch()) {
+    $fieldsTicket = $t->fetch();
+    if (!$fieldsTicket) {
         flash('error', 'Ticket not found.');
         redirect('/agent/tickets');
     }
+    _agentRequireTicketAccess($db, $fieldsTicket);
 
     $fields   = $db->query('SELECT * FROM ticket_form_fields WHERE deleted_at IS NULL ORDER BY sort_order')->fetchAll();
     $saveStmt = $db->prepare(
@@ -916,13 +965,15 @@ $router->post('/agent/tickets/{id}/comment', function (array $p) {
 
     $db = Database::connect();
 
-    // Verify ticket exists
-    $stmt = $db->prepare('SELECT id FROM tickets WHERE id = ?');
+    // Verify ticket exists and agent has access
+    $stmt = $db->prepare('SELECT id, group_id FROM tickets WHERE id = ?');
     $stmt->execute([$id]);
-    if (!$stmt->fetch()) {
+    $commentTicket = $stmt->fetch();
+    if (!$commentTicket) {
         flash('error', 'Ticket not found.');
         redirect('/agent/tickets');
     }
+    _agentRequireTicketAccess($db, $commentTicket);
 
     $db->prepare(
         'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, ?)'
@@ -1011,6 +1062,8 @@ $router->post('/agent/tickets/{id}/update', function (array $p) {
         flash('error', 'Ticket not found.');
         redirect('/agent/tickets');
     }
+
+    _agentRequireTicketAccess($db, $ticket);
 
     $changes = [];
 
@@ -1133,7 +1186,12 @@ $router->get('/agent/attachments/{id}/download', function (array $p) {
     Auth::requireRole('agent', 'admin');
     $db = Database::connect();
 
-    $stmt = $db->prepare('SELECT * FROM ticket_attachments WHERE id = ?');
+    $stmt = $db->prepare(
+        'SELECT ta.*, t.group_id AS ticket_group_id
+         FROM ticket_attachments ta
+         JOIN tickets t ON ta.ticket_id = t.id
+         WHERE ta.id = ?'
+    );
     $stmt->execute([(int) $p['id']]);
     $att = $stmt->fetch();
 
@@ -1141,6 +1199,8 @@ $router->get('/agent/attachments/{id}/download', function (array $p) {
         flash('error', 'Attachment not found.');
         redirect('/agent/tickets');
     }
+
+    _agentRequireTicketAccess($db, ['group_id' => $att['ticket_group_id']]);
 
     $filePath = ATTACHMENT_STORAGE_PATH . $att['stored_name'];
     if (!file_exists($filePath)) {
