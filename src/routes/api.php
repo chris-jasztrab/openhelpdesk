@@ -125,6 +125,52 @@ function _apiGroupRestriction(PDO $db, array $user): array
     return [" AND group_id IN ($ph)", $groupIds];
 }
 
+/**
+ * Enforce per-ticket access control for all individual-ticket endpoints.
+ *
+ * Rules:
+ *   - admin  → unrestricted
+ *   - user   → may only access tickets they created
+ *   - agent  → if the agent belongs to one or more groups, only tickets
+ *               whose group_id is in that set (or whose group_id is NULL)
+ *               are accessible; agents with no group assignment are unrestricted
+ *
+ * $ticket must contain at minimum: created_by (int), group_id (int|null).
+ * Exits with HTTP 403 if access is denied.
+ */
+function _apiEnforceTicketAccess(PDO $db, array $user, array $ticket): void
+{
+    if ($user['role'] === 'admin') {
+        return; // unrestricted
+    }
+
+    if ($user['role'] === 'user') {
+        if ((int) $ticket['created_by'] !== (int) $user['id']) {
+            _apiJson(['error' => 'Forbidden'], 403);
+        }
+        return;
+    }
+
+    // Agent: enforce group-based visibility
+    $gs = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
+    $gs->execute([$user['id']]);
+    $agentGroups = array_map('intval', $gs->fetchAll(PDO::FETCH_COLUMN));
+
+    // Agents not in any group can see all tickets (matches list-endpoint behaviour)
+    if (empty($agentGroups)) {
+        return;
+    }
+
+    // Tickets with no group assigned are visible to all agents
+    if ($ticket['group_id'] === null) {
+        return;
+    }
+
+    if (!in_array((int) $ticket['group_id'], $agentGroups, true)) {
+        _apiJson(['error' => 'Forbidden'], 403);
+    }
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // AUTH
 // ══════════════════════════════════════════════════════════════════════════════
@@ -589,10 +635,7 @@ $router->get('/api/v1/tickets/{id}', function (array $p) {
         _apiJson(['error' => 'Ticket not found'], 404);
     }
 
-    // Access check — users can only view their own tickets
-    if ($user['role'] === 'user' && (int) $ticket['created_by'] !== (int) $user['id']) {
-        _apiJson(['error' => 'Forbidden'], 403);
-    }
+    _apiEnforceTicketAccess($db, $user, $ticket);
 
     // Tags
     $s = $db->prepare(
@@ -668,6 +711,8 @@ $router->post('/api/v1/tickets/{id}/update', function (array $p) {
     if (!$ticket) {
         _apiJson(['error' => 'Ticket not found'], 404);
     }
+
+    _apiEnforceTicketAccess($db, $user, $ticket);
 
     $input   = _apiInput();
     $changes = [];
@@ -812,15 +857,14 @@ $router->get('/api/v1/tickets/{id}/timeline', function (array $p) {
     $db       = Database::connect();
     $ticketId = (int) $p['id'];
 
-    $tStmt = $db->prepare('SELECT id, created_by FROM tickets WHERE id = ?');
+    $tStmt = $db->prepare('SELECT id, created_by, group_id FROM tickets WHERE id = ?');
     $tStmt->execute([$ticketId]);
     $ticket = $tStmt->fetch(PDO::FETCH_ASSOC);
     if (!$ticket) {
         _apiJson(['error' => 'Ticket not found'], 404);
     }
-    if ($user['role'] === 'user' && (int) $ticket['created_by'] !== (int) $user['id']) {
-        _apiJson(['error' => 'Forbidden'], 403);
-    }
+
+    _apiEnforceTicketAccess($db, $user, $ticket);
 
     // Users always see public entries; agents/admins may request internal ones
     $internalFilter = '';
@@ -898,9 +942,8 @@ $router->post('/api/v1/tickets/{id}/replies', function (array $p) {
     if (!$ticket) {
         _apiJson(['error' => 'Ticket not found'], 404);
     }
-    if ($user['role'] === 'user' && (int) $ticket['created_by'] !== $userId) {
-        _apiJson(['error' => 'Forbidden'], 403);
-    }
+
+    _apiEnforceTicketAccess($db, $user, $ticket);
 
     $input   = _apiInput();
     $message = trim($input['message'] ?? '');
