@@ -7,6 +7,9 @@
     <title><?= e($pageTitle) ?> &ndash; <?= e(getSetting('branding_app_name', 'LocalDesk')) ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <?php if (Auth::check() && Auth::role() === 'agent'): ?>
+    <link href="https://cdn.jsdelivr.net/npm/driver.js@1.3.4/dist/driver.css" rel="stylesheet">
+    <?php endif; ?>
     <style>
         :root {
             --ld-primary: <?= e(getSetting('branding_primary_color', '#4f46e5')) ?>;
@@ -316,5 +319,9 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function(el){new bootstrap.Tooltip(el)});</script>
+    <?php if (Auth::check() && Auth::role() === 'agent'): ?>
+    <script src="https://cdn.jsdelivr.net/npm/driver.js@1.3.4/dist/driver.js.iife.js"></script>
+    <?php require ROOT_DIR . '/templates/partials/agent-tour.php'; ?>
+    <?php endif; ?>
 </body>
 </html>

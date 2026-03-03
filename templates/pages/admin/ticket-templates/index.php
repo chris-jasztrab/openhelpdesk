@@ -20,13 +20,13 @@ $breadcrumbs  = $isAgentView ? [
         <a href="<?= $ticketsUrl ?>" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-arrow-left me-1"></i>Back to Tickets
         </a>
-        <a href="/admin/ticket-templates/create" class="btn btn-sm text-white" style="background:var(--ld-primary);">
+        <a id="tour-create-template-btn" href="/admin/ticket-templates/create" class="btn btn-sm text-white" style="background:var(--ld-primary);">
             <i class="bi bi-plus-lg me-1"></i>New Template
         </a>
     </div>
 </div>
 
-<div class="card border-0 shadow-sm">
+<div class="card border-0 shadow-sm" id="tour-templates-card">
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
             <thead class="table-light">

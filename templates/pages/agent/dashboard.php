@@ -16,7 +16,7 @@ $statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 
     </div>
 </div>
 
-<div class="row g-4 mb-4">
+<div class="row g-4 mb-4" id="tour-stat-cards">
     <div class="col-md-3">
         <div class="card stat-card h-100">
             <div class="card-body d-flex align-items-center gap-3">
@@ -71,7 +71,7 @@ $statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 
     </div>
 </div>
 
-<div class="card border-0 shadow-sm">
+<div class="card border-0 shadow-sm" id="tour-recent-tickets">
     <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
         <h5 class="mb-0 fw-semibold"><i class="bi bi-ticket-detailed me-2"></i>Recent Tickets</h5>
         <a href="/agent/tickets" class="btn btn-sm btn-outline-secondary">View All</a>

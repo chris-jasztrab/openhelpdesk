@@ -1429,6 +1429,21 @@ $router->post('/notifications/read-all', function () {
 /* ------------------------------------------------------------------
  * Agent area
  * ------------------------------------------------------------------ */
+$router->post('/agent/tour/dismiss', function () {
+    Auth::requireRole('agent', 'admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        http_response_code(403);
+        header('Content-Type: application/json');
+        echo json_encode(['ok' => false]);
+        exit;
+    }
+    $db = Database::connect();
+    $db->prepare('UPDATE users SET show_agent_tour = 0 WHERE id = ?')->execute([Auth::id()]);
+    header('Content-Type: application/json');
+    echo json_encode(['ok' => true]);
+    exit;
+});
+
 $router->get('/agent', function () {
     Auth::requireRole('agent', 'admin');
     $db      = Database::connect();
@@ -1481,12 +1496,23 @@ $router->get('/agent', function () {
     $stmt->execute($groupParams);
     $recent = $stmt->fetchAll();
 
+    // Determine whether to auto-show the agent tour
+    $autoShowTour = false;
+    if (Auth::role() === 'agent') {
+        $tourStmt = $db->prepare('SELECT show_agent_tour FROM users WHERE id = ?');
+        $tourStmt->execute([$agentId]);
+        $autoShowTour = (bool) $tourStmt->fetchColumn() || isset($_GET['tour']);
+    } elseif (isset($_GET['tour'])) {
+        $autoShowTour = true; // Let admins preview the agent tour
+    }
+
     render('agent/dashboard', [
         'unassigned'    => $unassigned,
         'myTickets'     => $myTickets,
         'pending'       => $pending,
         'resolvedToday' => $resolvedToday,
         'recentTickets' => $recent,
+        'autoShowTour'  => $autoShowTour,
     ]);
 });
 

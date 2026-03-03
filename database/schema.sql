@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS `users` (
     `notify_csat`             TINYINT(1)   NOT NULL DEFAULT 1,
     `totp_secret`             VARCHAR(64)  NULL     DEFAULT NULL,
     `totp_enabled`            TINYINT(1)   NOT NULL DEFAULT 0,
+    `show_agent_tour`         TINYINT(1)   NOT NULL DEFAULT 1,
     `can_view_location_tickets` TINYINT(1) NOT NULL DEFAULT 0,
     `created_at`  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     `updated_at`  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

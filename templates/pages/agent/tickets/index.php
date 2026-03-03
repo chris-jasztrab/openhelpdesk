@@ -24,7 +24,7 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
             <?php if ($hasFilters): ?><span class="badge bg-primary rounded-pill ms-1"><?= count($hasFilters) ?></span><?php endif; ?>
         </button>
         <div class="dropdown">
-            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+            <button id="tour-columns-btn" class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
                 <i class="bi bi-layout-three-columns me-1"></i>Columns
             </button>
             <div class="dropdown-menu dropdown-menu-end p-3" style="min-width:200px;">
@@ -45,10 +45,10 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                 </form>
             </div>
         </div>
-        <a href="/admin/ticket-templates" class="btn btn-sm btn-outline-secondary">
+        <a id="tour-templates-link" href="/admin/ticket-templates" class="btn btn-sm btn-outline-secondary">
             <i class="bi bi-collection me-1"></i>Templates
         </a>
-        <a href="/agent/tickets/create" class="btn btn-sm text-white" style="background:var(--ld-primary);">
+        <a id="tour-new-ticket-btn" href="/agent/tickets/create" class="btn btn-sm text-white" style="background:var(--ld-primary);">
             <i class="bi bi-plus-lg me-1"></i>New Ticket
         </a>
     </div>
