@@ -20,6 +20,7 @@ declare(strict_types=1);
 
 define('ROOT_DIR', dirname(__DIR__));
 
+require_once ROOT_DIR . '/vendor/autoload.php';
 require_once ROOT_DIR . '/src/helpers.php';
 require_once ROOT_DIR . '/src/Database.php';
 
@@ -92,8 +93,9 @@ foreach ($messages as $msg) {
     logMsg('INFO', "Message {$msgId}: From={$fromAddr} Subject=\"{$subject}\"");
 
     // ── Extract ticket ID from subject ────────────────────────────────────────
+    // Matches both [Ticket #123] and [#123] to handle default and custom templates.
     $ticketId = null;
-    if (preg_match('/\[Ticket\s*#(\d+)\]/i', $subject, $m)) {
+    if (preg_match('/\[(?:Ticket\s*)?#(\d+)\]/i', $subject, $m)) {
         $ticketId = (int) $m[1];
     }
 
