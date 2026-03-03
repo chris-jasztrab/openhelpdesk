@@ -73,11 +73,14 @@ assert_eq('body unchanged', "Please check ticket #123 for details.\nThanks.", $r
 assert_eq('status=null',    null,                                              $r['status']);
 assert_eq('priority=null',  null,                                              $r['priority_slug']);
 
-// ─── 7. Hashtag mid-body on its own line but NOT at end ───────────────────────
-echo "\n7. Command-looking line in middle of body is ignored\n";
-$r = parseEmailCommands("#close\nActually, keep it open.\nLet me know.");
-assert_eq('body unchanged', "#close\nActually, keep it open.\nLet me know.", $r['body']);
-assert_eq('status=null',    null, $r['status']);
+// ─── 7. Command deeper than threshold (9 non-blank lines from end) — ignored ──
+// The signature-tolerance threshold is 8. If a command is > 8 non-blank lines
+// from the end, it is not treated as a command (truly "in the middle").
+echo "\n7. Command > 8 non-blank lines from end is ignored (truly mid-body)\n";
+$deepBody = "#close\nL1\nL2\nL3\nL4\nL5\nL6\nL7\nL8\nL9";
+$r = parseEmailCommands($deepBody);
+assert_eq('body unchanged (deep)', $deepBody, $r['body']);
+assert_eq('status=null (deep)',    null,       $r['status']);
 
 // ─── 8. Commands-only email (no body text) ────────────────────────────────────
 echo "\n8. Commands-only email produces empty body\n";
@@ -139,6 +142,35 @@ $input = "Use the #tag system to label issues.\n\nSee you later.";
 $r = parseEmailCommands($input);
 assert_eq('body unchanged', $input, $r['body']);
 assert_eq('status=null',    null,   $r['status']);
+
+// ─── 15. Command followed by typical email signature ─────────────────────────
+echo "\n15. Command followed by email signature (Outlook style)\n";
+$r = parseEmailCommands(
+    "This issue is resolved.\n\n#close\n\nThanks,\nJohn Smith\nIT Support\nWaterloo Public Library"
+);
+assert_eq('status=closed with sig',  'closed',                    $r['status']);
+// The blank before AND after #close both remain; the signature is preserved in body
+assert_eq('body has message+sig',    "This issue is resolved.\n\n\nThanks,\nJohn Smith\nIT Support\nWaterloo Public Library", $r['body']);
+
+// ─── 16. Command followed by longer corporate signature (6 lines) ─────────────
+echo "\n16. Command followed by 6-line corporate signature\n";
+$sig = "Kind regards,\nJohn Smith\nSenior IT Technician\nWaterloo Public Library\n(519) 886-1310\njsmith@wpl.ca";
+$r   = parseEmailCommands("Please close.\n\n#resolve #high\n\n{$sig}");
+assert_eq('status=resolved with long sig', 'resolved', $r['status']);
+assert_eq('priority=high with long sig',   'high',     $r['priority_slug']);
+
+// ─── 17. Signature longer than threshold — command NOT beyond max sig lines ───
+echo "\n17. Signature longer than max threshold (9 non-blank lines) — command not found\n";
+$longSig = implode("\n", ['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7', 'L8', 'L9']);
+$r = parseEmailCommands("Body text.\n\n#close\n\n{$longSig}");
+// With 9 non-blank non-command lines, parser gives up (threshold=8)
+assert_eq('no command past threshold', null, $r['status']);
+
+// ─── 18. Multiple commands across two lines before signature ──────────────────
+echo "\n18. Two command lines before signature\n";
+$r = parseEmailCommands("Done.\n#resolve\n#critical\n\nRegards,\nJohn");
+assert_eq('status=resolved multi-line', 'resolved', $r['status']);
+assert_eq('priority=critical multi-line', 'critical', $r['priority_slug']);
 
 // ─── Summary ─────────────────────────────────────────────────────────────────
 echo "\n=== Results: {$pass} passed, {$fail} failed ===\n\n";

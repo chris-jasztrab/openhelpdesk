@@ -407,7 +407,7 @@ function extractReplyBody(string $body): string
     $lines = explode("\n", $body);
     $result = [];
 
-    // Patterns that signal the start of the quoted original
+    // Patterns that signal the start of the quoted original or a signature block
     $stopPatterns = [
         '/^>/',                                        // Quoted line
         '/^On\s.+\bwrote\s*:\s*$/is',                 // "On Mon, 1 Jan wrote:"
@@ -415,6 +415,7 @@ function extractReplyBody(string $body): string
         '/^-{3,}\s*Forwarded\s*-{3,}/i',
         '/^_{5,}$/',                                   // ____________
         '/^From:\s+.+/i',                              // From: header in a reply block
+        '/^--\s*$/',                                   // RFC 3676 email signature delimiter (-- or "-- ")
     ];
 
     // "On [date] ..." can span two lines; buffer one line to look ahead

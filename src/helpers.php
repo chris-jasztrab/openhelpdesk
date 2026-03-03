@@ -1711,11 +1711,15 @@ function runAutomations(PDO $db, int $ticketId, string $triggerEvent): void
  *
  * Scans backward through the body lines. A line is a "command line" if its
  * entire trimmed content consists only of one or more #word tokens (e.g. "#close #high").
- * Blank lines between the body and the command block are skipped. Scanning stops
- * the moment a non-command, non-blank line is encountered.
+ * Blank lines are always skipped.
  *
- * Only trailing command lines are parsed — hashtags that appear mid-sentence are
- * never treated as commands.
+ * To handle email signatures that appear after the command (e.g. "Thanks, John / IT Support"),
+ * the scan allows up to MAX_SIG_LINES non-command non-blank lines at the tail before giving up.
+ * Once any command line is found, the scan stops immediately at the next non-command non-blank
+ * line going further up — this prevents scanning through the entire email body.
+ *
+ * Only lines that are purely "#word" tokens qualify as commands — hashtags embedded in
+ * normal sentences (e.g. "check ticket #123") are never treated as commands.
  *
  * Returns an array:
  *   'body'          => string  — body with command lines removed and trailing blanks trimmed
@@ -1740,20 +1744,38 @@ function parseEmailCommands(string $body): array
     ];
     $prioritySlugs = ['low', 'medium', 'high', 'critical'];
 
+    // Max non-blank non-command trailing lines to skip before giving up.
+    // Sized to cover typical corporate email signatures (name / title / company /
+    // phone / email / website = ~6 lines) plus a small buffer.
+    $maxSigLines = 8;
+
     $body  = str_replace(["\r\n", "\r"], "\n", $body);
     $lines = explode("\n", $body);
 
-    // Walk backward; collect indices of trailing command-only lines (skip blank lines)
-    $commandIdx = [];
+    // Walk backward looking for command-only lines.
+    // - Before any command is found: skip up to $maxSigLines non-blank non-command lines
+    //   (the email signature that appears after the command in the raw body).
+    // - Once a command is found: stop immediately at the next non-blank non-command line
+    //   (that's where the real message body starts).
+    $commandIdx    = [];
+    $trailingCount = 0;
+
     for ($i = count($lines) - 1; $i >= 0; $i--) {
         $trimmed = trim($lines[$i]);
         if ($trimmed === '') {
-            continue; // skip blank lines between body and commands
+            continue; // blank lines never count
         }
         if (preg_match('/^(#[a-z_]+\s*)+$/i', $trimmed)) {
-            $commandIdx[] = $i;
+            $commandIdx[]  = $i;
+            $trailingCount = 0; // reset — keep looking for more commands going upward
         } else {
-            break; // first non-command non-blank line — stop
+            if (!empty($commandIdx)) {
+                break; // already found commands; this is real body text — stop
+            }
+            $trailingCount++;
+            if ($trailingCount > $maxSigLines) {
+                break; // too many trailing non-command lines; give up
+            }
         }
     }
 
