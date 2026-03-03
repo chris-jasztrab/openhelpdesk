@@ -1552,3 +1552,8 @@ $router->get('/admin', function () {
 });
 
 require ROOT_DIR . '/src/routes/admin.php';
+
+/* ------------------------------------------------------------------
+ * Mobile REST API
+ * ------------------------------------------------------------------ */
+require ROOT_DIR . '/src/routes/api.php';
