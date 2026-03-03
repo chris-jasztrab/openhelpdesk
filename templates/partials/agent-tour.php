@@ -3,14 +3,11 @@
  * Agent onboarding tour (Driver.js spotlight).
  * Included by app.php for all agent-role pages.
  *
- * Variables expected from layout scope:
- *   $autoShowTour (bool) — true when the tour should auto-open on this page load.
- *
- * The tour spans three sections across different pages:
+ * Tour flow (4 sections across different pages):
  *   dashboard  → /agent
  *   tickets    → /agent/tickets
+ *   ticket     → /agent/tickets/{id}   ← new section
  *   templates  → /admin/ticket-templates
- *   (email steps are appended to the templates section)
  */
 $_agentTourCsrf     = csrfToken();
 $_agentTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
@@ -30,6 +27,8 @@ $_agentTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
         tourSection = 'dashboard';
     } else if (storedPage === 'tickets' && path === '/agent/tickets') {
         tourSection = 'tickets';
+    } else if (storedPage === 'ticket' && /^\/agent\/tickets\/\d+$/.test(path)) {
+        tourSection = 'ticket';
     } else if (storedPage === 'templates' && path === '/admin/ticket-templates') {
         tourSection = 'templates';
     }
@@ -160,14 +159,129 @@ $_agentTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
             }
         },
         {
-            element: '#tour-templates-link',
             popover: {
-                title:       'Ticket Templates',
-                description: 'Click <strong>Templates</strong> to manage your saved templates. ' +
-                             'Templates store a pre-filled subject, description, type, and priority for common requests — ' +
-                             'so you do not have to type the same details every time.',
-                side:        'bottom',
-                align:       'end',
+                title:       'Let\'s Open a Ticket',
+                description: 'Now let\'s look inside a ticket to see how to work with it.',
+                onNextClick: function () {
+                    isNavigating = true;
+                    var firstLink = document.querySelector('tbody tr a[href^="/agent/tickets/"]');
+                    if (firstLink) {
+                        localStorage.setItem('ld_agent_tour_page', 'ticket');
+                        window.location.href = firstLink.href;
+                    } else {
+                        // No tickets yet — skip straight to templates
+                        localStorage.setItem('ld_agent_tour_page', 'templates');
+                        window.location.href = '/admin/ticket-templates';
+                    }
+                }
+            }
+        }
+    ];
+
+    var ticketSteps = [
+        {
+            popover: {
+                title:       'Inside a Ticket',
+                description: 'This is the ticket detail page — where you read, respond to, and manage a support request. ' +
+                             'Let\'s walk through each part.'
+            }
+        },
+        {
+            element: '#tour-ticket-header',
+            popover: {
+                title:       'Ticket Header',
+                description: 'The subject line sits at the top, with colour-coded badges showing the current ' +
+                             '<strong>Status</strong>, <strong>Priority</strong>, and <strong>SLA state</strong> (On Track / Warning / Breached). ' +
+                             'The ticket number is also shown here for reference.',
+                side:  'bottom',
+                align: 'start'
+            }
+        },
+        {
+            element: '#tour-ticket-description',
+            popover: {
+                title:       'Description',
+                description: 'The full description submitted by the user appears here, along with any file attachments they included.',
+                side:  'bottom',
+                align: 'start'
+            }
+        },
+        {
+            element: '#tour-ticket-timeline',
+            popover: {
+                title:       'Timeline',
+                description: 'Every action on the ticket is logged here in chronological order — replies, internal notes, ' +
+                             'status changes, assignments, and SLA events. ' +
+                             'Internal notes (shown with a lock icon) are visible to agents only.',
+                side:  'top',
+                align: 'start'
+            }
+        },
+        {
+            element: '#replyActionBar',
+            popover: {
+                title:       'Reply, Note & Forward',
+                description: '<strong>Reply</strong> sends a visible response to the user by email.<br>' +
+                             '<strong>Note</strong> adds an internal-only comment — the user cannot see it, ' +
+                             'useful for leaving context for other agents.<br>' +
+                             '<strong>Forward</strong> routes the message to a third party (e.g. a vendor) ' +
+                             'while keeping the ticket open and tracked.',
+                side:  'top',
+                align: 'start'
+            }
+        },
+        {
+            element: '#tour-ticket-details',
+            popover: {
+                title:       'Ticket Details',
+                description: 'The Details panel shows who created the ticket, the assigned agent, group, type, location, ' +
+                             'created date, and due date. It also captures the browser and OS the request came from.',
+                side:  'left',
+                align: 'start'
+            }
+        },
+        {
+            element: '#tour-update-ticket',
+            popover: {
+                title:       'Update Ticket',
+                description: 'Use this panel to change the <strong>Status</strong>, <strong>Priority</strong>, ' +
+                             '<strong>Assigned Agent</strong>, or <strong>Group</strong>, then click <strong>Update</strong> to save.<br><br>' +
+                             'When sending a reply you can also change the status in one step using the dropdown ' +
+                             'next to the Send button — for example, reply and mark as Resolved at the same time.',
+                side:  'left',
+                align: 'start'
+            }
+        },
+        {
+            element: '#tour-watch-btn',
+            popover: {
+                title:       'Watch',
+                description: 'Click <strong>Watch</strong> to subscribe to email updates for this ticket even if it is ' +
+                             'not assigned to you — useful when you want to stay informed without being the primary agent. ' +
+                             'Click again to stop watching.',
+                side:  'bottom',
+                align: 'end'
+            }
+        },
+        {
+            element: '#tour-split-btn',
+            popover: {
+                title:       'Split',
+                description: 'Use <strong>Split</strong> when a ticket contains more than one unrelated issue. ' +
+                             'It creates a new ticket from the original so each issue can be tracked and resolved separately.',
+                side:  'bottom',
+                align: 'end'
+            }
+        },
+        {
+            element: '#tour-merge-btn',
+            popover: {
+                title:       'Merge',
+                description: 'Use <strong>Merge</strong> to combine duplicate or closely related tickets into one. ' +
+                             'Search for the target ticket, confirm, and all activity is consolidated under the master ticket. ' +
+                             'The merged ticket is then closed automatically.',
+                side:  'bottom',
+                align: 'end',
                 onNextClick: function () {
                     isNavigating = true;
                     localStorage.setItem('ld_agent_tour_page', 'templates');
@@ -237,6 +351,9 @@ $_agentTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
         steps = dashboardSteps;
     } else if (tourSection === 'tickets') {
         steps = ticketsSteps;
+        localStorage.removeItem('ld_agent_tour_page');
+    } else if (tourSection === 'ticket') {
+        steps = ticketSteps;
         localStorage.removeItem('ld_agent_tour_page');
     } else {
         steps = templatesSteps;

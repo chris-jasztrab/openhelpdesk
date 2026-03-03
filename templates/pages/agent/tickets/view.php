@@ -23,7 +23,7 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
 </div>
 <?php endif; ?>
 
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex justify-content-between align-items-center mb-4" id="tour-ticket-header">
     <div>
         <h2 class="fw-bold mb-1"><?= e($ticket['subject']) ?></h2>
         <div class="d-flex gap-2 align-items-center">
@@ -46,19 +46,19 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
             <span class="text-muted">Ticket #<?= $ticket['id'] ?></span>
         </div>
     </div>
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2" id="tour-ticket-actions">
         <form method="POST" action="/agent/tickets/<?= (int) $ticket['id'] ?>/watch">
             <?= csrfField() ?>
-            <button type="submit" class="btn <?= $isWatching ? 'btn-primary' : 'btn-outline-secondary' ?>"
+            <button type="submit" id="tour-watch-btn" class="btn <?= $isWatching ? 'btn-primary' : 'btn-outline-secondary' ?>"
                     title="<?= $isWatching ? 'Stop watching this ticket' : 'Watch this ticket to receive email updates' ?>">
                 <i class="bi <?= $isWatching ? 'bi-eye-fill' : 'bi-eye' ?> me-1"></i><?= $isWatching ? 'Watching' : 'Watch' ?>
             </button>
         </form>
         <?php if (!$ticket['merged_into_ticket_id']): ?>
-        <a href="/agent/tickets/<?= (int) $ticket['id'] ?>/split" class="btn btn-outline-warning">
+        <a href="/agent/tickets/<?= (int) $ticket['id'] ?>/split" id="tour-split-btn" class="btn btn-outline-warning">
             <i class="bi bi-scissors me-1"></i>Split
         </a>
-        <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#mergeModal">
+        <button type="button" id="tour-merge-btn" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#mergeModal">
             <i class="bi bi-arrow-right-circle me-1"></i>Merge
         </button>
         <?php endif; ?>
@@ -71,7 +71,7 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
 <div class="row g-4">
     <!-- Left column: Description + Timeline -->
     <div class="col-lg-8">
-        <div class="card border-0 shadow-sm mb-4">
+        <div class="card border-0 shadow-sm mb-4" id="tour-ticket-description">
             <div class="card-header bg-white border-bottom">
                 <h5 class="mb-0 fw-semibold"><i class="bi bi-text-paragraph me-2"></i>Description</h5>
             </div>
@@ -113,7 +113,7 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
             <div class="d-flex flex-wrap gap-1 align-items-center" id="tagList"></div>
         </div>
 
-        <div class="card border-0 shadow-sm">
+        <div class="card border-0 shadow-sm" id="tour-ticket-timeline">
             <div class="card-header bg-white border-bottom">
                 <h5 class="mb-0 fw-semibold"><i class="bi bi-clock-history me-2"></i>Timeline</h5>
             </div>
@@ -270,7 +270,7 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
 
     <!-- Right column: Metadata + Update -->
     <div class="col-lg-4">
-        <div class="card border-0 shadow-sm mb-4">
+        <div class="card border-0 shadow-sm mb-4" id="tour-ticket-details">
             <div class="card-header bg-white border-bottom">
                 <h5 class="mb-0 fw-semibold"><i class="bi bi-info-circle me-2"></i>Details</h5>
             </div>
@@ -465,7 +465,7 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
         </div>
 
         <!-- Update Ticket -->
-        <div class="card border-0 shadow-sm">
+        <div class="card border-0 shadow-sm" id="tour-update-ticket">
             <div class="card-header bg-white border-bottom">
                 <h5 class="mb-0 fw-semibold"><i class="bi bi-pencil-square me-2"></i>Update Ticket</h5>
             </div>
