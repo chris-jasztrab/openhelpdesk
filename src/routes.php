@@ -21,6 +21,11 @@ $router->post('/api/tickets/{id}/tags', function (array $p) {
         echo json_encode(['error' => 'Forbidden']);
         exit;
     }
+    if (!verifyCsrf($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '')) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Invalid CSRF token']);
+        exit;
+    }
     header('Content-Type: application/json');
 
     $ticketId = (int) $p['id'];
@@ -122,6 +127,11 @@ $router->post('/api/tickets/{id}/cc', function (array $p) {
         echo json_encode(['error' => 'Forbidden']);
         exit;
     }
+    if (!verifyCsrf($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '')) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Invalid CSRF token']);
+        exit;
+    }
     header('Content-Type: application/json');
 
     $ticketId = (int) $p['id'];
@@ -213,6 +223,12 @@ $router->post('/api/tickets/{id}/presence', function (array $p) {
         http_response_code(403);
         header('Content-Type: application/json');
         echo json_encode(['error' => 'Forbidden']);
+        exit;
+    }
+    if (!verifyCsrf($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '')) {
+        http_response_code(403);
+        header('Content-Type: application/json');
+        echo json_encode(['error' => 'Invalid CSRF token']);
         exit;
     }
     $db = Database::connect();

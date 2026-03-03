@@ -579,6 +579,7 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
 </div>
 
 <script>
+var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
 // Restore Back button and breadcrumb link to the previously visited ticket list URL (with filters)
 (function() {
     var saved = sessionStorage.getItem('agentTicketListUrl');
@@ -739,7 +740,7 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
         if (!name || tags.indexOf(name) !== -1) return;
         fetch('/api/tickets/' + ticketId + '/tags', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
             body: JSON.stringify({action: 'add', tag: name})
         }).then(function(r) { return r.json(); }).then(function(data) {
             if (data.tags) { tags = data.tags; render(); }
@@ -749,7 +750,7 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
     function removeTag(name) {
         fetch('/api/tickets/' + ticketId + '/tags', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
             body: JSON.stringify({action: 'remove', tag: name})
         }).then(function(r) { return r.json(); }).then(function(data) {
             if (data.tags) { tags = data.tags; render(); }
@@ -799,7 +800,7 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
     function addCc(userId) {
         fetch('/api/tickets/' + ticketId + '/cc', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
             body: JSON.stringify({action: 'add', user_id: userId})
         }).then(function(r) { return r.json(); }).then(function(data) {
             if (data.cc) { ccUsers = data.cc; renderList(); }
@@ -811,7 +812,7 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
     function removeCc(userId) {
         fetch('/api/tickets/' + ticketId + '/cc', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
             body: JSON.stringify({action: 'remove', user_id: userId})
         }).then(function(r) { return r.json(); }).then(function(data) {
             if (data.cc) { ccUsers = data.cc; renderList(); }
@@ -993,7 +994,7 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
         return modal;
     }
 
-    function ping() { fetch(pingUrl, {method: 'POST'}).catch(function(){}); }
+    function ping() { fetch(pingUrl, {method: 'POST', headers: {'X-CSRF-Token': csrfToken}}).catch(function(){}); }
 
     function checkPresence() {
         fetch(pingUrl)

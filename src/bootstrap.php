@@ -31,6 +31,10 @@ if (env('APP_DEBUG', 'false') === 'true') {
 require ROOT_DIR . '/database/migrate.php';
 
 // Start session
+session_set_cookie_params([
+    'httponly' => true,
+    'samesite' => 'Lax',
+]);
 session_start();
 
 // Create router, load routes, dispatch
