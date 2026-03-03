@@ -189,7 +189,7 @@ foreach ($messages as $msg) {
         continue;
     }
 
-    // ── Verify the ticket exists and is not closed ────────────────────────────
+    // ── Verify the ticket exists ──────────────────────────────────────────────
     $ticketStmt = $db->prepare('SELECT id, subject, status, created_by FROM tickets WHERE id = ?');
     $ticketStmt->execute([$ticketId]);
     $ticket = $ticketStmt->fetch();
@@ -201,15 +201,8 @@ foreach ($messages as $msg) {
         continue;
     }
 
-    if ($ticket['status'] === 'closed') {
-        logMsg('WARN', "  Ticket #{$ticketId} is closed, skipping reply.");
-        markMessageRead($accessToken, $mailbox, $msgId);
-        $skipped++;
-        continue;
-    }
-
-    // ── Find the sender in the users table ────────────────────────────────────
-    $userStmt = $db->prepare('SELECT id, first_name, last_name FROM users WHERE LOWER(email) = ?');
+    // ── Find the sender in the users table (with role) ────────────────────────
+    $userStmt = $db->prepare('SELECT id, first_name, last_name, role FROM users WHERE LOWER(email) = ?');
     $userStmt->execute([$fromAddr]);
     $user = $userStmt->fetch();
 
@@ -220,23 +213,71 @@ foreach ($messages as $msg) {
         continue;
     }
 
-    // ── Extract the reply body ────────────────────────────────────────────────
+    // ── Extract the reply body and parse hashtag commands ─────────────────────
     $rawBody = extractGraphBody($msg);
     $body    = extractReplyBody($rawBody);
+    $parsed  = parseEmailCommands($body);
+    $body    = $parsed['body'];
 
-    if (trim($body) === '') {
-        logMsg('WARN', '  Reply body is empty after stripping quoted text, skipping.');
+    // Resolve commands (admin/agent only)
+    $newStatus     = null;
+    $newPriorityId = null;
+    if (in_array($user['role'], ['admin', 'agent'], true)) {
+        if ($parsed['status'] !== null) {
+            $newStatus = $parsed['status'];
+        }
+        if ($parsed['priority_slug'] !== null) {
+            $pStmt = $db->prepare('SELECT id FROM ticket_priorities WHERE LOWER(name) = ? LIMIT 1');
+            $pStmt->execute([$parsed['priority_slug']]);
+            $pRow = $pStmt->fetch();
+            if ($pRow) {
+                $newPriorityId = (int) $pRow['id'];
+            }
+        }
+    }
+
+    // ── Guard: skip closed tickets unless an admin/agent is re-opening it ─────
+    if ($ticket['status'] === 'closed' && $newStatus !== 'open') {
+        logMsg('WARN', "  Ticket #{$ticketId} is closed, skipping reply.");
         markMessageRead($accessToken, $mailbox, $msgId);
         $skipped++;
         continue;
     }
 
-    // ── Insert timeline comment ───────────────────────────────────────────────
-    $db->prepare(
-        'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
-    )->execute([$ticketId, $user['id'], 'comment', $body]);
+    // ── Apply status change ───────────────────────────────────────────────────
+    if ($newStatus !== null && $newStatus !== $ticket['status']) {
+        $db->prepare('UPDATE tickets SET status = ? WHERE id = ?')
+           ->execute([$newStatus, $ticketId]);
+        $db->prepare(
+            'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
+        )->execute([$ticketId, $user['id'], 'status_changed', $newStatus]);
+        logMsg('INFO', "  Status changed to '{$newStatus}' via email command.");
+    }
 
-    logMsg('INFO', "  Added reply from {$fromAddr} to Ticket #{$ticketId} ✓");
+    // ── Apply priority change ─────────────────────────────────────────────────
+    if ($newPriorityId !== null) {
+        $db->prepare('UPDATE tickets SET priority_id = ? WHERE id = ?')
+           ->execute([$newPriorityId, $ticketId]);
+        $db->prepare(
+            'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
+        )->execute([$ticketId, $user['id'], 'priority_changed', $parsed['priority_slug']]);
+        logMsg('INFO', "  Priority changed to '{$parsed['priority_slug']}' via email command.");
+    }
+
+    // ── Insert timeline comment (skip if body is empty after command stripping) ─
+    if (trim($body) !== '') {
+        $db->prepare(
+            'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
+        )->execute([$ticketId, $user['id'], 'comment', $body]);
+        logMsg('INFO', "  Added reply from {$fromAddr} to Ticket #{$ticketId} ✓");
+    } elseif ($newStatus !== null || $newPriorityId !== null) {
+        logMsg('INFO', "  Commands-only email from {$fromAddr} on Ticket #{$ticketId} — no comment body.");
+    } else {
+        logMsg('WARN', '  Reply body is empty after stripping quoted text, skipping.');
+        markMessageRead($accessToken, $mailbox, $msgId);
+        $skipped++;
+        continue;
+    }
 
     markMessageRead($accessToken, $mailbox, $msgId);
     $processed++;

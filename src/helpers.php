@@ -1705,3 +1705,86 @@ function runAutomations(PDO $db, int $ticketId, string $triggerEvent): void
         }
     }
 }
+
+/**
+ * Parse hashtag commands from the end of an email reply body.
+ *
+ * Scans backward through the body lines. A line is a "command line" if its
+ * entire trimmed content consists only of one or more #word tokens (e.g. "#close #high").
+ * Blank lines between the body and the command block are skipped. Scanning stops
+ * the moment a non-command, non-blank line is encountered.
+ *
+ * Only trailing command lines are parsed — hashtags that appear mid-sentence are
+ * never treated as commands.
+ *
+ * Returns an array:
+ *   'body'          => string  — body with command lines removed and trailing blanks trimmed
+ *   'status'        => string|null — validated status slug (e.g. 'closed') or null
+ *   'priority_slug' => string|null — lowercase priority name (e.g. 'high') or null
+ */
+function parseEmailCommands(string $body): array
+{
+    $statusMap = [
+        'open'                   => 'open',
+        'close'                  => 'closed',
+        'closed'                 => 'closed',
+        'resolve'                => 'resolved',
+        'resolved'               => 'resolved',
+        'pending'                => 'pending',
+        'in_progress'            => 'in_progress',
+        'inprogress'             => 'in_progress',
+        'waiting_on_customer'    => 'waiting_on_customer',
+        'waitingoncustomer'      => 'waiting_on_customer',
+        'waiting_on_third_party' => 'waiting_on_third_party',
+        'waitingonthirdparty'    => 'waiting_on_third_party',
+    ];
+    $prioritySlugs = ['low', 'medium', 'high', 'critical'];
+
+    $body  = str_replace(["\r\n", "\r"], "\n", $body);
+    $lines = explode("\n", $body);
+
+    // Walk backward; collect indices of trailing command-only lines (skip blank lines)
+    $commandIdx = [];
+    for ($i = count($lines) - 1; $i >= 0; $i--) {
+        $trimmed = trim($lines[$i]);
+        if ($trimmed === '') {
+            continue; // skip blank lines between body and commands
+        }
+        if (preg_match('/^(#[a-z_]+\s*)+$/i', $trimmed)) {
+            $commandIdx[] = $i;
+        } else {
+            break; // first non-command non-blank line — stop
+        }
+    }
+
+    if (empty($commandIdx)) {
+        return ['body' => $body, 'status' => null, 'priority_slug' => null];
+    }
+
+    $status       = null;
+    $prioritySlug = null;
+    foreach ($commandIdx as $idx) {
+        preg_match_all('/#([a-z_]+)/i', $lines[$idx], $m);
+        foreach ($m[1] as $tag) {
+            $tag = strtolower($tag);
+            if (isset($statusMap[$tag])) {
+                $status = $statusMap[$tag];
+            } elseif (in_array($tag, $prioritySlugs, true)) {
+                $prioritySlug = $tag;
+            }
+        }
+        unset($lines[$idx]);
+    }
+
+    // Trim trailing blank lines from remaining body
+    $lines = array_values($lines);
+    while (!empty($lines) && trim(end($lines)) === '') {
+        array_pop($lines);
+    }
+
+    return [
+        'body'          => implode("\n", $lines),
+        'status'        => $status,
+        'priority_slug' => $prioritySlug,
+    ];
+}

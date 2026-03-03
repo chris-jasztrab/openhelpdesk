@@ -83,6 +83,60 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-hash text-primary me-2"></i>Email Reply Commands (Agents &amp; Admins)</h5>
+<p class="text-muted mb-3">Agents and admins can take actions on a ticket directly from their email client by adding <strong>hashtag commands</strong> on their own line at the very end of the reply. Commands placed in the middle of a message are never processed — only lines at the bottom of the reply count.</p>
+
+<h6 class="fw-semibold mb-2">Status Commands</h6>
+<div class="table-responsive mb-4">
+<table class="table table-sm mb-0">
+    <thead class="table-light"><tr><th>Hashtag</th><th>Sets ticket status to</th></tr></thead>
+    <tbody class="text-muted">
+        <tr><td><code>#open</code></td><td>Open — also re-opens a closed ticket</td></tr>
+        <tr><td><code>#close</code> or <code>#closed</code></td><td>Closed</td></tr>
+        <tr><td><code>#resolve</code> or <code>#resolved</code></td><td>Resolved</td></tr>
+        <tr><td><code>#pending</code></td><td>Pending</td></tr>
+        <tr><td><code>#in_progress</code> or <code>#inprogress</code></td><td>In Progress</td></tr>
+        <tr><td><code>#waiting_on_customer</code> or <code>#waitingoncustomer</code></td><td>Waiting on Customer</td></tr>
+        <tr><td><code>#waiting_on_third_party</code> or <code>#waitingonthirdparty</code></td><td>Waiting on Third Party</td></tr>
+    </tbody>
+</table>
+</div>
+
+<h6 class="fw-semibold mb-2">Priority Commands</h6>
+<div class="table-responsive mb-4">
+<table class="table table-sm mb-0">
+    <thead class="table-light"><tr><th>Hashtag</th><th>Sets ticket priority to</th></tr></thead>
+    <tbody class="text-muted">
+        <tr><td><code>#low</code></td><td>Low</td></tr>
+        <tr><td><code>#medium</code></td><td>Medium</td></tr>
+        <tr><td><code>#high</code></td><td>High</td></tr>
+        <tr><td><code>#critical</code></td><td>Critical</td></tr>
+    </tbody>
+</table>
+</div>
+
+<h6 class="fw-semibold mb-2">Usage Rules</h6>
+<ul class="text-muted mb-3">
+    <li>Commands must be on their <strong>own line at the very end</strong> of the reply — not in the middle of a sentence.</li>
+    <li>Multiple commands can appear on the <strong>same line</strong> (e.g. <code>#resolve #high</code>) or on <strong>consecutive lines</strong>.</li>
+    <li>Blank lines between your message and the command line are fine — they are automatically skipped.</li>
+    <li>Commands are <strong>only processed for agents and admins</strong>. If a regular portal user includes a hashtag command, it is treated as plain text and stored in the comment with no action taken.</li>
+    <li>Hashtags embedded in normal sentences (e.g. <em>"check ticket #123"</em>) are never treated as commands.</li>
+    <li>Unknown hashtags are silently ignored — they will not affect the ticket or appear in the comment.</li>
+</ul>
+
+<h6 class="fw-semibold mb-2">Example</h6>
+<pre class="bg-light p-3 rounded mb-0" style="font-size:.85rem;">Hi,
+
+I've confirmed the fix is deployed and the user has verified it works.
+
+#resolve #high</pre>
+<p class="text-muted mt-2 mb-0">This reply posts the comment, sets the ticket status to <strong>Resolved</strong>, and raises the priority to <strong>High</strong>. The <code>#resolve #high</code> line does not appear in the stored comment.</p>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-send-check text-primary me-2"></i>When Emails Are Sent</h5>
 <p class="text-muted mb-2">LocalDesk sends emails automatically for the following events:</p>
 <ul class="text-muted mb-0">
