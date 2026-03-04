@@ -8,9 +8,9 @@ $breadcrumbs  = [
 ];
 $statusColors = ['open' => 'primary', 'in_progress' => 'warning', 'pending' => 'info', 'waiting_on_customer' => 'warning', 'waiting_on_third_party' => 'dark', 'resolved' => 'success', 'closed' => 'secondary'];
 $statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 'Pending', 'waiting_on_customer' => 'Waiting on Customer', 'waiting_on_third_party' => 'Waiting on Third Party', 'resolved' => 'Resolved', 'closed' => 'Closed'];
-$isDefault  = $filters['status'] === 'open' && $filters['priority'] === '' && $filters['q'] === '';
+$isDefault  = $filters['status'] === 'open' && $filters['priority'] === '' && $filters['q'] === '' && $filters['scope'] === 'mine';
 $hasFilters = !$isDefault;
-$sortParams = array_filter($filters, fn($v) => $v !== '');
+$sortParams = array_filter($filters, fn($v) => $v !== '' && $v !== 'mine');
 ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="fw-bold mb-0">My Tickets</h2>
@@ -26,6 +26,9 @@ $sortParams = array_filter($filters, fn($v) => $v !== '');
 <div class="card border-0 shadow-sm mb-3">
     <div class="card-body py-3">
         <form method="GET" action="/portal/tickets" class="row g-2 align-items-end">
+            <?php if ($canViewLocation): ?>
+            <input type="hidden" name="scope" value="<?= e($filters['scope']) ?>">
+            <?php endif; ?>
             <div class="col-md">
                 <label class="form-label small text-muted mb-1">Search</label>
                 <input type="text" class="form-control form-control-sm" name="q"
@@ -59,6 +62,20 @@ $sortParams = array_filter($filters, fn($v) => $v !== '');
                 </a>
                 <?php endif; ?>
             </div>
+            <?php if ($canViewLocation): ?>
+            <div class="col-12 pt-1">
+                <div class="btn-group btn-group-sm" role="group">
+                    <a href="?<?= http_build_query(array_merge(array_filter($filters, fn($v) => $v !== '' && $v !== 'mine'), ['scope' => 'mine'])) ?>"
+                       class="btn <?= $filters['scope'] !== 'location' ? 'btn-secondary' : 'btn-outline-secondary' ?>">
+                        <i class="bi bi-person me-1"></i>My Tickets
+                    </a>
+                    <a href="?<?= http_build_query(array_merge(array_filter($filters, fn($v) => $v !== '' && $v !== 'mine'), ['scope' => 'location'])) ?>"
+                       class="btn <?= $filters['scope'] === 'location' ? 'btn-secondary' : 'btn-outline-secondary' ?>">
+                        <i class="bi bi-building me-1"></i>My Location
+                    </a>
+                </div>
+            </div>
+            <?php endif; ?>
         </form>
     </div>
 </div>

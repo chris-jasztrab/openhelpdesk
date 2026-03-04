@@ -14,6 +14,7 @@ $router->get('/portal/tickets', function () {
     $fStatus   = trim($_GET['status'] ?? 'open');
     $fPriority = trim($_GET['priority'] ?? '');
     $fSearch   = trim($_GET['q'] ?? '');
+    $fScope    = trim($_GET['scope'] ?? 'mine'); // 'mine' or 'location'
 
     $uid = Auth::id();
 
@@ -22,12 +23,14 @@ $router->get('/portal/tickets', function () {
     $permStmt->execute([$uid]);
     $userPerms = $permStmt->fetch();
 
+    $canViewLocation = (bool) ($userPerms['can_view_location_tickets'] && $userPerms['location_id']);
+
     // Base: own tickets (not merged away) plus master tickets whose merged child belongs to this user
     $ownCond = '(t.created_by = ? AND t.merged_into_ticket_id IS NULL)
                 OR t.id IN (SELECT DISTINCT merged_into_ticket_id FROM tickets WHERE created_by = ? AND merged_into_ticket_id IS NOT NULL)';
 
-    if ($userPerms['can_view_location_tickets'] && $userPerms['location_id']) {
-        // Also show all non-merged tickets at the user's location
+    if ($canViewLocation && $fScope === 'location') {
+        // Show all non-merged tickets at the user's location
         $where  = ['(' . $ownCond . ' OR (t.location_id = ? AND t.merged_into_ticket_id IS NULL))'];
         $params = [$uid, $uid, (int) $userPerms['location_id']];
     } else {
@@ -56,21 +59,12 @@ $router->get('/portal/tickets', function () {
     $countStmt->execute($params);
     $totalTickets = (int) $countStmt->fetchColumn();
 
-    // Count all tickets for this user regardless of filters (for empty-state message)
-    if ($userPerms['can_view_location_tickets'] && $userPerms['location_id']) {
-        $allCountStmt = $db->prepare(
-            "SELECT COUNT(*) FROM tickets t WHERE (t.created_by = ? AND t.merged_into_ticket_id IS NULL)
-             OR t.id IN (SELECT DISTINCT merged_into_ticket_id FROM tickets WHERE created_by = ? AND merged_into_ticket_id IS NOT NULL)
-             OR (t.location_id = ? AND t.merged_into_ticket_id IS NULL)"
-        );
-        $allCountStmt->execute([$uid, $uid, (int) $userPerms['location_id']]);
-    } else {
-        $allCountStmt = $db->prepare(
-            "SELECT COUNT(*) FROM tickets t WHERE (t.created_by = ? AND t.merged_into_ticket_id IS NULL)
-             OR t.id IN (SELECT DISTINCT merged_into_ticket_id FROM tickets WHERE created_by = ? AND merged_into_ticket_id IS NOT NULL)"
-        );
-        $allCountStmt->execute([$uid, $uid]);
-    }
+    // Count own tickets regardless of filters (for empty-state message)
+    $allCountStmt = $db->prepare(
+        "SELECT COUNT(*) FROM tickets t WHERE (t.created_by = ? AND t.merged_into_ticket_id IS NULL)
+         OR t.id IN (SELECT DISTINCT merged_into_ticket_id FROM tickets WHERE created_by = ? AND merged_into_ticket_id IS NOT NULL)"
+    );
+    $allCountStmt->execute([$uid, $uid]);
     $userHasAnyTickets = (int) $allCountStmt->fetchColumn() > 0;
 
     // Sorting
@@ -116,6 +110,7 @@ $router->get('/portal/tickets', function () {
         'status'   => $fStatus,
         'priority' => $fPriority,
         'q'        => $fSearch,
+        'scope'    => $fScope,
     ];
 
     render('portal/tickets/index', [
@@ -128,6 +123,7 @@ $router->get('/portal/tickets', function () {
         'sort'              => $sort,
         'dir'               => strtolower($dir),
         'userHasAnyTickets' => $userHasAnyTickets,
+        'canViewLocation'   => $canViewLocation,
     ]);
 });
 
