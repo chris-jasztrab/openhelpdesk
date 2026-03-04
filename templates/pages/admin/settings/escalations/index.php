@@ -66,8 +66,27 @@ unset($_SESSION['_escalation_run']);
                     'hours_in_status'    => 'Hours in status',
                     'is_assigned'        => 'Is assigned',
                     'priority_id'        => 'Priority',
+                    'priority'           => 'Priority',
                     'status'             => 'Status',
                     'group_id'           => 'Group',
+                    'assigned_to'        => 'Assigned to',
+                    'age_minutes'        => 'Age (minutes)',
+                    'type_id'            => 'Type',
+                    'location_id'        => 'Location',
+                ];
+                $opLabels = [
+                    'eq'      => '=',
+                    'neq'     => '≠',
+                    'in'      => 'in',
+                    'not_in'  => 'not in',
+                    'gte'     => '≥',
+                    'lte'     => '≤',
+                    'gt'      => '>',
+                    'lt'      => '<',
+                    'empty'   => 'is empty',
+                    'not_empty' => 'is not empty',
+                    'is_empty'     => 'is empty',
+                    'is_not_empty' => 'is not empty',
                 ];
                 $actionLabels = [
                     'set_priority'          => 'Set priority',
@@ -84,11 +103,17 @@ unset($_SESSION['_escalation_run']);
                 <td class="fw-semibold"><?= e($rule['name']) ?></td>
                 <td style="font-size:.8rem;">
                     <?php foreach ($conditions as $c): ?>
+                        <?php
+                            $op  = $c['op'] ?? $c['operator'] ?? '';
+                            $val = $c['value'] ?? '';
+                            $valStr = is_array($val) ? implode(', ', $val) : (string) $val;
+                            $hideValue = in_array($op, ['empty','not_empty','is_empty','is_not_empty'], true);
+                        ?>
                         <span class="badge bg-light text-dark border me-1 mb-1">
                             <?= e($condLabels[$c['field']] ?? $c['field']) ?>
-                            <?= e($c['operator']) ?>
-                            <?php if (!in_array($c['operator'], ['is_empty','is_not_empty'], true)): ?>
-                                <strong><?= e($c['value']) ?></strong>
+                            <?= e($opLabels[$op] ?? $op) ?>
+                            <?php if (!$hideValue && $valStr !== ''): ?>
+                                <strong><?= e($valStr) ?></strong>
                             <?php endif; ?>
                         </span>
                     <?php endforeach; ?>
