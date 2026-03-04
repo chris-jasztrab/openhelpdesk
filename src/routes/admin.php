@@ -205,7 +205,8 @@ $router->post('/admin/users/create', function () {
     $ln              = trim($_POST['last_name'] ?? '');
     $email           = trim($_POST['email'] ?? '');
     $password        = $_POST['password'] ?? '';
-    $role            = $_POST['role'] ?? 'user';
+    $roleRaw         = $_POST['role'] ?? 'user';
+    $role            = in_array($roleRaw, ['admin', 'agent', 'power_user', 'user'], true) ? $roleRaw : 'user';
     $phone           = trim($_POST['work_phone'] ?? '');
     $locId           = !empty($_POST['location_id']) ? (int) $_POST['location_id'] : null;
     $canViewLocTix   = !empty($_POST['can_view_location_tickets']) ? 1 : 0;
@@ -330,7 +331,8 @@ $router->post('/admin/users/{id}/edit', function (array $p) {
     $fn            = trim($_POST['first_name'] ?? '');
     $ln            = trim($_POST['last_name'] ?? '');
     $email         = trim($_POST['email'] ?? '');
-    $role          = $_POST['role'] ?? 'user';
+    $roleRaw       = $_POST['role'] ?? 'user';
+    $role          = in_array($roleRaw, ['admin', 'agent', 'power_user', 'user'], true) ? $roleRaw : 'user';
     $phone         = trim($_POST['work_phone'] ?? '');
     $locId         = !empty($_POST['location_id']) ? (int) $_POST['location_id'] : null;
     $canViewLocTix = !empty($_POST['can_view_location_tickets']) ? 1 : 0;
@@ -4661,7 +4663,7 @@ $router->post('/admin/settings/import-users/map', function () {
         $existingLocations[strtolower($l['name'])] = $l['id'];
     }
 
-    $validRoles = ['user', 'agent', 'admin'];
+    $validRoles = ['user', 'agent', 'power_user', 'admin'];
     $rows = [];
     $duplicateEmails  = [];
     $newLocationNames = [];
