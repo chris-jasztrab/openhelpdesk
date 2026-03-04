@@ -41,7 +41,7 @@ endif; ?>
         <form method="POST" action="/portal/tickets/create" enctype="multipart/form-data">
             <?= csrfField() ?>
 
-            <div class="mb-3">
+            <div class="mb-3" id="tour-portal-subject">
                 <label for="subject" class="form-label fw-semibold">Subject <span class="text-danger">*</span></label>
                 <input type="text" class="form-control" id="subject" name="subject"
                        value="<?= e(old('subject')) ?>" required
@@ -60,13 +60,13 @@ endif; ?>
                 </div>
             </div>
 
-            <div class="mb-3">
+            <div class="mb-3" id="tour-portal-description">
                 <label for="description" class="form-label fw-semibold">Description <span class="text-danger">*</span></label>
                 <textarea class="form-control" id="description" name="description" rows="5" required
                           placeholder="Please describe your issue in detail..."><?= e(old('description')) ?></textarea>
             </div>
 
-            <div class="row g-3 mb-3">
+            <div class="row g-3 mb-3" id="tour-portal-type">
                 <div class="col-md-6">
                     <label for="type_id" class="form-label fw-semibold">Ticket Type <span class="text-danger">*</span></label>
                     <select class="form-select" id="type_id" name="type_id" required>

@@ -1111,6 +1111,21 @@ $router->get('/survey/{token}/thanks', function (array $p) {
 /* ------------------------------------------------------------------
  * Portal (all authenticated users)
  * ------------------------------------------------------------------ */
+$router->post('/portal/tour/dismiss', function () {
+    Auth::requireAuth();
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        http_response_code(403);
+        header('Content-Type: application/json');
+        echo json_encode(['ok' => false]);
+        exit;
+    }
+    $db = Database::connect();
+    $db->prepare('UPDATE users SET show_portal_tour = 0 WHERE id = ?')->execute([Auth::id()]);
+    header('Content-Type: application/json');
+    echo json_encode(['ok' => true]);
+    exit;
+});
+
 $router->get('/portal', function () {
     Auth::requireAuth();
     $db = Database::connect();
@@ -1138,10 +1153,22 @@ $router->get('/portal', function () {
     $recentTickets->execute([$userId]);
     $recentTickets = $recentTickets->fetchAll();
 
+    // Determine whether to auto-show the portal tour
+    $autoShowTour = false;
+    $tourStmt = $db->prepare('SELECT show_portal_tour FROM users WHERE id = ?');
+    $tourStmt->execute([$userId]);
+    $showFlag = $tourStmt->fetchColumn();
+    if ($showFlag !== false) {
+        $autoShowTour = (bool) $showFlag || isset($_GET['tour']);
+    } elseif (isset($_GET['tour'])) {
+        $autoShowTour = true;
+    }
+
     render('portal/dashboard', [
         'openCount'     => $openCount,
         'resolvedCount' => $resolvedCount,
         'recentTickets' => $recentTickets,
+        'autoShowTour'  => $autoShowTour,
     ]);
 });
 

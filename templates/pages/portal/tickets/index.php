@@ -23,7 +23,7 @@ $sortParams = array_filter($filters, fn($v) => $v !== '' && $v !== 'mine');
 </div>
 
 <!-- Filter Bar -->
-<div class="card border-0 shadow-sm mb-3">
+<div class="card border-0 shadow-sm mb-3" id="tour-portal-filter-bar">
     <div class="card-body py-3">
         <form method="GET" action="/portal/tickets" class="row g-2 align-items-end">
             <?php if ($canViewLocation): ?>
@@ -82,7 +82,7 @@ $sortParams = array_filter($filters, fn($v) => $v !== '' && $v !== 'mine');
     </div>
 </div>
 
-<div class="card border-0 shadow-sm">
+<div class="card border-0 shadow-sm" id="tour-portal-ticket-table">
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
             <thead class="table-light">

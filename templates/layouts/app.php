@@ -8,7 +8,7 @@
     <title><?= e($pageTitle) ?> &ndash; <?= e(getSetting('branding_app_name', 'LocalDesk')) ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-    <?php if (Auth::check() && Auth::role() === 'agent'): ?>
+    <?php if (Auth::check() && in_array(Auth::role(), ['agent', 'user'], true)): ?>
     <link href="https://cdn.jsdelivr.net/npm/driver.js@1.3.4/dist/driver.css" rel="stylesheet">
     <?php endif; ?>
     <style>
@@ -323,6 +323,10 @@
     <?php if (Auth::check() && Auth::role() === 'agent'): ?>
     <script src="https://cdn.jsdelivr.net/npm/driver.js@1.3.4/dist/driver.js.iife.js"></script>
     <?php require ROOT_DIR . '/templates/partials/agent-tour.php'; ?>
+    <?php endif; ?>
+    <?php if (Auth::check() && Auth::role() === 'user'): ?>
+    <script src="https://cdn.jsdelivr.net/npm/driver.js@1.3.4/dist/driver.js.iife.js"></script>
+    <?php require ROOT_DIR . '/templates/partials/portal-tour.php'; ?>
     <?php endif; ?>
 </body>
 </html>

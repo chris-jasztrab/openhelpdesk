@@ -13,12 +13,12 @@ $statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 
         <h2 class="fw-bold mb-1">Welcome, <?= e($user['first_name'] ?? 'User') ?></h2>
         <p class="text-muted mb-0">How can we help you today?</p>
     </div>
-    <a href="/portal/tickets/create" class="btn text-white" style="background:var(--ld-primary);">
+    <a href="/portal/tickets/create" id="tour-portal-new-ticket" class="btn text-white" style="background:var(--ld-primary);">
         <i class="bi bi-plus-circle me-1"></i>New Ticket
     </a>
 </div>
 
-<div class="row g-4">
+<div class="row g-4" id="tour-portal-stats">
     <div class="col-md-6">
         <div class="card stat-card h-100">
             <div class="card-body d-flex align-items-center gap-3">
@@ -47,7 +47,7 @@ $statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 
     </div>
 </div>
 
-<div class="card border-0 shadow-sm mt-4">
+<div class="card border-0 shadow-sm mt-4" id="tour-portal-recent">
     <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
         <h5 class="mb-0 fw-semibold"><i class="bi bi-ticket-detailed me-2"></i>Recent Tickets</h5>
         <a href="/portal/tickets" class="btn btn-sm btn-outline-primary">View All</a>
