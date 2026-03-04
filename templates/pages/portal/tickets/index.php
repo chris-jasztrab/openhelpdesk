@@ -66,11 +66,13 @@ $sortParams = array_filter($filters, fn($v) => $v !== '' && $v !== 'mine');
             <div class="col-12 pt-1">
                 <div class="btn-group btn-group-sm" role="group">
                     <a href="?<?= http_build_query(array_merge(array_filter($filters, fn($v) => $v !== '' && $v !== 'mine'), ['scope' => 'mine'])) ?>"
-                       class="btn <?= $filters['scope'] !== 'location' ? 'btn-secondary' : 'btn-outline-secondary' ?>">
+                       class="btn <?= $filters['scope'] !== 'location' ? 'text-white' : 'btn-outline-secondary' ?>"
+                       <?= $filters['scope'] !== 'location' ? 'style="background:var(--ld-primary);"' : '' ?>>
                         <i class="bi bi-person me-1"></i>My Tickets
                     </a>
                     <a href="?<?= http_build_query(array_merge(array_filter($filters, fn($v) => $v !== '' && $v !== 'mine'), ['scope' => 'location'])) ?>"
-                       class="btn <?= $filters['scope'] === 'location' ? 'btn-secondary' : 'btn-outline-secondary' ?>">
+                       class="btn <?= $filters['scope'] === 'location' ? 'text-white' : 'btn-outline-secondary' ?>"
+                       <?= $filters['scope'] === 'location' ? 'style="background:var(--ld-primary);"' : '' ?>>
                         <i class="bi bi-building me-1"></i>My Location
                     </a>
                 </div>
