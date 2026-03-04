@@ -20,6 +20,9 @@ $hasFilters = !empty($filterParams);
             <i class="bi bi-funnel me-1"></i>Filters
             <?php if ($hasFilters): ?><span class="badge bg-primary rounded-pill ms-1"><?= count($filterParams) ?></span><?php endif; ?>
         </button>
+        <a href="/admin/users/merge" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left-right me-1"></i>Merge Users
+        </a>
         <a href="/admin/users/create" class="btn btn-sm text-white" style="background:var(--ld-primary);">
             <i class="bi bi-person-plus me-1"></i>Add User
         </a>

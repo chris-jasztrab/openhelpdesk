@@ -474,6 +474,181 @@ $router->post('/admin/users/{id}/reset-2fa', function (array $p) {
 });
 
 /* ==================================================================
+ * ADMIN – Merge Users
+ * ================================================================== */
+
+$router->get('/admin/users/merge', function () {
+    Auth::requireRole('admin');
+    $suggestDeleteId = (int) ($_GET['suggest_delete'] ?? 0);
+    $suggestUser     = null;
+    if ($suggestDeleteId > 0) {
+        $s = Database::connect()->prepare('SELECT id, first_name, last_name, email FROM users WHERE id = ?');
+        $s->execute([$suggestDeleteId]);
+        $suggestUser = $s->fetch() ?: null;
+    }
+    render('admin/users/merge', ['step' => 'search', 'keepUser' => null, 'deleteUser' => null, 'stats' => null, 'suggestUser' => $suggestUser]);
+});
+
+$router->post('/admin/users/merge', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/users/merge');
+    }
+
+    $db     = Database::connect();
+    $action = $_POST['action'] ?? 'preview';
+
+    // ── Preview step ────────────────────────────────────────────────
+    if ($action === 'preview') {
+        $keepId   = (int) ($_POST['keep_id']   ?? 0);
+        $deleteId = (int) ($_POST['delete_id'] ?? 0);
+
+        if ($keepId === 0 || $deleteId === 0 || $keepId === $deleteId) {
+            flash('error', 'Please select two different users.');
+            redirect('/admin/users/merge');
+        }
+
+        $stmt = $db->prepare('SELECT id, first_name, last_name, email, role, created_at, location_id FROM users WHERE id = ?');
+
+        $stmt->execute([$keepId]);
+        $keepUser = $stmt->fetch();
+        $stmt->execute([$deleteId]);
+        $deleteUser = $stmt->fetch();
+
+        if (!$keepUser || !$deleteUser) {
+            flash('error', 'One or both users not found.');
+            redirect('/admin/users/merge');
+        }
+
+        // Build stats for each user
+        $stats = [];
+        foreach ([['keep', $keepId], ['delete', $deleteId]] as [$role, $uid]) {
+            $tc = $db->prepare('SELECT COUNT(*) FROM tickets WHERE created_by = ?');
+            $tc->execute([$uid]);
+
+            $ta = $db->prepare('SELECT COUNT(*) FROM tickets WHERE assigned_to = ?');
+            $ta->execute([$uid]);
+
+            $tl = $db->prepare('SELECT COUNT(*) FROM ticket_timeline WHERE user_id = ?');
+            $tl->execute([$uid]);
+
+            $stats[$role] = [
+                'tickets_created'  => (int) $tc->fetchColumn(),
+                'tickets_assigned' => (int) $ta->fetchColumn(),
+                'comments'         => (int) $tl->fetchColumn(),
+            ];
+        }
+
+        render('admin/users/merge', [
+            'step'       => 'preview',
+            'keepUser'   => $keepUser,
+            'deleteUser' => $deleteUser,
+            'stats'      => $stats,
+        ]);
+        return;
+    }
+
+    // ── Execute step ────────────────────────────────────────────────
+    if ($action === 'execute') {
+        $keepId   = (int) ($_POST['keep_id']   ?? 0);
+        $deleteId = (int) ($_POST['delete_id'] ?? 0);
+
+        if ($keepId === 0 || $deleteId === 0 || $keepId === $deleteId) {
+            flash('error', 'Invalid merge request.');
+            redirect('/admin/users/merge');
+        }
+
+        $stmt = $db->prepare('SELECT id, email FROM users WHERE id = ?');
+        $stmt->execute([$keepId]);
+        $keepUser = $stmt->fetch();
+        $stmt->execute([$deleteId]);
+        $deleteUser = $stmt->fetch();
+
+        if (!$keepUser || !$deleteUser) {
+            flash('error', 'One or both users not found.');
+            redirect('/admin/users/merge');
+        }
+
+        // Prevent merging the currently logged-in admin into another account
+        if ($deleteId === Auth::id()) {
+            flash('error', 'You cannot merge your own account.');
+            redirect('/admin/users/merge');
+        }
+
+        $db->beginTransaction();
+        try {
+            // ── Simple column reassignments ──────────────────────────
+            $simpleUpdates = [
+                ['tickets',              'created_by'],
+                ['tickets',              'assigned_to'],
+                ['ticket_timeline',      'user_id'],
+                ['ticket_attachments',   'uploaded_by'],
+                ['ticket_cc',            'added_by'],
+                ['notifications',        'user_id'],
+                ['notifications',        'mentioned_by'],
+                ['audit_log',            'user_id'],
+                ['csat_surveys',         'user_id'],
+                ['canned_responses',     'user_id'],
+                ['saved_filters',        'user_id'],
+                ['api_tokens',           'user_id'],
+                ['kb_articles',          'created_by'],
+                ['kb_article_revisions', 'edited_by'],
+                ['ticket_templates',     'created_by'],
+            ];
+
+            foreach ($simpleUpdates as [$table, $col]) {
+                $db->prepare("UPDATE `{$table}` SET `{$col}` = ? WHERE `{$col}` = ?")->execute([$keepId, $deleteId]);
+            }
+
+            // ── Pivot tables — reassign non-duplicates then drop duplicates ──
+            // ticket_cc — unique on (ticket_id, user_id)
+            $db->prepare(
+                'UPDATE ticket_cc SET user_id = ? WHERE user_id = ?
+                 AND ticket_id NOT IN (SELECT ticket_id FROM (SELECT ticket_id FROM ticket_cc WHERE user_id = ?) AS t)'
+            )->execute([$keepId, $deleteId, $keepId]);
+            $db->prepare('DELETE FROM ticket_cc WHERE user_id = ?')->execute([$deleteId]);
+
+            // ticket_watchers — unique on (ticket_id, user_id)
+            $db->prepare(
+                'UPDATE ticket_watchers SET user_id = ? WHERE user_id = ?
+                 AND ticket_id NOT IN (SELECT ticket_id FROM (SELECT ticket_id FROM ticket_watchers WHERE user_id = ?) AS t)'
+            )->execute([$keepId, $deleteId, $keepId]);
+            $db->prepare('DELETE FROM ticket_watchers WHERE user_id = ?')->execute([$deleteId]);
+
+            // group_user_map — unique on (group_id, user_id)
+            $db->prepare(
+                'UPDATE group_user_map SET user_id = ? WHERE user_id = ?
+                 AND group_id NOT IN (SELECT group_id FROM (SELECT group_id FROM group_user_map WHERE user_id = ?) AS t)'
+            )->execute([$keepId, $deleteId, $keepId]);
+            $db->prepare('DELETE FROM group_user_map WHERE user_id = ?')->execute([$deleteId]);
+
+            // ticket_presence — transient, just remove
+            $db->prepare('DELETE FROM ticket_presence WHERE user_id = ?')->execute([$deleteId]);
+
+            // ── Delete the source user (cascades any remaining FK refs) ──
+            $db->prepare('DELETE FROM users WHERE id = ?')->execute([$deleteId]);
+
+            $db->commit();
+
+            logAudit('user.merged', $deleteId, 'user',
+                "Merged {$deleteUser['email']} into {$keepUser['email']} (kept id={$keepId})");
+
+        } catch (\Throwable $e) {
+            $db->rollBack();
+            flash('error', 'Merge failed: ' . $e->getMessage());
+            redirect('/admin/users/merge');
+        }
+
+        flash('success', "Accounts merged. \"{$deleteUser['email']}\" has been removed and all data transferred to \"{$keepUser['email']}\".");
+        redirect("/admin/users/{$keepId}");
+    }
+
+    flash('error', 'Unknown action.');
+    redirect('/admin/users/merge');
+});
+
+/* ==================================================================
  * ADMIN – Location Management
  * ================================================================== */
 

@@ -81,6 +81,10 @@ $statusLabels = [
                 </form>
                 <?php endif; ?>
                 <?php if ($profileUser['id'] !== Auth::id()): ?>
+                <a href="/admin/users/merge?suggest_delete=<?= (int)$profileUser['id'] ?>"
+                   class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left-right me-1"></i>Merge Into Another
+                </a>
                 <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteUserModal">
                     <i class="bi bi-trash me-1"></i>Delete User
                 </button>
