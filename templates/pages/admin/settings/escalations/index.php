@@ -95,6 +95,8 @@ unset($_SESSION['_escalation_run']);
                     'set_status'            => 'Set status',
                     'notify_user'           => 'Notify user',
                     'notify_assigned_agent' => 'Notify assigned agent',
+                    'notify_assigned'       => 'Notify assigned agent',
+                    'notify_admin'          => 'Notify admin',
                     'add_internal_note'     => 'Add note',
                 ];
             ?>
@@ -121,8 +123,9 @@ unset($_SESSION['_escalation_run']);
                 </td>
                 <td style="font-size:.8rem;">
                     <?php foreach ($actions as $a): ?>
+                        <?php $aType = $a['type'] ?? $a['action'] ?? ''; ?>
                         <span class="badge bg-primary bg-opacity-10 text-primary me-1 mb-1">
-                            <?= e($actionLabels[$a['action']] ?? $a['action']) ?>
+                            <?= e($actionLabels[$aType] ?? $aType) ?>
                         </span>
                     <?php endforeach; ?>
                 </td>
