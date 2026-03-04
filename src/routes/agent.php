@@ -1225,6 +1225,198 @@ $router->get('/agent/attachments/{id}/download', function (array $p) {
 });
 
 /* ==================================================================
+ * AGENT – Knowledge Base (read-only browse)
+ * ================================================================== */
+
+$_agentKbVars = [
+    'sidebarItems' => agentSidebar('kb'),
+    'kbBase'       => '/agent/kb',
+    'kbPanelLabel' => 'Agent',
+    'kbPanelUrl'   => '/agent',
+];
+
+$router->get('/agent/kb', function () use ($_agentKbVars) {
+    Auth::requireRole('agent', 'admin');
+    $categories = Database::connect()->query(
+        'SELECT c.*, COUNT(DISTINCT f.id) AS folder_count
+         FROM kb_categories c
+         LEFT JOIN kb_folders f ON f.category_id = c.id
+         GROUP BY c.id
+         ORDER BY c.sort_order, c.name'
+    )->fetchAll();
+    render('portal/kb/index', array_merge($_agentKbVars, ['categories' => $categories]));
+});
+
+$router->get('/agent/kb/search', function () {
+    Auth::requireRole('agent', 'admin');
+    $q = trim($_GET['q'] ?? '');
+    if ($q === '') {
+        header('Content-Type: application/json');
+        echo json_encode([]);
+        exit;
+    }
+    $db   = Database::connect();
+    $like = '%' . $q . '%';
+    $stmt = $db->prepare(
+        "SELECT a.title, a.slug, f.name AS folder_name, c.name AS category_name
+         FROM kb_articles a
+         LEFT JOIN kb_folders f    ON a.folder_id   = f.id
+         LEFT JOIN kb_categories c ON f.category_id = c.id
+         WHERE a.status = 'published' AND (a.title LIKE ? OR a.body_markdown LIKE ?)
+         ORDER BY a.updated_at DESC
+         LIMIT 10"
+    );
+    $stmt->execute([$like, $like]);
+    header('Content-Type: application/json');
+    echo json_encode($stmt->fetchAll());
+    exit;
+});
+
+$router->get('/agent/kb/articles/{slug}', function (array $p) use ($_agentKbVars) {
+    Auth::requireRole('agent', 'admin');
+    $db   = Database::connect();
+    $stmt = $db->prepare(
+        "SELECT a.*, f.name AS folder_name, f.slug AS folder_slug,
+                c.name AS category_name, c.slug AS category_slug
+         FROM kb_articles a
+         LEFT JOIN kb_folders f    ON a.folder_id   = f.id
+         LEFT JOIN kb_categories c ON f.category_id = c.id
+         WHERE a.slug = ? AND a.status = 'published'"
+    );
+    $stmt->execute([$p['slug']]);
+    $article = $stmt->fetch();
+    if (!$article) {
+        flash('error', 'Article not found.');
+        redirect('/agent/kb');
+    }
+    $article['body_html'] = renderMarkdown($article['body_markdown']);
+
+    $fc = $db->prepare(
+        "SELECT
+            SUM(CASE WHEN rating =  1 THEN 1 ELSE 0 END) AS helpful,
+            SUM(CASE WHEN rating = -1 THEN 1 ELSE 0 END) AS not_helpful
+         FROM kb_article_ratings WHERE article_id = ?"
+    );
+    $fc->execute([$article['id']]);
+    $counts = $fc->fetch();
+
+    $vq = $db->prepare('SELECT rating FROM kb_article_ratings WHERE article_id = ? AND user_id = ?');
+    $vq->execute([$article['id'], Auth::id()]);
+    $myVote = $vq->fetchColumn() ?: null;
+
+    $feedback = [
+        'helpful'     => (int)($counts['helpful']     ?? 0),
+        'not_helpful' => (int)($counts['not_helpful'] ?? 0),
+        'my_vote'     => $myVote !== null ? (int)$myVote : null,
+    ];
+
+    render('portal/kb/article', array_merge($_agentKbVars, ['article' => $article, 'feedback' => $feedback]));
+});
+
+$router->post('/agent/kb/articles/{slug}/feedback', function (array $p) {
+    Auth::requireRole('agent', 'admin');
+    header('Content-Type: application/json');
+
+    $rating = (int)($_POST['rating'] ?? 0);
+    if (!in_array($rating, [1, -1], true)) {
+        echo json_encode(['status' => 'error', 'message' => 'Invalid rating.']);
+        exit;
+    }
+
+    $db   = Database::connect();
+    $stmt = $db->prepare('SELECT id FROM kb_articles WHERE slug = ? AND status = ?');
+    $stmt->execute([$p['slug'], 'published']);
+    $article = $stmt->fetch();
+    if (!$article) {
+        echo json_encode(['status' => 'error', 'message' => 'Article not found.']);
+        exit;
+    }
+
+    try {
+        $db->prepare(
+            'INSERT INTO kb_article_ratings (article_id, user_id, rating)
+             VALUES (?, ?, ?)
+             ON DUPLICATE KEY UPDATE rating = VALUES(rating)'
+        )->execute([(int)$article['id'], Auth::id(), $rating]);
+    } catch (\Throwable $e) {
+        echo json_encode(['status' => 'error', 'message' => 'Could not save vote.']);
+        exit;
+    }
+
+    $fc = $db->prepare(
+        "SELECT SUM(CASE WHEN rating=1 THEN 1 ELSE 0 END) AS helpful,
+                SUM(CASE WHEN rating=-1 THEN 1 ELSE 0 END) AS not_helpful
+         FROM kb_article_ratings WHERE article_id = ?"
+    );
+    $fc->execute([(int)$article['id']]);
+    $counts = $fc->fetch();
+    echo json_encode([
+        'status'      => 'ok',
+        'helpful'     => (int)($counts['helpful']     ?? 0),
+        'not_helpful' => (int)($counts['not_helpful'] ?? 0),
+    ]);
+    exit;
+});
+
+$router->get('/agent/kb/{slug}/{folder_slug}', function (array $p) use ($_agentKbVars) {
+    Auth::requireRole('agent', 'admin');
+    $db = Database::connect();
+
+    $catStmt = $db->prepare('SELECT * FROM kb_categories WHERE slug = ?');
+    $catStmt->execute([$p['slug']]);
+    $category = $catStmt->fetch();
+    if (!$category) {
+        flash('error', 'Category not found.');
+        redirect('/agent/kb');
+    }
+
+    $folderStmt = $db->prepare('SELECT * FROM kb_folders WHERE slug = ? AND category_id = ?');
+    $folderStmt->execute([$p['folder_slug'], $category['id']]);
+    $folder = $folderStmt->fetch();
+    if (!$folder) {
+        flash('error', 'Folder not found.');
+        redirect('/agent/kb/' . $p['slug']);
+    }
+
+    $artStmt = $db->prepare(
+        "SELECT id, title, slug, published_at, sort_order
+         FROM kb_articles
+         WHERE folder_id = ? AND status = 'published'
+         ORDER BY sort_order, title"
+    );
+    $artStmt->execute([$folder['id']]);
+    $articles = $artStmt->fetchAll();
+
+    render('portal/kb/folder', array_merge($_agentKbVars, ['category' => $category, 'folder' => $folder, 'articles' => $articles]));
+});
+
+$router->get('/agent/kb/{slug}', function (array $p) use ($_agentKbVars) {
+    Auth::requireRole('agent', 'admin');
+    $db = Database::connect();
+
+    $catStmt = $db->prepare('SELECT * FROM kb_categories WHERE slug = ?');
+    $catStmt->execute([$p['slug']]);
+    $category = $catStmt->fetch();
+    if (!$category) {
+        flash('error', 'Category not found.');
+        redirect('/agent/kb');
+    }
+
+    $folders = $db->prepare(
+        'SELECT f.*, COUNT(a.id) AS article_count
+         FROM kb_folders f
+         LEFT JOIN kb_articles a ON a.folder_id = f.id AND a.status = \'published\'
+         WHERE f.category_id = ?
+         GROUP BY f.id
+         ORDER BY f.sort_order, f.name'
+    );
+    $folders->execute([$category['id']]);
+    $folders = $folders->fetchAll();
+
+    render('portal/kb/category', array_merge($_agentKbVars, ['category' => $category, 'folders' => $folders]));
+});
+
+/* ==================================================================
  * AGENT – Canned Responses JSON (used by ticket reply picker)
  * ================================================================== */
 

@@ -1,10 +1,13 @@
 <?php
 $layout       = 'app';
 $pageTitle    = $category['name'] . ' – Knowledge Base';
-$sidebarItems = portalSidebar('kb');
+$kbBase       ??= '/portal/kb';
+$kbPanelLabel ??= 'Portal';
+$kbPanelUrl   ??= '/portal';
+$sidebarItems ??= portalSidebar('kb');
 $breadcrumbs  = [
-    ['label' => 'Portal', 'url' => '/portal'],
-    ['label' => 'Knowledge Base', 'url' => '/portal/kb'],
+    ['label' => $kbPanelLabel, 'url' => $kbPanelUrl],
+    ['label' => 'Knowledge Base', 'url' => $kbBase],
     ['label' => $category['name']],
 ];
 ?>
@@ -15,7 +18,7 @@ $breadcrumbs  = [
             <p class="text-muted mb-0"><?= e($category['description']) ?></p>
         <?php endif; ?>
     </div>
-    <a href="/portal/kb" class="btn btn-outline-secondary">
+    <a href="<?= $kbBase ?>" class="btn btn-outline-secondary">
         <i class="bi bi-arrow-left me-1"></i>Back
     </a>
 </div>
@@ -29,7 +32,7 @@ $breadcrumbs  = [
     <div class="row g-3">
         <?php foreach ($folders as $f): ?>
         <div class="col-md-6 col-lg-4">
-            <a href="/portal/kb/<?= e($category['slug']) ?>/<?= e($f['slug']) ?>" class="text-decoration-none">
+            <a href="<?= $kbBase ?>/<?= e($category['slug']) ?>/<?= e($f['slug']) ?>" class="text-decoration-none">
                 <div class="card border-0 shadow-sm h-100">
                     <div class="card-body p-4">
                         <div class="d-flex align-items-center mb-2">

@@ -1,12 +1,15 @@
 <?php
 $layout       = 'app';
 $pageTitle    = $article['title'] . ' – Knowledge Base';
-$sidebarItems = portalSidebar('kb');
+$kbBase       ??= '/portal/kb';
+$kbPanelLabel ??= 'Portal';
+$kbPanelUrl   ??= '/portal';
+$sidebarItems ??= portalSidebar('kb');
 $breadcrumbs  = [
-    ['label' => 'Portal', 'url' => '/portal'],
-    ['label' => 'Knowledge Base', 'url' => '/portal/kb'],
-    ['label' => $article['category_name'], 'url' => '/portal/kb/' . $article['category_slug']],
-    ['label' => $article['folder_name'], 'url' => '/portal/kb/' . $article['category_slug'] . '/' . $article['folder_slug']],
+    ['label' => $kbPanelLabel, 'url' => $kbPanelUrl],
+    ['label' => 'Knowledge Base', 'url' => $kbBase],
+    ['label' => $article['category_name'], 'url' => $kbBase . '/' . $article['category_slug']],
+    ['label' => $article['folder_name'], 'url' => $kbBase . '/' . $article['category_slug'] . '/' . $article['folder_slug']],
     ['label' => $article['title']],
 ];
 ?>
@@ -19,7 +22,7 @@ $breadcrumbs  = [
             <?php endif; ?>
         </div>
     </div>
-    <a href="/portal/kb/<?= e($article['category_slug']) ?>/<?= e($article['folder_slug']) ?>" class="btn btn-outline-secondary">
+    <a href="<?= $kbBase ?>/<?= e($article['category_slug']) ?>/<?= e($article['folder_slug']) ?>" class="btn btn-outline-secondary">
         <i class="bi bi-arrow-left me-1"></i>Back
     </a>
 </div>
@@ -70,7 +73,7 @@ function sendFeedback(rating) {
     var form = new URLSearchParams();
     form.append('rating', rating);
 
-    fetch('/portal/kb/articles/<?= e($article['slug']) ?>/feedback', {
+    fetch('<?= $kbBase ?>/articles/<?= e($article['slug']) ?>/feedback', {
         method: 'POST',
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: form.toString()

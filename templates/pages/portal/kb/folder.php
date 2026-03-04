@@ -1,11 +1,14 @@
 <?php
 $layout       = 'app';
 $pageTitle    = $folder['name'] . ' – Knowledge Base';
-$sidebarItems = portalSidebar('kb');
+$kbBase       ??= '/portal/kb';
+$kbPanelLabel ??= 'Portal';
+$kbPanelUrl   ??= '/portal';
+$sidebarItems ??= portalSidebar('kb');
 $breadcrumbs  = [
-    ['label' => 'Portal', 'url' => '/portal'],
-    ['label' => 'Knowledge Base', 'url' => '/portal/kb'],
-    ['label' => $category['name'], 'url' => '/portal/kb/' . $category['slug']],
+    ['label' => $kbPanelLabel, 'url' => $kbPanelUrl],
+    ['label' => 'Knowledge Base', 'url' => $kbBase],
+    ['label' => $category['name'], 'url' => $kbBase . '/' . $category['slug']],
     ['label' => $folder['name']],
 ];
 ?>
@@ -16,7 +19,7 @@ $breadcrumbs  = [
             <p class="text-muted mb-0"><?= e($folder['description']) ?></p>
         <?php endif; ?>
     </div>
-    <a href="/portal/kb/<?= e($category['slug']) ?>" class="btn btn-outline-secondary">
+    <a href="<?= $kbBase ?>/<?= e($category['slug']) ?>" class="btn btn-outline-secondary">
         <i class="bi bi-arrow-left me-1"></i>Back
     </a>
 </div>
@@ -29,7 +32,7 @@ $breadcrumbs  = [
 <?php else: ?>
     <div class="list-group shadow-sm">
         <?php foreach ($articles as $a): ?>
-        <a href="/portal/kb/articles/<?= e($a['slug']) ?>" class="list-group-item list-group-item-action border-0 py-3">
+        <a href="<?= $kbBase ?>/articles/<?= e($a['slug']) ?>" class="list-group-item list-group-item-action border-0 py-3">
             <div class="d-flex align-items-center">
                 <i class="bi bi-file-text text-muted me-3" style="font-size:1.25rem;"></i>
                 <div>

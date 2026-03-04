@@ -1,9 +1,12 @@
 <?php
 $layout       = 'app';
 $pageTitle    = 'Knowledge Base';
-$sidebarItems = portalSidebar('kb');
+$kbBase       ??= '/portal/kb';
+$kbPanelLabel ??= 'Portal';
+$kbPanelUrl   ??= '/portal';
+$sidebarItems ??= portalSidebar('kb');
 $breadcrumbs  = [
-    ['label' => 'Portal', 'url' => '/portal'],
+    ['label' => $kbPanelLabel, 'url' => $kbPanelUrl],
     ['label' => 'Knowledge Base'],
 ];
 ?>
@@ -35,7 +38,7 @@ $breadcrumbs  = [
         <div class="row g-3">
             <?php foreach ($categories as $cat): ?>
             <div class="col-md-6 col-lg-4">
-                <a href="/portal/kb/<?= e($cat['slug']) ?>" class="text-decoration-none">
+                <a href="<?= $kbBase ?>/<?= e($cat['slug']) ?>" class="text-decoration-none">
                     <div class="card border-0 shadow-sm h-100" style="transition: transform .15s ease;">
                         <div class="card-body p-4">
                             <div class="d-flex align-items-center mb-2">
@@ -77,7 +80,7 @@ $breadcrumbs  = [
             return;
         }
         timer = setTimeout(function() {
-            fetch('/portal/kb/search?q=' + encodeURIComponent(q))
+            fetch('<?= $kbBase ?>/search?q=' + encodeURIComponent(q))
                 .then(function(r) { return r.json(); })
                 .then(function(data) {
                     if (data.length === 0) {
@@ -85,7 +88,7 @@ $breadcrumbs  = [
                     } else {
                         var html = '<div class="list-group">';
                         data.forEach(function(a) {
-                            html += '<a href="/portal/kb/articles/' + encodeURIComponent(a.slug) + '" class="list-group-item list-group-item-action">'
+                            html += '<a href="<?= $kbBase ?>/articles/' + encodeURIComponent(a.slug) + '" class="list-group-item list-group-item-action">'
                                 + '<div class="fw-semibold">' + escHtml(a.title) + '</div>'
                                 + '<small class="text-muted">' + escHtml(a.category_name || '') + ' / ' + escHtml(a.folder_name || '') + '</small>'
                                 + '</a>';
