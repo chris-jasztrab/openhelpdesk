@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS `users` (
     `last_name`   VARCHAR(255) NOT NULL,
     `email`       VARCHAR(255) NOT NULL UNIQUE,
     `password`    VARCHAR(255) NOT NULL,
-    `role`        ENUM('admin', 'agent', 'user') NOT NULL DEFAULT 'user',
+    `role`        ENUM('admin', 'agent', 'power_user', 'user') NOT NULL DEFAULT 'user',
     `avatar`      VARCHAR(255) DEFAULT NULL,
     `azure_oid`   VARCHAR(128) NULL DEFAULT NULL,
     `work_phone`              VARCHAR(50)  DEFAULT NULL,

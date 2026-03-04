@@ -59,7 +59,7 @@ $action = $isEdit ? "/admin/users/{$editing['id']}/edit" : '/admin/users/create'
                     <select class="form-select" id="role" name="role" required>
                         <?php
                         $currentRole = old('role', $editing['role'] ?? 'user');
-                        foreach (['admin' => 'Admin', 'agent' => 'Agent', 'user' => 'End User'] as $val => $label):
+                        foreach (['admin' => 'Admin', 'agent' => 'Agent', 'power_user' => 'Power User', 'user' => 'End User'] as $val => $label):
                         ?>
                         <option value="<?= $val ?>" <?= $currentRole === $val ? 'selected' : '' ?>><?= $label ?></option>
                         <?php endforeach; ?>
@@ -120,7 +120,7 @@ $action = $isEdit ? "/admin/users/{$editing['id']}/edit" : '/admin/users/create'
                 <?php endif; ?>
             </div>
 
-            <?php if ($isEdit && in_array($editing['role'] ?? '', ['agent', 'admin'])): ?>
+            <?php if ($isEdit && in_array($editing['role'] ?? '', ['agent', 'admin', 'power_user'])): ?>
             <hr class="my-4">
             <div>
                 <label class="form-label fw-semibold">Group Membership</label>

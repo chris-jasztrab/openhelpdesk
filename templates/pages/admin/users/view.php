@@ -8,7 +8,7 @@ $breadcrumbs  = [
     ['label' => $profileUser['first_name'] . ' ' . $profileUser['last_name']],
 ];
 
-$badgeColors = ['admin' => 'danger', 'agent' => 'primary', 'user' => 'secondary'];
+$badgeColors = ['admin' => 'danger', 'agent' => 'primary', 'power_user' => 'info', 'user' => 'secondary'];
 $bc = $badgeColors[$profileUser['role']] ?? 'secondary';
 
 $statusLabels = [
@@ -322,7 +322,7 @@ $statusLabels = [
         return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
     function roleBadge(role) {
-        return role === 'admin' ? 'danger' : role === 'agent' ? 'primary' : 'secondary';
+        return role === 'admin' ? 'danger' : role === 'agent' ? 'primary' : role === 'power_user' ? 'info' : 'secondary';
     }
 })();
 </script>

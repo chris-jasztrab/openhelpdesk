@@ -1959,6 +1959,17 @@ function agentSidebar(string $active = ''): array
     ]);
 }
 
+function powerUserSidebar(string $active = ''): array
+{
+    return array_map(fn($item) => array_merge($item, ['active' => $item['key'] === $active]), [
+        ['icon' => 'bi-speedometer2',     'label' => label('agent.nav.dashboard'),      'url' => '/agent',                  'key' => 'dashboard'],
+        ['icon' => 'bi-ticket-detailed',  'label' => label('agent.nav.tickets'),        'url' => '/agent/tickets',          'key' => 'tickets'],
+        ['icon' => 'bi-book',             'label' => label('agent.nav.knowledge_base'), 'url' => '/agent/kb',               'key' => 'kb'],
+        ['icon' => 'bi-chat-square-text', 'label' => 'Canned Responses',                'url' => '/agent/canned-responses', 'key' => 'canned-responses'],
+        ['icon' => 'bi-bar-chart',        'label' => label('nav.reports'),              'url' => '/admin/reports',          'key' => 'reports'],
+    ]);
+}
+
 function sortUrl(string $col, string $currentSort, string $currentDir, array $baseParams, string $basePath): string
 {
     $newDir = ($col === $currentSort && $currentDir === 'asc') ? 'desc' : 'asc';

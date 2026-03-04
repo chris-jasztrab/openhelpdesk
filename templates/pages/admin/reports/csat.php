@@ -5,7 +5,7 @@ $scheduleReportType  = 'csat';
 $scheduleReportTitle = 'CSAT / Satisfaction';
 $sidebarItems        = adminSidebar('reports');
 $breadcrumbs  = [
-    ['label' => 'Admin', 'url' => '/admin'],
+    Auth::role() === 'power_user' ? ['label' => 'Agent', 'url' => '/agent'] : ['label' => 'Admin', 'url' => '/admin'],
     ['label' => 'Reports', 'url' => '/admin/reports'],
     ['label' => 'Satisfaction'],
 ];

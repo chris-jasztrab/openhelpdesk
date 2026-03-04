@@ -8,7 +8,7 @@ $breadcrumbs  = [
     ['label' => 'Merge Users'],
 ];
 
-$roleBadge = fn($r) => match ($r) { 'admin' => 'danger', 'agent' => 'primary', default => 'secondary' };
+$roleBadge = fn($r) => match ($r) { 'admin' => 'danger', 'agent' => 'primary', 'power_user' => 'info', default => 'secondary' };
 
 $suggestUser ??= null;
 $keepUser    ??= null;
@@ -102,7 +102,7 @@ $suggestLabel = $suggestUser
     }
 
     function roleBadge(r) {
-        return r === 'admin' ? 'danger' : r === 'agent' ? 'primary' : 'secondary';
+        return r === 'admin' ? 'danger' : r === 'agent' ? 'primary' : r === 'power_user' ? 'info' : 'secondary';
     }
 
     function checkReady() {

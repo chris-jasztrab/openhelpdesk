@@ -3,9 +3,9 @@ $layout              = 'app';
 $pageTitle           = 'Agent Performance – Reports';
 $scheduleReportType  = 'agent_performance';
 $scheduleReportTitle = 'Agent Performance';
-$sidebarItems = adminSidebar('reports');
+$sidebarItems = Auth::role() === 'power_user' ? powerUserSidebar('reports') : adminSidebar('reports');
 $breadcrumbs  = [
-    ['label' => 'Admin', 'url' => '/admin'],
+    Auth::role() === 'power_user' ? ['label' => 'Agent', 'url' => '/agent'] : ['label' => 'Admin', 'url' => '/admin'],
     ['label' => 'Reports', 'url' => '/admin/reports'],
     ['label' => 'Agent Performance'],
 ];

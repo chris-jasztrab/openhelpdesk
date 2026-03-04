@@ -16,7 +16,7 @@ $router->get('/health', function () {
  * ------------------------------------------------------------------ */
 $router->post('/api/tickets/{id}/tags', function (array $p) {
     Auth::requireAuth();
-    if (!in_array(Auth::role(), ['admin', 'agent'], true)) {
+    if (!in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)) {
         http_response_code(403);
         echo json_encode(['error' => 'Forbidden']);
         exit;
@@ -89,7 +89,7 @@ $router->post('/api/tickets/{id}/tags', function (array $p) {
  * ------------------------------------------------------------------ */
 $router->get('/api/user-search', function () {
     Auth::requireAuth();
-    if (!in_array(Auth::role(), ['admin', 'agent'], true)) {
+    if (!in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)) {
         http_response_code(403);
         echo json_encode([]);
         exit;
@@ -122,7 +122,7 @@ $router->get('/api/user-search', function () {
  * ------------------------------------------------------------------ */
 $router->post('/api/tickets/{id}/cc', function (array $p) {
     Auth::requireAuth();
-    if (!in_array(Auth::role(), ['admin', 'agent'], true)) {
+    if (!in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)) {
         http_response_code(403);
         echo json_encode(['error' => 'Forbidden']);
         exit;
@@ -184,7 +184,7 @@ $router->post('/api/tickets/{id}/cc', function (array $p) {
  * ------------------------------------------------------------------ */
 $router->get('/api/mention-search', function () {
     Auth::requireAuth();
-    if (!in_array(Auth::role(), ['admin', 'agent'], true)) {
+    if (!in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)) {
         http_response_code(403);
         echo json_encode([]);
         exit;
@@ -219,7 +219,7 @@ $router->get('/api/mention-search', function () {
 // Register / refresh presence (ping every 20s)
 $router->post('/api/tickets/{id}/presence', function (array $p) {
     Auth::requireAuth();
-    if (!in_array(Auth::role(), ['admin', 'agent'], true)) {
+    if (!in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)) {
         http_response_code(403);
         header('Content-Type: application/json');
         echo json_encode(['error' => 'Forbidden']);
@@ -244,7 +244,7 @@ $router->post('/api/tickets/{id}/presence', function (array $p) {
 // Get other active viewers of a ticket
 $router->get('/api/tickets/{id}/presence', function (array $p) {
     Auth::requireAuth();
-    if (!in_array(Auth::role(), ['admin', 'agent'], true)) {
+    if (!in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)) {
         http_response_code(403);
         header('Content-Type: application/json');
         echo json_encode(['error' => 'Forbidden']);
@@ -325,7 +325,7 @@ $router->get('/search', function () {
     }
 
     // --- Contacts (admin/agent only) ---
-    if (($type === 'all' || $type === 'contacts') && in_array($role, ['admin', 'agent'], true)) {
+    if (($type === 'all' || $type === 'contacts') && in_array($role, ['admin', 'agent', 'power_user'], true)) {
         $stmt = $db->prepare(
             "SELECT id, first_name, last_name, email, role
              FROM users
@@ -377,9 +377,10 @@ $router->get('/', function () {
             unset($_SESSION['sso_needs_location']);
         }
         match (Auth::role()) {
-            'admin' => redirect('/admin'),
-            'agent' => redirect('/agent'),
-            default => redirect('/portal'),
+            'admin'      => redirect('/admin'),
+            'agent'      => redirect('/agent'),
+            'power_user' => redirect('/agent'),
+            default      => redirect('/portal'),
         };
     }
     render('home');
@@ -931,7 +932,7 @@ $router->post('/profile', function () {
  * ------------------------------------------------------------------ */
 $router->get('/profile/2fa/setup', function () {
     Auth::requireAuth();
-    if (!in_array(Auth::role(), ['admin', 'agent'], true)) {
+    if (!in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)) {
         redirect('/profile');
     }
 
@@ -959,7 +960,7 @@ $router->get('/profile/2fa/setup', function () {
 
 $router->post('/profile/2fa/setup', function () {
     Auth::requireAuth();
-    if (!in_array(Auth::role(), ['admin', 'agent'], true)) {
+    if (!in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)) {
         redirect('/profile');
     }
     if (!verifyCsrf($_POST['_token'] ?? '')) {
@@ -991,7 +992,7 @@ $router->post('/profile/2fa/setup', function () {
 
 $router->post('/profile/2fa/disable', function () {
     Auth::requireAuth();
-    if (!in_array(Auth::role(), ['admin', 'agent'], true)) {
+    if (!in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)) {
         redirect('/profile');
     }
     if (!verifyCsrf($_POST['_token'] ?? '')) {

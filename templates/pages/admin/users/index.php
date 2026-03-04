@@ -49,9 +49,10 @@ $hasFilters = !empty($filterParams);
                 <label class="form-label small fw-semibold mb-1">Role</label>
                 <select class="form-select form-select-sm" name="role">
                     <option value="">All Roles</option>
-                    <option value="admin"  <?= $roleFilter === 'admin'  ? 'selected' : '' ?>>Admin</option>
-                    <option value="agent"  <?= $roleFilter === 'agent'  ? 'selected' : '' ?>>Agent</option>
-                    <option value="user"   <?= $roleFilter === 'user'   ? 'selected' : '' ?>>User</option>
+                    <option value="admin"      <?= $roleFilter === 'admin'      ? 'selected' : '' ?>>Admin</option>
+                    <option value="agent"      <?= $roleFilter === 'agent'      ? 'selected' : '' ?>>Agent</option>
+                    <option value="power_user" <?= $roleFilter === 'power_user' ? 'selected' : '' ?>>Power User</option>
+                    <option value="user"       <?= $roleFilter === 'user'       ? 'selected' : '' ?>>User</option>
                 </select>
             </div>
             <div class="mb-3">

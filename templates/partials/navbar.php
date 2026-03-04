@@ -24,7 +24,7 @@
                     </a>
                 </li>
                 <?php endif; ?>
-                <?php if (in_array(Auth::role(), ['admin', 'agent'], true)): ?>
+                <?php if (in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)): ?>
                 <li class="nav-item">
                     <a class="nav-link <?= isActive('/agent') ? 'active' : '' ?>" href="/agent">
                         <i class="bi bi-headset me-1"></i>Agent Panel
@@ -53,7 +53,7 @@
                     <div class="d-flex border-bottom px-3 pt-2 gap-1" id="ld-search-tabs">
                         <button type="button" class="btn btn-sm px-2 py-1 ld-search-tab active" data-type="all">Everything</button>
                         <button type="button" class="btn btn-sm px-2 py-1 ld-search-tab" data-type="tickets">Tickets</button>
-                        <?php if (in_array(Auth::role(), ['admin', 'agent'], true)): ?>
+                        <?php if (in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)): ?>
                         <button type="button" class="btn btn-sm px-2 py-1 ld-search-tab" data-type="contacts">Contacts</button>
                         <?php endif; ?>
                         <button type="button" class="btn btn-sm px-2 py-1 ld-search-tab" data-type="kb">KB Articles</button>
@@ -67,7 +67,7 @@
             <ul class="navbar-nav">
                 <?php
                 $notifCount = notificationCount();
-                if (in_array(Auth::role(), ['admin', 'agent'], true)):
+                if (in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)):
                 ?>
                 <li class="nav-item" id="ld-notif-bell" data-count="<?= $notifCount ?>">
                     <a class="nav-link position-relative <?= $notifCount > 0 ? 'ld-bell-active' : '' ?>" href="/notifications" title="Notifications">
@@ -95,7 +95,7 @@
                         <?php if (Auth::role() === 'admin'): ?>
                         <li><a class="dropdown-item" href="/admin?tour=1"><i class="bi bi-play-circle me-2"></i>Restart Tour</a></li>
                         <?php endif; ?>
-                        <?php if (Auth::role() === 'agent'): ?>
+                        <?php if (in_array(Auth::role(), ['agent', 'power_user'], true)): ?>
                         <li><a class="dropdown-item" href="/agent?tour=1"><i class="bi bi-play-circle me-2"></i>Restart Tour</a></li>
                         <?php endif; ?>
                         <?php if (Auth::role() === 'user'): ?>

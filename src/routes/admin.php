@@ -136,7 +136,7 @@ $router->get('/admin/users', function () {
     $sql    = 'SELECT u.*, l.name AS location_name FROM users u LEFT JOIN locations l ON u.location_id = l.id';
     $where  = [];
     $params = [];
-    if (in_array($role, ['admin', 'agent', 'user'], true)) {
+    if (in_array($role, ['admin', 'agent', 'power_user', 'user'], true)) {
         $where[]  = 'u.role = ?';
         $params[] = $role;
     }
@@ -307,7 +307,7 @@ $router->get('/admin/users/{id}/edit', function (array $p) {
     }
     $locations  = $db->query('SELECT * FROM locations ORDER BY name')->fetchAll();
     $userGroups = [];
-    if (in_array($editing['role'], ['agent', 'admin'])) {
+    if (in_array($editing['role'], ['agent', 'admin', 'power_user'])) {
         $gStmt = $db->prepare(
             'SELECT g.id, g.name FROM `groups` g
              JOIN group_user_map gum ON gum.group_id = g.id
@@ -989,7 +989,7 @@ $router->get('/admin/groups', function () {
 $router->get('/admin/groups/create', function () {
     Auth::requireRole('admin');
     $users = Database::connect()->query(
-        "SELECT id, first_name, last_name, role FROM users WHERE role IN ('agent','admin') ORDER BY first_name, last_name"
+        "SELECT id, first_name, last_name, role FROM users WHERE role IN ('agent','admin','power_user') ORDER BY first_name, last_name"
     )->fetchAll();
     render('admin/groups/form', ['editing' => null, 'users' => $users, 'memberIds' => []]);
 });
@@ -1041,7 +1041,7 @@ $router->get('/admin/groups/{id}/edit', function (array $p) {
     }
 
     $users = $db->query(
-        "SELECT id, first_name, last_name, role FROM users WHERE role IN ('agent','admin') ORDER BY first_name, last_name"
+        "SELECT id, first_name, last_name, role FROM users WHERE role IN ('agent','admin','power_user') ORDER BY first_name, last_name"
     )->fetchAll();
 
     $memberStmt = $db->prepare('SELECT user_id FROM group_user_map WHERE group_id = ?');
@@ -1103,7 +1103,7 @@ $router->post('/admin/groups/{id}/delete', function (array $p) {
  * ================================================================== */
 
 $router->get('/admin/ticket-templates', function () {
-    Auth::requireRole('admin', 'agent');
+    Auth::requireRole('admin', 'agent', 'power_user');
     $db = Database::connect();
     $templates = $db->query(
         "SELECT t.*,
@@ -1120,7 +1120,7 @@ $router->get('/admin/ticket-templates', function () {
 });
 
 $router->get('/admin/ticket-templates/create', function () {
-    Auth::requireRole('admin', 'agent');
+    Auth::requireRole('admin', 'agent', 'power_user');
     $db         = Database::connect();
     $types      = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
     $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
@@ -1128,7 +1128,7 @@ $router->get('/admin/ticket-templates/create', function () {
 });
 
 $router->post('/admin/ticket-templates/create', function () {
-    Auth::requireRole('admin', 'agent');
+    Auth::requireRole('admin', 'agent', 'power_user');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/ticket-templates/create');
@@ -1158,7 +1158,7 @@ $router->post('/admin/ticket-templates/create', function () {
 });
 
 $router->get('/admin/ticket-templates/{id}/edit', function (array $p) {
-    Auth::requireRole('admin', 'agent');
+    Auth::requireRole('admin', 'agent', 'power_user');
     $db   = Database::connect();
     $tpl  = $db->prepare('SELECT * FROM ticket_templates WHERE id = ?');
     $tpl->execute([(int) $p['id']]);
@@ -1178,7 +1178,7 @@ $router->get('/admin/ticket-templates/{id}/edit', function (array $p) {
 });
 
 $router->post('/admin/ticket-templates/{id}/edit', function (array $p) {
-    Auth::requireRole('admin', 'agent');
+    Auth::requireRole('admin', 'agent', 'power_user');
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -1214,7 +1214,7 @@ $router->post('/admin/ticket-templates/{id}/edit', function (array $p) {
 });
 
 $router->post('/admin/ticket-templates/{id}/delete', function (array $p) {
-    Auth::requireRole('admin', 'agent');
+    Auth::requireRole('admin', 'agent', 'power_user');
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -1328,7 +1328,7 @@ $router->get('/admin/tickets', function () {
     $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
     $types      = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
     $locations  = $db->query('SELECT * FROM locations ORDER BY name')->fetchAll();
-    $agents     = $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin') ORDER BY first_name")->fetchAll();
+    $agents     = $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin','power_user') ORDER BY first_name")->fetchAll();
     $groups     = $db->query('SELECT * FROM `groups` ORDER BY sort_order, name')->fetchAll();
 
     // Load saved filters (own + shared)
@@ -1654,7 +1654,7 @@ $router->get('/admin/tickets/search', function () {
 });
 
 $router->get('/admin/tickets/create', function () {
-    Auth::requireRole('admin', 'agent');
+    Auth::requireRole('admin', 'agent', 'power_user');
     $db         = Database::connect();
     $types      = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
     $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
@@ -1662,7 +1662,7 @@ $router->get('/admin/tickets/create', function () {
     $groups     = $db->query('SELECT * FROM `groups` ORDER BY sort_order, name')->fetchAll();
     $agents     = $db->query(
         "SELECT id, first_name, last_name, email FROM users
-         WHERE role IN ('admin','agent') ORDER BY first_name, last_name"
+         WHERE role IN ('admin','agent','power_user') ORDER BY first_name, last_name"
     )->fetchAll();
     $templates  = $db->query(
         'SELECT * FROM ticket_templates ORDER BY name'
@@ -1679,7 +1679,7 @@ $router->get('/admin/tickets/create', function () {
 });
 
 $router->post('/admin/tickets/create', function () {
-    Auth::requireRole('admin', 'agent');
+    Auth::requireRole('admin', 'agent', 'power_user');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/tickets/create');
@@ -1707,7 +1707,7 @@ $router->post('/admin/tickets/create', function () {
     if ($subject === '' || $desc === '') {
         flashInput($_POST);
         flash('error', 'Subject and description are required.');
-        $redirectBase = Auth::role() === 'agent' ? '/agent' : '/admin';
+        $redirectBase = in_array(Auth::role(), ['agent', 'power_user'], true) ? '/agent' : '/admin';
         redirect("{$redirectBase}/tickets/create");
     }
 
@@ -1753,7 +1753,7 @@ $router->post('/admin/tickets/create', function () {
 });
 
 $router->post('/admin/tickets/bulk', function () {
-    Auth::requireRole('admin', 'agent');
+    Auth::requireRole('admin', 'agent', 'power_user');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/tickets');
@@ -1899,7 +1899,7 @@ $router->get('/admin/tickets/{id}', function (array $p) {
     $timeline = $tl->fetchAll();
 
     // Agents list for @mention suggestions and assignment dropdown
-    $agents = $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin') ORDER BY first_name")->fetchAll();
+    $agents = $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin','power_user') ORDER BY first_name")->fetchAll();
 
     // Priorities for update dropdown
     $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
@@ -2109,7 +2109,7 @@ $router->get('/admin/tickets/{id}/split', function (array $p) {
     $commentsStmt->execute([$ticket['id']]);
     $comments = $commentsStmt->fetchAll();
 
-    $agents     = $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin') ORDER BY first_name")->fetchAll();
+    $agents     = $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin','power_user') ORDER BY first_name")->fetchAll();
     $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
     $types      = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
     $groups     = $db->query('SELECT * FROM `groups` ORDER BY sort_order, name')->fetchAll();
@@ -5434,7 +5434,7 @@ function loadAutomationRefData(PDO $db): array
         'priorities' => $db->query('SELECT id, name FROM ticket_priorities ORDER BY sort_order')->fetchAll(),
         'locations'  => $db->query('SELECT id, name FROM locations ORDER BY name')->fetchAll(),
         'groups'     => $db->query('SELECT id, name FROM groups ORDER BY name')->fetchAll(),
-        'agents'     => $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin') ORDER BY first_name")->fetchAll(),
+        'agents'     => $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin','power_user') ORDER BY first_name")->fetchAll(),
         'allUsers'   => $db->query("SELECT id, first_name, last_name, email FROM users ORDER BY first_name")->fetchAll(),
     ];
 }
@@ -5653,7 +5653,7 @@ function loadEscalationRefData(PDO $db): array
     return [
         'priorities' => $db->query('SELECT id, name FROM ticket_priorities ORDER BY sort_order')->fetchAll(),
         'groups'     => $db->query('SELECT id, name FROM groups ORDER BY name')->fetchAll(),
-        'agents'     => $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin') ORDER BY first_name")->fetchAll(),
+        'agents'     => $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin','power_user') ORDER BY first_name")->fetchAll(),
         'allUsers'   => $db->query("SELECT id, first_name, last_name, email FROM users ORDER BY first_name")->fetchAll(),
     ];
 }
@@ -5798,7 +5798,7 @@ function reportDateRange(): array
 /* ── Reports Overview ─────────────────────────────────────────────── */
 
 $router->get('/admin/reports', function () {
-    Auth::requireRole('admin');
+    Auth::requireRole('admin', 'power_user');
     $db = Database::connect();
     [$from, $to] = reportDateRange();
     $toEnd = $to . ' 23:59:59';
@@ -5856,7 +5856,7 @@ $router->get('/admin/reports', function () {
 /* ── Agent Performance ────────────────────────────────────────────── */
 
 $router->get('/admin/reports/agent-performance', function () {
-    Auth::requireRole('admin');
+    Auth::requireRole('admin', 'power_user');
     $db = Database::connect();
     [$from, $to] = reportDateRange();
     $toEnd = $to . ' 23:59:59';
@@ -5903,7 +5903,7 @@ $router->get('/admin/reports/agent-performance', function () {
 /* ── Response Times ───────────────────────────────────────────────── */
 
 $router->get('/admin/reports/response-times', function () {
-    Auth::requireRole('admin');
+    Auth::requireRole('admin', 'power_user');
     $db = Database::connect();
     [$from, $to] = reportDateRange();
     $toEnd = $to . ' 23:59:59';
@@ -5998,7 +5998,7 @@ $router->get('/admin/reports/response-times', function () {
 /* ── SLA Compliance ───────────────────────────────────────────────── */
 
 $router->get('/admin/reports/sla', function () {
-    Auth::requireRole('admin');
+    Auth::requireRole('admin', 'power_user');
     $db = Database::connect();
     [$from, $to] = reportDateRange();
     $toEnd = $to . ' 23:59:59';
@@ -6086,7 +6086,7 @@ $router->get('/admin/reports/sla', function () {
 /* ── Unresolved Tickets ───────────────────────────────────────────── */
 
 $router->get('/admin/reports/unresolved', function () {
-    Auth::requireRole('admin');
+    Auth::requireRole('admin', 'power_user');
     $db = Database::connect();
 
     // No date filter for unresolved — it's current state
@@ -6147,7 +6147,7 @@ $router->get('/admin/reports/unresolved', function () {
 /* ── Ticket Volume ────────────────────────────────────────────────── */
 
 $router->get('/admin/reports/ticket-volume', function () {
-    Auth::requireRole('admin');
+    Auth::requireRole('admin', 'power_user');
     $db = Database::connect();
     [$from, $to] = reportDateRange();
     $toEnd = $to . ' 23:59:59';
@@ -6213,7 +6213,7 @@ $router->get('/admin/reports/ticket-volume', function () {
 /* ── Ticket Lifecycle ─────────────────────────────────────────────── */
 
 $router->get('/admin/reports/lifecycle', function () {
-    Auth::requireRole('admin');
+    Auth::requireRole('admin', 'power_user');
     $db = Database::connect();
     [$from, $to] = reportDateRange();
     $toEnd = $to . ' 23:59:59';
@@ -6342,7 +6342,7 @@ $router->get('/admin/reports/lifecycle', function () {
 /* ── Location Report ──────────────────────────────────────────────── */
 
 $router->get('/admin/reports/location', function () {
-    Auth::requireRole('admin');
+    Auth::requireRole('admin', 'power_user');
     $db = Database::connect();
     [$from, $to] = reportDateRange();
     $toEnd = $to . ' 23:59:59';
@@ -6388,7 +6388,7 @@ $router->get('/admin/reports/location', function () {
 /* ── CSAT Satisfaction Report ─────────────────────────────────────── */
 
 $router->get('/admin/reports/csat', function () {
-    Auth::requireRole('admin');
+    Auth::requireRole('admin', 'power_user');
     $db = Database::connect();
     [$from, $to] = reportDateRange();
     $toEnd = $to . ' 23:59:59';
@@ -6476,7 +6476,7 @@ $router->post('/admin/settings/csat', function () {
  * ================================================================== */
 
 $router->get('/admin/reports/workload', function () {
-    Auth::requireRole('admin');
+    Auth::requireRole('admin', 'power_user');
     $db = Database::connect();
 
     $stmt = $db->query(
@@ -6505,7 +6505,7 @@ $router->get('/admin/reports/workload', function () {
  * ================================================================== */
 
 $router->get('/admin/reports/trends', function () {
-    Auth::requireRole('admin');
+    Auth::requireRole('admin', 'power_user');
     $db      = Database::connect();
     [$from, $to] = reportDateRange();
     $toEnd   = $to . ' 23:59:59';
@@ -6576,7 +6576,7 @@ $router->get('/admin/reports/trends', function () {
  * ================================================================== */
 
 $router->get('/admin/reports/fcr', function () {
-    Auth::requireRole('admin');
+    Auth::requireRole('admin', 'power_user');
     $db = Database::connect();
     [$from, $to] = reportDateRange();
     $toEnd = $to . ' 23:59:59';
@@ -6688,7 +6688,7 @@ $router->get('/admin/reports/fcr', function () {
  * ================================================================== */
 
 $router->get('/admin/reports/custom', function () {
-    Auth::requireRole('admin');
+    Auth::requireRole('admin', 'power_user');
     $db = Database::connect();
     [$from, $to] = reportDateRange();
     $toEnd = $to . ' 23:59:59';
