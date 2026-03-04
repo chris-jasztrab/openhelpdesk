@@ -1003,6 +1003,9 @@ $router->post('/agent/tickets/{id}/comment', function (array $p) {
                 'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, ?, ?, 1)'
             )->execute([$id, 'sla_set', 'First response recorded']);
         }
+    } else {
+        // Internal note: notify the assigned agent (if not the note author)
+        notifyAgentNoteAdded($db, $id, $message);
     }
 
     $base = $isInternal ? 'Internal note added.' : 'Comment added.';
@@ -1078,6 +1081,10 @@ $router->post('/agent/tickets/{id}/update', function (array $p) {
         )->execute([$id, Auth::id(), 'status_changed', "Status changed from {$oldStatus} to {$newStatus}"]);
         $changes[] = 'status';
 
+        if (in_array($newStatus, ['resolved', 'closed'], true)) {
+            notifyRequesterStatusChanged($db, $id, $newStatus);
+        }
+
         // CSAT survey trigger
         $csatTrigger = getSetting('csat_trigger_status', 'resolved');
         if ($newStatus === $csatTrigger) {
@@ -1140,6 +1147,7 @@ $router->post('/agent/tickets/{id}/update', function (array $p) {
             'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
         )->execute([$id, Auth::id(), 'assigned', "Assigned to {$agentName}"]);
         $changes[] = 'assignment';
+        if ($newAssigned) { notifyAssignedAgent($db, $id, $newAssigned); }
     }
 
     // Group change
@@ -1166,6 +1174,7 @@ $router->post('/agent/tickets/{id}/update', function (array $p) {
             'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
         )->execute([$id, Auth::id(), 'group_changed', "Group changed from {$oldGroupName} to {$newGroupName}"]);
         $changes[] = 'group';
+        if ($newGroup) { notifyAssignedGroup($db, $id, $newGroup); }
     }
 
     // Run automations on ticket update

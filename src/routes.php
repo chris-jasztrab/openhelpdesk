@@ -887,22 +887,34 @@ $router->post('/profile', function () {
     // Save notification preferences
     $db->prepare(
         'UPDATE users SET
-            notify_ticket_created   = ?,
-            notify_ticket_updated   = ?,
-            notify_ticket_cc        = ?,
-            notify_ticket_merged    = ?,
-            notify_escalation       = ?,
-            notify_csat             = ?,
-            notify_group_new_ticket = ?
+            notify_ticket_created    = ?,
+            notify_ticket_updated    = ?,
+            notify_ticket_cc         = ?,
+            notify_ticket_merged     = ?,
+            notify_escalation        = ?,
+            notify_csat              = ?,
+            notify_group_new_ticket  = ?,
+            notify_assigned_to_me    = ?,
+            notify_assigned_to_group = ?,
+            notify_requester_replied = ?,
+            notify_note_added        = ?,
+            notify_ticket_solved     = ?,
+            notify_ticket_closed     = ?
          WHERE id = ?'
     )->execute([
-        isset($_POST['notify_ticket_created'])   ? 1 : 0,
-        isset($_POST['notify_ticket_updated'])   ? 1 : 0,
-        isset($_POST['notify_ticket_cc'])        ? 1 : 0,
-        isset($_POST['notify_ticket_merged'])    ? 1 : 0,
-        isset($_POST['notify_escalation'])       ? 1 : 0,
-        isset($_POST['notify_csat'])             ? 1 : 0,
-        isset($_POST['notify_group_new_ticket']) ? 1 : 0,
+        isset($_POST['notify_ticket_created'])    ? 1 : 0,
+        isset($_POST['notify_ticket_updated'])    ? 1 : 0,
+        isset($_POST['notify_ticket_cc'])         ? 1 : 0,
+        isset($_POST['notify_ticket_merged'])     ? 1 : 0,
+        isset($_POST['notify_escalation'])        ? 1 : 0,
+        isset($_POST['notify_csat'])              ? 1 : 0,
+        isset($_POST['notify_group_new_ticket'])  ? 1 : 0,
+        isset($_POST['notify_assigned_to_me'])    ? 1 : 0,
+        isset($_POST['notify_assigned_to_group']) ? 1 : 0,
+        isset($_POST['notify_requester_replied']) ? 1 : 0,
+        isset($_POST['notify_note_added'])        ? 1 : 0,
+        isset($_POST['notify_ticket_solved'])     ? 1 : 0,
+        isset($_POST['notify_ticket_closed'])     ? 1 : 0,
         $userId,
     ]);
 

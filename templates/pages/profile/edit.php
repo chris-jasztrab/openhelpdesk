@@ -104,31 +104,78 @@ $breadcrumbs = [
                 <div class="card-body pb-1">
                     <p class="text-muted small mb-3">Choose which events you want to receive emails about.</p>
                     <?php
-                    $notifyOptions = [
-                        ['key' => 'notify_ticket_created',    'icon' => 'bi-ticket-detailed',     'label' => 'Ticket submitted',     'desc' => 'Confirmation email when you open a new ticket.'],
-                        ['key' => 'notify_ticket_updated',    'icon' => 'bi-chat-left-text',       'label' => 'Ticket reply',         'desc' => 'Email when someone replies to one of your tickets.'],
-                        ['key' => 'notify_ticket_cc',         'icon' => 'bi-person-lines-fill',    'label' => 'CC updates',           'desc' => "Email when a ticket you're CC'd on receives a reply or is merged."],
-                        ['key' => 'notify_ticket_merged',     'icon' => 'bi-arrows-collapse',      'label' => 'Ticket merged',        'desc' => 'Email when one of your tickets is merged into another.'],
-                        ['key' => 'notify_escalation',        'icon' => 'bi-exclamation-triangle', 'label' => 'Escalation alerts',    'desc' => 'Email when an escalation rule fires and targets you.'],
-                        ['key' => 'notify_csat',              'icon' => 'bi-star',                 'label' => 'Satisfaction surveys', 'desc' => 'Survey email after your ticket is resolved.'],
-                        ['key' => 'notify_group_new_ticket',  'icon' => 'bi-people',               'label' => 'New ticket alerts',    'desc' => 'Email when a new support ticket is submitted and you belong to a notified group.'],
-                    ];
-                    foreach ($notifyOptions as $opt):
-                        $checked = ($user[$opt['key']] ?? 1) ? 'checked' : '';
+                    $isAgent = in_array($user['role'], ['agent', 'admin'], true);
+
+                    if ($isAgent):
+                        $agentOptions = [
+                            ['key' => 'notify_group_new_ticket',  'icon' => 'bi-people',               'label' => 'New ticket in my group',      'desc' => 'Email when a new ticket is submitted in a group you belong to.'],
+                            ['key' => 'notify_assigned_to_group', 'icon' => 'bi-people-fill',           'label' => 'Ticket assigned to my group', 'desc' => 'Email when a ticket is assigned to a group you belong to.'],
+                            ['key' => 'notify_assigned_to_me',    'icon' => 'bi-person-check',          'label' => 'Ticket assigned to me',       'desc' => 'Email when a ticket is assigned directly to you.'],
+                            ['key' => 'notify_requester_replied', 'icon' => 'bi-chat-left-text',        'label' => 'Requester replies',           'desc' => 'Email when a portal user replies to a ticket assigned to you.'],
+                            ['key' => 'notify_note_added',        'icon' => 'bi-sticky',                'label' => 'Internal note added',         'desc' => 'Email when an internal note is added to a ticket assigned to you.'],
+                        ];
+                        $otherOptions = [
+                            ['key' => 'notify_ticket_cc',         'icon' => 'bi-person-lines-fill',    'label' => 'CC updates',         'desc' => "Email when a ticket you're CC'd on receives a reply."],
+                            ['key' => 'notify_escalation',        'icon' => 'bi-exclamation-triangle', 'label' => 'Escalation alerts',  'desc' => 'Email when an escalation rule fires and targets you.'],
+                        ];
                     ?>
-                    <div class="d-flex align-items-start gap-3 py-2 border-bottom">
-                        <div class="form-check form-switch mb-0 pt-1">
-                            <input class="form-check-input" type="checkbox"
-                                   name="<?= $opt['key'] ?>" id="<?= $opt['key'] ?>" value="1" <?= $checked ?>>
-                        </div>
-                        <label class="mb-0 flex-grow-1" for="<?= $opt['key'] ?>" style="cursor:pointer;">
-                            <div class="fw-semibold small">
-                                <i class="bi <?= $opt['icon'] ?> me-1 text-muted"></i><?= $opt['label'] ?>
+                        <p class="text-muted small fw-semibold mb-1 mt-1">Agent Notifications</p>
+                        <?php foreach ($agentOptions as $opt): $checked = ($user[$opt['key']] ?? 1) ? 'checked' : ''; ?>
+                        <div class="d-flex align-items-start gap-3 py-2 border-bottom">
+                            <div class="form-check form-switch mb-0 pt-1">
+                                <input class="form-check-input" type="checkbox"
+                                       name="<?= $opt['key'] ?>" id="<?= $opt['key'] ?>" value="1" <?= $checked ?>>
                             </div>
-                            <div class="text-muted" style="font-size:.8rem;"><?= $opt['desc'] ?></div>
-                        </label>
-                    </div>
-                    <?php endforeach; ?>
+                            <label class="mb-0 flex-grow-1" for="<?= $opt['key'] ?>" style="cursor:pointer;">
+                                <div class="fw-semibold small">
+                                    <i class="bi <?= $opt['icon'] ?> me-1 text-muted"></i><?= $opt['label'] ?>
+                                </div>
+                                <div class="text-muted" style="font-size:.8rem;"><?= $opt['desc'] ?></div>
+                            </label>
+                        </div>
+                        <?php endforeach; ?>
+
+                        <p class="text-muted small fw-semibold mb-1 mt-3">Other Notifications</p>
+                        <?php foreach ($otherOptions as $opt): $checked = ($user[$opt['key']] ?? 1) ? 'checked' : ''; ?>
+                        <div class="d-flex align-items-start gap-3 py-2 border-bottom">
+                            <div class="form-check form-switch mb-0 pt-1">
+                                <input class="form-check-input" type="checkbox"
+                                       name="<?= $opt['key'] ?>" id="<?= $opt['key'] ?>" value="1" <?= $checked ?>>
+                            </div>
+                            <label class="mb-0 flex-grow-1" for="<?= $opt['key'] ?>" style="cursor:pointer;">
+                                <div class="fw-semibold small">
+                                    <i class="bi <?= $opt['icon'] ?> me-1 text-muted"></i><?= $opt['label'] ?>
+                                </div>
+                                <div class="text-muted" style="font-size:.8rem;"><?= $opt['desc'] ?></div>
+                            </label>
+                        </div>
+                        <?php endforeach; ?>
+
+                    <?php else: // portal user
+                        $portalOptions = [
+                            ['key' => 'notify_ticket_created',    'icon' => 'bi-ticket-detailed',     'label' => 'Ticket submitted',       'desc' => 'Confirmation email when you open a new ticket.'],
+                            ['key' => 'notify_ticket_updated',    'icon' => 'bi-chat-left-text',       'label' => 'Agent replies',          'desc' => 'Email when an agent replies to one of your tickets.'],
+                            ['key' => 'notify_ticket_cc',         'icon' => 'bi-person-lines-fill',    'label' => 'CC updates',             'desc' => "Email when a ticket you're CC'd on receives a reply."],
+                            ['key' => 'notify_ticket_merged',     'icon' => 'bi-arrows-collapse',      'label' => 'Ticket merged',          'desc' => 'Email when one of your tickets is merged into another.'],
+                            ['key' => 'notify_ticket_solved',     'icon' => 'bi-check-circle',         'label' => 'Ticket resolved',        'desc' => 'Email when your ticket is marked as resolved.'],
+                            ['key' => 'notify_ticket_closed',     'icon' => 'bi-x-circle',             'label' => 'Ticket closed',          'desc' => 'Email when your ticket is marked as closed.'],
+                            ['key' => 'notify_csat',              'icon' => 'bi-star',                 'label' => 'Satisfaction surveys',   'desc' => 'Survey email after your ticket is resolved.'],
+                        ];
+                        foreach ($portalOptions as $opt): $checked = ($user[$opt['key']] ?? 1) ? 'checked' : ''; ?>
+                        <div class="d-flex align-items-start gap-3 py-2 border-bottom">
+                            <div class="form-check form-switch mb-0 pt-1">
+                                <input class="form-check-input" type="checkbox"
+                                       name="<?= $opt['key'] ?>" id="<?= $opt['key'] ?>" value="1" <?= $checked ?>>
+                            </div>
+                            <label class="mb-0 flex-grow-1" for="<?= $opt['key'] ?>" style="cursor:pointer;">
+                                <div class="fw-semibold small">
+                                    <i class="bi <?= $opt['icon'] ?> me-1 text-muted"></i><?= $opt['label'] ?>
+                                </div>
+                                <div class="text-muted" style="font-size:.8rem;"><?= $opt['desc'] ?></div>
+                            </label>
+                        </div>
+                        <?php endforeach;
+                    endif; ?>
                 </div>
             </div>
 

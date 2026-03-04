@@ -2142,6 +2142,8 @@ $router->post('/admin/tickets/{id}/comment', function (array $p) {
                 'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, ?, ?, 1)'
             )->execute([$id, 'sla_set', 'First response recorded']);
         }
+    } else {
+        notifyAgentNoteAdded($db, $id, $message);
     }
 
     $base = $isInternal ? 'Internal note added.' : 'Comment added.';
@@ -2171,6 +2173,9 @@ $router->post('/admin/tickets/{id}/comment', function (array $p) {
                 Sla::pause($db, $id);
             } elseif (in_array($oldStatus, $pausingStatuses, true)) {
                 Sla::resume($db, $id);
+            }
+            if (in_array($statusAfter, ['resolved', 'closed'], true)) {
+                notifyRequesterStatusChanged($db, $id, $statusAfter);
             }
             $statusLabelsMap = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 'Pending', 'waiting_on_customer' => 'Waiting on Customer', 'waiting_on_third_party' => 'Waiting on Third Party', 'resolved' => 'Resolved', 'closed' => 'Closed'];
             $base .= ' Status set to ' . ($statusLabelsMap[$statusAfter] ?? $statusAfter) . '.';
@@ -2214,6 +2219,10 @@ $router->post('/admin/tickets/{id}/update', function (array $p) {
             'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
         )->execute([$id, Auth::id(), 'status_changed', "Status changed from {$oldStatus} to {$newStatus}"]);
         $changes[] = 'status';
+
+        if (in_array($newStatus, ['resolved', 'closed'], true)) {
+            notifyRequesterStatusChanged($db, $id, $newStatus);
+        }
 
         // SLA: pause on waiting statuses, resume when leaving them
         $pausingStatuses = ['pending', 'waiting_on_customer', 'waiting_on_third_party'];
@@ -2272,6 +2281,7 @@ $router->post('/admin/tickets/{id}/update', function (array $p) {
             'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
         )->execute([$id, Auth::id(), 'assigned', "Assigned to {$agentName}"]);
         $changes[] = 'assignment';
+        if ($newAssigned) { notifyAssignedAgent($db, $id, $newAssigned); }
     }
 
     // Group change
@@ -2298,6 +2308,7 @@ $router->post('/admin/tickets/{id}/update', function (array $p) {
             'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
         )->execute([$id, Auth::id(), 'group_changed', "Group changed from {$oldGroupName} to {$newGroupName}"]);
         $changes[] = 'group';
+        if ($newGroup) { notifyAssignedGroup($db, $id, $newGroup); }
     }
 
     // Run automations on ticket update
@@ -3405,6 +3416,52 @@ $router->post('/admin/settings/email-templates', function () {
     }
 
     redirect('/admin/settings/email-templates?tab=' . urlencode($tab));
+});
+
+/* ==================================================================
+ * ADMIN – Email Notifications Settings
+ * ================================================================== */
+
+$router->get('/admin/settings/email-notifications', function () {
+    Auth::requireRole('admin');
+
+    $keys = [
+        'agent_new_ticket', 'agent_assigned_group', 'agent_assigned_agent',
+        'agent_requester_reply', 'agent_note_added',
+        'requester_new_ticket', 'requester_agent_comment',
+        'requester_ticket_resolved', 'requester_ticket_closed',
+        'cc_new_ticket', 'cc_note_added',
+    ];
+
+    $settings = [];
+    foreach ($keys as $k) {
+        $settings[$k] = getSetting('email_notify:' . $k, '1');
+    }
+
+    render('admin/settings/email-notifications', ['settings' => $settings]);
+});
+
+$router->post('/admin/settings/email-notifications', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/email-notifications');
+    }
+
+    $keys = [
+        'agent_new_ticket', 'agent_assigned_group', 'agent_assigned_agent',
+        'agent_requester_reply', 'agent_note_added',
+        'requester_new_ticket', 'requester_agent_comment',
+        'requester_ticket_resolved', 'requester_ticket_closed',
+        'cc_new_ticket', 'cc_note_added',
+    ];
+
+    foreach ($keys as $k) {
+        setSetting('email_notify:' . $k, isset($_POST[$k]) ? '1' : '0');
+    }
+
+    flash('success', 'Email notification settings saved.');
+    redirect('/admin/settings/email-notifications');
 });
 
 /* ==================================================================

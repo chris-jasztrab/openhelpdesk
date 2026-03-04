@@ -553,6 +553,26 @@ function getEmailTpl(string $name, array $rawTokens): array
             'intro'   => 'A new support ticket has been submitted.',
             'button'  => 'View Ticket',
         ],
+        'ticket_assigned_agent' => [
+            'subject' => '[Ticket #{{ticket_id}}] Assigned to you: {{subject}}',
+            'intro'   => 'A ticket has been assigned to you.',
+            'button'  => 'View Ticket',
+        ],
+        'ticket_assigned_group' => [
+            'subject' => '[Ticket #{{ticket_id}}] Assigned to your group: {{subject}}',
+            'intro'   => 'A ticket has been assigned to your group.',
+            'button'  => 'View Ticket',
+        ],
+        'ticket_status_resolved' => [
+            'subject' => '[Ticket #{{ticket_id}}] Resolved: {{subject}}',
+            'intro'   => 'Your support ticket has been resolved. If you have further questions, you can reopen it by replying.',
+            'button'  => 'View Ticket',
+        ],
+        'ticket_status_closed' => [
+            'subject' => '[Ticket #{{ticket_id}}] Closed: {{subject}}',
+            'intro'   => 'Your support ticket has been closed. Thank you for contacting us.',
+            'button'  => 'View Ticket',
+        ],
     ];
 
     $d = $defaults[$key] ?? ['subject' => '', 'intro' => '', 'button' => 'View Ticket'];
@@ -592,11 +612,23 @@ function renderEmail(string $template, array $data = []): string
 }
 
 /**
+ * Check whether a notification type is globally enabled by the admin.
+ * Defaults to enabled (returns true) if no setting has been saved yet.
+ */
+function emailNotifyEnabled(string $type): bool
+{
+    return getSetting('email_notify:' . $type, '1') !== '0';
+}
+
+/**
  * Notify the ticket creator that their ticket was updated (comment added).
  * Skips if the updater IS the creator (no self-notifications).
  */
 function notifyTicketCreator(PDO $db, int $ticketId, string $message, string $authorName): void
 {
+    if (!emailNotifyEnabled('requester_agent_comment')) {
+        return;
+    }
     $stmt = $db->prepare(
         "SELECT t.subject, t.created_by, u.email, u.first_name, u.last_name, u.notify_ticket_updated
          FROM tickets t
@@ -652,6 +684,9 @@ function notifyTicketCreator(PDO $db, int $ticketId, string $message, string $au
  */
 function notifyCcUsers(PDO $db, int $ticketId, string $message, string $authorName): void
 {
+    if (!emailNotifyEnabled('cc_note_added')) {
+        return;
+    }
     // Get ticket subject and creator
     $ticket = $db->prepare('SELECT subject, created_by FROM tickets WHERE id = ?');
     $ticket->execute([$ticketId]);
@@ -790,6 +825,9 @@ function notifyWatchers(PDO $db, int $ticketId, string $message, string $authorN
  */
 function notifyGroupMembers(PDO $db, int $ticketId): void
 {
+    if (!emailNotifyEnabled('agent_new_ticket')) {
+        return;
+    }
     // Fetch the ticket
     $tStmt = $db->prepare(
         'SELECT t.subject, t.description, t.type_id, t.location_id, t.priority_id, t.created_by
@@ -896,6 +934,386 @@ function notifyGroupMembers(PDO $db, int $ticketId): void
             $ticketId
         );
     }
+}
+
+/**
+ * Email the agent when a ticket is assigned directly to them.
+ */
+function notifyAssignedAgent(PDO $db, int $ticketId, int $agentId): void
+{
+    if (!emailNotifyEnabled('agent_assigned_agent')) {
+        return;
+    }
+    if ($agentId === Auth::id()) {
+        return; // self-assignment
+    }
+
+    $stmt = $db->prepare(
+        'SELECT id, first_name, last_name, email, role, notify_assigned_to_me
+         FROM users WHERE id = ?'
+    );
+    $stmt->execute([$agentId]);
+    $agent = $stmt->fetch();
+    if (!$agent || !(bool) ($agent['notify_assigned_to_me'] ?? 1)) {
+        return;
+    }
+
+    $tStmt = $db->prepare(
+        'SELECT t.subject, t.description, t.type_id, t.priority_id, t.created_by
+         FROM tickets t WHERE t.id = ?'
+    );
+    $tStmt->execute([$ticketId]);
+    $ticket = $tStmt->fetch();
+    if (!$ticket) {
+        return;
+    }
+
+    $uStmt = $db->prepare('SELECT first_name, last_name FROM users WHERE id = ?');
+    $uStmt->execute([$ticket['created_by']]);
+    $submitter = $uStmt->fetch();
+    $submitterName = $submitter ? trim($submitter['first_name'] . ' ' . $submitter['last_name']) : '';
+
+    $typeName = $priorityName = '';
+    if ($ticket['type_id']) {
+        $s = $db->prepare('SELECT name FROM ticket_types WHERE id = ?');
+        $s->execute([$ticket['type_id']]);
+        $typeName = $s->fetchColumn() ?: '';
+    }
+    if ($ticket['priority_id']) {
+        $s = $db->prepare('SELECT name FROM ticket_priorities WHERE id = ?');
+        $s->execute([$ticket['priority_id']]);
+        $priorityName = $s->fetchColumn() ?: '';
+    }
+
+    $rolePrefix = match ($agent['role']) {
+        'admin' => '/admin',
+        default => '/agent',
+    };
+    $appUrl    = env('APP_URL', 'http://localhost:8000');
+    $ticketUrl = $appUrl . $rolePrefix . '/tickets/' . $ticketId;
+
+    $tpl = getEmailTpl('ticket-assigned-agent', [
+        'ticket_id'   => $ticketId,
+        'subject'     => $ticket['subject'],
+        'type'        => $typeName,
+        'priority'    => $priorityName,
+        'submitter'   => $submitterName,
+        'user_name'   => $agent['first_name'] . ' ' . $agent['last_name'],
+        'first_name'  => $agent['first_name'],
+        'last_name'   => $agent['last_name'],
+    ]);
+
+    $emailHtml = renderEmail('ticket-assigned-agent', [
+        'ticketId'      => $ticketId,
+        'subject'       => $ticket['subject'],
+        'description'   => $ticket['description'],
+        'typeName'      => $typeName,
+        'priorityName'  => $priorityName,
+        'submitterName' => $submitterName,
+        'ticketUrl'     => $ticketUrl,
+        'introText'     => $tpl['intro'],
+        'buttonLabel'   => $tpl['button'],
+        'footerText'    => $tpl['footer'],
+    ]);
+
+    sendMail(
+        $agent['email'],
+        $agent['first_name'] . ' ' . $agent['last_name'],
+        $tpl['subject'],
+        $emailHtml,
+        '',
+        $ticketId
+    );
+}
+
+/**
+ * Email all members of a group when a ticket is assigned to that group.
+ */
+function notifyAssignedGroup(PDO $db, int $ticketId, int $groupId): void
+{
+    if (!emailNotifyEnabled('agent_assigned_group')) {
+        return;
+    }
+
+    $gStmt = $db->prepare('SELECT name FROM `groups` WHERE id = ?');
+    $gStmt->execute([$groupId]);
+    $groupName = $gStmt->fetchColumn() ?: '';
+
+    $tStmt = $db->prepare(
+        'SELECT t.subject, t.description, t.type_id, t.priority_id, t.created_by
+         FROM tickets t WHERE t.id = ?'
+    );
+    $tStmt->execute([$ticketId]);
+    $ticket = $tStmt->fetch();
+    if (!$ticket) {
+        return;
+    }
+
+    $uStmt = $db->prepare('SELECT first_name, last_name FROM users WHERE id = ?');
+    $uStmt->execute([$ticket['created_by']]);
+    $submitter = $uStmt->fetch();
+    $submitterName = $submitter ? trim($submitter['first_name'] . ' ' . $submitter['last_name']) : '';
+
+    $typeName = $priorityName = '';
+    if ($ticket['type_id']) {
+        $s = $db->prepare('SELECT name FROM ticket_types WHERE id = ?');
+        $s->execute([$ticket['type_id']]);
+        $typeName = $s->fetchColumn() ?: '';
+    }
+    if ($ticket['priority_id']) {
+        $s = $db->prepare('SELECT name FROM ticket_priorities WHERE id = ?');
+        $s->execute([$ticket['priority_id']]);
+        $priorityName = $s->fetchColumn() ?: '';
+    }
+
+    $mStmt = $db->prepare(
+        'SELECT u.id, u.first_name, u.last_name, u.email, u.role, u.notify_assigned_to_group
+         FROM group_user_map gum
+         JOIN users u ON u.id = gum.user_id
+         WHERE gum.group_id = ?'
+    );
+    $mStmt->execute([$groupId]);
+    $appUrl = env('APP_URL', 'http://localhost:8000');
+
+    foreach ($mStmt->fetchAll() as $member) {
+        if ((int) $member['id'] === Auth::id()) {
+            continue; // skip the person making the change
+        }
+        if (!(bool) ($member['notify_assigned_to_group'] ?? 1)) {
+            continue;
+        }
+
+        $rolePrefix = match ($member['role']) {
+            'admin' => '/admin',
+            default => '/agent',
+        };
+        $ticketUrl = $appUrl . $rolePrefix . '/tickets/' . $ticketId;
+
+        $tpl = getEmailTpl('ticket-assigned-group', [
+            'ticket_id'   => $ticketId,
+            'subject'     => $ticket['subject'],
+            'group'       => $groupName,
+            'type'        => $typeName,
+            'priority'    => $priorityName,
+            'submitter'   => $submitterName,
+            'user_name'   => $member['first_name'] . ' ' . $member['last_name'],
+            'first_name'  => $member['first_name'],
+            'last_name'   => $member['last_name'],
+        ]);
+
+        $emailHtml = renderEmail('ticket-assigned-group', [
+            'ticketId'      => $ticketId,
+            'subject'       => $ticket['subject'],
+            'description'   => $ticket['description'],
+            'groupName'     => $groupName,
+            'typeName'      => $typeName,
+            'priorityName'  => $priorityName,
+            'submitterName' => $submitterName,
+            'ticketUrl'     => $ticketUrl,
+            'introText'     => $tpl['intro'],
+            'buttonLabel'   => $tpl['button'],
+            'footerText'    => $tpl['footer'],
+        ]);
+
+        sendMail(
+            $member['email'],
+            $member['first_name'] . ' ' . $member['last_name'],
+            $tpl['subject'],
+            $emailHtml,
+            '',
+            $ticketId
+        );
+    }
+}
+
+/**
+ * Email the assigned agent when the ticket requester (portal user) adds a comment.
+ */
+function notifyAgentRequesterReplied(PDO $db, int $ticketId, string $message): void
+{
+    if (!emailNotifyEnabled('agent_requester_reply')) {
+        return;
+    }
+
+    $stmt = $db->prepare(
+        'SELECT t.subject, t.assigned_to,
+                u.id AS agent_id, u.first_name, u.last_name, u.email, u.role, u.notify_requester_replied
+         FROM tickets t
+         JOIN users u ON u.id = t.assigned_to
+         WHERE t.id = ?'
+    );
+    $stmt->execute([$ticketId]);
+    $row = $stmt->fetch();
+    if (!$row || !(bool) ($row['notify_requester_replied'] ?? 1)) {
+        return;
+    }
+
+    $appUrl    = env('APP_URL', 'http://localhost:8000');
+    $rolePrefix = match ($row['role']) {
+        'admin' => '/admin',
+        default => '/agent',
+    };
+    $ticketUrl = $appUrl . $rolePrefix . '/tickets/' . $ticketId;
+
+    $tpl = getEmailTpl('ticket-updated', [
+        'ticket_id'  => $ticketId,
+        'subject'    => $row['subject'],
+        'message'    => $message,
+        'author'     => 'the requester',
+        'user_name'  => $row['first_name'] . ' ' . $row['last_name'],
+        'first_name' => $row['first_name'],
+        'last_name'  => $row['last_name'],
+    ]);
+
+    // Override intro for agent context
+    $introText = 'The requester has replied to a ticket assigned to you.';
+
+    $emailHtml = renderEmail('ticket-updated', [
+        'ticketId'    => $ticketId,
+        'subject'     => $row['subject'],
+        'message'     => $message,
+        'authorName'  => 'The Requester',
+        'ticketUrl'   => $ticketUrl,
+        'introText'   => $introText,
+        'buttonLabel' => $tpl['button'],
+        'footerText'  => $tpl['footer'],
+    ]);
+
+    sendMail(
+        $row['email'],
+        $row['first_name'] . ' ' . $row['last_name'],
+        '[Ticket #' . $ticketId . '] Requester replied: ' . $row['subject'],
+        $emailHtml,
+        '',
+        $ticketId
+    );
+}
+
+/**
+ * Email the assigned agent when an internal note is added to their ticket.
+ */
+function notifyAgentNoteAdded(PDO $db, int $ticketId, string $message): void
+{
+    if (!emailNotifyEnabled('agent_note_added')) {
+        return;
+    }
+
+    $stmt = $db->prepare(
+        'SELECT t.subject, t.assigned_to,
+                u.id AS agent_id, u.first_name, u.last_name, u.email, u.role, u.notify_note_added
+         FROM tickets t
+         JOIN users u ON u.id = t.assigned_to
+         WHERE t.id = ?'
+    );
+    $stmt->execute([$ticketId]);
+    $row = $stmt->fetch();
+    if (!$row || (int) $row['assigned_to'] === Auth::id()) {
+        return; // not assigned or self
+    }
+    if (!(bool) ($row['notify_note_added'] ?? 1)) {
+        return;
+    }
+
+    $appUrl    = env('APP_URL', 'http://localhost:8000');
+    $rolePrefix = match ($row['role']) {
+        'admin' => '/admin',
+        default => '/agent',
+    };
+    $ticketUrl = $appUrl . $rolePrefix . '/tickets/' . $ticketId;
+
+    $tpl = getEmailTpl('ticket-updated', [
+        'ticket_id'  => $ticketId,
+        'subject'    => $row['subject'],
+        'message'    => $message,
+        'author'     => Auth::fullName(),
+        'user_name'  => $row['first_name'] . ' ' . $row['last_name'],
+        'first_name' => $row['first_name'],
+        'last_name'  => $row['last_name'],
+    ]);
+
+    $emailHtml = renderEmail('ticket-updated', [
+        'ticketId'    => $ticketId,
+        'subject'     => $row['subject'],
+        'message'     => $message,
+        'authorName'  => Auth::fullName(),
+        'ticketUrl'   => $ticketUrl,
+        'introText'   => 'An internal note was added to a ticket assigned to you.',
+        'buttonLabel' => $tpl['button'],
+        'footerText'  => $tpl['footer'],
+    ]);
+
+    sendMail(
+        $row['email'],
+        $row['first_name'] . ' ' . $row['last_name'],
+        '[Ticket #' . $ticketId . '] Note added: ' . $row['subject'],
+        $emailHtml,
+        '',
+        $ticketId
+    );
+}
+
+/**
+ * Email the ticket requester when their ticket status changes to resolved or closed.
+ */
+function notifyRequesterStatusChanged(PDO $db, int $ticketId, string $newStatus): void
+{
+    $settingKey = match ($newStatus) {
+        'resolved' => 'requester_ticket_resolved',
+        'closed'   => 'requester_ticket_closed',
+        default    => null,
+    };
+    if ($settingKey === null || !emailNotifyEnabled($settingKey)) {
+        return;
+    }
+
+    $userCol = $newStatus === 'resolved' ? 'notify_ticket_solved' : 'notify_ticket_closed';
+
+    $stmt = $db->prepare(
+        "SELECT t.subject, u.id AS user_id, u.email, u.first_name, u.last_name, u.{$userCol} AS opted_in
+         FROM tickets t
+         JOIN users u ON t.created_by = u.id
+         WHERE t.id = ?"
+    );
+    $stmt->execute([$ticketId]);
+    $row = $stmt->fetch();
+    if (!$row || !(bool) ($row['opted_in'] ?? 1)) {
+        return;
+    }
+
+    $appUrl    = env('APP_URL', 'http://localhost:8000');
+    $ticketUrl = $appUrl . '/portal/tickets/' . $ticketId;
+
+    $defaultIntros = [
+        'resolved' => 'Your support ticket has been resolved. If you have further questions, you can reopen it by replying.',
+        'closed'   => 'Your support ticket has been closed. Thank you for contacting us.',
+    ];
+
+    $tpl = getEmailTpl('ticket-status-' . $newStatus, [
+        'ticket_id'  => $ticketId,
+        'subject'    => $row['subject'],
+        'user_name'  => $row['first_name'] . ' ' . $row['last_name'],
+        'first_name' => $row['first_name'],
+        'last_name'  => $row['last_name'],
+    ]);
+
+    $emailHtml = renderEmail('ticket-status-changed', [
+        'ticketId'    => $ticketId,
+        'subject'     => $row['subject'],
+        'newStatus'   => $newStatus,
+        'ticketUrl'   => $ticketUrl,
+        'introText'   => !empty($tpl['intro']) ? $tpl['intro'] : $defaultIntros[$newStatus],
+        'buttonLabel' => !empty($tpl['button']) ? $tpl['button'] : 'View Ticket',
+        'footerText'  => $tpl['footer'],
+    ]);
+
+    sendMail(
+        $row['email'],
+        $row['first_name'] . ' ' . $row['last_name'],
+        $tpl['subject'] ?: '[Ticket #' . $ticketId . '] ' . $row['subject'],
+        $emailHtml,
+        '',
+        $ticketId
+    );
 }
 
 /**

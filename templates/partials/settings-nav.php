@@ -1,7 +1,8 @@
 <?php
 $settingsNav = [
     ['label' => 'Email / SMTP',      'url' => '/admin/settings',                       'icon' => 'bi-envelope'],
-    ['label' => 'Email Templates',   'url' => '/admin/settings/email-templates',        'icon' => 'bi-pencil-square'],
+    ['label' => 'Email Templates',      'url' => '/admin/settings/email-templates',        'icon' => 'bi-pencil-square'],
+    ['label' => 'Email Notifications', 'url' => '/admin/settings/email-notifications',   'icon' => 'bi-bell'],
     ['label' => 'Business Hours',    'url' => '/admin/settings/business-hours',         'icon' => 'bi-clock'],
     ['label' => 'Holidays',       'url' => '/admin/settings/holidays',        'icon' => 'bi-calendar-x'],
     ['label' => 'SLA Policies',   'url' => '/admin/settings/sla-policies',   'icon' => 'bi-stopwatch'],

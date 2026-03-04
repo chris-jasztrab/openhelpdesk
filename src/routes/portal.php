@@ -574,8 +574,9 @@ $router->post('/portal/tickets/{id}/comment', function (array $p) {
     $attachments = handleAttachmentUploads('attachments');
     saveAttachments($db, $id, $timelineId, Auth::id(), $attachments);
 
-    // Notify CC'd users when portal user replies
+    // Notify CC'd users and assigned agent when portal user replies
     notifyCcUsers($db, $id, $message, Auth::fullName());
+    notifyAgentRequesterReplied($db, $id, $message);
 
     $msg = 'Comment added.';
     if (!empty($attachments)) {
