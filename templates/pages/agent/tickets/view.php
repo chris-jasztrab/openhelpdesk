@@ -518,7 +518,7 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
                         </select>
                     </div>
 
-                    <button type="submit" class="btn btn-sm text-white w-100" style="background:var(--ld-primary);">
+                    <button type="submit" id="updateTicketBtn" class="btn btn-sm text-white w-100" style="background:var(--ld-primary);" disabled>
                         <i class="bi bi-check-lg me-1"></i>Update
                     </button>
                 </form>
@@ -1092,6 +1092,28 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
             statusAfterEl.value = this.dataset.status;
             document.getElementById('replyForm').submit();
         });
+    });
+})();
+
+/* ── Update Ticket Button – enable only when a field has changed ── */
+(function () {
+    var btn    = document.getElementById('updateTicketBtn');
+    var fields = ['status', 'priority_id', 'assigned_to', 'group_id'];
+    var initial = {};
+    fields.forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) initial[id] = el.value;
+    });
+    function check() {
+        var changed = fields.some(function (id) {
+            var el = document.getElementById(id);
+            return el && el.value !== initial[id];
+        });
+        btn.disabled = !changed;
+    }
+    fields.forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener('change', check);
     });
 })();
 </script>
