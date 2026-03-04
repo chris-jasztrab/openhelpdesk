@@ -28,6 +28,8 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
         tourSection = 'tickets';
     } else if (storedPage === 'create' && path === '/portal/tickets/create') {
         tourSection = 'create';
+    } else if (storedPage === 'profile' && path === '/profile') {
+        tourSection = 'profile';
     }
 
     if (!tourSection) return;
@@ -182,10 +184,40 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
         },
         {
             popover: {
+                title:       'Almost done!',
+                description: 'One last thing — let\'s look at your <strong>Profile</strong>, where you can control which emails you receive from the support team.',
+                onNextClick: function () {
+                    isNavigating = true;
+                    localStorage.setItem('ld_portal_tour_page', 'profile');
+                    window.location.href = '/profile';
+                }
+            }
+        }
+    ];
+
+    var profileSteps = [
+        {
+            popover: {
+                title:       'Your Profile',
+                description: 'This page lets you update your name, change your password, and adjust your appearance and notification settings.'
+            }
+        },
+        {
+            element: '#tour-portal-notifications',
+            popover: {
+                title:       'Email Notifications',
+                description: 'Use these toggles to control exactly which emails you receive from the support team — ' +
+                             'such as confirmation when you submit a ticket, replies, or satisfaction surveys.<br><br>' +
+                             'Turn off anything you don\'t need.',
+                side:  'top',
+                align: 'start'
+            }
+        },
+        {
+            popover: {
                 title:       '🎉 You\'re all set!',
-                description: 'That\'s the tour! You now know how to submit tickets, track their status, and find help articles in the Knowledge Base.<br><br>' +
-                             'The support team will notify you by email whenever your ticket is updated. ' +
-                             'You can also <strong>reply directly to those emails</strong> to add a comment without logging in.'
+                description: 'That\'s the full tour! You now know how to submit tickets, track their status, find help articles in the Knowledge Base, and manage your notification preferences.<br><br>' +
+                             'You can also <strong>reply directly to ticket emails</strong> to add a comment without logging in.'
             }
         }
     ];
@@ -198,8 +230,11 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
     } else if (tourSection === 'tickets') {
         steps = ticketsSteps;
         localStorage.removeItem('ld_portal_tour_page');
-    } else {
+    } else if (tourSection === 'create') {
         steps = createSteps;
+        localStorage.removeItem('ld_portal_tour_page');
+    } else {
+        steps = profileSteps;
         localStorage.removeItem('ld_portal_tour_page');
     }
 

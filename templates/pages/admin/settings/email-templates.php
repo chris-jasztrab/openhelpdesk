@@ -52,6 +52,17 @@ $tokenSets = [
         ['token' => '{{ticket_id}}',    'desc' => 'Ticket number'],
         ['token' => '{{subject}}',      'desc' => 'Ticket subject line'],
     ],
+    'group_alerts' => [
+        ['token' => '{{first_name}}',   'desc' => 'Recipient\'s first name'],
+        ['token' => '{{last_name}}',    'desc' => 'Recipient\'s last name'],
+        ['token' => '{{user_name}}',    'desc' => 'Recipient\'s full name (first + last)'],
+        ['token' => '{{ticket_id}}',    'desc' => 'Ticket number'],
+        ['token' => '{{subject}}',      'desc' => 'Ticket subject line'],
+        ['token' => '{{type}}',         'desc' => 'Ticket type (if set)'],
+        ['token' => '{{location}}',     'desc' => 'Location (if set)'],
+        ['token' => '{{priority}}',     'desc' => 'Priority name (if set)'],
+        ['token' => '{{submitter}}',    'desc' => 'Full name of the person who submitted the ticket'],
+    ],
 ];
 
 $defaults = [
@@ -79,6 +90,11 @@ $defaults = [
         'intro'   => 'We\'re still waiting to hear back from you on your support ticket. Please reply with an update so we can continue helping you.',
         'button'  => 'View & Reply',
     ],
+    'group_alerts' => [
+        'subject' => '[Ticket #{{ticket_id}}] New Ticket: {{subject}}',
+        'intro'   => 'A new support ticket has been submitted.',
+        'button'  => 'View Ticket',
+    ],
 ];
 
 $defaultFooter = 'This is an automated message from LocalDesk. Please do not reply directly to this email.';
@@ -89,12 +105,14 @@ $tabs = [
     'ticket_merged'   => ['label' => 'Ticket Merged',     'icon' => 'bi-diagram-2'],
     'csat_survey'     => ['label' => 'CSAT Survey',       'icon' => 'bi-star'],
     'ticket_reminder' => ['label' => 'Customer Reminder', 'icon' => 'bi-clock-history'],
+    'group_alerts'    => ['label' => 'Group Alerts',      'icon' => 'bi-people'],
 ];
 
 $activeTab = $_GET['tab'] ?? 'ticket_created';
 if (!array_key_exists($activeTab, $tabs) && $activeTab !== 'shared') {
     $activeTab = 'ticket_created';
 }
+$groups ??= [];
 ?>
 
 <div class="mb-4">
@@ -149,6 +167,132 @@ if (!array_key_exists($activeTab, $tabs) && $activeTab !== 'shared') {
                 <i class="bi bi-arrow-counterclockwise me-1"></i>Reset to Default
             </button>
             <?php endif; ?>
+        </form>
+    </div>
+</div>
+
+<?php elseif ($activeTab === 'group_alerts'): ?>
+
+<!-- Group Alerts tab -->
+<div class="card border-0 shadow-sm border-top-0" style="border-radius:0 0 .5rem .5rem;">
+    <div class="card-body p-4">
+        <p class="text-muted mb-4">
+            When a new ticket is submitted, members of checked groups will receive an alert email.
+            Individual members can opt out via their profile <strong>Email Notifications</strong> settings.
+        </p>
+
+        <form method="POST" action="/admin/settings/email-templates">
+            <?= csrfField() ?>
+            <input type="hidden" name="tab" value="group_alerts">
+
+            <?php if (empty($groups)): ?>
+            <div class="alert alert-info small mb-4">
+                <i class="bi bi-info-circle me-1"></i>
+                No groups have been created yet. <a href="/admin/groups/create">Create a group</a> to get started.
+            </div>
+            <?php else: ?>
+            <!-- Group toggles -->
+            <div class="mb-4" style="max-width:640px;">
+                <label class="form-label fw-semibold">Groups to notify on new ticket</label>
+                <div class="border rounded overflow-hidden">
+                    <?php foreach ($groups as $i => $grp): ?>
+                    <div class="d-flex align-items-center px-3 py-2 <?= $i > 0 ? 'border-top' : '' ?>">
+                        <div class="form-check mb-0 flex-grow-1">
+                            <input class="form-check-input" type="checkbox"
+                                   name="notify_group[<?= (int) $grp['id'] ?>]" value="1"
+                                   id="grp_<?= (int) $grp['id'] ?>"
+                                   <?= $grp['notify_new_ticket'] ? 'checked' : '' ?>>
+                            <label class="form-check-label fw-semibold" for="grp_<?= (int) $grp['id'] ?>">
+                                <?= e($grp['name']) ?>
+                            </label>
+                        </div>
+                        <span class="text-muted small ms-3">
+                            <i class="bi bi-person me-1"></i><?= (int) $grp['member_count'] ?> member<?= (int) $grp['member_count'] !== 1 ? 's' : '' ?>
+                        </span>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            <?php endif; ?>
+
+            <div class="row g-4">
+                <!-- Editor column -->
+                <div class="col-lg-8">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Subject Line</label>
+                        <input type="text" class="form-control font-monospace"
+                               name="email_subject_group_alerts"
+                               value="<?= e($tplValues['email_subject_group_alerts'] ?? '') ?>"
+                               placeholder="<?= e($defaults['group_alerts']['subject']) ?>">
+                        <div class="form-text">Leave blank to use the default shown above as placeholder.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Intro Message</label>
+                        <textarea class="form-control" name="email_intro_group_alerts"
+                                  rows="3"
+                                  placeholder="<?= e($defaults['group_alerts']['intro']) ?>"><?= e($tplValues['email_intro_group_alerts'] ?? '') ?></textarea>
+                        <div class="form-text">Appears as the subtitle paragraph below the ticket heading. HTML is supported. Leave blank to use the default.</div>
+                    </div>
+
+                    <div class="mb-4" style="max-width:300px;">
+                        <label class="form-label fw-semibold">Button Label</label>
+                        <input type="text" class="form-control"
+                               name="email_button_group_alerts"
+                               value="<?= e($tplValues['email_button_group_alerts'] ?? '') ?>"
+                               placeholder="<?= e($defaults['group_alerts']['button']) ?>">
+                        <div class="form-text">Leave blank to use the default.</div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn text-white" style="background:var(--ld-primary);">
+                            <i class="bi bi-check-lg me-1"></i>Save
+                        </button>
+                        <?php
+                        $hasCustom = !empty($tplValues['email_subject_group_alerts'])
+                                  || !empty($tplValues['email_intro_group_alerts'])
+                                  || !empty($tplValues['email_button_group_alerts']);
+                        ?>
+                        <?php if ($hasCustom): ?>
+                        <button type="submit" name="reset_template" value="group_alerts"
+                                class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-counterclockwise me-1"></i>Reset Template to Defaults
+                        </button>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
+                <!-- Token legend column -->
+                <div class="col-lg-4">
+                    <div class="bg-light border rounded p-3">
+                        <h6 class="fw-semibold mb-2"><i class="bi bi-braces me-1"></i>Available Tokens</h6>
+                        <p class="text-muted small mb-3">Click a token to copy it. Tokens work in the Subject and Intro fields.</p>
+                        <div class="d-flex flex-column gap-2">
+                            <?php foreach ($tokenSets['group_alerts'] as $tok): ?>
+                            <div class="d-flex align-items-start gap-2">
+                                <code class="token-chip bg-white border rounded px-2 py-1 small flex-shrink-0"
+                                      style="cursor:pointer; user-select:all;"
+                                      title="Click to copy"
+                                      onclick="copyToken(this)"><?= e($tok['token']) ?></code>
+                                <span class="text-muted small pt-1"><?= e($tok['desc']) ?></span>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                    <!-- Subject preview -->
+                    <?php
+                    $gaSubjectTpl = $tplValues['email_subject_group_alerts'] ?? $defaults['group_alerts']['subject'];
+                    $gaPreview = $gaSubjectTpl;
+                    foreach (['ticket_id' => '42', 'subject' => 'Printer not working', 'submitter' => 'Jordan Lee'] as $k => $v) {
+                        $gaPreview = str_replace('{{' . $k . '}}', $v, $gaPreview);
+                    }
+                    ?>
+                    <div class="mt-3 bg-white border rounded p-3">
+                        <div class="text-muted small fw-semibold mb-1">Subject preview</div>
+                        <div class="small text-break" style="font-family:monospace;"><?= e($gaPreview) ?></div>
+                    </div>
+                </div>
+            </div>
         </form>
     </div>
 </div>
@@ -255,9 +399,10 @@ if (!array_key_exists($activeTab, $tabs) && $activeTab !== 'shared') {
                     'ticket_merged'   => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'source_ticket_id' => '42', 'source_subject' => 'Printer not working', 'target_ticket_id' => '38', 'target_subject' => 'Office printer issues'],
                     'csat_survey'     => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working'],
                     'ticket_reminder' => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working'],
+                    'group_alerts'    => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working', 'type' => 'Hardware', 'location' => 'Main Branch', 'priority' => 'High', 'submitter' => 'Jordan Lee'],
                 ];
                 $preview = $subjectTpl;
-                foreach ($previewTokens[$activeTab] as $k => $v) {
+                foreach (($previewTokens[$activeTab] ?? []) as $k => $v) {
                     $preview = str_replace('{{' . $k . '}}', $v, $preview);
                 }
                 ?>

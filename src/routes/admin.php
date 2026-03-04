@@ -1566,6 +1566,9 @@ $router->post('/admin/tickets/create', function () {
     // Automations
     runAutomations($db, $ticketId, 'ticket_created');
 
+    // Notify group members watching new tickets
+    notifyGroupMembers($db, $ticketId);
+
     flash('success', 'Ticket #' . $ticketId . ' created.');
     $redirectBase = Auth::role() === 'agent' ? '/agent' : '/admin';
     redirect("{$redirectBase}/tickets/{$ticketId}");
@@ -3324,11 +3327,12 @@ $router->get('/admin/settings/email-templates', function () {
     Auth::requireRole('admin');
 
     $keys = [
-        'email_subject_ticket_created',  'email_intro_ticket_created',  'email_button_ticket_created',
-        'email_subject_ticket_updated',  'email_intro_ticket_updated',  'email_button_ticket_updated',
-        'email_subject_ticket_merged',   'email_intro_ticket_merged',   'email_button_ticket_merged',
-        'email_subject_csat_survey',     'email_intro_csat_survey',
-        'email_subject_ticket_reminder', 'email_intro_ticket_reminder', 'email_button_ticket_reminder',
+        'email_subject_ticket_created',   'email_intro_ticket_created',   'email_button_ticket_created',
+        'email_subject_ticket_updated',   'email_intro_ticket_updated',   'email_button_ticket_updated',
+        'email_subject_ticket_merged',    'email_intro_ticket_merged',    'email_button_ticket_merged',
+        'email_subject_csat_survey',      'email_intro_csat_survey',
+        'email_subject_ticket_reminder',  'email_intro_ticket_reminder',  'email_button_ticket_reminder',
+        'email_subject_group_alerts',     'email_intro_group_alerts',     'email_button_group_alerts',
         'email_footer_text',
     ];
     $tplValues = [];
@@ -3336,7 +3340,16 @@ $router->get('/admin/settings/email-templates', function () {
         $tplValues[$k] = getSetting($k);
     }
 
-    render('admin/settings/email-templates', ['tplValues' => $tplValues]);
+    $db = Database::connect();
+    $groups = $db->query(
+        'SELECT g.id, g.name, g.notify_new_ticket, COUNT(gum.user_id) AS member_count
+         FROM `groups` g
+         LEFT JOIN group_user_map gum ON gum.group_id = g.id
+         GROUP BY g.id
+         ORDER BY g.sort_order, g.name'
+    )->fetchAll();
+
+    render('admin/settings/email-templates', ['tplValues' => $tplValues, 'groups' => $groups]);
 });
 
 $router->post('/admin/settings/email-templates', function () {
@@ -3349,7 +3362,7 @@ $router->post('/admin/settings/email-templates', function () {
     $tab = $_POST['tab'] ?? 'ticket_created';
 
     // Reset buttons clear settings back to default (empty = use hardcoded default)
-    if (isset($_POST['reset_template']) && in_array($_POST['reset_template'], ['ticket_created', 'ticket_updated', 'ticket_merged', 'csat_survey', 'ticket_reminder'], true)) {
+    if (isset($_POST['reset_template']) && in_array($_POST['reset_template'], ['ticket_created', 'ticket_updated', 'ticket_merged', 'csat_survey', 'ticket_reminder', 'group_alerts'], true)) {
         $tpl = $_POST['reset_template'];
         setSetting("email_subject_{$tpl}", '');
         setSetting("email_intro_{$tpl}", '');
@@ -3369,6 +3382,19 @@ $router->post('/admin/settings/email-templates', function () {
     if ($tab === 'shared') {
         setSetting('email_footer_text', trim($_POST['email_footer_text'] ?? ''));
         flash('success', 'Footer text saved.');
+    } elseif ($tab === 'group_alerts') {
+        setSetting('email_subject_group_alerts', trim($_POST['email_subject_group_alerts'] ?? ''));
+        setSetting('email_intro_group_alerts',   trim($_POST['email_intro_group_alerts']   ?? ''));
+        setSetting('email_button_group_alerts',  trim($_POST['email_button_group_alerts']  ?? ''));
+        // Save notify_new_ticket flag for each group
+        $db2 = Database::connect();
+        $allGroups = $db2->query('SELECT id FROM `groups`')->fetchAll(PDO::FETCH_COLUMN);
+        $checked   = $_POST['notify_group'] ?? [];
+        $upd = $db2->prepare('UPDATE `groups` SET notify_new_ticket = ? WHERE id = ?');
+        foreach ($allGroups as $gid) {
+            $upd->execute([isset($checked[(string) $gid]) ? 1 : 0, (int) $gid]);
+        }
+        flash('success', 'Group alerts settings saved.');
     } elseif (in_array($tab, ['ticket_created', 'ticket_updated', 'ticket_merged', 'csat_survey', 'ticket_reminder'], true)) {
         setSetting("email_subject_{$tab}", trim($_POST["email_subject_{$tab}"] ?? ''));
         setSetting("email_intro_{$tab}",   trim($_POST["email_intro_{$tab}"]   ?? ''));

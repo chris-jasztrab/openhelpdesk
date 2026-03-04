@@ -97,7 +97,7 @@ $breadcrumbs = [
             </div>
 
             <!-- Notification Preferences -->
-            <div class="card border-0 shadow-sm mb-4">
+            <div id="tour-portal-notifications" class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-transparent fw-semibold">
                     <i class="bi bi-bell me-1"></i>Email Notifications
                 </div>
@@ -105,12 +105,13 @@ $breadcrumbs = [
                     <p class="text-muted small mb-3">Choose which events you want to receive emails about.</p>
                     <?php
                     $notifyOptions = [
-                        ['key' => 'notify_ticket_created', 'icon' => 'bi-ticket-detailed',     'label' => 'Ticket submitted',     'desc' => 'Confirmation email when you open a new ticket.'],
-                        ['key' => 'notify_ticket_updated', 'icon' => 'bi-chat-left-text',       'label' => 'Ticket reply',         'desc' => 'Email when someone replies to one of your tickets.'],
-                        ['key' => 'notify_ticket_cc',      'icon' => 'bi-person-lines-fill',    'label' => 'CC updates',           'desc' => "Email when a ticket you're CC'd on receives a reply or is merged."],
-                        ['key' => 'notify_ticket_merged',  'icon' => 'bi-arrows-collapse',      'label' => 'Ticket merged',        'desc' => 'Email when one of your tickets is merged into another.'],
-                        ['key' => 'notify_escalation',     'icon' => 'bi-exclamation-triangle', 'label' => 'Escalation alerts',   'desc' => 'Email when an escalation rule fires and targets you.'],
-                        ['key' => 'notify_csat',           'icon' => 'bi-star',                 'label' => 'Satisfaction surveys', 'desc' => 'Survey email after your ticket is resolved.'],
+                        ['key' => 'notify_ticket_created',    'icon' => 'bi-ticket-detailed',     'label' => 'Ticket submitted',     'desc' => 'Confirmation email when you open a new ticket.'],
+                        ['key' => 'notify_ticket_updated',    'icon' => 'bi-chat-left-text',       'label' => 'Ticket reply',         'desc' => 'Email when someone replies to one of your tickets.'],
+                        ['key' => 'notify_ticket_cc',         'icon' => 'bi-person-lines-fill',    'label' => 'CC updates',           'desc' => "Email when a ticket you're CC'd on receives a reply or is merged."],
+                        ['key' => 'notify_ticket_merged',     'icon' => 'bi-arrows-collapse',      'label' => 'Ticket merged',        'desc' => 'Email when one of your tickets is merged into another.'],
+                        ['key' => 'notify_escalation',        'icon' => 'bi-exclamation-triangle', 'label' => 'Escalation alerts',    'desc' => 'Email when an escalation rule fires and targets you.'],
+                        ['key' => 'notify_csat',              'icon' => 'bi-star',                 'label' => 'Satisfaction surveys', 'desc' => 'Survey email after your ticket is resolved.'],
+                        ['key' => 'notify_group_new_ticket',  'icon' => 'bi-people',               'label' => 'New ticket alerts',    'desc' => 'Email when a new support ticket is submitted and you belong to a notified group.'],
                     ];
                     foreach ($notifyOptions as $opt):
                         $checked = ($user[$opt['key']] ?? 1) ? 'checked' : '';

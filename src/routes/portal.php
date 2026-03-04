@@ -384,6 +384,9 @@ $router->post('/portal/tickets/create', function () {
         );
     }
 
+    // Notify group members watching new tickets
+    notifyGroupMembers($db, $ticketId);
+
     // Initialize SLA timers if priority is set and SLA is configured
     if ($priorityId) {
         Sla::initializeForTicket($db, $ticketId, $priorityId);

@@ -548,6 +548,11 @@ function getEmailTpl(string $name, array $rawTokens): array
             'intro'   => 'We\'re still waiting to hear back from you on your support ticket. Please reply with an update so we can continue helping you.',
             'button'  => 'View & Reply',
         ],
+        'ticket_new_group' => [
+            'subject' => '[Ticket #{{ticket_id}}] New Ticket: {{subject}}',
+            'intro'   => 'A new support ticket has been submitted.',
+            'button'  => 'View Ticket',
+        ],
     ];
 
     $d = $defaults[$key] ?? ['subject' => '', 'intro' => '', 'button' => 'View Ticket'];
@@ -766,6 +771,120 @@ function notifyWatchers(PDO $db, int $ticketId, string $message, string $authorN
             'introText'   => $tpl['intro'],
             'buttonLabel' => $tpl['button'],
             'footerText'  => $tpl['footer'],
+        ]);
+
+        sendMail(
+            $user['email'],
+            $user['first_name'] . ' ' . $user['last_name'],
+            $tpl['subject'],
+            $emailHtml,
+            '',
+            $ticketId
+        );
+    }
+}
+
+/**
+ * Email all members of groups that have notify_new_ticket enabled when a ticket is created.
+ * Skips members who have opted out via notify_group_new_ticket = 0.
+ */
+function notifyGroupMembers(PDO $db, int $ticketId): void
+{
+    // Fetch the ticket
+    $tStmt = $db->prepare(
+        'SELECT t.subject, t.description, t.type_id, t.location_id, t.priority_id, t.created_by
+         FROM tickets t WHERE t.id = ?'
+    );
+    $tStmt->execute([$ticketId]);
+    $ticket = $tStmt->fetch();
+    if (!$ticket) {
+        return;
+    }
+
+    // Submitter name
+    $uStmt = $db->prepare('SELECT first_name, last_name FROM users WHERE id = ?');
+    $uStmt->execute([$ticket['created_by']]);
+    $submitter = $uStmt->fetch();
+    $submitterName = $submitter ? trim($submitter['first_name'] . ' ' . $submitter['last_name']) : '';
+
+    // Resolve type / location / priority names
+    $typeName = $locationName = $priorityName = '';
+    if ($ticket['type_id']) {
+        $s = $db->prepare('SELECT name FROM ticket_types WHERE id = ?');
+        $s->execute([$ticket['type_id']]);
+        $typeName = $s->fetchColumn() ?: '';
+    }
+    if ($ticket['location_id']) {
+        $s = $db->prepare('SELECT name FROM locations WHERE id = ?');
+        $s->execute([$ticket['location_id']]);
+        $locationName = $s->fetchColumn() ?: '';
+    }
+    if ($ticket['priority_id']) {
+        $s = $db->prepare('SELECT name FROM ticket_priorities WHERE id = ?');
+        $s->execute([$ticket['priority_id']]);
+        $priorityName = $s->fetchColumn() ?: '';
+    }
+
+    // Find all groups with notify_new_ticket = 1
+    $gStmt = $db->query('SELECT id FROM `groups` WHERE notify_new_ticket = 1');
+    $groupIds = $gStmt->fetchAll(PDO::FETCH_COLUMN);
+    if (empty($groupIds)) {
+        return;
+    }
+
+    // Collect unique members across all notified groups
+    $members = [];
+    foreach ($groupIds as $gid) {
+        $mStmt = $db->prepare(
+            'SELECT u.id, u.first_name, u.last_name, u.email, u.role, u.notify_group_new_ticket
+             FROM group_user_map gum
+             JOIN users u ON u.id = gum.user_id
+             WHERE gum.group_id = ?'
+        );
+        $mStmt->execute([$gid]);
+        foreach ($mStmt->fetchAll() as $m) {
+            $members[(int) $m['id']] = $m; // deduplicate
+        }
+    }
+
+    $appUrl = env('APP_URL', 'http://localhost:8000');
+
+    foreach ($members as $user) {
+        if (!(bool) ($user['notify_group_new_ticket'] ?? 1)) {
+            continue;
+        }
+
+        $rolePrefix = match ($user['role']) {
+            'admin' => '/admin',
+            'agent' => '/agent',
+            default => '/portal',
+        };
+        $ticketUrl = $appUrl . $rolePrefix . '/tickets/' . $ticketId;
+
+        $tpl = getEmailTpl('ticket-new-group', [
+            'ticket_id'  => $ticketId,
+            'subject'    => $ticket['subject'],
+            'type'       => $typeName,
+            'location'   => $locationName,
+            'priority'   => $priorityName,
+            'submitter'  => $submitterName,
+            'user_name'  => $user['first_name'] . ' ' . $user['last_name'],
+            'first_name' => $user['first_name'],
+            'last_name'  => $user['last_name'],
+        ]);
+
+        $emailHtml = renderEmail('ticket-opened-group', [
+            'ticketId'      => $ticketId,
+            'subject'       => $ticket['subject'],
+            'description'   => $ticket['description'],
+            'typeName'      => $typeName,
+            'locationName'  => $locationName,
+            'priorityName'  => $priorityName,
+            'submitterName' => $submitterName,
+            'ticketUrl'     => $ticketUrl,
+            'introText'     => $tpl['intro'],
+            'buttonLabel'   => $tpl['button'],
+            'footerText'    => $tpl['footer'],
         ]);
 
         sendMail(
