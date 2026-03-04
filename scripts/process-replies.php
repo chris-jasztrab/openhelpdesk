@@ -92,6 +92,14 @@ foreach ($messages as $msg) {
 
     logMsg('INFO', "Message {$msgId}: From={$fromAddr} Subject=\"{$subject}\"");
 
+    // ── Skip automated / out-of-office replies ────────────────────────────────
+    if (isAutoReply($msg)) {
+        logMsg('INFO', '  Auto-reply detected — skipping.');
+        markMessageRead($accessToken, $mailbox, $msgId);
+        $skipped++;
+        continue;
+    }
+
     // ── Extract ticket ID from subject ────────────────────────────────────────
     // Matches both [Ticket #123] and [#123] to handle default and custom templates.
     $ticketId = null;
@@ -291,6 +299,64 @@ exit(0);
 // ─── Helper functions ─────────────────────────────────────────────────────────
 
 /**
+ * Detect automated / out-of-office replies that should not create tickets.
+ *
+ * Checks:
+ *  1. Auto-Submitted internet message header (RFC 3834) — any value other than "no"
+ *  2. X-Auto-Response-Suppress header presence (Exchange / Outlook OOO)
+ *  3. Precedence: bulk|auto_reply|list
+ *  4. Common OOO / autoresponder subject keywords
+ */
+function isAutoReply(array $msg): bool
+{
+    $headers = $msg['internetMessageHeaders'] ?? [];
+    foreach ($headers as $header) {
+        $name  = strtolower(trim($header['name'] ?? ''));
+        $value = strtolower(trim($header['value'] ?? ''));
+
+        // RFC 3834 — any value other than "no" means it is automated
+        if ($name === 'auto-submitted' && $value !== 'no') {
+            return true;
+        }
+
+        // Exchange / Outlook out-of-office suppression header
+        if ($name === 'x-auto-response-suppress') {
+            return true;
+        }
+
+        // Mailing list / bulk senders
+        if ($name === 'precedence' && in_array($value, ['bulk', 'auto_reply', 'list'], true)) {
+            return true;
+        }
+    }
+
+    // Subject-line heuristics as a last resort
+    $subject = strtolower($msg['subject'] ?? '');
+    $keywords = [
+        'out of office',
+        'automatic reply',
+        'auto-reply',
+        'auto reply',
+        'autoreply',
+        'vacation reply',
+        'away from office',
+        'on vacation',
+        'autosvar',     // Swedish/Norwegian
+        'abwesend',     // German
+        'hors du bureau', // French
+        'fuera de la oficina', // Spanish
+    ];
+
+    foreach ($keywords as $kw) {
+        if (str_contains($subject, $kw)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
  * Split a display name / email address into [first_name, last_name].
  */
 function parseEmailName(string $fromName, string $fromAddr): array
@@ -340,7 +406,7 @@ function getUnreadMessages(string $token, string $mailbox): ?array
     $url = 'https://graph.microsoft.com/v1.0/users/' . $mailbox
          . '/mailFolders/Inbox/messages'
          . '?$filter=isRead%20eq%20false'
-         . '&$select=id,subject,from,body,bodyPreview'
+         . '&$select=id,subject,from,body,bodyPreview,internetMessageHeaders'
          . '&$top=50'
          . '&$orderby=receivedDateTime%20asc';
 
