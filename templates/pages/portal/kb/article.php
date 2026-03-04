@@ -4,7 +4,7 @@ $pageTitle    = $article['title'] . ' – Knowledge Base';
 $kbBase       ??= '/portal/kb';
 $kbPanelLabel ??= 'Portal';
 $kbPanelUrl   ??= '/portal';
-$sidebarItems ??= portalSidebar('kb');
+if (empty($sidebarItems)) $sidebarItems = portalSidebar('kb');
 $breadcrumbs  = [
     ['label' => $kbPanelLabel, 'url' => $kbPanelUrl],
     ['label' => 'Knowledge Base', 'url' => $kbBase],
