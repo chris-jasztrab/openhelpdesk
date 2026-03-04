@@ -81,7 +81,11 @@ $sortParams = array_filter($filters, fn($v) => $v !== '');
                 <?php if (empty($tickets)): ?>
                 <tr><td colspan="7" class="text-center py-4 text-muted">
                     <i class="bi bi-inbox fs-3 d-block mb-2"></i>
+                    <?php if ($userHasAnyTickets): ?>
+                    Change your filters to see your tickets, or <a href="/portal/tickets/create">create a new ticket</a>.
+                    <?php else: ?>
                     No tickets yet. <a href="/portal/tickets/create">Create your first ticket</a>.
+                    <?php endif; ?>
                 </td></tr>
                 <?php else: ?>
                     <?php foreach ($tickets as $t): ?>

@@ -56,6 +56,23 @@ $router->get('/portal/tickets', function () {
     $countStmt->execute($params);
     $totalTickets = (int) $countStmt->fetchColumn();
 
+    // Count all tickets for this user regardless of filters (for empty-state message)
+    if ($userPerms['can_view_location_tickets'] && $userPerms['location_id']) {
+        $allCountStmt = $db->prepare(
+            "SELECT COUNT(*) FROM tickets t WHERE (t.created_by = ? AND t.merged_into_ticket_id IS NULL)
+             OR t.id IN (SELECT DISTINCT merged_into_ticket_id FROM tickets WHERE created_by = ? AND merged_into_ticket_id IS NOT NULL)
+             OR (t.location_id = ? AND t.merged_into_ticket_id IS NULL)"
+        );
+        $allCountStmt->execute([$uid, $uid, (int) $userPerms['location_id']]);
+    } else {
+        $allCountStmt = $db->prepare(
+            "SELECT COUNT(*) FROM tickets t WHERE (t.created_by = ? AND t.merged_into_ticket_id IS NULL)
+             OR t.id IN (SELECT DISTINCT merged_into_ticket_id FROM tickets WHERE created_by = ? AND merged_into_ticket_id IS NOT NULL)"
+        );
+        $allCountStmt->execute([$uid, $uid]);
+    }
+    $userHasAnyTickets = (int) $allCountStmt->fetchColumn() > 0;
+
     // Sorting
     $sortableColumns = [
         'id'         => 't.id',
@@ -102,14 +119,15 @@ $router->get('/portal/tickets', function () {
     ];
 
     render('portal/tickets/index', [
-        'tickets'      => $tickets,
-        'priorities'   => $priorities,
-        'filters'      => $filters,
-        'page'         => $page,
-        'totalPages'   => $totalPages,
-        'totalTickets' => $totalTickets,
-        'sort'         => $sort,
-        'dir'          => strtolower($dir),
+        'tickets'           => $tickets,
+        'priorities'        => $priorities,
+        'filters'           => $filters,
+        'page'              => $page,
+        'totalPages'        => $totalPages,
+        'totalTickets'      => $totalTickets,
+        'sort'              => $sort,
+        'dir'               => strtolower($dir),
+        'userHasAnyTickets' => $userHasAnyTickets,
     ]);
 });
 
