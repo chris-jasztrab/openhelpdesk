@@ -1983,46 +1983,76 @@ function buildTicketFilterQuery(array $filters): array
     $where  = [];
     $params = [];
 
-    $fStatus   = trim($filters['status'] ?? '');
-    $fPriority = trim($filters['priority'] ?? '');
-    $fType     = trim($filters['type'] ?? '');
-    $fLocation = trim($filters['location'] ?? '');
-    $fAgent    = trim($filters['agent'] ?? '');
-    $fGroup    = trim($filters['group'] ?? '');
+    // Normalize: accept both scalar (legacy) and array values
+    $fStatus   = array_values(array_filter(array_map('trim', (array) ($filters['status']   ?? []))));
+    $fPriority = array_values(array_filter(array_map('trim', (array) ($filters['priority'] ?? []))));
+    $fType     = array_values(array_filter(array_map('trim', (array) ($filters['type']     ?? []))));
+    $fLocation = array_values(array_filter(array_map('trim', (array) ($filters['location'] ?? []))));
+    $fAgent    = array_values(array_filter(array_map('trim', (array) ($filters['agent']    ?? []))));
+    $fGroup    = array_values(array_filter(array_map('trim', (array) ($filters['group']    ?? []))));
     $fSearch   = trim($filters['q'] ?? '');
     $fDateFrom = trim($filters['date_from'] ?? '');
     $fDateTo   = trim($filters['date_to'] ?? '');
 
-    if ($fStatus !== '') {
-        $where[]  = 't.status = ?';
-        $params[] = $fStatus;
+    if (!empty($fStatus)) {
+        $placeholders = implode(',', array_fill(0, count($fStatus), '?'));
+        $where[]  = 't.status IN (' . $placeholders . ')';
+        $params   = array_merge($params, $fStatus);
     }
-    if ($fPriority !== '') {
-        $where[]  = 't.priority_id = ?';
-        $params[] = (int) $fPriority;
+    if (!empty($fPriority)) {
+        $ids = array_map('intval', $fPriority);
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $where[]  = 't.priority_id IN (' . $placeholders . ')';
+        $params   = array_merge($params, $ids);
     }
-    if ($fType !== '') {
-        $where[]  = 't.type_id = ?';
-        $params[] = (int) $fType;
+    if (!empty($fType)) {
+        $ids = array_map('intval', $fType);
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $where[]  = 't.type_id IN (' . $placeholders . ')';
+        $params   = array_merge($params, $ids);
     }
-    if ($fLocation !== '') {
-        $where[]  = 't.location_id = ?';
-        $params[] = (int) $fLocation;
+    if (!empty($fLocation)) {
+        $ids = array_map('intval', $fLocation);
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $where[]  = 't.location_id IN (' . $placeholders . ')';
+        $params   = array_merge($params, $ids);
     }
-    if ($fAgent !== '') {
-        if ($fAgent === 'unassigned') {
-            $where[] = 't.assigned_to IS NULL';
-        } else {
-            $where[]  = 't.assigned_to = ?';
-            $params[] = (int) $fAgent;
+    if (!empty($fAgent)) {
+        $agentConds  = [];
+        $otherAgents = [];
+        foreach ($fAgent as $v) {
+            if ($v === 'unassigned') {
+                $agentConds[] = 't.assigned_to IS NULL';
+            } else {
+                $otherAgents[] = (int) $v;
+            }
+        }
+        if (!empty($otherAgents)) {
+            $placeholders = implode(',', array_fill(0, count($otherAgents), '?'));
+            $agentConds[] = 't.assigned_to IN (' . $placeholders . ')';
+            $params       = array_merge($params, $otherAgents);
+        }
+        if (!empty($agentConds)) {
+            $where[] = '(' . implode(' OR ', $agentConds) . ')';
         }
     }
-    if ($fGroup !== '') {
-        if ($fGroup === 'none') {
-            $where[] = 't.group_id IS NULL';
-        } else {
-            $where[]  = 't.group_id = ?';
-            $params[] = (int) $fGroup;
+    if (!empty($fGroup)) {
+        $groupConds  = [];
+        $otherGroups = [];
+        foreach ($fGroup as $v) {
+            if ($v === 'none') {
+                $groupConds[] = 't.group_id IS NULL';
+            } else {
+                $otherGroups[] = (int) $v;
+            }
+        }
+        if (!empty($otherGroups)) {
+            $placeholders = implode(',', array_fill(0, count($otherGroups), '?'));
+            $groupConds[] = 't.group_id IN (' . $placeholders . ')';
+            $params       = array_merge($params, $otherGroups);
+        }
+        if (!empty($groupConds)) {
+            $where[] = '(' . implode(' OR ', $groupConds) . ')';
         }
     }
     if ($fSearch !== '') {

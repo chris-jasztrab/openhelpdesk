@@ -1256,14 +1256,14 @@ $router->get('/admin/tickets', function () {
         }
     }
 
-    // Read filter params
+    // Read filter params (multi-select arrays for status/priority/type/location/agent/group)
     $filters = [
-        'status'    => trim($_GET['status'] ?? ''),
-        'priority'  => trim($_GET['priority'] ?? ''),
-        'type'      => trim($_GET['type'] ?? ''),
-        'location'  => trim($_GET['location'] ?? ''),
-        'agent'     => trim($_GET['agent'] ?? ''),
-        'group'     => trim($_GET['group'] ?? ''),
+        'status'    => array_values(array_filter(array_map('trim', (array) ($_GET['status']   ?? [])))),
+        'priority'  => array_values(array_filter(array_map('trim', (array) ($_GET['priority'] ?? [])))),
+        'type'      => array_values(array_filter(array_map('trim', (array) ($_GET['type']     ?? [])))),
+        'location'  => array_values(array_filter(array_map('trim', (array) ($_GET['location'] ?? [])))),
+        'agent'     => array_values(array_filter(array_map('trim', (array) ($_GET['agent']    ?? [])))),
+        'group'     => array_values(array_filter(array_map('trim', (array) ($_GET['group']    ?? [])))),
         'q'         => trim($_GET['q'] ?? ''),
         'date_from' => trim($_GET['date_from'] ?? ''),
         'date_to'   => trim($_GET['date_to'] ?? ''),
@@ -1368,12 +1368,12 @@ $router->get('/admin/tickets/export', function () {
 
     // Build filters from query params
     $filters = [
-        'status'    => trim($_GET['status'] ?? ''),
-        'priority'  => trim($_GET['priority'] ?? ''),
-        'type'      => trim($_GET['type'] ?? ''),
-        'location'  => trim($_GET['location'] ?? ''),
-        'agent'     => trim($_GET['agent'] ?? ''),
-        'group'     => trim($_GET['group'] ?? ''),
+        'status'    => array_values(array_filter(array_map('trim', (array) ($_GET['status']   ?? [])))),
+        'priority'  => array_values(array_filter(array_map('trim', (array) ($_GET['priority'] ?? [])))),
+        'type'      => array_values(array_filter(array_map('trim', (array) ($_GET['type']     ?? [])))),
+        'location'  => array_values(array_filter(array_map('trim', (array) ($_GET['location'] ?? [])))),
+        'agent'     => array_values(array_filter(array_map('trim', (array) ($_GET['agent']    ?? [])))),
+        'group'     => array_values(array_filter(array_map('trim', (array) ($_GET['group']    ?? [])))),
         'q'         => trim($_GET['q'] ?? ''),
         'date_from' => trim($_GET['date_from'] ?? ''),
         'date_to'   => trim($_GET['date_to'] ?? ''),
@@ -1509,11 +1509,14 @@ $router->post('/admin/tickets/filters/save', function () {
     }
 
     $filterData = [];
-    foreach (['status', 'priority', 'type', 'location', 'agent', 'q'] as $key) {
-        $val = trim($_POST[$key] ?? '');
-        if ($val !== '') {
-            $filterData[$key] = $val;
+    foreach (['status', 'priority', 'type', 'location', 'agent', 'group'] as $key) {
+        $vals = array_values(array_filter(array_map('trim', (array) ($_POST[$key] ?? []))));
+        if (!empty($vals)) {
+            $filterData[$key] = $vals;
         }
+    }
+    if (trim($_POST['q'] ?? '') !== '') {
+        $filterData['q'] = trim($_POST['q']);
     }
 
     $db = Database::connect();

@@ -214,6 +214,30 @@
         [data-bs-theme="dark"] .filter-panel { background: #212529; border-right-color: #373b3e; }
         [data-bs-theme="dark"] .filter-panel-header { border-bottom-color: #373b3e; }
 
+        /* Multi-select checkbox lists inside filter panel */
+        .filter-checklist {
+            max-height: 150px;
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            border-radius: .375rem;
+            padding: .2rem;
+        }
+        .filter-check-item {
+            display: flex;
+            align-items: center;
+            gap: .4rem;
+            padding: .18rem .4rem;
+            border-radius: .25rem;
+            cursor: pointer;
+            font-size: .8rem;
+            user-select: none;
+            margin: 0;
+        }
+        .filter-check-item:hover { background: #f0f4ff; }
+        .filter-check-item input[type="checkbox"] { margin: 0; cursor: pointer; flex-shrink: 0; }
+        [data-bs-theme="dark"] .filter-checklist { border-color: #495057; }
+        [data-bs-theme="dark"] .filter-check-item:hover { background: #2c3034; }
+
         /* Tour resume pill */
         #ld-tour-resume {
             position: fixed;

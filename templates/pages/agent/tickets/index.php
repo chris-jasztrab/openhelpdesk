@@ -9,8 +9,8 @@ $breadcrumbs  = [
 $statusColors = ['open' => 'primary', 'in_progress' => 'warning', 'pending' => 'info', 'waiting_on_customer' => 'warning', 'waiting_on_third_party' => 'dark', 'resolved' => 'success', 'closed' => 'secondary'];
 $statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 'Pending', 'waiting_on_customer' => 'Waiting on Customer', 'waiting_on_third_party' => 'Waiting on Third Party', 'resolved' => 'Resolved', 'closed' => 'Closed'];
 $slaStateColors = ['on_track' => 'success', 'warning' => 'warning', 'breached' => 'danger'];
-$hasFilters = array_filter($filters, fn($v) => $v !== '');
-$sortParams = array_filter($filters, fn($v) => $v !== '');
+$hasFilters = array_filter($filters, fn($v) => is_array($v) ? !empty($v) : $v !== '');
+$sortParams = array_filter($filters, fn($v) => is_array($v) ? !empty($v) : $v !== '');
 $allColumns = ticketColumnDefinitions();
 $colCount = 3 + count($visibleColumns); // checkbox + id + subject + visible toggleable columns
 $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : '');
@@ -80,60 +80,81 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
             </div>
             <div class="mb-3">
                 <label class="form-label small fw-semibold mb-1">Status</label>
-                <select class="form-select form-select-sm" name="status">
-                    <option value="">All Statuses</option>
-                    <?php foreach ($statusLabels as $val => $label): ?>
-                    <option value="<?= $val ?>" <?= $filters['status'] === $val ? 'selected' : '' ?>><?= e($label) ?></option>
+                <div class="filter-checklist">
+                    <?php foreach ($statusLabels as $val => $lbl): ?>
+                    <label class="filter-check-item">
+                        <input type="checkbox" name="status[]" value="<?= $val ?>" <?= in_array($val, $filters['status'], true) ? 'checked' : '' ?>>
+                        <span><?= e($lbl) ?></span>
+                    </label>
                     <?php endforeach; ?>
-                </select>
+                </div>
             </div>
             <div class="mb-3">
                 <label class="form-label small fw-semibold mb-1">Priority</label>
-                <select class="form-select form-select-sm" name="priority">
-                    <option value="">All Priorities</option>
+                <div class="filter-checklist">
                     <?php foreach ($priorities as $p): ?>
-                    <option value="<?= $p['id'] ?>" <?= $filters['priority'] == $p['id'] ? 'selected' : '' ?>><?= e($p['name']) ?></option>
+                    <label class="filter-check-item">
+                        <input type="checkbox" name="priority[]" value="<?= $p['id'] ?>" <?= in_array((string)$p['id'], $filters['priority'], true) ? 'checked' : '' ?>>
+                        <span><?= e($p['name']) ?></span>
+                    </label>
                     <?php endforeach; ?>
-                </select>
+                </div>
             </div>
             <div class="mb-3">
                 <label class="form-label small fw-semibold mb-1">Type</label>
-                <select class="form-select form-select-sm" name="type">
-                    <option value="">All Types</option>
+                <div class="filter-checklist">
                     <?php foreach ($types as $tp): ?>
-                    <option value="<?= $tp['id'] ?>" <?= $filters['type'] == $tp['id'] ? 'selected' : '' ?>><?= e($tp['name']) ?></option>
+                    <label class="filter-check-item">
+                        <input type="checkbox" name="type[]" value="<?= $tp['id'] ?>" <?= in_array((string)$tp['id'], $filters['type'], true) ? 'checked' : '' ?>>
+                        <span><?= e($tp['name']) ?></span>
+                    </label>
                     <?php endforeach; ?>
-                </select>
+                </div>
             </div>
             <div class="mb-3">
                 <label class="form-label small fw-semibold mb-1"><?= label('location.singular') ?></label>
-                <select class="form-select form-select-sm" name="location">
-                    <option value=""><?= 'All ' . label('location.plural') ?></option>
+                <div class="filter-checklist">
                     <?php foreach ($locations as $loc): ?>
-                    <option value="<?= $loc['id'] ?>" <?= $filters['location'] == $loc['id'] ? 'selected' : '' ?>><?= e($loc['name']) ?></option>
+                    <label class="filter-check-item">
+                        <input type="checkbox" name="location[]" value="<?= $loc['id'] ?>" <?= in_array((string)$loc['id'], $filters['location'], true) ? 'checked' : '' ?>>
+                        <span><?= e($loc['name']) ?></span>
+                    </label>
                     <?php endforeach; ?>
-                </select>
+                </div>
             </div>
             <div class="mb-3">
                 <label class="form-label small fw-semibold mb-1">Agent</label>
-                <select class="form-select form-select-sm" name="agent">
-                    <option value="">All Agents</option>
-                    <option value="mine" <?= $filters['agent'] === 'mine' ? 'selected' : '' ?>>My Tickets</option>
-                    <option value="unassigned" <?= $filters['agent'] === 'unassigned' ? 'selected' : '' ?>>Unassigned</option>
+                <div class="filter-checklist">
+                    <label class="filter-check-item">
+                        <input type="checkbox" name="agent[]" value="mine" <?= in_array('mine', $filters['agent'], true) ? 'checked' : '' ?>>
+                        <span class="text-muted fst-italic">My Tickets</span>
+                    </label>
+                    <label class="filter-check-item">
+                        <input type="checkbox" name="agent[]" value="unassigned" <?= in_array('unassigned', $filters['agent'], true) ? 'checked' : '' ?>>
+                        <span class="text-muted fst-italic">Unassigned</span>
+                    </label>
                     <?php foreach ($agents as $ag): ?>
-                    <option value="<?= $ag['id'] ?>" <?= $filters['agent'] == $ag['id'] ? 'selected' : '' ?>><?= e($ag['first_name'] . ' ' . $ag['last_name']) ?></option>
+                    <label class="filter-check-item">
+                        <input type="checkbox" name="agent[]" value="<?= $ag['id'] ?>" <?= in_array((string)$ag['id'], $filters['agent'], true) ? 'checked' : '' ?>>
+                        <span><?= e($ag['first_name'] . ' ' . $ag['last_name']) ?></span>
+                    </label>
                     <?php endforeach; ?>
-                </select>
+                </div>
             </div>
             <div class="mb-3">
                 <label class="form-label small fw-semibold mb-1">Group</label>
-                <select class="form-select form-select-sm" name="group">
-                    <option value="">All Groups</option>
-                    <option value="none" <?= $filters['group'] === 'none' ? 'selected' : '' ?>>No Group</option>
+                <div class="filter-checklist">
+                    <label class="filter-check-item">
+                        <input type="checkbox" name="group[]" value="none" <?= in_array('none', $filters['group'], true) ? 'checked' : '' ?>>
+                        <span class="text-muted fst-italic">No Group</span>
+                    </label>
                     <?php foreach ($groups as $grp): ?>
-                    <option value="<?= $grp['id'] ?>" <?= $filters['group'] == $grp['id'] ? 'selected' : '' ?>><?= e($grp['name']) ?></option>
+                    <label class="filter-check-item">
+                        <input type="checkbox" name="group[]" value="<?= $grp['id'] ?>" <?= in_array((string)$grp['id'], $filters['group'], true) ? 'checked' : '' ?>>
+                        <span><?= e($grp['name']) ?></span>
+                    </label>
                     <?php endforeach; ?>
-                </select>
+                </div>
             </div>
             <div class="d-flex gap-2">
                 <button type="submit" class="btn btn-sm text-white flex-grow-1" style="background:var(--ld-primary);">
@@ -157,10 +178,16 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                 $sfUrl   = '/agent/tickets' . ($sfData ? '?' . http_build_query($sfData) : '');
                 $isOwner = ((int) $sf['user_id'] === Auth::id());
                 $isActive = true;
-                foreach (['status','priority','type','location','agent','group','q'] as $fk) {
-                    $saved   = (string) ($sfData[$fk] ?? '');
-                    $current = (string) ($filters[$fk] ?? '');
-                    if ($saved !== $current) { $isActive = false; break; }
+                foreach (['q'] as $fk) {
+                    if (($sfData[$fk] ?? '') !== ($filters[$fk] ?? '')) { $isActive = false; break; }
+                }
+                if ($isActive) {
+                    foreach (['status','priority','type','location','agent','group'] as $fk) {
+                        $saved   = array_map('strval', (array) ($sfData[$fk] ?? []));
+                        $current = array_map('strval', (array) ($filters[$fk] ?? []));
+                        sort($saved); sort($current);
+                        if ($saved !== $current) { $isActive = false; break; }
+                    }
                 }
             ?>
             <div class="btn-group btn-group-sm">
@@ -234,8 +261,12 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
             <form method="POST" action="/agent/tickets/filters/save">
                 <?= csrfField() ?>
                 <?php foreach ($filters as $fk => $fv): ?>
-                    <?php if ($fv !== ''): ?>
-                    <input type="hidden" name="<?= $fk === 'q' ? 'q' : e($fk) ?>" value="<?= e($fv) ?>">
+                    <?php if (is_array($fv)): ?>
+                        <?php foreach ($fv as $v): ?>
+                        <input type="hidden" name="<?= e($fk) ?>[]" value="<?= e($v) ?>">
+                        <?php endforeach; ?>
+                    <?php elseif ($fv !== ''): ?>
+                    <input type="hidden" name="<?= e($fk) ?>" value="<?= e($fv) ?>">
                     <?php endif; ?>
                 <?php endforeach; ?>
                 <div class="modal-header">
@@ -542,7 +573,7 @@ sessionStorage.setItem('agentTicketListUrl', window.location.href);
 
 <?php if ($totalPages > 1): ?>
 <?php
-    $pagerParams = array_filter($filters, fn($v) => $v !== '');
+    $pagerParams = array_filter($filters, fn($v) => is_array($v) ? !empty($v) : $v !== '');
     if ($sort !== 'created_at' || $dir !== 'desc') {
         $pagerParams['sort'] = $sort;
         $pagerParams['dir']  = $dir;

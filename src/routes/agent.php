@@ -62,51 +62,80 @@ $router->get('/agent/tickets', function () {
         }
     }
 
-    // Read filter params
-    $fStatus   = trim($_GET['status'] ?? '');
-    $fPriority = trim($_GET['priority'] ?? '');
-    $fType     = trim($_GET['type'] ?? '');
-    $fLocation = trim($_GET['location'] ?? '');
-    $fAgent    = trim($_GET['agent'] ?? '');
-    $fGroup    = trim($_GET['group'] ?? '');
+    // Read filter params (multi-select arrays for status/priority/type/location/agent/group)
+    $fStatus   = array_values(array_filter(array_map('trim', (array) ($_GET['status']   ?? []))));
+    $fPriority = array_values(array_filter(array_map('trim', (array) ($_GET['priority'] ?? []))));
+    $fType     = array_values(array_filter(array_map('trim', (array) ($_GET['type']     ?? []))));
+    $fLocation = array_values(array_filter(array_map('trim', (array) ($_GET['location'] ?? []))));
+    $fAgent    = array_values(array_filter(array_map('trim', (array) ($_GET['agent']    ?? []))));
+    $fGroup    = array_values(array_filter(array_map('trim', (array) ($_GET['group']    ?? []))));
     $fSearch   = trim($_GET['q'] ?? '');
 
     $where  = [];
     $params = [];
 
-    if ($fStatus !== '') {
-        $where[]  = 't.status = ?';
-        $params[] = $fStatus;
+    if (!empty($fStatus)) {
+        $placeholders = implode(',', array_fill(0, count($fStatus), '?'));
+        $where[]  = 't.status IN (' . $placeholders . ')';
+        $params   = array_merge($params, $fStatus);
     }
-    if ($fPriority !== '') {
-        $where[]  = 't.priority_id = ?';
-        $params[] = (int) $fPriority;
+    if (!empty($fPriority)) {
+        $ids = array_map('intval', $fPriority);
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $where[]  = 't.priority_id IN (' . $placeholders . ')';
+        $params   = array_merge($params, $ids);
     }
-    if ($fType !== '') {
-        $where[]  = 't.type_id = ?';
-        $params[] = (int) $fType;
+    if (!empty($fType)) {
+        $ids = array_map('intval', $fType);
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $where[]  = 't.type_id IN (' . $placeholders . ')';
+        $params   = array_merge($params, $ids);
     }
-    if ($fLocation !== '') {
-        $where[]  = 't.location_id = ?';
-        $params[] = (int) $fLocation;
+    if (!empty($fLocation)) {
+        $ids = array_map('intval', $fLocation);
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $where[]  = 't.location_id IN (' . $placeholders . ')';
+        $params   = array_merge($params, $ids);
     }
-    if ($fAgent !== '') {
-        if ($fAgent === 'unassigned') {
-            $where[] = 't.assigned_to IS NULL';
-        } elseif ($fAgent === 'mine') {
-            $where[]  = 't.assigned_to = ?';
-            $params[] = Auth::id();
-        } else {
-            $where[]  = 't.assigned_to = ?';
-            $params[] = (int) $fAgent;
+    if (!empty($fAgent)) {
+        $agentConds  = [];
+        $otherAgents = [];
+        foreach ($fAgent as $v) {
+            if ($v === 'unassigned') {
+                $agentConds[] = 't.assigned_to IS NULL';
+            } elseif ($v === 'mine') {
+                $agentConds[] = 't.assigned_to = ?';
+                $params[]     = Auth::id();
+            } else {
+                $otherAgents[] = (int) $v;
+            }
+        }
+        if (!empty($otherAgents)) {
+            $placeholders = implode(',', array_fill(0, count($otherAgents), '?'));
+            $agentConds[] = 't.assigned_to IN (' . $placeholders . ')';
+            $params       = array_merge($params, $otherAgents);
+        }
+        if (!empty($agentConds)) {
+            $where[] = '(' . implode(' OR ', $agentConds) . ')';
         }
     }
-    if ($fGroup !== '') {
-        if ($fGroup === 'none') {
-            $where[] = 't.group_id IS NULL';
-        } else {
-            $where[]  = 't.group_id = ?';
-            $params[] = (int) $fGroup;
+    if (!empty($fGroup)) {
+        $groupConds  = [];
+        $otherGroups = [];
+        foreach ($fGroup as $v) {
+            if ($v === 'none') {
+                $groupConds[] = 't.group_id IS NULL';
+            } else {
+                $otherGroups[] = (int) $v;
+            }
+        }
+        if (!empty($otherGroups)) {
+            $placeholders = implode(',', array_fill(0, count($otherGroups), '?'));
+            $groupConds[] = 't.group_id IN (' . $placeholders . ')';
+            $params       = array_merge($params, $otherGroups);
+        }
+        if (!empty($groupConds)) {
+            $where[] = '(' . implode(' OR ', $groupConds) . ')';
         }
     }
     if ($fSearch !== '') {
@@ -197,12 +226,12 @@ $router->get('/agent/tickets', function () {
     }
 
     $filters = [
-        'status'   => $fStatus,
-        'priority' => $fPriority,
-        'type'     => $fType,
-        'location' => $fLocation,
-        'agent'    => $fAgent,
-        'group'    => $fGroup,
+        'status'   => $fStatus,   // array
+        'priority' => $fPriority, // array
+        'type'     => $fType,     // array
+        'location' => $fLocation, // array
+        'agent'    => $fAgent,    // array
+        'group'    => $fGroup,    // array
         'q'        => $fSearch,
     ];
 
@@ -269,11 +298,14 @@ $router->post('/agent/tickets/filters/save', function () {
     }
 
     $filterData = [];
-    foreach (['status', 'priority', 'type', 'location', 'agent', 'q'] as $key) {
-        $val = trim($_POST[$key] ?? '');
-        if ($val !== '') {
-            $filterData[$key] = $val;
+    foreach (['status', 'priority', 'type', 'location', 'agent', 'group'] as $key) {
+        $vals = array_values(array_filter(array_map('trim', (array) ($_POST[$key] ?? []))));
+        if (!empty($vals)) {
+            $filterData[$key] = $vals;
         }
+    }
+    if (trim($_POST['q'] ?? '') !== '') {
+        $filterData['q'] = trim($_POST['q']);
     }
 
     $db = Database::connect();
