@@ -11,7 +11,7 @@ $router->get('/portal/tickets', function () {
     $db = Database::connect();
 
     // Read filter params
-    $fStatus   = trim($_GET['status'] ?? '');
+    $fStatus   = trim($_GET['status'] ?? 'open');
     $fPriority = trim($_GET['priority'] ?? '');
     $fSearch   = trim($_GET['q'] ?? '');
 

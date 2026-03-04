@@ -8,7 +8,8 @@ $breadcrumbs  = [
 ];
 $statusColors = ['open' => 'primary', 'in_progress' => 'warning', 'pending' => 'info', 'waiting_on_customer' => 'warning', 'waiting_on_third_party' => 'dark', 'resolved' => 'success', 'closed' => 'secondary'];
 $statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 'Pending', 'waiting_on_customer' => 'Waiting on Customer', 'waiting_on_third_party' => 'Waiting on Third Party', 'resolved' => 'Resolved', 'closed' => 'Closed'];
-$hasFilters = array_filter($filters, fn($v) => $v !== '');
+$isDefault  = $filters['status'] === 'open' && $filters['priority'] === '' && $filters['q'] === '';
+$hasFilters = !$isDefault;
 $sortParams = array_filter($filters, fn($v) => $v !== '');
 ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
