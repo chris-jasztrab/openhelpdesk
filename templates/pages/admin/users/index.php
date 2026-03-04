@@ -7,9 +7,9 @@ $breadcrumbs = [
     ['label' => 'Users'],
 ];
 $filterParams = [];
-if ($roleFilter !== '') $filterParams['role']     = $roleFilter;
-if ($locFilter !== '')  $filterParams['location'] = $locFilter;
-if ($qFilter !== '')    $filterParams['q']        = $qFilter;
+if (!empty($roleFilter)) $filterParams['role']     = $roleFilter;
+if (!empty($locFilter))  $filterParams['location'] = $locFilter;
+if ($qFilter !== '')     $filterParams['q']        = $qFilter;
 $hasFilters = !empty($filterParams);
 ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -47,23 +47,29 @@ $hasFilters = !empty($filterParams);
             </div>
             <div class="mb-3">
                 <label class="form-label small fw-semibold mb-1">Role</label>
-                <select class="form-select form-select-sm" name="role">
-                    <option value="">All Roles</option>
-                    <option value="admin"      <?= $roleFilter === 'admin'      ? 'selected' : '' ?>>Admin</option>
-                    <option value="agent"      <?= $roleFilter === 'agent'      ? 'selected' : '' ?>>Agent</option>
-                    <option value="power_user" <?= $roleFilter === 'power_user' ? 'selected' : '' ?>>Power User</option>
-                    <option value="user"       <?= $roleFilter === 'user'       ? 'selected' : '' ?>>User</option>
-                </select>
+                <div class="filter-checklist">
+                    <?php foreach (['admin' => 'Admin', 'agent' => 'Agent', 'power_user' => 'Power User', 'user' => 'End User'] as $val => $lbl): ?>
+                    <label class="filter-check-item">
+                        <input type="checkbox" name="role[]" value="<?= $val ?>" <?= in_array($val, $roleFilter, true) ? 'checked' : '' ?>>
+                        <span><?= e($lbl) ?></span>
+                    </label>
+                    <?php endforeach; ?>
+                </div>
             </div>
             <div class="mb-3">
                 <label class="form-label small fw-semibold mb-1"><?= label('location.singular') ?></label>
-                <select class="form-select form-select-sm" name="location">
-                    <option value=""><?= 'All ' . label('location.plural') ?></option>
-                    <option value="none" <?= $locFilter === 'none' ? 'selected' : '' ?>>No <?= label('location.singular') ?></option>
+                <div class="filter-checklist">
+                    <label class="filter-check-item">
+                        <input type="checkbox" name="location[]" value="none" <?= in_array('none', $locFilter, true) ? 'checked' : '' ?>>
+                        <span class="text-muted fst-italic">No <?= label('location.singular') ?></span>
+                    </label>
                     <?php foreach ($locations as $loc): ?>
-                    <option value="<?= $loc['id'] ?>" <?= $locFilter == $loc['id'] ? 'selected' : '' ?>><?= e($loc['name']) ?></option>
+                    <label class="filter-check-item">
+                        <input type="checkbox" name="location[]" value="<?= $loc['id'] ?>" <?= in_array((string) $loc['id'], $locFilter, true) ? 'checked' : '' ?>>
+                        <span><?= e($loc['name']) ?></span>
+                    </label>
                     <?php endforeach; ?>
-                </select>
+                </div>
             </div>
             <div class="d-flex gap-2">
                 <button type="submit" class="btn btn-sm text-white flex-grow-1" style="background:var(--ld-primary);">
@@ -115,7 +121,7 @@ $hasFilters = !empty($filterParams);
                         <td><span class="text-muted"><?= e($u['email']) ?></span></td>
                         <td>
                             <?php
-                            $badgeColors = ['admin' => 'danger', 'agent' => 'primary', 'user' => 'secondary'];
+                            $badgeColors = ['admin' => 'danger', 'agent' => 'primary', 'power_user' => 'info', 'user' => 'secondary'];
                             $bc = $badgeColors[$u['role']] ?? 'secondary';
                             ?>
                             <span class="badge bg-<?= $bc ?>"><?= e(ucfirst($u['role'])) ?></span>

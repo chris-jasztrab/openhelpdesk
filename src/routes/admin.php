@@ -129,25 +129,36 @@ $router->get('/admin/users', function () {
         redirect('/admin/users');
     }
 
-    $role  = $_GET['role'] ?? '';
-    $locId = trim($_GET['location'] ?? '');
-    $q     = trim($_GET['q'] ?? '');
+    $roleFilter = array_values(array_filter(array_map('trim', (array) ($_GET['role']     ?? []))));
+    $locFilter  = array_values(array_filter(array_map('trim', (array) ($_GET['location'] ?? []))));
+    $q          = trim($_GET['q'] ?? '');
 
     $sql    = 'SELECT u.*, l.name AS location_name FROM users u LEFT JOIN locations l ON u.location_id = l.id';
     $where  = [];
     $params = [];
-    if (in_array($role, ['admin', 'agent', 'power_user', 'user'], true)) {
-        $where[]  = 'u.role = ?';
-        $params[] = $role;
+
+    $validRoles = ['admin', 'agent', 'power_user', 'user'];
+    $roles = array_values(array_filter($roleFilter, fn($r) => in_array($r, $validRoles, true)));
+    if (!empty($roles)) {
+        $placeholders = implode(',', array_fill(0, count($roles), '?'));
+        $where[]  = "u.role IN ($placeholders)";
+        $params   = array_merge($params, $roles);
     }
-    if ($locId !== '') {
-        if ($locId === 'none') {
-            $where[] = 'u.location_id IS NULL';
-        } else {
-            $where[]  = 'u.location_id = ?';
-            $params[] = (int) $locId;
-        }
+
+    $hasNone = in_array('none', $locFilter, true);
+    $locIds  = array_values(array_filter($locFilter, fn($l) => $l !== 'none' && ctype_digit((string) $l)));
+    if ($hasNone && !empty($locIds)) {
+        $placeholders = implode(',', array_fill(0, count($locIds), '?'));
+        $where[]  = "(u.location_id IS NULL OR u.location_id IN ($placeholders))";
+        $params   = array_merge($params, array_map('intval', $locIds));
+    } elseif ($hasNone) {
+        $where[] = 'u.location_id IS NULL';
+    } elseif (!empty($locIds)) {
+        $placeholders = implode(',', array_fill(0, count($locIds), '?'));
+        $where[]  = "u.location_id IN ($placeholders)";
+        $params   = array_merge($params, array_map('intval', $locIds));
     }
+
     if ($q !== '') {
         $where[]  = "(CONCAT(u.first_name, ' ', u.last_name) LIKE ? OR u.email LIKE ?)";
         $params[] = '%' . $q . '%';
@@ -179,8 +190,8 @@ $router->get('/admin/users', function () {
 
     render('admin/users/index', [
         'users'      => $users,
-        'roleFilter' => $role,
-        'locFilter'  => $locId,
+        'roleFilter' => $roleFilter,
+        'locFilter'  => $locFilter,
         'qFilter'    => $q,
         'locations'  => $locations,
         'sort'       => $sort,
