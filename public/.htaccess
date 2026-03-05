@@ -12,6 +12,9 @@
     RewriteEngine On
     RewriteBase /
 
+    # Pass the Authorization header to PHP (Apache strips it by default)
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
     # Redirect trailing slashes (except root)
     RewriteCond %{REQUEST_URI} (.+)/$
     RewriteRule ^ %1 [L,R=301]
