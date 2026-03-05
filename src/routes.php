@@ -302,8 +302,16 @@ $router->get('/search', function () {
 
     // --- Tickets ---
     if ($type === 'all' || $type === 'tickets') {
-        $ticketWhere = '(t.subject LIKE ? OR t.description LIKE ?)';
-        $ticketParams = [$like, $like];
+        // Strip leading '#' so users can type e.g. "#123" to find ticket 123
+        $qStripped = ltrim($q, '#');
+        $ticketIdClause = '';
+        $ticketIdParams = [];
+        if (is_numeric($qStripped) && (int)$qStripped > 0) {
+            $ticketIdClause = ' OR t.id = ?';
+            $ticketIdParams[] = (int)$qStripped;
+        }
+        $ticketWhere = '(t.subject LIKE ? OR t.description LIKE ?' . $ticketIdClause . ')';
+        $ticketParams = array_merge([$like, $like], $ticketIdParams);
 
         // Regular users only see their own tickets
         if ($role === 'user') {
