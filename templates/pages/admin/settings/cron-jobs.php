@@ -49,6 +49,16 @@ $cronJobs = [
         'required'    => false,
         'note'        => 'Only required if you have scheduled reports configured in Admin → Reports → Scheduled Reports.',
     ],
+    [
+        'title'       => 'App Secret Expiry Reminders',
+        'icon'        => 'bi-key',
+        'description' => 'Sends email reminders to all administrators when the Microsoft Graph app secret is approaching its expiry date. Reminds at 30 days, 7 days, and on the day of expiry.',
+        'frequency'   => 'Once daily',
+        'command'     => '0 8 * * * php ' . ROOT_DIR . '/scripts/process-secret-reminders.php >> ' . ROOT_DIR . '/storage/logs/secret-reminders.log 2>&1',
+        'log'         => ROOT_DIR . '/storage/logs/secret-reminders.log',
+        'required'    => false,
+        'note'        => 'Only required if you have a Microsoft Graph app secret expiry date configured in Admin → Settings → Email / SMTP.',
+    ],
 ];
 ?>
 <div class="mb-4">

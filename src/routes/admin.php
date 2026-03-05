@@ -3357,7 +3357,7 @@ $router->get('/admin/settings', function () {
         'smtp_host', 'smtp_port', 'smtp_encryption', 'smtp_username', 'smtp_password',
         'mail_from_address', 'mail_from_name', 'smtp_debug',
         'graph_enabled', 'graph_reply_to', 'graph_tenant_id', 'graph_client_id',
-        'graph_client_secret', 'graph_mailbox',
+        'graph_client_secret', 'graph_mailbox', 'graph_secret_expires_at',
         'email_to_ticket_enabled', 'email_to_ticket_auto_create_users',
         'email_to_ticket_default_type_id', 'email_to_ticket_default_priority_id',
     ];
@@ -3430,6 +3430,18 @@ $router->post('/admin/settings/graph', function () {
 
     foreach ($fields as $key => $value) {
         setSetting($key, $value);
+    }
+
+    // Save secret expiry date and reset reminder flags if date changed
+    $newExpiry = trim($_POST['graph_secret_expires_at'] ?? '');
+    if ($newExpiry !== '') {
+        $existing = getSetting('graph_secret_expires_at', '');
+        if ($newExpiry !== $existing) {
+            setSetting('graph_secret_remind_1month', '0');
+            setSetting('graph_secret_remind_1week',  '0');
+            setSetting('graph_secret_remind_day',     '0');
+        }
+        setSetting('graph_secret_expires_at', $newExpiry);
     }
 
     // Ensure log directory exists

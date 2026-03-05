@@ -272,7 +272,7 @@ $breadcrumbs  = [
                 <div class="form-text">Found in your App Registration → Overview.</div>
             </div>
 
-            <div class="mb-4">
+            <div class="mb-3" id="graph-secret">
                 <label for="graph_client_secret" class="form-label fw-semibold">Client Secret</label>
                 <input type="password" class="form-control" id="graph_client_secret" name="graph_client_secret"
                        value="" placeholder="<?= $settings['graph_client_secret'] !== '' ? '••••••••' : '' ?>"
@@ -282,6 +282,31 @@ $breadcrumbs  = [
                 <?php else: ?>
                     <div class="form-text">Created under App Registration → Certificates &amp; secrets.</div>
                 <?php endif; ?>
+            </div>
+
+            <div class="mb-4">
+                <label for="graph_secret_expires_at" class="form-label fw-semibold">App Secret Expiry Date</label>
+                <div class="d-flex align-items-center gap-3 flex-wrap">
+                    <input type="date" class="form-control" id="graph_secret_expires_at" name="graph_secret_expires_at"
+                           value="<?= e($settings['graph_secret_expires_at'] ?? '') ?>"
+                           style="max-width:220px;">
+                    <?php
+                    $secretExpiry = $settings['graph_secret_expires_at'] ?? '';
+                    if ($secretExpiry !== '') {
+                        $daysLeft = (int) ceil((strtotime($secretExpiry) - time()) / 86400);
+                        if ($daysLeft <= 0) {
+                            echo '<span class="badge bg-danger fs-6"><i class="bi bi-exclamation-triangle-fill me-1"></i>EXPIRED</span>';
+                        } elseif ($daysLeft <= 7) {
+                            echo '<span class="badge bg-danger"><i class="bi bi-exclamation-triangle-fill me-1"></i>Expires in ' . $daysLeft . ' day' . ($daysLeft === 1 ? '' : 's') . ' — action required</span>';
+                        } elseif ($daysLeft <= 30) {
+                            echo '<span class="badge bg-warning text-dark"><i class="bi bi-clock-history me-1"></i>Expires in ' . $daysLeft . ' days — rotate soon</span>';
+                        } else {
+                            echo '<span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Expires ' . htmlspecialchars(date('M j, Y', strtotime($secretExpiry))) . '</span>';
+                        }
+                    }
+                    ?>
+                </div>
+                <div class="form-text">Enter the exact expiry date shown in Azure Portal → App Registration → Certificates &amp; secrets. You'll receive reminders 30 days, 7 days, and on the day of expiry.</div>
             </div>
 
             <hr class="my-4">
