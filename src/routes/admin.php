@@ -3486,7 +3486,7 @@ $router->post('/admin/settings/run-reply-processor', function () {
     }
 
     $script = ROOT_DIR . '/scripts/process-replies.php';
-    $cmd    = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($script) . ' 2>&1';
+    $cmd    = escapeshellarg(phpBinary()) . ' ' . escapeshellarg($script) . ' 2>&1';
 
     $outputLines = [];
     $returnCode  = 0;
@@ -5659,7 +5659,7 @@ $router->post('/admin/settings/escalations/run-now', function () {
         redirect('/admin/settings/escalations');
     }
     $script = ROOT_DIR . '/scripts/process-escalations.php';
-    $cmd    = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($script) . ' 2>&1';
+    $cmd    = escapeshellarg(phpBinary()) . ' ' . escapeshellarg($script) . ' 2>&1';
     $outputLines = [];
     $returnCode  = 0;
     exec($cmd, $outputLines, $returnCode);

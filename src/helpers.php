@@ -397,6 +397,30 @@ function setUserColumns(int $userId, array $columns): void
     setSetting("ticket_columns:{$userId}", json_encode($columns));
 }
 
+/* ── Process helpers ─────────────────────────────────────────── */
+
+/**
+ * Resolve a usable PHP CLI binary path.
+ *
+ * PHP_BINARY is empty (or points to the FPM daemon) when PHP runs under
+ * PHP-FPM. Fall back to searching PATH for a CLI php binary.
+ */
+function phpBinary(): string
+{
+    $bin = PHP_BINARY;
+    if ($bin !== '' && is_executable($bin) && !str_contains(basename($bin), 'fpm')) {
+        return $bin;
+    }
+    // Search common names in PATH
+    foreach (['php', 'php8.3', 'php8.2', 'php8.1', 'php8.0'] as $name) {
+        $found = trim((string) shell_exec('which ' . escapeshellarg($name) . ' 2>/dev/null'));
+        if ($found !== '' && is_executable($found)) {
+            return $found;
+        }
+    }
+    return 'php'; // last resort — rely on PATH at exec time
+}
+
 /* ── Email helpers ────────────────────────────────────────────── */
 
 /**
