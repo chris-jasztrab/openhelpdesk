@@ -1287,18 +1287,17 @@ $router->get('/admin/tickets', function () {
     Auth::requireRole('admin');
     $db = Database::connect();
 
-    // Auto-apply default filter when visiting the bare URL (no query params, not an explicit reset)
-    if (empty($_GET)) {
-        $defStmt = $db->prepare(
-            'SELECT filters FROM saved_filters WHERE user_id = ? AND is_default = 1 LIMIT 1'
-        );
-        $defStmt->execute([Auth::id()]);
-        $defaultFilter = $defStmt->fetchColumn();
-        if ($defaultFilter) {
-            $filterData = json_decode($defaultFilter, true) ?: [];
-            if ($filterData) {
-                redirect('/admin/tickets?' . http_build_query($filterData));
-            }
+    // Compute default filter URL for client-side persistence logic
+    $defaultFilterUrl = '';
+    $defStmt = $db->prepare(
+        'SELECT filters FROM saved_filters WHERE user_id = ? AND is_default = 1 LIMIT 1'
+    );
+    $defStmt->execute([Auth::id()]);
+    $defaultFilter = $defStmt->fetchColumn();
+    if ($defaultFilter) {
+        $filterData = json_decode($defaultFilter, true) ?: [];
+        if ($filterData) {
+            $defaultFilterUrl = '/admin/tickets?' . http_build_query($filterData);
         }
     }
 
@@ -1389,20 +1388,21 @@ $router->get('/admin/tickets', function () {
     $savedFilters = $sfStmt->fetchAll();
 
     render('admin/tickets/index', [
-        'tickets'        => $tickets,
-        'priorities'     => $priorities,
-        'types'          => $types,
-        'locations'      => $locations,
-        'agents'         => $agents,
-        'groups'         => $groups,
-        'filters'        => $filters,
-        'savedFilters'   => $savedFilters,
-        'page'           => $page,
-        'totalPages'     => $totalPages,
-        'totalTickets'   => $totalTickets,
-        'sort'           => $sort,
-        'dir'            => strtolower($dir),
-        'visibleColumns' => getUserColumns(Auth::id()),
+        'tickets'          => $tickets,
+        'priorities'       => $priorities,
+        'types'            => $types,
+        'locations'        => $locations,
+        'agents'           => $agents,
+        'groups'           => $groups,
+        'filters'          => $filters,
+        'savedFilters'     => $savedFilters,
+        'page'             => $page,
+        'totalPages'       => $totalPages,
+        'totalTickets'     => $totalTickets,
+        'sort'             => $sort,
+        'dir'              => strtolower($dir),
+        'visibleColumns'   => getUserColumns(Auth::id()),
+        'defaultFilterUrl' => $defaultFilterUrl,
     ]);
 });
 

@@ -15,6 +15,44 @@ $allColumns = ticketColumnDefinitions();
 $colCount = 3 + count($visibleColumns); // checkbox + id + subject + visible toggleable columns
 $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : '');
 ?>
+<script>
+(function () {
+    var KEY = 'ticketFilter_admin';
+    var DEFAULT_URL = <?= json_encode($defaultFilterUrl) ?>;
+    var today = new Date().toISOString().slice(0, 10);
+    var search = window.location.search;
+    var params = new URLSearchParams(search);
+
+    if (params.get('reset') === '1') {
+        // User explicitly cleared filters — remember cleared state for today
+        try { localStorage.setItem(KEY, JSON.stringify({ date: today, query: '', cleared: true })); } catch (e) {}
+        return;
+    }
+
+    if (search) {
+        // Page loaded with filter params — remember them for today
+        try { localStorage.setItem(KEY, JSON.stringify({ date: today, query: search, cleared: false })); } catch (e) {}
+        return;
+    }
+
+    // Bare URL — decide what to show
+    try {
+        var stored = JSON.parse(localStorage.getItem(KEY));
+        if (stored && stored.date === today) {
+            if (!stored.cleared && stored.query) {
+                window.location.replace(window.location.pathname + stored.query);
+            }
+            // else: user cleared filters today — show bare/no-filter page
+            return;
+        }
+    } catch (e) {}
+
+    // New day or no history — apply default filter if one exists
+    if (DEFAULT_URL) {
+        window.location.replace(DEFAULT_URL);
+    }
+})();
+</script>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="fw-bold mb-0">All Tickets</h2>
     <div class="d-flex align-items-center gap-2">
