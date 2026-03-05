@@ -10,6 +10,7 @@ $breadcrumbs  = [
     ['label' => $isEdit ? 'Edit' : 'Add'],
 ];
 $action = $isEdit ? "/admin/locations/{$editing['id']}/edit" : '/admin/locations/create';
+$isPerLocation = ($tzMode ?? 'shared') === 'per_location';
 ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="fw-bold mb-0"><?= $isEdit ? ('Edit ' . label('location.singular')) : ('Add ' . label('location.singular')) ?></h2>
@@ -38,6 +39,30 @@ $action = $isEdit ? "/admin/locations/{$editing['id']}/edit" : '/admin/locations
                 <label for="description" class="form-label fw-semibold">Description</label>
                 <textarea class="form-control" id="description" name="description" rows="3"><?= e(old('description', $editing['description'] ?? '')) ?></textarea>
             </div>
+
+            <?php if ($isPerLocation): ?>
+            <div class="mb-3">
+                <label for="timezone" class="form-label fw-semibold">
+                    <i class="bi bi-clock me-1"></i>Timezone
+                </label>
+                <select class="form-select" name="timezone" id="timezone" style="max-width:320px;">
+                    <option value="">Use default (UTC)</option>
+                    <?php foreach ($timezones as $tz): ?>
+                    <option value="<?= e($tz) ?>" <?= old('timezone', $editing['timezone'] ?? '') === $tz ? 'selected' : '' ?>><?= e($tz) ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <div class="form-text">Ticket timestamps for this <?= label('location.singular', 'location') ?> will be displayed in this timezone.</div>
+            </div>
+            <?php else: ?>
+            <div class="mb-3 p-3 bg-light rounded">
+                <i class="bi bi-clock text-muted me-1"></i>
+                <span class="text-muted small">
+                    All <?= label('location.plural', 'locations') ?> are using the shared timezone: <strong><?= e($sharedTz ?? 'UTC') ?></strong>.
+                    To set per-<?= label('location.singular', 'location') ?> timezones, change the timezone mode on the
+                    <a href="/admin/locations"><?= label('location.plural', 'locations') ?> settings page</a>.
+                </span>
+            </div>
+            <?php endif; ?>
 
             <hr class="my-4">
 

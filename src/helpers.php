@@ -343,6 +343,89 @@ function setSetting(string $key, string $value): void
     )->execute([$key, $value]);
 }
 
+/* ── Timezone helpers ─────────────────────────────────────────── */
+
+/**
+ * Returns the effective PHP timezone identifier for a given location.
+ *
+ * Respects the location_timezone_mode setting:
+ *   'shared'       — all locations use the location_timezone_shared value
+ *   'per_location' — each location has its own timezone column
+ *
+ * Falls back to UTC when nothing is configured.
+ *
+ * Future: when geo-API auto-detection is added, update this function
+ * to call the API and cache the result in locations.timezone.
+ */
+function getLocationTimezone(?int $locationId): string
+{
+    $mode = getSetting('location_timezone_mode', 'shared');
+    if ($mode === 'shared') {
+        $tz = getSetting('location_timezone_shared', 'UTC');
+        return $tz !== '' ? $tz : 'UTC';
+    }
+    if ($locationId === null) {
+        return 'UTC';
+    }
+    static $cache = [];
+    if (!isset($cache[$locationId])) {
+        $stmt = Database::connect()->prepare('SELECT timezone FROM locations WHERE id = ?');
+        $stmt->execute([$locationId]);
+        $tz = $stmt->fetchColumn();
+        $cache[$locationId] = ($tz && $tz !== '') ? $tz : 'UTC';
+    }
+    return $cache[$locationId];
+}
+
+/**
+ * Format a UTC datetime string in a given PHP timezone.
+ */
+function formatInTimezone(?string $utcDatetime, string $timezone, string $format = 'M j, Y g:i a'): string
+{
+    if ($utcDatetime === null || $utcDatetime === '') {
+        return '';
+    }
+    try {
+        $dt = new DateTime($utcDatetime, new DateTimeZone('UTC'));
+        $dt->setTimezone(new DateTimeZone($timezone));
+        return $dt->format($format);
+    } catch (\Exception $e) {
+        return date($format, strtotime($utcDatetime));
+    }
+}
+
+/**
+ * Returns the list of common timezone identifiers used across the app's
+ * timezone selectors. Centralised here so all selectors stay in sync.
+ */
+function commonTimezones(): array
+{
+    return [
+        'America/New_York',
+        'America/Chicago',
+        'America/Denver',
+        'America/Los_Angeles',
+        'America/Toronto',
+        'America/Vancouver',
+        'America/Winnipeg',
+        'America/Halifax',
+        'America/St_Johns',
+        'America/Edmonton',
+        'America/Regina',
+        'Europe/London',
+        'Europe/Paris',
+        'Europe/Berlin',
+        'Europe/Amsterdam',
+        'Australia/Sydney',
+        'Australia/Melbourne',
+        'Asia/Tokyo',
+        'Asia/Shanghai',
+        'Asia/Kolkata',
+        'Pacific/Auckland',
+        'UTC',
+    ];
+}
+
 /* ── Label helpers ────────────────────────────────────────────── */
 
 function label(string $key, string $default = ''): string

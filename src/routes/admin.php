@@ -668,12 +668,38 @@ $router->post('/admin/users/merge', function () {
 $router->get('/admin/locations', function () {
     Auth::requireRole('admin');
     $locations = Database::connect()->query('SELECT * FROM locations ORDER BY name')->fetchAll();
-    render('admin/locations/index', ['locations' => $locations]);
+    render('admin/locations/index', [
+        'locations'  => $locations,
+        'tzMode'     => getSetting('location_timezone_mode', 'shared'),
+        'sharedTz'   => getSetting('location_timezone_shared', 'UTC'),
+        'timezones'  => commonTimezones(),
+    ]);
+});
+
+$router->post('/admin/locations/timezone-settings', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/locations');
+    }
+    $mode = ($_POST['location_timezone_mode'] ?? '') === 'per_location' ? 'per_location' : 'shared';
+    $sharedTz = trim($_POST['location_timezone_shared'] ?? '');
+    setSetting('location_timezone_mode', $mode);
+    if ($sharedTz !== '') {
+        setSetting('location_timezone_shared', $sharedTz);
+    }
+    flash('success', 'Timezone settings saved.');
+    redirect('/admin/locations');
 });
 
 $router->get('/admin/locations/create', function () {
     Auth::requireRole('admin');
-    render('admin/locations/form', ['editing' => null]);
+    render('admin/locations/form', [
+        'editing'   => null,
+        'tzMode'    => getSetting('location_timezone_mode', 'shared'),
+        'sharedTz'  => getSetting('location_timezone_shared', 'UTC'),
+        'timezones' => commonTimezones(),
+    ]);
 });
 
 $router->post('/admin/locations/create', function () {
@@ -685,13 +711,14 @@ $router->post('/admin/locations/create', function () {
     $name = trim($_POST['name'] ?? '');
     $addr = trim($_POST['address'] ?? '');
     $desc = trim($_POST['description'] ?? '');
+    $tz   = trim($_POST['timezone'] ?? '') ?: null;
     if ($name === '') {
         flashInput($_POST);
         flash('error', 'Location name is required.');
         redirect('/admin/locations/create');
     }
-    Database::connect()->prepare('INSERT INTO locations (name, address, description) VALUES (?, ?, ?)')
-        ->execute([$name, $addr, $desc]);
+    Database::connect()->prepare('INSERT INTO locations (name, address, description, timezone) VALUES (?, ?, ?, ?)')
+        ->execute([$name, $addr, $desc, $tz]);
     flash('success', 'Location created.');
     redirect('/admin/locations');
 });
@@ -705,7 +732,12 @@ $router->get('/admin/locations/{id}/edit', function (array $p) {
         flash('error', 'Location not found.');
         redirect('/admin/locations');
     }
-    render('admin/locations/form', ['editing' => $editing]);
+    render('admin/locations/form', [
+        'editing'   => $editing,
+        'tzMode'    => getSetting('location_timezone_mode', 'shared'),
+        'sharedTz'  => getSetting('location_timezone_shared', 'UTC'),
+        'timezones' => commonTimezones(),
+    ]);
 });
 
 $router->post('/admin/locations/{id}/edit', function (array $p) {
@@ -718,13 +750,14 @@ $router->post('/admin/locations/{id}/edit', function (array $p) {
     $name = trim($_POST['name'] ?? '');
     $addr = trim($_POST['address'] ?? '');
     $desc = trim($_POST['description'] ?? '');
+    $tz   = trim($_POST['timezone'] ?? '') ?: null;
     if ($name === '') {
         flashInput($_POST);
         flash('error', 'Location name is required.');
         redirect("/admin/locations/{$id}/edit");
     }
-    Database::connect()->prepare('UPDATE locations SET name=?, address=?, description=? WHERE id=?')
-        ->execute([$name, $addr, $desc, $id]);
+    Database::connect()->prepare('UPDATE locations SET name=?, address=?, description=?, timezone=? WHERE id=?')
+        ->execute([$name, $addr, $desc, $tz, $id]);
     flash('success', 'Location updated.');
     redirect('/admin/locations');
 });
@@ -4272,11 +4305,19 @@ $router->post('/admin/settings/import/confirm', function () {
         'waiting on third party' => 'waiting_on_third_party',
     ];
 
-    // Robust date parser — handles Freshdesk-style and ISO formats
-    $parseDateTime = function (string $raw): ?string {
+    // Robust date parser — interprets $raw as a datetime in $sourceTz, stores as UTC.
+    // Pass the location's timezone as $sourceTz so imported timestamps from each
+    // location are correctly normalised to UTC for storage.
+    $parseDateTime = function (string $raw, string $sourceTz = 'UTC'): ?string {
         if ($raw === '') return null;
-        $ts = strtotime($raw);
-        return ($ts !== false && $ts > 0) ? date('Y-m-d H:i:s', $ts) : null;
+        try {
+            $dt = new DateTime($raw, new DateTimeZone($sourceTz));
+            $dt->setTimezone(new DateTimeZone('UTC'));
+            return $dt->format('Y-m-d H:i:s');
+        } catch (\Exception $e) {
+            $ts = strtotime($raw);
+            return ($ts !== false && $ts > 0) ? gmdate('Y-m-d H:i:s', $ts) : null;
+        }
     };
     $parseDateOnly = function (string $raw): ?string {
         if ($raw === '') return null;
@@ -4451,11 +4492,12 @@ $router->post('/admin/settings/import/confirm', function () {
             // --- Resolve group ---
             $groupId = ($row['group'] ?? '') !== '' ? ($existingGroups[strtolower($row['group'])] ?? null) : null;
 
-            // --- Parse dates robustly with strtotime() ---
-            $createdAt   = $parseDateTime($row['created_at']) ?? date('Y-m-d H:i:s');
+            // --- Parse dates — treat source timestamps as being in the location's timezone ---
+            $locationTz  = getLocationTimezone($locationId);
+            $createdAt   = $parseDateTime($row['created_at'], $locationTz) ?? gmdate('Y-m-d H:i:s');
             $dueDate     = $parseDateOnly($row['due_date']);
-            $updatedAt   = $parseDateTime($row['updated_at']) ?? $createdAt;
-            $respondedAt = $parseDateTime($row['responded_at']);
+            $updatedAt   = $parseDateTime($row['updated_at'], $locationTz) ?? $createdAt;
+            $respondedAt = $parseDateTime($row['responded_at'], $locationTz);
 
             // --- Insert ticket ---
             $insertTicket->execute([
