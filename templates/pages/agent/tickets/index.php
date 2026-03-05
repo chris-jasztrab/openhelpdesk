@@ -604,7 +604,7 @@ sessionStorage.setItem('agentTicketListUrl', window.location.href);
                 list.appendChild(div);
                 first = false;
             });
-            new bootstrap.Modal(document.getElementById('bulkMergeModal')).show();
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('bulkMergeModal')).show();
             return;
         }
         submitBulk(action, null);

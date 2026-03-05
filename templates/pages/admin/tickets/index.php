@@ -605,7 +605,7 @@ sessionStorage.setItem('adminTicketListUrl', window.location.href);
                 list.appendChild(div);
                 first = false;
             });
-            new bootstrap.Modal(document.getElementById('bulkMergeModal')).show();
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('bulkMergeModal')).show();
             return;
         }
         if (action === 'delete' && !confirm('Delete ' + selectedIds.size + ' ticket(s)? This cannot be undone.')) return;
