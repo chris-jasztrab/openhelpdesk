@@ -540,22 +540,33 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
             </div>
             <div class="modal-body">
                 <p class="text-muted small mb-3">
-                    This ticket will be <strong>closed</strong> and linked to the master ticket. The original submitter and any CC'd users will be notified and will be able to follow the master ticket.
+                    The secondary ticket will be <strong>closed</strong> and linked to the primary. The original submitter and any CC'd users will be notified.
                 </p>
                 <div class="mb-3" style="position:relative;">
-                    <label class="form-label fw-semibold small">Search for master ticket</label>
+                    <label class="form-label fw-semibold small">Search for ticket to merge with</label>
                     <input type="text" id="mergeSearchInput" class="form-control" placeholder="Type ticket # or subject..." autocomplete="off">
                     <div id="mergeResults" class="list-group shadow-sm" style="display:none;position:absolute;z-index:1050;width:100%;max-height:240px;overflow-y:auto;"></div>
                 </div>
                 <div id="mergeSelectedPreview" class="alert alert-success py-2 small" style="display:none;"></div>
+                <div id="mergePrimaryChoice" class="mt-2" style="display:none;">
+                    <label class="form-label fw-semibold small">Which ticket should be the primary?</label>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="mergePrimary" id="mergePrimarySelected" value="selected" checked>
+                        <label class="form-check-label small" id="mergePrimarySelectedLabel" for="mergePrimarySelected">Selected ticket</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="mergePrimary" id="mergePrimaryThis" value="this">
+                        <label class="form-check-label small" for="mergePrimaryThis">This ticket (#<?= $ticket['id'] ?>)</label>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                <form method="POST" action="/admin/tickets/<?= $ticket['id'] ?>/merge" class="d-inline">
+                <form method="POST" action="/admin/tickets/<?= $ticket['id'] ?>/merge" class="d-inline" id="mergeForm">
                     <?= csrfField() ?>
                     <input type="hidden" name="merge_into_id" id="mergeTargetId">
                     <button type="submit" id="mergeConfirmBtn" class="btn btn-danger" disabled>
-                        <i class="bi bi-arrow-right-circle me-1"></i>Merge &amp; Close This Ticket
+                        <i class="bi bi-arrow-right-circle me-1"></i>Merge Tickets
                     </button>
                 </form>
             </div>
@@ -913,14 +924,17 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
 <?php if (!$ticket['merged_into_ticket_id']): ?>
 // Merge modal typeahead
 (function() {
-    var searchInput  = document.getElementById('mergeSearchInput');
-    var resultsEl    = document.getElementById('mergeResults');
-    var selectedEl   = document.getElementById('mergeSelectedPreview');
-    var targetInput  = document.getElementById('mergeTargetId');
-    var confirmBtn   = document.getElementById('mergeConfirmBtn');
-    var debounce     = null;
-    var ticketId     = <?= (int) $ticket['id'] ?>;
-    var baseUrl      = '/admin/tickets/search';
+    var searchInput      = document.getElementById('mergeSearchInput');
+    var resultsEl        = document.getElementById('mergeResults');
+    var selectedEl       = document.getElementById('mergeSelectedPreview');
+    var primaryChoice    = document.getElementById('mergePrimaryChoice');
+    var targetInput      = document.getElementById('mergeTargetId');
+    var mergeForm        = document.getElementById('mergeForm');
+    var confirmBtn       = document.getElementById('mergeConfirmBtn');
+    var debounce         = null;
+    var ticketId         = <?= (int) $ticket['id'] ?>;
+    var selectedTicketId = null;
+    var baseUrl          = '/admin/tickets/search';
 
     if (!searchInput) return;
 
@@ -930,12 +944,29 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
         return d.innerHTML;
     }
 
+    function updateFormAction() {
+        var primaryThis = document.getElementById('mergePrimaryThis').checked;
+        if (primaryThis) {
+            mergeForm.action = '/admin/tickets/' + selectedTicketId + '/merge';
+            targetInput.value = ticketId;
+        } else {
+            mergeForm.action = '/admin/tickets/' + ticketId + '/merge';
+            targetInput.value = selectedTicketId || '';
+        }
+    }
+
+    document.querySelectorAll('input[name="mergePrimary"]').forEach(function(r) {
+        r.addEventListener('change', updateFormAction);
+    });
+
     searchInput.addEventListener('input', function() {
         clearTimeout(debounce);
         var q = this.value.trim();
         resultsEl.innerHTML = '';
         resultsEl.style.display = 'none';
         selectedEl.style.display = 'none';
+        primaryChoice.style.display = 'none';
+        selectedTicketId = null;
         targetInput.value = '';
         confirmBtn.disabled = true;
 
@@ -961,9 +992,14 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
                     resultsEl.style.display = 'block';
                     resultsEl.querySelectorAll('[data-id]').forEach(function(btn) {
                         btn.addEventListener('click', function() {
-                            targetInput.value = this.dataset.id;
-                            selectedEl.textContent = 'Merging into: #' + this.dataset.id + ' — ' + this.dataset.subject;
+                            selectedTicketId = this.dataset.id;
+                            selectedEl.textContent = 'Selected: #' + this.dataset.id + ' — ' + this.dataset.subject;
                             selectedEl.style.display = 'block';
+                            document.getElementById('mergePrimarySelectedLabel').textContent =
+                                'Selected ticket #' + this.dataset.id + ' — make it the primary';
+                            document.getElementById('mergePrimarySelected').checked = true;
+                            primaryChoice.style.display = 'block';
+                            updateFormAction();
                             confirmBtn.disabled = false;
                             resultsEl.style.display = 'none';
                             searchInput.value = '#' + this.dataset.id + ' — ' + this.dataset.subject;
@@ -979,8 +1015,12 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
         resultsEl.innerHTML = '';
         resultsEl.style.display = 'none';
         selectedEl.style.display = 'none';
+        primaryChoice.style.display = 'none';
+        selectedTicketId = null;
         targetInput.value = '';
         confirmBtn.disabled = true;
+        mergeForm.action = '/admin/tickets/' + ticketId + '/merge';
+        document.getElementById('mergePrimarySelected').checked = true;
     });
 })();
 <?php endif; ?>

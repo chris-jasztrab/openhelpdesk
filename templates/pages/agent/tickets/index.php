@@ -389,7 +389,7 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                     <tr style="cursor:pointer;<?= $isAssignedToMe ? 'background:#eef2ff;' : '' ?>"
                         onclick="window.location='/agent/tickets/<?= $t['id'] ?>'">
                         <td onclick="event.stopPropagation()">
-                            <input type="checkbox" class="ticket-cb form-check-input" value="<?= $t['id'] ?>">
+                            <input type="checkbox" class="ticket-cb form-check-input" value="<?= $t['id'] ?>" data-subject="<?= e($t['subject']) ?>">
                         </td>
                         <td class="text-muted fw-bold"><?= $t['id'] ?></td>
                         <td>
@@ -506,6 +506,27 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
     </div>
 </div>
 
+<!-- Bulk Merge Modal -->
+<div class="modal fade" id="bulkMergeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title fw-bold"><i class="bi bi-diagram-2 me-2"></i>Merge Tickets</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small mb-3">Select which ticket should be the <strong>primary</strong>. All others will be closed and linked to it.</p>
+                <div id="bulkMergeList"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-sm btn-danger" onclick="submitBulkMerge()">
+                    <i class="bi bi-diagram-2 me-1"></i>Merge Tickets
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 <script>
 sessionStorage.setItem('agentTicketListUrl', window.location.href);
 (function () {
@@ -566,11 +587,35 @@ sessionStorage.setItem('agentTicketListUrl', window.location.href);
             new bootstrap.Modal(document.getElementById('bulkAssignModal')).show();
             return;
         }
-        if (action === 'merge' && selectedIds.size < 2) {
-            alert('Select at least 2 tickets to merge.');
+        if (action === 'merge') {
+            if (selectedIds.size < 2) { alert('Select at least 2 tickets to merge.'); return; }
+            var list = document.getElementById('bulkMergeList');
+            list.innerHTML = '';
+            var first = true;
+            selectedIds.forEach(function(id) {
+                var cb = document.querySelector('.ticket-cb[value="' + id + '"]');
+                var subject = cb ? cb.dataset.subject : '';
+                var div = document.createElement('div');
+                div.className = 'form-check mb-1';
+                div.innerHTML = '<input class="form-check-input" type="radio" name="bulkPrimary" id="bp' + id + '" value="' + id + '"'
+                    + (first ? ' checked' : '') + '> '
+                    + '<label class="form-check-label small" for="bp' + id + '"><strong>#' + id + '</strong>'
+                    + (subject ? ' \u2014 ' + subject.replace(/</g, '&lt;').replace(/>/g, '&gt;') : '') + '</label>';
+                list.appendChild(div);
+                first = false;
+            });
+            new bootstrap.Modal(document.getElementById('bulkMergeModal')).show();
             return;
         }
         submitBulk(action, null);
+    };
+
+    window.submitBulkMerge = function () {
+        var checked = document.querySelector('input[name="bulkPrimary"]:checked');
+        if (!checked) { alert('Please select a primary ticket.'); return; }
+        var modal = bootstrap.Modal.getInstance(document.getElementById('bulkMergeModal'));
+        if (modal) modal.hide();
+        submitBulk('merge', null, checked.value);
     };
 
     window.submitBulkAssign = function () {
@@ -580,7 +625,7 @@ sessionStorage.setItem('agentTicketListUrl', window.location.href);
         submitBulk('assign', agentId);
     };
 
-    function submitBulk(action, agentId) {
+    function submitBulk(action, agentId, primaryId) {
         var form = document.getElementById('bulkForm');
         document.getElementById('bulkActionInput').value = action;
         form.querySelectorAll('input[name="ticket_ids[]"]').forEach(function (el) { el.remove(); });
@@ -589,6 +634,11 @@ sessionStorage.setItem('agentTicketListUrl', window.location.href);
             inp.type = 'hidden'; inp.name = 'ticket_ids[]'; inp.value = id;
             form.appendChild(inp);
         });
+        var pi = form.querySelector('input[name="primary_ticket_id"]');
+        if (primaryId !== undefined && primaryId !== null) {
+            if (!pi) { pi = document.createElement('input'); pi.type = 'hidden'; pi.name = 'primary_ticket_id'; form.appendChild(pi); }
+            pi.value = primaryId;
+        } else if (pi) { pi.remove(); }
         var ag = form.querySelector('input[name="assign_to"]');
         if (agentId !== null) {
             if (!ag) { ag = document.createElement('input'); ag.type = 'hidden'; ag.name = 'assign_to'; form.appendChild(ag); }

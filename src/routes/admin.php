@@ -1838,8 +1838,14 @@ $router->post('/admin/tickets/bulk', function () {
                 flash('error', 'Select at least 2 tickets to merge.');
                 redirect('/admin/tickets');
             }
-            sort($ticketIds);
-            $targetId = array_shift($ticketIds); // lowest ID becomes the primary
+            $primaryId = (int) ($_POST['primary_ticket_id'] ?? 0);
+            if ($primaryId > 0 && in_array($primaryId, $ticketIds)) {
+                $targetId  = $primaryId;
+                $ticketIds = array_values(array_filter($ticketIds, fn($id) => $id !== $primaryId));
+            } else {
+                sort($ticketIds);
+                $targetId = array_shift($ticketIds);
+            }
             $tgt = $db->prepare('SELECT id, subject FROM tickets WHERE id = ? AND merged_into_ticket_id IS NULL');
             $tgt->execute([$targetId]);
             $targetTicket = $tgt->fetch();
