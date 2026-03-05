@@ -154,7 +154,14 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
                                     <small class="text-muted"><?= date('M j, Y g:i A', strtotime($entry['created_at'])) ?></small>
                                 </div>
                                 <?php if ($entry['details']): ?>
-                                <div class="mt-1 text-muted" style="white-space:pre-wrap;"><?= e($entry['details']) ?></div>
+                                <div class="mt-1 text-muted" style="white-space:pre-wrap;"><?php
+                                    $det = e($entry['details']);
+                                    if ($entry['action'] === 'merged') {
+                                        $det = preg_replace('/Ticket #(\d+)/', '<a href="/admin/tickets/$1" class="text-reset" target="_blank" rel="noopener">Ticket #$1</a>', $det);
+                                        $det = preg_replace('/(merged into )#(\d+)/', '$1<a href="/admin/tickets/$2" class="text-reset" target="_blank" rel="noopener">#$2</a>', $det);
+                                    }
+                                    echo $det;
+                                ?></div>
                                 <?php endif; ?>
                             </div>
                         </div>
