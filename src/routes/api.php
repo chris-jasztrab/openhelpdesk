@@ -90,7 +90,7 @@ function _apiAuth(): array
  */
 function _apiRequireAgent(array $user): void
 {
-    if (!in_array($user['role'], ['admin', 'agent'], true)) {
+    if (!in_array($user['role'], ['admin', 'agent', 'power_user'], true)) {
         _apiJson(['error' => 'Forbidden — agents and admins only'], 403);
     }
 }
@@ -116,7 +116,7 @@ function _apiInput(): array
  */
 function _apiGroupRestriction(PDO $db, array $user): array
 {
-    if ($user['role'] !== 'agent') {
+    if (!in_array($user['role'], ['agent', 'power_user'], true)) {
         return ['', []];
     }
     $gs = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
@@ -349,7 +349,7 @@ $router->get('/api/v1/dashboard', function () {
     // Replicate the group-based visibility logic from the web dashboard
     $groupRestriction = '';
     $groupParams      = [];
-    if ($user['role'] === 'agent') {
+    if (in_array($user['role'], ['agent', 'power_user'], true)) {
         $gs = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
         $gs->execute([$agentId]);
         $agentGroupIds = array_map('intval', $gs->fetchAll(PDO::FETCH_COLUMN));
@@ -593,7 +593,7 @@ $router->post('/api/v1/tickets', function () {
     $dueDate    = null;
 
     // Fields only agents/admins may set
-    if (in_array($user['role'], ['admin', 'agent'], true)) {
+    if (in_array($user['role'], ['admin', 'agent', 'power_user'], true)) {
         $groupId    = isset($input['group_id'])    && $input['group_id']    !== null ? (int) $input['group_id']    : null;
         $assignedTo = isset($input['assigned_to']) && $input['assigned_to'] !== null ? (int) $input['assigned_to'] : null;
         if (isset($input['due_date']) && $input['due_date'] !== null && $input['due_date'] !== '') {
@@ -1001,7 +1001,7 @@ $router->post('/api/v1/tickets/{id}/replies', function (array $p) {
 
     // Internal notes are agent/admin only
     $isInternal = false;
-    if (in_array($user['role'], ['admin', 'agent'], true)) {
+    if (in_array($user['role'], ['admin', 'agent', 'power_user'], true)) {
         $isInternal = !empty($input['is_internal']);
     }
 
@@ -1032,7 +1032,7 @@ $router->post('/api/v1/tickets/{id}/replies', function (array $p) {
     $slaStatusPause  = ['pending', 'waiting_on_customer', 'waiting_on_third_party'];
     $slaStatusResume = ['open', 'in_progress'];
 
-    if (in_array($user['role'], ['admin', 'agent'], true)) {
+    if (in_array($user['role'], ['admin', 'agent', 'power_user'], true)) {
         $statusAfter = $input['status_after'] ?? '';
         if ($statusAfter !== '' && in_array($statusAfter, $validStatuses, true)
             && $statusAfter !== $ticket['status']
@@ -1386,11 +1386,11 @@ $router->get('/api/v1/meta', function () {
 
     // Agent list only exposed to agents/admins
     $agents = [];
-    if (in_array($user['role'], ['admin', 'agent'], true)) {
+    if (in_array($user['role'], ['admin', 'agent', 'power_user'], true)) {
         $agents = $db->query(
             "SELECT id, first_name, last_name, email, role, avatar
                FROM users
-              WHERE role IN ('admin','agent')
+              WHERE role IN ('admin','agent','power_user')
               ORDER BY first_name, last_name"
         )->fetchAll(PDO::FETCH_ASSOC);
     }
