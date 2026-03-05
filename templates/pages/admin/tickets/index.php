@@ -68,6 +68,90 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
         <button type="button" class="btn-close" onclick="filterPanelClose()" aria-label="Close"></button>
     </div>
     <div class="filter-panel-body">
+        <!-- Saved Filters -->
+        <div class="small fw-semibold mb-2"><i class="bi bi-bookmark me-1"></i>Saved Filters</div>
+        <?php if (empty($savedFilters)): ?>
+        <p class="text-muted small">No saved filters yet.</p>
+        <?php else: ?>
+        <div class="d-flex flex-column gap-1 mb-2">
+            <?php foreach ($savedFilters as $sf):
+                $sfData  = json_decode($sf['filters'], true) ?: [];
+                $sfUrl   = '/admin/tickets' . ($sfData ? '?' . http_build_query($sfData) : '');
+                $isOwner = ((int) $sf['user_id'] === Auth::id());
+                $isActive = true;
+                foreach (['q', 'date_from', 'date_to'] as $fk) {
+                    if (($sfData[$fk] ?? '') !== ($filters[$fk] ?? '')) { $isActive = false; break; }
+                }
+                if ($isActive) {
+                    foreach (['status','priority','type','location','agent','group'] as $fk) {
+                        $saved   = array_map('strval', (array) ($sfData[$fk] ?? []));
+                        $current = array_map('strval', (array) ($filters[$fk] ?? []));
+                        sort($saved); sort($current);
+                        if ($saved !== $current) { $isActive = false; break; }
+                    }
+                }
+            ?>
+            <div class="btn-group btn-group-sm">
+                <a href="<?= e($sfUrl) ?>"
+                   class="btn text-start <?= $isActive ? 'text-white' : 'btn-outline-secondary' ?>"
+                   style="<?= $isActive ? 'background:var(--ld-primary);' : '' ?>overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+                   title="<?= $isOwner ? ($sf['is_default'] ? 'Default filter' : '') : 'Shared by ' . e($sf['owner_name']) ?>">
+                    <?php if ($sf['is_default'] && $isOwner): ?>
+                        <i class="bi bi-star-fill me-1 text-warning"></i>
+                    <?php elseif ($sf['is_shared'] && !$isOwner): ?>
+                        <i class="bi bi-people-fill me-1"></i>
+                    <?php elseif ($sf['is_shared'] && $isOwner): ?>
+                        <i class="bi bi-share me-1"></i>
+                    <?php endif; ?>
+                    <?= e($sf['name']) ?>
+                </a>
+                <?php if ($isOwner): ?>
+                <button type="button" class="btn <?= $isActive ? 'text-white border-start' : 'btn-outline-secondary' ?> dropdown-toggle dropdown-toggle-split"
+                        <?= $isActive ? 'style="background:#4338ca;"' : '' ?>
+                        data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="visually-hidden">Options</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li>
+                        <form method="POST" action="/admin/tickets/filters/<?= $sf['id'] ?>/toggle-default" class="d-inline">
+                            <?= csrfField() ?>
+                            <button type="submit" class="dropdown-item">
+                                <i class="bi bi-star<?= $sf['is_default'] ? '-fill text-warning' : '' ?> me-2"></i>
+                                <?= $sf['is_default'] ? 'Remove Default' : 'Set as Default' ?>
+                            </button>
+                        </form>
+                    </li>
+                    <li>
+                        <form method="POST" action="/admin/tickets/filters/<?= $sf['id'] ?>/toggle-share" class="d-inline">
+                            <?= csrfField() ?>
+                            <button type="submit" class="dropdown-item">
+                                <i class="bi bi-<?= $sf['is_shared'] ? 'lock-fill' : 'people' ?> me-2"></i>
+                                <?= $sf['is_shared'] ? 'Make Private' : 'Share with Team' ?>
+                            </button>
+                        </form>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <form method="POST" action="/admin/tickets/filters/<?= $sf['id'] ?>/delete"
+                              onsubmit="return confirm('Delete this saved filter?')">
+                            <?= csrfField() ?>
+                            <button type="submit" class="dropdown-item text-danger">
+                                <i class="bi bi-trash me-2"></i>Delete
+                            </button>
+                        </form>
+                    </li>
+                </ul>
+                <?php endif; ?>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+        <?php if ($hasFilters): ?>
+        <button type="button" class="btn btn-sm btn-outline-primary w-100 mb-1" data-bs-toggle="modal" data-bs-target="#saveFilterModal">
+            <i class="bi bi-bookmark-plus me-1"></i>Save Current Filter
+        </button>
+        <?php endif; ?>
+        <hr class="my-3">
         <form method="GET" action="/admin/tickets">
             <div class="mb-3">
                 <label class="form-label small fw-semibold mb-1">Search</label>
@@ -170,90 +254,6 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
             </div>
         </form>
 
-        <!-- Saved Filters -->
-        <hr class="my-3">
-        <div class="small fw-semibold mb-2"><i class="bi bi-bookmark me-1"></i>Saved Filters</div>
-        <?php if (empty($savedFilters)): ?>
-        <p class="text-muted small">No saved filters yet.</p>
-        <?php else: ?>
-        <div class="d-flex flex-column gap-1 mb-2">
-            <?php foreach ($savedFilters as $sf):
-                $sfData  = json_decode($sf['filters'], true) ?: [];
-                $sfUrl   = '/admin/tickets' . ($sfData ? '?' . http_build_query($sfData) : '');
-                $isOwner = ((int) $sf['user_id'] === Auth::id());
-                $isActive = true;
-                foreach (['q', 'date_from', 'date_to'] as $fk) {
-                    if (($sfData[$fk] ?? '') !== ($filters[$fk] ?? '')) { $isActive = false; break; }
-                }
-                if ($isActive) {
-                    foreach (['status','priority','type','location','agent','group'] as $fk) {
-                        $saved   = array_map('strval', (array) ($sfData[$fk] ?? []));
-                        $current = array_map('strval', (array) ($filters[$fk] ?? []));
-                        sort($saved); sort($current);
-                        if ($saved !== $current) { $isActive = false; break; }
-                    }
-                }
-            ?>
-            <div class="btn-group btn-group-sm">
-                <a href="<?= e($sfUrl) ?>"
-                   class="btn text-start <?= $isActive ? 'text-white' : 'btn-outline-secondary' ?>"
-                   style="<?= $isActive ? 'background:var(--ld-primary);' : '' ?>overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
-                   title="<?= $isOwner ? ($sf['is_default'] ? 'Default filter' : '') : 'Shared by ' . e($sf['owner_name']) ?>">
-                    <?php if ($sf['is_default'] && $isOwner): ?>
-                        <i class="bi bi-star-fill me-1 text-warning"></i>
-                    <?php elseif ($sf['is_shared'] && !$isOwner): ?>
-                        <i class="bi bi-people-fill me-1"></i>
-                    <?php elseif ($sf['is_shared'] && $isOwner): ?>
-                        <i class="bi bi-share me-1"></i>
-                    <?php endif; ?>
-                    <?= e($sf['name']) ?>
-                </a>
-                <?php if ($isOwner): ?>
-                <button type="button" class="btn <?= $isActive ? 'text-white border-start' : 'btn-outline-secondary' ?> dropdown-toggle dropdown-toggle-split"
-                        <?= $isActive ? 'style="background:#4338ca;"' : '' ?>
-                        data-bs-toggle="dropdown" aria-expanded="false">
-                    <span class="visually-hidden">Options</span>
-                </button>
-                <ul class="dropdown-menu dropdown-menu-end">
-                    <li>
-                        <form method="POST" action="/admin/tickets/filters/<?= $sf['id'] ?>/toggle-default" class="d-inline">
-                            <?= csrfField() ?>
-                            <button type="submit" class="dropdown-item">
-                                <i class="bi bi-star<?= $sf['is_default'] ? '-fill text-warning' : '' ?> me-2"></i>
-                                <?= $sf['is_default'] ? 'Remove Default' : 'Set as Default' ?>
-                            </button>
-                        </form>
-                    </li>
-                    <li>
-                        <form method="POST" action="/admin/tickets/filters/<?= $sf['id'] ?>/toggle-share" class="d-inline">
-                            <?= csrfField() ?>
-                            <button type="submit" class="dropdown-item">
-                                <i class="bi bi-<?= $sf['is_shared'] ? 'lock-fill' : 'people' ?> me-2"></i>
-                                <?= $sf['is_shared'] ? 'Make Private' : 'Share with Team' ?>
-                            </button>
-                        </form>
-                    </li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li>
-                        <form method="POST" action="/admin/tickets/filters/<?= $sf['id'] ?>/delete"
-                              onsubmit="return confirm('Delete this saved filter?')">
-                            <?= csrfField() ?>
-                            <button type="submit" class="dropdown-item text-danger">
-                                <i class="bi bi-trash me-2"></i>Delete
-                            </button>
-                        </form>
-                    </li>
-                </ul>
-                <?php endif; ?>
-            </div>
-            <?php endforeach; ?>
-        </div>
-        <?php endif; ?>
-        <?php if ($hasFilters): ?>
-        <button type="button" class="btn btn-sm btn-outline-primary w-100 mt-1" data-bs-toggle="modal" data-bs-target="#saveFilterModal">
-            <i class="bi bi-bookmark-plus me-1"></i>Save Current Filter
-        </button>
-        <?php endif; ?>
     </div>
 </div>
 
