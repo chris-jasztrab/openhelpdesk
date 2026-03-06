@@ -11,13 +11,7 @@ $breadcrumbs  = [
 $badgeColors = ['admin' => 'danger', 'agent' => 'primary', 'power_user' => 'info', 'user' => 'secondary'];
 $bc = $badgeColors[$profileUser['role']] ?? 'secondary';
 
-$statusLabels = [
-    'open'                   => ['Open',                'primary'],
-    'in_progress'            => ['In Progress',         'warning'],
-    'pending'                => ['Pending',             'secondary'],
-    'waiting_on_customer'    => ['Waiting on Customer', 'info'],
-    'waiting_on_third_party' => ['Waiting on 3rd Party','info'],
-];
+// Status labels/colors defined inline in ticket section below
 ?>
 
 <!-- User info card -->
@@ -330,11 +324,100 @@ $statusLabels = [
 </script>
 <?php endif; ?>
 
-<!-- Open tickets -->
-<h5 class="fw-semibold mb-3">
-    Open Tickets
-    <span class="badge bg-secondary ms-1"><?= count($openTickets) ?></span>
-</h5>
+<?php
+$_statusColors    = ['open' => 'primary', 'in_progress' => 'warning', 'pending' => 'info', 'waiting_on_customer' => 'warning', 'waiting_on_third_party' => 'dark', 'resolved' => 'success', 'closed' => 'secondary'];
+$_allStatusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 'Pending', 'waiting_on_customer' => 'Waiting on Customer', 'waiting_on_third_party' => 'Waiting on Third Party', 'resolved' => 'Resolved', 'closed' => 'Closed'];
+$_hasFilters      = array_filter($userTicketFilters, fn($v) => is_array($v) ? !empty($v) : $v !== '');
+$_baseUrl         = '/admin/users/' . (int)$profileUser['id'];
+?>
+
+<!-- User tickets section header -->
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <h5 class="fw-semibold mb-0">
+        <?= $_hasFilters ? 'Tickets' : 'Open Tickets' ?>
+        <span class="badge bg-secondary ms-1"><?= count($openTickets) ?><?= $_hasFilters ? ' filtered' : '' ?></span>
+    </h5>
+    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="userFilterPanelToggle()">
+        <i class="bi bi-funnel me-1"></i>Filters
+        <?php if ($_hasFilters): ?><span class="badge bg-primary rounded-pill ms-1"><?= count($_hasFilters) ?></span><?php endif; ?>
+    </button>
+</div>
+
+<!-- User ticket filter panel backdrop -->
+<div class="filter-panel-backdrop" id="userFilterPanelBackdrop" onclick="userFilterPanelClose()"></div>
+
+<!-- User ticket filter panel -->
+<div class="filter-panel" id="userFilterPanel">
+    <div class="filter-panel-header">
+        <span class="fw-semibold"><i class="bi bi-funnel me-1"></i>Filter Tickets</span>
+        <button type="button" class="btn-close" onclick="userFilterPanelClose()" aria-label="Close"></button>
+    </div>
+    <div class="filter-panel-body">
+        <form method="GET" action="<?= e($_baseUrl) ?>">
+            <div class="mb-3">
+                <label class="form-label small fw-semibold mb-1">Search</label>
+                <input type="text" class="form-control form-control-sm" name="q"
+                       value="<?= e($userTicketFilters['q']) ?>" placeholder="Search subject&hellip;">
+            </div>
+            <div class="mb-3">
+                <label class="form-label small fw-semibold mb-1">Status</label>
+                <div class="filter-checklist">
+                    <?php foreach ($_allStatusLabels as $val => $lbl): ?>
+                    <label class="filter-check-item">
+                        <input type="checkbox" name="status[]" value="<?= $val ?>" <?= in_array($val, $userTicketFilters['status'], true) ? 'checked' : '' ?>>
+                        <span><?= e($lbl) ?></span>
+                    </label>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label small fw-semibold mb-1">Priority</label>
+                <div class="filter-checklist">
+                    <?php foreach ($ticketPriorities as $p): ?>
+                    <label class="filter-check-item">
+                        <input type="checkbox" name="priority[]" value="<?= $p['id'] ?>" <?= in_array((string)$p['id'], $userTicketFilters['priority'], true) ? 'checked' : '' ?>>
+                        <span><?= e($p['name']) ?></span>
+                    </label>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label small fw-semibold mb-1">Type</label>
+                <div class="filter-checklist">
+                    <?php foreach ($ticketTypes as $tp): ?>
+                    <label class="filter-check-item">
+                        <input type="checkbox" name="type[]" value="<?= $tp['id'] ?>" <?= in_array((string)$tp['id'], $userTicketFilters['type'], true) ? 'checked' : '' ?>>
+                        <span><?= e($tp['name']) ?></span>
+                    </label>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label small fw-semibold mb-1">Assigned Agent</label>
+                <div class="filter-checklist">
+                    <label class="filter-check-item">
+                        <input type="checkbox" name="agent[]" value="unassigned" <?= in_array('unassigned', $userTicketFilters['agent'], true) ? 'checked' : '' ?>>
+                        <span class="text-muted fst-italic">Unassigned</span>
+                    </label>
+                    <?php foreach ($ticketAgents as $ag): ?>
+                    <label class="filter-check-item">
+                        <input type="checkbox" name="agent[]" value="<?= $ag['id'] ?>" <?= in_array((string)$ag['id'], $userTicketFilters['agent'], true) ? 'checked' : '' ?>>
+                        <span><?= e($ag['first_name'] . ' ' . $ag['last_name']) ?></span>
+                    </label>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-sm text-white flex-grow-1" style="background:var(--ld-primary);">
+                    <i class="bi bi-funnel me-1"></i>Apply
+                </button>
+                <a href="<?= e($_baseUrl) ?>" class="btn btn-sm btn-outline-secondary" title="Clear all filters">
+                    <i class="bi bi-x-lg me-1"></i>Clear
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
 
 <div class="card border-0 shadow-sm">
     <div class="table-responsive">
@@ -355,18 +438,19 @@ $statusLabels = [
                 <tr>
                     <td colspan="7" class="text-center py-5 text-muted">
                         <i class="bi bi-check-circle" style="font-size:2rem;"></i>
-                        <p class="mt-2 mb-0">No open tickets.</p>
+                        <p class="mt-2 mb-0"><?= $_hasFilters ? 'No tickets match the current filters.' : 'No open tickets.' ?></p>
                     </td>
                 </tr>
                 <?php else: ?>
                     <?php foreach ($openTickets as $t):
-                        [$statusLabel, $statusColor] = $statusLabels[$t['status']] ?? [ucfirst(str_replace('_', ' ', $t['status'])), 'secondary'];
+                        $_stLabel = $_allStatusLabels[$t['status']] ?? ucfirst(str_replace('_', ' ', $t['status']));
+                        $_stColor = $_statusColors[$t['status']] ?? 'secondary';
                     ?>
                     <tr style="cursor:pointer;" onclick="window.location='/admin/tickets/<?= (int)$t['id'] ?>'">
                         <td class="text-muted small fw-semibold">#<?= (int)$t['id'] ?></td>
                         <td class="fw-semibold"><?= e($t['subject']) ?></td>
                         <td>
-                            <span class="badge bg-<?= $statusColor ?>"><?= $statusLabel ?></span>
+                            <span class="badge bg-<?= $_stColor ?>"><?= $_stLabel ?></span>
                         </td>
                         <td>
                             <?php if ($t['priority_name'] ?? null): ?>
@@ -374,10 +458,10 @@ $statusLabels = [
                                     <?= e($t['priority_name']) ?>
                                 </span>
                             <?php else: ?>
-                                <span class="text-muted">—</span>
+                                <span class="text-muted">&mdash;</span>
                             <?php endif; ?>
                         </td>
-                        <td class="text-muted small"><?= e($t['type_name'] ?? '—') ?></td>
+                        <td class="text-muted small"><?= e($t['type_name'] ?? '&mdash;') ?></td>
                         <td class="text-muted small"><?= e($t['assigned_name'] ?: 'Unassigned') ?></td>
                         <td class="text-muted small"><?= date('M j, Y', strtotime($t['created_at'])) ?></td>
                     </tr>
@@ -387,3 +471,22 @@ $statusLabels = [
         </table>
     </div>
 </div>
+<script>
+(function () {
+    function userFilterPanelOpen() {
+        document.getElementById('userFilterPanel').classList.add('open');
+        document.getElementById('userFilterPanelBackdrop').classList.add('open');
+    }
+    function userFilterPanelClose() {
+        document.getElementById('userFilterPanel').classList.remove('open');
+        document.getElementById('userFilterPanelBackdrop').classList.remove('open');
+    }
+    window.userFilterPanelToggle = function () {
+        document.getElementById('userFilterPanel').classList.contains('open') ? userFilterPanelClose() : userFilterPanelOpen();
+    };
+    window.userFilterPanelClose = userFilterPanelClose;
+    <?php if ($_hasFilters): ?>
+    userFilterPanelOpen();
+    <?php endif; ?>
+})();
+</script>

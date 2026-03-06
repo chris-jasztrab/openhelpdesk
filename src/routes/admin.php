@@ -288,21 +288,74 @@ $router->get('/admin/users/{id}', function (array $p) {
         redirect('/admin/users');
     }
 
-    // Open (non-resolved/closed) tickets submitted by this user
-    $tStmt = $db->prepare(
-        "SELECT t.id, t.subject, t.status, t.created_at,
-                tp.name AS priority_name, tp.color AS priority_color,
-                tt.name AS type_name,
-                CONCAT(a.first_name, ' ', a.last_name) AS assigned_name
-         FROM tickets t
-         LEFT JOIN ticket_priorities tp ON t.priority_id = tp.id
-         LEFT JOIN ticket_types     tt ON t.type_id     = tt.id
-         LEFT JOIN users             a  ON t.assigned_to = a.id
-         WHERE t.created_by = ?
-           AND t.status NOT IN ('resolved', 'closed')
-         ORDER BY t.created_at DESC"
-    );
-    $tStmt->execute([$uid]);
+    // Filter params for ticket list
+    $userTicketFilters = [
+        'q'       => trim($_GET['q'] ?? ''),
+        'status'  => array_map('strval', (array) ($_GET['status'] ?? [])),
+        'priority'=> array_map('strval', (array) ($_GET['priority'] ?? [])),
+        'type'    => array_map('strval', (array) ($_GET['type'] ?? [])),
+        'agent'   => array_map('strval', (array) ($_GET['agent'] ?? [])),
+    ];
+
+    // Options for filter panel
+    $ticketPriorities = $db->query('SELECT id, name, color FROM ticket_priorities ORDER BY sort_order, name')->fetchAll();
+    $ticketTypes      = $db->query('SELECT id, name FROM ticket_types ORDER BY name')->fetchAll();
+    $ticketAgents     = $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('admin','agent','power_user') ORDER BY first_name, last_name")->fetchAll();
+
+    // Build dynamic ticket query for this user
+    $where  = ['t.created_by = ?'];
+    $params = [$uid];
+
+    if ($userTicketFilters['q'] !== '') {
+        $where[] = 't.subject LIKE ?';
+        $params[] = '%' . $userTicketFilters['q'] . '%';
+    }
+
+    if (!empty($userTicketFilters['status'])) {
+        $placeholders = implode(',', array_fill(0, count($userTicketFilters['status']), '?'));
+        $where[] = "t.status IN ($placeholders)";
+        $params  = array_merge($params, $userTicketFilters['status']);
+    } else {
+        $where[] = "t.status NOT IN ('resolved', 'closed')";
+    }
+
+    if (!empty($userTicketFilters['priority'])) {
+        $placeholders = implode(',', array_fill(0, count($userTicketFilters['priority']), '?'));
+        $where[] = "t.priority_id IN ($placeholders)";
+        $params  = array_merge($params, $userTicketFilters['priority']);
+    }
+
+    if (!empty($userTicketFilters['type'])) {
+        $placeholders = implode(',', array_fill(0, count($userTicketFilters['type']), '?'));
+        $where[] = "t.type_id IN ($placeholders)";
+        $params  = array_merge($params, $userTicketFilters['type']);
+    }
+
+    if (!empty($userTicketFilters['agent'])) {
+        $agentClauses = [];
+        foreach ($userTicketFilters['agent'] as $av) {
+            if ($av === 'unassigned') {
+                $agentClauses[] = 't.assigned_to IS NULL';
+            } else {
+                $agentClauses[] = 't.assigned_to = ?';
+                $params[] = $av;
+            }
+        }
+        $where[] = '(' . implode(' OR ', $agentClauses) . ')';
+    }
+
+    $tSql = "SELECT t.id, t.subject, t.status, t.created_at,
+                    tp.name AS priority_name, tp.color AS priority_color,
+                    tt.name AS type_name,
+                    CONCAT(a.first_name, ' ', a.last_name) AS assigned_name
+             FROM tickets t
+             LEFT JOIN ticket_priorities tp ON t.priority_id = tp.id
+             LEFT JOIN ticket_types     tt ON t.type_id     = tt.id
+             LEFT JOIN users             a  ON t.assigned_to = a.id
+             WHERE " . implode(' AND ', $where) . "
+             ORDER BY t.created_at DESC";
+    $tStmt = $db->prepare($tSql);
+    $tStmt->execute($params);
     $openTickets = $tStmt->fetchAll();
 
     // Counts needed for the delete/transfer modal
@@ -319,11 +372,15 @@ $router->get('/admin/users/{id}', function (array $p) {
     $kbCount = (int) $kbStmt->fetchColumn();
 
     render('admin/users/view', [
-        'profileUser'   => $user,
-        'openTickets'   => $openTickets,
-        'createdCount'  => $createdCount,
-        'assignedCount' => $assignedCount,
-        'kbCount'       => $kbCount,
+        'profileUser'        => $user,
+        'openTickets'        => $openTickets,
+        'userTicketFilters'  => $userTicketFilters,
+        'ticketPriorities'   => $ticketPriorities,
+        'ticketTypes'        => $ticketTypes,
+        'ticketAgents'       => $ticketAgents,
+        'createdCount'       => $createdCount,
+        'assignedCount'      => $assignedCount,
+        'kbCount'            => $kbCount,
     ]);
 });
 
