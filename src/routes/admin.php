@@ -2337,9 +2337,10 @@ $router->post('/admin/tickets/{id}/comment', function (array $p) {
     $db = Database::connect();
 
     // Verify ticket exists
-    $stmt = $db->prepare('SELECT id FROM tickets WHERE id = ?');
+    $stmt = $db->prepare('SELECT id, assigned_to FROM tickets WHERE id = ?');
     $stmt->execute([$id]);
-    if (!$stmt->fetch()) {
+    $commentTicket = $stmt->fetch();
+    if (!$commentTicket) {
         flash('error', 'Ticket not found.');
         redirect('/admin/tickets');
     }
@@ -2374,6 +2375,15 @@ $router->post('/admin/tickets/{id}/comment', function (array $p) {
         }
     } else {
         notifyAgentNoteAdded($db, $id, $message);
+    }
+
+    // Auto-assign unassigned ticket to the replying admin
+    if (!$isInternal && $commentTicket['assigned_to'] === null) {
+        $db->prepare('UPDATE tickets SET assigned_to = ? WHERE id = ?')->execute([Auth::id(), $id]);
+        $db->prepare(
+            'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
+        )->execute([$id, Auth::id(), 'assigned', 'Ticket auto-assigned to ' . Auth::fullName() . ' upon reply']);
+        flash('info', 'This ticket was unassigned — it has been automatically assigned to you.');
     }
 
     $base = $isInternal ? 'Internal note added.' : 'Comment added.';
