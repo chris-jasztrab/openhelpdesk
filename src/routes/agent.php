@@ -200,7 +200,7 @@ $router->get('/agent/tickets', function () {
 
     // Pagination
     $allowedPerPage = [25, 50, 100, 200];
-    $perPage    = in_array((int) ($_GET['per_page'] ?? 25), $allowedPerPage, true) ? (int) $_GET['per_page'] : 25;
+    $perPage    = (isset($_GET['per_page']) && in_array((int) $_GET['per_page'], $allowedPerPage, true)) ? (int) $_GET['per_page'] : 25;
     $totalPages = max(1, (int) ceil($totalTickets / $perPage));
     $page       = max(1, min($totalPages, (int) ($_GET['page'] ?? 1)));
     $offset     = ($page - 1) * $perPage;
