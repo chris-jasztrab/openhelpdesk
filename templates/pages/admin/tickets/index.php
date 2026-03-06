@@ -374,7 +374,7 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                 <tr>
                     <th style="width:36px;"><input type="checkbox" id="selectAll" class="form-check-input" title="Select all"></th>
                     <th style="width:60px"><a href="<?= sortUrl('id', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark"># <?= sortIcon('id', $sort, $dir) ?></a></th>
-                    <th style="max-width:0"><a href="<?= sortUrl('subject', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Subject <?= sortIcon('subject', $sort, $dir) ?></a></th>
+                    <th style="width:100%"><a href="<?= sortUrl('subject', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Subject <?= sortIcon('subject', $sort, $dir) ?></a></th>
                     <?php if (in_array('status', $visibleColumns)): ?>
                     <th><a href="<?= sortUrl('status', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Status <?= sortIcon('status', $sort, $dir) ?></a></th>
                     <?php endif; ?>
@@ -417,7 +417,7 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                             <input type="checkbox" class="ticket-cb form-check-input" value="<?= $t['id'] ?>" data-subject="<?= e($t['subject']) ?>">
                         </td>
                         <td class="text-muted fw-bold"><?= $t['id'] ?></td>
-                        <td style="max-width:0">
+                        <td style="width:100%">
                             <a href="/admin/tickets/<?= $t['id'] ?>" class="text-decoration-none fw-semibold text-dark d-block text-truncate">
                                 <?= e($t['subject']) ?>
                             </a>
