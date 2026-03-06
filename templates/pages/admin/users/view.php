@@ -208,10 +208,12 @@ $statusLabels = [
     var selectedBadge = document.getElementById('selectedTransferUserBadge');
     var clearBtn      = document.getElementById('clearTransferBtn');
 
-    // Auto-open when URL contains ?delete=1
+    // Auto-open when URL contains ?delete=1 (deferred so Bootstrap is loaded first)
     if (window.location.search.indexOf('delete=1') !== -1) {
-        new bootstrap.Modal(document.getElementById('deleteUserModal')).show();
         history.replaceState({}, '', window.location.pathname);
+        window.addEventListener('load', function () {
+            new bootstrap.Modal(document.getElementById('deleteUserModal')).show();
+        });
     }
 
     // ── Autocomplete ──────────────────────────────────────────────────────────
