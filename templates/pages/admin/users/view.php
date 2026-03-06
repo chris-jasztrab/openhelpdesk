@@ -107,6 +107,7 @@ $bc = $badgeColors[$profileUser['role']] ?? 'secondary';
             <form method="POST" action="/admin/users/<?= (int)$profileUser['id'] ?>/delete" id="deleteUserForm">
                 <?= csrfField() ?>
                 <input type="hidden" name="transfer_to" id="transferToInput" value="">
+                <input type="hidden" name="delete_data" id="deleteDataInput" value="0">
 
                 <!-- Step 1: info + optional transfer -->
                 <div id="delStep1">
@@ -119,7 +120,7 @@ $bc = $badgeColors[$profileUser['role']] ?? 'secondary';
                         <?php if ($hasAssociated): ?>
                         <div class="alert alert-warning small mb-3">
                             <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                            <strong>This user has associated records that must be transferred:</strong>
+                            <strong>This user has associated records:</strong>
                             <ul class="mb-0 mt-1">
                                 <?php if ($createdCount > 0): ?>
                                 <li><?= $createdCount ?> ticket<?= $createdCount !== 1 ? 's' : '' ?> they submitted</li>
@@ -132,21 +133,37 @@ $bc = $badgeColors[$profileUser['role']] ?? 'secondary';
                                 <?php endif; ?>
                             </ul>
                         </div>
-                        <label class="form-label fw-semibold">Transfer records to:</label>
-                        <div class="position-relative mb-2">
-                            <input type="text" id="transferSearch" class="form-control"
-                                   placeholder="Search by name or email…" autocomplete="off">
-                            <div id="transferDropdown"
-                                 class="list-group position-absolute w-100 shadow-sm"
-                                 style="z-index:1100;display:none;max-height:200px;overflow-y:auto;"></div>
+                        <label class="form-label fw-semibold mb-2">What should happen to their records?</label>
+                        <div class="mb-3">
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="radio" name="data_action_radio" id="actionTransfer" value="transfer">
+                                <label class="form-check-label" for="actionTransfer">Transfer records to another user</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="data_action_radio" id="actionDeleteData" value="delete">
+                                <label class="form-check-label text-danger fw-semibold" for="actionDeleteData">Delete all associated records</label>
+                            </div>
                         </div>
-                        <div id="selectedTransferUserDiv" style="display:none;" class="mb-1">
-                            <span class="badge bg-primary fs-6 fw-normal py-2 px-3"
-                                  id="selectedTransferUserBadge"></span>
-                            <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2"
-                                    id="clearTransferBtn">
-                                <i class="bi bi-x-circle me-1"></i>Remove
-                            </button>
+                        <div id="transferSection" style="display:none;">
+                            <div class="position-relative mb-2">
+                                <input type="text" id="transferSearch" class="form-control"
+                                       placeholder="Search by name or email…" autocomplete="off">
+                                <div id="transferDropdown"
+                                     class="list-group position-absolute w-100 shadow-sm"
+                                     style="z-index:1100;display:none;max-height:200px;overflow-y:auto;"></div>
+                            </div>
+                            <div id="selectedTransferUserDiv" style="display:none;" class="mb-1">
+                                <span class="badge bg-primary fs-6 fw-normal py-2 px-3"
+                                      id="selectedTransferUserBadge"></span>
+                                <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2"
+                                        id="clearTransferBtn">
+                                    <i class="bi bi-x-circle me-1"></i>Remove
+                                </button>
+                            </div>
+                        </div>
+                        <div id="deleteDataWarning" style="display:none;" class="alert alert-danger small mb-0">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                            <strong>Warning:</strong> All tickets submitted by this user, tickets assigned to them, KB articles they authored, and all related records will be <strong>permanently deleted</strong>. This cannot be undone.
                         </div>
                         <?php else: ?>
                         <p class="text-muted small mb-0">
@@ -190,23 +207,56 @@ $bc = $badgeColors[$profileUser['role']] ?? 'secondary';
     var userId        = <?= (int) $profileUser['id'] ?>;
     var selectedUser  = null;
 
-    var step1        = document.getElementById('delStep1');
-    var step2        = document.getElementById('delStep2');
-    var step1Btn     = document.getElementById('delStep1Btn');
-    var backBtn      = document.getElementById('delBackBtn');
-    var confirmTxt   = document.getElementById('delConfirmText');
-    var transferInput = document.getElementById('transferToInput');
-    var searchInput   = document.getElementById('transferSearch');
-    var dropdown      = document.getElementById('transferDropdown');
-    var selectedDiv   = document.getElementById('selectedTransferUserDiv');
-    var selectedBadge = document.getElementById('selectedTransferUserBadge');
-    var clearBtn      = document.getElementById('clearTransferBtn');
+    var step1           = document.getElementById('delStep1');
+    var step2           = document.getElementById('delStep2');
+    var step1Btn        = document.getElementById('delStep1Btn');
+    var backBtn         = document.getElementById('delBackBtn');
+    var confirmTxt      = document.getElementById('delConfirmText');
+    var transferInput   = document.getElementById('transferToInput');
+    var deleteDataInput = document.getElementById('deleteDataInput');
+    var searchInput     = document.getElementById('transferSearch');
+    var dropdown        = document.getElementById('transferDropdown');
+    var selectedDiv     = document.getElementById('selectedTransferUserDiv');
+    var selectedBadge   = document.getElementById('selectedTransferUserBadge');
+    var clearBtn        = document.getElementById('clearTransferBtn');
+    var transferSection = document.getElementById('transferSection');
+    var deleteDataWarn  = document.getElementById('deleteDataWarning');
+    var radioTransfer   = document.getElementById('actionTransfer');
+    var radioDelete     = document.getElementById('actionDeleteData');
 
     // Auto-open when URL contains ?delete=1 (deferred so Bootstrap is loaded first)
     if (window.location.search.indexOf('delete=1') !== -1) {
         history.replaceState({}, '', window.location.pathname);
         window.addEventListener('load', function () {
             new bootstrap.Modal(document.getElementById('deleteUserModal')).show();
+        });
+    }
+
+    // ── Radio choice (Transfer vs Delete data) ─────────────────────────────────────────────
+    if (radioTransfer) {
+        radioTransfer.addEventListener('change', function () {
+            if (this.checked) {
+                transferSection.style.display = '';
+                deleteDataWarn.style.display = 'none';
+                deleteDataInput.value = '0';
+                step1Btn.disabled = !selectedUser;
+            }
+        });
+    }
+
+    if (radioDelete) {
+        radioDelete.addEventListener('change', function () {
+            if (this.checked) {
+                transferSection.style.display = 'none';
+                deleteDataWarn.style.display = '';
+                deleteDataInput.value = '1';
+                transferInput.value = '';
+                selectedUser = null;
+                if (searchInput) { searchInput.value = ''; searchInput.style.display = ''; }
+                if (dropdown) dropdown.style.display = 'none';
+                if (selectedDiv) selectedDiv.style.display = 'none';
+                step1Btn.disabled = false;
+            }
         });
     }
 
@@ -282,7 +332,9 @@ $bc = $badgeColors[$profileUser['role']] ?? 'secondary';
     if (step1Btn) {
         step1Btn.addEventListener('click', function () {
             var msg = 'Permanently delete <strong>' + esc(userName) + '</strong>?';
-            if (selectedUser) {
+            if (deleteDataInput && deleteDataInput.value === '1') {
+                msg += ' <strong class="text-danger">All their tickets, KB articles, and related records will be permanently deleted.</strong>';
+            } else if (selectedUser) {
                 msg += ' Their tickets and KB articles will be transferred to <strong>'
                     + esc(selectedUser.first_name + ' ' + selectedUser.last_name) + '</strong>.';
             }
@@ -303,11 +355,15 @@ $bc = $badgeColors[$profileUser['role']] ?? 'secondary';
     document.getElementById('deleteUserModal').addEventListener('hidden.bs.modal', function () {
         step1.style.display = '';
         step2.style.display = 'none';
-        if (hasAssociated && searchInput) {
+        if (hasAssociated) {
             selectedUser = null;
             transferInput.value = '';
-            searchInput.value = '';
-            searchInput.style.display = '';
+            if (deleteDataInput) deleteDataInput.value = '0';
+            if (radioTransfer) radioTransfer.checked = false;
+            if (radioDelete) radioDelete.checked = false;
+            if (transferSection) transferSection.style.display = 'none';
+            if (deleteDataWarn) deleteDataWarn.style.display = 'none';
+            if (searchInput) { searchInput.value = ''; searchInput.style.display = ''; }
             if (dropdown) dropdown.style.display = 'none';
             if (selectedDiv) selectedDiv.style.display = 'none';
             step1Btn.disabled = true;

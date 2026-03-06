@@ -482,6 +482,7 @@ $router->post('/admin/users/{id}/delete', function (array $p) {
     $db = Database::connect();
 
     $transferTo = !empty($_POST['transfer_to']) ? (int) $_POST['transfer_to'] : null;
+    $deleteData = ($_POST['delete_data'] ?? '0') === '1';
 
     // Count records associated with this user
     $cStmt = $db->prepare('SELECT COUNT(*) FROM tickets WHERE created_by = ?');
@@ -498,14 +499,45 @@ $router->post('/admin/users/{id}/delete', function (array $p) {
 
     $hasAssociated = $createdCount > 0 || $assignedCount > 0 || $kbCount > 0;
 
-    // If there are associated records a transfer target is required
-    if ($hasAssociated && $transferTo === null) {
-        flash('error', 'This user has associated tickets or KB articles. Select a user to transfer them to before deleting.');
+    // If there are associated records, either a transfer target or delete_data is required
+    if ($hasAssociated && $transferTo === null && !$deleteData) {
+        flash('error', 'This user has associated tickets or KB articles. Select a user to transfer them to, or choose to delete their records.');
         redirect("/admin/users/{$id}?delete=1");
     }
 
-    // Validate and perform transfer
-    if ($transferTo !== null) {
+    if ($deleteData) {
+        // Collect attachment files before deleting tickets
+        if ($createdCount > 0) {
+            $files = $db->prepare('SELECT stored_name FROM ticket_attachments WHERE ticket_id IN (SELECT id FROM tickets WHERE created_by = ?)');
+            $files->execute([$id]);
+            $filesToDelete = $files->fetchAll(\PDO::FETCH_COLUMN);
+        } else {
+            $filesToDelete = [];
+        }
+
+        // Delete ticket templates authored by this user
+        $db->prepare('DELETE FROM ticket_templates WHERE created_by = ?')->execute([$id]);
+
+        // Delete KB article revisions edited by this user on articles they did NOT author
+        // (revisions on their own articles cascade when those articles are deleted below)
+        $db->prepare('DELETE FROM kb_article_revisions WHERE edited_by = ? AND article_id NOT IN (SELECT id FROM kb_articles WHERE created_by = ?)')->execute([$id, $id]);
+
+        // Delete tickets created by this user (cascades child tables)
+        $db->prepare('DELETE FROM tickets WHERE created_by = ?')->execute([$id]);
+
+        // Unassign remaining tickets assigned to this user
+        $db->prepare('UPDATE tickets SET assigned_to = NULL WHERE assigned_to = ?')->execute([$id]);
+
+        // Delete KB articles authored by this user (cascades ratings and revisions)
+        $db->prepare('DELETE FROM kb_articles WHERE created_by = ?')->execute([$id]);
+
+        // Remove physical attachment files
+        foreach ($filesToDelete as $storedName) {
+            $path = ATTACHMENT_STORAGE_PATH . $storedName;
+            if (file_exists($path)) unlink($path);
+        }
+    } elseif ($transferTo !== null) {
+        // Validate and perform transfer
         $targetStmt = $db->prepare('SELECT id FROM users WHERE id = ? AND id != ?');
         $targetStmt->execute([$transferTo, $id]);
         if (!$targetStmt->fetch()) {
@@ -538,7 +570,9 @@ $router->post('/admin/users/{id}/delete', function (array $p) {
     $db->prepare('DELETE FROM users WHERE id = ?')->execute([$id]);
     logAudit('user.delete', $id, 'user', $deletedName);
 
-    if ($transferTo !== null) {
+    if ($deleteData) {
+        flash('success', "User \"{$deletedName}\" was deleted along with all their associated records.");
+    } elseif ($transferTo !== null) {
         flash('success', "User \"{$deletedName}\" was deleted and their records were transferred successfully.");
     } else {
         flash('success', "User \"{$deletedName}\" was deleted.");
