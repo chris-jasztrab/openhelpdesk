@@ -8,12 +8,16 @@ declare(strict_types=1);
 
 $router->get('/admin/settings/sso', function () {
     Auth::requireRole('admin');
+    $logFile    = ROOT_DIR . '/storage/logs/sso-debug.log';
+    $ssoLog     = is_readable($logFile) ? file_get_contents($logFile) : null;
     render('admin/settings/sso', [
         'ssoEnabled'        => getSetting('sso_enabled',        '0'),
         'ssoTenantId'       => getSetting('sso_tenant_id',      ''),
         'ssoClientId'       => getSetting('sso_client_id',      ''),
         'ssoClientSecret'   => getSetting('sso_client_secret',  ''),
         'ssoLocationPrompt' => getSetting('sso_location_prompt','sso_only'),
+        'ssoDebug'          => getSetting('sso_debug',          '0'),
+        'ssoLog'            => $ssoLog,
     ]);
 });
 
@@ -36,10 +40,13 @@ $router->post('/admin/settings/sso', function () {
         redirect('/admin/settings/sso');
     }
 
+    $debug = isset($_POST['sso_debug']) ? '1' : '0';
+
     setSetting('sso_enabled',        $enabled);
     setSetting('sso_tenant_id',      $tenantId);
     setSetting('sso_client_id',      $clientId);
     setSetting('sso_location_prompt', $locationPrompt);
+    setSetting('sso_debug',          $debug);
 
     // Only overwrite the secret if a new value was provided
     if ($clientSecret !== '') {
@@ -53,6 +60,19 @@ $router->post('/admin/settings/sso', function () {
 $router->get('/admin/settings/sso/help', function () {
     Auth::requireRole('admin');
     render('admin/settings/sso-help');
+});
+
+$router->post('/admin/settings/sso/clear-log', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        redirect('/admin/settings/sso');
+    }
+    $logFile = ROOT_DIR . '/storage/logs/sso-debug.log';
+    if (file_exists($logFile)) {
+        file_put_contents($logFile, '');
+    }
+    flash('success', 'SSO debug log cleared.');
+    redirect('/admin/settings/sso');
 });
 
 /* ==================================================================

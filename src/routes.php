@@ -447,6 +447,20 @@ $router->get('/logout', function () {
  * Microsoft 365 SSO – OAuth 2.0 Authorization Code Flow
  * ------------------------------------------------------------------ */
 
+function ssoDebugLog(string $message): void
+{
+    if (getSetting('sso_debug', '0') !== '1') {
+        return;
+    }
+    $logDir  = ROOT_DIR . '/storage/logs';
+    $logFile = $logDir . '/sso-debug.log';
+    if (!is_dir($logDir)) {
+        @mkdir($logDir, 0755, true);
+    }
+    $entry = '[' . date('Y-m-d H:i:s') . '] ' . $message . PHP_EOL;
+    @file_put_contents($logFile, $entry, FILE_APPEND | LOCK_EX);
+}
+
 function ssoHttpPost(string $url, array $fields): ?array
 {
     $ch = curl_init($url);
@@ -458,12 +472,22 @@ function ssoHttpPost(string $url, array $fields): ?array
         CURLOPT_HTTPHEADER     => ['Content-Type: application/x-www-form-urlencoded'],
         CURLOPT_SSL_VERIFYPEER => true,
     ]);
-    $body = curl_exec($ch);
+    $body     = curl_exec($ch);
+    $curlErr  = curl_error($ch);
+    $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
     if ($body === false) {
+        ssoDebugLog("POST {$url} -> curl error: {$curlErr}");
         return null;
     }
-    $data = json_decode($body, true);
+    $data    = json_decode($body, true);
+    $errCode = is_array($data) ? ($data['error'] ?? null) : null;
+    $errMsg  = is_array($data) ? ($data['error_description'] ?? null) : null;
+    if ($errCode) {
+        ssoDebugLog("POST {$url} HTTP {$httpCode} -> error={$errCode} | {$errMsg}");
+    } else {
+        ssoDebugLog("POST {$url} HTTP {$httpCode} -> " . (is_array($data) ? 'OK' : 'invalid JSON'));
+    }
     return is_array($data) ? $data : null;
 }
 
@@ -476,12 +500,21 @@ function ssoHttpGet(string $url, string $token): ?array
         CURLOPT_HTTPHEADER     => ['Authorization: Bearer ' . $token],
         CURLOPT_SSL_VERIFYPEER => true,
     ]);
-    $body = curl_exec($ch);
+    $body     = curl_exec($ch);
+    $curlErr  = curl_error($ch);
+    $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
     if ($body === false) {
+        ssoDebugLog("GET {$url} -> curl error: {$curlErr}");
         return null;
     }
-    $data = json_decode($body, true);
+    $data    = json_decode($body, true);
+    $errCode = is_array($data) ? ($data['error'] ?? null) : null;
+    if ($errCode) {
+        ssoDebugLog("GET {$url} HTTP {$httpCode} -> error=" . json_encode($data['error'] ?? $data));
+    } else {
+        ssoDebugLog("GET {$url} HTTP {$httpCode} -> OK");
+    }
     return is_array($data) ? $data : null;
 }
 
@@ -525,28 +558,38 @@ $router->get('/auth/microsoft', function () {
 
 // Microsoft OAuth callback – exchange code, look up / create user, log in
 $router->get('/auth/microsoft/callback', function () {
+    ssoDebugLog('--- SSO callback start | IP=' . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
+
     // 1. Verify state (CSRF guard on OAuth flow)
-    $state = $_GET['state'] ?? '';
-    if ($state === '' || $state !== ($_SESSION['sso_state'] ?? '')) {
+    $state        = $_GET['state'] ?? '';
+    $sessionState = $_SESSION['sso_state'] ?? '';
+    if ($state === '' || $state !== $sessionState) {
+        ssoDebugLog('State mismatch – received=' . substr($state, 0, 16) . '... session=' . substr($sessionState, 0, 16) . '...');
         unset($_SESSION['sso_state']);
         redirect('/login?sso_error=state');
     }
     unset($_SESSION['sso_state']);
+    ssoDebugLog('State verified OK');
 
     // 2. Check for user-denied / consent errors
     if (!empty($_GET['error'])) {
+        ssoDebugLog('Microsoft returned error: ' . ($_GET['error'] ?? '') . ' | ' . ($_GET['error_description'] ?? ''));
         redirect('/login?sso_error=denied');
     }
 
     $code = $_GET['code'] ?? '';
     if ($code === '') {
+        ssoDebugLog('No authorization code in callback');
         redirect('/login?sso_error=token');
     }
+    ssoDebugLog('Authorization code received (length=' . strlen($code) . ')');
 
     $tenantId     = getSetting('sso_tenant_id');
     $clientId     = getSetting('sso_client_id');
     $clientSecret = getSetting('sso_client_secret');
     $redirectUri  = rtrim(env('APP_URL', ''), '/') . '/auth/microsoft/callback';
+
+    ssoDebugLog("Config: tenant_id={$tenantId} | client_id={$clientId} | secret_set=" . ($clientSecret !== '' ? 'yes' : 'NO') . " | redirect_uri={$redirectUri}");
 
     // 3. Exchange code for access token
     $tokens = ssoHttpPost(
@@ -561,13 +604,16 @@ $router->get('/auth/microsoft/callback', function () {
     );
 
     if (empty($tokens['access_token'])) {
+        ssoDebugLog('Token exchange failed - no access_token. Keys=' . json_encode(array_keys($tokens ?? [])));
         redirect('/login?sso_error=token');
     }
+    ssoDebugLog('Token exchange OK | expires_in=' . ($tokens['expires_in'] ?? '?') . ' | token_type=' . ($tokens['token_type'] ?? '?'));
 
     // 4. Fetch user profile from Microsoft Graph
     $me = ssoHttpGet('https://graph.microsoft.com/v1.0/me', $tokens['access_token']);
 
     if (empty($me['id'])) {
+        ssoDebugLog('Graph /me failed - no id. Keys=' . json_encode(array_keys($me ?? [])));
         redirect('/login?sso_error=graph');
     }
 
@@ -577,7 +623,10 @@ $router->get('/auth/microsoft/callback', function () {
     $firstName = $me['givenName'] ?? $parts[0];
     $lastName  = $me['surname']   ?? (count($parts) > 1 ? implode(' ', array_slice($parts, 1)) : 'User');
 
+    ssoDebugLog("Graph /me: oid={$oid} | email={$email} | name={$firstName} {$lastName} | mail=" . ($me['mail'] ?? 'null') . " | upn=" . ($me['userPrincipalName'] ?? 'null'));
+
     if ($email === '') {
+        ssoDebugLog('Email empty - neither mail nor userPrincipalName set');
         redirect('/login?sso_error=graph');
     }
 
@@ -589,15 +638,21 @@ $router->get('/auth/microsoft/callback', function () {
     $stmt->execute([$oid]);
     $user = $stmt->fetch() ?: null;
 
-    if (!$user) {
+    if ($user) {
+        ssoDebugLog("User found by azure_oid: id={$user['id']} | email={$user['email']} | role={$user['role']}");
+    } else {
+        ssoDebugLog("No user by azure_oid={$oid} - trying email lookup");
         $stmt = $db->prepare('SELECT * FROM users WHERE email = ? LIMIT 1');
         $stmt->execute([$email]);
         $user = $stmt->fetch() ?: null;
         if ($user) {
+            ssoDebugLog("User found by email: id={$user['id']} | role={$user['role']} - linking azure_oid");
             // Link OID to the existing password-login account
             $db->prepare('UPDATE users SET azure_oid = ? WHERE id = ?')
                ->execute([$oid, $user['id']]);
             $user['azure_oid'] = $oid;
+        } else {
+            ssoDebugLog("No user found by email={$email} - will auto-create");
         }
     }
 
@@ -605,6 +660,7 @@ $router->get('/auth/microsoft/callback', function () {
 
     // 6. Auto-create account if no match found
     if (!$user) {
+        ssoDebugLog("Auto-creating user: {$firstName} {$lastName} <{$email}> role=user");
         $db->prepare(
             'INSERT INTO users (first_name, last_name, email, azure_oid, password, role)
              VALUES (?, ?, ?, ?, \'\', \'user\')'
@@ -615,17 +671,20 @@ $router->get('/auth/microsoft/callback', function () {
         $stmt->execute([$newId]);
         $user       = $stmt->fetch();
         $isBrandNew = true;
+        ssoDebugLog("New user created: id={$newId}");
     }
 
     // 7. Log in
     session_regenerate_id(true);
     ssoSetSessionUser($user);
     logAudit('login');
+    ssoDebugLog("Login successful: user_id={$user['id']} | email={$user['email']} | brand_new=" . ($isBrandNew ? 'yes' : 'no'));
 
     // 8. Redirect to location picker when needed
     $locationPrompt = getSetting('sso_location_prompt', 'sso_only');
     if (empty($user['location_id']) && ($isBrandNew || $locationPrompt === 'all')) {
         $_SESSION['sso_needs_location'] = true;
+        ssoDebugLog('Location picker required - user has no location_id');
     }
 
     redirect('/');

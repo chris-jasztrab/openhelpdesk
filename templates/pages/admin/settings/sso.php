@@ -144,6 +144,28 @@ $redirectUri = appUrl() . '/auth/microsoft/callback';
         </div>
     </div>
 
+    <!-- Debug Logging -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-transparent fw-semibold">
+            <i class="bi bi-bug me-1"></i>Debug Logging
+        </div>
+        <div class="card-body">
+            <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" role="switch"
+                       id="sso_debug" name="sso_debug" value="1"
+                       <?= ($ssoDebug ?? '0') === '1' ? 'checked' : '' ?>>
+                <label class="form-check-label fw-semibold" for="sso_debug">
+                    Enable SSO Debug Logging
+                </label>
+            </div>
+            <div class="form-text">
+                When enabled, detailed SSO login attempts are written to
+                <code>storage/logs/sso-debug.log</code>.
+                Disable once the issue is resolved — the log includes user email addresses.
+            </div>
+        </div>
+    </div>
+
     <div class="d-flex gap-2">
         <button type="submit" class="btn text-white px-4" style="background:var(--ld-primary);">
             <i class="bi bi-check-lg me-1"></i>Save SSO Settings
@@ -151,3 +173,25 @@ $redirectUri = appUrl() . '/auth/microsoft/callback';
         <a href="/admin/settings" class="btn btn-outline-secondary">Cancel</a>
     </div>
 </form>
+
+<?php if (($ssoDebug ?? '0') === '1'): ?>
+<div class="card border-0 shadow-sm mt-4">
+    <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+        <span class="fw-semibold"><i class="bi bi-file-text me-1"></i>SSO Debug Log</span>
+        <form method="POST" action="/admin/settings/sso/clear-log" class="d-inline">
+            <?= csrfField() ?>
+            <button type="submit" class="btn btn-sm btn-outline-danger"
+                    onclick="return confirm('Clear the SSO debug log?')">
+                <i class="bi bi-trash me-1"></i>Clear Log
+            </button>
+        </form>
+    </div>
+    <div class="card-body p-0">
+        <?php if (empty($ssoLog)): ?>
+            <p class="text-muted small p-3 mb-0">No log entries yet. Attempt a Microsoft SSO login to generate entries.</p>
+        <?php else: ?>
+            <pre class="mb-0 p-3" style="font-size:.78rem;max-height:500px;overflow-y:auto;background:#f8f9fa;border-radius:0 0 .375rem .375rem;"><?= e($ssoLog) ?></pre>
+        <?php endif; ?>
+    </div>
+</div>
+<?php endif; ?>
