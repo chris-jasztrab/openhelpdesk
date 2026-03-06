@@ -20,8 +20,6 @@ $breadcrumbs  = [
     <h5 class="fw-semibold mb-0"><?= $isEdit ? 'Edit Canned Response' : 'New Canned Response' ?></h5>
 </div>
 
-<?php flashMessages() ?>
-
 <div class="card border-0 shadow-sm">
     <div class="card-body p-4">
         <form method="POST" action="<?= e($action) ?>">
