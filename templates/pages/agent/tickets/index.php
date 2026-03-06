@@ -11,6 +11,7 @@ $statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 
 $slaStateColors = ['on_track' => 'success', 'warning' => 'warning', 'breached' => 'danger'];
 $hasFilters = array_filter($filters, fn($v) => is_array($v) ? !empty($v) : $v !== '');
 $sortParams = array_filter($filters, fn($v) => is_array($v) ? !empty($v) : $v !== '');
+if ($perPage !== 25) $sortParams['per_page'] = $perPage;
 $allColumns = ticketColumnDefinitions();
 $colCount = 3 + count($visibleColumns); // checkbox + id + subject + visible toggleable columns
 $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : '');
@@ -196,6 +197,7 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
         <?php endif; ?>
         <hr class="my-3">
         <form method="GET" action="/agent/tickets">
+            <?php if ($perPage !== 25): ?><input type="hidden" name="per_page" value="<?= $perPage ?>"><?php endif; ?>
             <div class="mb-3">
                 <label class="form-label small fw-semibold mb-1">Search</label>
                 <input type="text" class="form-control form-control-sm" name="q"
@@ -659,19 +661,38 @@ sessionStorage.setItem('agentTicketListUrl', window.location.href);
 })();
 </script>
 
-<?php if ($totalPages > 1): ?>
 <?php
-    $pagerParams = array_filter($filters, fn($v) => is_array($v) ? !empty($v) : $v !== '');
-    if ($sort !== 'created_at' || $dir !== 'desc') {
-        $pagerParams['sort'] = $sort;
-        $pagerParams['dir']  = $dir;
-    }
-    $pagerBase   = '/agent/tickets';
+$pagerParams = array_filter($filters, fn($v) => is_array($v) ? !empty($v) : $v !== '');
+if ($sort !== 'created_at' || $dir !== 'desc') {
+    $pagerParams['sort'] = $sort;
+    $pagerParams['dir']  = $dir;
+}
+if ($perPage !== 25) $pagerParams['per_page'] = $perPage;
+$pagerBase = '/agent/tickets';
 ?>
+<?php if ($totalTickets > 0): ?>
 <nav class="d-flex justify-content-between align-items-center mt-3">
-    <span class="text-muted small">
-        Showing <?= (($page - 1) * 30) + 1 ?>–<?= min($page * 30, $totalTickets) ?> of <?= $totalTickets ?>
-    </span>
+    <div class="d-flex align-items-center gap-2">
+        <span class="text-muted small">
+            Showing <?= (($page - 1) * $perPage) + 1 ?>–<?= min($page * $perPage, $totalTickets) ?> of <?= $totalTickets ?>
+        </span>
+        <form method="GET" action="/agent/tickets" class="d-inline">
+            <?php foreach ($pagerParams as $pk => $pv): ?>
+                <?php if (is_array($pv)): foreach ($pv as $pvi): ?>
+                <input type="hidden" name="<?= e($pk) ?>[]" value="<?= e($pvi) ?>">
+                <?php endforeach; else: ?>
+                <input type="hidden" name="<?= e($pk) ?>" value="<?= e($pv) ?>">
+                <?php endif; ?>
+            <?php endforeach; ?>
+            <select name="per_page" class="form-select form-select-sm d-inline-block w-auto"
+                    onchange="this.form.submit()" aria-label="Tickets per page">
+                <?php foreach ([25, 50, 100, 200] as $opt): ?>
+                <option value="<?= $opt ?>" <?= $perPage === $opt ? 'selected' : '' ?>><?= $opt ?> per page</option>
+                <?php endforeach; ?>
+            </select>
+        </form>
+    </div>
+    <?php if ($totalPages > 1): ?>
     <ul class="pagination pagination-sm mb-0">
         <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
             <a class="page-link" href="<?= e($pagerBase . '?' . http_build_query(array_merge($pagerParams, ['page' => $page - 1]))) ?>">
@@ -681,7 +702,7 @@ sessionStorage.setItem('agentTicketListUrl', window.location.href);
         <?php for ($p = max(1, $page - 2); $p <= min($totalPages, $page + 2); $p++): ?>
         <li class="page-item <?= $p === $page ? 'active' : '' ?>">
             <a class="page-link" href="<?= e($pagerBase . '?' . http_build_query(array_merge($pagerParams, ['page' => $p]))) ?>"
-               <?= $p === $page ? 'style="background:var(--ld-primary);border-color:var(--ld-primary);"' : '' ?>><?= $p ?></a>
+               <?= $p === $page ? 'style="background:var(--ld-primary);border-color:var(--ld-primary);"'  : '' ?>><?= $p ?></a>
         </li>
         <?php endfor; ?>
         <li class="page-item <?= $page >= $totalPages ? 'disabled' : '' ?>">
@@ -690,5 +711,6 @@ sessionStorage.setItem('agentTicketListUrl', window.location.href);
             </a>
         </li>
     </ul>
+    <?php endif; ?>
 </nav>
 <?php endif; ?>
