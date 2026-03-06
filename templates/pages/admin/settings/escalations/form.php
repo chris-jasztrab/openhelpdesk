@@ -352,27 +352,36 @@ $existingActions    = $isEdit ? ($editing['actions_decoded']    ?? []) : [];
         var hidden   = wrap.querySelector('.user-id-val');
         var dropdown = wrap.querySelector('.user-search-dropdown');
 
+        var searchTimer = null;
         input.addEventListener('input', function() {
-            var q = this.value.toLowerCase();
+            var q = this.value.trim();
             hidden.value = '';
             dropdown.innerHTML = '';
             if (q.length < 1) { dropdown.style.display = 'none'; return; }
-            var matches = allUsers.filter(function(u){ return u.label.toLowerCase().includes(q); }).slice(0,8);
-            if (!matches.length) { dropdown.style.display = 'none'; return; }
-            matches.forEach(function(u) {
-                var item = document.createElement('a');
-                item.href = '#';
-                item.className = 'dropdown-item small py-1';
-                item.textContent = u.label;
-                item.addEventListener('mousedown', function(e) {
-                    e.preventDefault();
-                    hidden.value  = u.id;
-                    input.value   = u.label;
-                    dropdown.style.display = 'none';
-                });
-                dropdown.appendChild(item);
-            });
-            dropdown.style.display = '';
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(function() {
+                fetch('/api/user-search?q=' + encodeURIComponent(q), { credentials: 'same-origin' })
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        dropdown.innerHTML = '';
+                        if (!data.length) { dropdown.style.display = 'none'; return; }
+                        data.forEach(function(u) {
+                            var item = document.createElement('a');
+                            item.href = '#';
+                            item.className = 'dropdown-item small py-1';
+                            item.textContent = u.label;
+                            item.addEventListener('mousedown', function(e) {
+                                e.preventDefault();
+                                hidden.value  = u.id;
+                                input.value   = u.label;
+                                dropdown.style.display = 'none';
+                            });
+                            dropdown.appendChild(item);
+                        });
+                        dropdown.style.display = '';
+                    })
+                    .catch(function() { dropdown.style.display = 'none'; });
+            }, 250);
         });
         input.addEventListener('blur', function() {
             setTimeout(function(){ dropdown.style.display = 'none'; }, 150);
