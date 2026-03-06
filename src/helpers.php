@@ -689,6 +689,16 @@ function getEmailTpl(string $name, array $rawTokens): array
     $button     = getSetting("email_button_{$key}")  ?: $d['button'];
     $footer     = getSetting('email_footer_text')    ?: 'This is an automated message from LocalDesk. Please do not reply directly to this email.';
 
+    // Add common token aliases so custom templates using alternative names still work
+    $aliases = [
+        'ticket_subject'      => $rawTokens['subject']     ?? '',
+        'customer_first_name' => $rawTokens['first_name']  ?? '',
+        'customer_last_name'  => $rawTokens['last_name']   ?? '',
+        'customer_name'       => $rawTokens['user_name']   ?? '',
+        'customer_full_name'  => $rawTokens['user_name']   ?? '',
+    ];
+    $rawTokens = array_merge($aliases, $rawTokens);
+
     // Subject line: raw substitution (email headers are plain text)
     $subject = applyEmailTokens($subjectTpl, $rawTokens);
 
