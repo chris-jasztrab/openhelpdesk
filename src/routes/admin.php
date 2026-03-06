@@ -1469,7 +1469,8 @@ $router->get('/admin/tickets', function () {
     $orderCol = $sortableColumns[$sort] ?? 't.created_at';
 
     // Pagination
-    $perPage    = 30;
+    $allowedPerPage = [25, 50, 100, 200];
+    $perPage    = (isset($_GET['per_page']) && in_array((int) $_GET['per_page'], $allowedPerPage, true)) ? (int) $_GET['per_page'] : 25;
     $totalPages = max(1, (int) ceil($totalTickets / $perPage));
     $page       = max(1, min($totalPages, (int) ($_GET['page'] ?? 1)));
     $offset     = ($page - 1) * $perPage;
@@ -1508,6 +1509,7 @@ $router->get('/admin/tickets', function () {
         'filters'          => $filters,
         'savedFilters'     => $savedFilters,
         'page'             => $page,
+        'perPage'          => $perPage,
         'totalPages'       => $totalPages,
         'totalTickets'     => $totalTickets,
         'sort'             => $sort,
