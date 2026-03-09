@@ -23,10 +23,10 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
 </div>
 <?php endif; ?>
 
-<div class="d-flex justify-content-between align-items-center mb-4" id="tour-ticket-header">
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4" id="tour-ticket-header">
     <div>
         <h2 class="fw-bold mb-1"><?= e($ticket['subject']) ?></h2>
-        <div class="d-flex gap-2 align-items-center">
+        <div class="d-flex flex-wrap gap-2 align-items-center">
             <span class="badge bg-<?= $statusColors[$ticket['status']] ?? 'secondary' ?> fs-6">
                 <?= e($statusLabels[$ticket['status']] ?? $ticket['status']) ?>
             </span>
