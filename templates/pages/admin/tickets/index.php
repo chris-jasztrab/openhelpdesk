@@ -484,7 +484,7 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                         <td class="text-muted small" style="white-space:nowrap;"><?= date('M j, Y', strtotime($t['created_at'])) ?></td>
                         <?php endif; ?>
                         <?php if (in_array('due_date', $visibleColumns)): ?>
-                        <td class="text-muted small">
+                        <td class="text-muted small" style="white-space:nowrap;">
                             <?php if ($t['due_date']): ?>
                                 <?php
                                 $due = strtotime($t['due_date']);
