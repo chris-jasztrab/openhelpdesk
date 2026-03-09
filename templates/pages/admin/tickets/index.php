@@ -138,7 +138,7 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                 $sfUrl   = '/admin/tickets' . ($sfData ? '?' . http_build_query($sfData) : '');
                 $isOwner = ((int) $sf['user_id'] === Auth::id());
                 $isActive = true;
-                foreach (['q', 'date_from', 'date_to'] as $fk) {
+                foreach (['q', 'date_from', 'date_to', 'watched'] as $fk) {
                     if (($sfData[$fk] ?? '') !== ($filters[$fk] ?? '')) { $isActive = false; break; }
                 }
                 if ($isActive) {
@@ -301,6 +301,15 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                     <label class="form-label small fw-semibold mb-1">To</label>
                     <input type="date" class="form-control form-control-sm" name="date_to"
                            value="<?= e($filters['date_to'] ?? '') ?>">
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label small fw-semibold mb-1">Watching</label>
+                <div class="filter-checklist">
+                    <label class="filter-check-item">
+                        <input type="checkbox" name="watched" value="1" <?= !empty($filters['watched']) ? 'checked' : '' ?>>
+                        <span class="text-muted fst-italic"><i class="bi bi-eye me-1"></i>My Watched Tickets</span>
+                    </label>
                 </div>
             </div>
             <div class="d-flex gap-2">

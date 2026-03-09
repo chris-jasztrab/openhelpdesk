@@ -2122,6 +2122,7 @@ function buildTicketFilterQuery(array $filters): array
     $fSearch    = trim($filters['q'] ?? '');
     $fDateFrom = trim($filters['date_from'] ?? '');
     $fDateTo   = trim($filters['date_to'] ?? '');
+    $fWatched  = !empty($filters['watched']);
 
     if (!empty($fStatus)) {
         $placeholders = implode(',', array_fill(0, count($fStatus), '?'));
@@ -2201,6 +2202,11 @@ function buildTicketFilterQuery(array $filters): array
     if ($fDateTo !== '') {
         $where[]  = 't.created_at <= ?';
         $params[] = $fDateTo . ' 23:59:59';
+    }
+
+    if ($fWatched) {
+        $where[]  = 't.id IN (SELECT ticket_id FROM ticket_watchers WHERE user_id = ?)';
+        $params[] = Auth::id();
     }
 
     $whereClause = !empty($where) ? ' WHERE ' . implode(' AND ', $where) : '';
