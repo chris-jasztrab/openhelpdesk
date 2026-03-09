@@ -9,7 +9,16 @@ $breadcrumbs  = [['label' => 'Admin', 'url' => '/admin'], ['label' => 'Docs']];
     <p class="text-muted mb-0">Everything you need to know about configuring and using LocalDesk.</p>
 </div>
 
-<div class="row g-3">
+<div class="mb-4">
+    <div class="input-group input-group-lg" style="max-width:540px;">
+        <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+        <input type="text" id="docsSearch" class="form-control border-start-0 ps-0"
+               placeholder="Search documentation&hellip;" autocomplete="off">
+    </div>
+    <div id="docsSearchResults" class="list-group mt-2 shadow-sm" style="max-width:540px;display:none;"></div>
+</div>
+
+<div class="row g-3" id="docsCards">
     <?php
     $cards = [
         ['url' => '/admin/docs/getting-started', 'icon' => 'bi-rocket-takeoff', 'color' => '#4f46e5', 'bg' => '#eff6ff',
@@ -20,10 +29,10 @@ $breadcrumbs  = [['label' => 'Admin', 'url' => '/admin'], ['label' => 'Docs']];
          'desc'  => 'Creating, managing and resolving tickets. Statuses, priorities and timelines.'],
         ['url' => '/admin/docs/users',           'icon' => 'bi-people',          'color' => '#16a34a', 'bg' => '#f0fdf4',
          'title' => 'Users & Roles',
-         'desc'  => 'Admin, Agent and User roles. Adding staff and managing locations.'],
+         'desc'  => 'Admin, Agent and User roles. Adding staff, 2FA, audit log, and managing locations.'],
         ['url' => '/admin/docs/email',           'icon' => 'bi-envelope',        'color' => '#7c3aed', 'bg' => '#fdf4ff',
          'title' => 'Email & Notifications',
-         'desc'  => 'SMTP setup, customisable email templates, tokens, and when emails are sent.'],
+         'desc'  => 'SMTP setup, inbound email, customisable templates, hashtag commands, and notification preferences.'],
         ['url' => '/admin/docs/sla',             'icon' => 'bi-stopwatch',       'color' => '#dc2626', 'bg' => '#fff1f2',
          'title' => 'SLA Policies',
          'desc'  => 'Response and resolution targets, business hours integration, breach alerts.'],
@@ -41,7 +50,7 @@ $breadcrumbs  = [['label' => 'Admin', 'url' => '/admin'], ['label' => 'Docs']];
          'desc'  => 'CSV import with flexible column mapping. Supported fields and data formats.'],
         ['url' => '/admin/docs/kb',              'icon' => 'bi-book',            'color' => '#9333ea', 'bg' => '#fdf4ff',
          'title' => 'Knowledge Base',
-         'desc'  => 'Creating categories, folders and articles. Markdown formatting and publishing.'],
+         'desc'  => 'Creating categories, folders and articles. Version history, feedback, and public KB.'],
     ];
     foreach ($cards as $card): ?>
     <div class="col-md-6 col-xl-4">
@@ -60,3 +69,88 @@ $breadcrumbs  = [['label' => 'Admin', 'url' => '/admin'], ['label' => 'Docs']];
     </div>
     <?php endforeach; ?>
 </div>
+<script>
+(function () {
+    var idx = [
+        ["Configure SMTP email", "/admin/docs/getting-started", "Getting Started"],
+        ["Add locations", "/admin/docs/getting-started", "Getting Started"],
+        ["Create agent accounts", "/admin/docs/getting-started", "Getting Started"],
+        ["Customise branding logo colour", "/admin/docs/getting-started", "Getting Started"],
+        ["Reset to fresh state danger zone", "/admin/docs/getting-started", "Getting Started"],
+        ["Creating tickets portal admin", "/admin/docs/tickets", "Tickets"],
+        ["Ticket statuses open in progress pending resolved closed waiting", "/admin/docs/tickets", "Tickets"],
+        ["Priorities urgency SLA", "/admin/docs/tickets", "Tickets"],
+        ["Replies internal notes", "/admin/docs/tickets", "Tickets"],
+        ["Assigning tickets agent", "/admin/docs/tickets", "Tickets"],
+        ["Tags labels ticket", "/admin/docs/tickets", "Tickets"],
+        ["Merging duplicate tickets", "/admin/docs/tickets", "Tickets"],
+        ["Ticket timeline audit trail history", "/admin/docs/tickets", "Tickets"],
+        ["SLA on tickets deadlines timers", "/admin/docs/tickets", "Tickets"],
+        ["Bulk actions assign close merge delete", "/admin/docs/tickets", "Tickets"],
+        ["Filter panel saved filters default preset", "/admin/docs/tickets", "Tickets"],
+        ["Ticket templates shared portal", "/admin/docs/tickets", "Tickets"],
+        ["Custom form fields workflows", "/admin/docs/tickets", "Tickets"],
+        ["Export tickets CSV download", "/admin/docs/tickets", "Tickets"],
+        ["Concurrent viewer warning duplicate", "/admin/docs/tickets", "Tickets"],
+        ["Per-page row count pagination", "/admin/docs/tickets", "Tickets"],
+        ["Roles admin agent user overview", "/admin/docs/users", "Users and Roles"],
+        ["Creating user accounts", "/admin/docs/users", "Users and Roles"],
+        ["Self-registration portal signup", "/admin/docs/users", "Users and Roles"],
+        ["Editing users profile", "/admin/docs/users", "Users and Roles"],
+        ["Locations branch department", "/admin/docs/users", "Users and Roles"],
+        ["Location ticket visibility supervisor", "/admin/docs/users", "Users and Roles"],
+        ["Groups agent ticket visibility scoping", "/admin/docs/users", "Users and Roles"],
+        ["Two-factor authentication 2FA TOTP authenticator", "/admin/docs/users", "Users and Roles"],
+        ["Email notification preferences opt-in", "/admin/docs/users", "Users and Roles"],
+        ["Admin user profile view tickets submitted", "/admin/docs/users", "Users and Roles"],
+        ["Deleting users transfer records", "/admin/docs/users", "Users and Roles"],
+        ["Dark mode light mode theme appearance", "/admin/docs/users", "Users and Roles"],
+        ["Audit log admin actions", "/admin/docs/users", "Users and Roles"],
+        ["SMTP configuration mail server setup", "/admin/docs/email", "Email and Notifications"],
+        ["Inbound email reply integration IMAP", "/admin/docs/email", "Email and Notifications"],
+        ["Microsoft Graph API email 365 Exchange", "/admin/docs/email", "Email and Notifications"],
+        ["Email reply hashtag commands resolve status priority", "/admin/docs/email", "Email and Notifications"],
+        ["Customisable email templates tokens placeholders", "/admin/docs/email", "Email and Notifications"],
+        ["When emails are sent notifications", "/admin/docs/email", "Email and Notifications"],
+        ["SLA policies create configure", "/admin/docs/sla", "SLA Policies"],
+        ["SLA timers first response resolution breach warning", "/admin/docs/sla", "SLA Policies"],
+        ["Business hours timezone schedule", "/admin/docs/sla", "SLA Policies"],
+        ["Pause resume SLA pending waiting", "/admin/docs/sla", "SLA Policies"],
+        ["Automation rules triggers conditions actions", "/admin/docs/automations", "Automations and Escalations"],
+        ["Escalation rules time-based inactivity", "/admin/docs/automations", "Automations and Escalations"],
+        ["Customer reminder email follow-up", "/admin/docs/automations", "Automations and Escalations"],
+        ["Logo upload branding", "/admin/docs/branding", "Branding"],
+        ["Colour scheme primary color navbar gradient", "/admin/docs/branding", "Branding"],
+        ["Application name helpdesk name", "/admin/docs/branding", "Branding"],
+        ["Portal URL end users submit tickets", "/admin/docs/portal", "Portal"],
+        ["CSAT satisfaction survey", "/admin/docs/portal", "Portal"],
+        ["Import tickets CSV column mapping", "/admin/docs/import", "Importing Tickets"],
+        ["Knowledge base categories folders articles", "/admin/docs/kb", "Knowledge Base"],
+        ["Public knowledge base no login", "/admin/docs/kb", "Knowledge Base"],
+        ["Article feedback ratings helpful", "/admin/docs/kb", "Knowledge Base"],
+        ["Article version history restore revision", "/admin/docs/kb", "Knowledge Base"],
+        ["KB article suggestions ticket creation", "/admin/docs/kb", "Knowledge Base"],
+        ["Import KB articles CSV bulk upload", "/admin/docs/kb", "Knowledge Base"],
+    ];
+    var input = document.getElementById("docsSearch");
+    var box = document.getElementById("docsSearchResults");
+    input.addEventListener("input", function () {
+        var q = this.value.trim().toLowerCase();
+        box.innerHTML = "";
+        if (q.length < 2) { box.style.display = "none"; return; }
+        var m = idx.filter(function (e) { return e[0].toLowerCase().indexOf(q) !== -1 || e[2].toLowerCase().indexOf(q) !== -1; }).slice(0, 8);
+        if (!m.length) { box.style.display = "none"; return; }
+        m.forEach(function (r) {
+            var a = document.createElement("a"); a.href = r[1];
+            a.className = "list-group-item list-group-item-action d-flex justify-content-between align-items-center";
+            a.innerHTML = "<span>" + esc(r[0]) + "</span><small class=\"text-muted ms-3 text-nowrap\">" + esc(r[2]) + "</small>";
+            box.appendChild(a);
+        });
+        box.style.display = "block";
+    });
+    document.addEventListener("click", function (e) {
+        if (!input.contains(e.target) && !box.contains(e.target)) box.style.display = "none";
+    });
+    function esc(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+})();
+</script>
