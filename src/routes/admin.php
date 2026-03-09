@@ -1424,6 +1424,7 @@ $router->get('/admin/tickets', function () {
         'q'         => trim($_GET['q'] ?? ''),
         'date_from' => trim($_GET['date_from'] ?? ''),
         'date_to'   => trim($_GET['date_to'] ?? ''),
+        'watched'   => !empty($_GET['watched']) ? '1' : '',
     ];
 
     $filterResult = buildTicketFilterQuery($filters);
@@ -1538,6 +1539,7 @@ $router->get('/admin/tickets/export', function () {
         'q'         => trim($_GET['q'] ?? ''),
         'date_from' => trim($_GET['date_from'] ?? ''),
         'date_to'   => trim($_GET['date_to'] ?? ''),
+        'watched'   => !empty($_GET['watched']) ? '1' : '',
     ];
 
     $filterResult = buildTicketFilterQuery($filters);
@@ -1969,6 +1971,17 @@ $router->post('/admin/tickets/bulk', function () {
                 redirect('/admin/tickets');
             }
             $actor  = Auth::fullName();
+            // Find the highest priority across all tickets being merged (target + sources)
+            $allIds = array_merge([$targetId], $ticketIds);
+            $allPlaceholders = implode(',', array_fill(0, count($allIds), '?'));
+            $hpStmt = $db->prepare(
+                "SELECT tp.id FROM ticket_priorities tp
+                 JOIN tickets t ON t.priority_id = tp.id
+                 WHERE t.id IN ({$allPlaceholders})
+                 ORDER BY tp.sort_order DESC LIMIT 1"
+            );
+            $hpStmt->execute($allIds);
+            $bestPriorityId = $hpStmt->fetchColumn() ?: null;
             $merged = 0;
             foreach ($ticketIds as $sourceId) {
                 $src = $db->prepare('SELECT id, subject FROM tickets WHERE id = ? AND merged_into_ticket_id IS NULL');
@@ -1992,6 +2005,21 @@ $router->post('/admin/tickets/bulk', function () {
                     $merged++;
                 } catch (\Throwable $e) {
                     $db->rollBack();
+                }
+            }
+            // Escalate primary ticket priority to the highest across all merged tickets
+            if ($bestPriorityId) {
+                $curPriStmt = $db->prepare('SELECT priority_id FROM tickets WHERE id = ?');
+                $curPriStmt->execute([$targetId]);
+                $curPriority = $curPriStmt->fetchColumn();
+                if ($bestPriorityId != $curPriority) {
+                    $db->prepare('UPDATE tickets SET priority_id = ? WHERE id = ?')
+                       ->execute([$bestPriorityId, $targetId]);
+                    $npStmt = $db->prepare('SELECT name FROM ticket_priorities WHERE id = ?');
+                    $npStmt->execute([$bestPriorityId]);
+                    $priorityLabel = $npStmt->fetchColumn();
+                    $db->prepare('INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)')
+                       ->execute([$targetId, Auth::id(), 'priority_changed', "Priority escalated to {$priorityLabel} during merge by {$actor}"]);
                 }
             }
             flash('success', "{$merged} ticket(s) merged into #{$targetId}.");
@@ -2174,7 +2202,7 @@ $router->post('/admin/tickets/{id}/merge', function (array $p) {
     $db = Database::connect();
 
     // Validate source ticket (must exist and not already merged)
-    $src = $db->prepare('SELECT id, subject FROM tickets WHERE id = ? AND merged_into_ticket_id IS NULL');
+    $src = $db->prepare('SELECT id, subject, priority_id FROM tickets WHERE id = ? AND merged_into_ticket_id IS NULL');
     $src->execute([$sourceId]);
     $sourceTicket = $src->fetch();
     if (!$sourceTicket) {
@@ -2183,13 +2211,23 @@ $router->post('/admin/tickets/{id}/merge', function (array $p) {
     }
 
     // Validate target ticket (must exist and not itself be merged)
-    $tgt = $db->prepare('SELECT id, subject FROM tickets WHERE id = ? AND merged_into_ticket_id IS NULL');
+    $tgt = $db->prepare('SELECT id, subject, priority_id FROM tickets WHERE id = ? AND merged_into_ticket_id IS NULL');
     $tgt->execute([$targetId]);
     $targetTicket = $tgt->fetch();
     if (!$targetTicket) {
         flash('error', 'Target ticket not found or is itself a merged ticket.');
         redirect("/admin/tickets/{$sourceId}");
     }
+
+    // Find the highest priority across both tickets
+    $hpStmt = $db->prepare(
+        'SELECT tp.id FROM ticket_priorities tp
+         JOIN tickets t ON t.priority_id = tp.id
+         WHERE t.id IN (?, ?)
+         ORDER BY tp.sort_order DESC LIMIT 1'
+    );
+    $hpStmt->execute([$sourceId, $targetId]);
+    $bestPriorityId = $hpStmt->fetchColumn() ?: null;
 
     $db->beginTransaction();
     try {
@@ -2206,6 +2244,21 @@ $router->post('/admin/tickets/{id}/merge', function (array $p) {
             'INSERT IGNORE INTO ticket_tag_map (ticket_id, tag_id)
              SELECT ?, tag_id FROM ticket_tag_map WHERE ticket_id = ?'
         )->execute([$targetId, $sourceId]);
+
+        // Escalate target priority to the highest of all merged tickets
+        if ($bestPriorityId && $bestPriorityId != $targetTicket['priority_id']) {
+            $db->prepare('UPDATE tickets SET priority_id = ? WHERE id = ?')
+               ->execute([$bestPriorityId, $targetId]);
+            $npStmt = $db->prepare('SELECT name FROM ticket_priorities WHERE id = ?');
+            $npStmt->execute([$bestPriorityId]);
+            $priorityLabel = $npStmt->fetchColumn();
+            $db->prepare(
+                'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
+            )->execute([
+                $targetId, Auth::id(), 'priority_changed',
+                "Priority escalated to {$priorityLabel} during merge by {$actor}",
+            ]);
+        }
 
         // Timeline entry on master ticket
         $db->prepare(

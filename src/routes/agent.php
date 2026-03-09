@@ -69,6 +69,7 @@ $router->get('/agent/tickets', function () {
     $fAgent    = array_values(array_filter(array_map('trim', (array) ($_GET['agent']    ?? []))));
     $fGroup    = array_values(array_filter(array_map('trim', (array) ($_GET['group']    ?? []))));
     $fSearch   = trim($_GET['q'] ?? '');
+    $fWatched  = !empty($_GET['watched']) ? '1' : '';
 
     $where  = [];
     $params = [];
@@ -140,6 +141,11 @@ $router->get('/agent/tickets', function () {
     if ($fSearch !== '') {
         $where[]  = 't.subject LIKE ?';
         $params[] = '%' . $fSearch . '%';
+    }
+
+    if ($fWatched) {
+        $where[]  = 't.id IN (SELECT ticket_id FROM ticket_watchers WHERE user_id = ?)';
+        $params[] = Auth::id();
     }
 
     // Group-based visibility: agents who belong to groups can only see those groups' tickets.
@@ -233,6 +239,7 @@ $router->get('/agent/tickets', function () {
         'agent'    => $fAgent,    // array
         'group'    => $fGroup,    // array
         'q'        => $fSearch,
+        'watched'  => $fWatched,
     ];
 
     // Load saved filters (own + shared)
@@ -524,6 +531,17 @@ $router->post('/agent/tickets/bulk', function () {
                 redirect('/agent/tickets');
             }
             $actor  = Auth::fullName();
+            // Find the highest priority across all tickets being merged (target + sources)
+            $allIds = array_merge([$targetId], $ticketIds);
+            $allPlaceholders = implode(',', array_fill(0, count($allIds), '?'));
+            $hpStmt = $db->prepare(
+                "SELECT tp.id FROM ticket_priorities tp
+                 JOIN tickets t ON t.priority_id = tp.id
+                 WHERE t.id IN ({$allPlaceholders})
+                 ORDER BY tp.sort_order DESC LIMIT 1"
+            );
+            $hpStmt->execute($allIds);
+            $bestPriorityId = $hpStmt->fetchColumn() ?: null;
             $merged = 0;
             foreach ($ticketIds as $sourceId) {
                 $src = $db->prepare('SELECT id, subject FROM tickets WHERE id = ? AND merged_into_ticket_id IS NULL');
@@ -547,6 +565,21 @@ $router->post('/agent/tickets/bulk', function () {
                     $merged++;
                 } catch (\Throwable $e) {
                     $db->rollBack();
+                }
+            }
+            // Escalate primary ticket priority to the highest across all merged tickets
+            if ($bestPriorityId) {
+                $curPriStmt = $db->prepare('SELECT priority_id FROM tickets WHERE id = ?');
+                $curPriStmt->execute([$targetId]);
+                $curPriority = $curPriStmt->fetchColumn();
+                if ($bestPriorityId != $curPriority) {
+                    $db->prepare('UPDATE tickets SET priority_id = ? WHERE id = ?')
+                       ->execute([$bestPriorityId, $targetId]);
+                    $npStmt = $db->prepare('SELECT name FROM ticket_priorities WHERE id = ?');
+                    $npStmt->execute([$bestPriorityId]);
+                    $priorityLabel = $npStmt->fetchColumn();
+                    $db->prepare('INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)')
+                       ->execute([$targetId, Auth::id(), 'priority_changed', "Priority escalated to {$priorityLabel} during merge by {$actor}"]);
                 }
             }
             flash('success', "{$merged} ticket(s) merged into #{$targetId}.");

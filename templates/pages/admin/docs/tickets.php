@@ -95,12 +95,15 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-intersect text-primary me-2"></i>Merging Tickets</h5>
 <p class="text-muted mb-2">When a requester submits duplicate tickets about the same issue, you can merge them. The secondary ticket is closed and its history is linked to the primary ticket.</p>
-<ol class="text-muted mb-0">
+<ol class="text-muted mb-3">
     <li>Open the ticket you want to keep as the <strong>primary</strong>.</li>
     <li>Click <strong>Merge</strong> in the ticket actions panel.</li>
     <li>Enter the ID of the duplicate ticket to merge in.</li>
     <li>Confirm the merge — the duplicate is marked closed and a merge event is recorded in the primary ticket's timeline.</li>
 </ol>
+<div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
+    <strong>Priority escalation:</strong> When tickets are merged, the primary ticket's priority is automatically updated to the highest priority among all tickets being merged. For example, if the primary ticket is Low priority and a merged ticket is High priority, the primary ticket will be escalated to High. A timeline event is recorded if the priority changes.
+</div>
 </div>
 </div>
 
@@ -137,7 +140,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <ul class="text-muted mb-0">
     <li><strong>Assign</strong> — open an agent picker and assign all selected tickets to one agent.</li>
     <li><strong>Close</strong> — set all selected tickets to Closed status.</li>
-    <li><strong>Merge</strong> — merge all selected tickets; the lowest-numbered ticket becomes the primary.</li>
+    <li><strong>Merge</strong> — merge all selected tickets; the lowest-numbered ticket becomes the primary. The primary's priority is automatically escalated to the highest priority among all tickets being merged.</li>
     <li><strong>Delete</strong> — permanently delete selected tickets (admin only).</li>
 </ul>
 </div>
