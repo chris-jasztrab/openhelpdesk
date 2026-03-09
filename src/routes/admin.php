@@ -94,7 +94,7 @@ $router->post('/admin/onboarding/dismiss', function () {
 
 $validDocPages = [
     'getting-started', 'tickets', 'users', 'email',
-    'sla', 'automations', 'branding', 'portal', 'import', 'kb',
+    'sla', 'automations', 'branding', 'portal', 'import', 'kb', 'sso',
 ];
 
 $router->get('/admin/docs', function () {
@@ -124,6 +124,7 @@ $router->get('/admin/docs/{page}', function (array $p) use ($validDocPages) {
         'portal'          => 'Portal',
         'import'          => 'Importing Tickets',
         'kb'              => 'Knowledge Base',
+        'sso'             => 'Single Sign-On',
     ];
     render('admin/docs/' . $page, [
         'sidebarItems' => adminSidebar('docs'),

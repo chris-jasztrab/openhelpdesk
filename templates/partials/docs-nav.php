@@ -11,6 +11,7 @@ $docsNav = [
     ['url' => '/admin/docs/portal',            'label' => 'Portal',                'icon' => 'bi-globe2'],
     ['url' => '/admin/docs/import',            'label' => 'Importing Tickets',     'icon' => 'bi-cloud-upload'],
     ['url' => '/admin/docs/kb',                'label' => 'Knowledge Base',        'icon' => 'bi-book'],
+    ['url' => '/admin/docs/sso',               'label' => 'Single Sign-On',        'icon' => 'bi-shield-lock'],
 ];
 $cp = currentPath();
 ?>

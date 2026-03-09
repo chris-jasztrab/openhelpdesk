@@ -51,6 +51,9 @@ $breadcrumbs  = [['label' => 'Admin', 'url' => '/admin'], ['label' => 'Docs']];
         ['url' => '/admin/docs/kb',              'icon' => 'bi-book',            'color' => '#9333ea', 'bg' => '#fdf4ff',
          'title' => 'Knowledge Base',
          'desc'  => 'Creating categories, folders and articles. Version history, feedback, and public KB.'],
+        ['url' => '/admin/docs/sso',             'icon' => 'bi-shield-lock',     'color' => '#0369a1', 'bg' => '#f0f9ff',
+         'title' => 'Single Sign-On',
+         'desc'  => 'Microsoft 365 SSO setup, Azure app registration, location prompt, and troubleshooting.'],
     ];
     foreach ($cards as $card): ?>
     <div class="col-md-6 col-xl-4">
@@ -131,6 +134,13 @@ $breadcrumbs  = [['label' => 'Admin', 'url' => '/admin'], ['label' => 'Docs']];
         ["Article version history restore revision", "/admin/docs/kb", "Knowledge Base"],
         ["KB article suggestions ticket creation", "/admin/docs/kb", "Knowledge Base"],
         ["Import KB articles CSV bulk upload", "/admin/docs/kb", "Knowledge Base"],
+        ["Single sign-on SSO enable disable", "/admin/docs/sso", "Single Sign-On"],
+        ["Microsoft 365 Azure AD login OAuth", "/admin/docs/sso", "Single Sign-On"],
+        ["Register Azure app tenant client ID secret", "/admin/docs/sso", "Single Sign-On"],
+        ["SSO redirect URI callback", "/admin/docs/sso", "Single Sign-On"],
+        ["API permissions openid User.Read", "/admin/docs/sso", "Single Sign-On"],
+        ["SSO location prompt pick location", "/admin/docs/sso", "Single Sign-On"],
+        ["SSO debug logging troubleshoot AADSTS", "/admin/docs/sso", "Single Sign-On"],
     ];
     var input = document.getElementById("docsSearch");
     var box = document.getElementById("docsSearchResults");

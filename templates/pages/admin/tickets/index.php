@@ -458,7 +458,7 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                         <td class="text-muted" style="white-space:nowrap;"><?= e($t['type_name'] ?? '—') ?></td>
                         <?php endif; ?>
                         <?php if (in_array('agent', $visibleColumns)): ?>
-                        <td><?= e($t['agent_name'] ?: '— Unassigned —') ?></td>
+                        <td style="white-space:nowrap;"><?= e($t['agent_name'] ?: '— Unassigned —') ?></td>
                         <?php endif; ?>
                         <?php if (in_array('group', $visibleColumns)): ?>
                         <td class="text-muted" style="white-space:nowrap;"><?= e($t['group_name'] ?? '—') ?></td>
