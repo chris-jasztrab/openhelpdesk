@@ -15,7 +15,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-filetype-csv text-primary me-2"></i>Supported Format</h5>
 <p class="text-muted mb-2">LocalDesk accepts any CSV file with a header row. The column names do not need to match exactly — you will map your columns to the correct LocalDesk fields in the next step.</p>
-<p class="text-muted mb-0">The importer supports common exports from Freshdesk, Zendesk, and generic CSV formats. Files must be UTF-8 encoded.</p>
+<p class="text-muted mb-0">The importer supports common exports from Zendesk and generic CSV formats. Files must be UTF-8 encoded.</p>
 </div>
 </div>
 

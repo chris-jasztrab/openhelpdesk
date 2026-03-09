@@ -1,6 +1,6 @@
 <?php
 /**
- * LocalDesk / FreshWPL — Web Installer
+ * LocalDesk — Web Installer
  *
  * Access this file at /install/ before the application is configured.
  * Delete (or restrict access to) this directory after installation is complete.
