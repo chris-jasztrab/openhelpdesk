@@ -377,42 +377,42 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
             <i class="bi bi-x-lg"></i>
         </button>
     </div>
-    <div style="overflow:auto;max-height:calc(100vh - 260px);">
-        <table class="table table-hover align-middle mb-0">
+    <div style="overflow-x:hidden;overflow-y:auto;max-height:calc(100vh - 260px);">
+        <table class="table table-hover align-middle mb-0" id="ticketTable" style="width:100%;visibility:hidden;">
             <thead class="table-light" style="position:sticky;top:0;z-index:5;box-shadow:0 1px 2px rgba(0,0,0,.06);">
                 <tr>
                     <th style="width:36px;"><input type="checkbox" id="selectAll" class="form-check-input" title="Select all"></th>
                     <th style="width:60px"><a href="<?= sortUrl('id', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark"># <?= sortIcon('id', $sort, $dir) ?></a></th>
-                    <th style="width:100%"><a href="<?= sortUrl('subject', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Subject <?= sortIcon('subject', $sort, $dir) ?></a></th>
+                    <th class="subject-col" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><a href="<?= sortUrl('subject', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Subject <?= sortIcon('subject', $sort, $dir) ?></a></th>
                     <?php if (in_array('status', $visibleColumns)): ?>
-                    <th><a href="<?= sortUrl('status', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Status <?= sortIcon('status', $sort, $dir) ?></a></th>
+                    <th style="white-space:nowrap;"><a href="<?= sortUrl('status', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Status <?= sortIcon('status', $sort, $dir) ?></a></th>
                     <?php endif; ?>
                     <?php if (in_array('priority', $visibleColumns)): ?>
-                    <th><a href="<?= sortUrl('priority', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Priority <?= sortIcon('priority', $sort, $dir) ?></a></th>
+                    <th style="white-space:nowrap;"><a href="<?= sortUrl('priority', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Priority <?= sortIcon('priority', $sort, $dir) ?></a></th>
                     <?php endif; ?>
                     <?php if (in_array('type', $visibleColumns)): ?>
-                    <th><a href="<?= sortUrl('type', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Type <?= sortIcon('type', $sort, $dir) ?></a></th>
+                    <th style="white-space:nowrap;"><a href="<?= sortUrl('type', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Type <?= sortIcon('type', $sort, $dir) ?></a></th>
                     <?php endif; ?>
                     <?php if (in_array('agent', $visibleColumns)): ?>
-                    <th><a href="<?= sortUrl('agent', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Assigned To <?= sortIcon('agent', $sort, $dir) ?></a></th>
+                    <th style="white-space:nowrap;"><a href="<?= sortUrl('agent', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Assigned To <?= sortIcon('agent', $sort, $dir) ?></a></th>
                     <?php endif; ?>
                     <?php if (in_array('group', $visibleColumns)): ?>
-                    <th><a href="<?= sortUrl('group', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Group <?= sortIcon('group', $sort, $dir) ?></a></th>
+                    <th style="white-space:nowrap;"><a href="<?= sortUrl('group', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Group <?= sortIcon('group', $sort, $dir) ?></a></th>
                     <?php endif; ?>
                     <?php if (in_array('creator', $visibleColumns)): ?>
-                    <th><a href="<?= sortUrl('creator', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Created By <?= sortIcon('creator', $sort, $dir) ?></a></th>
+                    <th style="white-space:nowrap;"><a href="<?= sortUrl('creator', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Created By <?= sortIcon('creator', $sort, $dir) ?></a></th>
                     <?php endif; ?>
                     <?php if (in_array('location', $visibleColumns)): ?>
-                    <th><a href="<?= sortUrl('location', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark"><?= label('location.singular') ?> <?= sortIcon('location', $sort, $dir) ?></a></th>
+                    <th style="white-space:nowrap;"><a href="<?= sortUrl('location', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark"><?= label('location.singular') ?> <?= sortIcon('location', $sort, $dir) ?></a></th>
                     <?php endif; ?>
                     <?php if (in_array('sla', $visibleColumns)): ?>
-                    <th>SLA</th>
+                    <th style="white-space:nowrap;">SLA</th>
                     <?php endif; ?>
                     <?php if (in_array('created_at', $visibleColumns)): ?>
-                    <th><a href="<?= sortUrl('created_at', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Created <?= sortIcon('created_at', $sort, $dir) ?></a></th>
+                    <th style="white-space:nowrap;"><a href="<?= sortUrl('created_at', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Created <?= sortIcon('created_at', $sort, $dir) ?></a></th>
                     <?php endif; ?>
                     <?php if (in_array('due_date', $visibleColumns)): ?>
-                    <th><a href="<?= sortUrl('due_date', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Due <?= sortIcon('due_date', $sort, $dir) ?></a></th>
+                    <th style="white-space:nowrap;"><a href="<?= sortUrl('due_date', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Due <?= sortIcon('due_date', $sort, $dir) ?></a></th>
                     <?php endif; ?>
                 </tr>
             </thead>
@@ -425,14 +425,14 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                         <td onclick="event.stopPropagation()">
                             <input type="checkbox" class="ticket-cb form-check-input" value="<?= $t['id'] ?>" data-subject="<?= e($t['subject']) ?>">
                         </td>
-                        <td class="text-muted fw-bold"><?= $t['id'] ?></td>
-                        <td style="width:100%">
-                            <a href="/admin/tickets/<?= $t['id'] ?>" class="text-decoration-none fw-semibold text-dark d-block text-truncate">
+                        <td class="text-muted fw-bold" style="white-space:nowrap;"><?= $t['id'] ?></td>
+                        <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                            <a href="/admin/tickets/<?= $t['id'] ?>" class="text-decoration-none fw-semibold text-dark">
                                 <?= e($t['subject']) ?>
                             </a>
                         </td>
                         <?php if (in_array('status', $visibleColumns)): ?>
-                        <td>
+                        <td style="white-space:nowrap;">
                             <span class="badge bg-<?= $statusColors[$t['status']] ?? 'secondary' ?>">
                                 <?= e($statusLabels[$t['status']] ?? $t['status']) ?>
                             </span>
@@ -444,7 +444,7 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                         </td>
                         <?php endif; ?>
                         <?php if (in_array('priority', $visibleColumns)): ?>
-                        <td>
+                        <td style="white-space:nowrap;">
                             <?php if ($t['priority_name']): ?>
                             <span class="badge" style="background:<?= e($t['priority_color']) ?>;">
                                 <?= e($t['priority_name']) ?>
@@ -455,19 +455,19 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                         </td>
                         <?php endif; ?>
                         <?php if (in_array('type', $visibleColumns)): ?>
-                        <td class="text-muted"><?= e($t['type_name'] ?? '—') ?></td>
+                        <td class="text-muted" style="white-space:nowrap;"><?= e($t['type_name'] ?? '—') ?></td>
                         <?php endif; ?>
                         <?php if (in_array('agent', $visibleColumns)): ?>
                         <td><?= e($t['agent_name'] ?: '— Unassigned —') ?></td>
                         <?php endif; ?>
                         <?php if (in_array('group', $visibleColumns)): ?>
-                        <td class="text-muted"><?= e($t['group_name'] ?? '—') ?></td>
+                        <td class="text-muted" style="white-space:nowrap;"><?= e($t['group_name'] ?? '—') ?></td>
                         <?php endif; ?>
                         <?php if (in_array('creator', $visibleColumns)): ?>
-                        <td class="text-muted"><?= e($t['creator_name'] ?? '—') ?></td>
+                        <td class="text-muted" style="white-space:nowrap;"><?= e($t['creator_name'] ?? '—') ?></td>
                         <?php endif; ?>
                         <?php if (in_array('location', $visibleColumns)): ?>
-                        <td class="text-muted"><?= e($t['location_name'] ?? '—') ?></td>
+                        <td class="text-muted" style="white-space:nowrap;"><?= e($t['location_name'] ?? '—') ?></td>
                         <?php endif; ?>
                         <?php if (in_array('sla', $visibleColumns)): ?>
                         <td>
@@ -481,7 +481,7 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                         </td>
                         <?php endif; ?>
                         <?php if (in_array('created_at', $visibleColumns)): ?>
-                        <td class="text-muted small"><?= date('M j, Y', strtotime($t['created_at'])) ?></td>
+                        <td class="text-muted small" style="white-space:nowrap;"><?= date('M j, Y', strtotime($t['created_at'])) ?></td>
                         <?php endif; ?>
                         <?php if (in_array('due_date', $visibleColumns)): ?>
                         <td class="text-muted small">
@@ -668,6 +668,17 @@ sessionStorage.setItem('adminTicketListUrl', window.location.href);
         updateBulkBar();
     };
 })();
+
+    // Measure natural column widths then switch to fixed layout so subject truncates
+    (function () {
+        var tbl = document.getElementById("ticketTable");
+        if (!tbl) return;
+        tbl.querySelectorAll("thead th:not(.subject-col)").forEach(function (th) {
+            th.style.width = th.offsetWidth + "px";
+        });
+        tbl.style.tableLayout = "fixed";
+        tbl.style.visibility = "";
+    })();
 </script>
 
 <?php if ($totalPages > 1): ?>
