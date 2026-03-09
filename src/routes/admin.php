@@ -1420,6 +1420,7 @@ $router->get('/admin/tickets', function () {
         'location'  => array_values(array_filter(array_map('trim', (array) ($_GET['location'] ?? [])))),
         'agent'     => array_values(array_filter(array_map('trim', (array) ($_GET['agent']    ?? [])))),
         'group'     => array_values(array_filter(array_map('trim', (array) ($_GET['group']    ?? [])))),
+        'requester' => array_values(array_filter(array_map('trim', (array) ($_GET['requester'] ?? [])))),
         'q'         => trim($_GET['q'] ?? ''),
         'date_from' => trim($_GET['date_from'] ?? ''),
         'date_to'   => trim($_GET['date_to'] ?? ''),
@@ -1533,6 +1534,7 @@ $router->get('/admin/tickets/export', function () {
         'location'  => array_values(array_filter(array_map('trim', (array) ($_GET['location'] ?? [])))),
         'agent'     => array_values(array_filter(array_map('trim', (array) ($_GET['agent']    ?? [])))),
         'group'     => array_values(array_filter(array_map('trim', (array) ($_GET['group']    ?? [])))),
+        'requester' => array_values(array_filter(array_map('trim', (array) ($_GET['requester'] ?? [])))),
         'q'         => trim($_GET['q'] ?? ''),
         'date_from' => trim($_GET['date_from'] ?? ''),
         'date_to'   => trim($_GET['date_to'] ?? ''),
@@ -2937,16 +2939,20 @@ $router->post('/admin/kb/folders/{id}/delete', function (array $p) {
 
 $router->get('/admin/kb/articles', function () {
     Auth::requireRole('admin');
-    $articles = Database::connect()->query(
+    $db = Database::connect();
+    $authorId = isset($_GET['author']) ? (int) $_GET['author'] : 0;
+    $where = $authorId ? 'WHERE a.created_by = ' . $authorId : '';
+    $articles = $db->query(
         "SELECT a.*, f.name AS folder_name, c.name AS category_name,
                 CONCAT(u.first_name, ' ', u.last_name) AS author_name
          FROM kb_articles a
          LEFT JOIN kb_folders f    ON a.folder_id   = f.id
          LEFT JOIN kb_categories c ON f.category_id = c.id
          LEFT JOIN users u         ON a.created_by  = u.id
-         ORDER BY a.updated_at DESC"
+         {$where} ORDER BY a.updated_at DESC"
     )->fetchAll();
-    render('admin/kb/articles/index', ['articles' => $articles]);
+    $authorFilter = $authorId ? $db->query("SELECT CONCAT(first_name, ' ', last_name) AS name FROM users WHERE id = " . $authorId)->fetchColumn() : null;
+    render('admin/kb/articles/index', ['articles' => $articles, 'authorFilter' => $authorFilter, 'authorId' => $authorId]);
 });
 
 $router->get('/admin/kb/articles/create', function () {

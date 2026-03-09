@@ -2117,8 +2117,9 @@ function buildTicketFilterQuery(array $filters): array
     $fType     = array_values(array_filter(array_map('trim', (array) ($filters['type']     ?? []))));
     $fLocation = array_values(array_filter(array_map('trim', (array) ($filters['location'] ?? []))));
     $fAgent    = array_values(array_filter(array_map('trim', (array) ($filters['agent']    ?? []))));
-    $fGroup    = array_values(array_filter(array_map('trim', (array) ($filters['group']    ?? []))));
-    $fSearch   = trim($filters['q'] ?? '');
+    $fGroup     = array_values(array_filter(array_map('trim', (array) ($filters['group']     ?? []))));
+    $fRequester = array_values(array_filter(array_map('trim', (array) ($filters['requester'] ?? []))));
+    $fSearch    = trim($filters['q'] ?? '');
     $fDateFrom = trim($filters['date_from'] ?? '');
     $fDateTo   = trim($filters['date_to'] ?? '');
 
@@ -2182,6 +2183,12 @@ function buildTicketFilterQuery(array $filters): array
         if (!empty($groupConds)) {
             $where[] = '(' . implode(' OR ', $groupConds) . ')';
         }
+    }
+    if (!empty($fRequester)) {
+        $ids = array_map('intval', $fRequester);
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $where[]  = 't.created_by IN (' . $placeholders . ')';
+        $params   = array_merge($params, $ids);
     }
     if ($fSearch !== '') {
         $where[]  = 't.subject LIKE ?';

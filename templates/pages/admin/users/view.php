@@ -123,13 +123,13 @@ $bc = $badgeColors[$profileUser['role']] ?? 'secondary';
                             <strong>This user has associated records:</strong>
                             <ul class="mb-0 mt-1">
                                 <?php if ($createdCount > 0): ?>
-                                <li><?= $createdCount ?> ticket<?= $createdCount !== 1 ? 's' : '' ?> they submitted</li>
+                                <li><a href="/admin/tickets?requester[]=<?= (int)$profileUser['id'] ?>" target="_blank"><?= $createdCount ?> ticket<?= $createdCount !== 1 ? 's' : '' ?> they submitted</a></li>
                                 <?php endif; ?>
                                 <?php if ($assignedCount > 0): ?>
                                 <li><?= $assignedCount ?> ticket<?= $assignedCount !== 1 ? 's' : '' ?> assigned to them</li>
                                 <?php endif; ?>
                                 <?php if ($kbCount > 0): ?>
-                                <li><?= $kbCount ?> KB article<?= $kbCount !== 1 ? 's' : '' ?> they authored</li>
+                                <li><a href="/admin/kb/articles?author=<?= (int)$profileUser['id'] ?>" target="_blank"><?= $kbCount ?> KB article<?= $kbCount !== 1 ? 's' : '' ?> they authored</a></li>
                                 <?php endif; ?>
                             </ul>
                         </div>

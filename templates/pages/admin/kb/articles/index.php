@@ -8,6 +8,12 @@ $breadcrumbs  = [
     ['label' => 'Articles'],
 ];
 ?>
+<?php if (!empty($authorFilter)): ?>
+<div class="alert alert-info d-flex align-items-center justify-content-between mb-3 py-2">
+    <span><i class="bi bi-person-fill me-2"></i>Showing articles authored by <strong><?= e($authorFilter) ?></strong></span>
+    <a href="/admin/kb/articles" class="btn btn-sm btn-outline-secondary">Clear filter</a>
+</div>
+<?php endif; ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="fw-bold mb-0">KB Articles</h2>
     <div class="d-flex gap-2">
