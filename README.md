@@ -10,24 +10,34 @@ A self-hosted IT helpdesk and ticketing system built for the Waterloo Public Lib
 - Tags, location tagging, due dates, and browser/OS auto-detection on creation
 - Internal notes visible only to agents and admins; public comments visible to the submitter
 - CC additional users on a ticket to keep them in the notification loop
-- **Ticket Merge** — combine duplicate tickets; timeline entries, tags, and CC users are copied to the target ticket and the source is closed
+- **Ticket Merge** — combine duplicate tickets; choose which is primary; timeline entries, tags, and CC users are copied; source ticket is closed with a link to the primary
+- **Ticket Splitting** — split a single ticket into two from the ticket detail view (admin and agent panels)
+- **Ticket Watching** — agents and admins can watch tickets to receive all update notifications
 - **Staff Ticket Creation** — admins and agents create tickets on behalf of users with full field control (status, assignment, group, due date, tags)
-- **Bulk Actions** — select multiple tickets to assign, close, merge, or delete (admin only) in one operation from a persistent bulk action bar
+- **Bulk Actions** — select multiple tickets to assign, close, merge, or delete (admin only) in one operation
 - **Ticket Templates** — reusable templates that pre-fill subject, body, type, and priority; shared templates appear as starting points on the portal create form
-- **Custom Form Fields** — drag-and-drop Workflows builder for adding custom fields to tickets (text, dropdown, checkbox, multi-select)
+- **Custom Form Fields** — drag-and-drop Ticket Forms builder for adding custom fields to tickets (text, dropdown, checkbox, multi-select); fields shown in a dedicated sidebar column on the ticket detail view
 - **Concurrent Viewer Warning** — presence detection alerts agents when another user is already viewing the same ticket
+- **Auto-Assign on First Reply** — ticket automatically assigned to the agent or admin who posts the first public reply if previously unassigned
+- **Reply / Forward / Note Panel** — tabbed panel on the ticket detail view for public replies, forwarding tickets to external addresses, and internal notes
 
 ### Filtering & Views
 - **Slide-Out Filter Panel** — filters accessible via a collapsible side panel with state preserved across navigation
 - **Saved & Default Filters** — save named filter presets, set a personal default view, and share filters with the team
+- **Multi-Select Filters** — filter by multiple statuses, priorities, types, groups, and agents simultaneously on the ticket list
+- **Watched Tickets Filter** — show only tickets you are watching
+- **Per-Page Selector** — choose how many tickets appear per page (25 / 50 / 100)
 - **Column Selector** — toggle which columns appear in the ticket list per user
 - Filters persist when navigating from the ticket list to a ticket and back
+- **Search by Ticket ID** — enter a ticket number in the global search box to jump directly to that ticket
 
 ### SLA Tracking
 - Business-hours-aware service level agreements per priority level
+- Per-location timezone support for multi-branch SLA calculations
 - Tracks first response and resolution targets with automatic state transitions (on track, warning at 80%, breached)
 - Timers pause when tickets enter pending/waiting status and resume on reactivation
 - Recalculation on priority changes; cron script for periodic SLA state updates; admin recalculate button
+- **Holidays / Closed Days** — configure public holidays and custom closed days; per-holiday option to exclude from SLA calculations
 
 ### Reports & Analytics
 Twelve built-in report types accessible from the Reports Overview:
@@ -43,7 +53,7 @@ Twelve built-in report types accessible from the Reports Overview:
 - **Ticket Trends** — multi-line volume trend drilled down by type or location
 - **FCR Rate** — first-contact resolution rate for tickets resolved without back-and-forth
 - **Custom Builder** — pick any metric and group-by combination to build a custom report
-- **Scheduled Reports** — configure reports to run automatically and email results on a schedule
+- **Scheduled Reports** — configure reports to run automatically and email results on a schedule; "Schedule" button on each report page for quick access
 
 ### CSAT Surveys
 - Satisfaction surveys sent automatically after ticket resolution
@@ -60,55 +70,78 @@ Twelve built-in report types accessible from the Reports Overview:
 - **KB Article Import** — bulk import articles via CSV from Admin → Settings → Import KB
 
 ### Automations & Escalations
-- **Automations** — rule-based engine triggered on ticket create or update; conditions match on type, priority, status, location, group, or assigned agent; actions: assign, set priority/status/group, add tag
-- **Escalation Rules** — time-based policies that automatically reassign, change priority, or update status when tickets remain unresolved past configurable thresholds
+- **Automations** — rule-based engine triggered on ticket create or update; nested AND/OR condition groups; conditions match on type, priority, status, location, group, or assigned agent; actions: assign, set priority/status/group, add tag
+- **Escalation Rules** — time-based policies that automatically reassign, change priority, or update status when tickets remain unresolved past configurable thresholds; includes waiting-on-customer reminder email action
 - Both automations and escalation actions are logged as internal timeline entries
+
+### Email & Notifications
+- **In-App Notifications** — @mention system in ticket comments; unread badge with 15-second polling; mark read individually or all at once
+- **Email Notification Preferences** — per-user opt-in/out controls for ticket creation, ticket update, and @mention emails
+- **Email Notifications Settings** — admin page to manage all outgoing notification hooks
+- **Group Email Notifications** — optional email alert to all group members when a new ticket is assigned to their group
+- **Email Reply Integration** — inbound email replies automatically added as ticket comments; supports both IMAP and Microsoft Graph API (OAuth2 / Exchange Online)
+- **Email-to-Ticket** — inbound emails to a monitored Microsoft Graph mailbox are automatically converted to new tickets
+- **Email Hashtag Commands** — agents and admins can control tickets via `#close`, `#resolve`, and other hashtag commands in email replies
+- **Customizable Email Templates** — edit the HTML/text of outgoing email templates with placeholder variable support
+- **Canned Responses** — personal snippets with token substitution insertable from the reply panel
+- **Microsoft Graph App Secret Expiry Reminders** — warning banner and email alerts when the Graph API client secret is nearing expiry
 
 ### User Profiles & Authentication
 - **User Profile** — all users can update name, change password (with current-password verification), set light/dark theme, and manage 2FA from `/profile`
-- **Two-Factor Authentication (TOTP)** — optional TOTP-based 2FA for admin and agent accounts using any authenticator app; admins can reset 2FA from the user management page
+- **Two-Factor Authentication (TOTP)** — optional TOTP-based 2FA for admin and agent accounts; admins can reset 2FA from the user management page
+- **Microsoft 365 SSO** — single sign-on via OAuth 2.0 / Microsoft Entra ID; "Sign in with Microsoft" button on the login page
 - **Dark Mode / Light Mode** — per-user theme preference stored in the database and applied on every page load
-
-### Notifications & Email
-- **In-App Notifications** — @mention system in ticket comments creates in-app notifications; unread badge with 15-second polling; mark read individually or all at once
-- **Email Notification Preferences** — per-user opt-in/out controls for ticket creation, ticket update, and @mention emails
-- **Email Notifications** — SMTP-based alerts on ticket creation and updates with Message-ID threading for email client grouping
-- **Customizable Email Templates** — edit the HTML/text of outgoing email templates with placeholder variable support (`{{ticket_id}}`, `{{user_name}}`, `{{agent_name}}`, etc.)
-- **Email Reply Integration** — inbound email replies are automatically added as ticket comments; supports both IMAP and Microsoft Graph API (OAuth2 / Exchange Online)
 
 ### Groups
 - Organise agents and admins into departmental groups
 - Agents who belong to groups see only tickets assigned to those groups; admins see all tickets
+- Group membership visible on the agent/admin edit page
+
+### Portal
+- Portal ticket list defaults to own open tickets; **My Location** toggle for multi-location users
+- Portal users without a location assignment are prompted to choose one when creating a ticket
+- Onboarding tour (Driver.js) covering key portal pages
 
 ### Admin Tools
-- **Audit Log** — admin-accessible trail of all admin actions (user CRUD, role changes, settings changes) with timestamp and actor, at `/admin/audit-log`
-- **Admin Documentation** — built-in docs at `/admin/docs` covering tickets, users, SLA, automations, branding, portal, import, and the knowledge base
+- **Audit Log** — admin-accessible trail of all admin actions with timestamp and actor, at `/admin/audit-log`
+- **Admin Documentation** — built-in docs at `/admin/docs` with search
 - **Onboarding Tour** — six-step walkthrough on first admin login, replayable from the user dropdown
+- **Admin Password Rescue Script** — CLI script to reset an admin password or change a user's role when locked out of the UI
+- **Danger Zone Full Reset** — wipe all data and re-run the setup wizard from the Settings page
 
 ### Ticket Import & Export
-- **Import** — bulk-import tickets and users from CSV with a flexible column-mapping step; auto-creates requester accounts; dry-run preview before committing
+- **Import Tickets** — bulk-import tickets from CSV with a flexible column-mapping step; dry-run preview before committing
+- **Import Users** — bulk-import user accounts from CSV with column mapping, dry-run preview, and duplicate detection; sample CSV available for download
 - **Export** — export the current filtered ticket list as CSV (UTF-8 BOM for Excel compatibility)
 
 ### Branding & Settings
-- Customise application name, logo, primary colour, navbar gradient, and timeline entry colours
+- Customise application name, logo, primary colour, navbar gradient, timeline entry colours, and navbar fallback icon
 - Live preview panel; reset to defaults button
-- Email and SMTP configuration through the admin UI
-- Business hours and timezone configuration
+- Configurable label for "Location" throughout the UI (e.g. substitute "Branch" or "Site")
+- Email and SMTP configuration through the admin UI; SMTP debug logging to `storage/logs/smtp.log`
+- Business hours and timezone configuration; per-location timezone overrides
 - SLA policies per priority with recalculate button
-- Priority, type, group, and location management
+- Priority, type, group, location, and holiday management
 
 ### Backup
 - One-click backup from Admin → Settings → Backup
 - Produces a `.zip` containing a full SQL dump plus uploaded files (attachments, branding assets, avatars)
 
+### Mobile REST API
+- Full REST API with Bearer token authentication for mobile and third-party integrations
+- Endpoints covering tickets, comments, users, groups, KB articles, and notifications
+- OpenAPI 3.0.3 specification at `openapi.json`
+- API tokens stored as hashes at rest with configurable expiry and rotation
+
 ### Security
-- CSRF token protection on all POST forms
+- CSRF token protection on all POST forms and session-authenticated JSON API endpoints
 - Bcrypt password hashing (`PASSWORD_DEFAULT`)
 - Prepared statements for all SQL queries (no raw interpolation)
 - HTML output escaping via `e()` helper throughout all templates
 - File upload validation (MIME type whitelist and size limit; attachments stored outside webroot)
 - Role checks on every route (`Auth::requireRole()`)
 - Installer locked after first run via `storage/installed.lock`
+- API tokens hashed at rest; secure session cookie flag set automatically under HTTPS
 
 ---
 
@@ -293,6 +326,7 @@ SMTP settings are configured through the admin UI at **Settings → Email / SMTP
 | `/install/` | Web-based setup wizard (removed after install) |
 | `/` | Home (redirects by role) |
 | `/login` | Sign in |
+| `/auth/microsoft` | Microsoft 365 SSO entry point |
 | `/profile` | User profile (name, password, theme, 2FA) |
 | `/kb` | Public knowledge base (no login required) |
 | `/portal` | End-user portal |
@@ -302,6 +336,7 @@ SMTP settings are configured through the admin UI at **Settings → Email / SMTP
 | `/agent` | Agent dashboard |
 | `/agent/tickets` | Agent ticket queue |
 | `/agent/tickets/create` | Create a new ticket (agent) |
+| `/agent/canned-responses` | Agent canned responses |
 | `/admin` | Admin dashboard |
 | `/admin/tickets` | All tickets |
 | `/admin/tickets/create` | Create a new ticket (admin) |
@@ -312,35 +347,39 @@ SMTP settings are configured through the admin UI at **Settings → Email / SMTP
 | `/admin/reports` | Reports & Analytics overview |
 | `/admin/audit-log` | Admin audit log |
 | `/admin/workflows/ticket-fields` | Custom ticket form field builder |
-| `/admin/settings` | Email, business hours, SLA, branding, automations, import, backup, CSAT, escalation rules, email templates, scheduled reports |
+| `/admin/settings` | Email, business hours, SLA, branding, automations, import, backup, CSAT, escalation rules, email templates, scheduled reports, holidays, notifications, SSO |
 | `/admin/docs` | Built-in documentation |
 | `/notifications` | Notification inbox |
+| `/api/v1/tickets` | REST API — ticket list/create (Bearer token) |
 | `/health` | Health check (JSON) |
 
 ## Role-Based Access
 
-| Capability | Admin | Agent | User |
-|---|:---:|:---:|:---:|
-| Submit tickets (portal) | — | — | ✓ |
-| Create tickets on behalf of users | ✓ | ✓ | — |
-| View & reply to all tickets | ✓ | ✓ | — |
-| View own tickets (portal) | — | — | ✓ |
-| Internal notes | ✓ | ✓ | — |
-| Two-Factor Authentication (TOTP) | ✓ | ✓ | — |
-| User management | ✓ | — | — |
-| Settings & branding | ✓ | — | — |
-| KB management | ✓ | — | — |
-| Reports & Analytics | ✓ | — | — |
-| Audit log | ✓ | — | — |
-| Automations & escalation rules | ✓ | — | — |
-| Backup | ✓ | — | — |
+| Capability | Admin | Power User | Agent | User |
+|---|:---:|:---:|:---:|:---:|
+| Submit tickets (portal) | — | — | — | ✓ |
+| Create tickets on behalf of users | ✓ | ✓ | ✓ | — |
+| View & reply to all tickets | ✓ | ✓ | ✓ | — |
+| View own tickets (portal) | — | — | — | ✓ |
+| Internal notes | ✓ | ✓ | ✓ | — |
+| Two-Factor Authentication (TOTP) | ✓ | ✓ | ✓ | — |
+| User management | ✓ | — | — | — |
+| Settings & branding | ✓ | — | — | — |
+| KB management | ✓ | — | — | — |
+| Reports & Analytics | ✓ | ✓ | — | — |
+| Audit log | ✓ | — | — | — |
+| Automations & escalation rules | ✓ | — | — | — |
+| Backup | ✓ | — | — | — |
 
 ## Project Structure
 
 ```
 localdesk/
+├── config/
+│   └── version.php             # APP_VERSION constant (Semantic Versioning)
 ├── database/
-│   ├── schema.sql              # Full database schema (32 tables)
+│   ├── migrations/             # Numbered migration files (auto-applied on startup)
+│   ├── schema.sql              # Full database schema (35 tables)
 │   └── seed.php                # Drop, recreate, and seed all tables
 ├── public/
 │   ├── index.php               # Front controller
@@ -349,6 +388,9 @@ localdesk/
 │   ├── css/style.css           # Custom styles
 │   ├── sla-cron.php            # Standalone SLA recalculation script
 │   └── uploads/                # Branding assets and user avatars
+├── scripts/
+│   ├── process-replies.php     # Inbound email processor (IMAP or Microsoft Graph API)
+│   └── rescue.php              # CLI admin password reset / role change script
 ├── src/
 │   ├── Auth.php                # Session-based authentication
 │   ├── Database.php            # PDO singleton connection
@@ -359,13 +401,13 @@ localdesk/
 │   ├── routes.php              # Top-level routes (home, auth, profile, public KB)
 │   └── routes/
 │       ├── admin.php           # Admin routes (users, settings, KB, tickets, reports, audit log, …)
-│       ├── agent.php           # Agent routes (tickets, comments)
+│       ├── agent.php           # Agent routes (tickets, comments, canned responses)
+│       ├── api.php             # REST API routes (Bearer token authentication)
 │       └── portal.php          # Portal routes (user tickets, KB, attachments)
-├── scripts/
-│   └── process-replies.php     # Inbound email processor (IMAP or Microsoft Graph API)
 ├── storage/
 │   ├── attachments/            # Ticket file attachments (outside webroot)
-│   └── backups/                # Backup zip files (outside webroot)
+│   ├── backups/                # Backup zip files (outside webroot)
+│   └── logs/                   # smtp.log and other runtime logs
 ├── templates/
 │   ├── layouts/                # Base and app layouts
 │   ├── pages/
@@ -375,13 +417,14 @@ localdesk/
 │   │   │   ├── settings/       # Settings pages (email, SLA, branding, escalations, CSAT, …)
 │   │   │   ├── tickets/        # Admin ticket list and detail views
 │   │   │   └── …
-│   │   ├── agent/              # Agent pages (dashboard, tickets)
+│   │   ├── agent/              # Agent pages (dashboard, tickets, canned responses)
 │   │   └── portal/             # Portal pages (dashboard, tickets, KB)
 │   ├── partials/               # Reusable components (navbar, sidebar, onboarding tour, docs nav)
 │   └── emails/                 # HTML email templates
 ├── tests/
 │   ├── Feature/                # PHPUnit integration tests (authenticated HTTP)
 │   └── Support/                # Test base class and database seeder
+├── openapi.json                # OpenAPI 3.0.3 specification for the REST API
 ├── vendor/                     # Composer dependencies
 ├── composer.json
 ├── .env.example
@@ -410,6 +453,8 @@ Replies to ticket notification emails are automatically added as comments. Two b
 
 - **IMAP** — configure a mailbox in Settings → Email; run `scripts/process-replies.php` via cron
 - **Microsoft Graph API** — OAuth2-based connection to Microsoft 365 / Exchange Online mailboxes; configure under Settings → Email → Graph API tab; run `scripts/process-replies.php` via cron or trigger from Settings → Run Now
+
+Agents and admins can also control tickets via hashtag commands in email replies (e.g. `#close`, `#resolve`).
 
 ## License
 

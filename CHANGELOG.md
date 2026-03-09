@@ -16,8 +16,153 @@ To release a new version: update `config/version.php`, add a dated entry below u
 Planned features not yet implemented:
 
 - Profile Avatars — allow users to upload their own avatar from the profile page (currently admin-managed only)
-- Office 365 SSO — login with Microsoft 365 credentials
 - Manage team dashboards — configurable per-team dashboard views
+
+---
+
+## 2.0.0 — 2026-03-03
+
+### Mobile REST API
+- Full REST API with Bearer token authentication for mobile and third-party integrations
+- Endpoints covering tickets, comments, users, groups, knowledge base articles, and notifications
+- OpenAPI 3.0.3 specification at `openapi.json`
+- API tokens stored as hashes at rest with configurable expiry and rotation support
+- CSRF protection on all session-authenticated JSON API endpoints
+- Group-based ticket access enforced on all individual-ticket API endpoints
+
+### Power User Role
+- New `power_user` role — full agent access plus access to Reports & Analytics
+- Selectable on user create, edit, and import flows
+- Fully supported throughout the API and all role-guarded routes
+
+### Portal Improvements
+- Portal ticket list defaults to own tickets and open status on first load
+- **My Location** toggle for users eligible to view tickets from their location
+- Portal users without a location assignment are prompted to choose one when creating a ticket
+- Portal onboarding tour (Driver.js) covering key pages; extended to include the profile page
+
+### Ticket List Enhancements
+- **Multi-Select Filter Checkboxes** — filter by multiple statuses, priorities, types, groups, and agents simultaneously on the admin and agent ticket lists
+- **Multi-Select Filters on Admin Users Page** — filter users by multiple roles and locations at once
+- **Per-Page Selector** — choose how many tickets appear per page (25 / 50 / 100)
+- **Watched Tickets Filter** — filter the ticket list to tickets you are watching
+- **Search by Ticket ID** — enter a ticket number in the global search box to jump directly to that ticket
+- Saved filters moved to the top of the filter panel for quicker access
+- Filter state persisted across navigation within the same browser session
+
+### Ticket Actions & Workflow
+- **Auto-Assign on First Reply** — ticket automatically assigned to the agent or admin who posts the first public reply if previously unassigned
+- **Choose Primary Ticket on Merge** — modal prompts the user to designate which ticket is primary; primary ticket inherits the highest priority of either ticket
+- **Linkify Merged Ticket Numbers** — merged ticket reference numbers in the timeline are rendered as clickable links
+- **Ticket Filter Panel on User Profile** — admin user profile pages include a filterable ticket list showing all tickets created by that user
+
+### User Management
+- **Delete User with Data** — option to delete a user along with all their tickets, comments, and attachments in a single operation
+- **Admin User Merge** — merge duplicate user accounts, reassigning all tickets and comments to the surviving account
+- **Ticket Transfer on Deletion** — when deleting a user, choose to reassign their open tickets to another agent before the account is removed
+- Group membership shown on agent and admin edit pages
+
+### Email & Notifications
+- **Email Notifications Settings Page** — dedicated page at Admin → Settings → Email Notifications to manage all outgoing notification hooks
+- **Group Email Notifications** — optional email alert to all group members when a new ticket is assigned to that group
+- **Microsoft Graph App Secret Expiry Reminders** — warning banner and scheduled reminder emails when the configured Graph API client secret is nearing expiry
+
+### Location & Timezone
+- **Per-Location Timezone** — each location can have its own timezone used for SLA business-hours calculations; falls back to the global app timezone if not set
+- **Location Ticket Visibility Flag** — optionally restrict a user's ticket view to tickets from their assigned location only
+
+### Branding & Settings
+- Configurable navbar fallback icon selectable from the Branding settings page
+- CSAT survey email template added to the customisable email templates list
+
+---
+
+## 1.1.1 — 2026-03-02
+
+### Microsoft 365 SSO
+- Single sign-on via OAuth 2.0 Authorization Code flow using Microsoft Entra ID (Azure AD)
+- Configure client ID, tenant ID, and client secret under Settings → Microsoft 365 SSO
+- "Sign in with Microsoft" button on the login page; HTTPS scheme auto-detected for redirect URI
+- SSO debug logging available for troubleshooting login failures
+
+### Email-to-Ticket
+- Inbound emails to a monitored Microsoft Graph mailbox are automatically converted to new tickets
+- Sender looked up by email address; new portal user account created if no match found
+- Subject becomes the ticket subject; plain-text body becomes the description
+- Runs as part of `scripts/process-replies.php`
+
+### Ticket Watching
+- Agents and admins can watch any ticket to receive notifications on all updates
+- Watch/unwatch toggle on the ticket detail view
+- Watched tickets appear in the **Watched** filter on the ticket list
+
+### Ticket Splitting
+- Split a single ticket into two separate tickets from the ticket detail view (admin and agent panels)
+- Choose which timeline entries to move to the new ticket
+- Both tickets retain the original metadata; a system note links them
+
+### Canned Responses
+- Admins and agents can create personal canned response snippets for common replies
+- Insert into the reply box from a dropdown picker on the ticket detail view
+- Token substitution: `{{ticket_id}}`, `{{ticket_subject}}`, `{{user_name}}`, `{{agent_name}}`
+
+### Reply / Forward / Note Panel
+- Ticket detail reply area replaced with a tabbed panel supporting **Reply**, **Forward**, and **Note** modes
+- Forward mode sends the ticket content to an external email address
+- Note mode creates an internal note (hidden from portal users)
+
+### User Import from CSV
+- Bulk import user accounts from a CSV file at Admin → Settings → Import Users
+- Flexible column-mapping step to match CSV headers to LocalDesk fields
+- Dry-run preview shows row count, role breakdown, and detected duplicates before committing
+- Skipped rows downloadable as a CSV after import
+- Sample CSV available for download from the import page
+
+### Holidays / Closed Days Management
+- Configure public holidays and custom closed days at Admin → Settings → Holidays
+- Per-holiday toggle to exclude the day from SLA business-hours calculations
+- Integrated into the business-hours-aware SLA timer
+
+### Waiting-on-Customer Reminder Email
+- Escalation rule action that sends an automated reminder to the ticket submitter when a ticket has been in **Waiting on Customer** status for a configurable period
+
+### Automatic Database Migration System
+- Schema changes applied automatically on each request if new migration files are present
+- Migrations tracked in the `migrations` table; idempotent and safe to re-run
+- New migrations added via numbered PHP files in `database/migrations/`
+
+### Versioning System
+- `APP_VERSION` constant defined in `config/version.php` following Semantic Versioning
+- Current version displayed in the user dropdown menu
+
+### Timeline Improvements
+- Timeline entries shown in reverse chronological order (most recent first)
+- Long timelines collapsed to the 10 most recent entries with an **Expand** button to show all
+
+### Agent Onboarding Tour
+- Spotlight-style step-by-step tour for new agent accounts covering the dashboard, ticket list, and ticket detail view
+- Replayable from the user dropdown
+
+### Automations — Nested Boolean Logic
+- Automation conditions now support nested AND / OR groups for complex rule matching
+
+### SMTP Debug Logging
+- SMTP session log written to `storage/logs/smtp.log` with a toggle in Settings → Email
+- Useful for diagnosing delivery issues without exposing credentials
+
+### Label Customisation
+- The word "Location" throughout the UI is driven by a configurable label, allowing sites to substitute their preferred term (e.g. "Branch", "Site")
+
+### Scheduled Reports — Schedule Button
+- "Schedule" button added to each individual report page as a shortcut to create a scheduled report for that report type
+
+### Users Filter Slide-Out Panel
+- Admin users list filter bar replaced with a slide-out panel matching the ticket list panel style
+
+### Admin Tools
+- **Admin Password Rescue Script** — command-line script to reset an admin password or change a user's role when locked out of the UI
+- **Danger Zone Full Reset** — settings page option to wipe all application data and re-run the setup wizard
+- Post-install success page now shows next-steps checklist including cron job setup instructions
 
 ---
 
