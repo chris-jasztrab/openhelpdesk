@@ -128,5 +128,86 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 </div>
 </div>
 
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-check2-square text-primary me-2"></i>Bulk Actions</h5>
+<p class="text-muted mb-2">The ticket list includes a checkbox column to select multiple tickets at once. When one or more tickets are selected, a bulk action bar appears at the bottom of the screen.</p>
+<p class="text-muted mb-2">Available bulk actions:</p>
+<ul class="text-muted mb-0">
+    <li><strong>Assign</strong> — open an agent picker and assign all selected tickets to one agent.</li>
+    <li><strong>Close</strong> — set all selected tickets to Closed status.</li>
+    <li><strong>Merge</strong> — merge all selected tickets; the lowest-numbered ticket becomes the primary.</li>
+    <li><strong>Delete</strong> — permanently delete selected tickets (admin only).</li>
+</ul>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-funnel text-primary me-2"></i>Filter Panel &amp; Saved Filters</h5>
+<p class="text-muted mb-2">Ticket list filters are in a slide-out panel on the right side of the screen. Click the <strong>Filters</strong> button to open it. The panel state (open or closed) is remembered across page navigations.</p>
+<p class="text-muted mb-2">You can save any combination of active filters as a named preset:</p>
+<ol class="text-muted mb-3">
+    <li>Apply the filters you want, then click <strong>Save Filter</strong> in the panel.</li>
+    <li>Give the preset a name and optionally share it with the rest of the team.</li>
+    <li>Saved filters appear in the panel and can be applied with a single click.</li>
+    <li>Mark any saved filter as your <strong>Default</strong> — it will be applied automatically when you open the ticket list.</li>
+</ol>
+<p class="text-muted mb-0">When you navigate from a ticket detail view back to the list, the previous URL (including all active filters and sort order) is automatically restored via the breadcrumb link.</p>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-file-earmark-text text-primary me-2"></i>Ticket Templates</h5>
+<p class="text-muted mb-2">Templates let you pre-fill a ticket's subject, description, type, and priority to speed up common requests. Managed at <a href="/admin/ticket-templates"><strong>Admin → Ticket Templates</strong></a>.</p>
+<ul class="text-muted mb-3">
+    <li>Admins can create, edit, and delete any template. Agents can manage their own templates.</li>
+    <li>Mark a template as <strong>Shared</strong> to make it available on the portal ticket creation form — users see a "Start from a Template" picker.</li>
+    <li>When a template is selected, the subject, body, type, and priority fields are auto-filled immediately.</li>
+</ul>
+<p class="text-muted mb-0">Staff (agents and admins) can also select templates when creating tickets from the admin interface at <a href="/admin/tickets/create"><strong>Admin → Tickets → Create Ticket</strong></a>.</p>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-ui-checks-grid text-primary me-2"></i>Custom Form Fields (Workflows)</h5>
+<p class="text-muted mb-2">LocalDesk supports custom fields on the ticket creation and detail forms. Build and manage fields at <a href="/admin/workflows/ticket-fields"><strong>Admin → Settings → Custom Fields</strong></a>.</p>
+<p class="text-muted mb-2">Supported field types:</p>
+<ul class="text-muted mb-0">
+    <li><strong>Short Text</strong> — single-line text input.</li>
+    <li><strong>Long Text</strong> — multi-line textarea.</li>
+    <li><strong>Dropdown</strong> — single-select from a defined list of options.</li>
+    <li><strong>Multi-Select</strong> — choose multiple values from a list.</li>
+    <li><strong>Checkbox</strong> — a true/false toggle.</li>
+</ul>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-download text-primary me-2"></i>Exporting Tickets (CSV)</h5>
+<p class="text-muted mb-2">Export the current filtered ticket list to CSV from the ticket list page. The export respects all active filters (status, priority, type, location, agent, group, search query, date range, requester).</p>
+<p class="text-muted mb-2">Exported columns include: ID, subject, status, priority, type, location, group, assigned agent, creator, tags, created date, due date, and SLA state. The file is UTF-8 encoded with a BOM for seamless Excel compatibility.</p>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-eye text-primary me-2"></i>Concurrent Viewer Warning</h5>
+<p class="text-muted mb-2">When two or more agents open the same ticket at the same time, a dismissible warning banner is shown to alert them that someone else is also viewing the ticket. This helps avoid duplicate work or conflicting replies.</p>
+<p class="text-muted mb-0">Presence is tracked per ticket and automatically cleared when a user navigates away.</p>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-list-ol text-primary me-2"></i>Per-Page Row Count</h5>
+<p class="text-muted mb-0">Use the <strong>per page</strong> selector at the bottom-right of the ticket list to control how many tickets are shown per page. Options are 25, 50, 100, or 200. Your selection is applied immediately and included in any export or saved filter URL.</p>
+</div>
+</div>
+
 </div><!-- col -->
 </div><!-- row -->

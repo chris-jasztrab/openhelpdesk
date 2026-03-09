@@ -152,5 +152,79 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 </div>
 </div>
 
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-shield-lock text-primary me-2"></i>Two-Factor Authentication (2FA)</h5>
+<p class="text-muted mb-2">Admins and agents can enable TOTP-based two-factor authentication from their profile page (<a href="/profile/2fa/setup"><strong>My Profile → Security → Enable 2FA</strong></a>).</p>
+<ol class="text-muted mb-3">
+    <li>Open <strong>My Profile</strong> from the top-right avatar menu.</li>
+    <li>Click <strong>Enable 2FA</strong> in the Security section.</li>
+    <li>Scan the QR code with an authenticator app (Google Authenticator, Authy, 1Password, etc.) or enter the key manually.</li>
+    <li>Confirm with a code from the app to activate.</li>
+</ol>
+<p class="text-muted mb-2">Once enabled, a 6-digit code is required at every login. If a user loses access to their authenticator, an admin can reset their 2FA from the user management page.</p>
+<div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
+    Portal (end user) accounts do not have access to 2FA — it is available to admin and agent accounts only.
+</div>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-bell text-primary me-2"></i>Email Notification Preferences</h5>
+<p class="text-muted mb-2">Each user can control which email notifications they receive from <strong>My Profile → Notification Preferences</strong>. Preferences are checked before every outgoing notification email, so users only receive the emails they want.</p>
+<div class="table-responsive mb-0">
+<table class="table table-sm mb-0">
+    <thead class="table-light"><tr><th>Preference</th><th>Email sent when…</th></tr></thead>
+    <tbody class="text-muted">
+        <tr><td><strong>New ticket assigned to me</strong></td><td>A ticket is assigned to the user.</td></tr>
+        <tr><td><strong>Ticket updated</strong></td><td>A public reply is added to a ticket they are involved with.</td></tr>
+        <tr><td><strong>@mentioned in a note</strong></td><td>Another agent @mentions them in an internal note or reply.</td></tr>
+    </tbody>
+</table>
+</div>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-person-lines-fill text-primary me-2"></i>Admin User Profile View</h5>
+<p class="text-muted mb-2">Admins can view any user's profile page at <code>/admin/users/{id}</code>. The profile page shows the user's details, role, and a list of open tickets they have submitted.</p>
+<p class="text-muted mb-0">From this page admins can also edit the user's account or initiate a deletion with the transfer/delete workflow described below.</p>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-person-x text-primary me-2"></i>Deleting Users</h5>
+<p class="text-muted mb-2">When an admin deletes a user who has associated tickets or KB articles, LocalDesk shows a warning listing those records. The ticket count and article count are clickable links that open the filtered list in a new tab so you can review them before deciding.</p>
+<p class="text-muted mb-2">You must choose one of two options before the deletion can proceed:</p>
+<ul class="text-muted mb-3">
+    <li><strong>Transfer records</strong> — search for another user and move all associated tickets and articles to them.</li>
+    <li><strong>Delete all records</strong> — permanently remove the user's tickets, notes, KB articles, and all other associated data.</li>
+</ul>
+<div class="alert alert-warning small mb-0"><i class="bi bi-exclamation-triangle-fill me-2"></i>
+    Deletion cannot be undone. Use the transfer option if you need to preserve ticket history.
+</div>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-moon-stars text-primary me-2"></i>Dark Mode</h5>
+<p class="text-muted mb-2">Each user can switch between light and dark mode from <strong>My Profile → Appearance</strong>. The preference is saved to their account and applied on every subsequent page load.</p>
+<p class="text-muted mb-0">Dark mode uses Bootstrap 5.3's native theming, so all components — sidebar, tables, cards, modals, and dropdowns — adapt automatically.</p>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-journal-text text-primary me-2"></i>Audit Log</h5>
+<p class="text-muted mb-2">Every significant admin action is recorded in the audit log, accessible at <a href="/admin/audit-log"><strong>Admin → Audit Log</strong></a>. Each entry shows the actor (who did it), the action taken, the target record, and a timestamp.</p>
+<p class="text-muted mb-0">Logged actions include: user creation and deletion, role changes, settings updates, SLA policy changes, automation rule changes, and more.</p>
+</div>
+</div>
+
 </div><!-- col -->
 </div><!-- row -->

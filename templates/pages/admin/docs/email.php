@@ -35,6 +35,33 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-envelope-arrow-down text-primary me-2"></i>Inbound Email (Email Reply Integration)</h5>
+<p class="text-muted mb-2">LocalDesk can process replies sent directly to your support email address and automatically add them as ticket comments — so agents and requesters can reply from their inbox without logging in.</p>
+
+<h6 class="fw-semibold mt-3 mb-2">Option 1 — Microsoft Graph API (Microsoft 365 / Exchange Online)</h6>
+<p class="text-muted mb-2">Configure at <a href="/admin/settings"><strong>Admin → Settings → Email → Graph API</strong></a>. You will need a registered Azure AD application with <code>Mail.Read</code> permissions.</p>
+<ol class="text-muted mb-3">
+    <li>Enter your Azure <strong>Client ID</strong>, <strong>Tenant ID</strong>, and <strong>Client Secret</strong>.</li>
+    <li>Enter the <strong>mailbox address</strong> to monitor.</li>
+    <li>Save, then use the <strong>Run Now</strong> button to test immediately.</li>
+    <li>Set up a cron job to run <code>scripts/process-replies.php</code> periodically (e.g. every 5 minutes).</li>
+</ol>
+
+<h6 class="fw-semibold mt-3 mb-2">Option 2 — IMAP</h6>
+<p class="text-muted mb-2">Configure IMAP credentials in the Email settings tab. Inbound messages are matched to tickets via <code>In-Reply-To</code> / <code>Message-ID</code> headers and a special <code>X-Ticket-ID</code> header added to outgoing emails.</p>
+
+<h6 class="fw-semibold mt-3 mb-2">How replies are processed</h6>
+<ul class="text-muted mb-0">
+    <li>Email signatures and quoted text are stripped — only the new reply content is saved.</li>
+    <li>Replies from unknown senders are rejected.</li>
+    <li>Portal user replies become public comments; agent/admin replies follow their default visibility setting.</li>
+    <li>Agents and admins can include <strong>hashtag commands</strong> (e.g. <code>#resolve</code>) at the end of their reply to update ticket status or priority — see the <em>Email Reply Commands</em> section below.</li>
+</ul>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-google text-primary me-2"></i>Common Providers</h5>
 <div class="table-responsive mb-0">
 <table class="table table-sm mb-0">
