@@ -93,7 +93,7 @@ $breadcrumbs = [
                         ];
                     ?>
                         <p class="text-muted small fw-semibold mb-1 mt-1">Agent Notifications</p>
-                        <?php foreach ($agentOptions as $opt): $checked = ($user[$opt['key']] ?? 1) ? 'checked' : ''; ?>
+                        <?php foreach ($agentOptions as $opt): $checked = ($profileUser[$opt['key']] ?? 1) ? 'checked' : ''; ?>
                         <div class="d-flex align-items-start gap-3 py-2 border-bottom">
                             <div class="form-check form-switch mb-0 pt-1">
                                 <input class="form-check-input" type="checkbox"
@@ -109,7 +109,7 @@ $breadcrumbs = [
                         <?php endforeach; ?>
 
                         <p class="text-muted small fw-semibold mb-1 mt-3">Other Notifications</p>
-                        <?php foreach ($otherOptions as $opt): $checked = ($user[$opt['key']] ?? 1) ? 'checked' : ''; ?>
+                        <?php foreach ($otherOptions as $opt): $checked = ($profileUser[$opt['key']] ?? 1) ? 'checked' : ''; ?>
                         <div class="d-flex align-items-start gap-3 py-2 border-bottom">
                             <div class="form-check form-switch mb-0 pt-1">
                                 <input class="form-check-input" type="checkbox"
@@ -134,7 +134,7 @@ $breadcrumbs = [
                             ['key' => 'notify_ticket_closed',     'icon' => 'bi-x-circle',             'label' => 'Ticket closed',          'desc' => 'Email when your ticket is marked as closed.'],
                             ['key' => 'notify_csat',              'icon' => 'bi-star',                 'label' => 'Satisfaction surveys',   'desc' => 'Survey email after your ticket is resolved.'],
                         ];
-                        foreach ($portalOptions as $opt): $checked = ($user[$opt['key']] ?? 1) ? 'checked' : ''; ?>
+                        foreach ($portalOptions as $opt): $checked = ($profileUser[$opt['key']] ?? 1) ? 'checked' : ''; ?>
                         <div class="d-flex align-items-start gap-3 py-2 border-bottom">
                             <div class="form-check form-switch mb-0 pt-1">
                                 <input class="form-check-input" type="checkbox"
@@ -198,7 +198,7 @@ $breadcrumbs = [
                 <i class="bi bi-shield-lock me-1"></i>Two-Factor Authentication
             </div>
             <div class="card-body">
-                <?php if ($user['totp_enabled'] ?? false): ?>
+                <?php if ($profileUser['totp_enabled'] ?? false): ?>
                     <div class="d-flex align-items-center gap-3 mb-3">
                         <span class="badge bg-success fs-6 px-3 py-2">
                             <i class="bi bi-shield-check me-1"></i>2FA is enabled
