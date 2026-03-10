@@ -59,13 +59,18 @@ $router->get('/portal/tickets', function () {
     $countStmt->execute($params);
     $totalTickets = (int) $countStmt->fetchColumn();
 
-    // Count own tickets regardless of filters (for empty-state message)
-    $allCountStmt = $db->prepare(
-        "SELECT COUNT(*) FROM tickets t WHERE (t.created_by = ? AND t.merged_into_ticket_id IS NULL)
-         OR t.id IN (SELECT DISTINCT merged_into_ticket_id FROM tickets WHERE created_by = ? AND merged_into_ticket_id IS NOT NULL)"
-    );
-    $allCountStmt->execute([$uid, $uid]);
-    $userHasAnyTickets = (int) $allCountStmt->fetchColumn() > 0;
+    // Count all accessible tickets (scope only, no status/priority/search — for filtered badge)
+    if ($canViewLocation && $fScope === 'location') {
+        $allCountSql = "SELECT COUNT(*) FROM tickets t WHERE (" . $ownCond . " OR (t.location_id = ? AND t.merged_into_ticket_id IS NULL))";
+        $allCountStmt = $db->prepare($allCountSql);
+        $allCountStmt->execute([$uid, $uid, (int) $userPerms['location_id']]);
+    } else {
+        $allCountSql = "SELECT COUNT(*) FROM tickets t WHERE (" . $ownCond . ")";
+        $allCountStmt = $db->prepare($allCountSql);
+        $allCountStmt->execute([$uid, $uid]);
+    }
+    $allTickets        = (int) $allCountStmt->fetchColumn();
+    $userHasAnyTickets = $allTickets > 0;
 
     // Sorting
     $sortableColumns = [
@@ -120,6 +125,7 @@ $router->get('/portal/tickets', function () {
         'page'              => $page,
         'totalPages'        => $totalPages,
         'totalTickets'      => $totalTickets,
+        'allTickets'        => $allTickets,
         'sort'              => $sort,
         'dir'               => strtolower($dir),
         'userHasAnyTickets' => $userHasAnyTickets,

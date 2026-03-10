@@ -1523,6 +1523,7 @@ $router->get('/admin/tickets', function () {
     $countStmt = $db->prepare($countSql);
     $countStmt->execute($params);
     $totalTickets = (int) $countStmt->fetchColumn();
+    $allTickets   = (int) $db->query('SELECT COUNT(*) FROM tickets')->fetchColumn();
 
     // Sorting
     $sortableColumns = [
@@ -1586,6 +1587,7 @@ $router->get('/admin/tickets', function () {
         'perPage'          => $perPage,
         'totalPages'       => $totalPages,
         'totalTickets'     => $totalTickets,
+        'allTickets'       => $allTickets,
         'sort'             => $sort,
         'dir'              => strtolower($dir),
         'visibleColumns'   => getUserColumns(Auth::id()),

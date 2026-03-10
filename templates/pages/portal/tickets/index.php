@@ -15,7 +15,7 @@ $sortParams = array_filter($filters, fn($v) => $v !== '' && $v !== 'mine');
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="fw-bold mb-0">My Tickets</h2>
     <div class="d-flex gap-2 align-items-center">
-        <span class="badge bg-secondary fs-6"><?= $totalTickets ?><?= $hasFilters ? ' filtered' : ' total' ?></span>
+        <?php if ($hasFilters): ?><span class="badge bg-secondary fs-6"><?= $totalTickets ?> filtered of <?= $allTickets ?> total</span><?php else: ?><span class="badge bg-secondary fs-6"><?= $totalTickets ?> total</span><?php endif; ?>
         <a href="/portal/tickets/create" class="btn text-white" style="background:var(--ld-primary);">
             <i class="bi bi-plus-circle me-1"></i>New Ticket
         </a>

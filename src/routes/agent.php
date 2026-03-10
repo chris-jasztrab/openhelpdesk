@@ -186,6 +186,16 @@ $router->get('/agent/tickets', function () {
     $countStmt->execute($params);
     $totalTickets = (int) $countStmt->fetchColumn();
 
+    // Count all visible tickets (no user filters, just group restriction)
+    if (!empty($agentGroupIds)) {
+        $allPlaceholders = implode(',', array_fill(0, count($agentGroupIds), '?'));
+        $allStmt = $db->prepare('SELECT COUNT(*) FROM tickets t WHERE t.group_id IN (' . $allPlaceholders . ')');
+        $allStmt->execute($agentGroupIds);
+    } else {
+        $allStmt = $db->query('SELECT COUNT(*) FROM tickets');
+    }
+    $allTickets = (int) $allStmt->fetchColumn();
+
     // Sorting
     $sortableColumns = [
         'id'         => 't.id',
@@ -266,6 +276,7 @@ $router->get('/agent/tickets', function () {
         'perPage'          => $perPage,
         'totalPages'       => $totalPages,
         'totalTickets'     => $totalTickets,
+        'allTickets'       => $allTickets,
         'sort'             => $sort,
         'dir'              => strtolower($dir),
         'visibleColumns'   => getUserColumns(Auth::id()),
