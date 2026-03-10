@@ -22,9 +22,16 @@ $breadcrumbs  = [
             <?php endif; ?>
         </div>
     </div>
-    <a href="<?= $kbBase ?>/<?= e($article['category_slug']) ?>/<?= e($article['folder_slug']) ?>" class="btn btn-outline-secondary">
-        <i class="bi bi-arrow-left me-1"></i>Back
-    </a>
+    <div class="d-flex gap-2">
+        <?php if (Auth::check() && in_array(Auth::role(), ['admin', 'agent'], true)): ?>
+            <a href="/admin/kb/articles/<?= (int) $article['id'] ?>/edit" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-pencil me-1"></i>Edit Article
+            </a>
+        <?php endif; ?>
+        <a href="<?= $kbBase ?>/<?= e($article['category_slug']) ?>/<?= e($article['folder_slug']) ?>" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i>Back
+        </a>
+    </div>
 </div>
 
 <div class="card border-0 shadow-sm mb-4">

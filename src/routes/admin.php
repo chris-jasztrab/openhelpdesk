@@ -3145,14 +3145,14 @@ $router->post('/admin/kb/articles/create', function () {
 });
 
 $router->get('/admin/kb/articles/{id}/edit', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requireRole('admin', 'agent');
     $db   = Database::connect();
     $stmt = $db->prepare('SELECT * FROM kb_articles WHERE id = ?');
     $stmt->execute([(int) $p['id']]);
     $editing = $stmt->fetch();
     if (!$editing) {
         flash('error', 'Article not found.');
-        redirect('/admin/kb/articles');
+        redirect(Auth::role() === 'admin' ? '/admin/kb/articles' : '/agent/kb');
     }
     $folders = $db->query(
         'SELECT f.id, f.name, c.name AS category_name
@@ -3164,7 +3164,7 @@ $router->get('/admin/kb/articles/{id}/edit', function (array $p) {
 });
 
 $router->post('/admin/kb/articles/{id}/edit', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requireRole('admin', 'agent');
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -3215,7 +3215,7 @@ $router->post('/admin/kb/articles/{id}/edit', function (array $p) {
         'UPDATE kb_articles SET folder_id=?, title=?, slug=?, body_markdown=?, status=?, published_at=?, sort_order=? WHERE id=?'
     )->execute([$folderId, $title, $slug, $body, $status, $publishedAt, $order, $id]);
     flash('success', 'Article updated.');
-    redirect('/admin/kb/articles');
+    redirect(Auth::role() === 'admin' ? '/admin/kb/articles' : '/agent/kb');
 });
 
 $router->post('/admin/kb/articles/{id}/delete', function (array $p) {
