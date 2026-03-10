@@ -885,7 +885,7 @@ $router->get('/profile', function () {
     }
 
     $theme = getSetting('ui_theme:' . Auth::id(), 'light');
-    render('profile/edit', ['user' => $user, 'theme' => $theme]);
+    render('profile/edit', ['profileUser' => $user, 'theme' => $theme]);
 });
 
 $router->post('/profile', function () {
