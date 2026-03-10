@@ -74,7 +74,7 @@ $statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 
 <div class="card border-0 shadow-sm" id="tour-recent-tickets">
     <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
         <h5 class="mb-0 fw-semibold"><i class="bi bi-ticket-detailed me-2"></i>Recent Tickets</h5>
-        <a href="/agent/tickets" class="btn btn-sm btn-outline-secondary">View All</a>
+        <a href="/agent/tickets?reset=1" class="btn btn-sm btn-outline-secondary">View All</a>
     </div>
     <?php if (empty($recentTickets)): ?>
     <div class="card-body text-center py-5 text-muted">
