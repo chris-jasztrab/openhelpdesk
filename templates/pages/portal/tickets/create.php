@@ -113,6 +113,7 @@ endif; ?>
                 </div>
             </div>
 
+            <?php if (getSetting('tags_enabled', '1') === '1'): ?>
             <div class="mb-3">
                 <label class="form-label fw-semibold">Tags</label>
                 <div id="tagContainer" class="d-flex flex-wrap gap-1 align-items-center form-control" style="min-height:38px;cursor:text;" onclick="document.getElementById('tagInput').focus();">
@@ -121,6 +122,7 @@ endif; ?>
                 </div>
                 <div class="form-text">Type <strong>#</strong> followed by a tag name, then press Enter to add it.</div>
             </div>
+            <?php endif; ?>
 
             <?php if (!empty($customFields)): ?>
             <hr class="my-3">
@@ -336,6 +338,7 @@ endif; ?>
     }
 })();
 
+<?php if (getSetting('tags_enabled', '1') === '1'): ?>
 // Tag input
 (function() {
     var input = document.getElementById('tagInput');
@@ -382,6 +385,7 @@ endif; ?>
         }
     });
 })();
+<?php endif; ?>
 
 <?php if (!empty($customFields)): ?>
 // Dependent field cascading dropdowns

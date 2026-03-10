@@ -117,7 +117,7 @@ $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-p
         </div>
         <?php endif; ?>
 
-        <?php if (!empty($ticket['tags'])): ?>
+        <?php if (getSetting('tags_enabled', '1') === '1' && !empty($ticket['tags'])): ?>
         <div class="mb-4">
             <?php foreach ($ticket['tags'] as $tag): ?>
             <span class="badge bg-light text-dark border me-1 mb-1">

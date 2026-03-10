@@ -6769,6 +6769,32 @@ $router->get('/admin/reports/csat', function () {
     ));
 });
 
+
+/* ==================================================================
+ * ADMIN – Tags Settings
+ * ================================================================== */
+
+$router->get('/admin/settings/tags', function () {
+    Auth::requireRole('admin');
+    $settings = [
+        'tags_enabled' => getSetting('tags_enabled', '1'),
+    ];
+    render('admin/settings/tags', compact('settings'));
+});
+
+$router->post('/admin/settings/tags', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/tags');
+    }
+
+    setSetting('tags_enabled', isset($_POST['tags_enabled']) ? '1' : '0');
+
+    flash('success', 'Tag settings saved.');
+    redirect('/admin/settings/tags');
+});
+
 /* ==================================================================
  * ADMIN – CSAT Settings
  * ================================================================== */

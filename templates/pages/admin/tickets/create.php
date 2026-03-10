@@ -200,6 +200,7 @@ $statusOptions = [
                 </div>
             </div>
 
+            <?php if (getSetting('tags_enabled', '1') === '1'): ?>
             <!-- Tags -->
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-transparent fw-semibold">
@@ -217,6 +218,7 @@ $statusOptions = [
                     <div class="form-text mt-1">Press Enter or comma to add a tag.</div>
                 </div>
             </div>
+            <?php endif; ?>
 
             <div class="d-flex gap-2">
                 <button type="submit" class="btn text-white px-4" style="background:var(--ld-primary);">
@@ -242,6 +244,7 @@ document.getElementById('templateSelect')?.addEventListener('change', function (
     if (tpl.priority_id) document.getElementById('priority_id').value  = tpl.priority_id;
 });
 
+<?php if (getSetting('tags_enabled', '1') === '1'): ?>
 // ── Tag management ──────────────────────────────────────────────
 const tagBadges      = document.getElementById('tagBadges');
 const tagHidden      = document.getElementById('tagHiddenFields');
@@ -277,6 +280,7 @@ tagInput.addEventListener('keydown', e => {
         tagInput.value = '';
     }
 });
+<?php endif; ?>
 
 <?php if (!$isAgent): ?>
 // ── "On behalf of" live search ─────────────────────────────────

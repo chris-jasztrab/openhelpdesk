@@ -107,12 +107,14 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
         </div>
         <?php endif; ?>
 
+        <?php if (getSetting('tags_enabled', '1') === '1'): ?>
         <!-- Tags -->
         <div class="mb-4" id="ticketTags"
              data-ticket-id="<?= $ticket['id'] ?>"
              data-tags="<?= e(json_encode($ticket['tags'] ?? [])) ?>">
             <div class="d-flex flex-wrap gap-1 align-items-center" id="tagList"></div>
         </div>
+        <?php endif; ?>
 
         <!-- Timeline -->
         <div class="card border-0 shadow-sm">
@@ -724,6 +726,7 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
     });
 })();
 
+<?php if (getSetting('tags_enabled', '1') === '1'): ?>
 // Tag management
 (function() {
     var container = document.getElementById('ticketTags');
@@ -788,6 +791,7 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
 
     render();
 })();
+<?php endif; ?>
 
 // CC management
 (function() {

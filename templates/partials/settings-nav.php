@@ -20,6 +20,7 @@ $settingsNav = [
     ['label' => 'Import Tickets', 'url' => '/admin/settings/import',         'icon' => 'bi-cloud-upload'],
     ['label' => 'Import Users',   'url' => '/admin/settings/import-users',   'icon' => 'bi-person-plus'],
     ['label' => 'Import KB',      'url' => '/admin/settings/import-kb',      'icon' => 'bi-book'],
+    ['label' => 'Tags',          'url' => '/admin/settings/tags',           'icon' => 'bi-hash'],
     ['label' => 'CSAT Surveys',  'url' => '/admin/settings/csat',           'icon' => 'bi-star'],
     ['label' => 'Backup',        'url' => '/admin/settings/backup',         'icon' => 'bi-archive'],
     ['label' => 'Danger Zone',   'url' => '/admin/settings/danger-zone',    'icon' => 'bi-exclamation-triangle'],
