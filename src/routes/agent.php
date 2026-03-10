@@ -68,8 +68,9 @@ $router->get('/agent/tickets', function () {
     $fLocation = array_values(array_filter(array_map('trim', (array) ($_GET['location'] ?? []))));
     $fAgent    = array_values(array_filter(array_map('trim', (array) ($_GET['agent']    ?? []))));
     $fGroup    = array_values(array_filter(array_map('trim', (array) ($_GET['group']    ?? []))));
-    $fSearch   = trim($_GET['q'] ?? '');
-    $fWatched  = !empty($_GET['watched']) ? '1' : '';
+    $fSearch      = trim($_GET['q'] ?? '');
+    $fWatched     = !empty($_GET['watched']) ? '1' : '';
+    $fResolvedToday = !empty($_GET['resolved_today']);
 
     $where  = [];
     $params = [];
@@ -146,6 +147,10 @@ $router->get('/agent/tickets', function () {
     if ($fWatched) {
         $where[]  = 't.id IN (SELECT ticket_id FROM ticket_watchers WHERE user_id = ?)';
         $params[] = Auth::id();
+    }
+
+    if ($fResolvedToday) {
+        $where[] = "t.status = 'resolved' AND DATE(t.updated_at) = CURDATE()";
     }
 
     // Group-based visibility: agents who belong to groups can only see those groups' tickets.
@@ -242,14 +247,15 @@ $router->get('/agent/tickets', function () {
     }
 
     $filters = [
-        'status'   => $fStatus,   // array
-        'priority' => $fPriority, // array
-        'type'     => $fType,     // array
-        'location' => $fLocation, // array
-        'agent'    => $fAgent,    // array
-        'group'    => $fGroup,    // array
-        'q'        => $fSearch,
-        'watched'  => $fWatched,
+        'status'        => $fStatus,   // array
+        'priority'      => $fPriority, // array
+        'type'          => $fType,     // array
+        'location'      => $fLocation, // array
+        'agent'         => $fAgent,    // array
+        'group'         => $fGroup,    // array
+        'q'             => $fSearch,
+        'watched'       => $fWatched,
+        'resolved_today' => $fResolvedToday,
     ];
 
     // Load saved filters (own + shared)

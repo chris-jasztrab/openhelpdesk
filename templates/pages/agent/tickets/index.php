@@ -290,6 +290,15 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                     </label>
                 </div>
             </div>
+            <div class="mb-3">
+                <label class="form-label small fw-semibold mb-1">Date</label>
+                <div class="filter-checklist">
+                    <label class="filter-check-item">
+                        <input type="checkbox" name="resolved_today" value="1" <?= !empty($filters['resolved_today']) ? 'checked' : '' ?>>
+                        <span class="text-muted fst-italic"><i class="bi bi-check-circle me-1"></i>Resolved Today</span>
+                    </label>
+                </div>
+            </div>
             <div class="d-flex gap-2">
                 <button type="submit" class="btn btn-sm text-white flex-grow-1" style="background:var(--ld-primary);">
                     <i class="bi bi-funnel me-1"></i>Apply

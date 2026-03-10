@@ -18,6 +18,7 @@ $statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 
 
 <div class="row g-4 mb-4" id="tour-stat-cards">
     <div class="col-md-3">
+        <a href="/agent/tickets?agent%5B%5D=unassigned&status%5B%5D=open&status%5B%5D=in_progress&status%5B%5D=pending" class="text-decoration-none">
         <div class="card stat-card h-100">
             <div class="card-body d-flex align-items-center gap-3">
                 <div class="stat-icon bg-danger bg-opacity-10 text-danger">
@@ -29,8 +30,10 @@ $statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 
                 </div>
             </div>
         </div>
+        </a>
     </div>
     <div class="col-md-3">
+        <a href="/agent/tickets?agent%5B%5D=mine&status%5B%5D=open&status%5B%5D=in_progress&status%5B%5D=pending" class="text-decoration-none">
         <div class="card stat-card h-100">
             <div class="card-body d-flex align-items-center gap-3">
                 <div class="stat-icon bg-primary bg-opacity-10 text-primary">
@@ -42,8 +45,10 @@ $statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 
                 </div>
             </div>
         </div>
+        </a>
     </div>
     <div class="col-md-3">
+        <a href="/agent/tickets?status%5B%5D=pending" class="text-decoration-none">
         <div class="card stat-card h-100">
             <div class="card-body d-flex align-items-center gap-3">
                 <div class="stat-icon bg-warning bg-opacity-10 text-warning">
@@ -55,8 +60,10 @@ $statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 
                 </div>
             </div>
         </div>
+        </a>
     </div>
     <div class="col-md-3">
+        <a href="/agent/tickets?resolved_today=1" class="text-decoration-none">
         <div class="card stat-card h-100">
             <div class="card-body d-flex align-items-center gap-3">
                 <div class="stat-icon bg-success bg-opacity-10 text-success">
@@ -68,6 +75,7 @@ $statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 
                 </div>
             </div>
         </div>
+        </a>
     </div>
 </div>
 
