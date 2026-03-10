@@ -347,7 +347,7 @@ $router->get('/admin/users/{id}', function (array $p) {
 
     $tSql = "SELECT t.id, t.subject, t.status, t.created_at,
                     tp.name AS priority_name, tp.color AS priority_color,
-                    tt.name AS type_name,
+                    tt.name AS type_name, tt.color AS type_color,
                     CONCAT(a.first_name, ' ', a.last_name) AS assigned_name
              FROM tickets t
              LEFT JOIN ticket_priorities tp ON t.priority_id = tp.id
@@ -986,14 +986,15 @@ $router->post('/admin/types/create', function () {
         redirect('/admin/types/create');
     }
     $name  = trim($_POST['name'] ?? '');
+    $color = preg_match('/^#[0-9a-fA-F]{6}$/', $_POST['color'] ?? '') ? $_POST['color'] : '#6c757d';
     $order = (int) ($_POST['sort_order'] ?? 0);
     if ($name === '') {
         flashInput($_POST);
         flash('error', 'Type name is required.');
         redirect('/admin/types/create');
     }
-    Database::connect()->prepare('INSERT INTO ticket_types (name, sort_order) VALUES (?, ?)')
-        ->execute([$name, $order]);
+    Database::connect()->prepare('INSERT INTO ticket_types (name, color, sort_order) VALUES (?, ?, ?)')
+        ->execute([$name, $color, $order]);
     flash('success', 'Ticket type created.');
     redirect('/admin/types');
 });
@@ -1018,14 +1019,15 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
         redirect("/admin/types/{$id}/edit");
     }
     $name  = trim($_POST['name'] ?? '');
+    $color = preg_match('/^#[0-9a-fA-F]{6}$/', $_POST['color'] ?? '') ? $_POST['color'] : '#6c757d';
     $order = (int) ($_POST['sort_order'] ?? 0);
     if ($name === '') {
         flashInput($_POST);
         flash('error', 'Type name is required.');
         redirect("/admin/types/{$id}/edit");
     }
-    Database::connect()->prepare('UPDATE ticket_types SET name=?, sort_order=? WHERE id=?')
-        ->execute([$name, $order, $id]);
+    Database::connect()->prepare('UPDATE ticket_types SET name=?, color=?, sort_order=? WHERE id=?')
+        ->execute([$name, $color, $order, $id]);
     flash('success', 'Ticket type updated.');
     redirect('/admin/types');
 });
@@ -1506,7 +1508,7 @@ $router->get('/admin/tickets', function () {
     $sql = "SELECT t.*,
                 tp.name AS priority_name, tp.color AS priority_color,
                 l.name  AS location_name,
-                tt.name AS type_name,
+                tt.name AS type_name, tt.color AS type_color,
                 g.name  AS group_name,
                 CONCAT(c.first_name, ' ', c.last_name) AS creator_name,
                 CONCAT(a.first_name, ' ', a.last_name) AS agent_name
@@ -1641,7 +1643,7 @@ $router->get('/admin/tickets/export', function () {
     $sql = "SELECT t.*,
                 tp.name AS priority_name,
                 l.name  AS location_name,
-                tt.name AS type_name,
+                tt.name AS type_name, tt.color AS type_color,
                 g.name  AS group_name,
                 CONCAT(c.first_name, ' ', c.last_name) AS creator_name,
                 CONCAT(a.first_name, ' ', a.last_name) AS agent_name,
@@ -2136,7 +2138,7 @@ $router->get('/admin/tickets/{id}', function (array $p) {
         "SELECT t.*,
                 tp.name AS priority_name, tp.color AS priority_color,
                 l.name  AS location_name,
-                tt.name AS type_name,
+                tt.name AS type_name, tt.color AS type_color,
                 c.first_name AS creator_first_name, c.last_name AS creator_last_name,
                 CONCAT(c.first_name, ' ', c.last_name) AS creator_name, c.email AS creator_email,
                 CONCAT(a.first_name, ' ', a.last_name) AS agent_name,
@@ -2387,7 +2389,7 @@ $router->get('/admin/tickets/{id}/split', function (array $p) {
     $db = Database::connect();
 
     $stmt = $db->prepare(
-        "SELECT t.*, l.name AS location_name, tt.name AS type_name,
+        "SELECT t.*, l.name AS location_name, tt.name AS type_name, tt.color AS type_color,
                 CONCAT(c.first_name, ' ', c.last_name) AS creator_name
          FROM tickets t
          LEFT JOIN ticket_types tt ON t.type_id = tt.id

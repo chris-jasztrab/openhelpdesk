@@ -455,7 +455,7 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                         </td>
                         <?php endif; ?>
                         <?php if (in_array('type', $visibleColumns)): ?>
-                        <td class="text-muted" style="white-space:nowrap;"><?= e($t['type_name'] ?: 'Not Set') ?></td>
+                        <td style="white-space:nowrap;"><?php if ($t['type_name']): ?><span class="badge" style="background:<?= e($t['type_color'] ?: '#6c757d') ?>;"><?= e($t['type_name']) ?></span><?php else: ?><span class="text-muted small">Not Set</span><?php endif; ?></td>
                         <?php endif; ?>
                         <?php if (in_array('agent', $visibleColumns)): ?>
                         <td style="white-space:nowrap;"><?= e($t['agent_name'] ?: '— Unassigned —') ?></td>

@@ -30,11 +30,23 @@ $action = $isEdit ? "/admin/types/{$editing['id']}/edit" : '/admin/types/create'
                        placeholder="e.g. IT, Marketing, Facilities">
             </div>
 
-            <div class="mb-3">
-                <label for="sort_order" class="form-label fw-semibold">Sort Order</label>
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label for="color" class="form-label fw-semibold">Color</label>
+                    <div class="d-flex gap-2 align-items-center">
+                        <input type="color" class="form-control form-control-color" id="color" name="color"
+                               value="<?= e(old('color', $editing['color'] ?? '#6c757d')) ?>">
+                        <span class="badge" id="colorPreview" style="background:<?= e(old('color', $editing['color'] ?? '#6c757d')) ?>;">
+                            <?= e(old('name', $editing['name'] ?? 'Preview')) ?>
+                        </span>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label for="sort_order" class="form-label fw-semibold">Sort Order</label>
                 <input type="number" class="form-control" id="sort_order" name="sort_order"
                        value="<?= e(old('sort_order', (string) ($editing['sort_order'] ?? '0'))) ?>" min="0">
-                <div class="form-text">Lower numbers appear first.</div>
+                    <div class="form-text">Lower numbers appear first.</div>
+                </div>
             </div>
 
             <hr class="my-4">
@@ -48,3 +60,12 @@ $action = $isEdit ? "/admin/types/{$editing['id']}/edit" : '/admin/types/create'
         </form>
     </div>
 </div>
+
+<script>
+document.getElementById('color').addEventListener('input', function() {
+    document.getElementById('colorPreview').style.background = this.value;
+});
+document.getElementById('name').addEventListener('input', function() {
+    document.getElementById('colorPreview').textContent = this.value || 'Preview';
+});
+</script>

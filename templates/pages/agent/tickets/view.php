@@ -302,7 +302,7 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
                     </dd>
 
                     <dt class="text-muted small">Type</dt>
-                    <dd><?= e($ticket['type_name'] ?: 'Not Set') ?></dd>
+                    <dd><?php if ($ticket['type_name']): ?><span class="badge" style="background:<?= e($ticket['type_color'] ?: '#6c757d') ?>;"><?= e($ticket['type_name']) ?></span><?php else: ?><span class="text-muted">Not Set</span><?php endif; ?></dd>
 
                     <dt class="text-muted small">Assigned To</dt>
                     <dd><?= e($ticket['agent_name'] ?: 'Unassigned') ?></dd>

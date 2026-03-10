@@ -129,7 +129,7 @@ $sortParams = array_filter($filters, fn($v) => $v !== '' && $v !== 'mine');
                             <span class="text-muted">—</span>
                             <?php endif; ?>
                         </td>
-                        <td class="text-muted"><?= e($t['type_name'] ?: 'Not Set') ?></td>
+                        <td><?php if ($t['type_name']): ?><span class="badge" style="background:<?= e($t['type_color'] ?: '#6c757d') ?>;"><?= e($t['type_name']) ?></span><?php else: ?><span class="text-muted small">Not Set</span><?php endif; ?></td>
                         <td><?= e($t['agent_name'] ?: 'Unassigned') ?></td>
                         <td class="text-muted small"><?= date('M j, Y', strtotime($t['created_at'])) ?></td>
                     </tr>

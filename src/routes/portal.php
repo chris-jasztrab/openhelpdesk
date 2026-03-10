@@ -95,7 +95,7 @@ $router->get('/portal/tickets', function () {
     $sql = "SELECT t.*,
                 tp.name AS priority_name, tp.color AS priority_color,
                 l.name  AS location_name,
-                tt.name AS type_name,
+                tt.name AS type_name, tt.color AS type_color,
                 CONCAT(a.first_name, ' ', a.last_name) AS agent_name
          FROM tickets t
          LEFT JOIN ticket_priorities tp ON t.priority_id = tp.id
@@ -435,7 +435,7 @@ $router->get('/portal/tickets/{id}', function (array $p) {
         "SELECT t.*,
                 tp.name AS priority_name, tp.color AS priority_color,
                 l.name  AS location_name,
-                tt.name AS type_name,
+                tt.name AS type_name, tt.color AS type_color,
                 CONCAT(a.first_name, ' ', a.last_name) AS agent_name
          FROM tickets t
          LEFT JOIN ticket_priorities tp ON t.priority_id = tp.id

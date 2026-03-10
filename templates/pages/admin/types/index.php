@@ -26,6 +26,7 @@ $breadcrumbs  = [
         <table class="table table-hover align-middle mb-0">
             <thead class="table-light">
                 <tr>
+                    <th style="width:60px">Color</th>
                     <th>Name</th>
                     <th>Sort Order</th>
                     <th>Created</th>
@@ -34,11 +35,16 @@ $breadcrumbs  = [
             </thead>
             <tbody>
                 <?php if (empty($types)): ?>
-                <tr><td colspan="4" class="text-center py-4 text-muted">No ticket types found.</td></tr>
+                <tr><td colspan="5" class="text-center py-4 text-muted">No ticket types found.</td></tr>
                 <?php else: ?>
                     <?php foreach ($types as $t): ?>
                     <tr>
-                        <td class="fw-semibold"><?= e($t['name']) ?></td>
+                        <td>
+                            <span class="badge rounded-pill" style="background:<?= e($t['color'] ?: '#6c757d') ?>;min-width:28px;">&nbsp;</span>
+                        </td>
+                        <td class="fw-semibold">
+                            <span class="badge" style="background:<?= e($t['color'] ?: '#6c757d') ?>;"><?= e($t['name']) ?></span>
+                        </td>
                         <td class="text-muted"><?= (int) $t['sort_order'] ?></td>
                         <td class="text-muted small"><?= date('M j, Y', strtotime($t['created_at'])) ?></td>
                         <td>

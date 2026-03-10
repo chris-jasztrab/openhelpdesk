@@ -166,7 +166,7 @@ $router->get('/agent/tickets', function () {
     $sql = "SELECT t.*,
                 tp.name AS priority_name, tp.color AS priority_color,
                 l.name  AS location_name,
-                tt.name AS type_name,
+                tt.name AS type_name, tt.color AS type_color,
                 g.name  AS group_name,
                 CONCAT(c.first_name, ' ', c.last_name) AS creator_name,
                 CONCAT(a.first_name, ' ', a.last_name) AS agent_name
@@ -611,7 +611,7 @@ $router->get('/agent/tickets/{id}', function (array $p) {
         "SELECT t.*,
                 tp.name AS priority_name, tp.color AS priority_color,
                 l.name  AS location_name,
-                tt.name AS type_name,
+                tt.name AS type_name, tt.color AS type_color,
                 c.first_name AS creator_first_name, c.last_name AS creator_last_name,
                 CONCAT(c.first_name, ' ', c.last_name) AS creator_name, c.email AS creator_email,
                 CONCAT(a.first_name, ' ', a.last_name) AS agent_name,
@@ -844,7 +844,7 @@ $router->get('/agent/tickets/{id}/split', function (array $p) {
     $db = Database::connect();
 
     $stmt = $db->prepare(
-        "SELECT t.*, l.name AS location_name, tt.name AS type_name,
+        "SELECT t.*, l.name AS location_name, tt.name AS type_name, tt.color AS type_color,
                 CONCAT(c.first_name, ' ', c.last_name) AS creator_name
          FROM tickets t
          LEFT JOIN ticket_types tt ON t.type_id = tt.id
