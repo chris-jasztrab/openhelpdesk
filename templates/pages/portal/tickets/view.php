@@ -240,7 +240,7 @@ $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-p
                     </dd>
 
                     <dt class="text-muted small">Type</dt>
-                    <dd><?= e($ticket['type_name'] ?? 'Not set') ?></dd>
+                    <dd><?= e($ticket['type_name'] ?: 'Not Set') ?></dd>
 
                     <dt class="text-muted small"><?= label('location.singular') ?></dt>
                     <dd><?= e($ticket['location_name'] ?? 'Not set') ?></dd>
