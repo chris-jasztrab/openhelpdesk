@@ -9,7 +9,7 @@ $sidebarItems = agentSidebar('dashboard');
 $statusColors = ['open' => 'primary', 'in_progress' => 'warning', 'pending' => 'info', 'resolved' => 'success', 'closed' => 'secondary'];
 $statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 'Pending', 'resolved' => 'Resolved', 'closed' => 'Closed'];
 ?>
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class=" mb-4">
     <div>
         <h2 class="fw-bold mb-1">Agent Dashboard</h2>
         <p class="text-muted mb-0">Welcome back, <?= e($user['first_name'] ?? 'Agent') ?></p>
@@ -72,9 +72,8 @@ $statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 
 </div>
 
 <div class="card border-0 shadow-sm" id="tour-recent-tickets">
-    <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
+    <div class="card-header bg-white border-bottom">
         <h5 class="mb-0 fw-semibold"><i class="bi bi-ticket-detailed me-2"></i>Recent Tickets</h5>
-        <a href="/agent/tickets" class="btn btn-sm btn-outline-secondary">View All</a>
     </div>
     <?php if (empty($recentTickets)): ?>
     <div class="card-body text-center py-5 text-muted">
