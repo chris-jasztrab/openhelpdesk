@@ -1973,6 +1973,16 @@ $router->post('/admin/tickets/create', function () {
         }
     }
 
+    // CC
+    $ccUserIds = array_values(array_unique(array_map('intval', (array) ($_POST['cc_user_ids'] ?? []))));
+    if (!empty($ccUserIds)) {
+        $ccInsert = $db->prepare('INSERT IGNORE INTO ticket_cc (ticket_id, user_id, added_by) VALUES (?, ?, ?)');
+        foreach ($ccUserIds as $uid) {
+            if ($uid > 0) {
+                $ccInsert->execute([$ticketId, $uid, Auth::id()]);
+            }
+        }
+    }
     // Timeline
     $db->prepare(
         'INSERT INTO ticket_timeline (ticket_id, user_id, action, details) VALUES (?, ?, ?, ?)'

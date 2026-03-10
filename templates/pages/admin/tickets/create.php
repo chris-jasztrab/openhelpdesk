@@ -200,6 +200,23 @@ $statusOptions = [
                 </div>
             </div>
 
+            <!-- CC -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-transparent fw-semibold">
+                    <i class="bi bi-people me-1"></i>CC
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-2">Add users to CC on this ticket. They will receive email updates.</p>
+                    <div id="ccBadges" class="d-flex flex-wrap gap-2 mb-2"></div>
+                    <div id="ccHiddenFields"></div>
+                    <div class="position-relative" style="max-width:360px;">
+                        <input type="text" class="form-control" id="ccSearchInput"
+                               placeholder="Search by name or email…" autocomplete="off">
+                        <div id="ccDropdown" class="mention-dropdown" style="display:none;"></div>
+                    </div>
+                </div>
+            </div>
+
             <?php if (getSetting('tags_enabled', '1') === '1'): ?>
             <!-- Tags -->
             <div class="card border-0 shadow-sm mb-4">
@@ -339,4 +356,100 @@ document.addEventListener('click', e => {
     }
 });
 <?php endif; ?>
+// ── CC autocomplete ─────────────────────────────────────────────
+(function() {
+    var ccInput   = document.getElementById('ccSearchInput');
+    var ccDrop    = document.getElementById('ccDropdown');
+    var ccBadges  = document.getElementById('ccBadges');
+    var ccHidden  = document.getElementById('ccHiddenFields');
+    var ccSet     = {};
+    var ccTimer   = null;
+    var ccResults = [];
+    var ccActive  = -1;
+
+    function escH(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+    function renderCcBadges() {
+        ccBadges.innerHTML = '';
+        Object.values(ccSet).forEach(function(u) {
+            var b = document.createElement('span');
+            b.className = 'badge bg-secondary d-inline-flex align-items-center gap-1 py-1 px-2';
+            b.innerHTML = escH(u.first_name + ' ' + u.last_name)
+                        + ' <span class="opacity-75 small">&lt;' + escH(u.email) + '&gt;</span>'
+                        + ' <button type="button" class="btn-close btn-close-white ms-1" style="font-size:.55rem;" aria-label="Remove" data-uid="' + u.id + '"></button>';
+            b.querySelector('.btn-close').addEventListener('click', function() {
+                delete ccSet[u.id]; renderCcBadges(); renderCcHidden();
+            });
+            ccBadges.appendChild(b);
+        });
+    }
+
+    function renderCcHidden() {
+        ccHidden.innerHTML = '';
+        Object.keys(ccSet).forEach(function(id) {
+            var inp = document.createElement('input');
+            inp.type = 'hidden'; inp.name = 'cc_user_ids[]'; inp.value = id;
+            ccHidden.appendChild(inp);
+        });
+    }
+
+    function ccAddUser(u) {
+        if (ccSet[u.id]) { ccClose(); ccInput.value = ''; return; }
+        ccSet[u.id] = u; renderCcBadges(); renderCcHidden();
+        ccInput.value = ''; ccClose();
+    }
+
+    function ccClose() {
+        ccDrop.style.display = 'none'; ccDrop.innerHTML = ''; ccActive = -1; ccResults = [];
+    }
+
+    function ccRenderDrop(data) {
+        ccResults = data; ccActive = -1;
+        if (!data.length) { ccClose(); return; }
+        var html = '';
+        data.forEach(function(u, i) {
+            var rb = u.role === 'admin' ? '<span class="badge bg-danger" style="font-size:.6rem;">Admin</span>'
+                   : u.role === 'agent' ? '<span class="badge bg-primary" style="font-size:.6rem;">Agent</span>'
+                   : '<span class="badge bg-secondary" style="font-size:.6rem;">User</span>';
+            html += '<div class="mention-item" data-index="' + i + '">'
+                  + '<span class="mention-name">' + escH(u.first_name + ' ' + u.last_name) + '</span> '
+                  + '<span class="text-muted" style="font-size:.75rem;">' + escH(u.email) + '</span> ' + rb
+                  + '</div>';
+        });
+        ccDrop.innerHTML = html; ccDrop.style.display = 'block';
+        ccDrop.querySelectorAll('.mention-item').forEach(function(el) {
+            el.addEventListener('mousedown', function(ev) {
+                ev.preventDefault(); ccAddUser(data[parseInt(this.dataset.index)]);
+            });
+        });
+    }
+
+    function ccSetActive(idx) {
+        ccActive = idx;
+        ccDrop.querySelectorAll('.mention-item').forEach(function(el, i) {
+            el.classList.toggle('active', i === idx);
+        });
+    }
+
+    ccInput.addEventListener('input', function() {
+        clearTimeout(ccTimer);
+        var q = this.value.trim();
+        if (q.length < 2) { ccClose(); return; }
+        ccTimer = setTimeout(function() {
+            fetch('/api/user-search?q=' + encodeURIComponent(q))
+                .then(function(r) { return r.json(); }).then(ccRenderDrop);
+        }, 250);
+    });
+
+    ccInput.addEventListener('keydown', function(ev) {
+        if (ev.key === 'ArrowDown') { ev.preventDefault(); ccSetActive(Math.min(ccActive + 1, ccResults.length - 1)); }
+        else if (ev.key === 'ArrowUp') { ev.preventDefault(); ccSetActive(Math.max(ccActive - 1, 0)); }
+        else if (ev.key === 'Enter') { ev.preventDefault(); if (ccActive >= 0 && ccResults[ccActive]) ccAddUser(ccResults[ccActive]); }
+        else if (ev.key === 'Escape') { ccClose(); }
+    });
+
+    document.addEventListener('click', function(ev) {
+        if (!ccInput.contains(ev.target) && !ccDrop.contains(ev.target)) ccClose();
+    });
+})();
 </script>
