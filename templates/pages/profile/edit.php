@@ -19,6 +19,7 @@ $breadcrumbs = [
             </div>
         </div>
 
+        <!-- Main profile form: name, appearance, notifications (no password fields) -->
         <form method="POST" action="/profile">
             <?= csrfField() ?>
 
@@ -38,34 +39,6 @@ $breadcrumbs = [
                             <label for="lastName" class="form-label">Last Name</label>
                             <input type="text" class="form-control" id="lastName" name="last_name"
                                    value="<?= e(old('last_name', $user['last_name'])) ?>" required>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Password -->
-            <div class="card border-0 shadow-sm mb-4">
-                <div class="card-header bg-transparent fw-semibold">
-                    <i class="bi bi-shield-lock me-1"></i>Change Password
-                </div>
-                <div class="card-body">
-                    <p class="text-muted small mb-3">Leave blank to keep your current password.</p>
-                    <div class="row g-3">
-                        <div class="col-12">
-                            <label for="currentPassword" class="form-label">Current Password</label>
-                            <input type="password" class="form-control" id="currentPassword" name="current_password"
-                                   autocomplete="current-password">
-                        </div>
-                        <div class="col-md-6">
-                            <label for="newPassword" class="form-label">New Password</label>
-                            <input type="password" class="form-control" id="newPassword" name="new_password"
-                                   minlength="8" autocomplete="new-password">
-                            <div class="form-text">Minimum 8 characters.</div>
-                        </div>
-                        <div class="col-md-6">
-                            <label for="confirmPassword" class="form-label">Confirm New Password</label>
-                            <input type="password" class="form-control" id="confirmPassword" name="confirm_password"
-                                   autocomplete="new-password">
                         </div>
                     </div>
                 </div>
@@ -181,6 +154,40 @@ $breadcrumbs = [
 
             <button type="submit" class="btn text-white px-4" style="background:var(--ld-primary);">
                 <i class="bi bi-check-lg me-1"></i>Save Changes
+            </button>
+        </form>
+
+        <!-- Separate form for password change to prevent autofill interference -->
+        <form method="POST" action="/profile/password" class="mt-4">
+            <?= csrfField() ?>
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-transparent fw-semibold">
+                    <i class="bi bi-shield-lock me-1"></i>Change Password
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">Leave blank to keep your current password.</p>
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label for="currentPassword" class="form-label">Current Password</label>
+                            <input type="password" class="form-control" id="currentPassword" name="current_password"
+                                   autocomplete="current-password">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="newPassword" class="form-label">New Password</label>
+                            <input type="password" class="form-control" id="newPassword" name="new_password"
+                                   minlength="8" autocomplete="new-password">
+                            <div class="form-text">Minimum 8 characters.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="confirmPassword" class="form-label">Confirm New Password</label>
+                            <input type="password" class="form-control" id="confirmPassword" name="confirm_password"
+                                   autocomplete="new-password">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-outline-secondary px-4">
+                <i class="bi bi-key me-1"></i>Update Password
             </button>
         </form>
 

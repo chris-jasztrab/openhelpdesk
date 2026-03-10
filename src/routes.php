@@ -909,51 +909,9 @@ $router->post('/profile', function () {
     $db     = Database::connect();
     $userId = Auth::id();
 
-    $currentPassword = $_POST['current_password'] ?? '';
-    $newPassword     = $_POST['new_password'] ?? '';
-    $confirmPassword = $_POST['confirm_password'] ?? '';
-
-    // Handle password change (only when user explicitly provides a new password)
-    if ($newPassword !== '') {
-        if ($currentPassword === '') {
-            flashInput($_POST);
-            flash('error', 'Please enter your current password to set a new one.');
-            redirect('/profile');
-            return;
-        }
-
-        // Fetch current hash
-        $stmt = $db->prepare('SELECT password FROM users WHERE id = ?');
-        $stmt->execute([$userId]);
-        $hash = $stmt->fetchColumn();
-
-        if (!password_verify($currentPassword, $hash)) {
-            flashInput($_POST);
-            flash('error', 'Current password is incorrect.');
-            redirect('/profile');
-            return;
-        }
-
-        if (strlen($newPassword) < 8) {
-            flashInput($_POST);
-            flash('error', 'New password must be at least 8 characters.');
-            redirect('/profile');
-            return;
-        }
-
-        if ($newPassword !== $confirmPassword) {
-            flashInput($_POST);
-            flash('error', 'New password and confirmation do not match.');
-            redirect('/profile');
-            return;
-        }
-
-        $stmt = $db->prepare('UPDATE users SET first_name = ?, last_name = ?, password = ? WHERE id = ?');
-        $stmt->execute([$fn, $ln, password_hash($newPassword, PASSWORD_DEFAULT), $userId]);
-    } else {
-        $stmt = $db->prepare('UPDATE users SET first_name = ?, last_name = ? WHERE id = ?');
-        $stmt->execute([$fn, $ln, $userId]);
-    }
+    // Update name (password handled by /profile/password)
+    $db->prepare('UPDATE users SET first_name = ?, last_name = ? WHERE id = ?')
+       ->execute([$fn, $ln, $userId]);
 
     // Save theme preference
     $theme = in_array($_POST['theme'] ?? '', ['light', 'dark'], true) ? $_POST['theme'] : 'light';
@@ -998,6 +956,56 @@ $router->post('/profile', function () {
     $_SESSION['user']['last_name']  = $ln;
 
     flash('success', 'Profile updated successfully.');
+    redirect('/profile');
+});
+
+$router->post('/profile/password', function () {
+    Auth::requireAuth();
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/profile');
+        return;
+    }
+
+    $currentPassword = $_POST['current_password'] ?? '';
+    $newPassword     = $_POST['new_password'] ?? '';
+    $confirmPassword = $_POST['confirm_password'] ?? '';
+
+    if ($currentPassword === '' || $newPassword === '') {
+        flash('error', 'Please fill in both your current and new password.');
+        redirect('/profile');
+        return;
+    }
+
+    $db     = Database::connect();
+    $userId = Auth::id();
+
+    $stmt = $db->prepare('SELECT password FROM users WHERE id = ?');
+    $stmt->execute([$userId]);
+    $hash = $stmt->fetchColumn();
+
+    if (!password_verify($currentPassword, $hash)) {
+        flash('error', 'Current password is incorrect.');
+        redirect('/profile');
+        return;
+    }
+
+    if (strlen($newPassword) < 8) {
+        flash('error', 'New password must be at least 8 characters.');
+        redirect('/profile');
+        return;
+    }
+
+    if ($newPassword !== $confirmPassword) {
+        flash('error', 'New password and confirmation do not match.');
+        redirect('/profile');
+        return;
+    }
+
+    $db->prepare('UPDATE users SET password = ? WHERE id = ?')
+       ->execute([password_hash($newPassword, PASSWORD_DEFAULT), $userId]);
+
+    flash('success', 'Password updated successfully.');
     redirect('/profile');
 });
 
