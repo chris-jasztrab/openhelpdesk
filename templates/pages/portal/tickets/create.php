@@ -83,20 +83,19 @@ endif; ?>
                         <?= label('location.singular') ?>
                         <?php if ($userHasNoLocation): ?><span class="text-danger">*</span><?php endif; ?>
                     </label>
-                    <?php if ($userHasNoLocation): ?>
-                    <select class="form-select" id="location_id" name="location_id" required>
-                        <option value="">— Select your <?= label('location.singular') ?> —</option>
+                    <select class="form-select" id="location_id" name="location_id">
+                        <option value="">— Select a <?= label('location.singular') ?> —</option>
                         <?php foreach ($locations as $loc): ?>
-                        <option value="<?= (int) $loc['id'] ?>"
-                            <?= old('location_id') == $loc['id'] ? 'selected' : '' ?>>
+                        <?php
+                        $selected = (old('location_id') != '')
+                            ? (old('location_id') == $loc['id'])
+                            : ((int) $loc['id'] === (int) $userLocationId);
+                        ?>
+                        <option value="<?= (int) $loc['id'] ?>" <?= $selected ? 'selected' : '' ?>>
                             <?= e($loc['name']) ?>
                         </option>
                         <?php endforeach; ?>
                     </select>
-                    <div class="form-text"><i class="bi bi-info-circle me-1"></i>Your selection will be saved to your profile for future tickets.</div>
-                    <?php else: ?>
-                    <input type="text" class="form-control" value="<?= e($userLocationName) ?>" readonly disabled>
-                    <?php endif; ?>
                 </div>
             </div>
 

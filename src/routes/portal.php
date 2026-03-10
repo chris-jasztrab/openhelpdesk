@@ -206,24 +206,19 @@ $router->post('/portal/tickets/create', function () {
     $osInfo      = trim($_POST['os_info'] ?? '');
     $tagNames    = $_POST['tags'] ?? [];
 
-    // Determine location: use profile location, or save the user's chosen location
+    // Determine location: use the submitted value if provided, otherwise fall back to profile location
     $db = Database::connect();
     $userLocStmt = $db->prepare('SELECT location_id FROM users WHERE id = ?');
     $userLocStmt->execute([Auth::id()]);
-    $locationId = $userLocStmt->fetchColumn() ?: null;
-    if (!$locationId) {
-        $chosenLocId = !empty($_POST['location_id']) ? (int) $_POST['location_id'] : null;
-        if ($chosenLocId) {
-            // Validate the chosen location exists
-            $locCheck = $db->prepare('SELECT id FROM locations WHERE id = ?');
-            $locCheck->execute([$chosenLocId]);
-            if ($locCheck->fetchColumn()) {
-                $locationId = $chosenLocId;
-                // Save to user profile so future tickets pre-fill this location
-                $db->prepare('UPDATE users SET location_id = ? WHERE id = ?')
-                   ->execute([$locationId, Auth::id()]);
-            }
-        }
+    $profileLocationId = $userLocStmt->fetchColumn() ?: null;
+
+    $chosenLocId = !empty($_POST['location_id']) ? (int) $_POST['location_id'] : null;
+    if ($chosenLocId) {
+        $locCheck = $db->prepare('SELECT id FROM locations WHERE id = ?');
+        $locCheck->execute([$chosenLocId]);
+        $locationId = $locCheck->fetchColumn() ? $chosenLocId : $profileLocationId;
+    } else {
+        $locationId = $profileLocationId;
     }
 
     // Assignment is handled by agents/admins, not portal users
