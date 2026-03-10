@@ -913,8 +913,15 @@ $router->post('/profile', function () {
     $newPassword     = $_POST['new_password'] ?? '';
     $confirmPassword = $_POST['confirm_password'] ?? '';
 
-    // Handle password change
-    if ($newPassword !== '' || $currentPassword !== '') {
+    // Handle password change (only when user explicitly provides a new password)
+    if ($newPassword !== '') {
+        if ($currentPassword === '') {
+            flashInput($_POST);
+            flash('error', 'Please enter your current password to set a new one.');
+            redirect('/profile');
+            return;
+        }
+
         // Fetch current hash
         $stmt = $db->prepare('SELECT password FROM users WHERE id = ?');
         $stmt->execute([$userId]);
