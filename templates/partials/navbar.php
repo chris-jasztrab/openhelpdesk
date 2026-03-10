@@ -56,7 +56,7 @@
                         <?php if (in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)): ?>
                         <button type="button" class="btn btn-sm px-2 py-1 ld-search-tab" data-type="contacts">Contacts</button>
                         <?php endif; ?>
-                        <button type="button" class="btn btn-sm px-2 py-1 ld-search-tab" data-type="kb">KB Articles</button>
+                        <button type="button" class="btn btn-sm px-2 py-1 ld-search-tab" data-type="kb">Knowledge Base Articles</button>
                     </div>
                     <div id="ld-search-results" class="p-2">
                         <div class="text-center text-muted py-3 small">Type to search...</div>
