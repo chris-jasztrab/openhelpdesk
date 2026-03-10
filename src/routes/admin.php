@@ -1030,14 +1030,85 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
     redirect('/admin/types');
 });
 
+$router->get('/admin/types/{id}/delete-confirm', function (array $p) {
+    Auth::requireRole('admin');
+    $db  = Database::connect();
+    $id  = (int) $p['id'];
+
+    $typeStmt = $db->prepare('SELECT * FROM ticket_types WHERE id = ?');
+    $typeStmt->execute([$id]);
+    $type = $typeStmt->fetch();
+    if (!$type) {
+        flash('error', 'Ticket type not found.');
+        redirect('/admin/types');
+    }
+
+    $countStmt = $db->prepare('SELECT COUNT(*) FROM tickets WHERE type_id = ?');
+    $countStmt->execute([$id]);
+    $ticketCount = (int) $countStmt->fetchColumn();
+
+    $tickets = [];
+    if ($ticketCount > 0) {
+        $tStmt = $db->prepare('SELECT t.id, t.subject, t.status, u.first_name, u.last_name FROM tickets t LEFT JOIN users u ON u.id = t.assigned_to WHERE t.type_id = ? ORDER BY t.id DESC');
+        $tStmt->execute([$id]);
+        $tickets = $tStmt->fetchAll();
+    }
+
+    $otherTypesStmt = $db->prepare('SELECT id, name FROM ticket_types WHERE id != ? ORDER BY sort_order, name');
+    $otherTypesStmt->execute([$id]);
+    $otherTypes = $otherTypesStmt->fetchAll();
+
+    render('admin/types/delete-confirm', [
+        'type'        => $type,
+        'ticketCount' => $ticketCount,
+        'tickets'     => $tickets,
+        'otherTypes'  => $otherTypes,
+    ]);
+});
+
 $router->post('/admin/types/{id}/delete', function (array $p) {
     Auth::requireRole('admin');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/types');
     }
-    Database::connect()->prepare('DELETE FROM ticket_types WHERE id = ?')->execute([(int) $p['id']]);
-    flash('success', 'Ticket type deleted.');
+    $db     = Database::connect();
+    $id     = (int) $p['id'];
+    $action = $_POST['action'] ?? '';
+
+    $typeStmt = $db->prepare('SELECT name FROM ticket_types WHERE id = ?');
+    $typeStmt->execute([$id]);
+    $typeName = $typeStmt->fetchColumn();
+    if (!$typeName) {
+        flash('error', 'Ticket type not found.');
+        redirect('/admin/types');
+    }
+
+    // Check if any tickets use this type
+    $countStmt = $db->prepare('SELECT COUNT(*) FROM tickets WHERE type_id = ?');
+    $countStmt->execute([$id]);
+    $ticketCount = (int) $countStmt->fetchColumn();
+
+    if ($ticketCount > 0 && $action === '') {
+        // No action chosen yet — redirect to confirmation page
+        redirect("/admin/types/{$id}/delete-confirm");
+    }
+
+    if ($action === 'delete_tickets') {
+        $db->prepare('DELETE FROM tickets WHERE type_id = ?')->execute([$id]);
+    } elseif ($action === 'reassign') {
+        $newTypeId = (int) ($_POST['new_type_id'] ?? 0);
+        $checkStmt = $db->prepare('SELECT id FROM ticket_types WHERE id = ? AND id != ?');
+        $checkStmt->execute([$newTypeId, $id]);
+        if (!$checkStmt->fetch()) {
+            flash('error', 'Please select a valid replacement ticket type.');
+            redirect("/admin/types/{$id}/delete-confirm");
+        }
+        $db->prepare('UPDATE tickets SET type_id = ? WHERE type_id = ?')->execute([$newTypeId, $id]);
+    }
+
+    $db->prepare('DELETE FROM ticket_types WHERE id = ?')->execute([$id]);
+    flash('success', "Ticket type \"{$typeName}\" deleted.");
     redirect('/admin/types');
 });
 

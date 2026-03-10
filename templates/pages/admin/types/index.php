@@ -46,8 +46,7 @@ $breadcrumbs  = [
                                 <a href="/admin/types/<?= $t['id'] ?>/edit" class="btn btn-sm btn-outline-primary" title="Edit">
                                     <i class="bi bi-pencil"></i>
                                 </a>
-                                <form method="POST" action="/admin/types/<?= $t['id'] ?>/delete" class="d-inline"
-                                      onsubmit="return confirm('Delete this ticket type?')">
+                                <form method="POST" action="/admin/types/<?= $t['id'] ?>/delete" class="d-inline">
                                     <?= csrfField() ?>
                                     <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
                                         <i class="bi bi-trash"></i>
