@@ -7492,9 +7492,17 @@ $router->post('/admin/workflows/ticket-fields/{id}/update', function (array $p) 
         exit;
     }
 
-    $db->prepare(
-        'UPDATE ticket_form_fields SET label=?, placeholder=?, is_required=?, is_visible=?, config=?, updated_at=NOW() WHERE id=?'
-    )->execute([$label, $placeholder ?: null, $isRequired, $isVisible, $config, $id]);
+    // For image fields, never overwrite config from this endpoint — the image path
+    // is managed exclusively by the upload-image endpoint.
+    if ($fieldType === 'image' && !isset($body['config'])) {
+        $db->prepare(
+            'UPDATE ticket_form_fields SET label=?, placeholder=?, is_required=?, is_visible=?, updated_at=NOW() WHERE id=?'
+        )->execute([$label, $placeholder ?: null, $isRequired, $isVisible, $id]);
+    } else {
+        $db->prepare(
+            'UPDATE ticket_form_fields SET label=?, placeholder=?, is_required=?, is_visible=?, config=?, updated_at=NOW() WHERE id=?'
+        )->execute([$label, $placeholder ?: null, $isRequired, $isVisible, $config, $id]);
+    }
 
     // Replace options for dropdown / dependent fields
     if (in_array($fieldType, ['dropdown', 'dependent'], true) && isset($body['options'])) {
