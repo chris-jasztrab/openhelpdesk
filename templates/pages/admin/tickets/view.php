@@ -15,6 +15,31 @@ $slaStateColors = ['on_track' => 'success', 'warning' => 'warning', 'breached' =
 $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' => 'Breached'];
 ?>
 <link rel="stylesheet" href="https://cdn.ckeditor.com/ckeditor5/43.3.1/ckeditor5.css">
+<script type="importmap">
+{"imports":{"ckeditor5":"https://cdn.ckeditor.com/ckeditor5/43.3.1/ckeditor5.js","ckeditor5/":"https://cdn.ckeditor.com/ckeditor5/43.3.1/"}}
+</script>
+<style>
+#replyEditor .ck.ck-editor__editable { min-height: 150px; }
+.ck.ck-toolbar { border-radius: .375rem .375rem 0 0 !important; border-color: #dee2e6 !important; }
+.ck.ck-editor__editable { border-radius: 0 0 .375rem .375rem !important; border-color: #dee2e6 !important; }
+[data-bs-theme="dark"] .ck.ck-toolbar,
+[data-bs-theme="dark"] .ck.ck-toolbar__separator { background: #2b3035 !important; border-color: #495057 !important; }
+[data-bs-theme="dark"] .ck.ck-button:not(.ck-disabled):hover,
+[data-bs-theme="dark"] .ck.ck-button.ck-on { background: #373b3e !important; }
+[data-bs-theme="dark"] .ck.ck-button { color: #dee2e6 !important; }
+[data-bs-theme="dark"] .ck.ck-icon { color: #dee2e6 !important; }
+[data-bs-theme="dark"] .ck.ck-editor__editable { background: #212529 !important; color: #dee2e6 !important; border-color: #495057 !important; }
+[data-bs-theme="dark"] .ck.ck-editor__editable:not(.ck-focused) { border-color: #495057 !important; }
+[data-bs-theme="dark"] .ck.ck-list { background: #2b3035 !important; border-color: #495057 !important; }
+[data-bs-theme="dark"] .ck.ck-list__item .ck-button:hover { background: #373b3e !important; }
+[data-bs-theme="dark"] .ck.ck-dropdown__panel { background: #2b3035 !important; border-color: #495057 !important; }
+[data-bs-theme="dark"] .ck.ck-label,
+[data-bs-theme="dark"] .ck.ck-heading_paragraph,
+[data-bs-theme="dark"] .ck.ck-list__item .ck-button .ck-button__label { color: #dee2e6 !important; }
+[data-bs-theme="dark"] .ck.ck-input { background: #212529 !important; color: #dee2e6 !important; border-color: #495057 !important; }
+[data-bs-theme="dark"] .ck.ck-balloon-panel { background: #2b3035 !important; border-color: #495057 !important; }
+[data-bs-theme="dark"] .ck.ck-color-grid__tile:hover { border-color: #fff !important; }
+</style>
 <?php if ($ticket['merged_into_ticket_id']): ?>
 <div class="alert alert-warning d-flex align-items-center gap-2 mb-4" role="alert">
     <i class="bi bi-arrow-right-circle-fill fs-5"></i>
@@ -162,14 +187,22 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
                                     <small class="text-muted"><?= date('M j, Y g:i A', strtotime($entry['created_at'])) ?></small>
                                 </div>
                                 <?php if ($entry['details']): ?>
-                                <div class="mt-1 text-muted" style="white-space:pre-wrap;"><?php
-                                    $det = linkify($entry['details']);
-                                    if ($entry['action'] === 'merged') {
-                                        $det = preg_replace('/Ticket #(\d+)/', '<a href="/admin/tickets/$1" class="text-reset" target="_blank" rel="noopener">Ticket #$1</a>', $det);
-                                        $det = preg_replace('/(merged into )#(\d+)/', '$1<a href="/admin/tickets/$2" class="text-reset" target="_blank" rel="noopener">#$2</a>', $det);
+                                <?php
+                                    $det = $entry['details'] ?? '';
+                                    $isHtmlDet = $det !== '' && ltrim($det)[0] === '<';
+                                    if (!$isHtmlDet) {
+                                        $det = linkify($det);
+                                        if ($entry['action'] === 'merged') {
+                                            $det = preg_replace('/Ticket #(\d+)/', '<a href="/admin/tickets/$1" class="text-reset" target="_blank" rel="noopener">Ticket #$1</a>', $det);
+                                            $det = preg_replace('/(merged into )#(\d+)/', '$1<a href="/admin/tickets/$2" class="text-reset" target="_blank" rel="noopener">#$2</a>', $det);
+                                        }
                                     }
-                                    echo $det;
-                                ?></div>
+                                ?>
+                                <?php if ($isHtmlDet): ?>
+                                <div class="mt-1 ck-content"><?= $det ?></div>
+                                <?php else: ?>
+                                <div class="mt-1 text-muted" style="white-space:pre-wrap;"><?= $det ?></div>
+                                <?php endif; ?>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -235,8 +268,8 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
                         <input type="hidden" name="is_internal" id="replyIsInternal" value="0">
                         <input type="hidden" name="status_after" id="replyStatusAfter" value="">
                         <div class="mb-3" style="position:relative;">
-                            <textarea class="form-control" name="message" id="commentMessage" rows="4" required
-                                      placeholder="Write a message... Type @ to mention someone"></textarea>
+                            <div id="replyEditor"></div>
+                            <input type="hidden" name="message" id="replyMessageHidden">
                             <div id="mentionDropdown" class="mention-dropdown" style="display:none;"></div>
                         </div>
                         <div class="mb-3">
@@ -622,118 +655,6 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
     });
 })();
 
-(function() {
-    var textarea = document.getElementById('commentMessage');
-    var dropdown = document.getElementById('mentionDropdown');
-    var debounceTimer = null;
-    var activeIndex = -1;
-    var items = [];
-    var mentionStart = -1;
-
-    function getQuery() {
-        var val = textarea.value, pos = textarea.selectionStart;
-        // Scan backwards from cursor for @ trigger
-        for (var i = pos - 1; i >= 0; i--) {
-            if (val[i] === '@') {
-                // Must be start of string or preceded by whitespace
-                if (i === 0 || /\s/.test(val[i - 1])) {
-                    mentionStart = i;
-                    return val.substring(i + 1, pos);
-                }
-                break;
-            }
-            // Stop scanning if we hit whitespace before finding @
-            if (/\s/.test(val[i]) && i < pos - 1) break;
-        }
-        mentionStart = -1;
-        return null;
-    }
-
-    function render(results) {
-        items = results;
-        activeIndex = -1;
-        if (!results.length) { dropdown.style.display = 'none'; return; }
-        var html = '';
-        results.forEach(function(u, idx) {
-            var badge = u.role === 'admin' ? '<span class="badge bg-danger" style="font-size:.65rem;">Admin</span>'
-                                           : '<span class="badge bg-primary" style="font-size:.65rem;">Agent</span>';
-            html += '<div class="mention-item" data-index="' + idx + '">'
-                  + '<span class="mention-name">' + u.first_name + ' ' + u.last_name + '</span> ' + badge
-                  + '</div>';
-        });
-        dropdown.innerHTML = html;
-        dropdown.style.display = 'block';
-
-        dropdown.querySelectorAll('.mention-item').forEach(function(el) {
-            el.addEventListener('mousedown', function(ev) {
-                ev.preventDefault();
-                select(parseInt(this.dataset.index));
-            });
-        });
-    }
-
-    function select(idx) {
-        if (idx < 0 || idx >= items.length) return;
-        var u = items[idx];
-        var name = '@' + u.first_name + ' ' + u.last_name + ' ';
-        var val = textarea.value;
-        var pos = textarea.selectionStart;
-        textarea.value = val.substring(0, mentionStart) + name + val.substring(pos);
-        var newPos = mentionStart + name.length;
-        textarea.focus();
-        textarea.selectionStart = textarea.selectionEnd = newPos;
-        close();
-    }
-
-    function close() {
-        dropdown.style.display = 'none';
-        items = [];
-        activeIndex = -1;
-        mentionStart = -1;
-    }
-
-    function highlight(idx) {
-        var els = dropdown.querySelectorAll('.mention-item');
-        els.forEach(function(el) { el.classList.remove('active'); });
-        if (idx >= 0 && idx < els.length) {
-            els[idx].classList.add('active');
-            els[idx].scrollIntoView({ block: 'nearest' });
-        }
-        activeIndex = idx;
-    }
-
-    textarea.addEventListener('input', function() {
-        clearTimeout(debounceTimer);
-        var q = getQuery();
-        if (q === null || q.length < 1) { close(); return; }
-        debounceTimer = setTimeout(function() {
-            fetch('/api/mention-search?q=' + encodeURIComponent(q))
-                .then(function(r) { return r.json(); })
-                .then(function(data) { render(data); });
-        }, 250);
-    });
-
-    textarea.addEventListener('keydown', function(ev) {
-        if (dropdown.style.display === 'none') return;
-        if (ev.key === 'ArrowDown') {
-            ev.preventDefault();
-            highlight(Math.min(activeIndex + 1, items.length - 1));
-        } else if (ev.key === 'ArrowUp') {
-            ev.preventDefault();
-            highlight(Math.max(activeIndex - 1, 0));
-        } else if ((ev.key === 'Enter' || ev.key === 'Tab') && activeIndex >= 0) {
-            ev.preventDefault();
-            select(activeIndex);
-        } else if (ev.key === 'Escape') {
-            ev.preventDefault();
-            close();
-        }
-    });
-
-    document.addEventListener('click', function(ev) {
-        if (!dropdown.contains(ev.target) && ev.target !== textarea) close();
-    });
-})();
 
 <?php if (getSetting('tags_enabled', '1') === '1'): ?>
 // Tag management
@@ -1112,7 +1033,6 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
     var submitLabel  = document.getElementById('replySubmitLabel');
     var submitIcon   = document.getElementById('replySubmitIcon');
     var closeBtn     = document.getElementById('replyBoxClose');
-    var textarea     = document.getElementById('commentMessage');
     var btnReply     = document.getElementById('btnReply');
     var btnForward   = document.getElementById('btnForward');
     var btnNote      = document.getElementById('btnNote');
@@ -1136,7 +1056,7 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
         statusAfterEl.value  = '';
         box.style.display    = '';
         box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        setTimeout(function() { textarea.focus(); }, 80);
+        setTimeout(function() { if (window._replyEditor) window._replyEditor.editing.view.focus(); }, 80);
         [btnReply, btnForward, btnNote].forEach(function(b) { b.classList.remove('active'); });
         ({ reply: btnReply, forward: btnForward, note: btnNote })[mode].classList.add('active');
     }
@@ -1271,11 +1191,12 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
         listEl.querySelectorAll('.cr-item').forEach(function (el) {
             el.addEventListener('click', function () {
                 var resolved = resolveTokens(this.dataset.body);
-                var ta    = document.getElementById('commentMessage');
-                var start = ta.selectionStart, end = ta.selectionEnd;
-                ta.value = ta.value.substring(0, start) + resolved + ta.value.substring(end);
-                ta.selectionStart = ta.selectionEnd = start + resolved.length;
-                ta.focus();
+                if (window._replyEditor) {
+                    window._replyEditor.model.change(function(writer) {
+                        window._replyEditor.model.insertContent(writer.createText(resolved));
+                    });
+                    window._replyEditor.editing.view.focus();
+                }
                 modal.hide();
             });
         });
@@ -1289,4 +1210,209 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
              + '</button>';
     }
 })();
+</script>
+
+<script type="module">
+import {
+    ClassicEditor,
+    Essentials,
+    Heading,
+    Bold, Italic, Underline, Strikethrough,
+    FontColor, FontBackgroundColor, FontSize,
+    Alignment,
+    List, ListProperties,
+    Link, AutoLink,
+    Image, ImageUpload, Base64UploadAdapter,
+    ImageCaption, ImageStyle, ImageToolbar, ImageResize,
+    Table, TableToolbar, TableProperties, TableCellProperties,
+    BlockQuote,
+    Code, CodeBlock,
+    HorizontalLine,
+    Indent, IndentBlock,
+    FindAndReplace,
+    RemoveFormat
+} from 'ckeditor5';
+
+ClassicEditor.create(document.querySelector('#replyEditor'), {
+    plugins: [
+        Essentials,
+        Heading,
+        Bold, Italic, Underline, Strikethrough,
+        FontColor, FontBackgroundColor, FontSize,
+        Alignment,
+        List, ListProperties,
+        Link, AutoLink,
+        Image, ImageUpload, Base64UploadAdapter,
+        ImageCaption, ImageStyle, ImageToolbar, ImageResize,
+        Table, TableToolbar, TableProperties, TableCellProperties,
+        BlockQuote,
+        Code, CodeBlock,
+        HorizontalLine,
+        Indent, IndentBlock,
+        FindAndReplace,
+        RemoveFormat
+    ],
+    toolbar: {
+        items: [
+            'heading', '|',
+            'fontSize', 'fontColor', 'fontBackgroundColor', '|',
+            'bold', 'italic', 'underline', 'strikethrough', 'removeFormat', '|',
+            'alignment', '|',
+            'bulletedList', 'numberedList', 'outdent', 'indent', '|',
+            'link', 'insertImage', 'insertTable', 'blockQuote', 'codeBlock', 'horizontalLine', '|',
+            'findAndReplace', 'undo', 'redo'
+        ],
+        shouldNotGroupWhenFull: true
+    },
+    heading: {
+        options: [
+            { model: 'paragraph', title: 'Paragraph', class: 'ck-heading_paragraph' },
+            { model: 'heading1', view: 'h1', title: 'Heading 1', class: 'ck-heading_heading1' },
+            { model: 'heading2', view: 'h2', title: 'Heading 2', class: 'ck-heading_heading2' },
+            { model: 'heading3', view: 'h3', title: 'Heading 3', class: 'ck-heading_heading3' }
+        ]
+    },
+    image: {
+        toolbar: [
+            'imageStyle:inline', 'imageStyle:block', 'imageStyle:side', '|',
+            'toggleImageCaption', 'imageTextAlternative', '|',
+            'resizeImage'
+        ]
+    },
+    table: {
+        contentToolbar: [
+            'tableColumn', 'tableRow', 'mergeTableCells', 'tableProperties', 'tableCellProperties'
+        ]
+    },
+    initialData: ''
+}).then(function(editor) {
+    window._replyEditor = editor;
+
+    // Form submit: validate and populate hidden field
+    document.getElementById('replyForm').addEventListener('submit', function(e) {
+        var data = editor.getData();
+        var text = data.replace(/<[^>]*>/g, '').trim();
+        if (!text) {
+            e.preventDefault();
+            editor.editing.view.focus();
+            return;
+        }
+        document.getElementById('replyMessageHidden').value = data;
+    });
+
+    // @mention autocomplete
+    var dropdown = document.getElementById('mentionDropdown');
+    var debounceTimer = null;
+    var activeIndex = -1;
+    var items = [];
+
+    function getMentionInfo() {
+        var sel = editor.model.document.selection;
+        var pos = sel.getFirstPosition();
+        if (!pos || !pos.textNode) return null;
+        var text = pos.textNode.data.substring(0, pos.offset);
+        for (var i = text.length - 1; i >= 0; i--) {
+            if (text[i] === '@') {
+                if (i === 0 || /\s/.test(text[i - 1])) {
+                    return { start: i, query: text.substring(i + 1), textNode: pos.textNode, endOffset: pos.offset };
+                }
+                return null;
+            }
+            if (/\s/.test(text[i])) return null;
+        }
+        return null;
+    }
+
+    function renderDrop(results) {
+        items = results;
+        activeIndex = -1;
+        if (!results.length) { closeDrop(); return; }
+        var html = '';
+        results.forEach(function(u, idx) {
+            var badge = u.role === 'admin'
+                ? '<span class="badge bg-danger" style="font-size:.65rem;">Admin</span>'
+                : '<span class="badge bg-primary" style="font-size:.65rem;">Agent</span>';
+            html += '<div class="mention-item" data-index="' + idx + '">'
+                  + '<span class="mention-name">' + u.first_name + ' ' + u.last_name + '</span> ' + badge
+                  + '</div>';
+        });
+        dropdown.innerHTML = html;
+        dropdown.style.display = 'block';
+        dropdown.querySelectorAll('.mention-item').forEach(function(el) {
+            el.addEventListener('mousedown', function(ev) {
+                ev.preventDefault();
+                selectMention(parseInt(this.dataset.index));
+            });
+        });
+    }
+
+    function selectMention(idx) {
+        if (idx < 0 || idx >= items.length) return;
+        var u = items[idx];
+        var text = '@' + u.first_name + ' ' + u.last_name + ' ';
+        var info = getMentionInfo();
+        editor.model.change(function(writer) {
+            var sel = editor.model.document.selection;
+            var pos = sel.getFirstPosition();
+            if (!pos) return;
+            if (info && info.textNode) {
+                var startPos = writer.createPositionAt(info.textNode, info.start);
+                var range = writer.createRange(startPos, pos);
+                writer.insertText(text, writer.createSelection(range));
+            } else {
+                writer.insertText(text, pos);
+            }
+        });
+        closeDrop();
+    }
+
+    function closeDrop() {
+        dropdown.style.display = 'none';
+        items = [];
+        activeIndex = -1;
+    }
+
+    function highlightDrop(idx) {
+        var els = dropdown.querySelectorAll('.mention-item');
+        els.forEach(function(el) { el.classList.remove('active'); });
+        if (idx >= 0 && idx < els.length) {
+            els[idx].classList.add('active');
+            els[idx].scrollIntoView({ block: 'nearest' });
+        }
+        activeIndex = idx;
+    }
+
+    editor.model.document.on('change:data', function() {
+        clearTimeout(debounceTimer);
+        var info = getMentionInfo();
+        if (!info || info.query.length < 1) { closeDrop(); return; }
+        debounceTimer = setTimeout(function() {
+            fetch('/api/mention-search?q=' + encodeURIComponent(info.query))
+                .then(function(r) { return r.json(); })
+                .then(function(data) { renderDrop(data); });
+        }, 250);
+    });
+
+    editor.editing.view.document.on('keydown', function(evt, data) {
+        if (dropdown.style.display === 'none') return;
+        if (data.keyCode === 40) {
+            data.preventDefault(); evt.stop();
+            highlightDrop(Math.min(activeIndex + 1, items.length - 1));
+        } else if (data.keyCode === 38) {
+            data.preventDefault(); evt.stop();
+            highlightDrop(Math.max(activeIndex - 1, 0));
+        } else if ((data.keyCode === 13 || data.keyCode === 9) && activeIndex >= 0) {
+            data.preventDefault(); evt.stop();
+            selectMention(activeIndex);
+        } else if (data.keyCode === 27) {
+            data.preventDefault(); evt.stop();
+            closeDrop();
+        }
+    }, { priority: 'high' });
+
+    document.addEventListener('click', function(ev) {
+        if (!dropdown.contains(ev.target)) closeDrop();
+    });
+
+}).catch(console.error);
 </script>
