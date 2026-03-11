@@ -11,38 +11,38 @@ $breadcrumbs  = [
 $action = $isEdit ? "/admin/kb/articles/{$editing['id']}/edit" : '/admin/kb/articles/create';
 
 // Lazily migrate legacy markdown to HTML for the editor.
-// If the stored content doesn't start with '<', it's still markdown — convert now.
 $rawBody = old('body_markdown', $editing['body_markdown'] ?? '');
 if ($rawBody !== '' && ltrim($rawBody)[0] !== '<') {
     $rawBody = renderMarkdown($rawBody);
 }
 ?>
-<link href="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.snow.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.ckeditor.com/ckeditor5/43.3.1/ckeditor5.css">
+<script type="importmap">
+{"imports":{"ckeditor5":"https://cdn.ckeditor.com/ckeditor5/43.3.1/ckeditor5.js","ckeditor5/":"https://cdn.ckeditor.com/ckeditor5/43.3.1/"}}
+</script>
 <style>
-/* Editor container sizing */
-#kb-editor { min-height: 420px; font-size: 1rem; }
-.ql-toolbar.ql-snow { border-radius: .375rem .375rem 0 0; border-color: #dee2e6; }
-.ql-container.ql-snow { border-radius: 0 0 .375rem .375rem; border-color: #dee2e6; }
-.ql-editor { min-height: 400px; }
+.ck.ck-editor__editable { min-height: 420px; }
+.ck.ck-toolbar { border-radius: .375rem .375rem 0 0 !important; border-color: #dee2e6 !important; }
+.ck.ck-editor__editable { border-radius: 0 0 .375rem .375rem !important; border-color: #dee2e6 !important; }
 
 /* Dark mode */
-[data-bs-theme="dark"] .ql-toolbar.ql-snow,
-[data-bs-theme="dark"] .ql-container.ql-snow { border-color: #495057; background: #2b3035; }
-[data-bs-theme="dark"] .ql-editor { color: #dee2e6; background: #212529; }
-[data-bs-theme="dark"] .ql-toolbar .ql-stroke { stroke: #adb5bd; }
-[data-bs-theme="dark"] .ql-toolbar .ql-fill { fill: #adb5bd; }
-[data-bs-theme="dark"] .ql-toolbar .ql-picker { color: #adb5bd; }
-[data-bs-theme="dark"] .ql-toolbar .ql-picker-options { background: #2b3035; border-color: #495057; }
-[data-bs-theme="dark"] .ql-toolbar button:hover .ql-stroke,
-[data-bs-theme="dark"] .ql-toolbar button.ql-active .ql-stroke { stroke: #fff; }
-[data-bs-theme="dark"] .ql-toolbar button:hover .ql-fill,
-[data-bs-theme="dark"] .ql-toolbar button.ql-active .ql-fill { fill: #fff; }
-[data-bs-theme="dark"] .ql-toolbar button:hover,
-[data-bs-theme="dark"] .ql-toolbar button.ql-active,
-[data-bs-theme="dark"] .ql-toolbar .ql-picker-label:hover,
-[data-bs-theme="dark"] .ql-toolbar .ql-picker-label.ql-active { color: #fff; }
-[data-bs-theme="dark"] .ql-snow .ql-tooltip { background: #2b3035; border-color: #495057; color: #dee2e6; box-shadow: none; }
-[data-bs-theme="dark"] .ql-snow .ql-tooltip input[type="text"] { background: #212529; border-color: #495057; color: #dee2e6; }
+[data-bs-theme="dark"] .ck.ck-toolbar,
+[data-bs-theme="dark"] .ck.ck-toolbar__separator { background: #2b3035 !important; border-color: #495057 !important; }
+[data-bs-theme="dark"] .ck.ck-button:not(.ck-disabled):hover,
+[data-bs-theme="dark"] .ck.ck-button.ck-on { background: #373b3e !important; }
+[data-bs-theme="dark"] .ck.ck-button { color: #dee2e6 !important; }
+[data-bs-theme="dark"] .ck.ck-icon { color: #dee2e6 !important; }
+[data-bs-theme="dark"] .ck.ck-editor__editable { background: #212529 !important; color: #dee2e6 !important; border-color: #495057 !important; }
+[data-bs-theme="dark"] .ck.ck-editor__editable:not(.ck-focused) { border-color: #495057 !important; }
+[data-bs-theme="dark"] .ck.ck-list { background: #2b3035 !important; border-color: #495057 !important; }
+[data-bs-theme="dark"] .ck.ck-list__item .ck-button:hover { background: #373b3e !important; }
+[data-bs-theme="dark"] .ck.ck-dropdown__panel { background: #2b3035 !important; border-color: #495057 !important; }
+[data-bs-theme="dark"] .ck.ck-label,
+[data-bs-theme="dark"] .ck.ck-heading_paragraph,
+[data-bs-theme="dark"] .ck.ck-list__item .ck-button .ck-button__label { color: #dee2e6 !important; }
+[data-bs-theme="dark"] .ck.ck-input { background: #212529 !important; color: #dee2e6 !important; border-color: #495057 !important; }
+[data-bs-theme="dark"] .ck.ck-balloon-panel { background: #2b3035 !important; border-color: #495057 !important; }
+[data-bs-theme="dark"] .ck.ck-color-grid__tile:hover { border-color: #fff !important; }
 </style>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -114,45 +114,96 @@ if ($rawBody !== '' && ltrim($rawBody)[0] !== '<') {
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.js"></script>
-<script>
-(function () {
-    var quill = new Quill('#kb-editor', {
-        theme: 'snow',
-        placeholder: 'Write your article here…',
-        modules: {
-            toolbar: [
-                [{ header: [1, 2, 3, false] }],
-                ['bold', 'italic', 'underline', 'strike'],
-                [{ list: 'ordered' }, { list: 'bullet' }],
-                ['blockquote', 'code-block'],
-                ['link'],
-                ['clean']
-            ]
-        }
-    });
+<script type="module">
+import {
+    ClassicEditor,
+    Essentials,
+    Heading,
+    Bold, Italic, Underline, Strikethrough,
+    FontColor, FontBackgroundColor, FontSize,
+    Alignment,
+    List, ListProperties,
+    Link, AutoLink,
+    Image, ImageUpload, Base64UploadAdapter,
+    ImageCaption, ImageStyle, ImageToolbar, ImageResize,
+    Table, TableToolbar, TableProperties, TableCellProperties,
+    BlockQuote,
+    Code, CodeBlock,
+    HorizontalLine,
+    Indent, IndentBlock,
+    FindAndReplace,
+    RemoveFormat
+} from 'ckeditor5';
 
-    // Pre-populate editor with existing content
-    var existing = document.getElementById('body_markdown').value;
-    if (existing) {
-        quill.clipboard.dangerouslyPasteHTML(existing);
-    }
+ClassicEditor.create(document.querySelector('#kb-editor'), {
+    plugins: [
+        Essentials,
+        Heading,
+        Bold, Italic, Underline, Strikethrough,
+        FontColor, FontBackgroundColor, FontSize,
+        Alignment,
+        List, ListProperties,
+        Link, AutoLink,
+        Image, ImageUpload, Base64UploadAdapter,
+        ImageCaption, ImageStyle, ImageToolbar, ImageResize,
+        Table, TableToolbar, TableProperties, TableCellProperties,
+        BlockQuote,
+        Code, CodeBlock,
+        HorizontalLine,
+        Indent, IndentBlock,
+        FindAndReplace,
+        RemoveFormat
+    ],
+    toolbar: {
+        items: [
+            'heading', '|',
+            'fontSize', 'fontColor', 'fontBackgroundColor', '|',
+            'bold', 'italic', 'underline', 'strikethrough', 'removeFormat', '|',
+            'alignment', '|',
+            'bulletedList', 'numberedList', 'outdent', 'indent', '|',
+            'link', 'insertImage', 'insertTable', 'blockQuote', 'codeBlock', 'horizontalLine', '|',
+            'findAndReplace', 'undo', 'redo'
+        ],
+        shouldNotGroupWhenFull: true
+    },
+    heading: {
+        options: [
+            { model: 'paragraph', title: 'Paragraph', class: 'ck-heading_paragraph' },
+            { model: 'heading1', view: 'h1', title: 'Heading 1', class: 'ck-heading_heading1' },
+            { model: 'heading2', view: 'h2', title: 'Heading 2', class: 'ck-heading_heading2' },
+            { model: 'heading3', view: 'h3', title: 'Heading 3', class: 'ck-heading_heading3' }
+        ]
+    },
+    image: {
+        toolbar: [
+            'imageStyle:inline', 'imageStyle:block', 'imageStyle:side', '|',
+            'toggleImageCaption', 'imageTextAlternative', '|',
+            'resizeImage'
+        ]
+    },
+    table: {
+        contentToolbar: [
+            'tableColumn', 'tableRow', 'mergeTableCells', 'tableProperties', 'tableCellProperties'
+        ]
+    },
+    initialData: document.getElementById('body_markdown').value
+}).then(editor => {
+    window._kbEditor = editor;
 
-    // Sync editor content to hidden input on form submit
     document.getElementById('kb-form').addEventListener('submit', function (e) {
-        var html   = quill.getSemanticHTML();
-        var text   = quill.getText().trim();
-        var errEl  = document.getElementById('kb-editor-error');
+        const data  = editor.getData();
+        const text  = data.replace(/<[^>]*>/g, '').trim();
+        const errEl = document.getElementById('kb-editor-error');
 
         if (!text) {
             e.preventDefault();
             errEl.style.display = '';
-            quill.focus();
+            editor.editing.view.focus();
             return;
         }
 
         errEl.style.display = 'none';
-        document.getElementById('body_markdown').value = html;
+        document.getElementById('body_markdown').value = data;
     });
-})();
+}).catch(console.error);
 </script>
