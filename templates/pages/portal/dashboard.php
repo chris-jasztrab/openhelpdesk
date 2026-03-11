@@ -49,13 +49,13 @@ $statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 
 
 <div class="card border-0 shadow-sm mt-4" id="tour-portal-recent">
     <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
-        <h5 class="mb-0 fw-semibold"><i class="bi bi-ticket-detailed me-2"></i>Recent Tickets</h5>
+        <h5 class="mb-0 fw-semibold"><i class="bi bi-ticket-detailed me-2"></i>Open Tickets</h5>
         <a href="/portal/tickets" class="btn btn-sm btn-outline-primary">View All</a>
     </div>
     <?php if (empty($recentTickets)): ?>
     <div class="card-body text-center py-5 text-muted">
         <i class="bi bi-inbox fs-1 d-block mb-2"></i>
-        <p class="mb-0">No tickets yet. Click "New Ticket" to get started.</p>
+        <p class="mb-0">You have no open tickets. Click "New Ticket" to get started.</p>
     </div>
     <?php else: ?>
     <div class="table-responsive">

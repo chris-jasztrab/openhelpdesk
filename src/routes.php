@@ -1272,7 +1272,7 @@ $router->get('/portal', function () {
          LEFT JOIN ticket_priorities tp ON t.priority_id = tp.id
          LEFT JOIN ticket_types tt     ON t.type_id     = tt.id
          LEFT JOIN users a             ON t.assigned_to  = a.id
-         WHERE t.created_by = ?
+         WHERE t.created_by = ? AND t.status NOT IN ('resolved','closed')
          ORDER BY t.created_at DESC LIMIT 5"
     );
     $recentTickets->execute([$userId]);
