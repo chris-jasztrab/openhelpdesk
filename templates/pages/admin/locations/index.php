@@ -111,13 +111,9 @@ $isShared = ($tzMode ?? 'shared') === 'shared';
                                 <a href="/admin/locations/<?= $loc['id'] ?>/edit" class="btn btn-sm btn-outline-primary" title="Edit">
                                     <i class="bi bi-pencil"></i>
                                 </a>
-                                <form method="POST" action="/admin/locations/<?= $loc['id'] ?>/delete" class="d-inline"
-                                      onsubmit="return confirm('Delete this location?')">
-                                    <?= csrfField() ?>
-                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </form>
+                                <a href="/admin/locations/<?= $loc['id'] ?>/delete-confirm" class="btn btn-sm btn-outline-danger" title="Delete">
+                                    <i class="bi bi-trash"></i>
+                                </a>
                             </div>
                         </td>
                     </tr>

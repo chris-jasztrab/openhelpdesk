@@ -874,14 +874,84 @@ $router->post('/admin/locations/{id}/edit', function (array $p) {
     redirect('/admin/locations');
 });
 
+$router->get('/admin/locations/{id}/delete-confirm', function (array $p) {
+    Auth::requireRole('admin');
+    $db  = Database::connect();
+    $id  = (int) $p['id'];
+
+    $locStmt = $db->prepare('SELECT * FROM locations WHERE id = ?');
+    $locStmt->execute([$id]);
+    $location = $locStmt->fetch();
+    if (!$location) {
+        flash('error', 'Location not found.');
+        redirect('/admin/locations');
+    }
+
+    $countStmt = $db->prepare('SELECT COUNT(*) FROM tickets WHERE location_id = ?');
+    $countStmt->execute([$id]);
+    $ticketCount = (int) $countStmt->fetchColumn();
+
+    $tickets = [];
+    if ($ticketCount > 0) {
+        $tStmt = $db->prepare('SELECT t.id, t.subject, t.status, u.first_name, u.last_name FROM tickets t LEFT JOIN users u ON u.id = t.assigned_to WHERE t.location_id = ? ORDER BY t.id DESC');
+        $tStmt->execute([$id]);
+        $tickets = $tStmt->fetchAll();
+    }
+
+    $otherLocStmt = $db->prepare('SELECT id, name FROM locations WHERE id != ? ORDER BY name');
+    $otherLocStmt->execute([$id]);
+    $otherLocations = $otherLocStmt->fetchAll();
+
+    render('admin/locations/delete-confirm', [
+        'location'       => $location,
+        'ticketCount'    => $ticketCount,
+        'tickets'        => $tickets,
+        'otherLocations' => $otherLocations,
+    ]);
+});
+
 $router->post('/admin/locations/{id}/delete', function (array $p) {
     Auth::requireRole('admin');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/locations');
     }
-    Database::connect()->prepare('DELETE FROM locations WHERE id = ?')->execute([(int) $p['id']]);
-    flash('success', 'Location deleted.');
+    $db     = Database::connect();
+    $id     = (int) $p['id'];
+    $action = $_POST['action'] ?? '';
+
+    $locStmt = $db->prepare('SELECT name FROM locations WHERE id = ?');
+    $locStmt->execute([$id]);
+    $locName = $locStmt->fetchColumn();
+    if (!$locName) {
+        flash('error', 'Location not found.');
+        redirect('/admin/locations');
+    }
+
+    // Check if any tickets use this location
+    $countStmt = $db->prepare('SELECT COUNT(*) FROM tickets WHERE location_id = ?');
+    $countStmt->execute([$id]);
+    $ticketCount = (int) $countStmt->fetchColumn();
+
+    if ($ticketCount > 0 && $action === '') {
+        redirect("/admin/locations/{$id}/delete-confirm");
+    }
+
+    if ($action === 'reassign') {
+        $newLocId = (int) ($_POST['new_location_id'] ?? 0);
+        $checkStmt = $db->prepare('SELECT id FROM locations WHERE id = ? AND id != ?');
+        $checkStmt->execute([$newLocId, $id]);
+        if (!$checkStmt->fetch()) {
+            flash('error', 'Please select a valid replacement location.');
+            redirect("/admin/locations/{$id}/delete-confirm");
+        }
+        $db->prepare('UPDATE tickets SET location_id = ? WHERE location_id = ?')->execute([$newLocId, $id]);
+    } elseif ($action === 'clear') {
+        $db->prepare('UPDATE tickets SET location_id = NULL WHERE location_id = ?')->execute([$id]);
+    }
+
+    $db->prepare('DELETE FROM locations WHERE id = ?')->execute([$id]);
+    flash('success', "Location \"{$locName}\" deleted.");
     redirect('/admin/locations');
 });
 
