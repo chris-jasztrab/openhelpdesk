@@ -3230,7 +3230,7 @@ $router->post('/admin/kb/articles/{id}/delete', function (array $p) {
 });
 
 $router->get('/admin/kb/articles/{id}/preview', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requireRole('admin', 'agent');
     $db   = Database::connect();
     $stmt = $db->prepare(
         'SELECT a.*, f.name AS folder_name, f.slug AS folder_slug,
@@ -7299,7 +7299,7 @@ $router->post('/admin/workflows/ticket-fields/add', function () {
     Auth::requireRole('admin');
     header('Content-Type: application/json');
 
-    $allowed = ['text','textarea','checkbox','dropdown','date','number','decimal','dependent'];
+    $allowed = ['text','textarea','checkbox','dropdown','date','number','decimal','dependent','text_block','image'];
     $type    = $_POST['field_type'] ?? '';
     if (!in_array($type, $allowed, true)) {
         echo json_encode(['success' => false, 'error' => 'Invalid field type.']);
@@ -7310,14 +7310,16 @@ $router->post('/admin/workflows/ticket-fields/add', function () {
     $maxOrder = (int) $db->query('SELECT COALESCE(MAX(sort_order),0) FROM ticket_form_fields WHERE deleted_at IS NULL')->fetchColumn();
 
     $labelMap = [
-        'text'      => 'Text Field',
-        'textarea'  => 'Multi-line Text',
-        'checkbox'  => 'Checkbox',
-        'dropdown'  => 'Dropdown',
-        'date'      => 'Date',
-        'number'    => 'Number',
-        'decimal'   => 'Decimal',
-        'dependent' => 'Dependent Field',
+        'text'       => 'Text Field',
+        'textarea'   => 'Multi-line Text',
+        'checkbox'   => 'Checkbox',
+        'dropdown'   => 'Dropdown',
+        'date'       => 'Date',
+        'number'     => 'Number',
+        'decimal'    => 'Decimal',
+        'dependent'  => 'Dependent Field',
+        'text_block' => 'Text Block',
+        'image'      => 'Image',
     ];
 
     $stmt = $db->prepare(
@@ -7353,6 +7355,20 @@ $router->post('/admin/workflows/ticket-fields/reorder', function () {
     }
 
     echo json_encode(['success' => true]);
+    exit;
+});
+
+// Get config for a field (AJAX, used by text_block / image edit modal)
+$router->get('/admin/workflows/ticket-fields/{id}/config', function (array $p) {
+    Auth::requireRole('admin');
+    header('Content-Type: application/json');
+
+    $id  = (int) $p['id'];
+    $db  = Database::connect();
+    $row = $db->prepare('SELECT config FROM ticket_form_fields WHERE id = ? AND deleted_at IS NULL');
+    $row->execute([$id]);
+    $cfg = $row->fetchColumn();
+    echo json_encode(['config' => $cfg ? json_decode($cfg, true) : null]);
     exit;
 });
 
@@ -7466,6 +7482,73 @@ $router->post('/admin/workflows/ticket-fields/{id}/delete', function (array $p) 
     $db->prepare('UPDATE ticket_form_fields SET deleted_at = NOW() WHERE id = ? AND deleted_at IS NULL')->execute([$id]);
 
     echo json_encode(['success' => true]);
+    exit;
+});
+
+// Upload image for an image-type field (AJAX, multipart)
+$router->post('/admin/workflows/ticket-fields/{id}/upload-image', function (array $p) {
+    Auth::requireRole('admin');
+    header('Content-Type: application/json');
+
+    $id = (int) $p['id'];
+    $db = Database::connect();
+
+    $check = $db->prepare('SELECT field_type FROM ticket_form_fields WHERE id = ? AND deleted_at IS NULL');
+    $check->execute([$id]);
+    $fieldType = $check->fetchColumn();
+    if ($fieldType !== 'image') {
+        echo json_encode(['success' => false, 'error' => 'Field is not an image type.']);
+        exit;
+    }
+
+    $file = $_FILES['image'] ?? null;
+    if (!$file || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        echo json_encode(['success' => false, 'error' => 'No file uploaded.']);
+        exit;
+    }
+
+    $allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    $mime    = mime_content_type($file['tmp_name']);
+    if (!in_array($mime, $allowed, true)) {
+        echo json_encode(['success' => false, 'error' => 'Only JPEG, PNG, GIF, and WebP images are allowed.']);
+        exit;
+    }
+
+    if ($file['size'] > 5 * 1024 * 1024) {
+        echo json_encode(['success' => false, 'error' => 'Image must be under 5 MB.']);
+        exit;
+    }
+
+    $uploadDir = ROOT_DIR . '/public/uploads/field-images/';
+    if (!is_dir($uploadDir)) {
+        mkdir($uploadDir, 0755, true);
+    }
+
+    $ext      = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif', 'image/webp' => 'webp'][$mime];
+    $filename = 'field_' . $id . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
+    $dest     = $uploadDir . $filename;
+
+    // Delete old image if present
+    $cfgRow = $db->prepare('SELECT config FROM ticket_form_fields WHERE id = ?');
+    $cfgRow->execute([$id]);
+    $oldCfg = json_decode($cfgRow->fetchColumn() ?? '{}', true);
+    if (!empty($oldCfg['image_path'])) {
+        $oldFile = ROOT_DIR . '/public/uploads/field-images/' . $oldCfg['image_path'];
+        if (file_exists($oldFile)) {
+            unlink($oldFile);
+        }
+    }
+
+    if (!move_uploaded_file($file['tmp_name'], $dest)) {
+        echo json_encode(['success' => false, 'error' => 'Failed to save image.']);
+        exit;
+    }
+
+    $newCfg = array_merge($oldCfg ?? [], ['image_path' => $filename]);
+    $db->prepare('UPDATE ticket_form_fields SET config = ?, updated_at = NOW() WHERE id = ?')
+       ->execute([json_encode($newCfg), $id]);
+
+    echo json_encode(['success' => true, 'image_path' => $filename]);
     exit;
 });
 
