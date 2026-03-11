@@ -2254,7 +2254,20 @@ $router->get('/admin/tickets/{id}', function (array $p) {
     $timeline = $tl->fetchAll();
 
     // Agents list for @mention suggestions and assignment dropdown
-    $agents = $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin','power_user') ORDER BY first_name")->fetchAll();
+    // If the ticket belongs to a group, only show members of that group
+    if (!empty($ticket['group_id'])) {
+        $agentStmt = $db->prepare(
+            "SELECT u.id, u.first_name, u.last_name
+             FROM users u
+             INNER JOIN group_user_map gum ON u.id = gum.user_id
+             WHERE gum.group_id = ? AND u.role IN ('agent','admin','power_user')
+             ORDER BY u.first_name"
+        );
+        $agentStmt->execute([$ticket['group_id']]);
+        $agents = $agentStmt->fetchAll();
+    } else {
+        $agents = $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin','power_user') ORDER BY first_name")->fetchAll();
+    }
 
     // Priorities for update dropdown
     $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
