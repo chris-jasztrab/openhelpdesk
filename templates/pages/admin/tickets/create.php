@@ -31,6 +31,34 @@ $statusOptions = [
     'closed'                 => 'Closed',
 ];
 ?>
+<link rel="stylesheet" href="https://cdn.ckeditor.com/ckeditor5/43.3.1/ckeditor5.css">
+<script type="importmap">
+{"imports":{"ckeditor5":"https://cdn.ckeditor.com/ckeditor5/43.3.1/ckeditor5.js","ckeditor5/":"https://cdn.ckeditor.com/ckeditor5/43.3.1/"}}
+</script>
+<style>
+.ck.ck-editor__editable { min-height: 200px; }
+.ck.ck-toolbar { border-radius: .375rem .375rem 0 0 !important; border-color: #dee2e6 !important; }
+.ck.ck-editor__editable { border-radius: 0 0 .375rem .375rem !important; border-color: #dee2e6 !important; }
+
+/* Dark mode */
+[data-bs-theme="dark"] .ck.ck-toolbar,
+[data-bs-theme="dark"] .ck.ck-toolbar__separator { background: #2b3035 !important; border-color: #495057 !important; }
+[data-bs-theme="dark"] .ck.ck-button:not(.ck-disabled):hover,
+[data-bs-theme="dark"] .ck.ck-button.ck-on { background: #373b3e !important; }
+[data-bs-theme="dark"] .ck.ck-button { color: #dee2e6 !important; }
+[data-bs-theme="dark"] .ck.ck-icon { color: #dee2e6 !important; }
+[data-bs-theme="dark"] .ck.ck-editor__editable { background: #212529 !important; color: #dee2e6 !important; border-color: #495057 !important; }
+[data-bs-theme="dark"] .ck.ck-editor__editable:not(.ck-focused) { border-color: #495057 !important; }
+[data-bs-theme="dark"] .ck.ck-list { background: #2b3035 !important; border-color: #495057 !important; }
+[data-bs-theme="dark"] .ck.ck-list__item .ck-button:hover { background: #373b3e !important; }
+[data-bs-theme="dark"] .ck.ck-dropdown__panel { background: #2b3035 !important; border-color: #495057 !important; }
+[data-bs-theme="dark"] .ck.ck-label,
+[data-bs-theme="dark"] .ck.ck-heading_paragraph,
+[data-bs-theme="dark"] .ck.ck-list__item .ck-button .ck-button__label { color: #dee2e6 !important; }
+[data-bs-theme="dark"] .ck.ck-input { background: #212529 !important; color: #dee2e6 !important; border-color: #495057 !important; }
+[data-bs-theme="dark"] .ck.ck-balloon-panel { background: #2b3035 !important; border-color: #495057 !important; }
+[data-bs-theme="dark"] .ck.ck-color-grid__tile:hover { border-color: #fff !important; }
+</style>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="fw-bold mb-0">New Ticket</h2>
     <div class="d-flex align-items-center gap-2">
@@ -51,7 +79,7 @@ $statusOptions = [
 <div class="row justify-content-center">
     <div class="col-lg-8">
 
-        <form method="POST" action="<?= e($formAction) ?>">
+        <form method="POST" action="<?= e($formAction) ?>" id="admin-ticket-form">
             <?= csrfField() ?>
 
             <!-- Subject & Description -->
@@ -69,12 +97,12 @@ $statusOptions = [
                                placeholder="Brief summary of the issue" required>
                     </div>
                     <div class="mb-0">
-                        <label for="description" class="form-label fw-semibold">
+                        <label class="form-label fw-semibold">
                             Description <span class="text-danger">*</span>
                         </label>
-                        <textarea class="form-control" id="description" name="description"
-                                  rows="8" required
-                                  placeholder="Describe the issue in detail..."><?= e(old('description', '')) ?></textarea>
+                        <div id="admin-ticket-editor"></div>
+                        <input type="hidden" id="description" name="description" value="<?= e(old('description', '')) ?>">
+                        <div id="admin-ticket-editor-error" class="text-danger small mt-1" style="display:none;">Description is required.</div>
                     </div>
                 </div>
             </div>
@@ -256,7 +284,7 @@ document.getElementById('templateSelect')?.addEventListener('change', function (
     const tpl = TEMPLATES[this.value];
     if (!tpl) return;
     if (tpl.subject)     document.getElementById('subject').value      = tpl.subject;
-    if (tpl.body)        document.getElementById('description').value  = tpl.body;
+    if (tpl.body && window._adminTicketEditor) window._adminTicketEditor.setData(tpl.body);
     if (tpl.type_id)     document.getElementById('type_id').value      = tpl.type_id;
     if (tpl.priority_id) document.getElementById('priority_id').value  = tpl.priority_id;
 });
@@ -452,4 +480,98 @@ document.addEventListener('click', e => {
         if (!ccInput.contains(ev.target) && !ccDrop.contains(ev.target)) ccClose();
     });
 })();
+</script>
+
+<script type="module">
+import {
+    ClassicEditor,
+    Essentials,
+    Heading,
+    Bold, Italic, Underline, Strikethrough,
+    FontColor, FontBackgroundColor, FontSize,
+    Alignment,
+    List, ListProperties,
+    Link, AutoLink,
+    Image, ImageUpload, Base64UploadAdapter,
+    ImageCaption, ImageStyle, ImageToolbar, ImageResize,
+    Table, TableToolbar, TableProperties, TableCellProperties,
+    BlockQuote,
+    Code, CodeBlock,
+    HorizontalLine,
+    Indent, IndentBlock,
+    FindAndReplace,
+    RemoveFormat
+} from 'ckeditor5';
+
+ClassicEditor.create(document.querySelector('#admin-ticket-editor'), {
+    plugins: [
+        Essentials,
+        Heading,
+        Bold, Italic, Underline, Strikethrough,
+        FontColor, FontBackgroundColor, FontSize,
+        Alignment,
+        List, ListProperties,
+        Link, AutoLink,
+        Image, ImageUpload, Base64UploadAdapter,
+        ImageCaption, ImageStyle, ImageToolbar, ImageResize,
+        Table, TableToolbar, TableProperties, TableCellProperties,
+        BlockQuote,
+        Code, CodeBlock,
+        HorizontalLine,
+        Indent, IndentBlock,
+        FindAndReplace,
+        RemoveFormat
+    ],
+    toolbar: {
+        items: [
+            'heading', '|',
+            'fontSize', 'fontColor', 'fontBackgroundColor', '|',
+            'bold', 'italic', 'underline', 'strikethrough', 'removeFormat', '|',
+            'alignment', '|',
+            'bulletedList', 'numberedList', 'outdent', 'indent', '|',
+            'link', 'insertImage', 'insertTable', 'blockQuote', 'codeBlock', 'horizontalLine', '|',
+            'findAndReplace', 'undo', 'redo'
+        ],
+        shouldNotGroupWhenFull: true
+    },
+    heading: {
+        options: [
+            { model: 'paragraph', title: 'Paragraph', class: 'ck-heading_paragraph' },
+            { model: 'heading1', view: 'h1', title: 'Heading 1', class: 'ck-heading_heading1' },
+            { model: 'heading2', view: 'h2', title: 'Heading 2', class: 'ck-heading_heading2' },
+            { model: 'heading3', view: 'h3', title: 'Heading 3', class: 'ck-heading_heading3' }
+        ]
+    },
+    image: {
+        toolbar: [
+            'imageStyle:inline', 'imageStyle:block', 'imageStyle:side', '|',
+            'toggleImageCaption', 'imageTextAlternative', '|',
+            'resizeImage'
+        ]
+    },
+    table: {
+        contentToolbar: [
+            'tableColumn', 'tableRow', 'mergeTableCells', 'tableProperties', 'tableCellProperties'
+        ]
+    },
+    initialData: document.getElementById('description').value
+}).then(editor => {
+    window._adminTicketEditor = editor;
+
+    document.getElementById('admin-ticket-form').addEventListener('submit', function (e) {
+        const data  = editor.getData();
+        const text  = data.replace(/<[^>]*>/g, '').trim();
+        const errEl = document.getElementById('admin-ticket-editor-error');
+
+        if (!text) {
+            e.preventDefault();
+            errEl.style.display = '';
+            editor.editing.view.focus();
+            return;
+        }
+
+        errEl.style.display = 'none';
+        document.getElementById('description').value = data;
+    });
+}).catch(console.error);
 </script>
