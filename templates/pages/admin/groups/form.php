@@ -71,6 +71,21 @@ $roleColors = ['admin' => 'danger', 'agent' => 'primary'];
 
             <hr class="my-4">
 
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Notifications</label>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="notify_new_ticket" value="1"
+                           id="notify_new_ticket"
+                           <?= !empty($editing['notify_new_ticket']) ? 'checked' : '' ?>>
+                    <label class="form-check-label" for="notify_new_ticket">
+                        Notify members when a new ticket is created
+                    </label>
+                </div>
+                <div class="form-text">Members can opt out individually via their profile Email Notifications settings.</div>
+            </div>
+
+            <hr class="my-4">
+
             <div class="d-flex gap-2">
                 <button type="submit" class="btn text-white" style="background:var(--ld-primary);">
                     <i class="bi bi-check-lg me-1"></i><?= $isEdit ? 'Update Group' : 'Create Group' ?>

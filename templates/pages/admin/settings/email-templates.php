@@ -177,43 +177,13 @@ $groups ??= [];
 <div class="card border-0 shadow-sm border-top-0" style="border-radius:0 0 .5rem .5rem;">
     <div class="card-body p-4">
         <p class="text-muted mb-4">
-            When a new ticket is submitted, members of checked groups will receive an alert email.
-            Individual members can opt out via their profile <strong>Email Notifications</strong> settings.
+            Customize the email sent to group members when a new ticket is created.
+            To control which groups receive these alerts, edit the group under <a href="/admin/groups">Settings → Groups</a>.
         </p>
 
         <form method="POST" action="/admin/settings/email-templates">
             <?= csrfField() ?>
             <input type="hidden" name="tab" value="group_alerts">
-
-            <?php if (empty($groups)): ?>
-            <div class="alert alert-info small mb-4">
-                <i class="bi bi-info-circle me-1"></i>
-                No groups have been created yet. <a href="/admin/groups/create">Create a group</a> to get started.
-            </div>
-            <?php else: ?>
-            <!-- Group toggles -->
-            <div class="mb-4" style="max-width:640px;">
-                <label class="form-label fw-semibold">Groups to notify on new ticket</label>
-                <div class="border rounded overflow-hidden">
-                    <?php foreach ($groups as $i => $grp): ?>
-                    <div class="d-flex align-items-center px-3 py-2 <?= $i > 0 ? 'border-top' : '' ?>">
-                        <div class="form-check mb-0 flex-grow-1">
-                            <input class="form-check-input" type="checkbox"
-                                   name="notify_group[<?= (int) $grp['id'] ?>]" value="1"
-                                   id="grp_<?= (int) $grp['id'] ?>"
-                                   <?= $grp['notify_new_ticket'] ? 'checked' : '' ?>>
-                            <label class="form-check-label fw-semibold" for="grp_<?= (int) $grp['id'] ?>">
-                                <?= e($grp['name']) ?>
-                            </label>
-                        </div>
-                        <span class="text-muted small ms-3">
-                            <i class="bi bi-person me-1"></i><?= (int) $grp['member_count'] ?> member<?= (int) $grp['member_count'] !== 1 ? 's' : '' ?>
-                        </span>
-                    </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-            <?php endif; ?>
 
             <div class="row g-4">
                 <!-- Editor column -->

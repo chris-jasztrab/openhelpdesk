@@ -1312,9 +1312,11 @@ $router->post('/admin/groups/create', function () {
         redirect('/admin/groups/create');
     }
 
+    $notifyNew = isset($_POST['notify_new_ticket']) ? 1 : 0;
+
     $db = Database::connect();
-    $db->prepare('INSERT INTO `groups` (name, description, sort_order) VALUES (?, ?, ?)')
-        ->execute([$name, $desc, $order]);
+    $db->prepare('INSERT INTO `groups` (name, description, sort_order, notify_new_ticket) VALUES (?, ?, ?, ?)')
+        ->execute([$name, $desc, $order, $notifyNew]);
     $groupId = (int) $db->lastInsertId();
 
     // Assign members
@@ -1370,9 +1372,11 @@ $router->post('/admin/groups/{id}/edit', function (array $p) {
         redirect("/admin/groups/{$id}/edit");
     }
 
+    $notifyNew = isset($_POST['notify_new_ticket']) ? 1 : 0;
+
     $db = Database::connect();
-    $db->prepare('UPDATE `groups` SET name=?, description=?, sort_order=? WHERE id=?')
-        ->execute([$name, $desc, $order, $id]);
+    $db->prepare('UPDATE `groups` SET name=?, description=?, sort_order=?, notify_new_ticket=? WHERE id=?')
+        ->execute([$name, $desc, $order, $notifyNew, $id]);
 
     // Sync members: delete existing, insert new
     $db->prepare('DELETE FROM group_user_map WHERE group_id = ?')->execute([$id]);
@@ -3977,14 +3981,6 @@ $router->post('/admin/settings/email-templates', function () {
         setSetting('email_subject_group_alerts', trim($_POST['email_subject_group_alerts'] ?? ''));
         setSetting('email_intro_group_alerts',   trim($_POST['email_intro_group_alerts']   ?? ''));
         setSetting('email_button_group_alerts',  trim($_POST['email_button_group_alerts']  ?? ''));
-        // Save notify_new_ticket flag for each group
-        $db2 = Database::connect();
-        $allGroups = $db2->query('SELECT id FROM `groups`')->fetchAll(PDO::FETCH_COLUMN);
-        $checked   = $_POST['notify_group'] ?? [];
-        $upd = $db2->prepare('UPDATE `groups` SET notify_new_ticket = ? WHERE id = ?');
-        foreach ($allGroups as $gid) {
-            $upd->execute([isset($checked[(string) $gid]) ? 1 : 0, (int) $gid]);
-        }
         flash('success', 'Group alerts settings saved.');
     } elseif (in_array($tab, ['ticket_created', 'ticket_updated', 'ticket_merged', 'csat_survey', 'ticket_reminder'], true)) {
         setSetting("email_subject_{$tab}", trim($_POST["email_subject_{$tab}"] ?? ''));
