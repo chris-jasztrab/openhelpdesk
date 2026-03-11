@@ -13,6 +13,7 @@ $fieldTypeMeta = [
     'dependent'  => ['label' => 'Dependent',       'icon' => 'bi-diagram-3'],
     'text_block' => ['label' => 'Text Block',      'icon' => 'bi-text-paragraph'],
     'image'      => ['label' => 'Image',           'icon' => 'bi-image'],
+    'cc'         => ['label' => 'CC',              'icon' => 'bi-people'],
 ];
 
 // Built-in (system) fields shown at top and bottom — not editable
@@ -481,7 +482,8 @@ document.addEventListener('DOMContentLoaded', function () {
     var depL3Wrap      = document.getElementById('depL3Wrap');
     var currentOptions = [];
 
-    var displayOnlyTypes = ['text_block', 'image'];
+    var displayOnlyTypes  = ['text_block', 'image'];
+    var noPlaceholderTypes = ['text_block', 'image', 'cc'];
 
     function openModal(field) {
         document.getElementById('modalFieldId').value      = field.id;
@@ -495,10 +497,11 @@ document.addEventListener('DOMContentLoaded', function () {
             field.is_visible === undefined ? true : !!parseInt(field.is_visible);
 
         // Hide/show options row and placeholder for display-only types
-        var isDisplayOnly = displayOnlyTypes.indexOf(field.field_type) !== -1;
-        document.getElementById('modalOptionsRow').style.display    = isDisplayOnly ? 'none' : '';
-        document.getElementById('modalPlaceholderWrap').style.display = isDisplayOnly ? 'none' : '';
-        document.getElementById('modalHr').style.display            = isDisplayOnly ? 'none' : '';
+        var isDisplayOnly  = displayOnlyTypes.indexOf(field.field_type) !== -1;
+        var noPlaceholder  = noPlaceholderTypes.indexOf(field.field_type) !== -1;
+        document.getElementById('modalOptionsRow').style.display      = isDisplayOnly ? 'none' : '';
+        document.getElementById('modalPlaceholderWrap').style.display = noPlaceholder ? 'none' : '';
+        document.getElementById('modalHr').style.display              = isDisplayOnly ? 'none' : '';
 
         document.querySelectorAll('.field-section').forEach(function (s) { s.classList.remove('active'); });
 

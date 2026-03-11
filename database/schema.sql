@@ -314,7 +314,7 @@ CREATE TABLE IF NOT EXISTS `automations` (
 -- Custom ticket form fields (Workflows > Ticket Fields builder)
 CREATE TABLE IF NOT EXISTS `ticket_form_fields` (
     `id`          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    `field_type`  ENUM('text','textarea','checkbox','dropdown','date','number','decimal','dependent','text_block','image') NOT NULL,
+    `field_type`  ENUM('text','textarea','checkbox','dropdown','date','number','decimal','dependent','text_block','image','cc') NOT NULL,
     `label`       VARCHAR(255) NOT NULL,
     `placeholder` VARCHAR(255) DEFAULT NULL,
     `config`      JSON NULL,

@@ -244,7 +244,10 @@ $router->post('/portal/tickets/create', function () {
         if (!$cf['is_required']) continue;
         if (in_array($cf['field_type'], ['text_block', 'image'], true)) continue; // display-only, no value
         $key = 'field_' . $cf['id'];
-        if ($cf['field_type'] === 'dependent') {
+        if ($cf['field_type'] === 'cc') {
+            $ccIds = array_filter(array_map('intval', (array) ($_POST['cc_field_' . $cf['id']] ?? [])));
+            $missing = empty($ccIds);
+        } elseif ($cf['field_type'] === 'dependent') {
             $missing = empty($_POST[$key . '_l1']);
         } elseif ($cf['field_type'] === 'checkbox') {
             $missing = false; // checkboxes are never "missing"
@@ -299,7 +302,7 @@ $router->post('/portal/tickets/create', function () {
              ON DUPLICATE KEY UPDATE value = VALUES(value)'
         );
         foreach ($visibleCustomFields as $cf) {
-            if (in_array($cf['field_type'], ['text_block', 'image'], true)) continue; // display-only, no value
+            if (in_array($cf['field_type'], ['text_block', 'image', 'cc'], true)) continue; // display-only or handled separately
             $key = 'field_' . $cf['id'];
             if ($cf['field_type'] === 'dependent') {
                 $val = json_encode([
@@ -314,6 +317,18 @@ $router->post('/portal/tickets/create', function () {
                 if ($val === null || trim($val) === '') continue;
             }
             $cfSaveStmt->execute([$ticketId, $cf['id'], $val]);
+        }
+
+        // Process CC fields — insert into ticket_cc
+        $ccInsert = $db->prepare('INSERT IGNORE INTO ticket_cc (ticket_id, user_id, added_by) VALUES (?, ?, ?)');
+        foreach ($visibleCustomFields as $cf) {
+            if ($cf['field_type'] !== 'cc') continue;
+            $ccIds = array_values(array_unique(array_map('intval', (array) ($_POST['cc_field_' . $cf['id']] ?? []))));
+            foreach ($ccIds as $uid) {
+                if ($uid > 0) {
+                    $ccInsert->execute([$ticketId, $uid, Auth::id()]);
+                }
+            }
         }
     }
 

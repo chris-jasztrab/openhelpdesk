@@ -7369,7 +7369,7 @@ $router->post('/admin/workflows/ticket-fields/add', function () {
     Auth::requireRole('admin');
     header('Content-Type: application/json');
 
-    $allowed = ['text','textarea','checkbox','dropdown','date','number','decimal','dependent','text_block','image'];
+    $allowed = ['text','textarea','checkbox','dropdown','date','number','decimal','dependent','text_block','image','cc'];
     $type    = $_POST['field_type'] ?? '';
     if (!in_array($type, $allowed, true)) {
         echo json_encode(['success' => false, 'error' => 'Invalid field type.']);
@@ -7390,6 +7390,7 @@ $router->post('/admin/workflows/ticket-fields/add', function () {
         'dependent'  => 'Dependent Field',
         'text_block' => 'Text Block',
         'image'      => 'Image',
+        'cc'         => 'CC',
     ];
 
     $stmt = $db->prepare(

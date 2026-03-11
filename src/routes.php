@@ -118,6 +118,34 @@ $router->get('/api/user-search', function () {
 });
 
 /* ------------------------------------------------------------------
+ * CC User Search for portal users (any authenticated user)
+ * ------------------------------------------------------------------ */
+$router->get('/api/cc-search', function () {
+    Auth::requireAuth();
+    header('Content-Type: application/json');
+
+    $q = trim($_GET['q'] ?? '');
+    if (strlen($q) < 2) {
+        echo json_encode([]);
+        exit;
+    }
+
+    $like = '%' . $q . '%';
+    $db   = Database::connect();
+    $stmt = $db->prepare(
+        "SELECT id, first_name, last_name, email
+         FROM users
+         WHERE first_name LIKE ? OR last_name LIKE ? OR email LIKE ?
+               OR CONCAT(first_name, ' ', last_name) LIKE ?
+         ORDER BY first_name
+         LIMIT 8"
+    );
+    $stmt->execute([$like, $like, $like, $like]);
+    echo json_encode($stmt->fetchAll());
+    exit;
+});
+
+/* ------------------------------------------------------------------
  * Ticket CC Management (JSON API)
  * ------------------------------------------------------------------ */
 $router->post('/api/tickets/{id}/cc', function (array $p) {
