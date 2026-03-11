@@ -14,6 +14,7 @@ $actionLabels = ['created' => 'Created', 'assigned' => 'Assigned', 'status_chang
 $slaStateColors = ['on_track' => 'success', 'warning' => 'warning', 'breached' => 'danger'];
 $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' => 'Breached'];
 ?>
+<link rel="stylesheet" href="https://cdn.ckeditor.com/ckeditor5/43.3.1/ckeditor5.css">
 <?php if ($ticket['merged_into_ticket_id']): ?>
 <div class="alert alert-warning d-flex align-items-center gap-2 mb-4" role="alert">
     <i class="bi bi-arrow-right-circle-fill fs-5"></i>
@@ -77,7 +78,12 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
                 <h5 class="mb-0 fw-semibold"><i class="bi bi-text-paragraph me-2"></i>Description</h5>
             </div>
             <div class="card-body">
-                <div style="white-space:pre-wrap;"><?= linkify($ticket['description']) ?></div>
+                <?php $desc = $ticket['description'] ?? ''; ?>
+                <?php if ($desc !== '' && ltrim($desc)[0] === '<'): ?>
+                <div class="ck-content"><?= $desc ?></div>
+                <?php else: ?>
+                <div style="white-space:pre-wrap;"><?= linkify($desc) ?></div>
+                <?php endif; ?>
             </div>
         </div>
 

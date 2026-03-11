@@ -11,6 +11,7 @@ $statusColors = ['open' => 'primary', 'in_progress' => 'warning', 'pending' => '
 $statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 'Pending', 'waiting_on_customer' => 'Waiting on Customer', 'waiting_on_third_party' => 'Waiting on Third Party', 'resolved' => 'Resolved', 'closed' => 'Closed'];
 $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-person-check text-primary', 'status_changed' => 'bi-arrow-repeat text-warning', 'priority_changed' => 'bi-flag text-danger', 'comment' => 'bi-chat-dots text-info'];
 ?>
+<link rel="stylesheet" href="https://cdn.ckeditor.com/ckeditor5/43.3.1/ckeditor5.css">
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h2 class="fw-bold mb-1"><?= e($ticket['subject']) ?></h2>
@@ -39,7 +40,12 @@ $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-p
                 <h5 class="mb-0 fw-semibold"><i class="bi bi-text-paragraph me-2"></i>Description</h5>
             </div>
             <div class="card-body">
-                <div style="white-space:pre-wrap;"><?= linkify($ticket['description']) ?></div>
+                <?php $desc = $ticket['description'] ?? ''; ?>
+                <?php if ($desc !== '' && ltrim($desc)[0] === '<'): ?>
+                <div class="ck-content"><?= $desc ?></div>
+                <?php else: ?>
+                <div style="white-space:pre-wrap;"><?= linkify($desc) ?></div>
+                <?php endif; ?>
             </div>
         </div>
 
