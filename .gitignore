@@ -1,6 +1,8 @@
 .env
 /vendor/
 /public/uploads/avatars/*
+/public/uploads/field-images/*
+/public/uploads/branding/*
 !/public/uploads/avatars/.gitkeep
 *.log
 .idea/
