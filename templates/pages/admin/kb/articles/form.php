@@ -9,7 +9,42 @@ $breadcrumbs  = [
     ['label' => $isEdit ? 'Edit' : 'Add'],
 ];
 $action = $isEdit ? "/admin/kb/articles/{$editing['id']}/edit" : '/admin/kb/articles/create';
+
+// Lazily migrate legacy markdown to HTML for the editor.
+// If the stored content doesn't start with '<', it's still markdown — convert now.
+$rawBody = old('body_markdown', $editing['body_markdown'] ?? '');
+if ($rawBody !== '' && ltrim($rawBody)[0] !== '<') {
+    $rawBody = renderMarkdown($rawBody);
+}
 ?>
+<link href="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.snow.css" rel="stylesheet">
+<style>
+/* Editor container sizing */
+#kb-editor { min-height: 420px; font-size: 1rem; }
+.ql-toolbar.ql-snow { border-radius: .375rem .375rem 0 0; border-color: #dee2e6; }
+.ql-container.ql-snow { border-radius: 0 0 .375rem .375rem; border-color: #dee2e6; }
+.ql-editor { min-height: 400px; }
+
+/* Dark mode */
+[data-bs-theme="dark"] .ql-toolbar.ql-snow,
+[data-bs-theme="dark"] .ql-container.ql-snow { border-color: #495057; background: #2b3035; }
+[data-bs-theme="dark"] .ql-editor { color: #dee2e6; background: #212529; }
+[data-bs-theme="dark"] .ql-toolbar .ql-stroke { stroke: #adb5bd; }
+[data-bs-theme="dark"] .ql-toolbar .ql-fill { fill: #adb5bd; }
+[data-bs-theme="dark"] .ql-toolbar .ql-picker { color: #adb5bd; }
+[data-bs-theme="dark"] .ql-toolbar .ql-picker-options { background: #2b3035; border-color: #495057; }
+[data-bs-theme="dark"] .ql-toolbar button:hover .ql-stroke,
+[data-bs-theme="dark"] .ql-toolbar button.ql-active .ql-stroke { stroke: #fff; }
+[data-bs-theme="dark"] .ql-toolbar button:hover .ql-fill,
+[data-bs-theme="dark"] .ql-toolbar button.ql-active .ql-fill { fill: #fff; }
+[data-bs-theme="dark"] .ql-toolbar button:hover,
+[data-bs-theme="dark"] .ql-toolbar button.ql-active,
+[data-bs-theme="dark"] .ql-toolbar .ql-picker-label:hover,
+[data-bs-theme="dark"] .ql-toolbar .ql-picker-label.ql-active { color: #fff; }
+[data-bs-theme="dark"] .ql-snow .ql-tooltip { background: #2b3035; border-color: #495057; color: #dee2e6; box-shadow: none; }
+[data-bs-theme="dark"] .ql-snow .ql-tooltip input[type="text"] { background: #212529; border-color: #495057; color: #dee2e6; }
+</style>
+
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="fw-bold mb-0"><?= $isEdit ? 'Edit Article' : 'Add Article' ?></h2>
     <a href="/admin/kb/articles" class="btn btn-outline-secondary">
@@ -19,7 +54,7 @@ $action = $isEdit ? "/admin/kb/articles/{$editing['id']}/edit" : '/admin/kb/arti
 
 <div class="card border-0 shadow-sm">
     <div class="card-body p-4">
-        <form method="POST" action="<?= e($action) ?>">
+        <form method="POST" action="<?= e($action) ?>" id="kb-form">
             <?= csrfField() ?>
 
             <div class="mb-3">
@@ -55,11 +90,11 @@ $action = $isEdit ? "/admin/kb/articles/{$editing['id']}/edit" : '/admin/kb/arti
             </div>
 
             <div class="mb-3">
-                <label for="body_markdown" class="form-label fw-semibold">
-                    Body (Markdown) <span class="text-danger">*</span>
-                </label>
-                <textarea class="form-control font-monospace" id="body_markdown" name="body_markdown" rows="18" required><?= e(old('body_markdown', $editing['body_markdown'] ?? '')) ?></textarea>
-                <div class="form-text">Supports Markdown formatting: **bold**, *italic*, # headings, - lists, [links](url), ```code blocks```, etc.</div>
+                <label class="form-label fw-semibold">Body <span class="text-danger">*</span></label>
+                <div id="kb-editor"></div>
+                <input type="hidden" id="body_markdown" name="body_markdown"
+                       value="<?= e($rawBody) ?>">
+                <div id="kb-editor-error" class="text-danger small mt-1" style="display:none;">Article body is required.</div>
             </div>
 
             <hr class="my-4">
@@ -78,3 +113,46 @@ $action = $isEdit ? "/admin/kb/articles/{$editing['id']}/edit" : '/admin/kb/arti
         </form>
     </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.js"></script>
+<script>
+(function () {
+    var quill = new Quill('#kb-editor', {
+        theme: 'snow',
+        placeholder: 'Write your article here…',
+        modules: {
+            toolbar: [
+                [{ header: [1, 2, 3, false] }],
+                ['bold', 'italic', 'underline', 'strike'],
+                [{ list: 'ordered' }, { list: 'bullet' }],
+                ['blockquote', 'code-block'],
+                ['link'],
+                ['clean']
+            ]
+        }
+    });
+
+    // Pre-populate editor with existing content
+    var existing = document.getElementById('body_markdown').value;
+    if (existing) {
+        quill.clipboard.dangerouslyPasteHTML(existing);
+    }
+
+    // Sync editor content to hidden input on form submit
+    document.getElementById('kb-form').addEventListener('submit', function (e) {
+        var html   = quill.getSemanticHTML();
+        var text   = quill.getText().trim();
+        var errEl  = document.getElementById('kb-editor-error');
+
+        if (!text) {
+            e.preventDefault();
+            errEl.style.display = '';
+            quill.focus();
+            return;
+        }
+
+        errEl.style.display = 'none';
+        document.getElementById('body_markdown').value = html;
+    });
+})();
+</script>

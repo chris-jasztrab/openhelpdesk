@@ -295,8 +295,15 @@ function getFileIcon(string $mimeType): string
 
 /* ── Markdown / slug helpers ──────────────────────────────────── */
 
-function renderMarkdown(string $markdown): string
+function renderMarkdown(string $content): string
 {
+    // Content saved by the WYSIWYG editor is already HTML — return as-is.
+    $trimmed = ltrim($content);
+    if ($trimmed !== '' && $trimmed[0] === '<') {
+        return $content;
+    }
+
+    // Legacy markdown content — convert to HTML.
     $config = [
         'html_input' => 'escape',
         'allow_unsafe_links' => false,
@@ -308,7 +315,7 @@ function renderMarkdown(string $markdown): string
 
     $converter = new \League\CommonMark\MarkdownConverter($environment);
 
-    return $converter->convert($markdown)->getContent();
+    return $converter->convert($content)->getContent();
 }
 
 function slugify(string $text): string
