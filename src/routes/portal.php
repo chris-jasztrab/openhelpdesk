@@ -242,6 +242,7 @@ $router->post('/portal/tickets/create', function () {
     )->fetchAll();
     foreach ($visibleCustomFields as $cf) {
         if (!$cf['is_required']) continue;
+        if (in_array($cf['field_type'], ['text_block', 'image'], true)) continue; // display-only, no value
         $key = 'field_' . $cf['id'];
         if ($cf['field_type'] === 'dependent') {
             $missing = empty($_POST[$key . '_l1']);
@@ -298,6 +299,7 @@ $router->post('/portal/tickets/create', function () {
              ON DUPLICATE KEY UPDATE value = VALUES(value)'
         );
         foreach ($visibleCustomFields as $cf) {
+            if (in_array($cf['field_type'], ['text_block', 'image'], true)) continue; // display-only, no value
             $key = 'field_' . $cf['id'];
             if ($cf['field_type'] === 'dependent') {
                 $val = json_encode([

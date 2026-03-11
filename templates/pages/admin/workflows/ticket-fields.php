@@ -3,14 +3,16 @@ $sidebarItems = adminSidebar('workflows');
 $layout       = 'app';
 
 $fieldTypeMeta = [
-    'text'      => ['label' => 'Text',            'icon' => 'bi-input-cursor-text'],
-    'textarea'  => ['label' => 'Multi-line Text', 'icon' => 'bi-textarea-t'],
-    'checkbox'  => ['label' => 'Checkbox',        'icon' => 'bi-check2-square'],
-    'dropdown'  => ['label' => 'Dropdown',        'icon' => 'bi-chevron-expand'],
-    'date'      => ['label' => 'Date',            'icon' => 'bi-calendar'],
-    'number'    => ['label' => 'Number',          'icon' => 'bi-123'],
-    'decimal'   => ['label' => 'Decimal',         'icon' => 'bi-0-circle'],
-    'dependent' => ['label' => 'Dependent',       'icon' => 'bi-diagram-3'],
+    'text'       => ['label' => 'Text',            'icon' => 'bi-input-cursor-text'],
+    'textarea'   => ['label' => 'Multi-line Text', 'icon' => 'bi-textarea-t'],
+    'checkbox'   => ['label' => 'Checkbox',        'icon' => 'bi-check2-square'],
+    'dropdown'   => ['label' => 'Dropdown',        'icon' => 'bi-chevron-expand'],
+    'date'       => ['label' => 'Date',            'icon' => 'bi-calendar'],
+    'number'     => ['label' => 'Number',          'icon' => 'bi-123'],
+    'decimal'    => ['label' => 'Decimal',         'icon' => 'bi-0-circle'],
+    'dependent'  => ['label' => 'Dependent',       'icon' => 'bi-diagram-3'],
+    'text_block' => ['label' => 'Text Block',      'icon' => 'bi-text-paragraph'],
+    'image'      => ['label' => 'Image',           'icon' => 'bi-image'],
 ];
 
 // Built-in (system) fields shown at top and bottom — not editable
@@ -218,17 +220,17 @@ $systemFieldsBottom = [
                 <input type="hidden" id="modalFieldId">
                 <input type="hidden" id="modalFieldType">
 
-                <div class="row g-3 mb-3">
+                <div class="row g-3 mb-3" id="modalLabelRow">
                     <div class="col-md-8">
-                        <label class="form-label fw-medium">Label <span class="text-danger">*</span></label>
+                        <label class="form-label fw-medium" id="modalLabelLabel">Label <span class="text-danger">*</span></label>
                         <input type="text" class="form-control" id="modalLabel" placeholder="Field label shown to users">
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-4" id="modalPlaceholderWrap">
                         <label class="form-label fw-medium">Placeholder</label>
                         <input type="text" class="form-control" id="modalPlaceholder" placeholder="Optional hint text">
                     </div>
                 </div>
-                <div class="row g-3 mb-3">
+                <div class="row g-3 mb-3" id="modalOptionsRow">
                     <div class="col-auto">
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" id="modalRequired">
@@ -243,7 +245,7 @@ $systemFieldsBottom = [
                     </div>
                 </div>
 
-                <hr>
+                <hr id="modalHr">
 
                 <!-- Dropdown options -->
                 <div id="sectionDropdown" class="field-section">
@@ -296,6 +298,28 @@ $systemFieldsBottom = [
                     </button>
                     <div id="depPreview" class="dep-tree mt-2"
                          style="display:none;max-height:200px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:.375rem;padding:.5rem;"></div>
+                </div>
+
+                <!-- Text Block content -->
+                <div id="sectionTextBlock" class="field-section">
+                    <label class="form-label fw-medium">Content <span class="text-danger">*</span></label>
+                    <textarea class="form-control" id="modalTextBlockContent" rows="6"
+                              placeholder="Enter the text, instructions, or notes to display on the form…"></textarea>
+                    <div class="form-text">This text will be displayed as a read-only block on the ticket submission form.</div>
+                </div>
+
+                <!-- Image -->
+                <div id="sectionImage" class="field-section">
+                    <div id="imageCurrentWrap" class="mb-3" style="display:none;">
+                        <label class="form-label fw-medium">Current Image</label><br>
+                        <img id="imageCurrentPreview" src="" alt="Current image" class="img-thumbnail" style="max-height:160px;">
+                    </div>
+                    <label class="form-label fw-medium">Upload Image</label>
+                    <input type="file" class="form-control" id="modalImageFile" accept="image/jpeg,image/png,image/gif,image/webp">
+                    <div class="form-text">JPEG, PNG, GIF, or WebP. Max 5 MB. The image will be displayed on the ticket submission form.</div>
+                    <div id="imageUploadProgress" class="mt-2" style="display:none;">
+                        <div class="spinner-border spinner-border-sm text-primary me-1"></div> Uploading…
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -416,17 +440,35 @@ document.addEventListener('DOMContentLoaded', function () {
     list.addEventListener('click', function (e) {
         var btn = e.target.closest('.edit-field-btn');
         if (!btn) return;
-        var id  = btn.dataset.fieldId;
-        var row = list.querySelector('[data-field-id="' + id + '"]');
-        openModal({
-            id:          id,
-            field_type:  row.dataset.fieldType,
-            label:       row.querySelector('.field-row-label').textContent.trim(),
-            placeholder: '',
-            is_required: row.querySelector('.badge.bg-danger') ? 1 : 0,
-            is_visible:  row.querySelector('.bi-eye-slash')    ? 0 : 1,
-            config:      null,
-        });
+        var id   = btn.dataset.fieldId;
+        var row  = list.querySelector('[data-field-id="' + id + '"]');
+        var type = row.dataset.fieldType;
+        // For types that store config (text_block, image), fetch it server-side
+        if (type === 'text_block' || type === 'image') {
+            fetch('/admin/workflows/ticket-fields/' + id + '/config', {credentials: 'same-origin'})
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    openModal({
+                        id:          id,
+                        field_type:  type,
+                        label:       row.querySelector('.field-row-label').textContent.trim(),
+                        placeholder: '',
+                        is_required: 0,
+                        is_visible:  row.querySelector('.bi-eye-slash') ? 0 : 1,
+                        config:      data.config,
+                    });
+                });
+        } else {
+            openModal({
+                id:          id,
+                field_type:  type,
+                label:       row.querySelector('.field-row-label').textContent.trim(),
+                placeholder: '',
+                is_required: row.querySelector('.badge.bg-danger') ? 1 : 0,
+                is_visible:  row.querySelector('.bi-eye-slash')    ? 0 : 1,
+                config:      null,
+            });
+        }
     });
 
     /* ─── Modal logic ─── */
@@ -439,6 +481,8 @@ document.addEventListener('DOMContentLoaded', function () {
     var depL3Wrap      = document.getElementById('depL3Wrap');
     var currentOptions = [];
 
+    var displayOnlyTypes = ['text_block', 'image'];
+
     function openModal(field) {
         document.getElementById('modalFieldId').value      = field.id;
         document.getElementById('modalFieldType').value    = field.field_type;
@@ -449,6 +493,12 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('modalRequired').checked   = !!parseInt(field.is_required);
         document.getElementById('modalVisible').checked    =
             field.is_visible === undefined ? true : !!parseInt(field.is_visible);
+
+        // Hide/show options row and placeholder for display-only types
+        var isDisplayOnly = displayOnlyTypes.indexOf(field.field_type) !== -1;
+        document.getElementById('modalOptionsRow').style.display    = isDisplayOnly ? 'none' : '';
+        document.getElementById('modalPlaceholderWrap').style.display = isDisplayOnly ? 'none' : '';
+        document.getElementById('modalHr').style.display            = isDisplayOnly ? 'none' : '';
 
         document.querySelectorAll('.field-section').forEach(function (s) { s.classList.remove('active'); });
 
@@ -483,6 +533,30 @@ document.addEventListener('DOMContentLoaded', function () {
             fetch('/admin/workflows/ticket-fields/' + field.id + '/options', {credentials: 'same-origin'})
                 .then(function (r) { return r.json(); })
                 .then(function (opts) { depHierarchy.value = optionsToText(opts); });
+
+        } else if (field.field_type === 'text_block') {
+            document.getElementById('sectionTextBlock').classList.add('active');
+            var cfg = field.config
+                ? (typeof field.config === 'string' ? JSON.parse(field.config) : field.config)
+                : null;
+            document.getElementById('modalTextBlockContent').value = (cfg && cfg.content) ? cfg.content : '';
+
+        } else if (field.field_type === 'image') {
+            document.getElementById('sectionImage').classList.add('active');
+            document.getElementById('modalImageFile').value = '';
+            document.getElementById('imageUploadProgress').style.display = 'none';
+            var cfg = field.config
+                ? (typeof field.config === 'string' ? JSON.parse(field.config) : field.config)
+                : null;
+            var previewWrap = document.getElementById('imageCurrentWrap');
+            var previewImg  = document.getElementById('imageCurrentPreview');
+            if (cfg && cfg.image_path) {
+                previewImg.src = '/uploads/field-images/' + cfg.image_path;
+                previewWrap.style.display = '';
+            } else {
+                previewWrap.style.display = 'none';
+                previewImg.src = '';
+            }
         }
 
         modal.show();
@@ -570,6 +644,31 @@ document.addEventListener('DOMContentLoaded', function () {
         depPreview.style.display = 'block';
     });
 
+    /* ─── Image upload (fires immediately on file select) ─── */
+    document.getElementById('modalImageFile').addEventListener('change', function () {
+        var file = this.files[0];
+        if (!file) return;
+        var id = document.getElementById('modalFieldId').value;
+        var progress = document.getElementById('imageUploadProgress');
+        progress.style.display = '';
+
+        var fd = new FormData();
+        fd.append('image', file);
+        fetch('/admin/workflows/ticket-fields/' + id + '/upload-image', {
+            method: 'POST', credentials: 'same-origin', body: fd
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            progress.style.display = 'none';
+            if (!data.success) { alert(data.error || 'Upload failed.'); return; }
+            var previewImg  = document.getElementById('imageCurrentPreview');
+            var previewWrap = document.getElementById('imageCurrentWrap');
+            previewImg.src = '/uploads/field-images/' + data.image_path + '?t=' + Date.now();
+            previewWrap.style.display = '';
+        })
+        .catch(function () { progress.style.display = 'none'; alert('Upload failed.'); });
+    });
+
     /* ─── Save field ─── */
     document.getElementById('saveFieldBtn').addEventListener('click', function () {
         var id          = document.getElementById('modalFieldId').value;
@@ -580,6 +679,12 @@ document.addEventListener('DOMContentLoaded', function () {
         var isVisible   = document.getElementById('modalVisible').checked;
 
         if (!label) { document.getElementById('modalLabel').focus(); return; }
+
+        // text_block: validate content
+        if (type === 'text_block') {
+            var content = document.getElementById('modalTextBlockContent').value.trim();
+            if (!content) { document.getElementById('modalTextBlockContent').focus(); return; }
+        }
 
         var payload = {label: label, placeholder: placeholder, is_required: isRequired, is_visible: isVisible};
 
@@ -596,6 +701,9 @@ document.addEventListener('DOMContentLoaded', function () {
             };
             payload.options = parseHierarchy(depHierarchy.value);
         }
+        if (type === 'text_block') {
+            payload.config = {content: document.getElementById('modalTextBlockContent').value.trim()};
+        }
 
         fetch('/admin/workflows/ticket-fields/' + id + '/update', {
             method:      'POST',
@@ -610,18 +718,21 @@ document.addEventListener('DOMContentLoaded', function () {
             var row = list.querySelector('[data-field-id="' + id + '"]');
             if (row) {
                 row.querySelector('.field-row-label').textContent = label;
-                var reqBadge = row.querySelector('.badge.bg-danger');
-                if (isRequired && !reqBadge) {
-                    var b = document.createElement('span');
-                    b.className = 'badge bg-danger'; b.style.fontSize = '.65rem'; b.textContent = 'Required';
-                    row.querySelector('.field-row-label').after(b);
-                } else if (!isRequired && reqBadge) { reqBadge.remove(); }
-                var eyeIcon = row.querySelector('.bi-eye-slash');
-                if (!isVisible && !eyeIcon) {
-                    var i = document.createElement('i');
-                    i.className = 'bi bi-eye-slash text-muted'; i.title = 'Hidden from portal users';
-                    row.querySelector('.edit-field-btn').before(i);
-                } else if (isVisible && eyeIcon) { eyeIcon.remove(); }
+                var isDisplayOnly = displayOnlyTypes.indexOf(type) !== -1;
+                if (!isDisplayOnly) {
+                    var reqBadge = row.querySelector('.badge.bg-danger');
+                    if (isRequired && !reqBadge) {
+                        var b = document.createElement('span');
+                        b.className = 'badge bg-danger'; b.style.fontSize = '.65rem'; b.textContent = 'Required';
+                        row.querySelector('.field-row-label').after(b);
+                    } else if (!isRequired && reqBadge) { reqBadge.remove(); }
+                    var eyeIcon = row.querySelector('.bi-eye-slash');
+                    if (!isVisible && !eyeIcon) {
+                        var i = document.createElement('i');
+                        i.className = 'bi bi-eye-slash text-muted'; i.title = 'Hidden from portal users';
+                        row.querySelector('.edit-field-btn').before(i);
+                    } else if (isVisible && eyeIcon) { eyeIcon.remove(); }
+                }
             }
             modal.hide();
         });

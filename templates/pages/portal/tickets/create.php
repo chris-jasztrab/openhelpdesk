@@ -130,6 +130,30 @@ endif; ?>
                 $cfKey = 'field_' . $cf['id'];
                 $cfOpts = $fieldOptions[$cf['id']] ?? [];
             ?>
+            <?php if ($cf['field_type'] === 'text_block'):
+                $tbCfg = $cf['config'] ? (is_string($cf['config']) ? json_decode($cf['config'], true) : $cf['config']) : [];
+            ?>
+            <div class="mb-3">
+                <?php if (!empty($cf['label'])): ?>
+                <p class="fw-semibold mb-1"><?= e($cf['label']) ?></p>
+                <?php endif; ?>
+                <div class="border rounded p-3 bg-light text-secondary small" style="white-space:pre-wrap;"><?= e($tbCfg['content'] ?? '') ?></div>
+            </div>
+            <?php elseif ($cf['field_type'] === 'image'):
+                $imgCfg = $cf['config'] ? (is_string($cf['config']) ? json_decode($cf['config'], true) : $cf['config']) : [];
+            ?>
+            <div class="mb-3">
+                <?php if (!empty($imgCfg['image_path'])): ?>
+                <img src="/uploads/field-images/<?= e($imgCfg['image_path']) ?>"
+                     alt="<?= e($cf['label']) ?>"
+                     class="img-fluid rounded"
+                     style="max-height:400px;">
+                <?php if (!empty($cf['label'])): ?>
+                <p class="text-muted small mt-1"><?= e($cf['label']) ?></p>
+                <?php endif; ?>
+                <?php endif; ?>
+            </div>
+            <?php else: ?>
             <div class="mb-3">
                 <label class="form-label fw-semibold">
                     <?= e($cf['label']) ?>
@@ -227,6 +251,7 @@ endif; ?>
                 </div>
                 <?php endif; ?>
             </div>
+            <?php endif; ?>
             <?php endforeach; ?>
             <?php endif; ?>
 
