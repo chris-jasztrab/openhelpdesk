@@ -71,7 +71,7 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
 
 <div class="row g-4">
     <!-- Left column: Description + Timeline -->
-    <div class="col-lg-8">
+    <div class="col-lg-6">
         <div class="card border-0 shadow-sm mb-4" id="tour-ticket-description">
             <div class="card-header bg-white border-bottom">
                 <h5 class="mb-0 fw-semibold"><i class="bi bi-text-paragraph me-2"></i>Description</h5>
@@ -283,8 +283,8 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
         </div>
     </div>
 
-    <!-- Right column: Metadata + Update -->
-    <div class="col-lg-4">
+    <!-- Middle column: Details + Custom Fields + SLA -->
+    <div class="col-lg-3">
         <div class="card border-0 shadow-sm mb-4" id="tour-ticket-details">
             <div class="card-header bg-white border-bottom">
                 <h5 class="mb-0 fw-semibold"><i class="bi bi-info-circle me-2"></i>Details</h5>
@@ -461,7 +461,10 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
             </div>
         </div>
         <?php endif; ?>
+    </div>
 
+    <!-- Right column: CC + Update Ticket -->
+    <div class="col-lg-3">
         <!-- CC -->
         <div class="card border-0 shadow-sm mb-4">
             <div class="card-header bg-white border-bottom">
