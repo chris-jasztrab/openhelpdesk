@@ -1077,7 +1077,7 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
         el.addEventListener('click', function(e) {
             e.preventDefault();
             statusAfterEl.value = this.dataset.status;
-            document.getElementById('replyForm').submit();
+            document.getElementById('replyForm').requestSubmit();
         });
     });
 })();
