@@ -132,6 +132,16 @@ function e(?string $value): string
     return htmlspecialchars($value ?? '', ENT_QUOTES | ENT_HTML5, 'UTF-8');
 }
 
+function linkify(?string $value): string
+{
+    $escaped = htmlspecialchars($value ?? '', ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    return preg_replace(
+        '/(https?:\/\/[^\s\'"<>]+)/i',
+        '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>',
+        $escaped
+    );
+}
+
 function currentPath(): string
 {
     return parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);

@@ -39,7 +39,7 @@ $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-p
                 <h5 class="mb-0 fw-semibold"><i class="bi bi-text-paragraph me-2"></i>Description</h5>
             </div>
             <div class="card-body">
-                <div style="white-space:pre-wrap;"><?= e($ticket['description']) ?></div>
+                <div style="white-space:pre-wrap;"><?= linkify($ticket['description']) ?></div>
             </div>
         </div>
 
@@ -156,7 +156,7 @@ $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-p
                                     <small class="text-muted"><?= date('M j, Y g:i A', strtotime($entry['created_at'])) ?></small>
                                 </div>
                                 <?php if ($entry['details']): ?>
-                                <div class="mt-1 text-muted"><?= e($entry['details']) ?></div>
+                                <div class="mt-1 text-muted" style="white-space:pre-wrap;"><?= linkify($entry['details']) ?></div>
                                 <?php endif; ?>
                             </div>
                         </div>
