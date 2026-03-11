@@ -18,35 +18,6 @@ $statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 
     </a>
 </div>
 
-<div class="row g-4" id="tour-portal-stats">
-    <div class="col-md-6">
-        <div class="card stat-card h-100">
-            <div class="card-body d-flex align-items-center gap-3">
-                <div class="stat-icon bg-primary bg-opacity-10 text-primary">
-                    <i class="bi bi-ticket-detailed"></i>
-                </div>
-                <div>
-                    <div class="text-muted small">Open Tickets</div>
-                    <div class="fs-4 fw-bold"><?= $openCount ?? 0 ?></div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-6">
-        <div class="card stat-card h-100">
-            <div class="card-body d-flex align-items-center gap-3">
-                <div class="stat-icon bg-success bg-opacity-10 text-success">
-                    <i class="bi bi-check-circle"></i>
-                </div>
-                <div>
-                    <div class="text-muted small">Resolved</div>
-                    <div class="fs-4 fw-bold"><?= $resolvedCount ?? 0 ?></div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
 <div class="card border-0 shadow-sm mt-4" id="tour-portal-recent">
     <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
         <h5 class="mb-0 fw-semibold"><i class="bi bi-ticket-detailed me-2"></i>Open Tickets</h5>
