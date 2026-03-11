@@ -441,64 +441,9 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
         </div>
         <?php endif; ?>
 
-        <!-- SLA Info -->
-        <?php if ($ticket['sla_state']): ?>
-        <div class="card border-0 shadow-sm mb-4">
-            <div class="card-header bg-white border-bottom">
-                <h5 class="mb-0 fw-semibold"><i class="bi bi-stopwatch me-2"></i>SLA</h5>
-            </div>
-            <div class="card-body">
-                <dl class="mb-0">
-                    <dt class="text-muted small">State</dt>
-                    <dd>
-                        <span class="badge bg-<?= $slaStateColors[$ticket['sla_state']] ?? 'secondary' ?>">
-                            <?= e($slaStateLabels[$ticket['sla_state']] ?? $ticket['sla_state']) ?>
-                        </span>
-                        <?php if (!empty($ticket['sla_paused_at'])): ?>
-                        <span class="badge bg-info ms-1"><i class="bi bi-pause-fill"></i> Paused</span>
-                        <?php endif; ?>
-                    </dd>
-
-                    <dt class="text-muted small">First Response</dt>
-                    <dd>
-                        <?php if ($ticket['first_responded_at']): ?>
-                            <span class="text-success"><i class="bi bi-check-circle me-1"></i>Responded <?= date('M j, g:i A', strtotime($ticket['first_responded_at'])) ?></span>
-                        <?php elseif ($ticket['first_response_due_at']): ?>
-                            <?php
-                            $frDue = new DateTimeImmutable($ticket['first_response_due_at']);
-                            $frOverdue = $frDue < new DateTimeImmutable('now');
-                            ?>
-                            <span class="<?= $frOverdue ? 'text-danger fw-bold' : '' ?>">
-                                Due <?= $frDue->format('M j, g:i A') ?>
-                                <?= $frOverdue ? ' (Overdue)' : '' ?>
-                            </span>
-                        <?php else: ?>
-                            <span class="text-muted">N/A</span>
-                        <?php endif; ?>
-                    </dd>
-
-                    <dt class="text-muted small">Resolution</dt>
-                    <dd>
-                        <?php if ($ticket['resolution_due_at']): ?>
-                            <?php
-                            $resDue = new DateTimeImmutable($ticket['resolution_due_at']);
-                            $resOverdue = $resDue < new DateTimeImmutable('now') && !in_array($ticket['status'], ['resolved', 'closed']);
-                            ?>
-                            <span class="<?= $resOverdue ? 'text-danger fw-bold' : '' ?>">
-                                Due <?= $resDue->format('M j, g:i A') ?>
-                                <?= $resOverdue ? ' (Overdue)' : '' ?>
-                            </span>
-                        <?php else: ?>
-                            <span class="text-muted">N/A</span>
-                        <?php endif; ?>
-                    </dd>
-                </dl>
-            </div>
-        </div>
-        <?php endif; ?>
     </div>
 
-    <!-- Right column: CC + Update Ticket -->
+    <!-- Right column: CC + Update Ticket + SLA -->
     <div class="col-lg-3">
         <!-- CC -->
         <div class="card border-0 shadow-sm mb-4">
@@ -577,6 +522,62 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
                 </form>
             </div>
         </div>
+
+        <!-- SLA Info -->
+        <?php if ($ticket['sla_state']): ?>
+        <div class="card border-0 shadow-sm mt-4">
+            <div class="card-header bg-white border-bottom">
+                <h5 class="mb-0 fw-semibold"><i class="bi bi-stopwatch me-2"></i>SLA</h5>
+            </div>
+            <div class="card-body">
+                <dl class="mb-0">
+                    <dt class="text-muted small">State</dt>
+                    <dd>
+                        <span class="badge bg-<?= $slaStateColors[$ticket['sla_state']] ?? 'secondary' ?>">
+                            <?= e($slaStateLabels[$ticket['sla_state']] ?? $ticket['sla_state']) ?>
+                        </span>
+                        <?php if (!empty($ticket['sla_paused_at'])): ?>
+                        <span class="badge bg-info ms-1"><i class="bi bi-pause-fill"></i> Paused</span>
+                        <?php endif; ?>
+                    </dd>
+
+                    <dt class="text-muted small">First Response</dt>
+                    <dd>
+                        <?php if ($ticket['first_responded_at']): ?>
+                            <span class="text-success"><i class="bi bi-check-circle me-1"></i>Responded <?= date('M j, g:i A', strtotime($ticket['first_responded_at'])) ?></span>
+                        <?php elseif ($ticket['first_response_due_at']): ?>
+                            <?php
+                            $frDue = new DateTimeImmutable($ticket['first_response_due_at']);
+                            $frOverdue = $frDue < new DateTimeImmutable('now');
+                            ?>
+                            <span class="<?= $frOverdue ? 'text-danger fw-bold' : '' ?>">
+                                Due <?= $frDue->format('M j, g:i A') ?>
+                                <?= $frOverdue ? ' (Overdue)' : '' ?>
+                            </span>
+                        <?php else: ?>
+                            <span class="text-muted">N/A</span>
+                        <?php endif; ?>
+                    </dd>
+
+                    <dt class="text-muted small">Resolution</dt>
+                    <dd>
+                        <?php if ($ticket['resolution_due_at']): ?>
+                            <?php
+                            $resDue = new DateTimeImmutable($ticket['resolution_due_at']);
+                            $resOverdue = $resDue < new DateTimeImmutable('now') && !in_array($ticket['status'], ['resolved', 'closed']);
+                            ?>
+                            <span class="<?= $resOverdue ? 'text-danger fw-bold' : '' ?>">
+                                Due <?= $resDue->format('M j, g:i A') ?>
+                                <?= $resOverdue ? ' (Overdue)' : '' ?>
+                            </span>
+                        <?php else: ?>
+                            <span class="text-muted">N/A</span>
+                        <?php endif; ?>
+                    </dd>
+                </dl>
+            </div>
+        </div>
+        <?php endif; ?>
     </div>
 </div>
 
