@@ -46,7 +46,7 @@ function _agentRequireTicketAccess(PDO $db, array $ticket): void
 $validHelpPages = ['dashboard', 'ticket-list', 'working-tickets', 'canned-responses'];
 
 $router->get('/agent/help', function () {
-    Auth::requireRole('agent');
+    Auth::requireRole('agent', 'admin', 'power_user');
     render('agent/docs/index', [
         'sidebarItems' => agentSidebar('help'),
         'layout'       => 'app',
@@ -56,7 +56,7 @@ $router->get('/agent/help', function () {
 });
 
 $router->get('/agent/help/{page}', function (array $p) use ($validHelpPages) {
-    Auth::requireRole('agent');
+    Auth::requireRole('agent', 'admin', 'power_user');
     $page = $p['page'] ?? '';
     if (!in_array($page, $validHelpPages, true)) {
         redirect('/agent/help');
