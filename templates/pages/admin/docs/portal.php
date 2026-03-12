@@ -61,6 +61,18 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-pencil-square text-primary me-2"></i>Editing &amp; Closing Your Own Ticket</h5>
+<p class="text-muted mb-2">Portal users have limited self-service options on their own open tickets:</p>
+<ul class="text-muted mb-3">
+    <li><strong>Edit subject &amp; description</strong> — a user can update the subject line and description of a ticket they submitted, as long as it has not yet been closed.</li>
+    <li><strong>Close ticket</strong> — a user can close one of their own open tickets if the issue has been resolved or the request is no longer needed.</li>
+</ul>
+<p class="text-muted mb-0">Both actions are available from the ticket detail view in the portal. Internal notes and system events are never shown to portal users.</p>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-book text-primary me-2"></i>Knowledge Base Access</h5>
 <p class="text-muted mb-2">Published knowledge base articles are accessible to portal users from the <strong>Knowledge Base</strong> link in the portal navigation. Users can browse by category and search for articles before submitting a ticket.</p>
 <p class="text-muted mb-0">See the <a href="/admin/docs/kb"><strong>Knowledge Base</strong></a> documentation for how to create and publish articles.</p>

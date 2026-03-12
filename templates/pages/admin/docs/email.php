@@ -192,9 +192,14 @@ I've confirmed the fix is deployed and the user has verified it works.
         <tr><td><strong>Ticket Merged</strong></td><td>Two tickets are merged and the requester is notified.</td></tr>
         <tr><td><strong>CSAT Survey</strong></td><td>A satisfaction survey is sent after a ticket is resolved/closed.</td></tr>
         <tr><td><strong>Customer Reminder</strong></td><td>An escalation rule with the "Notify ticket creator" action fires (e.g. follow-up after no reply).</td></tr>
+        <tr><td><strong>Group Alerts</strong></td><td>A new ticket is created and the ticket's assigned group has email alerts enabled.</td></tr>
     </tbody>
 </table>
 </div>
+
+<h6 class="fw-semibold mb-2">Rich Text Intro Messages</h6>
+<p class="text-muted mb-2">The <strong>Intro Message</strong> field on each template uses a rich text editor (CKEditor 5). You can apply bold, italic, bullet lists, numbered lists, and hyperlinks — the formatted HTML is rendered directly in the outgoing email. Tokens (see below) work inside the rich text editor as normal.</p>
+
 <h6 class="fw-semibold mb-2">Using Tokens</h6>
 <p class="text-muted mb-2">Template fields support dynamic tokens that are replaced with live ticket data when the email is sent. Wrap tokens in double curly braces:</p>
 <div class="table-responsive mb-3">
@@ -209,7 +214,7 @@ I've confirmed the fix is deployed and the user has verified it works.
     </tbody>
 </table>
 </div>
-<p class="text-muted mb-0">Each template also has a <strong>Reset to default</strong> button to restore the original built-in content if needed.</p>
+<p class="text-muted mb-0">Each template also has a <strong>Reset to default</strong> button to restore the original built-in content if needed. A shared <strong>Footer Text</strong> tab lets you customise the footer that appears on all outgoing ticket emails.</p>
 </div>
 </div>
 

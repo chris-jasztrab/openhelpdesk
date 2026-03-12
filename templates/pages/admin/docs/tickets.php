@@ -75,11 +75,28 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-person-check text-primary me-2"></i>Assigning Tickets</h5>
 <p class="text-muted mb-2">Tickets can be assigned to any agent or admin. Assignment can happen:</p>
-<ul class="text-muted mb-0">
+<ul class="text-muted mb-3">
     <li>At creation time (by an admin or agent creating the ticket).</li>
     <li>From the ticket view — use the <strong>Assigned To</strong> dropdown in the details panel on the right.</li>
+    <li>From the ticket list — click the <strong>agent chevron <i class="bi bi-chevron-down"></i></strong> in the Agent column to open a quick-assign dropdown without leaving the list.</li>
     <li>Via automations (see the <a href="/admin/docs/automations">Automations</a> doc).</li>
 </ul>
+<div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
+    When a ticket is assigned to a <strong>Group</strong>, the agent picker (both in the ticket view and the quick-assign dropdown) is automatically filtered to show only members of that group. To assign outside the group, first clear the Group field or change it.
+</div>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-lightning text-primary me-2"></i>Inline Ticket List Actions</h5>
+<p class="text-muted mb-2">Agents and admins can update key ticket fields directly from the ticket list without opening the ticket. Each row shows chevron icons (<i class="bi bi-chevron-down"></i>) in the <strong>Agent</strong>, <strong>Type</strong>, and <strong>Group</strong> columns. Hovering a cell reveals the chevron; clicking it opens a small dropdown to change that field immediately.</p>
+<ul class="text-muted mb-3">
+    <li><strong>Agent column</strong> — quick-assign to any agent (filtered to the ticket's group if one is set).</li>
+    <li><strong>Type column</strong> — change the ticket type in one click.</li>
+    <li><strong>Group column</strong> — reassign to a different group.</li>
+</ul>
+<p class="text-muted mb-0">The same inline actions are available in the <strong>Recent Tickets</strong> widget on the agent dashboard. A column picker on the dashboard widget lets you choose which columns are displayed.</p>
 </div>
 </div>
 
@@ -111,11 +128,12 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-clock-history text-primary me-2"></i>Ticket Timeline</h5>
 <p class="text-muted mb-2">Every ticket has a full audit trail in the timeline tab, showing all events in chronological order:</p>
-<ul class="text-muted mb-0">
-    <li><strong>Replies</strong> — customer-visible messages (white background)</li>
-    <li><strong>Internal Notes</strong> — private agent notes (highlighted with your configured note colour)</li>
-    <li><strong>System Events</strong> — status changes, priority changes, assignments, SLA updates, merges (highlighted with your configured system colour)</li>
+<ul class="text-muted mb-3">
+    <li><strong>Replies</strong> — customer-visible messages (white background).</li>
+    <li><strong>Internal Notes</strong> — private agent notes (highlighted with your configured note colour). Never visible to portal users.</li>
+    <li><strong>System Events</strong> — status changes, priority changes, assignments, SLA updates, merges (highlighted with your configured system colour). Visible to agents and admins only — portal users do not see system events.</li>
 </ul>
+<p class="text-muted mb-0">File attachments are displayed <strong>inline</strong> within the timeline entry they were uploaded with, so agents can preview images and download files without leaving the ticket view.</p>
 </div>
 </div>
 
