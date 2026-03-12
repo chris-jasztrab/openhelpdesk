@@ -60,7 +60,7 @@
                     <td style="padding:8px 12px; background:#f8fafc; border:1px solid #e2e8f0; border-bottom:none; border-radius:8px 8px 0 0; font-size:13px; color:#64748b; font-weight:600;">Description</td>
                 </tr>
                 <tr>
-                    <td style="padding:16px; border:1px solid #e2e8f0; border-radius:0 0 8px 8px; font-size:14px; color:#334155; line-height:1.6; white-space:pre-wrap;"><?= htmlspecialchars($description, ENT_QUOTES, 'UTF-8') ?></td>
+                    <td style="padding:16px; border:1px solid #e2e8f0; border-radius:0 0 8px 8px; font-size:14px; color:#334155; line-height:1.6;"><?= $description ?></td>
                 </tr>
             </table>
 
