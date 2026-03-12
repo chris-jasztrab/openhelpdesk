@@ -448,7 +448,7 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                         <?php endif; ?>
                         <?php if (in_array('agent', $visibleColumns)): ?>
                         <?php $qaAgents = $t['group_id'] ? ($groupAgents[(int)$t['group_id']] ?? []) : $allAgentsForAssign; ?>
-                        <td style="white-space:nowrap;overflow:hidden;text-align:right;" onclick="event.stopPropagation()">
+                        <td style="white-space:nowrap;overflow:hidden;text-align:right;">
                             <span class="d-inline-flex align-items-center gap-1 quick-assign-wrap" data-ticket-id="<?= (int)$t['id'] ?>">
                                 <span class="quick-assign-name"><?= e($t['agent_name'] ?: '— Unassigned —') ?></span>
                                 <button class="btn btn-link btn-sm p-0 border-0 text-muted quick-assign-btn"
@@ -701,21 +701,57 @@ sessionStorage.setItem('agentTicketListUrl', window.location.href);
         tbl.style.visibility = "";
     })();
 
-    // Quick-assign: custom fixed-position dropdown (escapes overflow:hidden containers)
+    // Quick-assign: custom fixed-position dropdown
     (function () {
         var activeMenu = null;
+        var activeBtn  = null;
         var esc = function (s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
 
         function closeMenu() {
-            if (activeMenu) { activeMenu.remove(); activeMenu = null; }
+            if (activeMenu) { activeMenu.remove(); activeMenu = null; activeBtn = null; }
         }
 
+        function openMenu(btn) {
+            closeMenu();
+            var wrap = btn.closest('.quick-assign-wrap');
+            var ticketId = wrap ? wrap.dataset.ticketId : '';
+            var agents = [];
+            try { agents = JSON.parse(btn.dataset.agents || '[]'); } catch (_) {}
+            var html = '<ul class="dropdown-menu show shadow-sm" style="position:fixed;z-index:1060;min-width:180px;max-height:260px;overflow-y:auto;font-size:0.85rem;">';
+            html += '<li><a class="dropdown-item quick-assign-floating-item" href="#" data-agent-id="" data-ticket-id="' + esc(ticketId) + '">— Unassigned —</a></li>';
+            if (agents.length) {
+                html += '<li><hr class="dropdown-divider"></li>';
+                agents.forEach(function (a) {
+                    html += '<li><a class="dropdown-item quick-assign-floating-item" href="#" data-agent-id="' + esc(a.id) + '" data-ticket-id="' + esc(ticketId) + '">' + esc(a.name) + '</a></li>';
+                });
+            }
+            html += '</ul>';
+            var div = document.createElement('div');
+            div.innerHTML = html;
+            var menu = div.firstChild;
+            document.body.appendChild(menu);
+            var rect = btn.getBoundingClientRect();
+            menu.style.top = (rect.bottom + 2) + 'px';
+            menu.style.left = rect.left + 'px';
+            activeMenu = menu;
+            activeBtn  = btn;
+        }
+
+        // Attach directly to each button so stopPropagation only blocks tr navigation
+        document.querySelectorAll('.quick-assign-btn').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                if (activeBtn === btn) { closeMenu(); return; }
+                openMenu(btn);
+            });
+        });
+
+        // Handle floating menu item clicks and outside-close
         document.addEventListener('click', function (e) {
-            // Item click
             var item = e.target.closest('.quick-assign-floating-item');
             if (item) {
                 e.preventDefault();
-                var agentId = item.dataset.agentId;
+                var agentId  = item.dataset.agentId;
                 var ticketId = item.dataset.ticketId;
                 var wrap = document.querySelector('.quick-assign-wrap[data-ticket-id="' + ticketId + '"]');
                 closeMenu();
@@ -731,40 +767,7 @@ sessionStorage.setItem('agentTicketListUrl', window.location.href);
                 }).catch(function () {});
                 return;
             }
-
-            // Button click
-            var btn = e.target.closest('.quick-assign-btn');
-            if (btn) {
-                e.stopPropagation();
-                if (activeMenu && activeMenu.dataset.forBtn === btn) { closeMenu(); return; }
-                closeMenu();
-                var wrap = btn.closest('.quick-assign-wrap');
-                var ticketId = wrap ? wrap.dataset.ticketId : '';
-                var agents = [];
-                try { agents = JSON.parse(btn.dataset.agents || '[]'); } catch (_) {}
-                var html = '<ul class="dropdown-menu show shadow-sm" style="position:fixed;z-index:1060;min-width:180px;max-height:260px;overflow-y:auto;font-size:0.85rem;">';
-                html += '<li><a class="dropdown-item quick-assign-floating-item" href="#" data-agent-id="" data-ticket-id="' + esc(ticketId) + '">— Unassigned —</a></li>';
-                if (agents.length) {
-                    html += '<li><hr class="dropdown-divider"></li>';
-                    agents.forEach(function (a) {
-                        html += '<li><a class="dropdown-item quick-assign-floating-item" href="#" data-agent-id="' + esc(a.id) + '" data-ticket-id="' + esc(ticketId) + '">' + esc(a.name) + '</a></li>';
-                    });
-                }
-                html += '</ul>';
-                var div = document.createElement('div');
-                div.innerHTML = html;
-                var menu = div.firstChild;
-                menu.dataset.forBtn = btn;
-                document.body.appendChild(menu);
-                var rect = btn.getBoundingClientRect();
-                menu.style.top = (rect.bottom + 2) + 'px';
-                menu.style.left = rect.left + 'px';
-                activeMenu = menu;
-                return;
-            }
-
-            // Outside click
-            closeMenu();
+            if (!e.target.closest('.quick-assign-btn')) { closeMenu(); }
         });
 
         window.addEventListener('scroll', closeMenu, true);
