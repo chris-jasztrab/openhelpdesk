@@ -151,6 +151,118 @@ $router->post('/api/tickets/{id}/assign', function (array $p) {
 });
 
 /* ------------------------------------------------------------------
+ * Quick Set Type (JSON API)
+ * ------------------------------------------------------------------ */
+$router->post('/api/tickets/{id}/set-type', function (array $p) {
+    Auth::requireAuth();
+    if (!in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)) {
+        http_response_code(403); echo json_encode(['error' => 'Forbidden']); exit;
+    }
+    if (!verifyCsrf($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '')) {
+        http_response_code(403); echo json_encode(['error' => 'Invalid CSRF token']); exit;
+    }
+    header('Content-Type: application/json');
+
+    $ticketId = (int) $p['id'];
+    $input    = json_decode(file_get_contents('php://input'), true);
+    $typeId   = isset($input['type_id']) && $input['type_id'] !== null && $input['type_id'] !== ''
+                ? (int) $input['type_id'] : null;
+
+    $db = Database::connect();
+    $stmt = $db->prepare('SELECT id, type_id FROM tickets WHERE id = ?');
+    $stmt->execute([$ticketId]);
+    $ticket = $stmt->fetch();
+    if (!$ticket) { http_response_code(404); echo json_encode(['error' => 'Ticket not found']); exit; }
+
+    $oldTypeId = $ticket['type_id'] ? (int) $ticket['type_id'] : null;
+    $typeName  = null;
+    $typeColor = null;
+    if ($typeId) {
+        $ts = $db->prepare('SELECT name, color FROM ticket_types WHERE id = ?');
+        $ts->execute([$typeId]);
+        $row = $ts->fetch();
+        if ($row) { $typeName = $row['name']; $typeColor = $row['color']; }
+    }
+
+    if ($typeId !== $oldTypeId) {
+        $db->prepare('UPDATE tickets SET type_id = ? WHERE id = ?')->execute([$typeId, $ticketId]);
+        $oldName = 'None';
+        if ($oldTypeId) {
+            $s = $db->prepare('SELECT name FROM ticket_types WHERE id = ?');
+            $s->execute([$oldTypeId]);
+            $oldName = $s->fetchColumn() ?: 'None';
+        }
+        $db->prepare('INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)')
+           ->execute([$ticketId, Auth::id(), 'type_changed', 'Type changed from ' . $oldName . ' to ' . ($typeName ?? 'None')]);
+        runAutomations($db, $ticketId, 'ticket_updated');
+    }
+    echo json_encode(['success' => true, 'type_name' => $typeName, 'type_color' => $typeColor ?: '#6c757d']);
+    exit;
+});
+
+/* ------------------------------------------------------------------
+ * Quick Set Group (JSON API)
+ * ------------------------------------------------------------------ */
+$router->post('/api/tickets/{id}/set-group', function (array $p) {
+    Auth::requireAuth();
+    if (!in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)) {
+        http_response_code(403); echo json_encode(['error' => 'Forbidden']); exit;
+    }
+    if (!verifyCsrf($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '')) {
+        http_response_code(403); echo json_encode(['error' => 'Invalid CSRF token']); exit;
+    }
+    header('Content-Type: application/json');
+
+    $ticketId = (int) $p['id'];
+    $input    = json_decode(file_get_contents('php://input'), true);
+    $groupId  = isset($input['group_id']) && $input['group_id'] !== null && $input['group_id'] !== ''
+                ? (int) $input['group_id'] : null;
+
+    $db = Database::connect();
+    $stmt = $db->prepare('SELECT id, group_id FROM tickets WHERE id = ?');
+    $stmt->execute([$ticketId]);
+    $ticket = $stmt->fetch();
+    if (!$ticket) { http_response_code(404); echo json_encode(['error' => 'Ticket not found']); exit; }
+
+    $oldGroupId = $ticket['group_id'] ? (int) $ticket['group_id'] : null;
+    $groupName  = null;
+    if ($groupId) {
+        $gs = $db->prepare('SELECT name FROM `groups` WHERE id = ?');
+        $gs->execute([$groupId]);
+        $groupName = $gs->fetchColumn() ?: null;
+    }
+
+    if ($groupId !== $oldGroupId) {
+        $db->prepare('UPDATE tickets SET group_id = ? WHERE id = ?')->execute([$groupId, $ticketId]);
+        $oldName = 'None';
+        if ($oldGroupId) {
+            $s = $db->prepare('SELECT name FROM `groups` WHERE id = ?');
+            $s->execute([$oldGroupId]);
+            $oldName = $s->fetchColumn() ?: 'None';
+        }
+        $db->prepare('INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)')
+           ->execute([$ticketId, Auth::id(), 'group_changed', 'Group changed from ' . $oldName . ' to ' . ($groupName ?? 'None')]);
+        if ($groupId) { notifyAssignedGroup($db, $ticketId, $groupId); }
+        runAutomations($db, $ticketId, 'ticket_updated');
+    }
+
+    // Return agents for the new group so the client can update the agent dropdown
+    if ($groupId) {
+        $as = $db->prepare("SELECT u.id, CONCAT(u.first_name,' ',u.last_name) AS name
+                             FROM users u JOIN group_user_map gum ON u.id = gum.user_id
+                             WHERE gum.group_id = ? AND u.role IN ('agent','admin','power_user')
+                             ORDER BY u.first_name, u.last_name");
+        $as->execute([$groupId]);
+    } else {
+        $as = $db->query("SELECT id, CONCAT(first_name,' ',last_name) AS name FROM users
+                          WHERE role IN ('agent','admin','power_user') ORDER BY first_name, last_name");
+    }
+    $agents = array_map(fn($r) => ['id' => (int)$r['id'], 'name' => $r['name']], $as->fetchAll());
+    echo json_encode(['success' => true, 'group_name' => $groupName, 'agents' => $agents]);
+    exit;
+});
+
+/* ------------------------------------------------------------------
  * User Search for CC (JSON API)
  * ------------------------------------------------------------------ */
 $router->get('/api/user-search', function () {
