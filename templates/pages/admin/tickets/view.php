@@ -112,13 +112,25 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
             </div>
         </div>
 
-        <?php if (!empty($attachments)): ?>
+        <?php
+        // Split attachments: those linked to a timeline entry render inline; others show here
+        $attachmentsByTimeline = [];
+        $standaloneAttachments = [];
+        foreach ($attachments as $att) {
+            if ($att['timeline_id']) {
+                $attachmentsByTimeline[$att['timeline_id']][] = $att;
+            } else {
+                $standaloneAttachments[] = $att;
+            }
+        }
+        ?>
+        <?php if (!empty($standaloneAttachments)): ?>
         <div class="card border-0 shadow-sm mb-4">
             <div class="card-header bg-white border-bottom">
                 <h5 class="mb-0 fw-semibold"><i class="bi bi-paperclip me-2"></i>Attachments</h5>
             </div>
             <div class="list-group list-group-flush">
-                <?php foreach ($attachments as $att): ?>
+                <?php foreach ($standaloneAttachments as $att): ?>
                 <a href="/admin/attachments/<?= $att['id'] ?>/download"
                    class="list-group-item list-group-item-action d-flex align-items-center gap-3 <?= !empty($att['is_internal']) ? 'bg-warning bg-opacity-10' : '' ?>">
                     <i class="bi <?= getFileIcon($att['mime_type']) ?> fs-4"></i>
@@ -203,6 +215,18 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
                                 <?php else: ?>
                                 <div class="mt-1 text-muted" style="white-space:pre-wrap;"><?= $det ?></div>
                                 <?php endif; ?>
+                                <?php endif; ?>
+                                <?php if (!empty($attachmentsByTimeline[$entry['id']])): ?>
+                                <div class="mt-2 d-flex flex-wrap gap-2">
+                                    <?php foreach ($attachmentsByTimeline[$entry['id']] as $att): ?>
+                                    <a href="/admin/attachments/<?= $att['id'] ?>/download"
+                                       class="d-inline-flex align-items-center gap-1 text-decoration-none border rounded px-2 py-1 small bg-light text-dark">
+                                        <i class="bi <?= getFileIcon($att['mime_type']) ?>"></i>
+                                        <?= e($att['original_name']) ?>
+                                        <span class="text-muted">(<?= formatFileSize($att['file_size']) ?>)</span>
+                                    </a>
+                                    <?php endforeach; ?>
+                                </div>
                                 <?php endif; ?>
                             </div>
                         </div>
