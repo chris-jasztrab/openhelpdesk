@@ -1,7 +1,7 @@
 <?php
 $settingsNavGroups = [
     'Email' => [
-        ['label' => 'Email / SMTP',        'url' => '/admin/settings',                      'icon' => 'bi-envelope'],
+        ['label' => 'Email / SMTP',        'url' => '/admin/settings',                      'icon' => 'bi-envelope', 'exact' => true],
         ['label' => 'Email Templates',     'url' => '/admin/settings/email-templates',      'icon' => 'bi-pencil-square'],
         ['label' => 'Email Notifications', 'url' => '/admin/settings/email-notifications',  'icon' => 'bi-bell'],
     ],
@@ -55,7 +55,7 @@ $currentPath = currentPath();
                         <?= e($groupLabel) ?>
                     </div>
                     <?php foreach ($items as $item): ?>
-                    <?php $isActive = $currentPath === $item['url'] || str_starts_with($currentPath, $item['url'] . '/'); ?>
+                    <?php $isActive = $currentPath === $item['url'] || (!($item['exact'] ?? false) && str_starts_with($currentPath, $item['url'] . '/')); ?>
                     <a class="d-flex align-items-center nav-link py-1 px-2 small rounded mb-0 <?= $isActive ? 'fw-semibold' : 'text-muted' ?>"
                        href="<?= e($item['url']) ?>"
                        style="<?= $isActive ? 'background:var(--bs-secondary-bg);color:var(--ld-primary)!important;' : '' ?>">
