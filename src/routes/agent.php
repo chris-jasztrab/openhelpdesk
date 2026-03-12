@@ -636,7 +636,7 @@ $router->get('/agent/tickets/{id}', function (array $p) {
         "SELECT t.*,
                 tp.name AS priority_name, tp.color AS priority_color,
                 l.name  AS location_name,
-                tt.name AS type_name, tt.color AS type_color,
+                tt.name AS type_name, tt.color AS type_color, tt.group_id AS type_group_id,
                 c.first_name AS creator_first_name, c.last_name AS creator_last_name,
                 CONCAT(c.first_name, ' ', c.last_name) AS creator_name, c.email AS creator_email,
                 CONCAT(a.first_name, ' ', a.last_name) AS agent_name,
@@ -679,20 +679,19 @@ $router->get('/agent/tickets/{id}', function (array $p) {
     $tl->execute([$ticket['id']]);
     $timeline = $tl->fetchAll();
 
-    // Agents list for @mention suggestions and assignment dropdown
-    // If the ticket belongs to a group, only show members of that group
-    if (!empty($ticket['group_id'])) {
+    // Agents list for assignment dropdown — filter by the ticket type's group if set
+    if (!empty($ticket['type_group_id'])) {
         $agentStmt = $db->prepare(
             "SELECT u.id, u.first_name, u.last_name
              FROM users u
              INNER JOIN group_user_map gum ON u.id = gum.user_id
-             WHERE gum.group_id = ? AND u.role IN ('agent','admin')
+             WHERE gum.group_id = ? AND u.role IN ('agent','admin','power_user')
              ORDER BY u.first_name"
         );
-        $agentStmt->execute([$ticket['group_id']]);
+        $agentStmt->execute([$ticket['type_group_id']]);
         $agents = $agentStmt->fetchAll();
     } else {
-        $agents = $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin') ORDER BY first_name")->fetchAll();
+        $agents = $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin','power_user') ORDER BY first_name")->fetchAll();
     }
 
     // Priorities for update dropdown

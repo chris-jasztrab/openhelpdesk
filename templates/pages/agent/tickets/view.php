@@ -369,7 +369,21 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
                     <dd><?php if ($ticket['type_name']): ?><span class="badge" style="background:<?= e($ticket['type_color'] ?: '#6c757d') ?>;"><?= e($ticket['type_name']) ?></span><?php else: ?><span class="text-muted">Not Set</span><?php endif; ?></dd>
 
                     <dt class="text-muted small">Assigned To</dt>
-                    <dd><?= e($ticket['agent_name'] ?: 'Unassigned') ?></dd>
+                    <dd>
+                        <?php
+                            $qaAgents = array_map(fn($a) => ['id' => (int)$a['id'], 'name' => $a['first_name'] . ' ' . $a['last_name']], $agents);
+                        ?>
+                        <span class="d-inline-flex align-items-center gap-1 quick-assign-wrap" data-ticket-id="<?= (int)$ticket['id'] ?>">
+                            <span class="quick-assign-name"><?= e($ticket['agent_name'] ?: 'Unassigned') ?></span>
+                            <button class="btn btn-link btn-sm p-0 border-0 text-muted quick-assign-btn"
+                                    type="button"
+                                    data-agents="<?= e(json_encode($qaAgents)) ?>"
+                                    title="Change assignee"
+                                    style="line-height:1;">
+                                <i class="bi bi-chevron-down" style="font-size:0.65rem;"></i>
+                            </button>
+                        </span>
+                    </dd>
 
                     <dt class="text-muted small">Group</dt>
                     <dd><?= e($ticket['group_name'] ?? 'None') ?></dd>
@@ -1439,4 +1453,84 @@ ClassicEditor.create(document.querySelector('#replyEditor'), {
     });
 
 }).catch(console.error);
+</script>
+
+<script>
+// Quick-assign dropdown for the Assigned To detail row
+(function () {
+    var activeMenu = null;
+    var activeBtn  = null;
+    var esc = function (s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+
+    function closeMenu() {
+        if (activeMenu) { activeMenu.remove(); activeMenu = null; activeBtn = null; }
+    }
+
+    function openMenu(btn) {
+        closeMenu();
+        var wrap = btn.closest('.quick-assign-wrap');
+        var ticketId = wrap ? wrap.dataset.ticketId : '';
+        var agents = [];
+        try { agents = JSON.parse(btn.dataset.agents || '[]'); } catch (_) {}
+        var html = '<ul class="dropdown-menu show shadow-sm" style="position:fixed;z-index:1060;min-width:180px;max-height:260px;overflow-y:auto;font-size:0.85rem;">';
+        html += '<li><a class="dropdown-item quick-assign-floating-item" href="#" data-agent-id="" data-ticket-id="' + esc(ticketId) + '">Unassigned</a></li>';
+        if (agents.length) {
+            html += '<li><hr class="dropdown-divider"></li>';
+            agents.forEach(function (a) {
+                html += '<li><a class="dropdown-item quick-assign-floating-item" href="#" data-agent-id="' + esc(a.id) + '" data-ticket-id="' + esc(ticketId) + '">' + esc(a.name) + '</a></li>';
+            });
+        }
+        html += '</ul>';
+        var div = document.createElement('div');
+        div.innerHTML = html;
+        var menu = div.firstChild;
+        document.body.appendChild(menu);
+        var rect = btn.getBoundingClientRect();
+        menu.style.top = (rect.bottom + 2) + 'px';
+        menu.style.left = rect.left + 'px';
+        activeMenu = menu;
+        activeBtn  = btn;
+    }
+
+    document.querySelectorAll('.quick-assign-btn').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            if (activeBtn === btn) { closeMenu(); return; }
+            openMenu(btn);
+        });
+    });
+
+    document.addEventListener('click', function (e) {
+        var item = e.target.closest('.quick-assign-floating-item');
+        if (item) {
+            e.preventDefault();
+            var agentId  = item.dataset.agentId;
+            var ticketId = item.dataset.ticketId;
+            var wrap = document.querySelector('.quick-assign-wrap[data-ticket-id="' + ticketId + '"]');
+            closeMenu();
+            if (!wrap) return;
+            var nameSpan = wrap.querySelector('.quick-assign-name');
+            // Also update the sidebar select
+            var sidebarSelect = document.getElementById('assigned_to');
+            fetch('/api/tickets/' + ticketId + '/assign', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
+                body: JSON.stringify({assigned_to: agentId === '' ? null : parseInt(agentId, 10)})
+            }).then(function (r) { return r.json(); }).then(function (data) {
+                if (data.success) {
+                    nameSpan.textContent = data.agent_name || 'Unassigned';
+                    if (sidebarSelect) { sidebarSelect.value = agentId; }
+                }
+            }).catch(function () {});
+            return;
+        }
+        if (!e.target.closest('.quick-assign-btn')) { closeMenu(); }
+    });
+
+    window.addEventListener('scroll', function (e) {
+        if (activeMenu && (activeMenu === e.target || activeMenu.contains(e.target))) return;
+        closeMenu();
+    }, true);
+    window.addEventListener('resize', closeMenu);
+})();
 </script>
