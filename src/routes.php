@@ -85,6 +85,72 @@ $router->post('/api/tickets/{id}/tags', function (array $p) {
 });
 
 /* ------------------------------------------------------------------
+ * Quick Assign Ticket (JSON API)
+ * ------------------------------------------------------------------ */
+$router->post('/api/tickets/{id}/assign', function (array $p) {
+    Auth::requireAuth();
+    if (!in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Forbidden']);
+        exit;
+    }
+    if (!verifyCsrf($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '')) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Invalid CSRF token']);
+        exit;
+    }
+    header('Content-Type: application/json');
+
+    $ticketId = (int) $p['id'];
+    $input = json_decode(file_get_contents('php://input'), true);
+    $assignedToRaw = $input['assigned_to'] ?? null;
+    $assignedTo = ($assignedToRaw !== null && $assignedToRaw !== '') ? (int) $assignedToRaw : null;
+
+    $db = Database::connect();
+
+    $stmt = $db->prepare('SELECT id, group_id, assigned_to FROM tickets WHERE id = ?');
+    $stmt->execute([$ticketId]);
+    $ticket = $stmt->fetch();
+    if (!$ticket) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Ticket not found']);
+        exit;
+    }
+
+    // Verify assigned agent is in the ticket's group (if group is set)
+    if ($assignedTo && $ticket['group_id']) {
+        $check = $db->prepare('SELECT 1 FROM group_user_map WHERE group_id = ? AND user_id = ?');
+        $check->execute([$ticket['group_id'], $assignedTo]);
+        if (!$check->fetch()) {
+            http_response_code(422);
+            echo json_encode(['error' => 'Agent not in ticket group']);
+            exit;
+        }
+    }
+
+    $oldAssigned = $ticket['assigned_to'] ? (int) $ticket['assigned_to'] : null;
+
+    // Compute agent name
+    $agentName = null;
+    if ($assignedTo) {
+        $s = $db->prepare("SELECT CONCAT(first_name, ' ', last_name) FROM users WHERE id = ?");
+        $s->execute([$assignedTo]);
+        $agentName = $s->fetchColumn() ?: 'Unknown';
+    }
+
+    if ($assignedTo !== $oldAssigned) {
+        $db->prepare('UPDATE tickets SET assigned_to = ? WHERE id = ?')->execute([$assignedTo, $ticketId]);
+        $db->prepare('INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)')
+           ->execute([$ticketId, Auth::id(), 'assigned', 'Assigned to ' . ($agentName ?? 'Unassigned')]);
+        if ($assignedTo) { notifyAssignedAgent($db, $ticketId, $assignedTo); }
+        runAutomations($db, $ticketId, 'ticket_updated');
+    }
+
+    echo json_encode(['success' => true, 'agent_name' => $agentName]);
+    exit;
+});
+
+/* ------------------------------------------------------------------
  * User Search for CC (JSON API)
  * ------------------------------------------------------------------ */
 $router->get('/api/user-search', function () {

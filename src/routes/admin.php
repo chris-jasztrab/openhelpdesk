@@ -1639,6 +1639,22 @@ $router->get('/admin/tickets', function () {
     $agents     = $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin','power_user') ORDER BY first_name")->fetchAll();
     $groups     = $db->query('SELECT * FROM `groups` ORDER BY sort_order, name')->fetchAll();
 
+    // Build group → agents map for quick-assign dropdowns
+    $gaRows = $db->query(
+        "SELECT gum.group_id, u.id, CONCAT(u.first_name, ' ', u.last_name) AS name
+         FROM group_user_map gum
+         JOIN users u ON gum.user_id = u.id
+         WHERE u.role IN ('agent','admin','power_user')
+         ORDER BY u.first_name, u.last_name"
+    )->fetchAll();
+    $groupAgents = [];
+    foreach ($gaRows as $row) {
+        $groupAgents[(int) $row['group_id']][] = ['id' => (int) $row['id'], 'name' => $row['name']];
+    }
+    $allAgentsForAssign = $db->query(
+        "SELECT id, CONCAT(first_name, ' ', last_name) AS name FROM users WHERE role IN ('agent','admin','power_user') ORDER BY first_name, last_name"
+    )->fetchAll();
+
     // Load saved filters (own + shared)
     $sfStmt = $db->prepare(
         "SELECT sf.*, CONCAT(u.first_name, ' ', u.last_name) AS owner_name
@@ -1651,23 +1667,25 @@ $router->get('/admin/tickets', function () {
     $savedFilters = $sfStmt->fetchAll();
 
     render('admin/tickets/index', [
-        'tickets'          => $tickets,
-        'priorities'       => $priorities,
-        'types'            => $types,
-        'locations'        => $locations,
-        'agents'           => $agents,
-        'groups'           => $groups,
-        'filters'          => $filters,
-        'savedFilters'     => $savedFilters,
-        'page'             => $page,
-        'perPage'          => $perPage,
-        'totalPages'       => $totalPages,
-        'totalTickets'     => $totalTickets,
-        'allTickets'       => $allTickets,
-        'sort'             => $sort,
-        'dir'              => strtolower($dir),
-        'visibleColumns'   => getUserColumns(Auth::id()),
-        'defaultFilterUrl' => $defaultFilterUrl,
+        'tickets'            => $tickets,
+        'priorities'         => $priorities,
+        'types'              => $types,
+        'locations'          => $locations,
+        'agents'             => $agents,
+        'groups'             => $groups,
+        'groupAgents'        => $groupAgents,
+        'allAgentsForAssign' => $allAgentsForAssign,
+        'filters'            => $filters,
+        'savedFilters'       => $savedFilters,
+        'page'               => $page,
+        'perPage'            => $perPage,
+        'totalPages'         => $totalPages,
+        'totalTickets'       => $totalTickets,
+        'allTickets'         => $allTickets,
+        'sort'               => $sort,
+        'dir'                => strtolower($dir),
+        'visibleColumns'     => getUserColumns(Auth::id()),
+        'defaultFilterUrl'   => $defaultFilterUrl,
     ]);
 });
 
