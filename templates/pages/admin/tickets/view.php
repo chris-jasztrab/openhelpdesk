@@ -1313,6 +1313,7 @@ ClassicEditor.create(document.querySelector('#replyEditor'), {
     initialData: ''
 }).then(function(editor) {
     window._replyEditor = editor;
+    editor.ui.view.editable.element.style.minHeight = '150px';
 
     // Form submit: validate and populate hidden field
     document.getElementById('replyForm').addEventListener('submit', function(e) {
