@@ -199,10 +199,10 @@ $groups ??= [];
 
                     <div class="mb-3">
                         <label class="form-label fw-semibold">Intro Message</label>
-                        <textarea class="form-control" name="email_intro_group_alerts"
+                        <textarea id="intro-editor" class="form-control" name="email_intro_group_alerts"
                                   rows="3"
                                   placeholder="<?= e($defaults['group_alerts']['intro']) ?>"><?= e($tplValues['email_intro_group_alerts'] ?? '') ?></textarea>
-                        <div class="form-text">Appears as the subtitle paragraph below the ticket heading. HTML is supported. Leave blank to use the default.</div>
+                        <div class="form-text">Appears as the subtitle paragraph below the ticket heading. Leave blank to use the default.</div>
                     </div>
 
                     <div class="mb-4" style="max-width:300px;">
@@ -291,11 +291,11 @@ $groups ??= [];
 
                     <div class="mb-3">
                         <label class="form-label fw-semibold">Intro Message</label>
-                        <textarea class="form-control" name="email_intro_<?= e($activeTab) ?>"
+                        <textarea id="intro-editor" class="form-control" name="email_intro_<?= e($activeTab) ?>"
                                   rows="3"
                                   placeholder="<?= e($defaults[$activeTab]['intro']) ?>"><?= e($tplValues["email_intro_{$activeTab}"] ?? '') ?></textarea>
                         <div class="form-text">
-                            Appears as the subtitle paragraph below the ticket heading. HTML is supported.
+                            Appears as the subtitle paragraph below the ticket heading.
                             Leave blank to use the default.
                         </div>
                     </div>
@@ -388,6 +388,8 @@ $groups ??= [];
 
 <?php endif; ?>
 
+<link rel="stylesheet" href="https://cdn.ckeditor.com/ckeditor5/41.4.2/classic/ckeditor.css">
+<script src="https://cdn.ckeditor.com/ckeditor5/41.4.2/classic/ckeditor.js"></script>
 <script>
 function copyToken(el) {
     const text = el.textContent.trim();
@@ -397,6 +399,28 @@ function copyToken(el) {
         setTimeout(() => { el.style.background = orig; }, 800);
     });
 }
+
+(function () {
+    var ta = document.getElementById('intro-editor');
+    if (!ta) return;
+
+    ClassicEditor.create(ta, {
+        placeholder: ta.getAttribute('placeholder') || '',
+        toolbar: {
+            items: ['bold', 'italic', '|', 'link', '|', 'bulletedList', 'numberedList']
+        },
+        link: {
+            defaultProtocol: 'https://'
+        }
+    }).then(function (editor) {
+        var form = ta.form || ta.closest('form');
+        if (form) {
+            form.addEventListener('submit', function () {
+                ta.value = editor.getData();
+            });
+        }
+    }).catch(console.error);
+})();
 </script>
 
 <?php require ROOT_DIR . '/templates/partials/settings-nav-end.php'; ?>
