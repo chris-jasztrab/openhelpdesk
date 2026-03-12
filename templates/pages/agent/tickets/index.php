@@ -378,7 +378,7 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                     <th style="white-space:nowrap;"><a href="<?= sortUrl('type', $sort, $dir, $sortParams, '/agent/tickets') ?>" class="text-decoration-none text-dark">Type <?= sortIcon('type', $sort, $dir) ?></a></th>
                     <?php endif; ?>
                     <?php if (in_array('agent', $visibleColumns)): ?>
-                    <th style="white-space:nowrap;"><a href="<?= sortUrl('agent', $sort, $dir, $sortParams, '/agent/tickets') ?>" class="text-decoration-none text-dark">Assigned To <?= sortIcon('agent', $sort, $dir) ?></a></th>
+                    <th style="white-space:nowrap;text-align:right;"><a href="<?= sortUrl('agent', $sort, $dir, $sortParams, '/agent/tickets') ?>" class="text-decoration-none text-dark">Assigned To <?= sortIcon('agent', $sort, $dir) ?></a></th>
                     <?php endif; ?>
                     <?php if (in_array('group', $visibleColumns)): ?>
                     <th style="white-space:nowrap;"><a href="<?= sortUrl('group', $sort, $dir, $sortParams, '/agent/tickets') ?>" class="text-decoration-none text-dark">Group <?= sortIcon('group', $sort, $dir) ?></a></th>
@@ -448,7 +448,7 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                         <?php endif; ?>
                         <?php if (in_array('agent', $visibleColumns)): ?>
                         <?php $qaAgents = $t['group_id'] ? ($groupAgents[(int)$t['group_id']] ?? []) : $allAgentsForAssign; ?>
-                        <td style="white-space:nowrap;overflow:hidden;">
+                        <td style="white-space:nowrap;overflow:hidden;text-align:right;" onclick="event.stopPropagation()">
                             <span class="d-inline-flex align-items-center gap-1 quick-assign-wrap" data-ticket-id="<?= (int)$t['id'] ?>">
                                 <span class="quick-assign-name"><?= e($t['agent_name'] ?: '— Unassigned —') ?></span>
                                 <button class="btn btn-link btn-sm p-0 border-0 text-muted quick-assign-btn"
