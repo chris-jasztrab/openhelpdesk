@@ -111,3 +111,5 @@ document.querySelectorAll('.col-select').forEach(sel => {
     sel.addEventListener('change', () => updateSample(sel));
 });
 </script>
+
+<?php require ROOT_DIR . '/templates/partials/settings-nav-end.php'; ?>

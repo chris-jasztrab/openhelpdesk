@@ -398,3 +398,5 @@ function copyToken(el) {
     });
 }
 </script>
+
+<?php require ROOT_DIR . '/templates/partials/settings-nav-end.php'; ?>

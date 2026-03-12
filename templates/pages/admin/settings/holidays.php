@@ -135,3 +135,5 @@ $breadcrumbs  = [
 
 </div><!-- /col -->
 </div><!-- /row -->
+
+<?php require ROOT_DIR . '/templates/partials/settings-nav-end.php'; ?>

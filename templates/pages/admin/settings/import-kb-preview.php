@@ -107,3 +107,5 @@ $breadcrumbs  = [
         </a>
     </div>
 </form>
+
+<?php require ROOT_DIR . '/templates/partials/settings-nav-end.php'; ?>

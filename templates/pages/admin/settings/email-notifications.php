@@ -215,3 +215,5 @@ $on = function (string $key) use ($settings): string {
         <i class="bi bi-check-lg me-1"></i>Save Settings
     </button>
 </form>
+
+<?php require ROOT_DIR . '/templates/partials/settings-nav-end.php'; ?>

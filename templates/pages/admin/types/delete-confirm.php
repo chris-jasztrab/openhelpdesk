@@ -154,3 +154,5 @@ $breadcrumbs  = [
 </a>
 
 <?php endif; ?>
+
+<?php require ROOT_DIR . '/templates/partials/settings-nav-end.php'; ?>

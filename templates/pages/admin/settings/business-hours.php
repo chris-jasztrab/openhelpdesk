@@ -138,3 +138,5 @@ document.querySelectorAll('.day-toggle').forEach(function(toggle) {
     });
 });
 </script>
+
+<?php require ROOT_DIR . '/templates/partials/settings-nav-end.php'; ?>

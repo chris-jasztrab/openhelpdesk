@@ -97,3 +97,5 @@ document.querySelectorAll('#tokenBar .token-chip').forEach(function (btn) {
     });
 });
 </script>
+
+<?php require ROOT_DIR . '/templates/partials/settings-nav-end.php'; ?>

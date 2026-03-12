@@ -530,3 +530,5 @@ if (!empty($existingConditions) && isset($existingConditions[0]['field'])) {
     updateEmptyMessages();
 })();
 </script>
+
+<?php require ROOT_DIR . '/templates/partials/settings-nav-end.php'; ?>

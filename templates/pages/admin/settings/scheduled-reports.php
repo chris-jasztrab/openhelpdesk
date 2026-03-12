@@ -145,3 +145,5 @@ $typeLabels = [
         </p>
     </div>
 </div>
+
+<?php require ROOT_DIR . '/templates/partials/settings-nav-end.php'; ?>
