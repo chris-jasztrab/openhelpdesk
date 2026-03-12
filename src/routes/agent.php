@@ -40,6 +40,45 @@ function _agentRequireTicketAccess(PDO $db, array $ticket): void
 }
 
 /* ==================================================================
+ * AGENT – Help / Documentation
+ * ================================================================== */
+
+$validHelpPages = ['dashboard', 'ticket-list', 'working-tickets', 'canned-responses'];
+
+$router->get('/agent/help', function () {
+    Auth::requireRole('agent');
+    render('agent/docs/index', [
+        'sidebarItems' => agentSidebar('help'),
+        'layout'       => 'app',
+        'pageTitle'    => 'Agent Help',
+        'breadcrumbs'  => [['label' => 'Help']],
+    ]);
+});
+
+$router->get('/agent/help/{page}', function (array $p) use ($validHelpPages) {
+    Auth::requireRole('agent');
+    $page = $p['page'] ?? '';
+    if (!in_array($page, $validHelpPages, true)) {
+        redirect('/agent/help');
+    }
+    $titles = [
+        'dashboard'        => 'Dashboard',
+        'ticket-list'      => 'Ticket List & Filters',
+        'working-tickets'  => 'Working on Tickets',
+        'canned-responses' => 'Canned Responses',
+    ];
+    render('agent/docs/' . $page, [
+        'sidebarItems' => agentSidebar('help'),
+        'layout'       => 'app',
+        'pageTitle'    => 'Help: ' . ($titles[$page] ?? $page),
+        'breadcrumbs'  => [
+            ['label' => 'Help', 'url' => '/agent/help'],
+            ['label' => $titles[$page] ?? $page],
+        ],
+    ]);
+});
+
+/* ==================================================================
  * AGENT – Ticket Viewing
  * ================================================================== */
 
