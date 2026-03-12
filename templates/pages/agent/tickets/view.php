@@ -19,7 +19,7 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
 {"imports":{"ckeditor5":"https://cdn.ckeditor.com/ckeditor5/43.3.1/ckeditor5.js","ckeditor5/":"https://cdn.ckeditor.com/ckeditor5/43.3.1/"}}
 </script>
 <style>
-#replyEditor .ck.ck-editor__editable { min-height: 150px; }
+#replyEditor .ck.ck-editor__editable { min-height: 150px !important; }
 .ck.ck-toolbar { border-radius: .375rem .375rem 0 0 !important; border-color: #dee2e6 !important; }
 .ck.ck-editor__editable { border-radius: 0 0 .375rem .375rem !important; border-color: #dee2e6 !important; }
 [data-bs-theme="dark"] .ck.ck-toolbar,
