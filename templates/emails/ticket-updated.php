@@ -26,7 +26,7 @@
                     </td>
                 </tr>
                 <tr>
-                    <td style="padding:16px; border:1px solid #e2e8f0; border-radius:0 0 8px 8px; font-size:14px; color:#334155; line-height:1.6; white-space:pre-wrap;"><?= htmlspecialchars($message, ENT_QUOTES, 'UTF-8') ?></td>
+                    <td style="padding:16px; border:1px solid #e2e8f0; border-radius:0 0 8px 8px; font-size:14px; color:#334155; line-height:1.6;"><?= emailContent($message) ?></td>
                 </tr>
             </table>
 

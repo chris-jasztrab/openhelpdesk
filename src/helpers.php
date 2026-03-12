@@ -534,6 +534,25 @@ function phpBinary(): string
  * @param int|null    $ticketId  If set, generates a ticket-specific Message-ID and X-Ticket-ID header
  * @return string|false  The Message-ID on success, false on failure
  */
+
+/**
+ * Render user-supplied content safely inside an HTML email.
+ *
+ * - If the content already contains HTML tags (e.g. from CKEditor rich-text),
+ *   it is returned as-is so that formatting renders correctly in the email.
+ * - If the content is plain text (e.g. from a <textarea> or inbound email),
+ *   HTML special characters are escaped and newlines are converted to <br>.
+ */
+function emailContent(string $content): string
+{
+    if (strip_tags($content) !== $content) {
+        // Contains HTML markup — output as-is (rich text from editor)
+        return $content;
+    }
+    // Plain text — escape entities and preserve line breaks
+    return nl2br(htmlspecialchars($content, ENT_QUOTES, 'UTF-8'));
+}
+
 function sendMail(string $toEmail, string $toName, string $subject, string $htmlBody, string $textBody = '', ?int $ticketId = null): string|false
 {
     $host = getSetting('smtp_host');
