@@ -1826,21 +1826,54 @@ $router->get('/agent', function () {
     $resolvedToday = (int) $stmt->fetchColumn();
 
     // Recent tickets (open/in_progress/pending, newest first)
+    $trRestriction = $groupRestriction ? str_replace('AND group_id', 'AND t.group_id', $groupRestriction) : '';
     $stmt = $db->prepare(
-        "SELECT t.id, t.subject, t.status, t.created_at,
+        "SELECT t.id, t.subject, t.status, t.created_at, t.group_id, t.sla_state, t.due_date,
                 tp.name AS priority_name, tp.color AS priority_color,
+                tt.name AS type_name, tt.color AS type_color, tt.group_id AS type_group_id,
+                g.name AS group_name,
+                l.name AS location_name,
                 CONCAT(c.first_name, ' ', c.last_name) AS creator_name,
                 CONCAT(a.first_name, ' ', a.last_name) AS agent_name
          FROM tickets t
          LEFT JOIN ticket_priorities tp ON t.priority_id = tp.id
+         LEFT JOIN ticket_types tt      ON t.type_id     = tt.id
+         LEFT JOIN `groups` g           ON t.group_id    = g.id
+         LEFT JOIN locations l          ON t.location_id = l.id
          LEFT JOIN users c ON t.created_by = c.id
          LEFT JOIN users a ON t.assigned_to = a.id
-         WHERE t.status IN ('open','in_progress','pending')" . $groupRestriction . "
+         WHERE t.status IN ('open','in_progress','pending')" . $trRestriction . "
          ORDER BY t.created_at DESC
          LIMIT 10"
     );
     $stmt->execute($groupParams);
     $recent = $stmt->fetchAll();
+
+    // Quick-assign / type / group dropdown data for dashboard
+    $dashTypes = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
+    $gaRows2 = $db->query(
+        "SELECT gum.group_id, u.id, CONCAT(u.first_name, ' ', u.last_name) AS name
+         FROM group_user_map gum
+         JOIN users u ON gum.user_id = u.id
+         WHERE u.role IN ('agent','admin','power_user')
+         ORDER BY u.first_name, u.last_name"
+    )->fetchAll();
+    $dashGroupAgents = [];
+    foreach ($gaRows2 as $row) {
+        $dashGroupAgents[(int) $row['group_id']][] = ['id' => (int) $row['id'], 'name' => $row['name']];
+    }
+    $dashAllAgents = $db->query(
+        "SELECT id, CONCAT(first_name, ' ', last_name) AS name FROM users WHERE role IN ('agent','admin','power_user') ORDER BY first_name, last_name"
+    )->fetchAll();
+    if (!empty($agentGroupIds)) {
+        $ph2 = implode(',', array_fill(0, count($agentGroupIds), '?'));
+        $gStmt2 = $db->prepare("SELECT * FROM `groups` WHERE id IN ($ph2) ORDER BY sort_order, name");
+        $gStmt2->execute($agentGroupIds);
+        $dashGroups = $gStmt2->fetchAll();
+    } else {
+        $dashGroups = $db->query('SELECT * FROM `groups` ORDER BY sort_order, name')->fetchAll();
+    }
+    $dashVisibleColumns = getUserColumns(Auth::id());
 
     // Determine whether to auto-show the agent tour
     $autoShowTour = false;
@@ -1853,12 +1886,17 @@ $router->get('/agent', function () {
     }
 
     render('agent/dashboard', [
-        'unassigned'    => $unassigned,
-        'myTickets'     => $myTickets,
-        'pending'       => $pending,
-        'resolvedToday' => $resolvedToday,
-        'recentTickets' => $recent,
-        'autoShowTour'  => $autoShowTour,
+        'unassigned'         => $unassigned,
+        'myTickets'          => $myTickets,
+        'pending'            => $pending,
+        'resolvedToday'      => $resolvedToday,
+        'recentTickets'      => $recent,
+        'autoShowTour'       => $autoShowTour,
+        'types'              => $dashTypes,
+        'groups'             => $dashGroups,
+        'groupAgents'        => $dashGroupAgents,
+        'allAgentsForAssign' => $dashAllAgents,
+        'visibleColumns'     => $dashVisibleColumns,
     ]);
 });
 
