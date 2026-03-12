@@ -455,7 +455,12 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                         </td>
                         <?php endif; ?>
                         <?php if (in_array('type', $visibleColumns)): ?>
-                        <td style="white-space:nowrap;"><?php if ($t['type_name']): ?><span class="badge" style="background:<?= e($t['type_color'] ?: '#6c757d') ?>;"><?= e($t['type_name']) ?></span><?php else: ?><span class="text-muted small">Not Set</span><?php endif; ?></td>
+                        <td style="white-space:nowrap;">
+                            <span class="d-inline-flex align-items-center gap-1 quick-type-wrap" data-ticket-id="<?= (int)$t['id'] ?>">
+                                <span class="quick-type-badge"><?php if ($t['type_name']): ?><span class="badge" style="background:<?= e($t['type_color'] ?: '#6c757d') ?>;"><?= e($t['type_name']) ?></span><?php else: ?><span class="text-muted small">Not Set</span><?php endif; ?></span>
+                                <button class="btn btn-link btn-sm p-0 border-0 text-muted quick-type-btn" type="button" title="Change type" style="line-height:1;"><i class="bi bi-chevron-down" style="font-size:0.65rem;"></i></button>
+                            </span>
+                        </td>
                         <?php endif; ?>
                         <?php if (in_array('agent', $visibleColumns)): ?>
                         <?php
@@ -477,7 +482,12 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                         </td>
                         <?php endif; ?>
                         <?php if (in_array('group', $visibleColumns)): ?>
-                        <td class="text-muted" style="white-space:nowrap;"><?= e($t['group_name'] ?? '—') ?></td>
+                        <td style="white-space:nowrap;">
+                            <span class="d-inline-flex align-items-center gap-1 quick-group-wrap" data-ticket-id="<?= (int)$t['id'] ?>">
+                                <span class="quick-group-name<?= $t['group_name'] ? '' : ' text-muted' ?>"><?= e($t['group_name'] ?: '—') ?></span>
+                                <button class="btn btn-link btn-sm p-0 border-0 text-muted quick-group-btn" type="button" title="Change group" style="line-height:1;"><i class="bi bi-chevron-down" style="font-size:0.65rem;"></i></button>
+                            </span>
+                        </td>
                         <?php endif; ?>
                         <?php if (in_array('creator', $visibleColumns)): ?>
                         <td class="text-muted" style="white-space:nowrap;"><?= e($t['creator_name'] ?? '—') ?></td>
@@ -696,8 +706,13 @@ sessionStorage.setItem('adminTicketListUrl', window.location.href);
         tbl.style.visibility = "";
     })();
 
-    // Quick-assign: custom fixed-position dropdown
+    // Quick-change: type, group, agent dropdowns
     (function () {
+        var quickTypes = <?= json_encode(array_values(array_map(fn($t) => ['id' => (int)$t['id'], 'name' => $t['name'], 'color' => $t['color'] ?: '#6c757d', 'group_id' => $t['group_id'] ? (int)$t['group_id'] : null], $types))) ?>;
+        var quickGroups = <?= json_encode(array_values(array_map(fn($g) => ['id' => (int)$g['id'], 'name' => $g['name']], $groups))) ?>;
+        var quickGroupAgents = <?= json_encode(array_map(fn($agents) => array_values($agents), $groupAgents)) ?>;
+        var quickAllAgents = <?= json_encode(array_values(array_map(fn($a) => ['id' => (int)$a['id'], 'name' => $a['name']], $allAgentsForAssign))) ?>;
+        var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
         var activeMenu = null;
         var activeBtn  = null;
         var esc = function (s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
@@ -706,19 +721,37 @@ sessionStorage.setItem('adminTicketListUrl', window.location.href);
             if (activeMenu) { activeMenu.remove(); activeMenu = null; activeBtn = null; }
         }
 
-        function openMenu(btn) {
+        function openMenu(btn, kind) {
             closeMenu();
-            var wrap = btn.closest('.quick-assign-wrap');
-            var ticketId = wrap ? wrap.dataset.ticketId : '';
-            var agents = [];
-            try { agents = JSON.parse(btn.dataset.agents || '[]'); } catch (_) {}
+            var wrapEl = btn.closest('[data-ticket-id]');
+            var ticketId = wrapEl ? wrapEl.dataset.ticketId : '';
             var html = '<ul class="dropdown-menu show shadow-sm" style="position:fixed;z-index:1060;min-width:180px;max-height:260px;overflow-y:auto;font-size:0.85rem;">';
-            html += '<li><a class="dropdown-item quick-assign-floating-item" href="#" data-agent-id="" data-ticket-id="' + esc(ticketId) + '">Unassigned</a></li>';
-            if (agents.length) {
-                html += '<li><hr class="dropdown-divider"></li>';
-                agents.forEach(function (a) {
-                    html += '<li><a class="dropdown-item quick-assign-floating-item" href="#" data-agent-id="' + esc(a.id) + '" data-ticket-id="' + esc(ticketId) + '">' + esc(a.name) + '</a></li>';
-                });
+            if (kind === 'agent') {
+                var agents = [];
+                try { agents = JSON.parse(btn.dataset.agents || '[]'); } catch (_) {}
+                html += '<li><a class="dropdown-item quick-menu-item" href="#" data-kind="agent" data-val="" data-ticket-id="' + esc(ticketId) + '">Unassigned</a></li>';
+                if (agents.length) {
+                    html += '<li><hr class="dropdown-divider"></li>';
+                    agents.forEach(function (a) {
+                        html += '<li><a class="dropdown-item quick-menu-item" href="#" data-kind="agent" data-val="' + esc(a.id) + '" data-ticket-id="' + esc(ticketId) + '">' + esc(a.name) + '</a></li>';
+                    });
+                }
+            } else if (kind === 'type') {
+                html += '<li><a class="dropdown-item quick-menu-item" href="#" data-kind="type" data-val="" data-ticket-id="' + esc(ticketId) + '"><span class="text-muted">Not Set</span></a></li>';
+                if (quickTypes.length) {
+                    html += '<li><hr class="dropdown-divider"></li>';
+                    quickTypes.forEach(function (tp) {
+                        html += '<li><a class="dropdown-item quick-menu-item" href="#" data-kind="type" data-val="' + esc(tp.id) + '" data-ticket-id="' + esc(ticketId) + '"><span class="badge" style="background:' + esc(tp.color) + ';">' + esc(tp.name) + '</span></a></li>';
+                    });
+                }
+            } else if (kind === 'group') {
+                html += '<li><a class="dropdown-item quick-menu-item" href="#" data-kind="group" data-val="" data-ticket-id="' + esc(ticketId) + '"><span class="text-muted">None</span></a></li>';
+                if (quickGroups.length) {
+                    html += '<li><hr class="dropdown-divider"></li>';
+                    quickGroups.forEach(function (g) {
+                        html += '<li><a class="dropdown-item quick-menu-item" href="#" data-kind="group" data-val="' + esc(g.id) + '" data-ticket-id="' + esc(ticketId) + '">' + esc(g.name) + '</a></li>';
+                    });
+                }
             }
             html += '</ul>';
             var div = document.createElement('div');
@@ -732,37 +765,81 @@ sessionStorage.setItem('adminTicketListUrl', window.location.href);
             activeBtn  = btn;
         }
 
-        // Attach directly to each button so stopPropagation only blocks tr navigation
-        document.querySelectorAll('.quick-assign-btn').forEach(function (btn) {
+        function bindBtn(btn, kind) {
             btn.addEventListener('click', function (e) {
                 e.stopPropagation();
                 if (activeBtn === btn) { closeMenu(); return; }
-                openMenu(btn);
+                openMenu(btn, kind);
             });
-        });
+        }
 
-        // Handle floating menu item clicks and outside-close
+        document.querySelectorAll('.quick-assign-btn').forEach(function (b) { bindBtn(b, 'agent'); });
+        document.querySelectorAll('.quick-type-btn').forEach(function (b) { bindBtn(b, 'type'); });
+        document.querySelectorAll('.quick-group-btn').forEach(function (b) { bindBtn(b, 'group'); });
+
         document.addEventListener('click', function (e) {
-            var item = e.target.closest('.quick-assign-floating-item');
+            var item = e.target.closest('.quick-menu-item');
             if (item) {
                 e.preventDefault();
-                var agentId  = item.dataset.agentId;
+                var kind     = item.dataset.kind;
+                var val      = item.dataset.val;
                 var ticketId = item.dataset.ticketId;
-                var wrap = document.querySelector('.quick-assign-wrap[data-ticket-id="' + ticketId + '"]');
                 closeMenu();
-                if (!wrap) return;
-                var nameSpan = wrap.querySelector('.quick-assign-name');
-                var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
-                fetch('/api/tickets/' + ticketId + '/assign', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
-                    body: JSON.stringify({assigned_to: agentId === '' ? null : parseInt(agentId, 10)})
-                }).then(function (r) { return r.json(); }).then(function (data) {
-                    if (data.success) { nameSpan.textContent = data.agent_name || 'Unassigned'; }
-                }).catch(function () {});
+                if (kind === 'agent') {
+                    var assignWrap = document.querySelector('.quick-assign-wrap[data-ticket-id="' + ticketId + '"]');
+                    if (!assignWrap) return;
+                    var nameSpan = assignWrap.querySelector('.quick-assign-name');
+                    fetch('/api/tickets/' + ticketId + '/assign', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
+                        body: JSON.stringify({assigned_to: val === '' ? null : parseInt(val, 10)})
+                    }).then(function (r) { return r.json(); }).then(function (data) {
+                        if (data.success) { nameSpan.textContent = data.agent_name || 'Unassigned'; }
+                    }).catch(function () {});
+                } else if (kind === 'type') {
+                    var typeWrap = document.querySelector('.quick-type-wrap[data-ticket-id="' + ticketId + '"]');
+                    if (!typeWrap) return;
+                    var badge = typeWrap.querySelector('.quick-type-badge');
+                    fetch('/api/tickets/' + ticketId + '/set-type', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
+                        body: JSON.stringify({type_id: val === '' ? null : parseInt(val, 10)})
+                    }).then(function (r) { return r.json(); }).then(function (data) {
+                        if (data.success) {
+                            if (data.type_name) {
+                                badge.innerHTML = '<span class="badge" style="background:' + esc(data.type_color || '#6c757d') + ';">' + esc(data.type_name) + '</span>';
+                            } else {
+                                badge.innerHTML = '<span class="text-muted small">Not Set</span>';
+                            }
+                            var tp = val === '' ? null : quickTypes.find(function (t) { return t.id === parseInt(val, 10); });
+                            var newAgents = (tp && tp.group_id && quickGroupAgents[tp.group_id]) ? quickGroupAgents[tp.group_id] : quickAllAgents;
+                            var assignBtn = document.querySelector('.quick-assign-wrap[data-ticket-id="' + ticketId + '"] .quick-assign-btn');
+                            if (assignBtn) { assignBtn.dataset.agents = JSON.stringify(newAgents); }
+                        }
+                    }).catch(function () {});
+                } else if (kind === 'group') {
+                    var groupWrap = document.querySelector('.quick-group-wrap[data-ticket-id="' + ticketId + '"]');
+                    if (!groupWrap) return;
+                    var groupNameSpan = groupWrap.querySelector('.quick-group-name');
+                    fetch('/api/tickets/' + ticketId + '/set-group', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
+                        body: JSON.stringify({group_id: val === '' ? null : parseInt(val, 10)})
+                    }).then(function (r) { return r.json(); }).then(function (data) {
+                        if (data.success) {
+                            groupNameSpan.textContent = data.group_name || '—';
+                            groupNameSpan.className = 'quick-group-name' + (data.group_name ? '' : ' text-muted');
+                            var newAgents = data.agents || quickAllAgents;
+                            var assignBtn = document.querySelector('.quick-assign-wrap[data-ticket-id="' + ticketId + '"] .quick-assign-btn');
+                            if (assignBtn) { assignBtn.dataset.agents = JSON.stringify(newAgents); }
+                        }
+                    }).catch(function () {});
+                }
                 return;
             }
-            if (!e.target.closest('.quick-assign-btn') && !(activeMenu && activeMenu.contains(e.target))) { closeMenu(); }
+            if (!e.target.closest('.quick-assign-btn') && !e.target.closest('.quick-type-btn') && !e.target.closest('.quick-group-btn') && !(activeMenu && activeMenu.contains(e.target))) {
+                closeMenu();
+            }
         });
 
         window.addEventListener('scroll', function (e) {
