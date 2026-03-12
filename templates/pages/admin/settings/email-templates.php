@@ -422,5 +422,8 @@ function copyToken(el) {
     }).catch(console.error);
 })();
 </script>
+<style>
+.ck-editor__editable { min-height: 7.5em; }
+</style>
 
 <?php require ROOT_DIR . '/templates/partials/settings-nav-end.php'; ?>
