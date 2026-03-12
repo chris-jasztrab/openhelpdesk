@@ -13,10 +13,61 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ## Unreleased
 
-### Portal Improvements
-- **Requester Self-Close** — portal users can now close their own tickets directly from the ticket detail page
+### Ticket Detail Page Redesign
+- **Three-Column Layout** — ticket detail page reorganised into three columns: main content, ticket actions, and a metadata/SLA sidebar
+- **SLA Card** — SLA status card moved to the third column, below the Update Ticket panel
+- **Inline Attachments** — file attachments are now displayed inline within their parent timeline entry rather than in a separate section
+- System-generated timeline events (e.g. SLA state changes) hidden from portal users and non-admin views
+
+### WYSIWYG Editing (CKEditor 5)
+- **New Ticket Forms** — description field on the portal, admin, and agent ticket creation forms replaced with a full CKEditor 5 rich-text editor
+- **Reply / Comment Area** — reply and comment textarea on admin and agent ticket views replaced with CKEditor 5
+- **KB Article Editor** — knowledge base article editor upgraded from Quill to CKEditor 5 with font color, background color, image upload, and table support
+- Ticket descriptions created with the WYSIWYG editor now render as HTML throughout the UI
+- Fix: CKEditor data correctly populated in the hidden field when using Send & Set Status
+
+### Ticket Management
+- **Group-Scoped Assignee Dropdown** — when a ticket belongs to a group, the assignee dropdown is filtered to members of that group only
+- **Ticket Type Color Picker** — color picker added to ticket type create and edit forms
+- **Ticket Type Deletion Safety** — attempting to delete a ticket type that has tickets now prompts to either reassign affected tickets to another type or delete them
+- **Clickable URLs** — URLs in ticket descriptions and timeline entries are automatically rendered as clickable links
+
+### Custom Form Fields
+- **CC Field Type** — new CC field type added to the ticket form builder, allowing tickets to include a list of CC'd users
+- CC field rendered with user autocomplete on the ticket create form
+- Fix: image field configuration preserved correctly when saving field properties in the form builder
+
+### Portal
+- **Requester Self-Close** — portal users can close their own open tickets directly from the ticket detail page
 - **Requester Self-Edit** — portal users can edit the subject and description of their own open tickets
-- Both actions write internal-only timeline entries (visible to agents and admins only) recording exactly what changed
+- Both self-service actions write internal-only timeline entries (visible to agents and admins only) recording what changed
+- Portal users can now change their location assignment when creating a ticket
+- Open tickets and Resolved Today stat cards removed from the portal dashboard for a cleaner view
+
+### Groups & Notifications
+- Group new-ticket email notification toggle moved from the admin groups list to the individual group edit form
+
+### Knowledge Base
+- Edit Article button added to KB article pages for admins and agents (no longer requires navigating back to the article list)
+- Fix: agents can now access the KB article preview route
+
+### Dashboard & Ticket List
+- Agent dashboard stat cards now link directly to the filtered ticket list for that stat
+- Ticket list displays a filtered count vs total (e.g. "Showing 12 of 47") when filters are active
+
+### Tags
+- Tags feature can now be toggled on or off from Admin → Settings
+
+### Location Management
+- **Bulk Reassign on Location Delete** — deleting a location that has tickets now prompts to reassign those tickets to another location before deletion
+
+### Bug Fixes
+- Fix: profile page now correctly saves notification preferences
+- Fix: password change and notification preferences separated into independent form submissions to prevent conflicts
+- Fix: "View All" link on the dashboard Recent Tickets card correctly clears filters and shows all permitted tickets
+- Fix: ticket detail header action buttons wrap correctly on mobile screens instead of causing horizontal scroll
+- Fix: tickets without a type assigned display "Not Set" rather than a blank value
+- Fix: "Knowledge Base Articles" label corrected in the global search box
 
 Planned features not yet implemented:
 
