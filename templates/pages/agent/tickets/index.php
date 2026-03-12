@@ -454,7 +454,7 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                         ?>
                         <td style="white-space:nowrap;overflow:hidden;text-align:right;">
                             <span class="d-inline-flex align-items-center gap-1 quick-assign-wrap" data-ticket-id="<?= (int)$t['id'] ?>">
-                                <span class="quick-assign-name"><?= e($t['agent_name'] ?: '— Unassigned —') ?></span>
+                                <span class="quick-assign-name"><?= e($t['agent_name'] ?: 'Unassigned') ?></span>
                                 <button class="btn btn-link btn-sm p-0 border-0 text-muted quick-assign-btn"
                                         type="button"
                                         data-agents="<?= e(json_encode(array_values($qaAgents))) ?>"
@@ -528,7 +528,7 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
             <div class="modal-body">
                 <label class="form-label small fw-semibold mb-1">Assign to</label>
                 <select id="bulkAssignAgent" class="form-select form-select-sm">
-                    <option value="">— Unassigned —</option>
+                    <option value="">Unassigned</option>
                     <?php foreach ($agents as $ag): ?>
                     <option value="<?= $ag['id'] ?>"><?= e($ag['first_name'] . ' ' . $ag['last_name']) ?></option>
                     <?php endforeach; ?>
@@ -722,7 +722,7 @@ sessionStorage.setItem('agentTicketListUrl', window.location.href);
             var agents = [];
             try { agents = JSON.parse(btn.dataset.agents || '[]'); } catch (_) {}
             var html = '<ul class="dropdown-menu show shadow-sm" style="position:fixed;z-index:1060;min-width:180px;max-height:260px;overflow-y:auto;font-size:0.85rem;">';
-            html += '<li><a class="dropdown-item quick-assign-floating-item" href="#" data-agent-id="" data-ticket-id="' + esc(ticketId) + '">— Unassigned —</a></li>';
+            html += '<li><a class="dropdown-item quick-assign-floating-item" href="#" data-agent-id="" data-ticket-id="' + esc(ticketId) + '">Unassigned</a></li>';
             if (agents.length) {
                 html += '<li><hr class="dropdown-divider"></li>';
                 agents.forEach(function (a) {
@@ -767,7 +767,7 @@ sessionStorage.setItem('agentTicketListUrl', window.location.href);
                     headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
                     body: JSON.stringify({assigned_to: agentId === '' ? null : parseInt(agentId, 10)})
                 }).then(function (r) { return r.json(); }).then(function (data) {
-                    if (data.success) { nameSpan.textContent = data.agent_name || '— Unassigned —'; }
+                    if (data.success) { nameSpan.textContent = data.agent_name || 'Unassigned'; }
                 }).catch(function () {});
                 return;
             }
