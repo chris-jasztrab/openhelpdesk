@@ -184,6 +184,20 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
         },
         {
             popover: {
+                title:       'Editing a Ticket',
+                description: 'After submitting a ticket, you can update the <strong>Subject</strong> or <strong>Description</strong> at any time. ' +
+                             'Just open the ticket and click the <strong>Edit</strong> button — useful if you forgot a detail or need to clarify something.'
+            }
+        },
+        {
+            popover: {
+                title:       'Closing a Ticket',
+                description: 'If your issue is resolved and the ticket is still open, you can close it yourself. ' +
+                             'Open the ticket and click <strong>Close Ticket</strong> to let the support team know it\'s taken care of.'
+            }
+        },
+        {
+            popover: {
                 title:       'Almost done!',
                 description: 'One last thing — let\'s look at your <strong>Profile</strong>, where you can control which emails you receive from the support team.',
                 onNextClick: function () {
@@ -216,7 +230,7 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
         {
             popover: {
                 title:       '🎉 You\'re all set!',
-                description: 'That\'s the full tour! You now know how to submit tickets, track their status, find help articles in the Knowledge Base, and manage your notification preferences.<br><br>' +
+                description: 'That\'s the full tour! You now know how to submit, edit, and close tickets, track their status, find help articles in the Knowledge Base, and manage your notification preferences.<br><br>' +
                              'You can also <strong>reply directly to ticket emails</strong> to add a comment without logging in.'
             }
         }
