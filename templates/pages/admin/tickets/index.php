@@ -458,14 +458,18 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                         <td style="white-space:nowrap;"><?php if ($t['type_name']): ?><span class="badge" style="background:<?= e($t['type_color'] ?: '#6c757d') ?>;"><?= e($t['type_name']) ?></span><?php else: ?><span class="text-muted small">Not Set</span><?php endif; ?></td>
                         <?php endif; ?>
                         <?php if (in_array('agent', $visibleColumns)): ?>
-                        <?php $qaAgents = $t['group_id'] ? ($groupAgents[(int)$t['group_id']] ?? []) : $allAgentsForAssign; ?>
+                        <?php
+                            $qaGroupId = $t['group_id'] ? (int)$t['group_id'] : null;
+                            $qaAgents  = $qaGroupId ? ($groupAgents[$qaGroupId] ?? []) : $allAgentsForAssign;
+                            $qaTip     = $qaGroupId ? 'Assign (group: ' . e($t['group_name'] ?? $qaGroupId) . ')' : 'Assign (all agents)';
+                        ?>
                         <td style="white-space:nowrap;text-align:right;">
                             <span class="d-inline-flex align-items-center gap-1 quick-assign-wrap" data-ticket-id="<?= (int)$t['id'] ?>">
                                 <span class="quick-assign-name"><?= e($t['agent_name'] ?: '— Unassigned —') ?></span>
                                 <button class="btn btn-link btn-sm p-0 border-0 text-muted quick-assign-btn"
                                         type="button"
-                                        data-agents="<?= e(json_encode($qaAgents)) ?>"
-                                        title="Change assignee"
+                                        data-agents="<?= e(json_encode(array_values($qaAgents))) ?>"
+                                        title="<?= $qaTip ?>"
                                         style="line-height:1;">
                                     <i class="bi bi-chevron-down" style="font-size:0.65rem;"></i>
                                 </button>
@@ -758,10 +762,13 @@ sessionStorage.setItem('adminTicketListUrl', window.location.href);
                 }).catch(function () {});
                 return;
             }
-            if (!e.target.closest('.quick-assign-btn')) { closeMenu(); }
+            if (!e.target.closest('.quick-assign-btn') && !(activeMenu && activeMenu.contains(e.target))) { closeMenu(); }
         });
 
-        window.addEventListener('scroll', closeMenu, true);
+        window.addEventListener('scroll', function (e) {
+            if (activeMenu && (activeMenu === e.target || activeMenu.contains(e.target))) return;
+            closeMenu();
+        }, true);
         window.addEventListener('resize', closeMenu);
     })();
 </script>
