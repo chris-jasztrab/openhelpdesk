@@ -27,7 +27,8 @@ A self-hosted IT helpdesk and ticketing system built for the Waterloo Public Lib
 - **Multi-Select Filters** — filter by multiple statuses, priorities, types, groups, and agents simultaneously on the ticket list
 - **Watched Tickets Filter** — show only tickets you are watching
 - **Per-Page Selector** — choose how many tickets appear per page (25 / 50 / 100)
-- **Column Selector** — toggle which columns appear in the ticket list per user
+- **Column Selector** — toggle which columns appear in the ticket list per user; also available on the agent dashboard Recent Tickets widget
+- **Inline Ticket List Actions** — hover the Agent, Type, or Group column on any row to reveal a chevron dropdown for reassigning, changing type, or changing group without opening the ticket; agent dropdown filtered to group members when a group is set
 - Filters persist when navigating from the ticket list to a ticket and back
 - **Search by Ticket ID** — enter a ticket number in the global search box to jump directly to that ticket
 
@@ -82,7 +83,7 @@ Twelve built-in report types accessible from the Reports Overview:
 - **Email Reply Integration** — inbound email replies automatically added as ticket comments; supports both IMAP and Microsoft Graph API (OAuth2 / Exchange Online)
 - **Email-to-Ticket** — inbound emails to a monitored Microsoft Graph mailbox are automatically converted to new tickets
 - **Email Hashtag Commands** — agents and admins can control tickets via `#close`, `#resolve`, and other hashtag commands in email replies
-- **Customizable Email Templates** — edit the HTML/text of outgoing email templates with placeholder variable support
+- **Customizable Email Templates** — edit the subject, intro message (rich-text CKEditor 5 editor), and button label for outgoing emails; templates: ticket created, ticket updated, ticket merged, CSAT survey, customer reminder, group alerts; shared footer tab for the footer on all ticket emails
 - **Canned Responses** — personal snippets with token substitution insertable from the reply panel
 - **Microsoft Graph App Secret Expiry Reminders** — warning banner and email alerts when the Graph API client secret is nearing expiry
 
@@ -105,6 +106,7 @@ Twelve built-in report types accessible from the Reports Overview:
 ### Admin Tools
 - **Audit Log** — admin-accessible trail of all admin actions with timestamp and actor, at `/admin/audit-log`
 - **Admin Documentation** — built-in docs at `/admin/docs` with search
+- **Agent Help Documentation** — built-in help pages for agents at `/agent/help` (dashboard, ticket list & filters, working on tickets, canned responses); accessible from the Help link in the agent sidebar
 - **Onboarding Tour** — six-step walkthrough on first admin login, replayable from the user dropdown
 - **Admin Password Rescue Script** — CLI script to reset an admin password or change a user's role when locked out of the UI
 - **Danger Zone Full Reset** — wipe all data and re-run the setup wizard from the Settings page

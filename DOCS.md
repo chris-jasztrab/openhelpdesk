@@ -90,13 +90,13 @@ After submission you receive a confirmation email and are redirected to the tick
 
 The ticket detail page shows:
 
-- **Description** -- the full issue text
-- **Attachments** -- any files attached to the ticket or its comments, with download links
-- **Tags** -- applied tags shown as badges
-- **Timeline** -- chronological log of all public activity: creation, comments, status changes, assignments, and priority changes. Internal notes added by agents are not visible.
-- **Add Comment** -- post a public reply with optional file attachments
+- **Description** — the full issue text.
+- **Timeline** — chronological log of all public activity: creation, replies, and status changes. Internal notes and system events added by agents are **not** visible to portal users. File attachments are shown inline within the entry they were uploaded with.
+- **Add Reply** — post a public reply with optional file attachments.
+- **Edit** — update the subject and description of your own ticket (available while the ticket is not closed).
+- **Close Ticket** — close your own open ticket if the issue is resolved or the request is no longer needed.
 
-The right sidebar shows ticket metadata: status, priority, type, location, assigned agent, and creation date.
+The sidebar shows ticket metadata: status, priority, type, location, assigned agent, and creation date.
 
 ### Knowledge Base
 
@@ -119,57 +119,85 @@ The agent dashboard at `/agent` shows four stat cards:
 
 | Stat | Description |
 |------|-------------|
-| **Unassigned** | Tickets with no agent assigned (open, in-progress, or pending) |
-| **My Tickets** | Tickets assigned to you that are still active |
-| **Pending** | All tickets in pending status |
-| **Resolved Today** | Tickets resolved today |
+| **Unassigned** | Tickets with no agent assigned (open, in-progress, or pending). Click to jump to the filtered ticket list. |
+| **My Tickets** | Tickets assigned to you that are still active. Click to jump to your personal queue. |
+| **Pending** | All tickets in pending, waiting on customer, or waiting on third party status. |
+| **Resolved Today** | Tickets resolved or closed today. |
 
-Below the stats is a table of the 10 most recent active tickets. Rows assigned to you are highlighted with a light blue background and a "Mine" badge.
+Below the stats is a **Recent Tickets** widget showing your most recently updated tickets. You can work on tickets directly from the widget:
+
+- Click any row to open the ticket.
+- Hover the **Agent**, **Type**, or **Group** cell to reveal a chevron (▾). Click it to change that field inline without leaving the dashboard.
+- Use the **Columns** button (top-right of the widget) to choose which columns appear. Your selection is saved automatically.
 
 ### Ticket List
 
-The full ticket list at `/agent/tickets` shows all tickets in the system with these columns:
-
-| Column | Description |
-|--------|-------------|
-| # | Ticket ID |
-| Subject | Issue title ("Mine" badge if assigned to you) |
-| Status | Open, In Progress, Pending, Resolved, or Closed |
-| Priority | Color-coded badge |
-| Type | Ticket category |
-| Assigned To | Agent name or "Unassigned" |
-| Created By | The user who submitted the ticket |
-| Location | Branch or building |
-| SLA | Stopwatch icon -- green (on track), yellow (warning), or red (breached) |
-| Created | Submission date |
-| Due | Due date (bold red if overdue) |
+The full ticket list at `/agent/tickets` shows all permitted tickets. Use the **Columns** button to toggle which columns are displayed. Available columns include: Status, Priority, Type, Assigned To, Group, Created By, Location, SLA, Created, Due.
 
 Click any row to open the ticket.
 
+#### Inline Actions
+
+Hover a cell in the **Agent**, **Type**, or **Group** column to reveal a chevron dropdown:
+
+- **Agent** — quick-assign without opening the ticket. If the ticket has a group, only that group's members are shown.
+- **Type** — change the ticket type in one click.
+- **Group** — reassign the ticket to a different group.
+
+#### Filtering
+
+Click the **Filters** button to open the slide-out filter panel. Available filters:
+
+| Filter | Options |
+|--------|---------|
+| Status | Multi-select |
+| Priority | Multi-select |
+| Type | Multi-select |
+| Location | Multi-select |
+| Agent | Unassigned, Mine, or a specific agent |
+| Group | None or a specific group |
+| Search | Free-text subject search |
+| Watched | Your watched tickets only |
+| Resolved Today | Tickets resolved or closed today |
+
+**Saved Filters** — save any filter combination as a named preset. Mark one as your default to apply it automatically on page load. Share presets with the team using the share toggle.
+
+#### Bulk Actions
+
+Tick the checkbox column to select multiple tickets. A bulk action bar appears at the bottom with: Assign, Change Status, Change Priority, Change Group, Merge, Close.
+
 ### Working a Ticket
 
-The ticket detail view at `/agent/tickets/{id}` has two columns.
+The ticket detail view at `/agent/tickets/{id}` has three columns.
 
-**Left column:**
+**Left column — Conversation:**
 
-- **Description** -- the full issue
-- **Attachments** -- files on the ticket and its comments. Internal-note attachments are labeled with an "Internal" badge.
-- **Tags** -- applied tags
-- **Timeline** -- full activity log including internal notes. Internal notes have a yellow background, a lock icon, and an "Internal" badge.
-- **Add Comment** -- write a public reply or an internal note
-  - Check **"Internal note (not visible to the user)"** to make it private to agents and admins
-  - Use the **@mention** buttons to insert agent names. Mentioned agents receive a notification.
-  - Attach files if needed
+- **Description** — the full issue text, rendered as rich text if entered with the editor.
+- **Timeline** — full activity log. Replies have a white background. Internal notes are highlighted (configured colour) and never shown to portal users. System events (assignments, status changes, SLA updates) are highlighted separately and also hidden from portal users. File attachments are displayed inline within the entry they were uploaded with.
+- **Reply / Add Note / Forward** — three buttons open the reply composer:
+  - **Reply** — public message sent to the requester.
+  - **Add Note** — private internal note (agents and admins only).
+  - **Forward** — send ticket details to an external email address.
+- The composer uses CKEditor 5 (bold, italic, lists, links). Attach files directly in the composer.
+- **Send & Set Status** — click the arrow on the Send button to send a reply and change the ticket status in one action (Resolved, Closed, Pending, Waiting on Customer, Waiting on Third Party).
+- **Canned Response** — click to pick a saved reply template. Tokens are substituted with real ticket values on insertion.
 
-**Right column:**
+**Middle column — Details:**
 
-- **Details** -- status, priority, type, assigned agent, creator (name and email), location, created date, due date, browser info, and OS info. Overdue dates appear in red.
-- **SLA** (if configured) -- current SLA state, whether timers are paused, first response status (responded or due by), and resolution due date.
-- **Update Ticket** -- change status, priority, or assignment. Each change is logged in the timeline.
+- Status, priority, type, assigned agent, group, creator, location, created date, due date, browser, OS, and any custom fields.
+
+**Right column — Actions:**
+
+- **CC** — add or remove users who receive all notification emails for this ticket.
+- **Update Ticket** — change status, priority, assigned agent, or group. Each change is logged in the timeline as a system event.
+- **SLA** (if applicable) — first response due and resolution due with amber/red warning when deadlines approach or breach. Timers pause automatically when the ticket is set to Waiting on Customer or Waiting on Third Party.
+- **Watch / Unwatch** — subscribe to all activity notifications on this ticket regardless of assignment.
+- **Merge** — combine a duplicate ticket into this one. The duplicate is closed; its history links to this ticket.
+- **Split** — move selected timeline entries to a new separate ticket.
 
 ### First Response Tracking
 
-When you post the first non-internal comment on a ticket you did not create, the system records the first response timestamp. This is used by SLA tracking to determine whether the first-response target was met.
+When you post the first public reply on a ticket you did not create, the system records the first response timestamp for SLA compliance reporting.
 
 ---
 
@@ -410,26 +438,29 @@ The notification bell in the navbar shows the unread count and updates automatic
 
 ## Email Notifications
 
-The system sends emails for two events (requires SMTP to be configured in Settings):
+Requires SMTP to be configured in Settings → Email / SMTP.
 
-### Ticket Created
+### When Emails Are Sent
 
-Sent to the **ticket creator** when they submit a new ticket. Contains:
+| Event | Recipient |
+|-------|-----------|
+| New ticket submitted | Ticket creator (confirmation) |
+| Agent posts a public reply | Ticket creator |
+| Ticket merged | Ticket creator of the merged (closed) ticket |
+| Ticket resolved | Ticket creator (includes CSAT survey link if enabled) |
+| New ticket assigned to agent | Assigned agent |
+| New ticket assigned to group (if alerts enabled) | All group members |
+| Escalation rule fires (notify creator action) | Ticket creator |
+| Welcome email | Newly created user account |
+| Password reset | User who requested the reset |
 
-- Ticket number and subject
-- Status, type, location, and priority (if set)
-- Full description text
-- Link to view the ticket in the portal
+### Customising Email Templates
 
-### Ticket Updated
+Admins can customise the subject line, intro message, and button label for each outgoing template at **Admin → Settings → Email Templates**. The intro message field uses a rich-text editor (CKEditor 5) — bold, italic, lists, and links render in the outgoing email. Tokens such as `{{first_name}}`, `{{ticket_id}}`, and `{{subject}}` are replaced with live data when the email is sent.
 
-Sent to the **ticket creator** when an agent or admin adds a public comment. Not sent for internal notes or when the creator comments on their own ticket. Contains:
+A **Shared Footer** tab lets you customise the footer text that appears on all outgoing ticket emails.
 
-- Ticket number and subject
-- The comment text and author name
-- Link to view the ticket
-
-Emails include a `Message-ID` header with the ticket ID for threading in email clients.
+Each template has a **Reset to default** button to restore the original built-in content.
 
 ---
 

@@ -47,6 +47,16 @@ To release a new version: update `config/version.php`, add a dated entry below u
 ### Groups & Notifications
 - Group new-ticket email notification toggle moved from the admin groups list to the individual group edit form
 
+### Email Templates
+- **Rich Text Intro Messages** — the Intro Message field on all email templates now uses a CKEditor 5 rich-text editor (bold, italic, lists, links); formatted HTML renders directly in outgoing emails
+- **Group Alerts Template** — new tab for customising the subject, intro message, and button label of the group alert email sent when a new ticket is assigned to a group with alerts enabled
+- **Shared Footer Tab** — dedicated tab for customising the shared footer text that appears on all outgoing ticket emails
+
+### Agent Help Documentation
+- Built-in help pages for agents at `/agent/help`, covering the dashboard, ticket list & filters, working on tickets, and canned responses
+- Accessible from a **Help** link in the agent sidebar (question-circle icon)
+- Includes a search widget on the overview page
+
 ### Knowledge Base
 - Edit Article button added to KB article pages for admins and agents (no longer requires navigating back to the article list)
 - Fix: agents can now access the KB article preview route
@@ -54,6 +64,9 @@ To release a new version: update `config/version.php`, add a dated entry below u
 ### Dashboard & Ticket List
 - Agent dashboard stat cards now link directly to the filtered ticket list for that stat
 - Ticket list displays a filtered count vs total (e.g. "Showing 12 of 47") when filters are active
+- **Inline Ticket List Actions** — hovering the Agent, Type, or Group column on any ticket row reveals a chevron; clicking it opens a dropdown to reassign the agent, change the type, or change the group without opening the ticket
+- Agent quick-assign dropdown is filtered to members of the ticket's group when a group is set
+- **Column Picker on Agent Dashboard** — the Recent Tickets widget on the agent dashboard includes the column picker and the same inline Agent/Type/Group chevron actions
 
 ### Tags
 - Tags feature can now be toggled on or off from Admin → Settings
