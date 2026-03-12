@@ -540,6 +540,7 @@ $router->get('/portal/tickets/{id}', function (array $p) {
         'customFields' => $customFields,
         'fieldValues'  => $fieldValues,
         'fieldOptions' => $fieldOptions,
+        'isOwner'      => (int) $ticket['created_by'] === (int) $uid,
     ]);
 });
 
@@ -601,6 +602,130 @@ $router->post('/portal/tickets/{id}/comment', function (array $p) {
         $msg = 'Comment added with ' . count($attachments) . ' file(s).';
     }
     flash('success', $msg);
+    redirect("/portal/tickets/{$id}");
+});
+
+/* ==================================================================
+ * PORTAL – Close Ticket (requester self-close)
+ * ================================================================== */
+
+$router->post('/portal/tickets/{id}/close', function (array $p) {
+    Auth::requireAuth();
+    $id  = (int) $p['id'];
+    $uid = Auth::id();
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect("/portal/tickets/{$id}");
+    }
+
+    $db = Database::connect();
+
+    // Only the ticket creator can close it
+    $stmt = $db->prepare('SELECT id, status FROM tickets WHERE id = ? AND created_by = ?');
+    $stmt->execute([$id, $uid]);
+    $ticket = $stmt->fetch();
+    if (!$ticket) {
+        flash('error', 'Ticket not found.');
+        redirect('/portal/tickets');
+    }
+
+    if ($ticket['status'] === 'closed') {
+        flash('info', 'Ticket is already closed.');
+        redirect("/portal/tickets/{$id}");
+    }
+
+    $oldStatus = $ticket['status'];
+    $db->prepare('UPDATE tickets SET status = ?, updated_at = NOW() WHERE id = ?')
+       ->execute(['closed', $id]);
+
+    // Internal audit trail entry — visible to admins/agents only
+    $db->prepare(
+        'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 1)'
+    )->execute([$id, $uid, 'status_changed', "Requester closed ticket (was: {$oldStatus})"]);
+
+    flash('success', 'Your ticket has been closed.');
+    redirect("/portal/tickets/{$id}");
+});
+
+/* ==================================================================
+ * PORTAL – Edit Ticket (requester self-edit)
+ * ================================================================== */
+
+$router->get('/portal/tickets/{id}/edit', function (array $p) {
+    Auth::requireAuth();
+    $id  = (int) $p['id'];
+    $uid = Auth::id();
+
+    $db   = Database::connect();
+    $stmt = $db->prepare('SELECT * FROM tickets WHERE id = ? AND created_by = ?');
+    $stmt->execute([$id, $uid]);
+    $ticket = $stmt->fetch();
+    if (!$ticket) {
+        flash('error', 'Ticket not found.');
+        redirect('/portal/tickets');
+    }
+
+    if ($ticket['status'] === 'closed') {
+        flash('error', 'Closed tickets cannot be edited.');
+        redirect("/portal/tickets/{$id}");
+    }
+
+    render('portal/tickets/edit', ['ticket' => $ticket]);
+});
+
+$router->post('/portal/tickets/{id}/edit', function (array $p) {
+    Auth::requireAuth();
+    $id  = (int) $p['id'];
+    $uid = Auth::id();
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect("/portal/tickets/{$id}");
+    }
+
+    $db   = Database::connect();
+    $stmt = $db->prepare('SELECT * FROM tickets WHERE id = ? AND created_by = ?');
+    $stmt->execute([$id, $uid]);
+    $ticket = $stmt->fetch();
+    if (!$ticket) {
+        flash('error', 'Ticket not found.');
+        redirect('/portal/tickets');
+    }
+
+    if ($ticket['status'] === 'closed') {
+        flash('error', 'Closed tickets cannot be edited.');
+        redirect("/portal/tickets/{$id}");
+    }
+
+    $subject     = trim($_POST['subject'] ?? '');
+    $description = trim($_POST['description'] ?? '');
+    if ($subject === '' || $description === '') {
+        flash('error', 'Subject and description are required.');
+        redirect("/portal/tickets/{$id}/edit");
+    }
+
+    // Build audit trail before updating
+    $changes = [];
+    if ($subject !== $ticket['subject']) {
+        $changes[] = "Subject changed from \"{$ticket['subject']}\" to \"{$subject}\"";
+    }
+    if ($description !== $ticket['description']) {
+        $changes[] = 'Description updated';
+    }
+
+    if (empty($changes)) {
+        flash('info', 'No changes were made.');
+        redirect("/portal/tickets/{$id}");
+    }
+
+    $db->prepare('UPDATE tickets SET subject = ?, description = ?, updated_at = NOW() WHERE id = ?')
+       ->execute([$subject, $description, $id]);
+
+    // Internal audit trail entry — visible to admins/agents only
+    $db->prepare(
+        'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 1)'
+    )->execute([$id, $uid, 'edited', implode("\n", $changes)]);
+
+    flash('success', 'Ticket updated.');
     redirect("/portal/tickets/{$id}");
 });
 

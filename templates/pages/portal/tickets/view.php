@@ -9,7 +9,7 @@ $breadcrumbs  = [
 ];
 $statusColors = ['open' => 'primary', 'in_progress' => 'warning', 'pending' => 'info', 'waiting_on_customer' => 'warning', 'waiting_on_third_party' => 'dark', 'resolved' => 'success', 'closed' => 'secondary'];
 $statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 'Pending', 'waiting_on_customer' => 'Waiting on Customer', 'waiting_on_third_party' => 'Waiting on Third Party', 'resolved' => 'Resolved', 'closed' => 'Closed'];
-$actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-person-check text-primary', 'status_changed' => 'bi-arrow-repeat text-warning', 'priority_changed' => 'bi-flag text-danger', 'comment' => 'bi-chat-dots text-info'];
+$actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-person-check text-primary', 'status_changed' => 'bi-arrow-repeat text-warning', 'priority_changed' => 'bi-flag text-danger', 'comment' => 'bi-chat-dots text-info', 'edited' => 'bi-pencil text-secondary'];
 ?>
 <link rel="stylesheet" href="https://cdn.ckeditor.com/ckeditor5/43.3.1/ckeditor5.css">
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -27,9 +27,23 @@ $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-p
             <span class="text-muted">Ticket #<?= $ticket['id'] ?></span>
         </div>
     </div>
-    <a href="/portal/tickets" class="btn btn-outline-secondary">
-        <i class="bi bi-arrow-left me-1"></i>Back
-    </a>
+    <div class="d-flex gap-2">
+        <?php if ($isOwner && $ticket['status'] !== 'closed'): ?>
+        <a href="/portal/tickets/<?= $ticket['id'] ?>/edit" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-pencil me-1"></i>Edit
+        </a>
+        <form method="POST" action="/portal/tickets/<?= $ticket['id'] ?>/close" class="d-inline"
+              onsubmit="return confirm('Are you sure you want to close this ticket?');">
+            <?= csrfField() ?>
+            <button type="submit" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-x-circle me-1"></i>Close Ticket
+            </button>
+        </form>
+        <?php endif; ?>
+        <a href="/portal/tickets" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i>Back
+        </a>
+    </div>
 </div>
 
 <div class="row g-4">
