@@ -1077,6 +1077,7 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
         boxHeader.className  = 'card-header border-bottom d-flex align-items-center justify-content-between py-2 ' + cfg.header;
         statusAfterEl.value  = '';
         box.style.display    = '';
+        if (window._replyEditor) window._replyEditor.ui.update();
         box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         setTimeout(function() { if (window._replyEditor) window._replyEditor.editing.view.focus(); }, 80);
         [btnReply, btnForward, btnNote].forEach(function(b) { b.classList.remove('active'); });
