@@ -453,7 +453,7 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                         <?php endif; ?>
                         <?php if (in_array('agent', $visibleColumns)): ?>
                         <?php
-                            $qaGroupId = $t['type_group_id'] ? (int)$t['type_group_id'] : null;
+                            $qaGroupId = $t['type_group_id'] ? (int)$t['type_group_id'] : ($t['group_id'] ? (int)$t['group_id'] : null);
                             $qaAgents  = $qaGroupId ? ($groupAgents[$qaGroupId] ?? []) : $allAgentsForAssign;
                             $qaTip     = $qaGroupId ? 'Assign (type group: ' . e($t['type_name'] ?? '') . ')' : 'Assign (all agents)';
                         ?>
@@ -471,7 +471,7 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                         </td>
                         <?php endif; ?>
                         <?php if (in_array('group', $visibleColumns)): ?>
-                        <td style="white-space:nowrap;overflow:hidden;">
+                        <td style="white-space:nowrap;">
                             <span class="d-inline-flex align-items-center gap-1 quick-group-wrap" data-ticket-id="<?= (int)$t['id'] ?>">
                                 <span class="quick-group-name<?= $t['group_name'] ? '' : ' text-muted' ?>"><?= e($t['group_name'] ?: '—') ?></span>
                                 <button class="btn btn-link btn-sm p-0 border-0 text-muted quick-group-btn" type="button" title="Change group" style="line-height:1;"><i class="bi bi-chevron-down" style="font-size:0.65rem;"></i></button>
