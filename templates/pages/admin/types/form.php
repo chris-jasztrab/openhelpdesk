@@ -49,6 +49,19 @@ $action = $isEdit ? "/admin/types/{$editing['id']}/edit" : '/admin/types/create'
                 </div>
             </div>
 
+            <div class="mb-3">
+                <label for="group_id" class="form-label fw-semibold">Default Group</label>
+                <select class="form-select" id="group_id" name="group_id">
+                    <option value="">— No group —</option>
+                    <?php foreach ($groups as $g): ?>
+                    <option value="<?= $g['id'] ?>" <?= (int) old('group_id', (string) ($editing['group_id'] ?? '')) === (int) $g['id'] ? 'selected' : '' ?>>
+                        <?= e($g['name']) ?>
+                    </option>
+                    <?php endforeach; ?>
+                </select>
+                <div class="form-text">When assigning agents to tickets of this type, only agents in this group will be shown.</div>
+            </div>
+
             <hr class="my-4">
 
             <div class="d-flex gap-2">

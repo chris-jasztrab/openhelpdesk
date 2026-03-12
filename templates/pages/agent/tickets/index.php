@@ -448,9 +448,9 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                         <?php endif; ?>
                         <?php if (in_array('agent', $visibleColumns)): ?>
                         <?php
-                            $qaGroupId = $t['group_id'] ? (int)$t['group_id'] : null;
+                            $qaGroupId = $t['type_group_id'] ? (int)$t['type_group_id'] : null;
                             $qaAgents  = $qaGroupId ? ($groupAgents[$qaGroupId] ?? []) : $allAgentsForAssign;
-                            $qaTip     = $qaGroupId ? 'Assign (group: ' . e($t['group_name'] ?? $qaGroupId) . ')' : 'Assign (all agents)';
+                            $qaTip     = $qaGroupId ? 'Assign (type group: ' . e($t['type_name'] ?? '') . ')' : 'Assign (all agents)';
                         ?>
                         <td style="white-space:nowrap;overflow:hidden;text-align:right;">
                             <span class="d-inline-flex align-items-center gap-1 quick-assign-wrap" data-ticket-id="<?= (int)$t['id'] ?>">

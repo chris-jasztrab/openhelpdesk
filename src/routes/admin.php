@@ -1046,7 +1046,8 @@ $router->get('/admin/types', function () {
 
 $router->get('/admin/types/create', function () {
     Auth::requireRole('admin');
-    render('admin/types/form', ['editing' => null]);
+    $groups = Database::connect()->query('SELECT id, name FROM `groups` ORDER BY sort_order, name')->fetchAll();
+    render('admin/types/form', ['editing' => null, 'groups' => $groups]);
 });
 
 $router->post('/admin/types/create', function () {
@@ -1055,30 +1056,33 @@ $router->post('/admin/types/create', function () {
         flash('error', 'Invalid request.');
         redirect('/admin/types/create');
     }
-    $name  = trim($_POST['name'] ?? '');
-    $color = preg_match('/^#[0-9a-fA-F]{6}$/', $_POST['color'] ?? '') ? $_POST['color'] : '#6c757d';
-    $order = (int) ($_POST['sort_order'] ?? 0);
+    $name    = trim($_POST['name'] ?? '');
+    $color   = preg_match('/^#[0-9a-fA-F]{6}$/', $_POST['color'] ?? '') ? $_POST['color'] : '#6c757d';
+    $order   = (int) ($_POST['sort_order'] ?? 0);
+    $groupId = !empty($_POST['group_id']) ? (int) $_POST['group_id'] : null;
     if ($name === '') {
         flashInput($_POST);
         flash('error', 'Type name is required.');
         redirect('/admin/types/create');
     }
-    Database::connect()->prepare('INSERT INTO ticket_types (name, color, sort_order) VALUES (?, ?, ?)')
-        ->execute([$name, $color, $order]);
+    Database::connect()->prepare('INSERT INTO ticket_types (name, color, group_id, sort_order) VALUES (?, ?, ?, ?)')
+        ->execute([$name, $color, $groupId, $order]);
     flash('success', 'Ticket type created.');
     redirect('/admin/types');
 });
 
 $router->get('/admin/types/{id}/edit', function (array $p) {
     Auth::requireRole('admin');
-    $stmt = Database::connect()->prepare('SELECT * FROM ticket_types WHERE id = ?');
+    $db = Database::connect();
+    $stmt = $db->prepare('SELECT * FROM ticket_types WHERE id = ?');
     $stmt->execute([(int) $p['id']]);
     $editing = $stmt->fetch();
     if (!$editing) {
         flash('error', 'Ticket type not found.');
         redirect('/admin/types');
     }
-    render('admin/types/form', ['editing' => $editing]);
+    $groups = $db->query('SELECT id, name FROM `groups` ORDER BY sort_order, name')->fetchAll();
+    render('admin/types/form', ['editing' => $editing, 'groups' => $groups]);
 });
 
 $router->post('/admin/types/{id}/edit', function (array $p) {
@@ -1088,16 +1092,17 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
         flash('error', 'Invalid request.');
         redirect("/admin/types/{$id}/edit");
     }
-    $name  = trim($_POST['name'] ?? '');
-    $color = preg_match('/^#[0-9a-fA-F]{6}$/', $_POST['color'] ?? '') ? $_POST['color'] : '#6c757d';
-    $order = (int) ($_POST['sort_order'] ?? 0);
+    $name    = trim($_POST['name'] ?? '');
+    $color   = preg_match('/^#[0-9a-fA-F]{6}$/', $_POST['color'] ?? '') ? $_POST['color'] : '#6c757d';
+    $order   = (int) ($_POST['sort_order'] ?? 0);
+    $groupId = !empty($_POST['group_id']) ? (int) $_POST['group_id'] : null;
     if ($name === '') {
         flashInput($_POST);
         flash('error', 'Type name is required.');
         redirect("/admin/types/{$id}/edit");
     }
-    Database::connect()->prepare('UPDATE ticket_types SET name=?, color=?, sort_order=? WHERE id=?')
-        ->execute([$name, $color, $order, $id]);
+    Database::connect()->prepare('UPDATE ticket_types SET name=?, color=?, group_id=?, sort_order=? WHERE id=?')
+        ->execute([$name, $color, $groupId, $order, $id]);
     flash('success', 'Ticket type updated.');
     redirect('/admin/types');
 });
@@ -1582,7 +1587,7 @@ $router->get('/admin/tickets', function () {
     $sql = "SELECT t.*,
                 tp.name AS priority_name, tp.color AS priority_color,
                 l.name  AS location_name,
-                tt.name AS type_name, tt.color AS type_color,
+                tt.name AS type_name, tt.color AS type_color, tt.group_id AS type_group_id,
                 g.name  AS group_name,
                 CONCAT(c.first_name, ' ', c.last_name) AS creator_name,
                 CONCAT(a.first_name, ' ', a.last_name) AS agent_name
