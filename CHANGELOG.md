@@ -13,6 +13,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ## Unreleased
 
+### Portal Improvements
+- **Requester Self-Close** — portal users can now close their own tickets directly from the ticket detail page
+- **Requester Self-Edit** — portal users can edit the subject and description of their own open tickets
+- Both actions write internal-only timeline entries (visible to agents and admins only) recording exactly what changed
+
 Planned features not yet implemented:
 
 - Profile Avatars — allow users to upload their own avatar from the profile page (currently admin-managed only)
