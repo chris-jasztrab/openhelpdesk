@@ -721,6 +721,16 @@ sessionStorage.setItem('adminTicketListUrl', window.location.href);
             if (activeMenu) { activeMenu.remove(); activeMenu = null; activeBtn = null; }
         }
 
+        function resizeColumns() {
+            var tbl = document.getElementById("ticketTable");
+            if (!tbl) return;
+            var ths = tbl.querySelectorAll("thead th:not(.subject-col)");
+            ths.forEach(function(th) { th.style.width = ''; });
+            tbl.style.tableLayout = 'auto';
+            ths.forEach(function(th) { th.style.width = th.offsetWidth + 'px'; });
+            tbl.style.tableLayout = 'fixed';
+        }
+
         function openMenu(btn, kind) {
             closeMenu();
             var wrapEl = btn.closest('[data-ticket-id]');
@@ -794,7 +804,7 @@ sessionStorage.setItem('adminTicketListUrl', window.location.href);
                         headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
                         body: JSON.stringify({assigned_to: val === '' ? null : parseInt(val, 10)})
                     }).then(function (r) { return r.json(); }).then(function (data) {
-                        if (data.success) { nameSpan.textContent = data.agent_name || 'Unassigned'; }
+                        if (data.success) { nameSpan.textContent = data.agent_name || 'Unassigned'; resizeColumns(); }
                     }).catch(function () {});
                 } else if (kind === 'type') {
                     var typeWrap = document.querySelector('.quick-type-wrap[data-ticket-id="' + ticketId + '"]');
@@ -815,6 +825,7 @@ sessionStorage.setItem('adminTicketListUrl', window.location.href);
                             var newAgents = (tp && tp.group_id && quickGroupAgents[tp.group_id]) ? quickGroupAgents[tp.group_id] : quickAllAgents;
                             var assignBtn = document.querySelector('.quick-assign-wrap[data-ticket-id="' + ticketId + '"] .quick-assign-btn');
                             if (assignBtn) { assignBtn.dataset.agents = JSON.stringify(newAgents); }
+                            resizeColumns();
                         }
                     }).catch(function () {});
                 } else if (kind === 'group') {
@@ -832,6 +843,7 @@ sessionStorage.setItem('adminTicketListUrl', window.location.href);
                             var newAgents = data.agents || quickAllAgents;
                             var assignBtn = document.querySelector('.quick-assign-wrap[data-ticket-id="' + ticketId + '"] .quick-assign-btn');
                             if (assignBtn) { assignBtn.dataset.agents = JSON.stringify(newAgents); }
+                            resizeColumns();
                         }
                     }).catch(function () {});
                 }
