@@ -418,12 +418,14 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
                         <?php endif; ?>
                     </dd>
 
+                    <?php if ($user['role'] === 'admin'): ?>
                     <hr>
                     <dt class="text-muted small">Browser</dt>
                     <dd class="small"><?= e($ticket['browser_info'] ?? 'Unknown') ?></dd>
 
                     <dt class="text-muted small">Operating System</dt>
                     <dd class="small"><?= e($ticket['os_info'] ?? 'Unknown') ?></dd>
+                    <?php endif; ?>
                 </dl>
             </div>
         </div>
