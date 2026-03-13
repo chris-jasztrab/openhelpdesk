@@ -93,14 +93,10 @@ $breadcrumbs  = [
                 <p class="text-muted small mb-3">
                     Remove the location from all <?= number_format($ticketCount) ?> affected ticket<?= $ticketCount !== 1 ? 's' : '' ?> (set to none), then delete this location.
                 </p>
-                <form method="POST" action="/admin/locations/<?= (int) $location['id'] ?>/delete"
-                      onsubmit="return confirm('Clear the location from <?= $ticketCount ?> ticket<?= $ticketCount !== 1 ? 's' : '' ?> and delete this location?')">
-                    <?= csrfField() ?>
-                    <input type="hidden" name="action" value="clear">
-                    <button type="submit" class="btn btn-secondary">
-                        <i class="bi bi-x-circle me-1"></i>Clear & Delete
-                    </button>
-                </form>
+                <button type="button" class="btn btn-secondary"
+                        data-bs-toggle="modal" data-bs-target="#clearDeleteLocationModal">
+                    <i class="bi bi-x-circle me-1"></i>Clear & Delete
+                </button>
             </div>
         </div>
     </div>
@@ -154,5 +150,32 @@ $breadcrumbs  = [
 </a>
 
 <?php endif; ?>
+
+<!-- Clear & Delete Location Modal -->
+<div class="modal fade" id="clearDeleteLocationModal" tabindex="-1" aria-labelledby="clearDeleteLocationModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="clearDeleteLocationModalLabel">
+                    <i class="bi bi-x-circle me-2"></i>Clear &amp; Delete Location
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0">Clear the location from <strong><?= number_format($ticketCount) ?> ticket<?= $ticketCount !== 1 ? 's' : '' ?></strong> and delete this location? This cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <form method="POST" action="/admin/locations/<?= (int) $location['id'] ?>/delete">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="action" value="clear">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-secondary px-4">
+                        <i class="bi bi-x-circle me-1"></i>Clear &amp; Delete
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 
 <?php require ROOT_DIR . '/templates/partials/settings-nav-end.php'; ?>

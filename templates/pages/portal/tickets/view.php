@@ -32,13 +32,10 @@ $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-p
         <a href="/portal/tickets/<?= $ticket['id'] ?>/edit" class="btn btn-outline-primary btn-sm">
             <i class="bi bi-pencil me-1"></i>Edit
         </a>
-        <form method="POST" action="/portal/tickets/<?= $ticket['id'] ?>/close" class="d-inline"
-              onsubmit="return confirm('Are you sure you want to close this ticket?');">
-            <?= csrfField() ?>
-            <button type="submit" class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-x-circle me-1"></i>Close Ticket
-            </button>
-        </form>
+        <button type="button" class="btn btn-outline-secondary btn-sm"
+                data-bs-toggle="modal" data-bs-target="#closeTicketModal">
+            <i class="bi bi-x-circle me-1"></i>Close Ticket
+        </button>
         <?php endif; ?>
         <a href="/portal/tickets" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-arrow-left me-1"></i>Back
@@ -289,5 +286,31 @@ $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-p
             </div>
         </div>
         <?php endif; ?>
+    </div>
+</div>
+
+<!-- Close Ticket Modal -->
+<div class="modal fade" id="closeTicketModal" tabindex="-1" aria-labelledby="closeTicketModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="closeTicketModalLabel">
+                    <i class="bi bi-x-circle me-2"></i>Close Ticket
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0">Are you sure you want to close this ticket?</p>
+            </div>
+            <div class="modal-footer">
+                <form method="POST" action="/portal/tickets/<?= $ticket['id'] ?>/close">
+                    <?= csrfField() ?>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-secondary px-4">
+                        <i class="bi bi-x-circle me-1"></i>Close Ticket
+                    </button>
+                </form>
+            </div>
+        </div>
     </div>
 </div>

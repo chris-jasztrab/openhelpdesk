@@ -331,6 +331,30 @@ $systemFieldsBottom = [
     </div>
 </div>
 
+<!-- Delete Field Confirmation Modal -->
+<div class="modal fade" id="deleteFieldModal" tabindex="-1" aria-labelledby="deleteFieldModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="deleteFieldModalLabel">
+                    <i class="bi bi-trash me-2 text-danger"></i>Remove Field
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-1">Remove this field from the form?</p>
+                <p class="text-muted small mb-0">The field will no longer appear on new or existing tickets, but historical values submitted by users will be preserved.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger px-4" id="deleteFieldConfirmBtn">
+                    <i class="bi bi-trash me-1"></i>Remove Field
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -422,18 +446,25 @@ document.addEventListener('DOMContentLoaded', function () {
     function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
     /* ─── Delete ─── */
+    var pendingDeleteId  = null;
+    var pendingDeleteRow = null;
+
     list.addEventListener('click', function (e) {
         var btn = e.target.closest('.delete-field-btn');
         if (!btn) return;
-        if (!confirm('Remove this field from the form?\n\nThe field will no longer appear on new or existing tickets, but historical values submitted by users will be preserved.')) return;
-        var id  = btn.dataset.fieldId;
-        var row = list.querySelector('[data-field-id="' + id + '"]');
-        fetch('/admin/workflows/ticket-fields/' + id + '/delete', {
+        pendingDeleteId  = btn.dataset.fieldId;
+        pendingDeleteRow = list.querySelector('[data-field-id="' + pendingDeleteId + '"]');
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('deleteFieldModal')).show();
+    });
+
+    document.getElementById('deleteFieldConfirmBtn').addEventListener('click', function () {
+        bootstrap.Modal.getInstance(document.getElementById('deleteFieldModal')).hide();
+        fetch('/admin/workflows/ticket-fields/' + pendingDeleteId + '/delete', {
             method: 'POST', credentials: 'same-origin'
         })
         .then(function (r) { return r.json(); })
         .then(function (data) {
-            if (data.success) { row.remove(); updateCount(); }
+            if (data.success && pendingDeleteRow) { pendingDeleteRow.remove(); updateCount(); }
         });
     });
 

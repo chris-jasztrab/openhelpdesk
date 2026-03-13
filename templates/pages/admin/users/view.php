@@ -66,13 +66,10 @@ $bc = $badgeColors[$profileUser['role']] ?? 'secondary';
                     <i class="bi bi-pencil me-1"></i>Edit User
                 </a>
                 <?php if ($profileUser['totp_enabled'] ?? false): ?>
-                <form method="POST" action="/admin/users/<?= (int)$profileUser['id'] ?>/reset-2fa" class="d-inline"
-                      onsubmit="return confirm('Reset 2FA for this user? They will need to set it up again.')">
-                    <?= csrfField() ?>
-                    <button type="submit" class="btn btn-outline-warning">
-                        <i class="bi bi-shield-x me-1"></i>Reset 2FA
-                    </button>
-                </form>
+                <button type="button" class="btn btn-outline-warning"
+                        data-bs-toggle="modal" data-bs-target="#reset2faModal">
+                    <i class="bi bi-shield-x me-1"></i>Reset 2FA
+                </button>
                 <?php endif; ?>
                 <?php if ($profileUser['id'] !== Auth::id()): ?>
                 <a href="/admin/users/merge?suggest_delete=<?= (int)$profileUser['id'] ?>"
@@ -546,3 +543,31 @@ $_baseUrl         = '/admin/users/' . (int)$profileUser['id'];
     <?php endif; ?>
 })();
 </script>
+
+<?php if ($profileUser['totp_enabled'] ?? false): ?>
+<!-- Reset 2FA Modal -->
+<div class="modal fade" id="reset2faModal" tabindex="-1" aria-labelledby="reset2faModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="reset2faModalLabel">
+                    <i class="bi bi-shield-x me-2 text-warning"></i>Reset 2FA
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0">Reset 2FA for this user? They will need to set it up again on their next login.</p>
+            </div>
+            <div class="modal-footer">
+                <form method="POST" action="/admin/users/<?= (int)$profileUser['id'] ?>/reset-2fa">
+                    <?= csrfField() ?>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning px-4">
+                        <i class="bi bi-shield-x me-1"></i>Reset 2FA
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>

@@ -93,14 +93,10 @@ $breadcrumbs  = [
                 <p class="text-muted small mb-3">
                     Permanently delete all <?= number_format($ticketCount) ?> ticket<?= $ticketCount !== 1 ? 's' : '' ?> that use this type, then delete the type. <strong class="text-danger">This cannot be undone.</strong>
                 </p>
-                <form method="POST" action="/admin/types/<?= (int) $type['id'] ?>/delete"
-                      onsubmit="return confirm('Delete <?= $ticketCount ?> ticket<?= $ticketCount !== 1 ? 's' : '' ?> and this ticket type? This cannot be undone.')">
-                    <?= csrfField() ?>
-                    <input type="hidden" name="action" value="delete_tickets">
-                    <button type="submit" class="btn btn-danger">
-                        <i class="bi bi-trash me-1"></i>Delete Tickets & Type
-                    </button>
-                </form>
+                <button type="button" class="btn btn-danger"
+                        data-bs-toggle="modal" data-bs-target="#deleteTicketsTypeModal">
+                    <i class="bi bi-trash me-1"></i>Delete Tickets & Type
+                </button>
             </div>
         </div>
     </div>
@@ -154,5 +150,32 @@ $breadcrumbs  = [
 </a>
 
 <?php endif; ?>
+
+<!-- Delete Tickets & Type Modal -->
+<div class="modal fade" id="deleteTicketsTypeModal" tabindex="-1" aria-labelledby="deleteTicketsTypeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="deleteTicketsTypeModalLabel">
+                    <i class="bi bi-trash me-2 text-danger"></i>Delete Tickets &amp; Type
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0">Delete <strong><?= number_format($ticketCount) ?> ticket<?= $ticketCount !== 1 ? 's' : '' ?></strong> and this ticket type? <span class="text-danger fw-semibold">This cannot be undone.</span></p>
+            </div>
+            <div class="modal-footer">
+                <form method="POST" action="/admin/types/<?= (int) $type['id'] ?>/delete">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="action" value="delete_tickets">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger px-4">
+                        <i class="bi bi-trash me-1"></i>Delete Tickets &amp; Type
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 
 <?php require ROOT_DIR . '/templates/partials/settings-nav-end.php'; ?>

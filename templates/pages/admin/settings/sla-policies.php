@@ -19,12 +19,10 @@ $breadcrumbs  = [
         <h5 class="fw-bold mb-1">SLA Policies</h5>
         <p class="text-muted mb-0">Define response and resolution targets for each priority level. Times are in business minutes.</p>
     </div>
-    <form method="POST" action="/admin/settings/sla-recalculate" class="d-inline">
-        <?= csrfField() ?>
-        <button type="submit" class="btn btn-outline-secondary" onclick="return confirm('Recalculate SLA state for all active tickets?')">
-            <i class="bi bi-arrow-clockwise me-1"></i>Recalculate All
-        </button>
-    </form>
+    <button type="button" class="btn btn-outline-secondary"
+            data-bs-toggle="modal" data-bs-target="#recalcSlaModal">
+        <i class="bi bi-arrow-clockwise me-1"></i>Recalculate All
+    </button>
 </div>
 
 <?php if (empty($priorities)): ?>
@@ -114,5 +112,31 @@ document.querySelectorAll('.sla-input').forEach(function(input) {
     });
 });
 </script>
+
+<!-- Recalculate SLA Modal -->
+<div class="modal fade" id="recalcSlaModal" tabindex="-1" aria-labelledby="recalcSlaModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="recalcSlaModalLabel">
+                    <i class="bi bi-arrow-clockwise me-2"></i>Recalculate SLA
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0">Recalculate SLA state for all active tickets? This may take a moment.</p>
+            </div>
+            <div class="modal-footer">
+                <form method="POST" action="/admin/settings/sla-recalculate">
+                    <?= csrfField() ?>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary px-4">
+                        <i class="bi bi-arrow-clockwise me-1"></i>Recalculate All
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 
 <?php require ROOT_DIR . '/templates/partials/settings-nav-end.php'; ?>

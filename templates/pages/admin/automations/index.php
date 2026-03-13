@@ -167,13 +167,12 @@ $renderConditions = function (array $conditions) use ($renderCond): string {
                                 <a href="/admin/settings/automations/<?= $auto['id'] ?>/edit" class="btn btn-sm btn-outline-primary" title="Edit">
                                     <i class="bi bi-pencil"></i>
                                 </a>
-                                <form method="POST" action="/admin/settings/automations/<?= $auto['id'] ?>/delete" class="d-inline"
-                                      onsubmit="return confirm('Delete this automation?')">
-                                    <?= csrfField() ?>
-                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </form>
+                                <button type="button" class="btn btn-sm btn-outline-danger" title="Delete"
+                                        data-bs-toggle="modal" data-bs-target="#deleteAutomationModal"
+                                        data-id="<?= $auto['id'] ?>"
+                                        data-name="<?= e($auto['name']) ?>">
+                                    <i class="bi bi-trash"></i>
+                                </button>
                             </div>
                         </td>
                     </tr>
@@ -183,5 +182,38 @@ $renderConditions = function (array $conditions) use ($renderCond): string {
         </table>
     </div>
 </div>
+
+<!-- Delete Automation Modal -->
+<div class="modal fade" id="deleteAutomationModal" tabindex="-1" aria-labelledby="deleteAutomationModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="deleteAutomationModalLabel">
+                    <i class="bi bi-trash me-2 text-danger"></i>Delete Automation
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0">Delete automation <strong id="deleteAutomationName"></strong>? This cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <form method="POST" id="deleteAutomationForm" action="">
+                    <?= csrfField() ?>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger px-4">
+                        <i class="bi bi-trash me-1"></i>Delete
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+document.getElementById('deleteAutomationModal').addEventListener('show.bs.modal', function (e) {
+    var btn = e.relatedTarget;
+    document.getElementById('deleteAutomationName').textContent = btn.dataset.name;
+    document.getElementById('deleteAutomationForm').action = '/admin/settings/automations/' + btn.dataset.id + '/delete';
+});
+</script>
 
 <?php require ROOT_DIR . '/templates/partials/settings-nav-end.php'; ?>

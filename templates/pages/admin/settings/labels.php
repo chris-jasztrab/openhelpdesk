@@ -117,13 +117,10 @@ unset($defaults['_readme']);
                 <p class="text-muted small mb-3">
                     Remove all custom labels and restore the original built-in terminology.
                 </p>
-                <form method="POST" action="/admin/settings/labels/reset"
-                      onsubmit="return confirm('Reset all labels to their defaults?')">
-                    <?= csrfField() ?>
-                    <button type="submit" class="btn btn-sm btn-outline-danger">
-                        <i class="bi bi-arrow-counterclockwise me-1"></i>Reset Labels
-                    </button>
-                </form>
+                <button type="button" class="btn btn-sm btn-outline-danger"
+                        data-bs-toggle="modal" data-bs-target="#resetLabelsModal">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i>Reset Labels
+                </button>
             </div>
         </div>
     </div>
@@ -179,5 +176,31 @@ function copyJsonToClipboard() {
     });
 }
 </script>
+
+<!-- Reset Labels Modal -->
+<div class="modal fade" id="resetLabelsModal" tabindex="-1" aria-labelledby="resetLabelsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="resetLabelsModalLabel">
+                    <i class="bi bi-arrow-counterclockwise me-2 text-danger"></i>Reset Labels
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0">Reset all labels to their defaults? All custom labels will be removed.</p>
+            </div>
+            <div class="modal-footer">
+                <form method="POST" action="/admin/settings/labels/reset">
+                    <?= csrfField() ?>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger px-4">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i>Reset Labels
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 
 <?php require ROOT_DIR . '/templates/partials/settings-nav-end.php'; ?>

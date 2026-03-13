@@ -225,8 +225,8 @@ $breadcrumbs = [
                                        required
                                        style="letter-spacing:.3em;max-width:140px;">
                             </div>
-                            <button type="submit" class="btn btn-outline-danger"
-                                    onclick="return confirm('Are you sure you want to disable 2FA?')">
+                            <button type="button" class="btn btn-outline-danger"
+                                    data-bs-toggle="modal" data-bs-target="#disable2faModal">
                                 <i class="bi bi-shield-x me-1"></i>Disable 2FA
                             </button>
                         </div>
@@ -245,3 +245,31 @@ $breadcrumbs = [
         <?php endif; ?>
     </div>
 </div>
+
+<!-- Disable 2FA Confirmation Modal -->
+<div class="modal fade" id="disable2faModal" tabindex="-1" aria-labelledby="disable2faModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="disable2faModalLabel">
+                    <i class="bi bi-shield-x me-2 text-danger"></i>Disable 2FA
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0">Are you sure you want to disable two-factor authentication? Your account will be less secure.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger px-4" id="confirmDisable2fa">
+                    <i class="bi bi-shield-x me-1"></i>Disable 2FA
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+document.getElementById('confirmDisable2fa').addEventListener('click', function () {
+    document.getElementById('disableCode').closest('form').submit();
+});
+</script>

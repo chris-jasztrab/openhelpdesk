@@ -178,13 +178,10 @@ $redirectUri = appUrl() . '/auth/microsoft/callback';
 <div class="card border-0 shadow-sm mt-4">
     <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
         <span class="fw-semibold"><i class="bi bi-file-text me-1"></i>SSO Debug Log</span>
-        <form method="POST" action="/admin/settings/sso/clear-log" class="d-inline">
-            <?= csrfField() ?>
-            <button type="submit" class="btn btn-sm btn-outline-danger"
-                    onclick="return confirm('Clear the SSO debug log?')">
-                <i class="bi bi-trash me-1"></i>Clear Log
-            </button>
-        </form>
+        <button type="button" class="btn btn-sm btn-outline-danger"
+                data-bs-toggle="modal" data-bs-target="#clearSsoLogModal">
+            <i class="bi bi-trash me-1"></i>Clear Log
+        </button>
     </div>
     <div class="card-body p-0">
         <?php if (empty($ssoLog)): ?>
@@ -195,5 +192,31 @@ $redirectUri = appUrl() . '/auth/microsoft/callback';
     </div>
 </div>
 <?php endif; ?>
+
+<!-- Clear SSO Log Modal -->
+<div class="modal fade" id="clearSsoLogModal" tabindex="-1" aria-labelledby="clearSsoLogModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="clearSsoLogModalLabel">
+                    <i class="bi bi-trash me-2 text-danger"></i>Clear SSO Debug Log
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0">Clear the SSO debug log? All log entries will be permanently deleted.</p>
+            </div>
+            <div class="modal-footer">
+                <form method="POST" action="/admin/settings/sso/clear-log">
+                    <?= csrfField() ?>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger px-4">
+                        <i class="bi bi-trash me-1"></i>Clear Log
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 
 <?php require ROOT_DIR . '/templates/partials/settings-nav-end.php'; ?>

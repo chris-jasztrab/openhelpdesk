@@ -84,13 +84,12 @@ $breadcrumbs  = [
                                 <a href="/admin/kb/articles/<?= $a['id'] ?>/history" class="btn btn-sm btn-outline-secondary" title="History">
                                     <i class="bi bi-clock-history"></i>
                                 </a>
-                                <form method="POST" action="/admin/kb/articles/<?= $a['id'] ?>/delete" class="d-inline"
-                                      onsubmit="return confirm('Delete this article?')">
-                                    <?= csrfField() ?>
-                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </form>
+                                <button type="button" class="btn btn-sm btn-outline-danger" title="Delete"
+                                        data-bs-toggle="modal" data-bs-target="#deleteArticleModal"
+                                        data-id="<?= $a['id'] ?>"
+                                        data-title="<?= e($a['title']) ?>">
+                                    <i class="bi bi-trash"></i>
+                                </button>
                             </div>
                         </td>
                     </tr>
@@ -100,3 +99,36 @@ $breadcrumbs  = [
         </table>
     </div>
 </div>
+
+<!-- Delete Article Modal -->
+<div class="modal fade" id="deleteArticleModal" tabindex="-1" aria-labelledby="deleteArticleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="deleteArticleModalLabel">
+                    <i class="bi bi-trash me-2 text-danger"></i>Delete Article
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0">Delete article <strong id="deleteArticleTitle"></strong>? This cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <form method="POST" id="deleteArticleForm" action="">
+                    <?= csrfField() ?>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger px-4">
+                        <i class="bi bi-trash me-1"></i>Delete
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+document.getElementById('deleteArticleModal').addEventListener('show.bs.modal', function (e) {
+    var btn = e.relatedTarget;
+    document.getElementById('deleteArticleTitle').textContent = btn.dataset.title;
+    document.getElementById('deleteArticleForm').action = '/admin/kb/articles/' + btn.dataset.id + '/delete';
+});
+</script>

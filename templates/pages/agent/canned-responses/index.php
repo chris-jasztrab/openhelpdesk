@@ -57,14 +57,12 @@ $breadcrumbs  = [
                                class="btn btn-sm btn-outline-primary" title="Edit">
                                 <i class="bi bi-pencil"></i>
                             </a>
-                            <form method="POST" action="/agent/canned-responses/<?= (int) $r['id'] ?>/delete"
-                                  class="d-inline"
-                                  onsubmit="return confirm('Delete canned response \'<?= e(addslashes($r['title'])) ?>\'?')">
-                                <?= csrfField() ?>
-                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </form>
+                            <button type="button" class="btn btn-sm btn-outline-danger" title="Delete"
+                                    data-bs-toggle="modal" data-bs-target="#deleteCannedResponseModal"
+                                    data-id="<?= (int) $r['id'] ?>"
+                                    data-title="<?= e($r['title']) ?>">
+                                <i class="bi bi-trash"></i>
+                            </button>
                         </div>
                     </td>
                 </tr>
@@ -105,3 +103,36 @@ $breadcrumbs  = [
     </div>
 </div>
 <?php endif; ?>
+
+<!-- Delete Canned Response Modal -->
+<div class="modal fade" id="deleteCannedResponseModal" tabindex="-1" aria-labelledby="deleteCannedResponseModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="deleteCannedResponseModalLabel">
+                    <i class="bi bi-trash me-2 text-danger"></i>Delete Canned Response
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0">Delete canned response <strong id="deleteCannedResponseTitle"></strong>? This cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <form method="POST" id="deleteCannedResponseForm" action="">
+                    <?= csrfField() ?>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger px-4">
+                        <i class="bi bi-trash me-1"></i>Delete
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+document.getElementById('deleteCannedResponseModal').addEventListener('show.bs.modal', function (e) {
+    var btn = e.relatedTarget;
+    document.getElementById('deleteCannedResponseTitle').textContent = btn.dataset.title;
+    document.getElementById('deleteCannedResponseForm').action = '/agent/canned-responses/' + btn.dataset.id + '/delete';
+});
+</script>

@@ -233,16 +233,39 @@ $suggestLabel = $suggestUser
     <a href="/admin/users/merge" class="btn btn-outline-secondary">
         <i class="bi bi-arrow-left me-1"></i>Back
     </a>
-    <form method="POST" action="/admin/users/merge"
-          onsubmit="return confirm('Are you sure you want to permanently merge these accounts? This cannot be undone.')">
-        <?= csrfField() ?>
-        <input type="hidden" name="action"    value="execute">
-        <input type="hidden" name="keep_id"   value="<?= (int) $keepUser['id'] ?>">
-        <input type="hidden" name="delete_id" value="<?= (int) $deleteUser['id'] ?>">
-        <button type="submit" class="btn btn-danger">
-            <i class="bi bi-arrow-left-right me-1"></i>Confirm Merge
-        </button>
-    </form>
+    <button type="button" class="btn btn-danger"
+            data-bs-toggle="modal" data-bs-target="#confirmMergeModal">
+        <i class="bi bi-arrow-left-right me-1"></i>Confirm Merge
+    </button>
+</div>
+
+<!-- Confirm Merge Modal -->
+<div class="modal fade" id="confirmMergeModal" tabindex="-1" aria-labelledby="confirmMergeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="confirmMergeModalLabel">
+                    <i class="bi bi-arrow-left-right me-2 text-danger"></i>Confirm Account Merge
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0">Are you sure you want to permanently merge these accounts? <strong class="text-danger">This cannot be undone.</strong></p>
+            </div>
+            <div class="modal-footer">
+                <form method="POST" action="/admin/users/merge">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="action"    value="execute">
+                    <input type="hidden" name="keep_id"   value="<?= (int) $keepUser['id'] ?>">
+                    <input type="hidden" name="delete_id" value="<?= (int) $deleteUser['id'] ?>">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger px-4">
+                        <i class="bi bi-arrow-left-right me-1"></i>Merge Accounts
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
 </div>
 
 <?php endif; ?>

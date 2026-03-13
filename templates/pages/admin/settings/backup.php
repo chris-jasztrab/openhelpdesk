@@ -78,15 +78,11 @@ $breadcrumbs  = [
                                    class="btn btn-sm btn-outline-primary me-1">
                                     <i class="bi bi-download me-1"></i>Download
                                 </a>
-                                <form method="POST" action="/admin/settings/backup/delete"
-                                      class="d-inline"
-                                      onsubmit="return confirm('Delete this backup? This cannot be undone.');">
-                                    <?= csrfField() ?>
-                                    <input type="hidden" name="filename" value="<?= e($b['name']) ?>">
-                                    <button type="submit" class="btn btn-sm btn-outline-danger">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </form>
+                                <button type="button" class="btn btn-sm btn-outline-danger"
+                                        data-bs-toggle="modal" data-bs-target="#deleteBackupModal"
+                                        data-filename="<?= e($b['name']) ?>">
+                                    <i class="bi bi-trash"></i>
+                                </button>
                             </td>
                         </tr>
                         <?php endforeach; ?>
@@ -136,5 +132,39 @@ $breadcrumbs  = [
 
     </div>
 </div>
+
+<!-- Delete Backup Modal -->
+<div class="modal fade" id="deleteBackupModal" tabindex="-1" aria-labelledby="deleteBackupModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="deleteBackupModalLabel">
+                    <i class="bi bi-trash me-2 text-danger"></i>Delete Backup
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0">Delete backup <strong id="deleteBackupFilename"></strong>? This cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <form method="POST" action="/admin/settings/backup/delete" id="deleteBackupForm">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="filename" id="deleteBackupFilenameInput">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger px-4">
+                        <i class="bi bi-trash me-1"></i>Delete
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+document.getElementById('deleteBackupModal').addEventListener('show.bs.modal', function (e) {
+    var btn = e.relatedTarget;
+    document.getElementById('deleteBackupFilename').textContent = btn.dataset.filename;
+    document.getElementById('deleteBackupFilenameInput').value = btn.dataset.filename;
+});
+</script>
 
 <?php require ROOT_DIR . '/templates/partials/settings-nav-end.php'; ?>

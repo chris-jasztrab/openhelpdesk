@@ -82,14 +82,12 @@ $breadcrumbs  = $isAgentView ? [
                                    class="btn btn-sm btn-outline-primary" title="Edit">
                                     <i class="bi bi-pencil"></i>
                                 </a>
-                                <form method="POST" action="/admin/ticket-templates/<?= $tpl['id'] ?>/delete"
-                                      class="d-inline"
-                                      onsubmit="return confirm('Delete this template?')">
-                                    <?= csrfField() ?>
-                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </form>
+                                <button type="button" class="btn btn-sm btn-outline-danger" title="Delete"
+                                        data-bs-toggle="modal" data-bs-target="#deleteTemplateModal"
+                                        data-id="<?= $tpl['id'] ?>"
+                                        data-name="<?= e($tpl['name']) ?>">
+                                    <i class="bi bi-trash"></i>
+                                </button>
                                 <?php else: ?>
                                 <span class="text-muted small fst-italic">View only</span>
                                 <?php endif; ?>
@@ -102,3 +100,36 @@ $breadcrumbs  = $isAgentView ? [
         </table>
     </div>
 </div>
+
+<!-- Delete Template Modal -->
+<div class="modal fade" id="deleteTemplateModal" tabindex="-1" aria-labelledby="deleteTemplateModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="deleteTemplateModalLabel">
+                    <i class="bi bi-trash me-2 text-danger"></i>Delete Template
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0">Delete template <strong id="deleteTemplateName"></strong>? This cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <form method="POST" id="deleteTemplateForm" action="">
+                    <?= csrfField() ?>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger px-4">
+                        <i class="bi bi-trash me-1"></i>Delete
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+document.getElementById('deleteTemplateModal').addEventListener('show.bs.modal', function (e) {
+    var btn = e.relatedTarget;
+    document.getElementById('deleteTemplateName').textContent = btn.dataset.name;
+    document.getElementById('deleteTemplateForm').action = '/admin/ticket-templates/' + btn.dataset.id + '/delete';
+});
+</script>

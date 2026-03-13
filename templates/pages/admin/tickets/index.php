@@ -191,13 +191,13 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                     </li>
                     <li><hr class="dropdown-divider"></li>
                     <li>
-                        <form method="POST" action="/admin/tickets/filters/<?= $sf['id'] ?>/delete"
-                              onsubmit="return confirm('Delete this saved filter?')">
-                            <?= csrfField() ?>
-                            <button type="submit" class="dropdown-item text-danger">
-                                <i class="bi bi-trash me-2"></i>Delete
-                            </button>
-                        </form>
+                        <button type="button" class="dropdown-item text-danger"
+                                data-bs-toggle="modal" data-bs-target="#deleteFilterModal"
+                                data-id="<?= $sf['id'] ?>"
+                                data-name="<?= e($sf['name']) ?>"
+                                data-url="/admin/tickets/filters/<?= $sf['id'] ?>/delete">
+                            <i class="bi bi-trash me-2"></i>Delete
+                        </button>
                     </li>
                 </ul>
                 <?php endif; ?>
@@ -563,6 +563,55 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
     </div>
 </div>
 
+<!-- Bulk Delete Confirmation Modal -->
+<div class="modal fade" id="bulkDeleteModal" tabindex="-1" aria-labelledby="bulkDeleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="bulkDeleteModalLabel">
+                    <i class="bi bi-trash me-2 text-danger"></i>Delete Tickets
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0">Delete <strong id="bulkDeleteCount"></strong> ticket(s)? <span class="text-danger fw-semibold">This cannot be undone.</span></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger px-4" id="bulkDeleteConfirmBtn">
+                    <i class="bi bi-trash me-1"></i>Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Saved Filter Modal -->
+<div class="modal fade" id="deleteFilterModal" tabindex="-1" aria-labelledby="deleteFilterModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="deleteFilterModalLabel">
+                    <i class="bi bi-trash me-2 text-danger"></i>Delete Saved Filter
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0">Delete saved filter <strong id="deleteFilterName"></strong>?</p>
+            </div>
+            <div class="modal-footer">
+                <form method="POST" id="deleteFilterForm" action="">
+                    <?= csrfField() ?>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger px-4">
+                        <i class="bi bi-trash me-1"></i>Delete
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 sessionStorage.setItem('adminTicketListUrl', window.location.href);
 (function () {
@@ -643,7 +692,11 @@ sessionStorage.setItem('adminTicketListUrl', window.location.href);
             bootstrap.Modal.getOrCreateInstance(document.getElementById('bulkMergeModal')).show();
             return;
         }
-        if (action === 'delete' && !confirm('Delete ' + selectedIds.size + ' ticket(s)? This cannot be undone.')) return;
+        if (action === 'delete') {
+            document.getElementById('bulkDeleteCount').textContent = selectedIds.size;
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('bulkDeleteModal')).show();
+            return;
+        }
         submitBulk(action, null);
     };
 
@@ -693,7 +746,18 @@ sessionStorage.setItem('adminTicketListUrl', window.location.href);
         sa.checked = false; sa.indeterminate = false;
         updateBulkBar();
     };
+
+    document.getElementById('bulkDeleteConfirmBtn').addEventListener('click', function () {
+        bootstrap.Modal.getInstance(document.getElementById('bulkDeleteModal')).hide();
+        submitBulk('delete', null);
+    });
 })();
+
+document.getElementById('deleteFilterModal').addEventListener('show.bs.modal', function (e) {
+    var btn = e.relatedTarget;
+    document.getElementById('deleteFilterName').textContent = btn.dataset.name;
+    document.getElementById('deleteFilterForm').action = btn.dataset.url;
+});
 
     // Measure natural column widths then switch to fixed layout so subject truncates
     (function () {

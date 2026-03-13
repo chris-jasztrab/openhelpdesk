@@ -145,14 +145,12 @@ unset($_SESSION['_escalation_run']);
                        class="btn btn-sm btn-outline-secondary me-1">
                         <i class="bi bi-pencil"></i>
                     </a>
-                    <form method="POST" action="/admin/settings/escalations/<?= (int) $rule['id'] ?>/delete"
-                          class="d-inline"
-                          onsubmit="return confirm('Delete rule \'<?= e(addslashes($rule['name'])) ?>\'?')">
-                        <?= csrfField() ?>
-                        <button type="submit" class="btn btn-sm btn-outline-danger">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    </form>
+                    <button type="button" class="btn btn-sm btn-outline-danger"
+                            data-bs-toggle="modal" data-bs-target="#deleteEscalationModal"
+                            data-id="<?= (int) $rule['id'] ?>"
+                            data-name="<?= e($rule['name']) ?>">
+                        <i class="bi bi-trash"></i>
+                    </button>
                 </td>
             </tr>
             <?php endforeach; ?>
@@ -199,5 +197,38 @@ unset($_SESSION['_escalation_run']);
         <?php endif; ?>
     </div>
 </div>
+
+<!-- Delete Escalation Rule Modal -->
+<div class="modal fade" id="deleteEscalationModal" tabindex="-1" aria-labelledby="deleteEscalationModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="deleteEscalationModalLabel">
+                    <i class="bi bi-trash me-2 text-danger"></i>Delete Escalation Rule
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0">Delete rule <strong id="deleteEscalationName"></strong>? This cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <form method="POST" id="deleteEscalationForm" action="">
+                    <?= csrfField() ?>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger px-4">
+                        <i class="bi bi-trash me-1"></i>Delete
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+document.getElementById('deleteEscalationModal').addEventListener('show.bs.modal', function (e) {
+    var btn = e.relatedTarget;
+    document.getElementById('deleteEscalationName').textContent = btn.dataset.name;
+    document.getElementById('deleteEscalationForm').action = '/admin/settings/escalations/' + btn.dataset.id + '/delete';
+});
+</script>
 
 <?php require ROOT_DIR . '/templates/partials/settings-nav-end.php'; ?>

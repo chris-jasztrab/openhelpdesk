@@ -52,13 +52,12 @@ $breadcrumbs  = [
                                 <a href="/admin/priorities/<?= $p['id'] ?>/edit" class="btn btn-sm btn-outline-primary" title="Edit">
                                     <i class="bi bi-pencil"></i>
                                 </a>
-                                <form method="POST" action="/admin/priorities/<?= $p['id'] ?>/delete" class="d-inline"
-                                      onsubmit="return confirm('Delete this priority?')">
-                                    <?= csrfField() ?>
-                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </form>
+                                <button type="button" class="btn btn-sm btn-outline-danger" title="Delete"
+                                        data-bs-toggle="modal" data-bs-target="#deletePriorityModal"
+                                        data-id="<?= $p['id'] ?>"
+                                        data-name="<?= e($p['name']) ?>">
+                                    <i class="bi bi-trash"></i>
+                                </button>
                             </div>
                         </td>
                     </tr>
@@ -68,5 +67,38 @@ $breadcrumbs  = [
         </table>
     </div>
 </div>
+
+<!-- Delete Priority Modal -->
+<div class="modal fade" id="deletePriorityModal" tabindex="-1" aria-labelledby="deletePriorityModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="deletePriorityModalLabel">
+                    <i class="bi bi-trash me-2 text-danger"></i>Delete Priority
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0">Delete priority <strong id="deletePriorityName"></strong>? This cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <form method="POST" id="deletePriorityForm" action="">
+                    <?= csrfField() ?>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger px-4">
+                        <i class="bi bi-trash me-1"></i>Delete
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+document.getElementById('deletePriorityModal').addEventListener('show.bs.modal', function (e) {
+    var btn = e.relatedTarget;
+    document.getElementById('deletePriorityName').textContent = btn.dataset.name;
+    document.getElementById('deletePriorityForm').action = '/admin/priorities/' + btn.dataset.id + '/delete';
+});
+</script>
 
 <?php require ROOT_DIR . '/templates/partials/settings-nav-end.php'; ?>

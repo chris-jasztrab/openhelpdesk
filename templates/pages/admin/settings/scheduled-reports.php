@@ -110,14 +110,12 @@ $typeLabels = [
                        class="btn btn-sm btn-outline-secondary me-1">
                         <i class="bi bi-pencil"></i>
                     </a>
-                    <form method="POST" action="/admin/settings/scheduled-reports/<?= (int)$report['id'] ?>/delete"
-                          class="d-inline"
-                          onsubmit="return confirm('Delete \'<?= e(addslashes($report['name'])) ?>\'?')">
-                        <?= csrfField() ?>
-                        <button type="submit" class="btn btn-sm btn-outline-danger">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    </form>
+                    <button type="button" class="btn btn-sm btn-outline-danger"
+                            data-bs-toggle="modal" data-bs-target="#deleteReportModal"
+                            data-id="<?= (int)$report['id'] ?>"
+                            data-name="<?= e($report['name']) ?>">
+                        <i class="bi bi-trash"></i>
+                    </button>
                 </td>
             </tr>
             <?php endforeach; ?>
@@ -145,5 +143,38 @@ $typeLabels = [
         </p>
     </div>
 </div>
+
+<!-- Delete Scheduled Report Modal -->
+<div class="modal fade" id="deleteReportModal" tabindex="-1" aria-labelledby="deleteReportModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="deleteReportModalLabel">
+                    <i class="bi bi-trash me-2 text-danger"></i>Delete Scheduled Report
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0">Delete <strong id="deleteReportName"></strong>? This cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <form method="POST" id="deleteReportForm" action="">
+                    <?= csrfField() ?>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger px-4">
+                        <i class="bi bi-trash me-1"></i>Delete
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+document.getElementById('deleteReportModal').addEventListener('show.bs.modal', function (e) {
+    var btn = e.relatedTarget;
+    document.getElementById('deleteReportName').textContent = btn.dataset.name;
+    document.getElementById('deleteReportForm').action = '/admin/settings/scheduled-reports/' + btn.dataset.id + '/delete';
+});
+</script>
 
 <?php require ROOT_DIR . '/templates/partials/settings-nav-end.php'; ?>
