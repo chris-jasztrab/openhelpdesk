@@ -63,6 +63,35 @@ $tokenSets = [
         ['token' => '{{priority}}',     'desc' => 'Priority name (if set)'],
         ['token' => '{{submitter}}',    'desc' => 'Full name of the person who submitted the ticket'],
     ],
+    'ticket_assigned_agent' => [
+        ['token' => '{{first_name}}',   'desc' => 'Agent\'s first name'],
+        ['token' => '{{last_name}}',    'desc' => 'Agent\'s last name'],
+        ['token' => '{{user_name}}',    'desc' => 'Agent\'s full name (first + last)'],
+        ['token' => '{{ticket_id}}',    'desc' => 'Ticket number'],
+        ['token' => '{{subject}}',      'desc' => 'Ticket subject line'],
+        ['token' => '{{type}}',         'desc' => 'Ticket type (if set)'],
+        ['token' => '{{priority}}',     'desc' => 'Priority name (if set)'],
+        ['token' => '{{submitter}}',    'desc' => 'Full name of the person who submitted the ticket'],
+    ],
+    'ticket_assigned_group' => [
+        ['token' => '{{first_name}}',   'desc' => 'Recipient\'s first name'],
+        ['token' => '{{last_name}}',    'desc' => 'Recipient\'s last name'],
+        ['token' => '{{user_name}}',    'desc' => 'Recipient\'s full name (first + last)'],
+        ['token' => '{{ticket_id}}',    'desc' => 'Ticket number'],
+        ['token' => '{{subject}}',      'desc' => 'Ticket subject line'],
+        ['token' => '{{group}}',        'desc' => 'Name of the group assigned to the ticket'],
+        ['token' => '{{type}}',         'desc' => 'Ticket type (if set)'],
+        ['token' => '{{priority}}',     'desc' => 'Priority name (if set)'],
+        ['token' => '{{submitter}}',    'desc' => 'Full name of the person who submitted the ticket'],
+    ],
+    'escalation_alert' => [
+        ['token' => '{{first_name}}',   'desc' => 'Recipient\'s first name'],
+        ['token' => '{{last_name}}',    'desc' => 'Recipient\'s last name'],
+        ['token' => '{{user_name}}',    'desc' => 'Recipient\'s full name (first + last)'],
+        ['token' => '{{ticket_id}}',    'desc' => 'Ticket number'],
+        ['token' => '{{subject}}',      'desc' => 'Ticket subject line'],
+        ['token' => '{{rule_name}}',    'desc' => 'Name of the escalation rule that triggered'],
+    ],
 ];
 
 $defaults = [
@@ -95,17 +124,35 @@ $defaults = [
         'intro'   => 'A new support ticket has been submitted.',
         'button'  => 'View Ticket',
     ],
+    'ticket_assigned_agent' => [
+        'subject' => '[Ticket #{{ticket_id}}] Assigned to you: {{subject}}',
+        'intro'   => 'A ticket has been assigned to you.',
+        'button'  => 'View Ticket',
+    ],
+    'ticket_assigned_group' => [
+        'subject' => '[Ticket #{{ticket_id}}] Assigned to your group: {{subject}}',
+        'intro'   => 'A ticket has been assigned to your group.',
+        'button'  => 'View Ticket',
+    ],
+    'escalation_alert' => [
+        'subject' => 'Escalation Alert: [Ticket #{{ticket_id}}] {{subject}}',
+        'intro'   => 'An escalation rule has been triggered for a ticket that requires your attention.',
+        'button'  => 'View Ticket',
+    ],
 ];
 
 $defaultFooter = 'This is an automated message from LocalDesk. Please do not reply directly to this email.';
 
 $tabs = [
-    'ticket_created'  => ['label' => 'Ticket Created',    'icon' => 'bi-ticket-perforated'],
-    'ticket_updated'  => ['label' => 'Ticket Updated',    'icon' => 'bi-chat-left-text'],
-    'ticket_merged'   => ['label' => 'Ticket Merged',     'icon' => 'bi-diagram-2'],
-    'csat_survey'     => ['label' => 'CSAT Survey',       'icon' => 'bi-star'],
-    'ticket_reminder' => ['label' => 'Customer Reminder', 'icon' => 'bi-clock-history'],
-    'group_alerts'    => ['label' => 'Group Alerts',      'icon' => 'bi-people'],
+    'ticket_created'        => ['label' => 'Ticket Created',      'icon' => 'bi-ticket-perforated'],
+    'ticket_updated'        => ['label' => 'Ticket Updated',      'icon' => 'bi-chat-left-text'],
+    'ticket_merged'         => ['label' => 'Ticket Merged',       'icon' => 'bi-diagram-2'],
+    'csat_survey'           => ['label' => 'CSAT Survey',         'icon' => 'bi-star'],
+    'ticket_reminder'       => ['label' => 'Customer Reminder',   'icon' => 'bi-clock-history'],
+    'group_alerts'          => ['label' => 'Group Alerts',        'icon' => 'bi-people'],
+    'ticket_assigned_agent' => ['label' => 'Agent Assigned',      'icon' => 'bi-person-check'],
+    'ticket_assigned_group' => ['label' => 'Group Assigned',      'icon' => 'bi-people-fill'],
+    'escalation_alert'      => ['label' => 'Escalation Alert',    'icon' => 'bi-exclamation-triangle'],
 ];
 
 $activeTab = $_GET['tab'] ?? 'ticket_created';
@@ -369,7 +416,10 @@ $groups ??= [];
                     'ticket_merged'   => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'source_ticket_id' => '42', 'source_subject' => 'Printer not working', 'target_ticket_id' => '38', 'target_subject' => 'Office printer issues'],
                     'csat_survey'     => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working'],
                     'ticket_reminder' => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working'],
-                    'group_alerts'    => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working', 'type' => 'Hardware', 'location' => 'Main Branch', 'priority' => 'High', 'submitter' => 'Jordan Lee'],
+                    'group_alerts'          => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working', 'type' => 'Hardware', 'location' => 'Main Branch', 'priority' => 'High', 'submitter' => 'Jordan Lee'],
+                    'ticket_assigned_agent' => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working', 'type' => 'Hardware', 'priority' => 'High', 'submitter' => 'Jordan Lee'],
+                    'ticket_assigned_group' => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working', 'group' => 'IT Support', 'type' => 'Hardware', 'priority' => 'High', 'submitter' => 'Jordan Lee'],
+                    'escalation_alert'      => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working', 'rule_name' => 'Overdue after 24h'],
                 ];
                 $preview = $subjectTpl;
                 foreach (($previewTokens[$activeTab] ?? []) as $k => $v) {

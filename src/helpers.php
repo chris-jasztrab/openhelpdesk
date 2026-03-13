@@ -706,6 +706,11 @@ function getEmailTpl(string $name, array $rawTokens): array
             'intro'   => 'A ticket has been assigned to your group.',
             'button'  => 'View Ticket',
         ],
+        'escalation_alert' => [
+            'subject' => 'Escalation Alert: [Ticket #{{ticket_id}}] {{subject}}',
+            'intro'   => 'An escalation rule has been triggered for a ticket that requires your attention.',
+            'button'  => 'View Ticket',
+        ],
         'ticket_status_resolved' => [
             'subject' => '[Ticket #{{ticket_id}}] Resolved: {{subject}}',
             'intro'   => 'Your support ticket has been resolved. If you have further questions, you can reopen it by replying.',
@@ -1145,7 +1150,7 @@ function notifyAssignedAgent(PDO $db, int $ticketId, int $agentId): void
     $appUrl    = env('APP_URL', 'http://localhost:8000');
     $ticketUrl = $appUrl . $rolePrefix . '/tickets/' . $ticketId;
 
-    $tpl = getEmailTpl('ticket-assigned-agent', [
+    $tpl = getEmailTpl('ticket_assigned_agent', [
         'ticket_id'   => $ticketId,
         'subject'     => $ticket['subject'],
         'type'        => $typeName,
@@ -1242,7 +1247,7 @@ function notifyAssignedGroup(PDO $db, int $ticketId, int $groupId): void
         };
         $ticketUrl = $appUrl . $rolePrefix . '/tickets/' . $ticketId;
 
-        $tpl = getEmailTpl('ticket-assigned-group', [
+        $tpl = getEmailTpl('ticket_assigned_group', [
             'ticket_id'   => $ticketId,
             'subject'     => $ticket['subject'],
             'group'       => $groupName,
@@ -1803,20 +1808,30 @@ function runEscalationRule(\PDO $db, array $rule, array $ticket): void
                 };
                 $ticketUrl = $appUrl . $rolePrefix . '/tickets/' . $ticketId;
 
-                $emailHtml = renderEmail('escalation', [
-                    'ticketId'   => $ticketId,
+                $escTpl = getEmailTpl('escalation_alert', [
+                    'ticket_id'  => $ticketId,
                     'subject'    => $subject,
-                    'ruleName'   => $ruleName,
-                    'firstName'  => $targetUser['first_name'],
-                    'ticketUrl'  => $ticketUrl,
-                    'brandColor' => $brandColor,
-                    'appName'    => $appName,
-                    'footerText' => 'This is an automated escalation alert from ' . $appName . '.',
+                    'rule_name'  => $ruleName,
+                    'first_name' => $targetUser['first_name'],
+                    'last_name'  => $targetUser['last_name'],
+                    'user_name'  => $targetUser['first_name'] . ' ' . $targetUser['last_name'],
+                ]);
+                $emailHtml = renderEmail('escalation', [
+                    'ticketId'    => $ticketId,
+                    'subject'     => $subject,
+                    'ruleName'    => $ruleName,
+                    'firstName'   => $targetUser['first_name'],
+                    'ticketUrl'   => $ticketUrl,
+                    'brandColor'  => $brandColor,
+                    'appName'     => $appName,
+                    'introText'   => $escTpl['intro'],
+                    'buttonLabel' => $escTpl['button'],
+                    'footerText'  => $escTpl['footer'],
                 ]);
                 sendMail(
                     $targetUser['email'],
                     $targetUser['first_name'] . ' ' . $targetUser['last_name'],
-                    "Escalation Alert: [Ticket #{$ticketId}] {$subject}",
+                    $escTpl['subject'],
                     $emailHtml,
                     '',
                     $ticketId

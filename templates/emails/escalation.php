@@ -29,7 +29,7 @@
                 Hi <?= htmlspecialchars($firstName, ENT_QUOTES, 'UTF-8') ?>,
             </h2>
             <p style="margin:0 0 20px; font-size:14px; color:#64748b;">
-                An escalation rule has been triggered for a ticket that requires your attention.
+                <?= $introText ?? 'An escalation rule has been triggered for a ticket that requires your attention.' ?>
             </p>
 
             <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden;">
@@ -59,7 +59,7 @@
                     <td style="border-radius:6px; background:<?= htmlspecialchars($brandColor, ENT_QUOTES, 'UTF-8') ?>;">
                         <a href="<?= htmlspecialchars($ticketUrl, ENT_QUOTES, 'UTF-8') ?>"
                            style="display:inline-block; padding:10px 24px; color:#ffffff; text-decoration:none; font-size:14px; font-weight:600;">
-                            View Ticket
+                            <?= $buttonLabel ?? 'View Ticket' ?>
                         </a>
                     </td>
                 </tr>

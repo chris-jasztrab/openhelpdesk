@@ -3992,7 +3992,10 @@ $router->get('/admin/settings/email-templates', function () {
         'email_subject_ticket_merged',    'email_intro_ticket_merged',    'email_button_ticket_merged',
         'email_subject_csat_survey',      'email_intro_csat_survey',
         'email_subject_ticket_reminder',  'email_intro_ticket_reminder',  'email_button_ticket_reminder',
-        'email_subject_group_alerts',     'email_intro_group_alerts',     'email_button_group_alerts',
+        'email_subject_group_alerts',          'email_intro_group_alerts',          'email_button_group_alerts',
+        'email_subject_ticket_assigned_agent', 'email_intro_ticket_assigned_agent', 'email_button_ticket_assigned_agent',
+        'email_subject_ticket_assigned_group', 'email_intro_ticket_assigned_group', 'email_button_ticket_assigned_group',
+        'email_subject_escalation_alert',      'email_intro_escalation_alert',      'email_button_escalation_alert',
         'email_footer_text',
     ];
     $tplValues = [];
@@ -4022,7 +4025,7 @@ $router->post('/admin/settings/email-templates', function () {
     $tab = $_POST['tab'] ?? 'ticket_created';
 
     // Reset buttons clear settings back to default (empty = use hardcoded default)
-    if (isset($_POST['reset_template']) && in_array($_POST['reset_template'], ['ticket_created', 'ticket_updated', 'ticket_merged', 'csat_survey', 'ticket_reminder', 'group_alerts'], true)) {
+    if (isset($_POST['reset_template']) && in_array($_POST['reset_template'], ['ticket_created', 'ticket_updated', 'ticket_merged', 'csat_survey', 'ticket_reminder', 'group_alerts', 'ticket_assigned_agent', 'ticket_assigned_group', 'escalation_alert'], true)) {
         $tpl = $_POST['reset_template'];
         setSetting("email_subject_{$tpl}", '');
         setSetting("email_intro_{$tpl}", '');
@@ -4047,6 +4050,11 @@ $router->post('/admin/settings/email-templates', function () {
         setSetting('email_intro_group_alerts',   trim($_POST['email_intro_group_alerts']   ?? ''));
         setSetting('email_button_group_alerts',  trim($_POST['email_button_group_alerts']  ?? ''));
         flash('success', 'Group alerts settings saved.');
+    } elseif (in_array($tab, ['ticket_assigned_agent', 'ticket_assigned_group', 'escalation_alert'], true)) {
+        setSetting("email_subject_{$tab}", trim($_POST["email_subject_{$tab}"] ?? ''));
+        setSetting("email_intro_{$tab}",   trim($_POST["email_intro_{$tab}"]   ?? ''));
+        setSetting("email_button_{$tab}",  trim($_POST["email_button_{$tab}"]  ?? ''));
+        flash('success', 'Email template saved.');
     } elseif (in_array($tab, ['ticket_created', 'ticket_updated', 'ticket_merged', 'csat_survey', 'ticket_reminder'], true)) {
         setSetting("email_subject_{$tab}", trim($_POST["email_subject_{$tab}"] ?? ''));
         setSetting("email_intro_{$tab}",   trim($_POST["email_intro_{$tab}"]   ?? ''));
