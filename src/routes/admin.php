@@ -4234,6 +4234,56 @@ $router->post('/admin/settings/holidays/toggle', function () {
     redirect('/admin/settings/holidays');
 });
 
+$router->post('/admin/settings/holidays/auto-populate', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/holidays');
+    }
+
+    $country = strtoupper(trim($_POST['country'] ?? ''));
+    $year    = (int) ($_POST['year'] ?? date('Y'));
+
+    if (!array_key_exists($country, Holidays::supportedCountries())) {
+        flash('error', 'Please select a valid country.');
+        redirect('/admin/settings/holidays');
+    }
+    if ($year < 1990 || $year > 2100) {
+        flash('error', 'Please enter a year between 1990 and 2100.');
+        redirect('/admin/settings/holidays');
+    }
+
+    $holidays = Holidays::getForYear($country, $year);
+    if (empty($holidays)) {
+        flash('error', 'No holidays found for the selected country and year.');
+        redirect('/admin/settings/holidays');
+    }
+
+    $db      = Database::connect();
+    $stmt    = $db->prepare('INSERT IGNORE INTO holidays (holiday_date, name, exclude_from_sla) VALUES (?, ?, 1)');
+    $added   = 0;
+    $skipped = 0;
+
+    foreach ($holidays as $h) {
+        $stmt->execute([$h['date'], $h['name']]);
+        if ($stmt->rowCount() > 0) {
+            $added++;
+        } else {
+            $skipped++;
+        }
+    }
+
+    Sla::recalculateAll($db);
+
+    $countryName = Holidays::supportedCountries()[$country];
+    $msg = "Added {$added} " . ($added === 1 ? 'holiday' : 'holidays') . " for {$countryName} ({$year}).";
+    if ($skipped > 0) {
+        $msg .= " {$skipped} " . ($skipped === 1 ? 'was' : 'were') . " already present and skipped.";
+    }
+    flash('success', $msg);
+    redirect('/admin/settings/holidays');
+});
+
 /* ==================================================================
  * ADMIN – SLA Policy Settings
  * ================================================================== */

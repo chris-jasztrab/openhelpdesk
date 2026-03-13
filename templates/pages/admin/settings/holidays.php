@@ -16,6 +16,59 @@ $breadcrumbs  = [
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h5 class="fw-bold mb-0"><i class="bi bi-calendar-x me-2"></i>Holidays &amp; Closed Days</h5>
+    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#autoPopulateModal">
+        <i class="bi bi-magic me-1"></i>Auto-Populate Year
+    </button>
+</div>
+
+<!-- Auto-Populate Modal -->
+<div class="modal fade" id="autoPopulateModal" tabindex="-1" aria-labelledby="autoPopulateModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="autoPopulateModalLabel">
+                    <i class="bi bi-magic me-2"></i>Auto-Populate Holidays
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="/admin/settings/holidays/auto-populate">
+                <?= csrfField() ?>
+                <div class="modal-body">
+                    <p class="text-muted small mb-4">
+                        The system will add all federal and provincial/state public holidays for the
+                        selected country and year. Variable-date holidays like Easter are calculated
+                        for the exact year. Any dates already in your list will be skipped.
+                    </p>
+
+                    <div class="mb-3">
+                        <label for="auto_country" class="form-label fw-semibold">Country</label>
+                        <select class="form-select" id="auto_country" name="country" required>
+                            <option value="" disabled selected>Select a country…</option>
+                            <option value="CA">Canada</option>
+                            <option value="US">United States</option>
+                            <option value="GB">United Kingdom</option>
+                            <option value="AU">Australia</option>
+                            <option value="NZ">New Zealand</option>
+                            <option value="IE">Ireland</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-1">
+                        <label for="auto_year" class="form-label fw-semibold">Year</label>
+                        <input type="number" class="form-control" id="auto_year" name="year"
+                               value="<?= date('Y') ?>" min="1990" max="2100" required>
+                    </div>
+                    <div class="form-text mb-2">All added holidays will be set to exclude from SLA by default.</div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn text-white px-4" style="background:var(--ld-primary);">
+                        <i class="bi bi-calendar-plus me-1"></i>Populate Holidays
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 
 <div class="row g-4">
