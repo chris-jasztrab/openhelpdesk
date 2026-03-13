@@ -169,14 +169,12 @@ $breadcrumbs  = [
                     </form>
                 </td>
                 <td class="text-end">
-                    <form method="POST" action="/admin/settings/holidays/delete"
-                          onsubmit="return confirm('Remove <?= e(addslashes($h['name'])) ?> from holidays?');">
-                        <?= csrfField() ?>
-                        <input type="hidden" name="id" value="<?= (int) $h['id'] ?>">
-                        <button type="submit" class="btn btn-sm btn-outline-danger">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    </form>
+                    <button type="button" class="btn btn-sm btn-outline-danger"
+                            data-bs-toggle="modal" data-bs-target="#deleteHolidayModal"
+                            data-id="<?= (int) $h['id'] ?>"
+                            data-name="<?= e($h['name']) ?>">
+                        <i class="bi bi-trash"></i>
+                    </button>
                 </td>
             </tr>
             <?php endforeach; ?>
@@ -188,5 +186,40 @@ $breadcrumbs  = [
 
 </div><!-- /col -->
 </div><!-- /row -->
+
+<!-- Delete Holiday Modal -->
+<div class="modal fade" id="deleteHolidayModal" tabindex="-1" aria-labelledby="deleteHolidayModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="deleteHolidayModalLabel">
+                    <i class="bi bi-trash me-2 text-danger"></i>Remove Holiday
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0">Are you sure you want to remove <strong id="deleteHolidayName"></strong> from the holidays list?</p>
+            </div>
+            <div class="modal-footer">
+                <form method="POST" action="/admin/settings/holidays/delete" id="deleteHolidayForm">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="id" id="deleteHolidayId">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger px-4">
+                        <i class="bi bi-trash me-1"></i>Remove
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('deleteHolidayModal').addEventListener('show.bs.modal', function (e) {
+    var btn = e.relatedTarget;
+    document.getElementById('deleteHolidayName').textContent = btn.dataset.name;
+    document.getElementById('deleteHolidayId').value = btn.dataset.id;
+});
+</script>
 
 <?php require ROOT_DIR . '/templates/partials/settings-nav-end.php'; ?>
