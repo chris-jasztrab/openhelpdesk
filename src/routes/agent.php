@@ -736,6 +736,9 @@ $router->get('/agent/tickets/{id}', function (array $p) {
     // Priorities for update dropdown
     $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
 
+    // Ticket types for update dropdown
+    $ticketTypes = $db->query('SELECT id, name FROM ticket_types ORDER BY sort_order, name')->fetchAll();
+
     // Attachments (agents see all including internal)
     $attStmt = $db->prepare(
         'SELECT ta.*, tl.is_internal FROM ticket_attachments ta
@@ -786,7 +789,7 @@ $router->get('/agent/tickets/{id}', function (array $p) {
     $watchStmt->execute([$ticket['id'], Auth::id()]);
     $isWatching = (bool) $watchStmt->fetchColumn();
 
-    render('agent/tickets/view', ['ticket' => $ticket, 'timeline' => $timeline, 'agents' => $agents, 'priorities' => $priorities, 'attachments' => $attachments, 'ccUsers' => $ccUsers, 'groups' => $groups, 'customFields' => $customFields, 'fieldValues' => $fieldValues, 'fieldOptions' => $fieldOptions, 'isWatching' => $isWatching]);
+    render('agent/tickets/view', ['ticket' => $ticket, 'timeline' => $timeline, 'agents' => $agents, 'priorities' => $priorities, 'ticketTypes' => $ticketTypes, 'attachments' => $attachments, 'ccUsers' => $ccUsers, 'groups' => $groups, 'customFields' => $customFields, 'fieldValues' => $fieldValues, 'fieldOptions' => $fieldOptions, 'isWatching' => $isWatching]);
 });
 
 /* ==================================================================
@@ -1344,6 +1347,32 @@ $router->post('/agent/tickets/{id}/update', function (array $p) {
         )->execute([$id, Auth::id(), 'group_changed', "Group changed from {$oldGroupName} to {$newGroupName}"]);
         $changes[] = 'group';
         if ($newGroup) { notifyAssignedGroup($db, $id, $newGroup); }
+    }
+
+    // Type change
+    $newTypeRaw = $_POST['type_id'] ?? '';
+    $newType = $newTypeRaw === '' ? null : (int) $newTypeRaw;
+    $oldType = $ticket['type_id'] ? (int) $ticket['type_id'] : null;
+    if ($newType !== $oldType) {
+        $db->prepare('UPDATE tickets SET type_id = ? WHERE id = ?')->execute([$newType, $id]);
+
+        $oldTypeName = 'None';
+        $newTypeName = 'None';
+        if ($oldType) {
+            $s = $db->prepare('SELECT name FROM ticket_types WHERE id = ?');
+            $s->execute([$oldType]);
+            $oldTypeName = $s->fetchColumn() ?: 'None';
+        }
+        if ($newType) {
+            $s = $db->prepare('SELECT name FROM ticket_types WHERE id = ?');
+            $s->execute([$newType]);
+            $newTypeName = $s->fetchColumn() ?: 'None';
+        }
+
+        $db->prepare(
+            'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
+        )->execute([$id, Auth::id(), 'type_changed', "Type changed from {$oldTypeName} to {$newTypeName}"]);
+        $changes[] = 'type';
     }
 
     // Run automations on ticket update

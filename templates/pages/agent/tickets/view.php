@@ -555,6 +555,18 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
                         </select>
                     </div>
 
+                    <div class="mb-3">
+                        <label for="type_id" class="form-label fw-semibold small">Type</label>
+                        <select class="form-select form-select-sm" name="type_id" id="type_id">
+                            <option value="">None</option>
+                            <?php foreach ($ticketTypes as $tt): ?>
+                            <option value="<?= $tt['id'] ?>" <?= (int) ($ticket['type_id'] ?? 0) === (int) $tt['id'] ? 'selected' : '' ?>>
+                                <?= e($tt['name']) ?>
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
                     <button type="submit" id="updateTicketBtn" class="btn btn-sm text-white w-100" style="background:var(--ld-primary);" disabled>
                         <i class="bi bi-check-lg me-1"></i>Update
                     </button>
