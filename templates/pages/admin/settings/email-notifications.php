@@ -26,6 +26,9 @@ $on = function (string $key) use ($settings): string {
         <div class="card-header bg-white py-3">
             <h5 class="mb-0 fw-semibold"><i class="bi bi-person-badge me-2"></i>Agent Notifications</h5>
         </div>
+        <div class="px-4 pt-3 pb-1">
+            <p class="text-muted mb-0" style="font-size:.875rem;"><i class="bi bi-info-circle me-1"></i>These are the default notification settings for all agents. Individual agents can override these preferences in their profile.</p>
+        </div>
         <div class="card-body p-0">
             <ul class="list-group list-group-flush">
 
