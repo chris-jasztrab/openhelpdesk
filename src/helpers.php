@@ -685,6 +685,7 @@ function getEmailTpl(string $name, array $rawTokens): array
         'csat_survey' => [
             'subject' => 'How did we do? — [Ticket #{{ticket_id}}] {{subject}}',
             'intro'   => 'Your ticket has been resolved. We\'d love to hear how we did — it only takes one click!',
+            'button'  => '',
         ],
         'ticket_reminder' => [
             'subject' => 'Following up on your ticket [#{{ticket_id}}] {{subject}}',
