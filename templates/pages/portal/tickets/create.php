@@ -70,7 +70,7 @@ endif; ?>
             <?= csrfField() ?>
 
             <div class="mb-3" id="tour-portal-subject">
-                <label for="subject" class="form-label fw-semibold">Subject <span class="text-danger">*</span></label>
+                <label for="subject" class="form-label fw-semibold"><?= e(getSetting('sys_field_label_subject', 'Subject')) ?> <span class="text-danger">*</span></label>
                 <input type="text" class="form-control" id="subject" name="subject"
                        value="<?= e(old('subject')) ?>" required
                        placeholder="Brief summary of your issue" autocomplete="off">
@@ -89,7 +89,7 @@ endif; ?>
             </div>
 
             <div class="mb-3" id="tour-portal-description">
-                <label class="form-label fw-semibold">Description <span class="text-danger">*</span></label>
+                <label class="form-label fw-semibold"><?= e(getSetting('sys_field_label_description', 'Description')) ?> <span class="text-danger">*</span></label>
                 <div id="portal-ticket-editor"></div>
                 <input type="hidden" id="description" name="description" value="<?= e(old('description')) ?>">
                 <div id="portal-ticket-editor-error" class="text-danger small mt-1" style="display:none;">Description is required.</div>
@@ -97,7 +97,7 @@ endif; ?>
 
             <div class="row g-3 mb-3" id="tour-portal-type">
                 <div class="col-md-6">
-                    <label for="type_id" class="form-label fw-semibold">Ticket Type <span class="text-danger">*</span></label>
+                    <label for="type_id" class="form-label fw-semibold"><?= e(getSetting('sys_field_label_ticket_type', 'Ticket Type')) ?> <span class="text-danger">*</span></label>
                     <select class="form-select" id="type_id" name="type_id" required>
                         <option value="">— Select type —</option>
                         <?php foreach ($types as $t): ?>
@@ -129,9 +129,14 @@ endif; ?>
             </div>
 
             <div class="row g-3 mb-3">
+                <?php $priorityRequired = getSetting('sys_field_required_priority', '0') === '1'; ?>
                 <div class="col-md-6">
-                    <label for="priority_id" class="form-label fw-semibold">Priority</label>
-                    <select class="form-select" id="priority_id" name="priority_id">
+                    <label for="priority_id" class="form-label fw-semibold">
+                        <?= e(getSetting('sys_field_label_priority', 'Priority')) ?>
+                        <?php if ($priorityRequired): ?><span class="text-danger">*</span><?php endif; ?>
+                    </label>
+                    <select class="form-select" id="priority_id" name="priority_id"
+                            <?= $priorityRequired ? 'required' : '' ?>>
                         <option value="">— Select priority —</option>
                         <?php foreach ($priorities as $p): ?>
                         <option value="<?= $p['id'] ?>" <?= old('priority_id') == $p['id'] ? 'selected' : '' ?>>
@@ -142,9 +147,15 @@ endif; ?>
                 </div>
             </div>
 
+            <?php
+            $tagsRequired = getSetting('sys_field_required_tags', '0') === '1';
+            ?>
             <?php if (getSetting('tags_enabled', '1') === '1'): ?>
             <div class="mb-3">
-                <label class="form-label fw-semibold">Tags</label>
+                <label class="form-label fw-semibold">
+                    <?= e(getSetting('sys_field_label_tags', 'Tags')) ?>
+                    <?php if ($tagsRequired): ?><span class="text-danger">*</span><?php endif; ?>
+                </label>
                 <div id="tagContainer" class="d-flex flex-wrap gap-1 align-items-center form-control" style="min-height:38px;cursor:text;" onclick="document.getElementById('tagInput').focus();">
                     <input type="text" id="tagInput" class="border-0 flex-grow-1" style="outline:none;min-width:120px;background:transparent;"
                            placeholder="Type #tag and press Enter">

@@ -16,17 +16,17 @@ $fieldTypeMeta = [
     'cc'         => ['label' => 'CC',              'icon' => 'bi-people'],
 ];
 
-// Built-in (system) fields shown at top and bottom — not editable
+// Built-in (system) fields — label and (for priority/tags) required are configurable
 $systemFieldsTop = [
-    ['label' => 'Subject',      'icon' => 'bi-input-cursor-text', 'badge' => 'Required'],
-    ['label' => 'Description',  'icon' => 'bi-textarea-t',        'badge' => 'Required'],
-    ['label' => 'Ticket Type',  'icon' => 'bi-tag',               'badge' => 'Required'],
-    ['label' => label('location.singular'), 'icon' => 'bi-geo-alt',           'badge' => 'Auto'],
-    ['label' => 'Priority',     'icon' => 'bi-flag',              'badge' => 'Optional'],
-    ['label' => 'Tags',         'icon' => 'bi-hash',              'badge' => 'Optional'],
+    ['key' => 'subject',     'label' => $sysFs['label_subject'],     'icon' => 'bi-input-cursor-text', 'badge' => 'Required', 'editable' => true,  'has_required' => false],
+    ['key' => 'description', 'label' => $sysFs['label_description'], 'icon' => 'bi-textarea-t',        'badge' => 'Required', 'editable' => true,  'has_required' => false],
+    ['key' => 'ticket_type', 'label' => $sysFs['label_ticket_type'], 'icon' => 'bi-tag',               'badge' => 'Required', 'editable' => true,  'has_required' => false],
+    ['key' => 'location',    'label' => label('location.singular'),  'icon' => 'bi-geo-alt',            'badge' => 'Auto',     'editable' => false, 'has_required' => false],
+    ['key' => 'priority',    'label' => $sysFs['label_priority'],    'icon' => 'bi-flag',               'badge' => $sysFs['required_priority'] === '1' ? 'Required' : 'Optional', 'editable' => true, 'has_required' => true],
+    ['key' => 'tags',        'label' => $sysFs['label_tags'],        'icon' => 'bi-hash',               'badge' => $sysFs['required_tags'] === '1' ? 'Required' : 'Optional',     'editable' => true, 'has_required' => true],
 ];
 $systemFieldsBottom = [
-    ['label' => 'Attachments',  'icon' => 'bi-paperclip',         'badge' => 'Optional'],
+    ['key' => 'attachments', 'label' => $sysFs['label_attachments'], 'icon' => 'bi-paperclip', 'badge' => 'Optional', 'editable' => true, 'has_required' => false],
 ];
 ?>
 <style>
@@ -138,12 +138,13 @@ $systemFieldsBottom = [
         <!-- Built-in fields (top) -->
         <div class="custom-section-label">
             <i class="bi bi-lock me-1"></i>System Fields
+            <span class="text-muted fw-normal">&nbsp;— click <i class="bi bi-pencil"></i> to rename</span>
         </div>
         <?php foreach ($systemFieldsTop as $sf): ?>
         <div class="field-row system-row">
             <i class="bi bi-grip-vertical drag-handle"></i>
             <i class="bi <?= e($sf['icon']) ?> text-muted" style="font-size:1rem;flex-shrink:0;"></i>
-            <span class="field-row-label"><?= e($sf['label']) ?></span>
+            <span class="field-row-label sys-field-label-text" data-key="<?= e($sf['key']) ?>"><?= e($sf['label']) ?></span>
             <span class="badge bg-secondary" style="font-size:.65rem;">System</span>
             <?php
                 $badgeClass = match($sf['badge']) {
@@ -152,7 +153,16 @@ $systemFieldsBottom = [
                     default    => 'bg-light text-secondary border'
                 };
             ?>
-            <span class="badge <?= $badgeClass ?>" style="font-size:.65rem;"><?= e($sf['badge']) ?></span>
+            <span class="badge <?= $badgeClass ?> sys-field-badge" style="font-size:.65rem;" data-key="<?= e($sf['key']) ?>"><?= e($sf['badge']) ?></span>
+            <?php if ($sf['editable']): ?>
+            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 edit-sys-field-btn"
+                    data-key="<?= e($sf['key']) ?>"
+                    data-label="<?= e($sf['label']) ?>"
+                    data-has-required="<?= $sf['has_required'] ? '1' : '0' ?>"
+                    data-required="<?= isset($sysFs['required_' . $sf['key']]) ? $sysFs['required_' . $sf['key']] : '0' ?>">
+                <i class="bi bi-pencil"></i>
+            </button>
+            <?php endif; ?>
         </div>
         <?php endforeach; ?>
 
@@ -200,9 +210,18 @@ $systemFieldsBottom = [
         <div class="field-row system-row">
             <i class="bi bi-grip-vertical drag-handle"></i>
             <i class="bi <?= e($sf['icon']) ?> text-muted" style="font-size:1rem;flex-shrink:0;"></i>
-            <span class="field-row-label"><?= e($sf['label']) ?></span>
+            <span class="field-row-label sys-field-label-text" data-key="<?= e($sf['key']) ?>"><?= e($sf['label']) ?></span>
             <span class="badge bg-secondary" style="font-size:.65rem;">System</span>
-            <span class="badge bg-light text-secondary border" style="font-size:.65rem;"><?= e($sf['badge']) ?></span>
+            <span class="badge bg-light text-secondary border sys-field-badge" style="font-size:.65rem;" data-key="<?= e($sf['key']) ?>"><?= e($sf['badge']) ?></span>
+            <?php if ($sf['editable']): ?>
+            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 edit-sys-field-btn"
+                    data-key="<?= e($sf['key']) ?>"
+                    data-label="<?= e($sf['label']) ?>"
+                    data-has-required="<?= $sf['has_required'] ? '1' : '0' ?>"
+                    data-required="0">
+                <i class="bi bi-pencil"></i>
+            </button>
+            <?php endif; ?>
         </div>
         <?php endforeach; ?>
 
@@ -326,6 +345,40 @@ $systemFieldsBottom = [
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-primary" id="saveFieldBtn">Save Field</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- System Field Edit Modal -->
+<div class="modal fade" id="sysFieldModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-semibold"><i class="bi bi-pencil me-2"></i>Edit System Field</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="sysFieldKey">
+                <div class="mb-3">
+                    <label class="form-label fw-medium">Label <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="sysFieldLabel" maxlength="80"
+                           placeholder="Label shown to users">
+                    <div class="form-text">This is the wording shown on the ticket form.</div>
+                </div>
+                <div id="sysFieldRequiredWrap" style="display:none;">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="sysFieldRequired">
+                        <label class="form-check-label" for="sysFieldRequired">Required field</label>
+                    </div>
+                    <div class="form-text">When enabled, users must fill this in before submitting.</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveSysFieldBtn">
+                    <i class="bi bi-check-lg me-1"></i>Save
+                </button>
             </div>
         </div>
     </div>
@@ -773,5 +826,69 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     updateCount();
+
+    /* ─── System field edit ─── */
+    var sysModal       = new bootstrap.Modal(document.getElementById('sysFieldModal'));
+    var sysFieldKey    = document.getElementById('sysFieldKey');
+    var sysFieldLabel  = document.getElementById('sysFieldLabel');
+    var sysFieldReqWrap = document.getElementById('sysFieldRequiredWrap');
+    var sysFieldReq    = document.getElementById('sysFieldRequired');
+
+    document.querySelectorAll('.edit-sys-field-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            sysFieldKey.value       = btn.dataset.key;
+            sysFieldLabel.value     = btn.dataset.label;
+            sysFieldReq.checked     = btn.dataset.required === '1';
+            sysFieldReqWrap.style.display = btn.dataset.hasRequired === '1' ? '' : 'none';
+            sysModal.show();
+        });
+    });
+
+    document.getElementById('saveSysFieldBtn').addEventListener('click', function () {
+        var key   = sysFieldKey.value;
+        var label = sysFieldLabel.value.trim();
+        if (!label) { sysFieldLabel.focus(); return; }
+
+        var payload = { field: key, label: label, required: sysFieldReq.checked };
+
+        fetch('/admin/workflows/ticket-fields/system', {
+            method:      'POST',
+            credentials: 'same-origin',
+            headers:     { 'Content-Type': 'application/json' },
+            body:        JSON.stringify(payload)
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (!data.success) { alert(data.error || 'Error saving.'); return; }
+
+            // Update label text in the row
+            document.querySelectorAll('.sys-field-label-text[data-key="' + key + '"]').forEach(function (el) {
+                el.textContent = label;
+            });
+
+            // Update the button's stored label
+            document.querySelectorAll('.edit-sys-field-btn[data-key="' + key + '"]').forEach(function (btn) {
+                btn.dataset.label    = label;
+                btn.dataset.required = sysFieldReq.checked ? '1' : '0';
+            });
+
+            // Update required badge for priority / tags
+            if (payload.required !== undefined) {
+                document.querySelectorAll('.sys-field-badge[data-key="' + key + '"]').forEach(function (badge) {
+                    badge.textContent = sysFieldReq.checked ? 'Required' : 'Optional';
+                    badge.className = badge.className
+                        .replace(/\bbg-danger\b|\bbg-light\b|\btext-secondary\b|\bborder\b/g, '')
+                        .trim();
+                    if (sysFieldReq.checked) {
+                        badge.classList.add('bg-danger');
+                    } else {
+                        badge.classList.add('bg-light', 'text-secondary', 'border');
+                    }
+                });
+            }
+
+            sysModal.hide();
+        });
+    });
 });
 </script>

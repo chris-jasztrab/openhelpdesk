@@ -7564,12 +7564,63 @@ $router->get('/admin/workflows/ticket-fields', function () {
         }
     }
 
+    $sysFs = [
+        'label_subject'     => getSetting('sys_field_label_subject',     'Subject'),
+        'label_description' => getSetting('sys_field_label_description', 'Description'),
+        'label_ticket_type' => getSetting('sys_field_label_ticket_type', 'Ticket Type'),
+        'label_priority'    => getSetting('sys_field_label_priority',    'Priority'),
+        'label_tags'        => getSetting('sys_field_label_tags',        'Tags'),
+        'label_attachments' => getSetting('sys_field_label_attachments', 'Attachments'),
+        'required_priority' => getSetting('sys_field_required_priority', '0'),
+        'required_tags'     => getSetting('sys_field_required_tags',     '0'),
+    ];
+
     render('admin/workflows/ticket-fields', [
         'layout'       => 'app',
         'pageTitle'    => 'Ticket Fields',
         'fields'       => $fields,
         'fieldOptions' => $fieldOptions,
+        'sysFs'        => $sysFs,
     ]);
+});
+
+// Save system field label / required settings (AJAX)
+$router->post('/admin/workflows/ticket-fields/system', function () {
+    Auth::requireRole('admin');
+    header('Content-Type: application/json');
+
+    $raw     = file_get_contents('php://input');
+    $payload = json_decode($raw, true);
+    if (!is_array($payload)) {
+        echo json_encode(['success' => false, 'error' => 'Bad request.']);
+        exit;
+    }
+
+    $allowedKeys = ['subject', 'description', 'ticket_type', 'priority', 'tags', 'attachments'];
+    $fieldKey    = $payload['field'] ?? '';
+    if (!in_array($fieldKey, $allowedKeys, true)) {
+        echo json_encode(['success' => false, 'error' => 'Invalid field.']);
+        exit;
+    }
+
+    $label = trim($payload['label'] ?? '');
+    if ($label === '') {
+        echo json_encode(['success' => false, 'error' => 'Label cannot be empty.']);
+        exit;
+    }
+    if (mb_strlen($label) > 80) {
+        echo json_encode(['success' => false, 'error' => 'Label too long (max 80 characters).']);
+        exit;
+    }
+
+    setSetting("sys_field_label_{$fieldKey}", $label);
+
+    if (in_array($fieldKey, ['priority', 'tags'], true)) {
+        setSetting("sys_field_required_{$fieldKey}", !empty($payload['required']) ? '1' : '0');
+    }
+
+    echo json_encode(['success' => true]);
+    exit;
 });
 
 // Add a new field (AJAX)

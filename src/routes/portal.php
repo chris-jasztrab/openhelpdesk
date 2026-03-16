@@ -236,6 +236,20 @@ $router->post('/portal/tickets/create', function () {
         redirect('/portal/tickets/create');
     }
 
+    if (getSetting('sys_field_required_priority', '0') === '1' && $priorityId === null) {
+        flashInput($_POST);
+        flash('error', getSetting('sys_field_label_priority', 'Priority') . ' is required.');
+        redirect('/portal/tickets/create');
+    }
+
+    if (getSetting('sys_field_required_tags', '0') === '1' && getSetting('tags_enabled', '1') === '1') {
+        if (empty($tagNames)) {
+            flashInput($_POST);
+            flash('error', getSetting('sys_field_label_tags', 'Tags') . ' is required.');
+            redirect('/portal/tickets/create');
+        }
+    }
+
     // Validate required custom fields
     $visibleCustomFields = $db->query(
         'SELECT * FROM ticket_form_fields WHERE is_visible = 1 AND deleted_at IS NULL ORDER BY sort_order'
