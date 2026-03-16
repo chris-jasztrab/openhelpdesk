@@ -1411,6 +1411,57 @@ $router->get('/survey/{token}/thanks', function (array $p) {
     ]);
 });
 
+$router->get('/survey/{token}/reopen', function (array $p) {
+    $token = preg_replace('/[^a-f0-9]/', '', $p['token'] ?? '');
+    if (strlen($token) !== 64) {
+        http_response_code(404);
+        render('errors/404');
+        return;
+    }
+
+    $db   = Database::connect();
+    $stmt = $db->prepare(
+        'SELECT cs.*, t.subject, t.id AS ticket_id, t.status AS ticket_status
+         FROM csat_surveys cs
+         JOIN tickets t ON cs.ticket_id = t.id
+         WHERE cs.token = ?'
+    );
+    $stmt->execute([$token]);
+    $survey = $stmt->fetch();
+
+    if (!$survey) {
+        http_response_code(404);
+        render('errors/404');
+        return;
+    }
+
+    // If already reopened or already rated, just show the page without re-doing it
+    if ($survey['reopened_at'] === null && $survey['responded_at'] === null) {
+        // Reopen the ticket
+        $db->prepare('UPDATE tickets SET status = ?, updated_at = NOW() WHERE id = ?')
+           ->execute(['open', $survey['ticket_id']]);
+
+        // Record the reopen in the survey
+        $db->prepare('UPDATE csat_surveys SET reopened_at = NOW() WHERE token = ?')
+           ->execute([$token]);
+
+        // Add a timeline entry
+        $db->prepare(
+            'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal)
+             VALUES (?, NULL, ?, ?, 1)'
+        )->execute([
+            $survey['ticket_id'],
+            'status_changed',
+            'Customer reported issue not resolved via CSAT survey — ticket reopened to open',
+        ]);
+    }
+
+    render('survey/reopened', [
+        'ticketId' => (int) $survey['ticket_id'],
+        'appName'  => getSetting('app_name', 'LocalDesk'),
+    ]);
+});
+
 /* ------------------------------------------------------------------
  * Portal (all authenticated users)
  * ------------------------------------------------------------------ */

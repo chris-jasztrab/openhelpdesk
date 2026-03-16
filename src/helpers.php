@@ -1932,6 +1932,7 @@ function sendCsatSurvey(\PDO $db, int $ticketId): void
 
     $appUrl     = env('APP_URL', 'http://localhost:8000');
     $surveyUrl  = $appUrl . '/survey/' . $token;
+    $reopenUrl  = $appUrl . '/survey/' . $token . '/reopen';
     $brandColor = getSetting('branding_primary_color', '#4f46e5');
     $appName    = getSetting('app_name', 'LocalDesk');
 
@@ -1948,6 +1949,7 @@ function sendCsatSurvey(\PDO $db, int $ticketId): void
         'subject'    => $row['subject'],
         'firstName'  => $row['first_name'],
         'surveyUrl'  => $surveyUrl,
+        'reopenUrl'  => $reopenUrl,
         'brandColor' => $brandColor,
         'appName'    => $appName,
         'introText'  => $tpl['intro'],
