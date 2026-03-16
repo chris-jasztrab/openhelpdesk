@@ -65,4 +65,28 @@ $breadcrumbs  = [
     </div>
 </div>
 
+<div class="card border-0 shadow-sm mt-4">
+    <div class="card-header bg-white py-3">
+        <h5 class="mb-0 fw-semibold"><i class="bi bi-send me-2"></i>Send a Test Survey</h5>
+    </div>
+    <div class="card-body p-4">
+        <p class="text-muted mb-4" style="font-size:.9rem;">
+            Send a sample CSAT survey email to any address so you can preview the design and test the full rating flow.
+        </p>
+        <form method="POST" action="/admin/settings/csat/test" class="row g-3 align-items-end">
+            <?= csrfField() ?>
+            <div class="col-sm-6">
+                <label for="test_email" class="form-label fw-semibold">Send to</label>
+                <input type="email" class="form-control" id="test_email" name="test_email"
+                       placeholder="you@example.com" required>
+            </div>
+            <div class="col-sm-auto">
+                <button type="submit" class="btn btn-outline-primary">
+                    <i class="bi bi-envelope me-1"></i>Send Test Survey
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <?php require ROOT_DIR . '/templates/partials/settings-nav-end.php'; ?>

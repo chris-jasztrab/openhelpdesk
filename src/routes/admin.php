@@ -7027,6 +7027,95 @@ $router->post('/admin/settings/csat', function () {
     redirect('/admin/settings/csat');
 });
 
+$router->post('/admin/settings/csat/test', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/csat');
+        return;
+    }
+
+    $email = trim($_POST['test_email'] ?? '');
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        flash('error', 'Please enter a valid email address.');
+        redirect('/admin/settings/csat');
+        return;
+    }
+
+    $db = Database::connect();
+
+    // Find a ticket that does not already have a csat_survey so we can create
+    // a fully functional test. Fall back to any ticket if all have surveys.
+    $stmt = $db->query(
+        'SELECT t.id, t.subject
+         FROM tickets t
+         LEFT JOIN csat_surveys cs ON cs.ticket_id = t.id
+         WHERE cs.id IS NULL
+         ORDER BY t.id DESC
+         LIMIT 1'
+    );
+    $ticket = $stmt->fetch();
+
+    if (!$ticket) {
+        // All tickets have surveys — just pick any ticket for a preview
+        $ticket = $db->query('SELECT id, subject FROM tickets ORDER BY id DESC LIMIT 1')->fetch();
+    }
+
+    if (!$ticket) {
+        flash('error', 'No tickets exist yet. Create at least one ticket before sending a test survey.');
+        redirect('/admin/settings/csat');
+        return;
+    }
+
+    // Create (or reuse) a test survey record
+    $existingStmt = $db->prepare('SELECT token FROM csat_surveys WHERE ticket_id = ?');
+    $existingStmt->execute([$ticket['id']]);
+    $existingToken = $existingStmt->fetchColumn();
+
+    if ($existingToken) {
+        $token = $existingToken;
+    } else {
+        $token = bin2hex(random_bytes(32));
+        $db->prepare('INSERT INTO csat_surveys (ticket_id, user_id, token) VALUES (?, ?, ?)')
+           ->execute([$ticket['id'], Auth::id(), $token]);
+    }
+
+    $appUrl     = env('APP_URL', 'http://localhost:8000');
+    $surveyUrl  = $appUrl . '/survey/' . $token;
+    $reopenUrl  = $appUrl . '/survey/' . $token . '/reopen';
+    $brandColor = getSetting('branding_primary_color', '#4f46e5');
+    $appName    = getSetting('app_name', 'LocalDesk');
+
+    $tpl = getEmailTpl('csat_survey', [
+        'ticket_id'  => $ticket['id'],
+        'subject'    => $ticket['subject'],
+        'first_name' => 'Admin',
+        'last_name'  => '',
+        'user_name'  => 'Admin',
+    ]);
+
+    $emailHtml = renderEmail('csat-survey', [
+        'ticketId'   => $ticket['id'],
+        'subject'    => $ticket['subject'],
+        'firstName'  => 'Admin',
+        'surveyUrl'  => $surveyUrl,
+        'reopenUrl'  => $reopenUrl,
+        'brandColor' => $brandColor,
+        'appName'    => $appName,
+        'introText'  => $tpl['intro'],
+        'footerText' => $tpl['footer'],
+    ]);
+
+    $sent = sendMail($email, 'Admin', '[TEST] ' . $tpl['subject'], $emailHtml);
+
+    if ($sent) {
+        flash('success', "Test survey sent to {$email}. Check your inbox!");
+    } else {
+        flash('error', 'Failed to send the test email. Check your mail settings.');
+    }
+    redirect('/admin/settings/csat');
+});
+
 /* ==================================================================
  * ADMIN – Report: Agent Workload Heatmap
  * ================================================================== */
