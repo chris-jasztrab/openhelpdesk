@@ -267,8 +267,9 @@ $statusOptions = [
 
             <?php if (!empty($customFields)): ?>
             <!-- Custom Fields -->
+            <div style="max-height:0; overflow:hidden; transition:max-height 0.4s ease;" id="customFieldsCardWrap">
             <div class="card shadow-sm mb-4" id="customFieldsCard"
-                 style="display:none; border:none; border-left:3px solid var(--ld-primary, #0d6efd);">
+                 style="border:none; border-left:3px solid var(--ld-primary, #0d6efd);">
                 <div class="card-header bg-transparent fw-semibold">
                     <i class="bi bi-sliders me-1"></i>Additional Information
                 </div>
@@ -405,6 +406,7 @@ $statusOptions = [
                     <?php endforeach; ?>
                 </div>
             </div>
+            </div><!-- /customFieldsCardWrap -->
             <?php endif; ?>
 
             <div class="d-flex gap-2">
@@ -422,11 +424,9 @@ $statusOptions = [
 // ── Custom field type filtering ────────────────────────────────
 <?php if (!empty($customFields)): ?>
 (function() {
-    var fieldTypeMap    = <?= json_encode($fieldTypeMap ?: new stdClass()) ?>;
-    var typeSelect      = document.getElementById('type_id');
-    var customFieldCard = document.getElementById('customFieldsCard');
-
-    var wasVisible = false;
+    var fieldTypeMap        = <?= json_encode($fieldTypeMap ?: new stdClass()) ?>;
+    var typeSelect          = document.getElementById('type_id');
+    var customFieldCardWrap = document.getElementById('customFieldsCardWrap');
 
     function filterFieldsByType() {
         var selectedType = parseInt(typeSelect.value) || 0;
@@ -438,18 +438,13 @@ $statusOptions = [
             wrap.style.display = show ? '' : 'none';
             if (show) anyVisible = true;
         });
-        if (customFieldCard) {
-            customFieldCard.style.display = anyVisible ? '' : 'none';
-            // Brief highlight when the card first appears
-            if (anyVisible && !wasVisible) {
-                customFieldCard.style.transition = 'box-shadow 0.6s ease';
-                customFieldCard.style.boxShadow  = '0 0 0 3px rgba(13,110,253,0.25)';
-                setTimeout(function() {
-                    customFieldCard.style.boxShadow = '';
-                }, 1000);
+        if (customFieldCardWrap) {
+            if (anyVisible) {
+                customFieldCardWrap.style.maxHeight = customFieldCardWrap.scrollHeight + 'px';
+            } else {
+                customFieldCardWrap.style.maxHeight = '0';
             }
         }
-        wasVisible = anyVisible;
     }
 
     typeSelect.addEventListener('change', filterFieldsByType);

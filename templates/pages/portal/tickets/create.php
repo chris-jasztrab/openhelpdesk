@@ -165,7 +165,8 @@ endif; ?>
             <?php endif; ?>
 
             <?php if (!empty($customFields)): ?>
-            <div class="custom-fields-hr my-4" style="display:none;">
+            <div id="customFieldsWrap" style="max-height:0; overflow:hidden; transition:max-height 0.4s ease;">
+            <div class="custom-fields-hr my-4">
                 <div class="d-flex align-items-center gap-2 mb-3">
                     <hr class="flex-grow-1 m-0" style="border-top:2px solid var(--ld-primary, #0d6efd); opacity:.35;">
                     <span class="text-muted small fw-semibold text-uppercase text-nowrap" style="letter-spacing:.05em;">
@@ -329,6 +330,7 @@ endif; ?>
             </div>
             <?php endif; ?>
             <?php endforeach; ?>
+            </div><!-- /customFieldsWrap -->
             <?php endif; ?>
 
             <div class="mb-3">
@@ -358,11 +360,9 @@ endif; ?>
 <script>
 // ── Custom field type filtering ────────────────────────────────
 (function() {
-    var fieldTypeMap = <?= json_encode($fieldTypeMap ?: new stdClass()) ?>;
-    var typeSelect   = document.getElementById('type_id');
-    var hrLine       = document.querySelector('.custom-fields-hr');
-
-    var wasVisible = false;
+    var fieldTypeMap      = <?= json_encode($fieldTypeMap ?: new stdClass()) ?>;
+    var typeSelect        = document.getElementById('type_id');
+    var customFieldsWrap  = document.getElementById('customFieldsWrap');
 
     function filterFieldsByType() {
         var selectedType = parseInt(typeSelect.value) || 0;
@@ -380,27 +380,13 @@ endif; ?>
                 else if (inp.dataset.wasRequired) { inp.setAttribute('required', ''); }
             });
         });
-        if (hrLine) hrLine.style.display = anyVisible ? '' : 'none';
-
-        // Brief highlight when custom fields first appear
-        if (anyVisible && !wasVisible && hrLine) {
-            document.querySelectorAll('.custom-field-wrap').forEach(function(wrap) {
-                if (wrap.style.display !== 'none') {
-                    wrap.style.transition = 'background-color 0.6s ease';
-                    wrap.style.backgroundColor = 'rgba(13,110,253,0.06)';
-                    wrap.style.borderRadius = '6px';
-                    wrap.style.padding = '0.5rem';
-                    setTimeout(function() {
-                        wrap.style.backgroundColor = 'transparent';
-                    }, 800);
-                    setTimeout(function() {
-                        wrap.style.padding = '';
-                        wrap.style.borderRadius = '';
-                    }, 1400);
-                }
-            });
+        if (customFieldsWrap) {
+            if (anyVisible) {
+                customFieldsWrap.style.maxHeight = customFieldsWrap.scrollHeight + 'px';
+            } else {
+                customFieldsWrap.style.maxHeight = '0';
+            }
         }
-        wasVisible = anyVisible;
     }
 
     typeSelect.addEventListener('change', filterFieldsByType);
