@@ -267,7 +267,8 @@ $statusOptions = [
 
             <?php if (!empty($customFields)): ?>
             <!-- Custom Fields -->
-            <div class="card border-0 shadow-sm mb-4" id="customFieldsCard" style="display:none;">
+            <div class="card shadow-sm mb-4" id="customFieldsCard"
+                 style="display:none; border:none; border-left:3px solid var(--ld-primary, #0d6efd);">
                 <div class="card-header bg-transparent fw-semibold">
                     <i class="bi bi-sliders me-1"></i>Additional Information
                 </div>
@@ -425,6 +426,8 @@ $statusOptions = [
     var typeSelect      = document.getElementById('type_id');
     var customFieldCard = document.getElementById('customFieldsCard');
 
+    var wasVisible = false;
+
     function filterFieldsByType() {
         var selectedType = parseInt(typeSelect.value) || 0;
         var anyVisible   = false;
@@ -435,7 +438,18 @@ $statusOptions = [
             wrap.style.display = show ? '' : 'none';
             if (show) anyVisible = true;
         });
-        if (customFieldCard) customFieldCard.style.display = anyVisible ? '' : 'none';
+        if (customFieldCard) {
+            customFieldCard.style.display = anyVisible ? '' : 'none';
+            // Brief highlight when the card first appears
+            if (anyVisible && !wasVisible) {
+                customFieldCard.style.transition = 'box-shadow 0.6s ease';
+                customFieldCard.style.boxShadow  = '0 0 0 3px rgba(13,110,253,0.25)';
+                setTimeout(function() {
+                    customFieldCard.style.boxShadow = '';
+                }, 1000);
+            }
+        }
+        wasVisible = anyVisible;
     }
 
     typeSelect.addEventListener('change', filterFieldsByType);

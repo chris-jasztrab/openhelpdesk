@@ -165,7 +165,15 @@ endif; ?>
             <?php endif; ?>
 
             <?php if (!empty($customFields)): ?>
-            <hr class="my-3 custom-fields-hr">
+            <div class="custom-fields-hr my-4" style="display:none;">
+                <div class="d-flex align-items-center gap-2 mb-3">
+                    <hr class="flex-grow-1 m-0" style="border-top:2px solid var(--ld-primary, #0d6efd); opacity:.35;">
+                    <span class="text-muted small fw-semibold text-uppercase text-nowrap" style="letter-spacing:.05em;">
+                        <i class="bi bi-sliders me-1"></i>Additional Information
+                    </span>
+                    <hr class="flex-grow-1 m-0" style="border-top:2px solid var(--ld-primary, #0d6efd); opacity:.35;">
+                </div>
+            </div>
             <?php foreach ($customFields as $cf):
                 $cfKey = 'field_' . $cf['id'];
                 $cfOpts = $fieldOptions[$cf['id']] ?? [];
@@ -354,6 +362,8 @@ endif; ?>
     var typeSelect   = document.getElementById('type_id');
     var hrLine       = document.querySelector('.custom-fields-hr');
 
+    var wasVisible = false;
+
     function filterFieldsByType() {
         var selectedType = parseInt(typeSelect.value) || 0;
         var anyVisible   = false;
@@ -371,6 +381,26 @@ endif; ?>
             });
         });
         if (hrLine) hrLine.style.display = anyVisible ? '' : 'none';
+
+        // Brief highlight when custom fields first appear
+        if (anyVisible && !wasVisible && hrLine) {
+            document.querySelectorAll('.custom-field-wrap').forEach(function(wrap) {
+                if (wrap.style.display !== 'none') {
+                    wrap.style.transition = 'background-color 0.6s ease';
+                    wrap.style.backgroundColor = 'rgba(13,110,253,0.06)';
+                    wrap.style.borderRadius = '6px';
+                    wrap.style.padding = '0.5rem';
+                    setTimeout(function() {
+                        wrap.style.backgroundColor = 'transparent';
+                    }, 800);
+                    setTimeout(function() {
+                        wrap.style.padding = '';
+                        wrap.style.borderRadius = '';
+                    }, 1400);
+                }
+            });
+        }
+        wasVisible = anyVisible;
     }
 
     typeSelect.addEventListener('change', filterFieldsByType);
