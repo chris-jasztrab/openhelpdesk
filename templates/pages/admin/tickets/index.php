@@ -468,8 +468,8 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                             $qaAgents  = $qaGroupId ? ($groupAgents[$qaGroupId] ?? []) : $allAgentsForAssign;
                             $qaTip     = $qaGroupId ? 'Assign (type group: ' . e($t['type_name'] ?? '') . ')' : 'Assign (all agents)';
                         ?>
-                        <td style="white-space:nowrap;text-align:right;">
-                            <span class="d-inline-flex align-items-center gap-1 quick-assign-wrap" data-ticket-id="<?= (int)$t['id'] ?>">
+                        <td style="white-space:nowrap;text-align:right;cursor:default;" onclick="event.stopPropagation()">
+                            <span class="d-inline-flex align-items-center gap-1 quick-assign-wrap" data-ticket-id="<?= (int)$t['id'] ?>" style="cursor:pointer;">
                                 <span class="quick-assign-name"><?= e($t['agent_name'] ?: 'Unassigned') ?></span>
                                 <button class="btn btn-link btn-sm p-0 border-0 text-muted quick-assign-btn"
                                         type="button"
@@ -482,8 +482,8 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                         </td>
                         <?php endif; ?>
                         <?php if (in_array('group', $visibleColumns)): ?>
-                        <td style="white-space:nowrap;overflow:visible;">
-                            <span class="d-inline-flex align-items-center gap-1 quick-group-wrap" data-ticket-id="<?= (int)$t['id'] ?>">
+                        <td style="white-space:nowrap;overflow:visible;cursor:default;" onclick="event.stopPropagation()">
+                            <span class="d-inline-flex align-items-center gap-1 quick-group-wrap" data-ticket-id="<?= (int)$t['id'] ?>" style="cursor:pointer;">
                                 <span class="quick-group-name<?= $t['group_name'] ? '' : ' text-muted' ?>"><?= e($t['group_name'] ?: '—') ?></span>
                                 <button class="btn btn-link btn-sm p-0 border-0 text-muted quick-group-btn" type="button" title="Change group" style="line-height:1;"><i class="bi bi-chevron-down" style="font-size:0.65rem;"></i></button>
                             </span>
@@ -851,6 +851,21 @@ document.getElementById('deleteFilterModal').addEventListener('show.bs.modal', f
         document.querySelectorAll('.quick-type-btn').forEach(function (b) { bindBtn(b, 'type'); });
         document.querySelectorAll('.quick-group-btn').forEach(function (b) { bindBtn(b, 'group'); });
 
+        document.querySelectorAll('.quick-assign-wrap').forEach(function (wrap) {
+            wrap.addEventListener('click', function (e) {
+                if (e.target.closest('.quick-assign-btn')) return;
+                var btn = wrap.querySelector('.quick-assign-btn');
+                if (btn) { e.stopPropagation(); if (activeBtn === btn) { closeMenu(); } else { openMenu(btn, 'agent'); } }
+            });
+        });
+        document.querySelectorAll('.quick-group-wrap').forEach(function (wrap) {
+            wrap.addEventListener('click', function (e) {
+                if (e.target.closest('.quick-group-btn')) return;
+                var btn = wrap.querySelector('.quick-group-btn');
+                if (btn) { e.stopPropagation(); if (activeBtn === btn) { closeMenu(); } else { openMenu(btn, 'group'); } }
+            });
+        });
+
         document.addEventListener('click', function (e) {
             var item = e.target.closest('.quick-menu-item');
             if (item) {
@@ -913,7 +928,7 @@ document.getElementById('deleteFilterModal').addEventListener('show.bs.modal', f
                 }
                 return;
             }
-            if (!e.target.closest('.quick-assign-btn') && !e.target.closest('.quick-type-btn') && !e.target.closest('.quick-group-btn') && !(activeMenu && activeMenu.contains(e.target))) {
+            if (!e.target.closest('.quick-assign-wrap') && !e.target.closest('.quick-type-btn') && !e.target.closest('.quick-group-wrap') && !(activeMenu && activeMenu.contains(e.target))) {
                 closeMenu();
             }
         });
