@@ -44,6 +44,9 @@ $breadcrumbs  = [
                         </td>
                         <td class="fw-semibold">
                             <span class="badge" style="background:<?= e($t['color'] ?: '#6c757d') ?>;"><?= e($t['name']) ?></span>
+                            <?php if (!empty($t['is_confidential'])): ?>
+                            <i class="bi bi-shield-lock text-warning ms-1" title="Confidential"></i>
+                            <?php endif; ?>
                         </td>
                         <td class="text-muted"><?= (int) $t['sort_order'] ?></td>
                         <td class="text-muted small"><?= date('M j, Y', strtotime($t['created_at'])) ?></td>

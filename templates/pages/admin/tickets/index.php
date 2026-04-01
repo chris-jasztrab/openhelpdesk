@@ -421,15 +421,24 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                 <tr><td colspan="<?= $colCount ?>" class="text-center py-4 text-muted">No tickets found.</td></tr>
                 <?php else: ?>
                     <?php foreach ($tickets as $t): ?>
-                    <tr style="cursor:pointer;" onclick="window.location='/admin/tickets/<?= $t['id'] ?>'">
+                    <?php $isRedacted = isTicketRedactedForUser($t, $confidentialTypeIds ?? [], $adminGroupIds ?? []); ?>
+                    <tr style="cursor:pointer;<?= $isRedacted ? 'opacity:0.75;' : '' ?>" onclick="window.location='/admin/tickets/<?= $t['id'] ?>'">
                         <td onclick="event.stopPropagation()">
-                            <input type="checkbox" class="ticket-cb form-check-input" value="<?= $t['id'] ?>" data-subject="<?= e($t['subject']) ?>">
+                            <input type="checkbox" class="ticket-cb form-check-input" value="<?= $t['id'] ?>"
+                                   data-subject="<?= $isRedacted ? 'Confidential' : e($t['subject']) ?>"
+                                   <?= $isRedacted ? 'data-confidential="1"' : '' ?>>
                         </td>
                         <td class="text-muted fw-bold" style="white-space:nowrap;"><?= $t['id'] ?></td>
                         <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                            <?php if ($isRedacted): ?>
+                            <span class="text-muted fst-italic">
+                                <i class="bi bi-shield-lock me-1"></i>[Confidential]
+                            </span>
+                            <?php else: ?>
                             <a href="/admin/tickets/<?= $t['id'] ?>" class="text-decoration-none fw-semibold text-dark">
                                 <?= e($t['subject']) ?>
                             </a>
+                            <?php endif; ?>
                         </td>
                         <?php if (in_array('status', $visibleColumns)): ?>
                         <td style="white-space:nowrap;">
@@ -490,7 +499,7 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                         </td>
                         <?php endif; ?>
                         <?php if (in_array('creator', $visibleColumns)): ?>
-                        <td class="text-muted" style="white-space:nowrap;"><?= e($t['creator_name'] ?? '—') ?></td>
+                        <td class="text-muted" style="white-space:nowrap;"><?= $isRedacted ? '—' : e($t['creator_name'] ?? '—') ?></td>
                         <?php endif; ?>
                         <?php if (in_array('location', $visibleColumns)): ?>
                         <td class="text-muted" style="white-space:nowrap;"><?= e($t['location_name'] ?? '—') ?></td>

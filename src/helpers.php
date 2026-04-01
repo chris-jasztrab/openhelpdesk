@@ -722,6 +722,11 @@ function getEmailTpl(string $name, array $rawTokens): array
             'intro'   => 'Your support ticket has been closed. Thank you for contacting us.',
             'button'  => 'View Ticket',
         ],
+        'confidential_ticket_accessed' => [
+            'subject' => '[Security Notice] Confidential Ticket #{{ticket_id}} accessed by {{admin_name}}',
+            'intro'   => '{{admin_name}} ({{admin_email}}) has accessed confidential ticket #{{ticket_id}} "{{subject}}" at {{timestamp}} from IP {{ip_address}}. This access has been recorded in the audit log.',
+            'button'  => 'View Ticket',
+        ],
     ];
 
     $d = $defaults[$key] ?? ['subject' => '', 'intro' => '', 'button' => 'View Ticket'];
@@ -2091,6 +2096,138 @@ function logAudit(string $action, ?int $targetId = null, ?string $targetType = n
         ]);
     } catch (\Throwable $e) {
         // Never let audit logging break the application
+    }
+}
+
+/* ── Confidential ticket helpers ─────────────────────────────── */
+
+/**
+ * Determine if the current user needs re-authentication to view a confidential ticket.
+ * Returns true if the ticket's type is confidential AND the current admin is NOT
+ * a member of the type's group.
+ */
+function requiresConfidentialReAuth(PDO $db, array $ticket): bool
+{
+    if (Auth::role() !== 'admin') {
+        return false;
+    }
+    if (empty($ticket['type_id'])) {
+        return false;
+    }
+
+    $stmt = $db->prepare('SELECT is_confidential, group_id FROM ticket_types WHERE id = ?');
+    $stmt->execute([$ticket['type_id']]);
+    $type = $stmt->fetch();
+
+    if (!$type || !$type['is_confidential'] || !$type['group_id']) {
+        return false;
+    }
+
+    $gs = $db->prepare('SELECT 1 FROM group_user_map WHERE group_id = ? AND user_id = ? LIMIT 1');
+    $gs->execute([$type['group_id'], Auth::id()]);
+    return !$gs->fetchColumn();
+}
+
+/**
+ * Check if a ticket should appear redacted in listings for the current user.
+ * Designed to be called in a loop without extra queries — pass preloaded data.
+ *
+ * @param array $ticket            A ticket row (must include type_id and type_group_id)
+ * @param array $confidentialTypeIds  Array of int type IDs that are confidential
+ * @param array $userGroupIds         Array of int group IDs the current user belongs to
+ */
+function isTicketRedactedForUser(array $ticket, array $confidentialTypeIds, array $userGroupIds): bool
+{
+    if (Auth::role() !== 'admin') {
+        return false;
+    }
+    if (empty($ticket['type_id']) || !in_array((int) $ticket['type_id'], $confidentialTypeIds, true)) {
+        return false;
+    }
+    $typeGroupId = (int) ($ticket['type_group_id'] ?? 0);
+    return $typeGroupId > 0 && !in_array($typeGroupId, $userGroupIds, true);
+}
+
+/**
+ * Notify all members of a confidential ticket's group that an admin has accessed it.
+ */
+function notifyConfidentialAccess(PDO $db, int $ticketId): void
+{
+    $tStmt = $db->prepare('SELECT t.subject, t.type_id FROM tickets t WHERE t.id = ?');
+    $tStmt->execute([$ticketId]);
+    $ticket = $tStmt->fetch();
+    if (!$ticket || !$ticket['type_id']) {
+        return;
+    }
+
+    $ttStmt = $db->prepare('SELECT group_id, name FROM ticket_types WHERE id = ? AND is_confidential = 1');
+    $ttStmt->execute([$ticket['type_id']]);
+    $type = $ttStmt->fetch();
+    if (!$type || !$type['group_id']) {
+        return;
+    }
+
+    $mStmt = $db->prepare(
+        'SELECT u.id, u.first_name, u.last_name, u.email, u.role
+         FROM group_user_map gum
+         JOIN users u ON u.id = gum.user_id
+         WHERE gum.group_id = ?'
+    );
+    $mStmt->execute([$type['group_id']]);
+    $members = $mStmt->fetchAll();
+    if (empty($members)) {
+        return;
+    }
+
+    $adminName  = Auth::fullName();
+    $adminEmail = Auth::user()['email'] ?? '';
+    $ip         = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    $timestamp  = date('Y-m-d H:i:s');
+    $appUrl     = env('APP_URL', 'http://localhost:8000');
+
+    foreach ($members as $user) {
+        $rolePrefix = match ($user['role']) {
+            'admin'      => '/admin',
+            'power_user' => '/agent',
+            'agent'      => '/agent',
+            default      => '/portal',
+        };
+        $ticketUrl = $appUrl . $rolePrefix . '/tickets/' . $ticketId;
+
+        $tpl = getEmailTpl('confidential-ticket-accessed', [
+            'ticket_id'   => $ticketId,
+            'subject'     => $ticket['subject'],
+            'admin_name'  => $adminName,
+            'admin_email' => $adminEmail,
+            'ip_address'  => $ip,
+            'timestamp'   => $timestamp,
+            'user_name'   => $user['first_name'] . ' ' . $user['last_name'],
+            'first_name'  => $user['first_name'],
+            'last_name'   => $user['last_name'],
+        ]);
+
+        $emailHtml = renderEmail('confidential-access-alert', [
+            'ticketId'    => $ticketId,
+            'subject'     => $ticket['subject'],
+            'typeName'    => $type['name'],
+            'adminName'   => $adminName,
+            'adminEmail'  => $adminEmail,
+            'ipAddress'   => $ip,
+            'timestamp'   => $timestamp,
+            'ticketUrl'   => $ticketUrl,
+            'introText'   => $tpl['intro'],
+            'buttonLabel' => $tpl['button'],
+            'footerText'  => $tpl['footer'],
+        ]);
+
+        sendMail(
+            $user['email'],
+            $user['first_name'] . ' ' . $user['last_name'],
+            $tpl['subject'],
+            $emailHtml,
+            '',
+            $ticketId
+        );
     }
 }
 

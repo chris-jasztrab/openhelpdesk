@@ -1059,14 +1059,15 @@ $router->post('/admin/types/create', function () {
     $name    = trim($_POST['name'] ?? '');
     $color   = preg_match('/^#[0-9a-fA-F]{6}$/', $_POST['color'] ?? '') ? $_POST['color'] : '#6c757d';
     $order   = (int) ($_POST['sort_order'] ?? 0);
-    $groupId = !empty($_POST['group_id']) ? (int) $_POST['group_id'] : null;
+    $groupId        = !empty($_POST['group_id']) ? (int) $_POST['group_id'] : null;
+    $isConfidential = !empty($_POST['is_confidential']) && $groupId ? 1 : 0;
     if ($name === '') {
         flashInput($_POST);
         flash('error', 'Type name is required.');
         redirect('/admin/types/create');
     }
-    Database::connect()->prepare('INSERT INTO ticket_types (name, color, group_id, sort_order) VALUES (?, ?, ?, ?)')
-        ->execute([$name, $color, $groupId, $order]);
+    Database::connect()->prepare('INSERT INTO ticket_types (name, color, group_id, is_confidential, sort_order) VALUES (?, ?, ?, ?, ?)')
+        ->execute([$name, $color, $groupId, $isConfidential, $order]);
     flash('success', 'Ticket type created.');
     redirect('/admin/types');
 });
@@ -1095,14 +1096,15 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
     $name    = trim($_POST['name'] ?? '');
     $color   = preg_match('/^#[0-9a-fA-F]{6}$/', $_POST['color'] ?? '') ? $_POST['color'] : '#6c757d';
     $order   = (int) ($_POST['sort_order'] ?? 0);
-    $groupId = !empty($_POST['group_id']) ? (int) $_POST['group_id'] : null;
+    $groupId        = !empty($_POST['group_id']) ? (int) $_POST['group_id'] : null;
+    $isConfidential = !empty($_POST['is_confidential']) && $groupId ? 1 : 0;
     if ($name === '') {
         flashInput($_POST);
         flash('error', 'Type name is required.');
         redirect("/admin/types/{$id}/edit");
     }
-    Database::connect()->prepare('UPDATE ticket_types SET name=?, color=?, group_id=?, sort_order=? WHERE id=?')
-        ->execute([$name, $color, $groupId, $order, $id]);
+    Database::connect()->prepare('UPDATE ticket_types SET name=?, color=?, group_id=?, is_confidential=?, sort_order=? WHERE id=?')
+        ->execute([$name, $color, $groupId, $isConfidential, $order, $id]);
     flash('success', 'Ticket type updated.');
     redirect('/admin/types');
 });
@@ -1671,26 +1673,41 @@ $router->get('/admin/tickets', function () {
     $sfStmt->execute([Auth::id(), Auth::id()]);
     $savedFilters = $sfStmt->fetchAll();
 
+    // Preload confidential ticket type info for redaction in the template
+    $confidentialTypeIds = [];
+    $adminGroupIds       = [];
+    $confStmt = $db->query('SELECT id, group_id FROM ticket_types WHERE is_confidential = 1 AND group_id IS NOT NULL');
+    foreach ($confStmt->fetchAll() as $ct) {
+        $confidentialTypeIds[] = (int) $ct['id'];
+    }
+    if (!empty($confidentialTypeIds)) {
+        $gs = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
+        $gs->execute([Auth::id()]);
+        $adminGroupIds = array_map('intval', $gs->fetchAll(PDO::FETCH_COLUMN));
+    }
+
     render('admin/tickets/index', [
-        'tickets'            => $tickets,
-        'priorities'         => $priorities,
-        'types'              => $types,
-        'locations'          => $locations,
-        'agents'             => $agents,
-        'groups'             => $groups,
-        'groupAgents'        => $groupAgents,
-        'allAgentsForAssign' => $allAgentsForAssign,
-        'filters'            => $filters,
-        'savedFilters'       => $savedFilters,
-        'page'               => $page,
-        'perPage'            => $perPage,
-        'totalPages'         => $totalPages,
-        'totalTickets'       => $totalTickets,
-        'allTickets'         => $allTickets,
-        'sort'               => $sort,
-        'dir'                => strtolower($dir),
-        'visibleColumns'     => getUserColumns(Auth::id()),
-        'defaultFilterUrl'   => $defaultFilterUrl,
+        'tickets'              => $tickets,
+        'priorities'           => $priorities,
+        'types'                => $types,
+        'locations'            => $locations,
+        'agents'               => $agents,
+        'groups'               => $groups,
+        'groupAgents'          => $groupAgents,
+        'allAgentsForAssign'   => $allAgentsForAssign,
+        'filters'              => $filters,
+        'savedFilters'         => $savedFilters,
+        'page'                 => $page,
+        'perPage'              => $perPage,
+        'totalPages'           => $totalPages,
+        'totalTickets'         => $totalTickets,
+        'allTickets'           => $allTickets,
+        'sort'                 => $sort,
+        'dir'                  => strtolower($dir),
+        'visibleColumns'       => getUserColumns(Auth::id()),
+        'defaultFilterUrl'     => $defaultFilterUrl,
+        'confidentialTypeIds'  => $confidentialTypeIds,
+        'adminGroupIds'        => $adminGroupIds,
     ]);
 });
 
@@ -1741,6 +1758,7 @@ $router->get('/admin/tickets/export', function () {
                 tp.name AS priority_name,
                 l.name  AS location_name,
                 tt.name AS type_name, tt.color AS type_color,
+                tt.is_confidential AS type_confidential, tt.group_id AS type_group_id,
                 g.name  AS group_name,
                 CONCAT(c.first_name, ' ', c.last_name) AS creator_name,
                 CONCAT(a.first_name, ' ', a.last_name) AS agent_name,
@@ -1790,18 +1808,30 @@ $router->get('/admin/tickets/export', function () {
         'Created', 'Due Date', 'SLA State',
     ]);
 
+    // Preload admin's group memberships for confidential redaction
+    $gs = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
+    $gs->execute([Auth::id()]);
+    $exportAdminGroups = array_map('intval', $gs->fetchAll(PDO::FETCH_COLUMN));
+
     while ($row = $stmt->fetch()) {
+        // Redact confidential tickets the admin is not in the group for
+        $redact = false;
+        if (!empty($row['type_confidential']) && !empty($row['type_group_id'])
+            && !in_array((int) $row['type_group_id'], $exportAdminGroups, true)) {
+            $redact = true;
+        }
+
         fputcsv($out, [
             $row['id'],
-            $row['subject'],
+            $redact ? '[Confidential]' : $row['subject'],
             $statusLabels[$row['status']] ?? $row['status'],
             $row['priority_name'] ?? '',
             $row['type_name'] ?? '',
             $row['location_name'] ?? '',
             $row['group_name'] ?? '',
-            $row['agent_name'] ?? 'Unassigned',
-            $row['creator_name'] ?? '',
-            $row['tag_list'] ?? '',
+            $redact ? '—' : ($row['agent_name'] ?? 'Unassigned'),
+            $redact ? '—' : ($row['creator_name'] ?? ''),
+            $redact ? '' : ($row['tag_list'] ?? ''),
             $row['created_at'] ? date('Y-m-d H:i', strtotime($row['created_at'])) : '',
             $row['due_date'] ? date('Y-m-d H:i', strtotime($row['due_date'])) : '',
             $row['sla_state'] ?? '',
@@ -1983,9 +2013,37 @@ $router->get('/admin/tickets/search', function () {
          LIMIT 10"
     );
     $stmt->execute($params);
+    $results = $stmt->fetchAll();
+
+    // Redact confidential ticket subjects for admins not in the type's group
+    $confStmt = $db->query('SELECT id, group_id FROM ticket_types WHERE is_confidential = 1 AND group_id IS NOT NULL');
+    $confTypes = [];
+    foreach ($confStmt->fetchAll() as $ct) {
+        $confTypes[(int) $ct['id']] = (int) $ct['group_id'];
+    }
+    if (!empty($confTypes)) {
+        $gs = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
+        $gs->execute([Auth::id()]);
+        $myGroups = array_map('intval', $gs->fetchAll(PDO::FETCH_COLUMN));
+
+        foreach ($results as &$r) {
+            $tTypeId = null;
+            if (!empty($r['id'])) {
+                $ts = $db->prepare('SELECT type_id FROM tickets WHERE id = ?');
+                $ts->execute([$r['id']]);
+                $tTypeId = $ts->fetchColumn();
+            }
+            if ($tTypeId && isset($confTypes[(int) $tTypeId])
+                && !in_array($confTypes[(int) $tTypeId], $myGroups, true)) {
+                $r['subject'] = '[Confidential]';
+                $r['creator_name'] = '—';
+            }
+        }
+        unset($r);
+    }
 
     header('Content-Type: application/json');
-    echo json_encode($stmt->fetchAll());
+    echo json_encode($results);
     exit;
 });
 
@@ -2116,6 +2174,34 @@ $router->post('/admin/tickets/bulk', function () {
     }
 
     $db          = Database::connect();
+
+    // Filter out confidential tickets the user cannot access
+    if (Auth::role() === 'admin') {
+        $gs = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
+        $gs->execute([Auth::id()]);
+        $myGroups = array_map('intval', $gs->fetchAll(PDO::FETCH_COLUMN));
+
+        $allowed = [];
+        foreach ($ticketIds as $tid) {
+            $ts = $db->prepare(
+                'SELECT t.type_id, tt.is_confidential, tt.group_id AS type_group_id
+                 FROM tickets t LEFT JOIN ticket_types tt ON t.type_id = tt.id WHERE t.id = ?'
+            );
+            $ts->execute([$tid]);
+            $tRow = $ts->fetch();
+            if ($tRow && $tRow['is_confidential'] && $tRow['type_group_id']
+                && !in_array((int) $tRow['type_group_id'], $myGroups, true)) {
+                continue; // skip confidential tickets the admin cannot access
+            }
+            $allowed[] = $tid;
+        }
+        $ticketIds = $allowed;
+        if (empty($ticketIds)) {
+            flash('error', 'No accessible tickets selected (confidential tickets were excluded).');
+            redirect('/admin/tickets');
+        }
+    }
+
     $placeholders = implode(',', array_fill(0, count($ticketIds), '?'));
 
     switch ($action) {
@@ -2256,6 +2342,21 @@ $router->get('/admin/tickets/{id}', function (array $p) {
         redirect('/admin/tickets');
     }
 
+    // Confidential ticket re-authentication gate
+    if (requiresConfidentialReAuth($db, $ticket)) {
+        $ticketId   = (int) $ticket['id'];
+        $sessionKey = "confidential_access_{$ticketId}";
+        $granted    = $_SESSION[$sessionKey] ?? 0;
+        $ttl        = 300; // 5-minute window after re-auth
+
+        if (!$granted || (time() - $granted) > $ttl) {
+            render('admin/tickets/confidential-reauth', [
+                'ticketId' => $ticketId,
+            ]);
+            return;
+        }
+    }
+
     // Tags
     $tags = $db->prepare(
         'SELECT tt.name FROM ticket_tags tt
@@ -2351,6 +2452,55 @@ $router->get('/admin/tickets/{id}', function (array $p) {
 });
 
 /* ==================================================================
+ * ADMIN – Confidential Ticket Re-Authentication
+ * ================================================================== */
+
+$router->post('/admin/tickets/{id}/confidential-auth', function (array $p) {
+    Auth::requireRole('admin');
+    $ticketId = (int) $p['id'];
+
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect("/admin/tickets/{$ticketId}");
+    }
+
+    $password = $_POST['password'] ?? '';
+    $db = Database::connect();
+
+    $stmt = $db->prepare('SELECT password FROM users WHERE id = ?');
+    $stmt->execute([Auth::id()]);
+    $user = $stmt->fetch();
+
+    if (!$user || !password_verify($password, $user['password'])) {
+        flash('error', 'Incorrect password. Please try again.');
+        redirect("/admin/tickets/{$ticketId}");
+    }
+
+    $_SESSION["confidential_access_{$ticketId}"] = time();
+
+    logAudit(
+        'confidential_ticket_viewed',
+        $ticketId,
+        'ticket',
+        'Admin ' . Auth::fullName() . ' (ID: ' . Auth::id() . ') accessed confidential ticket #' . $ticketId
+    );
+
+    $db->prepare(
+        'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal)
+         VALUES (?, ?, ?, ?, 1)'
+    )->execute([
+        $ticketId,
+        Auth::id(),
+        'confidential_access',
+        Auth::fullName() . ' viewed this confidential ticket (IP: ' . ($_SERVER['REMOTE_ADDR'] ?? 'unknown') . ')',
+    ]);
+
+    notifyConfidentialAccess($db, $ticketId);
+
+    redirect("/admin/tickets/{$ticketId}");
+});
+
+/* ==================================================================
  * ADMIN – Watch / Unwatch Ticket
  * ================================================================== */
 
@@ -2401,7 +2551,7 @@ $router->post('/admin/tickets/{id}/merge', function (array $p) {
     $db = Database::connect();
 
     // Validate source ticket (must exist and not already merged)
-    $src = $db->prepare('SELECT id, subject, priority_id FROM tickets WHERE id = ? AND merged_into_ticket_id IS NULL');
+    $src = $db->prepare('SELECT id, subject, priority_id, type_id FROM tickets WHERE id = ? AND merged_into_ticket_id IS NULL');
     $src->execute([$sourceId]);
     $sourceTicket = $src->fetch();
     if (!$sourceTicket) {
@@ -2410,11 +2560,17 @@ $router->post('/admin/tickets/{id}/merge', function (array $p) {
     }
 
     // Validate target ticket (must exist and not itself be merged)
-    $tgt = $db->prepare('SELECT id, subject, priority_id FROM tickets WHERE id = ? AND merged_into_ticket_id IS NULL');
+    $tgt = $db->prepare('SELECT id, subject, priority_id, type_id FROM tickets WHERE id = ? AND merged_into_ticket_id IS NULL');
     $tgt->execute([$targetId]);
     $targetTicket = $tgt->fetch();
     if (!$targetTicket) {
         flash('error', 'Target ticket not found or is itself a merged ticket.');
+        redirect("/admin/tickets/{$sourceId}");
+    }
+
+    // Block merging if either ticket is confidential and admin is not in the group
+    if (requiresConfidentialReAuth($db, $sourceTicket) || requiresConfidentialReAuth($db, $targetTicket)) {
+        flash('error', 'Cannot merge confidential tickets without proper access. Please view each ticket first.');
         redirect("/admin/tickets/{$sourceId}");
     }
 
@@ -2566,6 +2722,11 @@ $router->post('/admin/tickets/{id}/split', function (array $p) {
     if (!$sourceTicket) {
         flash('error', 'Source ticket not found or already merged.');
         redirect('/admin/tickets');
+    }
+
+    if (requiresConfidentialReAuth($db, $sourceTicket)) {
+        flash('error', 'Re-authenticate to access this confidential ticket before splitting.');
+        redirect("/admin/tickets/{$sourceId}");
     }
 
     $newId = null;

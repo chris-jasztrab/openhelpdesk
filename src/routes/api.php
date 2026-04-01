@@ -160,8 +160,20 @@ function _apiEnforceTicketAccess(PDO $db, array $user, array $ticket): void
     $gs->execute([$user['id']]);
     $agentGroups = array_map('intval', $gs->fetchAll(PDO::FETCH_COLUMN));
 
-    // Agents not in any group can see all tickets (matches list-endpoint behaviour)
+    // Agents not in any group — block confidential tickets they are not authorised for
     if (empty($agentGroups)) {
+        if (!empty($ticket['type_id'])) {
+            $cStmt = $db->prepare('SELECT is_confidential, group_id FROM ticket_types WHERE id = ?');
+            $cStmt->execute([$ticket['type_id']]);
+            $cType = $cStmt->fetch();
+            if ($cType && $cType['is_confidential'] && $cType['group_id']) {
+                $inGroup = $db->prepare('SELECT 1 FROM group_user_map WHERE group_id = ? AND user_id = ?');
+                $inGroup->execute([$cType['group_id'], $user['id']]);
+                if (!$inGroup->fetchColumn()) {
+                    _apiJson(['error' => 'Forbidden'], 403);
+                }
+            }
+        }
         return;
     }
 
@@ -172,6 +184,28 @@ function _apiEnforceTicketAccess(PDO $db, array $user, array $ticket): void
 
     if (!in_array((int) $ticket['group_id'], $agentGroups, true)) {
         _apiJson(['error' => 'Forbidden'], 403);
+    }
+}
+
+/**
+ * Block API access to confidential tickets for users who are not in the type's group.
+ * Call after _apiEnforceTicketAccess().
+ */
+function _apiEnforceConfidential(PDO $db, array $user, array $ticket): void
+{
+    if (empty($ticket['type_id'])) {
+        return;
+    }
+    $stmt = $db->prepare('SELECT is_confidential, group_id FROM ticket_types WHERE id = ?');
+    $stmt->execute([$ticket['type_id']]);
+    $type = $stmt->fetch();
+    if (!$type || !$type['is_confidential'] || !$type['group_id']) {
+        return;
+    }
+    $gs = $db->prepare('SELECT 1 FROM group_user_map WHERE group_id = ? AND user_id = ? LIMIT 1');
+    $gs->execute([$type['group_id'], $user['id']]);
+    if (!$gs->fetchColumn()) {
+        _apiJson(['error' => 'This ticket is confidential. Access via the web interface is required.'], 403);
     }
 }
 
@@ -447,6 +481,16 @@ $router->get('/api/v1/tickets', function () {
             $where[] = substr($groupRestriction, 5);
             $params  = array_merge($params, $groupParams);
         }
+
+        // Exclude confidential tickets where the user is not in the type's group
+        $where[] = "NOT EXISTS (
+            SELECT 1 FROM ticket_types ct
+            WHERE ct.id = t.type_id
+              AND ct.is_confidential = 1
+              AND ct.group_id IS NOT NULL
+              AND ct.group_id NOT IN (SELECT group_id FROM group_user_map WHERE user_id = ?)
+        )";
+        $params[] = (int) $user['id'];
     }
 
     // Filter: status (comma-separated)
@@ -684,6 +728,7 @@ $router->get('/api/v1/tickets/{id}', function (array $p) {
     }
 
     _apiEnforceTicketAccess($db, $user, $ticket);
+    _apiEnforceConfidential($db, $user, $ticket);
 
     // Tags
     $s = $db->prepare(
@@ -761,6 +806,7 @@ $router->post('/api/v1/tickets/{id}/update', function (array $p) {
     }
 
     _apiEnforceTicketAccess($db, $user, $ticket);
+    _apiEnforceConfidential($db, $user, $ticket);
 
     $input   = _apiInput();
     $changes = [];
@@ -913,6 +959,7 @@ $router->get('/api/v1/tickets/{id}/timeline', function (array $p) {
     }
 
     _apiEnforceTicketAccess($db, $user, $ticket);
+    _apiEnforceConfidential($db, $user, $ticket);
 
     // Users always see public entries; agents/admins may request internal ones
     $internalFilter = '';
@@ -992,6 +1039,7 @@ $router->post('/api/v1/tickets/{id}/replies', function (array $p) {
     }
 
     _apiEnforceTicketAccess($db, $user, $ticket);
+    _apiEnforceConfidential($db, $user, $ticket);
 
     $input   = _apiInput();
     $message = trim($input['message'] ?? '');

@@ -18,7 +18,7 @@ declare(strict_types=1);
 function _agentRequireTicketAccess(PDO $db, array $ticket): void
 {
     if (!in_array(Auth::role(), ['agent', 'power_user'], true)) {
-        return; // admins: unrestricted
+        return; // admins: confidential access handled by re-auth flow in the route
     }
 
     $gs = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
@@ -26,7 +26,21 @@ function _agentRequireTicketAccess(PDO $db, array $ticket): void
     $agentGroups = array_map('intval', $gs->fetchAll(PDO::FETCH_COLUMN));
 
     if (empty($agentGroups)) {
-        return; // agent not in any group: unrestricted
+        // Agent not in any group — block confidential tickets they are not authorised for
+        if (!empty($ticket['type_id'])) {
+            $cStmt = $db->prepare('SELECT is_confidential, group_id FROM ticket_types WHERE id = ?');
+            $cStmt->execute([$ticket['type_id']]);
+            $cType = $cStmt->fetch();
+            if ($cType && $cType['is_confidential'] && $cType['group_id']) {
+                $inGroup = $db->prepare('SELECT 1 FROM group_user_map WHERE group_id = ? AND user_id = ?');
+                $inGroup->execute([$cType['group_id'], Auth::id()]);
+                if (!$inGroup->fetchColumn()) {
+                    flash('error', 'You do not have access to this ticket.');
+                    redirect('/agent/tickets');
+                }
+            }
+        }
+        return;
     }
 
     if ($ticket['group_id'] === null) {
@@ -193,7 +207,7 @@ $router->get('/agent/tickets', function () {
     }
 
     // Group-based visibility: agents who belong to groups can only see those groups' tickets.
-    // Agents in no groups, and all admins, see all tickets.
+    // Agents in no groups, and all admins, see all tickets (except confidential restrictions).
     $agentGroupIds = [];
     if (in_array(Auth::role(), ['agent', 'power_user'], true)) {
         $gStmt = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
@@ -204,6 +218,32 @@ $router->get('/agent/tickets', function () {
             $placeholders = implode(',', array_fill(0, count($agentGroupIds), '?'));
             $where[]      = 't.group_id IN (' . $placeholders . ')';
             $params       = array_merge($params, $agentGroupIds);
+        } else {
+            // Agent has no group restrictions but must still not see confidential tickets
+            // they are not authorised for
+            $where[] = "NOT EXISTS (
+                SELECT 1 FROM ticket_types ct
+                WHERE ct.id = t.type_id
+                  AND ct.is_confidential = 1
+                  AND ct.group_id IS NOT NULL
+                  AND ct.group_id NOT IN (SELECT group_id FROM group_user_map WHERE user_id = ?)
+            )";
+            $params[] = Auth::id();
+        }
+    }
+
+    // Preload confidential ticket type info for admin redaction in the template
+    $confidentialTypeIds = [];
+    $adminGroupIds       = [];
+    if (Auth::role() === 'admin') {
+        $confStmt = $db->query('SELECT id, group_id FROM ticket_types WHERE is_confidential = 1 AND group_id IS NOT NULL');
+        foreach ($confStmt->fetchAll() as $ct) {
+            $confidentialTypeIds[] = (int) $ct['id'];
+        }
+        if (!empty($confidentialTypeIds)) {
+            $gs = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
+            $gs->execute([Auth::id()]);
+            $adminGroupIds = array_map('intval', $gs->fetchAll(PDO::FETCH_COLUMN));
         }
     }
 
@@ -344,8 +384,10 @@ $router->get('/agent/tickets', function () {
         'sort'               => $sort,
         'dir'                => strtolower($dir),
         'visibleColumns'   => getUserColumns(Auth::id()),
-        'groupRestricted'  => !empty($agentGroupIds),
-        'defaultFilterUrl' => $defaultFilterUrl,
+        'groupRestricted'    => !empty($agentGroupIds),
+        'defaultFilterUrl'   => $defaultFilterUrl,
+        'confidentialTypeIds' => $confidentialTypeIds,
+        'adminGroupIds'       => $adminGroupIds,
     ]);
 });
 
@@ -520,9 +562,39 @@ $router->get('/agent/tickets/search', function () {
          LIMIT 10"
     );
     $stmt->execute($params);
+    $results = $stmt->fetchAll();
+
+    // Redact confidential ticket subjects for users not in the type's group
+    if (Auth::role() === 'admin') {
+        $confStmt = $db->query('SELECT id, group_id FROM ticket_types WHERE is_confidential = 1 AND group_id IS NOT NULL');
+        $confTypes = [];
+        foreach ($confStmt->fetchAll() as $ct) {
+            $confTypes[(int) $ct['id']] = (int) $ct['group_id'];
+        }
+        if (!empty($confTypes)) {
+            $gs = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
+            $gs->execute([Auth::id()]);
+            $myGroups = array_map('intval', $gs->fetchAll(PDO::FETCH_COLUMN));
+
+            foreach ($results as &$r) {
+                $tTypeId = null;
+                if (!empty($r['id'])) {
+                    $ts = $db->prepare('SELECT type_id FROM tickets WHERE id = ?');
+                    $ts->execute([$r['id']]);
+                    $tTypeId = $ts->fetchColumn();
+                }
+                if ($tTypeId && isset($confTypes[(int) $tTypeId])
+                    && !in_array($confTypes[(int) $tTypeId], $myGroups, true)) {
+                    $r['subject'] = '[Confidential]';
+                    $r['creator_name'] = '—';
+                }
+            }
+            unset($r);
+        }
+    }
 
     header('Content-Type: application/json');
-    echo json_encode($stmt->fetchAll());
+    echo json_encode($results);
     exit;
 });
 
@@ -568,6 +640,34 @@ $router->post('/agent/tickets/bulk', function () {
     }
 
     $db           = Database::connect();
+
+    // Filter out confidential tickets the user cannot access
+    if (Auth::role() === 'admin') {
+        $gs = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
+        $gs->execute([Auth::id()]);
+        $myGroups = array_map('intval', $gs->fetchAll(PDO::FETCH_COLUMN));
+
+        $allowed = [];
+        foreach ($ticketIds as $tid) {
+            $ts = $db->prepare(
+                'SELECT t.type_id, tt.is_confidential, tt.group_id AS type_group_id
+                 FROM tickets t LEFT JOIN ticket_types tt ON t.type_id = tt.id WHERE t.id = ?'
+            );
+            $ts->execute([$tid]);
+            $tRow = $ts->fetch();
+            if ($tRow && $tRow['is_confidential'] && $tRow['type_group_id']
+                && !in_array((int) $tRow['type_group_id'], $myGroups, true)) {
+                continue;
+            }
+            $allowed[] = $tid;
+        }
+        $ticketIds = $allowed;
+        if (empty($ticketIds)) {
+            flash('error', 'No accessible tickets selected (confidential tickets were excluded).');
+            redirect('/agent/tickets');
+        }
+    }
+
     $placeholders = implode(',', array_fill(0, count($ticketIds), '?'));
 
     switch ($action) {
@@ -698,6 +798,21 @@ $router->get('/agent/tickets/{id}', function (array $p) {
 
     _agentRequireTicketAccess($db, $ticket);
 
+    // Confidential ticket re-authentication gate (admins only)
+    if (requiresConfidentialReAuth($db, $ticket)) {
+        $ticketId   = (int) $ticket['id'];
+        $sessionKey = "confidential_access_{$ticketId}";
+        $granted    = $_SESSION[$sessionKey] ?? 0;
+        $ttl        = 300; // 5-minute window after re-auth
+
+        if (!$granted || (time() - $granted) > $ttl) {
+            render('agent/tickets/confidential-reauth', [
+                'ticketId' => $ticketId,
+            ]);
+            return; // stop — re-auth page rendered instead of the ticket
+        }
+    }
+
     // Tags
     $tags = $db->prepare(
         'SELECT tt.name FROM ticket_tags tt
@@ -793,6 +908,60 @@ $router->get('/agent/tickets/{id}', function (array $p) {
 });
 
 /* ==================================================================
+ * AGENT – Confidential Ticket Re-Authentication
+ * ================================================================== */
+
+$router->post('/agent/tickets/{id}/confidential-auth', function (array $p) {
+    Auth::requireRole('admin');
+    $ticketId = (int) $p['id'];
+
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect("/agent/tickets/{$ticketId}");
+    }
+
+    $password = $_POST['password'] ?? '';
+    $db = Database::connect();
+
+    // Verify password
+    $stmt = $db->prepare('SELECT password FROM users WHERE id = ?');
+    $stmt->execute([Auth::id()]);
+    $user = $stmt->fetch();
+
+    if (!$user || !password_verify($password, $user['password'])) {
+        flash('error', 'Incorrect password. Please try again.');
+        redirect("/agent/tickets/{$ticketId}");
+    }
+
+    // Grant access — store timestamp in session
+    $_SESSION["confidential_access_{$ticketId}"] = time();
+
+    // Audit log
+    logAudit(
+        'confidential_ticket_viewed',
+        $ticketId,
+        'ticket',
+        'Admin ' . Auth::fullName() . ' (ID: ' . Auth::id() . ') accessed confidential ticket #' . $ticketId
+    );
+
+    // Timeline entry on the ticket
+    $db->prepare(
+        'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal)
+         VALUES (?, ?, ?, ?, 1)'
+    )->execute([
+        $ticketId,
+        Auth::id(),
+        'confidential_access',
+        Auth::fullName() . ' viewed this confidential ticket (IP: ' . ($_SERVER['REMOTE_ADDR'] ?? 'unknown') . ')',
+    ]);
+
+    // Notify all group members via email
+    notifyConfidentialAccess($db, $ticketId);
+
+    redirect("/agent/tickets/{$ticketId}");
+});
+
+/* ==================================================================
  * AGENT – Watch / Unwatch Ticket
  * ================================================================== */
 
@@ -845,7 +1014,7 @@ $router->post('/agent/tickets/{id}/merge', function (array $p) {
     $db = Database::connect();
 
     // Validate source ticket (must exist and not already merged)
-    $src = $db->prepare('SELECT id, subject, group_id FROM tickets WHERE id = ? AND merged_into_ticket_id IS NULL');
+    $src = $db->prepare('SELECT id, subject, group_id, type_id FROM tickets WHERE id = ? AND merged_into_ticket_id IS NULL');
     $src->execute([$sourceId]);
     $sourceTicket = $src->fetch();
     if (!$sourceTicket) {
@@ -855,7 +1024,7 @@ $router->post('/agent/tickets/{id}/merge', function (array $p) {
     _agentRequireTicketAccess($db, $sourceTicket);
 
     // Validate target ticket (must exist and not itself be merged)
-    $tgt = $db->prepare('SELECT id, subject, group_id FROM tickets WHERE id = ? AND merged_into_ticket_id IS NULL');
+    $tgt = $db->prepare('SELECT id, subject, group_id, type_id FROM tickets WHERE id = ? AND merged_into_ticket_id IS NULL');
     $tgt->execute([$targetId]);
     $targetTicket = $tgt->fetch();
     if (!$targetTicket) {
@@ -863,6 +1032,12 @@ $router->post('/agent/tickets/{id}/merge', function (array $p) {
         redirect("/agent/tickets/{$sourceId}");
     }
     _agentRequireTicketAccess($db, $targetTicket);
+
+    // Block merging if either ticket is confidential and user is not in the group
+    if (requiresConfidentialReAuth($db, $sourceTicket) || requiresConfidentialReAuth($db, $targetTicket)) {
+        flash('error', 'Cannot merge confidential tickets without proper access. Please view each ticket first.');
+        redirect("/agent/tickets/{$sourceId}");
+    }
 
     $db->beginTransaction();
     try {
@@ -992,6 +1167,11 @@ $router->post('/agent/tickets/{id}/split', function (array $p) {
     }
 
     _agentRequireTicketAccess($db, $sourceTicket);
+
+    if (requiresConfidentialReAuth($db, $sourceTicket)) {
+        flash('error', 'Re-authenticate to access this confidential ticket before splitting.');
+        redirect("/agent/tickets/{$sourceId}");
+    }
 
     $newId = null;
     $db->beginTransaction();

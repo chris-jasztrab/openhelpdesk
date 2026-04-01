@@ -151,5 +151,20 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/agent/help'], ['label' => 'Worki
 </div>
 </div>
 
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-shield-lock text-primary me-2"></i>Confidential Tickets</h5>
+<p class="text-muted mb-2">Some ticket types may be marked as <strong>Confidential</strong> by an administrator. When a ticket type is confidential:</p>
+<ul class="text-muted mb-3">
+    <li>Only members of the ticket type's assigned group can view and work on those tickets.</li>
+    <li>If you are not a member of the group, confidential tickets will not appear in your ticket list or search results.</li>
+    <li>Admins who are not in the group can see confidential tickets listed but must re-authenticate to view the details. Their access is logged and all group members are notified via email.</li>
+</ul>
+<div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
+    If you need access to a confidential ticket type, ask your administrator to add you to the associated group.
+</div>
+</div>
+</div>
+
 </div><!-- col -->
 </div><!-- row -->

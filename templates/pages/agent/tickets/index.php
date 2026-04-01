@@ -405,19 +405,30 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                 <tr><td colspan="<?= $colCount ?>" class="text-center py-4 text-muted">No tickets found.</td></tr>
                 <?php else: ?>
                     <?php foreach ($tickets as $t): ?>
-                    <?php $isAssignedToMe = ($t['assigned_to'] == Auth::id()); ?>
-                    <tr style="cursor:pointer;<?= $isAssignedToMe ? 'background:#eef2ff;' : '' ?>"
+                    <?php
+                        $isAssignedToMe = ($t['assigned_to'] == Auth::id());
+                        $isRedacted = isTicketRedactedForUser($t, $confidentialTypeIds ?? [], $adminGroupIds ?? []);
+                    ?>
+                    <tr style="cursor:pointer;<?= $isRedacted ? 'opacity:0.75;' : ($isAssignedToMe ? 'background:#eef2ff;' : '') ?>"
                         onclick="window.location='/agent/tickets/<?= $t['id'] ?>'">
                         <td onclick="event.stopPropagation()">
-                            <input type="checkbox" class="ticket-cb form-check-input" value="<?= $t['id'] ?>" data-subject="<?= e($t['subject']) ?>">
+                            <input type="checkbox" class="ticket-cb form-check-input" value="<?= $t['id'] ?>"
+                                   data-subject="<?= $isRedacted ? 'Confidential' : e($t['subject']) ?>"
+                                   <?= $isRedacted ? 'data-confidential="1"' : '' ?>>
                         </td>
                         <td class="text-muted fw-bold" style="white-space:nowrap;"><?= $t['id'] ?></td>
                         <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                            <?php if ($isRedacted): ?>
+                            <span class="text-muted fst-italic">
+                                <i class="bi bi-shield-lock me-1"></i>[Confidential]
+                            </span>
+                            <?php else: ?>
                             <a href="/agent/tickets/<?= $t['id'] ?>" class="text-decoration-none fw-semibold text-dark">
                                 <?= e($t['subject']) ?>
                             </a>
                             <?php if ($isAssignedToMe): ?>
                             <span class="badge bg-primary bg-opacity-10 text-primary ms-1">Mine</span>
+                            <?php endif; ?>
                             <?php endif; ?>
                         </td>
                         <?php if (in_array('status', $visibleColumns)): ?>
@@ -479,7 +490,7 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                         </td>
                         <?php endif; ?>
                         <?php if (in_array('creator', $visibleColumns)): ?>
-                        <td class="text-muted" style="white-space:nowrap;overflow:hidden;"><?= e($t['creator_name'] ?? '—') ?></td>
+                        <td class="text-muted" style="white-space:nowrap;overflow:hidden;"><?= $isRedacted ? '—' : e($t['creator_name'] ?? '—') ?></td>
                         <?php endif; ?>
                         <?php if (in_array('location', $visibleColumns)): ?>
                         <td class="text-muted" style="white-space:nowrap;overflow:hidden;"><?= e($t['location_name'] ?? '—') ?></td>

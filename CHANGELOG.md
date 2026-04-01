@@ -11,7 +11,48 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
-## Unreleased
+## 2.3.0 — 2026-04-01
+
+### Confidential Ticket Types
+- **Confidential Flag** — admins can mark ticket types as "Confidential" in Settings → Ticket Types; requires a group to be assigned
+- Tickets of a confidential type are only visible to members of the type's assigned group
+- Agents not in the group cannot see confidential tickets in listings or search results
+- Admins outside the group see confidential tickets in listings with redacted subjects ("[Confidential]")
+- **Admin Re-Authentication** — viewing a confidential ticket requires re-entering the admin's password; a warning explains that access is logged and group members will be notified
+- Access grants a 5-minute session window before re-authentication is required again
+- **Audit Logging** — every admin access to a confidential ticket is recorded in the audit log (`confidential_ticket_viewed`) and as an internal timeline entry on the ticket
+- **Group Email Notification** — all members of the confidential type's group receive an email alert with the admin's name, email, IP address, and timestamp when a confidential ticket is accessed
+- **API Enforcement** — confidential tickets are excluded from API listings for non-group members; individual ticket endpoints return 403 with a message to use the web interface
+- **Edge Case Protection** — bulk actions exclude inaccessible confidential tickets; merge and split operations are blocked; search/typeahead results redact subjects; CSV exports replace sensitive fields with "[Confidential]"
+- Admin and agent help documentation updated with Confidential Ticket Types section
+
+---
+
+## 2.2.0 — 2026-04-01
+
+### CSAT Redesign
+- **Emoji Ratings** — customer satisfaction surveys redesigned with emoji-based ratings and an issue-resolved flow
+- **Send Test Survey** — admins can send a test CSAT survey from the admin settings page
+- Fix: emoji rating section removed from CSAT email (ratings are on the survey page)
+- Fix: missing button key added to `csat_survey` email template default
+
+### Custom Labels
+- **System Field Labels** — admins can customise the display labels for system fields (e.g. rename "Location" to "Branch") and control whether Priority and Tags are required
+
+### Email Templates
+- **Agent Assigned, Group Assigned, and Escalation Alert** email templates added to admin settings for customisation
+
+### UX Improvements
+- **Bootstrap Modals** — all browser `confirm()` dialogs replaced with styled Bootstrap confirmation modals
+- **Auto-Populate Holidays** — button added to admin holidays settings to auto-populate public holidays
+- **Type Field on Update Card** — ticket type can now be changed from the Update Ticket card for agents and admins
+- Browser and OS info hidden from non-admin users on ticket details
+- UI improvements for ticket listing pages (spacing, alignment, responsive)
+- Fix: columns resize correctly after quick-change dropdown selection
+
+---
+
+## 2.1.0 — 2026-03-12
 
 ### Ticket Detail Page Redesign
 - **Three-Column Layout** — ticket detail page reorganised into three columns: main content, ticket actions, and a metadata/SLA sidebar
@@ -81,11 +122,6 @@ To release a new version: update `config/version.php`, add a dated entry below u
 - Fix: ticket detail header action buttons wrap correctly on mobile screens instead of causing horizontal scroll
 - Fix: tickets without a type assigned display "Not Set" rather than a blank value
 - Fix: "Knowledge Base Articles" label corrected in the global search box
-
-Planned features not yet implemented:
-
-- Profile Avatars — allow users to upload their own avatar from the profile page (currently admin-managed only)
-- Manage team dashboards — configurable per-team dashboard views
 
 ---
 

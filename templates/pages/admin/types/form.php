@@ -62,6 +62,17 @@ $action = $isEdit ? "/admin/types/{$editing['id']}/edit" : '/admin/types/create'
                 <div class="form-text">When assigning agents to tickets of this type, only agents in this group will be shown.</div>
             </div>
 
+            <div class="mb-3">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="is_confidential" name="is_confidential" value="1"
+                           <?= (int) old('is_confidential', (string) ($editing['is_confidential'] ?? '0')) ? 'checked' : '' ?>>
+                    <label class="form-check-label fw-semibold" for="is_confidential">
+                        <i class="bi bi-shield-lock me-1"></i>Confidential
+                    </label>
+                </div>
+                <div class="form-text">Only members of the assigned group can view these tickets. Admins outside the group must re-authenticate to access them, and all access is logged and notified to group members.</div>
+            </div>
+
             <hr class="my-4">
 
             <div class="d-flex gap-2">
@@ -81,4 +92,15 @@ document.getElementById('color').addEventListener('input', function() {
 document.getElementById('name').addEventListener('input', function() {
     document.getElementById('colorPreview').textContent = this.value || 'Preview';
 });
+// Disable confidential checkbox when no group is selected
+(function() {
+    var groupSel = document.getElementById('group_id');
+    var confCb   = document.getElementById('is_confidential');
+    function toggle() {
+        if (!groupSel.value) { confCb.checked = false; confCb.disabled = true; }
+        else { confCb.disabled = false; }
+    }
+    groupSel.addEventListener('change', toggle);
+    toggle();
+})();
 </script>

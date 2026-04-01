@@ -217,6 +217,53 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-shield-lock text-primary me-2"></i>Confidential Ticket Types</h5>
+<p class="text-muted mb-2">Ticket types can be marked as <strong>Confidential</strong> to restrict access to sensitive tickets (e.g., HR, Legal). This feature ensures that only authorised group members can view the ticket details.</p>
+
+<h6 class="fw-semibold mt-3">How to Enable</h6>
+<ol class="text-muted mb-3">
+    <li>Go to <a href="/admin/types"><strong>Admin &rarr; Settings &rarr; Ticket Types</strong></a>.</li>
+    <li>Edit or create a ticket type.</li>
+    <li>Select a <strong>Default Group</strong> (required for confidentiality).</li>
+    <li>Check the <strong>Confidential</strong> checkbox and save.</li>
+</ol>
+
+<h6 class="fw-semibold mt-3">What Happens</h6>
+<ul class="text-muted mb-3">
+    <li><strong>Group members</strong> can see and work on confidential tickets normally.</li>
+    <li><strong>Agents not in the group</strong> cannot see confidential tickets at all &mdash; they are completely hidden from ticket lists and search results.</li>
+    <li><strong>Admins not in the group</strong> can see confidential tickets in the listing, but the subject is replaced with <em>[Confidential]</em> and other details are hidden.</li>
+</ul>
+
+<h6 class="fw-semibold mt-3">Admin Re-Authentication</h6>
+<p class="text-muted mb-2">When an admin who is <strong>not</strong> a member of the confidential type's group clicks on a confidential ticket, they are presented with a re-authentication screen. Before viewing the ticket they must:</p>
+<ul class="text-muted mb-3">
+    <li>Re-enter their password.</li>
+    <li>Acknowledge that the access will be recorded in the <a href="/admin/audit-log"><strong>Audit Log</strong></a>.</li>
+    <li>Acknowledge that all members of the assigned group will be notified via email.</li>
+</ul>
+<p class="text-muted mb-2">After authentication, the admin can view the ticket for 5 minutes before needing to re-authenticate again.</p>
+
+<h6 class="fw-semibold mt-3">Audit &amp; Notification</h6>
+<ul class="text-muted mb-3">
+    <li>Every admin access to a confidential ticket is recorded in the <strong>Audit Log</strong> with action <code>confidential_ticket_viewed</code>.</li>
+    <li>A timeline entry is added to the ticket itself (internal only).</li>
+    <li>All members of the assigned group receive an email notification containing the admin's name, email, IP address, and timestamp.</li>
+</ul>
+
+<h6 class="fw-semibold mt-3">Restrictions</h6>
+<ul class="text-muted mb-0">
+    <li>Confidential tickets are excluded from the <strong>REST API</strong> for non-group members. A 403 response is returned with a message to use the web interface.</li>
+    <li><strong>Bulk actions</strong> automatically exclude confidential tickets the user cannot access.</li>
+    <li><strong>Merge and Split</strong> operations are blocked if either ticket is confidential and the user is not in the group.</li>
+    <li><strong>CSV exports</strong> replace the subject and identifying fields with "[Confidential]" for tickets the admin is not authorised to view.</li>
+    <li><strong>Search/typeahead</strong> results redact confidential ticket subjects.</li>
+</ul>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-eye text-primary me-2"></i>Concurrent Viewer Warning</h5>
 <p class="text-muted mb-2">When two or more agents open the same ticket at the same time, a dismissible warning banner is shown to alert them that someone else is also viewing the ticket. This helps avoid duplicate work or conflicting replies.</p>
 <p class="text-muted mb-0">Presence is tracked per ticket and automatically cleared when a user navigates away.</p>
