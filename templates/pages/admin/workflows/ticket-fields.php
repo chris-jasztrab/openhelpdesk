@@ -445,7 +445,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var modal      = new bootstrap.Modal(document.getElementById('fieldModal'));
 
     var fieldTypeMeta = <?= json_encode(array_map(fn($m) => ['label' => $m['label'], 'icon' => $m['icon']], $fieldTypeMeta)) ?>;
-    var fieldTypeMap  = <?= json_encode((object) array_map(fn($ids) => $ids, $fieldTypeMap), JSON_FORCE_OBJECT) ?>;
+    var fieldTypeMap  = <?= json_encode($fieldTypeMap ?: new stdClass()) ?>;
     var ticketTypes   = <?= json_encode($ticketTypes) ?>;
 
     /* ─── SortableJS: reorder within custom list only ─── */

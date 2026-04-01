@@ -407,7 +407,7 @@ $statusOptions = [
 // ── Custom field type filtering ────────────────────────────────
 <?php if (!empty($customFields)): ?>
 (function() {
-    var fieldTypeMap    = <?= json_encode((object) ($fieldTypeMap ?? []), JSON_FORCE_OBJECT) ?>;
+    var fieldTypeMap    = <?= json_encode($fieldTypeMap ?: new stdClass()) ?>;
     var typeSelect      = document.getElementById('type_id');
     var customFieldCard = document.getElementById('customFieldsCard');
 
@@ -417,7 +417,7 @@ $statusOptions = [
         document.querySelectorAll('.custom-field-wrap').forEach(function(wrap) {
             var fieldId = wrap.dataset.fieldId;
             var types   = fieldTypeMap[fieldId] || [];
-            var show    = types.length === 0 || types.indexOf(selectedType) !== -1;
+            var show    = selectedType > 0 && (types.length === 0 || types.indexOf(selectedType) !== -1);
             wrap.style.display = show ? '' : 'none';
             if (show) anyVisible = true;
         });

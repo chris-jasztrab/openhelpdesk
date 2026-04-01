@@ -334,7 +334,7 @@ endif; ?>
 <script>
 // ── Custom field type filtering ────────────────────────────────
 (function() {
-    var fieldTypeMap = <?= json_encode((object) ($fieldTypeMap ?? []), JSON_FORCE_OBJECT) ?>;
+    var fieldTypeMap = <?= json_encode($fieldTypeMap ?: new stdClass()) ?>;
     var typeSelect   = document.getElementById('type_id');
     var hrLine       = document.querySelector('.custom-fields-hr');
 
@@ -344,8 +344,8 @@ endif; ?>
         document.querySelectorAll('.custom-field-wrap').forEach(function(wrap) {
             var fieldId = wrap.dataset.fieldId;
             var types   = fieldTypeMap[fieldId] || [];
-            // Show if: global (empty/no mapping) OR selected type is in the array
-            var show = types.length === 0 || types.indexOf(selectedType) !== -1;
+            // Hide everything when no type is selected; otherwise show global + matching
+            var show = selectedType > 0 && (types.length === 0 || types.indexOf(selectedType) !== -1);
             wrap.style.display = show ? '' : 'none';
             if (show) anyVisible = true;
             // Toggle required on hidden fields so they don't block form submission
