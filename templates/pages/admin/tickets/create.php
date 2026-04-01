@@ -335,6 +335,20 @@ $statusOptions = [
                         <input type="date" class="form-control" name="<?= e($cfKey) ?>"
                                value="<?= e(old($cfKey)) ?>">
 
+                        <?php elseif ($cf['field_type'] === 'date_range'): ?>
+                        <div class="row g-2">
+                            <div class="col">
+                                <label class="form-label small">From</label>
+                                <input type="date" class="form-control" name="<?= e($cfKey) ?>_from"
+                                       value="<?= e(old($cfKey . '_from')) ?>">
+                            </div>
+                            <div class="col">
+                                <label class="form-label small">To</label>
+                                <input type="date" class="form-control" name="<?= e($cfKey) ?>_to"
+                                       value="<?= e(old($cfKey . '_to')) ?>">
+                            </div>
+                        </div>
+
                         <?php elseif ($cf['field_type'] === 'number'): ?>
                         <input type="number" step="1" class="form-control" name="<?= e($cfKey) ?>"
                                placeholder="<?= e($cf['placeholder'] ?? '') ?>"

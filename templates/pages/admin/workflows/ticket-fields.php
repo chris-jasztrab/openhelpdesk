@@ -14,6 +14,7 @@ $fieldTypeMeta = [
     'text_block' => ['label' => 'Text Block',      'icon' => 'bi-text-paragraph'],
     'image'      => ['label' => 'Image',           'icon' => 'bi-image'],
     'cc'         => ['label' => 'CC',              'icon' => 'bi-people'],
+    'date_range' => ['label' => 'Date Range',     'icon' => 'bi-calendar-range'],
 ];
 
 // Built-in (system) fields — label and (for priority/tags) required are configurable
@@ -598,7 +599,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var currentOptions = [];
 
     var displayOnlyTypes  = ['text_block', 'image'];
-    var noPlaceholderTypes = ['text_block', 'image', 'cc'];
+    var noPlaceholderTypes = ['text_block', 'image', 'cc', 'date_range'];
 
     function openModal(field) {
         document.getElementById('modalFieldId').value      = field.id;

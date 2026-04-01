@@ -236,6 +236,22 @@ endif; ?>
                        value="<?= e(old($cfKey)) ?>"
                        <?= $cf['is_required'] ? 'required' : '' ?>>
 
+                <?php elseif ($cf['field_type'] === 'date_range'): ?>
+                <div class="row g-2">
+                    <div class="col">
+                        <label class="form-label small">From</label>
+                        <input type="date" class="form-control" name="<?= e($cfKey) ?>_from"
+                               value="<?= e(old($cfKey . '_from')) ?>"
+                               <?= $cf['is_required'] ? 'required' : '' ?>>
+                    </div>
+                    <div class="col">
+                        <label class="form-label small">To</label>
+                        <input type="date" class="form-control" name="<?= e($cfKey) ?>_to"
+                               value="<?= e(old($cfKey . '_to')) ?>"
+                               <?= $cf['is_required'] ? 'required' : '' ?>>
+                    </div>
+                </div>
+
                 <?php elseif ($cf['field_type'] === 'number'): ?>
                 <input type="number" step="1" class="form-control" name="<?= e($cfKey) ?>"
                        placeholder="<?= e($cf['placeholder'] ?? '') ?>"

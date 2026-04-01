@@ -455,6 +455,13 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
                             }
                         ?>
                         <?= $parts ? implode(' &rsaquo; ', $parts) : '<span class="text-muted">&mdash;</span>' ?>
+                    <?php elseif ($cf['field_type'] === 'date_range'): ?>
+                        <?php
+                            $dr = $cfVal ? (json_decode($cfVal, true) ?? []) : [];
+                            $drFrom = $dr['from'] ?? '';
+                            $drTo   = $dr['to']   ?? '';
+                        ?>
+                        <?= ($drFrom || $drTo) ? e($drFrom) . ' &mdash; ' . e($drTo) : '<span class="text-muted">&mdash;</span>' ?>
                     <?php else: ?>
                         <?= $cfVal !== '' ? e($cfVal) : '<span class="text-muted">&mdash;</span>' ?>
                     <?php endif; ?>

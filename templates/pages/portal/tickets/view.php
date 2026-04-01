@@ -100,6 +100,11 @@ $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-p
                             }
                         }
                         $display = implode(' › ', $parts);
+                    } elseif ($cf['field_type'] === 'date_range') {
+                        $dr = json_decode($raw, true) ?? [];
+                        $drFrom = $dr['from'] ?? '';
+                        $drTo   = $dr['to']   ?? '';
+                        $display = ($drFrom || $drTo) ? $drFrom . ' — ' . $drTo : '';
                     } else {
                         $display = $raw;
                     }

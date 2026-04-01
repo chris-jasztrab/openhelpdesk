@@ -2176,6 +2176,11 @@ $router->post('/admin/tickets/create', function () {
                     'l2' => $_POST[$key . '_l2'] ?? null,
                     'l3' => $_POST[$key . '_l3'] ?? null,
                 ]);
+            } elseif ($cf['field_type'] === 'date_range') {
+                $from = $_POST[$key . '_from'] ?? '';
+                $to   = $_POST[$key . '_to']   ?? '';
+                if ($from === '' && $to === '') continue;
+                $val = json_encode(['from' => $from, 'to' => $to]);
             } elseif ($cf['field_type'] === 'checkbox') {
                 $val = isset($_POST[$key]) ? '1' : '0';
             } else {
@@ -2870,6 +2875,10 @@ $router->post('/admin/tickets/{id}/fields', function (array $p) {
                 'l2' => $_POST[$key . '_l2'] ?? null,
                 'l3' => $_POST[$key . '_l3'] ?? null,
             ]);
+        } elseif ($field['field_type'] === 'date_range') {
+            $from = $_POST[$key . '_from'] ?? '';
+            $to   = $_POST[$key . '_to']   ?? '';
+            $val  = ($from !== '' || $to !== '') ? json_encode(['from' => $from, 'to' => $to]) : null;
         } elseif ($field['field_type'] === 'checkbox') {
             $val = isset($_POST[$key]) ? '1' : '0';
         } else {
@@ -7841,7 +7850,7 @@ $router->post('/admin/workflows/ticket-fields/add', function () {
     Auth::requireRole('admin');
     header('Content-Type: application/json');
 
-    $allowed = ['text','textarea','checkbox','dropdown','date','number','decimal','dependent','text_block','image','cc'];
+    $allowed = ['text','textarea','checkbox','dropdown','date','number','decimal','dependent','text_block','image','cc','date_range'];
     $type    = $_POST['field_type'] ?? '';
     if (!in_array($type, $allowed, true)) {
         echo json_encode(['success' => false, 'error' => 'Invalid field type.']);
@@ -7863,6 +7872,7 @@ $router->post('/admin/workflows/ticket-fields/add', function () {
         'text_block' => 'Text Block',
         'image'      => 'Image',
         'cc'         => 'CC',
+        'date_range' => 'Date Range',
     ];
 
     $stmt = $db->prepare(

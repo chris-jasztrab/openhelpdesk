@@ -325,6 +325,11 @@ $router->post('/portal/tickets/create', function () {
                     'l2' => $_POST[$key . '_l2'] ?? null,
                     'l3' => $_POST[$key . '_l3'] ?? null,
                 ]);
+            } elseif ($cf['field_type'] === 'date_range') {
+                $from = $_POST[$key . '_from'] ?? '';
+                $to   = $_POST[$key . '_to']   ?? '';
+                if ($from === '' && $to === '') continue;
+                $val = json_encode(['from' => $from, 'to' => $to]);
             } elseif ($cf['field_type'] === 'checkbox') {
                 $val = isset($_POST[$key]) ? '1' : '0';
             } else {
