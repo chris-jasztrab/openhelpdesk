@@ -349,6 +349,16 @@ CREATE TABLE IF NOT EXISTS `ticket_field_values` (
     FOREIGN KEY (`field_id`)  REFERENCES `ticket_form_fields`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Map custom fields to specific ticket types (many-to-many).
+-- Fields with no rows here are "global" and shown for all types.
+CREATE TABLE IF NOT EXISTS `ticket_form_field_type_map` (
+    `field_id` INT UNSIGNED NOT NULL,
+    `type_id`  INT UNSIGNED NOT NULL,
+    PRIMARY KEY (`field_id`, `type_id`),
+    FOREIGN KEY (`field_id`) REFERENCES `ticket_form_fields`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`type_id`)  REFERENCES `ticket_types`(`id`)      ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Escalation rules — time-driven, evaluated by cron script
 CREATE TABLE IF NOT EXISTS `escalation_rules` (
     `id`             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

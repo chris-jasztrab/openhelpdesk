@@ -183,6 +183,8 @@ $router->get('/portal/tickets/create', function () {
          ORDER BY t.name'
     )->fetchAll();
 
+    $fieldTypeMap = getFieldTypeMap($db);
+
     render('portal/tickets/create', [
         'types'             => $types,
         'locations'         => $locations,
@@ -194,6 +196,7 @@ $router->get('/portal/tickets/create', function () {
         'customFields'      => $customFields,
         'fieldOptions'      => $fieldOptions,
         'sharedTemplates'   => $sharedTemplates,
+        'fieldTypeMap'      => $fieldTypeMap,
     ]);
 });
 
@@ -250,10 +253,8 @@ $router->post('/portal/tickets/create', function () {
         }
     }
 
-    // Validate required custom fields
-    $visibleCustomFields = $db->query(
-        'SELECT * FROM ticket_form_fields WHERE is_visible = 1 AND deleted_at IS NULL ORDER BY sort_order'
-    )->fetchAll();
+    // Validate required custom fields (filtered by the selected ticket type)
+    $visibleCustomFields = getCustomFieldsForType($db, $typeId ?? 0, true);
     foreach ($visibleCustomFields as $cf) {
         if (!$cf['is_required']) continue;
         if (in_array($cf['field_type'], ['text_block', 'image'], true)) continue; // display-only, no value

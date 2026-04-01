@@ -610,15 +610,35 @@ $router->get('/agent/tickets/create', function () {
          WHERE role IN ('admin','agent') ORDER BY first_name, last_name"
     )->fetchAll();
     $templates  = $db->query('SELECT * FROM ticket_templates ORDER BY name')->fetchAll();
+
+    // Custom form fields for type-specific forms
+    $customFields = $db->query(
+        'SELECT * FROM ticket_form_fields WHERE deleted_at IS NULL ORDER BY sort_order'
+    )->fetchAll();
+    $fieldOptions = [];
+    foreach ($customFields as $f) {
+        if (in_array($f['field_type'], ['dropdown', 'dependent'], true)) {
+            $s = $db->prepare(
+                'SELECT * FROM ticket_form_field_options WHERE field_id = ? ORDER BY parent_option_id, sort_order'
+            );
+            $s->execute([$f['id']]);
+            $fieldOptions[$f['id']] = $s->fetchAll();
+        }
+    }
+    $fieldTypeMap = getFieldTypeMap($db);
+
     render('admin/tickets/create', [
-        'types'      => $types,
-        'priorities' => $priorities,
-        'locations'  => $locations,
-        'groups'     => $groups,
-        'agents'     => $agents,
-        'templates'  => $templates,
-        'isAgent'    => true,
-        'formAction' => '/admin/tickets/create',
+        'types'        => $types,
+        'priorities'   => $priorities,
+        'locations'    => $locations,
+        'groups'       => $groups,
+        'agents'       => $agents,
+        'templates'    => $templates,
+        'isAgent'      => true,
+        'formAction'   => '/admin/tickets/create',
+        'customFields' => $customFields,
+        'fieldOptions' => $fieldOptions,
+        'fieldTypeMap' => $fieldTypeMap,
     ]);
 });
 

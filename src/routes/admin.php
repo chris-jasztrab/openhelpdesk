@@ -2061,14 +2061,34 @@ $router->get('/admin/tickets/create', function () {
     $templates  = $db->query(
         'SELECT * FROM ticket_templates ORDER BY name'
     )->fetchAll();
+
+    // Custom form fields for type-specific forms
+    $customFields = $db->query(
+        'SELECT * FROM ticket_form_fields WHERE deleted_at IS NULL ORDER BY sort_order'
+    )->fetchAll();
+    $fieldOptions = [];
+    foreach ($customFields as $f) {
+        if (in_array($f['field_type'], ['dropdown', 'dependent'], true)) {
+            $s = $db->prepare(
+                'SELECT * FROM ticket_form_field_options WHERE field_id = ? ORDER BY parent_option_id, sort_order'
+            );
+            $s->execute([$f['id']]);
+            $fieldOptions[$f['id']] = $s->fetchAll();
+        }
+    }
+    $fieldTypeMap = getFieldTypeMap($db);
+
     render('admin/tickets/create', [
-        'types'      => $types,
-        'priorities' => $priorities,
-        'locations'  => $locations,
-        'groups'     => $groups,
-        'agents'     => $agents,
-        'templates'  => $templates,
-        'isAgent'    => false,
+        'types'        => $types,
+        'priorities'   => $priorities,
+        'locations'    => $locations,
+        'groups'       => $groups,
+        'agents'       => $agents,
+        'templates'    => $templates,
+        'isAgent'      => false,
+        'customFields' => $customFields,
+        'fieldOptions' => $fieldOptions,
+        'fieldTypeMap' => $fieldTypeMap,
     ]);
 });
 
@@ -2140,6 +2160,32 @@ $router->post('/admin/tickets/create', function () {
             }
         }
     }
+    // Save custom field values (filtered by selected ticket type)
+    $adminCustomFields = getCustomFieldsForType($db, $typeId ?? 0);
+    if (!empty($adminCustomFields)) {
+        $cfSaveStmt = $db->prepare(
+            'INSERT INTO ticket_field_values (ticket_id, field_id, value) VALUES (?, ?, ?)
+             ON DUPLICATE KEY UPDATE value = VALUES(value)'
+        );
+        foreach ($adminCustomFields as $cf) {
+            if (in_array($cf['field_type'], ['text_block', 'image', 'cc'], true)) continue;
+            $key = 'field_' . $cf['id'];
+            if ($cf['field_type'] === 'dependent') {
+                $val = json_encode([
+                    'l1' => $_POST[$key . '_l1'] ?? null,
+                    'l2' => $_POST[$key . '_l2'] ?? null,
+                    'l3' => $_POST[$key . '_l3'] ?? null,
+                ]);
+            } elseif ($cf['field_type'] === 'checkbox') {
+                $val = isset($_POST[$key]) ? '1' : '0';
+            } else {
+                $val = $_POST[$key] ?? null;
+                if ($val === null || trim($val) === '') continue;
+            }
+            $cfSaveStmt->execute([$ticketId, $cf['id'], $val]);
+        }
+    }
+
     // Timeline
     $db->prepare(
         'INSERT INTO ticket_timeline (ticket_id, user_id, action, details) VALUES (?, ?, ?, ?)'
@@ -7736,12 +7782,18 @@ $router->get('/admin/workflows/ticket-fields', function () {
         'required_tags'     => getSetting('sys_field_required_tags',     '0'),
     ];
 
+    // Ticket types + field-type map for the type-association UI
+    $ticketTypes  = $db->query('SELECT id, name FROM ticket_types ORDER BY sort_order, name')->fetchAll();
+    $fieldTypeMap = getFieldTypeMap($db);
+
     render('admin/workflows/ticket-fields', [
         'layout'       => 'app',
         'pageTitle'    => 'Ticket Fields',
         'fields'       => $fields,
         'fieldOptions' => $fieldOptions,
         'sysFs'        => $sysFs,
+        'ticketTypes'  => $ticketTypes,
+        'fieldTypeMap' => $fieldTypeMap,
     ]);
 });
 
@@ -7922,6 +7974,18 @@ $router->post('/admin/workflows/ticket-fields/{id}/update', function (array $p) 
         $db->prepare(
             'UPDATE ticket_form_fields SET label=?, placeholder=?, is_required=?, is_visible=?, config=?, updated_at=NOW() WHERE id=?'
         )->execute([$label, $placeholder ?: null, $isRequired, $isVisible, $config, $id]);
+    }
+
+    // Sync ticket-type associations
+    if (array_key_exists('type_ids', $body)) {
+        $db->prepare('DELETE FROM ticket_form_field_type_map WHERE field_id = ?')->execute([$id]);
+        $typeIds = array_unique(array_map('intval', (array) $body['type_ids']));
+        $mapInsert = $db->prepare('INSERT INTO ticket_form_field_type_map (field_id, type_id) VALUES (?, ?)');
+        foreach ($typeIds as $tid) {
+            if ($tid > 0) {
+                $mapInsert->execute([$id, $tid]);
+            }
+        }
     }
 
     // Replace options for dropdown / dependent fields

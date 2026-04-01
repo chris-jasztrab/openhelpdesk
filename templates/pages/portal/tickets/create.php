@@ -165,7 +165,7 @@ endif; ?>
             <?php endif; ?>
 
             <?php if (!empty($customFields)): ?>
-            <hr class="my-3">
+            <hr class="my-3 custom-fields-hr">
             <?php foreach ($customFields as $cf):
                 $cfKey = 'field_' . $cf['id'];
                 $cfOpts = $fieldOptions[$cf['id']] ?? [];
@@ -173,7 +173,7 @@ endif; ?>
             <?php if ($cf['field_type'] === 'text_block'):
                 $tbCfg = $cf['config'] ? (is_string($cf['config']) ? json_decode($cf['config'], true) : $cf['config']) : [];
             ?>
-            <div class="mb-3">
+            <div class="mb-3 custom-field-wrap" data-field-id="<?= (int) $cf['id'] ?>">
                 <?php if (!empty($cf['label'])): ?>
                 <p class="fw-semibold mb-1"><?= e($cf['label']) ?></p>
                 <?php endif; ?>
@@ -182,7 +182,7 @@ endif; ?>
             <?php elseif ($cf['field_type'] === 'image'):
                 $imgCfg = $cf['config'] ? (is_string($cf['config']) ? json_decode($cf['config'], true) : $cf['config']) : [];
             ?>
-            <div class="mb-3">
+            <div class="mb-3 custom-field-wrap" data-field-id="<?= (int) $cf['id'] ?>">
                 <?php if (!empty($imgCfg['image_path'])): ?>
                 <img src="/uploads/field-images/<?= e($imgCfg['image_path']) ?>"
                      alt="<?= e($cf['label']) ?>"
@@ -194,7 +194,7 @@ endif; ?>
                 <?php endif; ?>
             </div>
             <?php else: ?>
-            <div class="mb-3">
+            <div class="mb-3 custom-field-wrap" data-field-id="<?= (int) $cf['id'] ?>">
                 <label class="form-label fw-semibold">
                     <?= e($cf['label']) ?>
                     <?php if ($cf['is_required']): ?><span class="text-danger ms-1">*</span><?php endif; ?>
@@ -332,6 +332,36 @@ endif; ?>
 </div>
 
 <script>
+// ── Custom field type filtering ────────────────────────────────
+(function() {
+    var fieldTypeMap = <?= json_encode((object) ($fieldTypeMap ?? []), JSON_FORCE_OBJECT) ?>;
+    var typeSelect   = document.getElementById('type_id');
+    var hrLine       = document.querySelector('.custom-fields-hr');
+
+    function filterFieldsByType() {
+        var selectedType = parseInt(typeSelect.value) || 0;
+        var anyVisible   = false;
+        document.querySelectorAll('.custom-field-wrap').forEach(function(wrap) {
+            var fieldId = wrap.dataset.fieldId;
+            var types   = fieldTypeMap[fieldId] || [];
+            // Show if: global (empty/no mapping) OR selected type is in the array
+            var show = types.length === 0 || types.indexOf(selectedType) !== -1;
+            wrap.style.display = show ? '' : 'none';
+            if (show) anyVisible = true;
+            // Toggle required on hidden fields so they don't block form submission
+            wrap.querySelectorAll('[required]').forEach(function(inp) {
+                if (!show) { inp.removeAttribute('required'); inp.dataset.wasRequired = '1'; }
+                else if (inp.dataset.wasRequired) { inp.setAttribute('required', ''); }
+            });
+        });
+        if (hrLine) hrLine.style.display = anyVisible ? '' : 'none';
+    }
+
+    typeSelect.addEventListener('change', filterFieldsByType);
+    // Run on page load
+    filterFieldsByType();
+})();
+
 <?php if (!empty($sharedTemplates)): ?>
 // Template picker
 (function() {
@@ -341,7 +371,10 @@ endif; ?>
         if (!tpl) return;
         if (tpl.subject)     document.getElementById('subject').value     = tpl.subject;
         if (tpl.body && window._portalTicketEditor) window._portalTicketEditor.setData(tpl.body);
-        if (tpl.type_id)     document.getElementById('type_id').value     = tpl.type_id;
+        if (tpl.type_id) {
+            document.getElementById('type_id').value = tpl.type_id;
+            document.getElementById('type_id').dispatchEvent(new Event('change'));
+        }
         if (tpl.priority_id) {
             const priSel = document.getElementById('priority_id');
             if (priSel) priSel.value = tpl.priority_id;

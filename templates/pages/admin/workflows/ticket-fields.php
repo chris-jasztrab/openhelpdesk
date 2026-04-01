@@ -181,10 +181,24 @@ $systemFieldsBottom = [
             <?php foreach ($fields as $field):
                 $meta = $fieldTypeMeta[$field['field_type']] ?? ['label' => $field['field_type'], 'icon' => 'bi-question'];
             ?>
+            <?php
+                $typeIds = $fieldTypeMap[$field['id']] ?? [];
+                $typeNames = [];
+                if ($typeIds) {
+                    foreach ($ticketTypes as $tt) {
+                        if (in_array((int) $tt['id'], $typeIds, true)) $typeNames[] = $tt['name'];
+                    }
+                }
+            ?>
             <div class="field-row" data-field-id="<?= (int) $field['id'] ?>" data-field-type="<?= e($field['field_type']) ?>">
                 <i class="bi bi-grip-vertical drag-handle"></i>
                 <span class="badge bg-secondary" style="font-size:.68rem;"><?= e($meta['label']) ?></span>
                 <span class="field-row-label"><?= e($field['label']) ?></span>
+                <?php if (!empty($typeNames)): ?>
+                <span class="badge bg-info type-badge" style="font-size:.65rem;" title="<?= e(implode(', ', $typeNames)) ?>">
+                    <?= count($typeNames) <= 2 ? e(implode(', ', $typeNames)) : count($typeNames) . ' types' ?>
+                </span>
+                <?php endif; ?>
                 <?php if ($field['is_required']): ?>
                 <span class="badge bg-danger" style="font-size:.65rem;">Required</span>
                 <?php endif; ?>
@@ -262,6 +276,21 @@ $systemFieldsBottom = [
                             <input class="form-check-input" type="checkbox" id="modalVisible" checked>
                             <label class="form-check-label" for="modalVisible">Visible to portal users</label>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Ticket type association -->
+                <div class="mb-3" id="modalTypeRow">
+                    <label class="form-label fw-medium">Show for Ticket Types</label>
+                    <div class="form-text mb-2">Leave all unchecked to show this field for <strong>every</strong> ticket type.</div>
+                    <div class="d-flex flex-wrap gap-2" id="modalTypeChecks">
+                        <?php foreach ($ticketTypes as $tt): ?>
+                        <div class="form-check">
+                            <input class="form-check-input modal-type-cb" type="checkbox"
+                                   id="modalType_<?= (int) $tt['id'] ?>" value="<?= (int) $tt['id'] ?>">
+                            <label class="form-check-label" for="modalType_<?= (int) $tt['id'] ?>"><?= e($tt['name']) ?></label>
+                        </div>
+                        <?php endforeach; ?>
                     </div>
                 </div>
 
@@ -416,6 +445,8 @@ document.addEventListener('DOMContentLoaded', function () {
     var modal      = new bootstrap.Modal(document.getElementById('fieldModal'));
 
     var fieldTypeMeta = <?= json_encode(array_map(fn($m) => ['label' => $m['label'], 'icon' => $m['icon']], $fieldTypeMeta)) ?>;
+    var fieldTypeMap  = <?= json_encode((object) array_map(fn($ids) => $ids, $fieldTypeMap), JSON_FORCE_OBJECT) ?>;
+    var ticketTypes   = <?= json_encode($ticketTypes) ?>;
 
     /* ─── SortableJS: reorder within custom list only ─── */
     Sortable.create(list, {
@@ -580,10 +611,17 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('modalVisible').checked    =
             field.is_visible === undefined ? true : !!parseInt(field.is_visible);
 
+        // Populate type checkboxes
+        var assignedTypes = fieldTypeMap[field.id] || [];
+        document.querySelectorAll('.modal-type-cb').forEach(function (cb) {
+            cb.checked = assignedTypes.indexOf(parseInt(cb.value)) !== -1;
+        });
+
         // Hide/show options row and placeholder for display-only types
         var isDisplayOnly  = displayOnlyTypes.indexOf(field.field_type) !== -1;
         var noPlaceholder  = noPlaceholderTypes.indexOf(field.field_type) !== -1;
         document.getElementById('modalOptionsRow').style.display      = isDisplayOnly ? 'none' : '';
+        document.getElementById('modalTypeRow').style.display         = isDisplayOnly ? 'none' : '';
         document.getElementById('modalPlaceholderWrap').style.display = noPlaceholder ? 'none' : '';
         document.getElementById('modalHr').style.display              = isDisplayOnly ? 'none' : '';
 
@@ -773,7 +811,13 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!content) { document.getElementById('modalTextBlockContent').focus(); return; }
         }
 
-        var payload = {label: label, placeholder: placeholder, is_required: isRequired, is_visible: isVisible};
+        // Collect selected ticket type IDs
+        var typeIds = [];
+        document.querySelectorAll('.modal-type-cb:checked').forEach(function (cb) {
+            typeIds.push(parseInt(cb.value));
+        });
+
+        var payload = {label: label, placeholder: placeholder, is_required: isRequired, is_visible: isVisible, type_ids: typeIds};
 
         if (type === 'dropdown') {
             payload.options = currentOptions.map(function (o, i) { return {label: o, sort_order: i}; });
@@ -819,6 +863,29 @@ document.addEventListener('DOMContentLoaded', function () {
                         i.className = 'bi bi-eye-slash text-muted'; i.title = 'Hidden from portal users';
                         row.querySelector('.edit-field-btn').before(i);
                     } else if (isVisible && eyeIcon) { eyeIcon.remove(); }
+                }
+
+                // Update type badge
+                var oldTypeBadge = row.querySelector('.type-badge');
+                if (oldTypeBadge) oldTypeBadge.remove();
+                if (typeIds.length > 0) {
+                    var names = typeIds.map(function (tid) {
+                        var found = ticketTypes.find(function (t) { return parseInt(t.id) === tid; });
+                        return found ? found.name : '';
+                    }).filter(Boolean);
+                    var tb = document.createElement('span');
+                    tb.className = 'badge bg-info type-badge';
+                    tb.style.fontSize = '.65rem';
+                    tb.title = names.join(', ');
+                    tb.textContent = names.length <= 2 ? names.join(', ') : names.length + ' types';
+                    row.querySelector('.field-row-label').after(tb);
+                }
+
+                // Update JS map
+                if (typeIds.length > 0) {
+                    fieldTypeMap[id] = typeIds;
+                } else {
+                    delete fieldTypeMap[id];
                 }
             }
             modal.hide();

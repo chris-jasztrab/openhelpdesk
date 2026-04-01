@@ -153,6 +153,42 @@ function isActive(string $path): bool
     return $current === $path || str_starts_with($current, $path . '/');
 }
 
+/* ── Custom form fields by ticket type ────────────────────────── */
+
+/**
+ * Return custom fields that should appear for a given ticket type.
+ * Fields with no rows in ticket_form_field_type_map are "global" (show for all types).
+ */
+function getCustomFieldsForType(PDO $db, int $typeId, bool $visibleOnly = false): array
+{
+    $visibleClause = $visibleOnly ? 'AND f.is_visible = 1' : '';
+    $stmt = $db->prepare(
+        "SELECT f.*
+         FROM ticket_form_fields f
+         LEFT JOIN ticket_form_field_type_map m ON f.id = m.field_id
+         WHERE f.deleted_at IS NULL {$visibleClause}
+         GROUP BY f.id
+         HAVING COUNT(m.type_id) = 0 OR SUM(m.type_id = ?) > 0
+         ORDER BY f.sort_order"
+    );
+    $stmt->execute([$typeId]);
+    return $stmt->fetchAll();
+}
+
+/**
+ * Return the full field→type mapping as [field_id => [type_id, …]].
+ * Fields with no mapping (global) will not have an entry.
+ */
+function getFieldTypeMap(PDO $db): array
+{
+    $rows = $db->query('SELECT field_id, type_id FROM ticket_form_field_type_map')->fetchAll();
+    $map = [];
+    foreach ($rows as $r) {
+        $map[(int) $r['field_id']][] = (int) $r['type_id'];
+    }
+    return $map;
+}
+
 /* ── Flash messages ───────────────────────────────────────────── */
 
 function flash(string $key, string $message): void
