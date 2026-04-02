@@ -12,6 +12,60 @@ $router->get('/health', function () {
 });
 
 /* ------------------------------------------------------------------
+ * Shared: enforce ticket-level access for JSON API endpoints.
+ * Mirrors _agentRequireTicketAccess() but returns JSON 403 instead of redirect.
+ * ------------------------------------------------------------------ */
+function _apiRequireTicketAccess(PDO $db, int $ticketId): void
+{
+    $role = Auth::role();
+    if ($role === 'admin') {
+        return; // admins: unrestricted
+    }
+
+    $gs = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
+    $gs->execute([Auth::id()]);
+    $agentGroups = array_map('intval', $gs->fetchAll(PDO::FETCH_COLUMN));
+
+    $ts = $db->prepare('SELECT group_id, type_id FROM tickets WHERE id = ?');
+    $ts->execute([$ticketId]);
+    $ticket = $ts->fetch();
+    if (!$ticket) {
+        return; // ticket-not-found is handled by the caller
+    }
+
+    if (empty($agentGroups)) {
+        // Agent not in any group — block confidential tickets they're not authorised for
+        if (!empty($ticket['type_id'])) {
+            $cStmt = $db->prepare('SELECT is_confidential, group_id FROM ticket_types WHERE id = ?');
+            $cStmt->execute([$ticket['type_id']]);
+            $cType = $cStmt->fetch();
+            if ($cType && $cType['is_confidential'] && $cType['group_id']) {
+                $inGroup = $db->prepare('SELECT 1 FROM group_user_map WHERE group_id = ? AND user_id = ?');
+                $inGroup->execute([$cType['group_id'], Auth::id()]);
+                if (!$inGroup->fetchColumn()) {
+                    http_response_code(403);
+                    header('Content-Type: application/json');
+                    echo json_encode(['error' => 'You do not have access to this ticket.']);
+                    exit;
+                }
+            }
+        }
+        return;
+    }
+
+    if ($ticket['group_id'] === null) {
+        return; // unassigned ticket: visible to all agents
+    }
+
+    if (!in_array((int) $ticket['group_id'], $agentGroups, true)) {
+        http_response_code(403);
+        header('Content-Type: application/json');
+        echo json_encode(['error' => 'You do not have access to this ticket.']);
+        exit;
+    }
+}
+
+/* ------------------------------------------------------------------
  * Ticket Tag Management (JSON API)
  * ------------------------------------------------------------------ */
 $router->post('/api/tickets/{id}/tags', function (array $p) {
@@ -39,6 +93,7 @@ $router->post('/api/tickets/{id}/tags', function (array $p) {
     }
 
     $db = Database::connect();
+    _apiRequireTicketAccess($db, $ticketId);
 
     // Verify ticket exists
     $stmt = $db->prepare('SELECT id FROM tickets WHERE id = ?');
@@ -107,6 +162,7 @@ $router->post('/api/tickets/{id}/assign', function (array $p) {
     $assignedTo = ($assignedToRaw !== null && $assignedToRaw !== '') ? (int) $assignedToRaw : null;
 
     $db = Database::connect();
+    _apiRequireTicketAccess($db, $ticketId);
 
     $stmt = $db->prepare('SELECT id, group_id, assigned_to FROM tickets WHERE id = ?');
     $stmt->execute([$ticketId]);
@@ -169,6 +225,7 @@ $router->post('/api/tickets/{id}/set-type', function (array $p) {
                 ? (int) $input['type_id'] : null;
 
     $db = Database::connect();
+    _apiRequireTicketAccess($db, $ticketId);
     $stmt = $db->prepare('SELECT id, type_id FROM tickets WHERE id = ?');
     $stmt->execute([$ticketId]);
     $ticket = $stmt->fetch();
@@ -219,6 +276,7 @@ $router->post('/api/tickets/{id}/set-group', function (array $p) {
                 ? (int) $input['group_id'] : null;
 
     $db = Database::connect();
+    _apiRequireTicketAccess($db, $ticketId);
     $stmt = $db->prepare('SELECT id, group_id FROM tickets WHERE id = ?');
     $stmt->execute([$ticketId]);
     $ticket = $stmt->fetch();
@@ -300,6 +358,11 @@ $router->get('/api/user-search', function () {
  * ------------------------------------------------------------------ */
 $router->get('/api/cc-search', function () {
     Auth::requireAuth();
+    if (!in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)) {
+        http_response_code(403);
+        echo json_encode([]);
+        exit;
+    }
     header('Content-Type: application/json');
 
     $q = trim($_GET['q'] ?? '');
@@ -351,6 +414,7 @@ $router->post('/api/tickets/{id}/cc', function (array $p) {
     }
 
     $db = Database::connect();
+    _apiRequireTicketAccess($db, $ticketId);
 
     // Verify ticket exists
     $stmt = $db->prepare('SELECT id FROM tickets WHERE id = ?');
@@ -438,6 +502,7 @@ $router->post('/api/tickets/{id}/presence', function (array $p) {
         exit;
     }
     $db = Database::connect();
+    _apiRequireTicketAccess($db, (int) $p['id']);
     $db->prepare(
         'INSERT INTO ticket_presence (ticket_id, user_id, last_seen) VALUES (?, ?, NOW())
          ON DUPLICATE KEY UPDATE last_seen = NOW()'
@@ -457,6 +522,7 @@ $router->get('/api/tickets/{id}/presence', function (array $p) {
         exit;
     }
     $db = Database::connect();
+    _apiRequireTicketAccess($db, (int) $p['id']);
     // Clean up stale records (older than 45 seconds)
     $db->prepare(
         'DELETE FROM ticket_presence WHERE last_seen < DATE_SUB(NOW(), INTERVAL 45 SECOND)'
@@ -478,6 +544,7 @@ $router->get('/api/tickets/{id}/presence', function (array $p) {
 $router->post('/api/tickets/{id}/presence/leave', function (array $p) {
     Auth::requireAuth();
     $db = Database::connect();
+    _apiRequireTicketAccess($db, (int) $p['id']);
     $db->prepare(
         'DELETE FROM ticket_presence WHERE ticket_id = ? AND user_id = ?'
     )->execute([(int) $p['id'], Auth::id()]);
@@ -1881,7 +1948,7 @@ $router->get('/agent', function () {
     $stmt = $db->prepare(
         "SELECT t.id, t.subject, t.status, t.created_at, t.group_id, t.sla_state, t.due_date,
                 tp.name AS priority_name, tp.color AS priority_color,
-                tt.name AS type_name, tt.color AS type_color, tt.group_id AS type_group_id,
+                tt.name AS type_name, tt.color AS type_color, tt.is_confidential AS type_confidential, tt.group_id AS type_group_id,
                 g.name AS group_name,
                 l.name AS location_name,
                 CONCAT(c.first_name, ' ', c.last_name) AS creator_name,

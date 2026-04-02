@@ -475,6 +475,8 @@ document.addEventListener('DOMContentLoaded', function () {
     var ticketTypes   = <?= json_encode($ticketTypes) ?>;
 
     /* ─── SortableJS: reorder within custom list only ─── */
+    var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
+
     Sortable.create(list, {
         handle:    '.drag-handle',
         animation: 150,
@@ -493,7 +495,7 @@ document.addEventListener('DOMContentLoaded', function () {
         fetch('/admin/workflows/ticket-fields/add', {
             method:      'POST',
             credentials: 'same-origin',
-            headers:     {'Content-Type': 'application/x-www-form-urlencoded'},
+            headers:     {'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-Token': csrfToken},
             body:        'field_type=' + encodeURIComponent(type)
         })
         .then(function (r) { return r.json(); })
@@ -517,7 +519,7 @@ document.addEventListener('DOMContentLoaded', function () {
         fetch('/admin/workflows/ticket-fields/reorder', {
             method:      'POST',
             credentials: 'same-origin',
-            headers:     {'Content-Type': 'application/json'},
+            headers:     {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
             body:        JSON.stringify({order: order})
         });
     }
@@ -572,7 +574,7 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('deleteFieldConfirmBtn').addEventListener('click', function () {
         bootstrap.Modal.getInstance(document.getElementById('deleteFieldModal')).hide();
         fetch('/admin/workflows/ticket-fields/' + pendingDeleteId + '/delete', {
-            method: 'POST', credentials: 'same-origin'
+            method: 'POST', credentials: 'same-origin', headers: {'X-CSRF-Token': csrfToken}
         })
         .then(function (r) { return r.json(); })
         .then(function (data) {
@@ -808,7 +810,7 @@ document.addEventListener('DOMContentLoaded', function () {
         var fd = new FormData();
         fd.append('image', file);
         fetch('/admin/workflows/ticket-fields/' + id + '/upload-image', {
-            method: 'POST', credentials: 'same-origin', body: fd
+            method: 'POST', credentials: 'same-origin', headers: {'X-CSRF-Token': csrfToken}, body: fd
         })
         .then(function (r) { return r.json(); })
         .then(function (data) {
@@ -867,7 +869,7 @@ document.addEventListener('DOMContentLoaded', function () {
         fetch('/admin/workflows/ticket-fields/' + id + '/update', {
             method:      'POST',
             credentials: 'same-origin',
-            headers:     {'Content-Type': 'application/json'},
+            headers:     {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
             body:        JSON.stringify(payload)
         })
         .then(function (r) { return r.json(); })
@@ -949,7 +951,7 @@ document.addEventListener('DOMContentLoaded', function () {
         fetch('/admin/workflows/ticket-fields/system', {
             method:      'POST',
             credentials: 'same-origin',
-            headers:     { 'Content-Type': 'application/json' },
+            headers:     { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
             body:        JSON.stringify(payload)
         })
         .then(function (r) { return r.json(); })

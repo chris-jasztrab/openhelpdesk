@@ -129,6 +129,7 @@ $allColumns     = ticketColumnDefinitions();
                     <?php if (in_array('sla', $visibleColumns)): ?><th>SLA</th><?php endif; ?>
                     <?php if (in_array('created_at', $visibleColumns)): ?><th>Created</th><?php endif; ?>
                     <?php if (in_array('due_date', $visibleColumns)): ?><th>Due</th><?php endif; ?>
+                    <?php if (in_array('confidential', $visibleColumns)): ?><th style="text-align:center;">Confidential</th><?php endif; ?>
                 </tr>
             </thead>
             <tbody>
@@ -221,6 +222,15 @@ $allColumns     = ticketColumnDefinitions();
                         <?php endif; ?>
                     </td>
                     <?php endif; ?>
+                    <?php if (in_array('confidential', $visibleColumns)): ?>
+                    <td style="white-space:nowrap;text-align:center;">
+                        <?php if (!empty($t['type_confidential'])): ?>
+                        <i class="bi bi-shield-lock text-danger" title="Confidential"></i>
+                        <?php else: ?>
+                        <span class="text-muted">—</span>
+                        <?php endif; ?>
+                    </td>
+                    <?php endif; ?>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
@@ -239,6 +249,7 @@ $allColumns     = ticketColumnDefinitions();
     var activeMenu = null;
     var activeBtn  = null;
     var esc = function (s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+    var safeColor = function (c) { return /^#[0-9a-fA-F]{3,8}$/.test(c) ? c : '#6c757d'; };
 
     function closeMenu() {
         if (activeMenu) { activeMenu.remove(); activeMenu = null; activeBtn = null; }
@@ -264,7 +275,7 @@ $allColumns     = ticketColumnDefinitions();
             if (quickTypes.length) {
                 html += '<li><hr class="dropdown-divider"></li>';
                 quickTypes.forEach(function (tp) {
-                    html += '<li><a class="dropdown-item quick-menu-item" href="#" data-kind="type" data-val="' + esc(tp.id) + '" data-ticket-id="' + esc(ticketId) + '"><span class="badge" style="background:' + esc(tp.color) + ';">' + esc(tp.name) + '</span></a></li>';
+                    html += '<li><a class="dropdown-item quick-menu-item" href="#" data-kind="type" data-val="' + esc(tp.id) + '" data-ticket-id="' + esc(ticketId) + '"><span class="badge" style="background:' + safeColor(tp.color) + ';">' + esc(tp.name) + '</span></a></li>';
                 });
             }
         } else if (kind === 'group') {
@@ -330,7 +341,7 @@ $allColumns     = ticketColumnDefinitions();
                 }).then(function (r) { return r.json(); }).then(function (data) {
                     if (data.success) {
                         if (data.type_name) {
-                            badge.innerHTML = '<span class="badge" style="background:' + esc(data.type_color || '#6c757d') + ';">' + esc(data.type_name) + '</span>';
+                            badge.innerHTML = '<span class="badge" style="background:' + safeColor(data.type_color || '#6c757d') + ';">' + esc(data.type_name) + '</span>';
                         } else {
                             badge.innerHTML = '<span class="text-muted small">Not Set</span>';
                         }

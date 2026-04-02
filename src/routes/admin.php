@@ -560,8 +560,11 @@ $router->post('/admin/users/{id}/delete', function (array $p) {
     $avatar = $db->prepare('SELECT avatar FROM users WHERE id = ?');
     $avatar->execute([$id]);
     $file = $avatar->fetchColumn();
-    if ($file && file_exists(ROOT_DIR . '/public/uploads/avatars/' . $file)) {
-        unlink(ROOT_DIR . '/public/uploads/avatars/' . $file);
+    if ($file) {
+        $file = basename($file);
+        if (file_exists(ROOT_DIR . '/public/uploads/avatars/' . $file)) {
+            unlink(ROOT_DIR . '/public/uploads/avatars/' . $file);
+        }
     }
 
     $nameStmt = $db->prepare('SELECT CONCAT(first_name, " ", last_name, " (", email, ")") FROM users WHERE id = ?');
@@ -3443,17 +3446,23 @@ $router->get('/admin/kb/articles', function () {
     Auth::requireRole('admin');
     $db = Database::connect();
     $authorId = isset($_GET['author']) ? (int) $_GET['author'] : 0;
-    $where = $authorId ? 'WHERE a.created_by = ' . $authorId : '';
-    $articles = $db->query(
-        "SELECT a.*, f.name AS folder_name, c.name AS category_name,
+    $sql = "SELECT a.*, f.name AS folder_name, c.name AS category_name,
                 CONCAT(u.first_name, ' ', u.last_name) AS author_name
          FROM kb_articles a
          LEFT JOIN kb_folders f    ON a.folder_id   = f.id
          LEFT JOIN kb_categories c ON f.category_id = c.id
-         LEFT JOIN users u         ON a.created_by  = u.id
-         {$where} ORDER BY a.updated_at DESC"
-    )->fetchAll();
-    $authorFilter = $authorId ? $db->query("SELECT CONCAT(first_name, ' ', last_name) AS name FROM users WHERE id = " . $authorId)->fetchColumn() : null;
+         LEFT JOIN users u         ON a.created_by  = u.id"
+         . ($authorId ? ' WHERE a.created_by = ?' : '')
+         . ' ORDER BY a.updated_at DESC';
+    $stmt = $db->prepare($sql);
+    $stmt->execute($authorId ? [$authorId] : []);
+    $articles = $stmt->fetchAll();
+    $authorFilter = null;
+    if ($authorId) {
+        $afStmt = $db->prepare("SELECT CONCAT(first_name, ' ', last_name) AS name FROM users WHERE id = ?");
+        $afStmt->execute([$authorId]);
+        $authorFilter = $afStmt->fetchColumn() ?: null;
+    }
     render('admin/kb/articles/index', ['articles' => $articles, 'authorFilter' => $authorFilter, 'authorId' => $authorId]);
 });
 
@@ -5841,7 +5850,7 @@ $router->post('/admin/settings/branding', function () {
     }
 
     // Handle logo upload
-    $currentLogo = getSetting('branding_logo', '');
+    $currentLogo = basename(getSetting('branding_logo', ''));
 
     // Remove logo checkbox
     if (!empty($_POST['remove_logo'])) {
@@ -8277,7 +8286,7 @@ $router->post('/admin/workflows/ticket-fields/{id}/upload-image', function (arra
     $cfgRow->execute([$id]);
     $oldCfg = json_decode($cfgRow->fetchColumn() ?? '{}', true);
     if (!empty($oldCfg['image_path'])) {
-        $oldFile = ROOT_DIR . '/public/uploads/field-images/' . $oldCfg['image_path'];
+        $oldFile = ROOT_DIR . '/public/uploads/field-images/' . basename($oldCfg['image_path']);
         if (file_exists($oldFile)) {
             unlink($oldFile);
         }

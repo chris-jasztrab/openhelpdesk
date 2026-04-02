@@ -92,6 +92,7 @@
         const input   = document.getElementById('pubSearchInput');
         const results = document.getElementById('pub-search-results');
         if (!input) return;
+        function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
         let timer;
         input.addEventListener('input', function () {
             clearTimeout(timer);
@@ -103,9 +104,9 @@
                     .then(data => {
                         if (!data.length) { results.style.display = 'none'; return; }
                         results.innerHTML = data.map(a =>
-                            `<a href="/kb/articles/${a.slug}">
-                                <div>${a.title}</div>
-                                <div class="text-muted">${a.category_name} › ${a.folder_name}</div>
+                            `<a href="/kb/articles/${encodeURIComponent(a.slug)}">
+                                <div>${esc(a.title)}</div>
+                                <div class="text-muted">${esc(a.category_name)} › ${esc(a.folder_name)}</div>
                             </a>`
                         ).join('');
                         results.style.display = 'block';
