@@ -17,7 +17,7 @@ $breadcrumbs  = [
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h5 class="fw-bold mb-1">SLA Policies</h5>
-        <p class="text-muted mb-0">Define response and resolution targets for each priority level. Times are in business minutes.</p>
+        <p class="text-muted mb-0">Define response and resolution targets per ticket type and priority. Times are in business minutes.</p>
     </div>
     <button type="button" class="btn btn-outline-secondary"
             data-bs-toggle="modal" data-bs-target="#recalcSlaModal">
@@ -35,54 +35,45 @@ $breadcrumbs  = [
         <form method="POST" action="/admin/settings/sla-policies">
             <?= csrfField() ?>
 
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Priority</th>
-                            <th style="width:200px">First Response (minutes)</th>
-                            <th style="width:200px">Resolution (minutes)</th>
-                            <th style="width:180px">Human-readable</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($priorities as $pri): ?>
-                        <?php
-                        $policy = $policies[(int) $pri['id']] ?? null;
-                        $frMin = $policy ? (int) $policy['first_response_minutes'] : 0;
-                        $resMin = $policy ? (int) $policy['resolution_minutes'] : 0;
-                        ?>
-                        <tr>
-                            <td>
-                                <span class="badge" style="background:<?= e($pri['color']) ?>;"><?= e($pri['name']) ?></span>
-                            </td>
-                            <td>
-                                <input type="number" class="form-control form-control-sm sla-input"
-                                       name="policies[<?= $pri['id'] ?>][first_response_minutes]"
-                                       value="<?= $frMin ?>" min="0" placeholder="e.g. 60"
-                                       data-target="fr_<?= $pri['id'] ?>">
-                            </td>
-                            <td>
-                                <input type="number" class="form-control form-control-sm sla-input"
-                                       name="policies[<?= $pri['id'] ?>][resolution_minutes]"
-                                       value="<?= $resMin ?>" min="0" placeholder="e.g. 480"
-                                       data-target="res_<?= $pri['id'] ?>">
-                            </td>
-                            <td class="text-muted small">
-                                <span id="fr_<?= $pri['id'] ?>"><?= $frMin > 0 ? formatMinutes($frMin) : '—' ?></span> /
-                                <span id="res_<?= $pri['id'] ?>"><?= $resMin > 0 ? formatMinutes($resMin) : '—' ?></span>
-                            </td>
-                        </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
+            <!-- Tabs -->
+            <ul class="nav nav-tabs mb-3" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="sla-tab-default" data-bs-toggle="tab" data-bs-target="#sla-pane-default"
+                            type="button" role="tab" aria-controls="sla-pane-default" aria-selected="true">
+                        Default
+                    </button>
+                </li>
+                <?php foreach ($types as $type): ?>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="sla-tab-<?= $type['id'] ?>" data-bs-toggle="tab" data-bs-target="#sla-pane-<?= $type['id'] ?>"
+                            type="button" role="tab" aria-controls="sla-pane-<?= $type['id'] ?>" aria-selected="false">
+                        <span class="badge me-1" style="background:<?= e($type['color']) ?>;">&nbsp;</span><?= e($type['name']) ?>
+                    </button>
+                </li>
+                <?php endforeach; ?>
+            </ul>
+
+            <div class="tab-content">
+                <!-- Default tab -->
+                <div class="tab-pane fade show active" id="sla-pane-default" role="tabpanel" aria-labelledby="sla-tab-default">
+                    <p class="text-muted small mb-3">These are the fallback SLA targets used when no type-specific policy is defined.</p>
+                    <?php renderSlaPriorityTable($priorities, $policies[0] ?? [], 0); ?>
+                </div>
+
+                <!-- Per-type tabs -->
+                <?php foreach ($types as $type): ?>
+                <div class="tab-pane fade" id="sla-pane-<?= $type['id'] ?>" role="tabpanel" aria-labelledby="sla-tab-<?= $type['id'] ?>">
+                    <p class="text-muted small mb-3">Override SLA targets for <strong><?= e($type['name']) ?></strong> tickets. Leave at 0 to use the default policy.</p>
+                    <?php renderSlaPriorityTable($priorities, $policies[(int) $type['id']] ?? [], (int) $type['id'], $policies[0] ?? []); ?>
+                </div>
+                <?php endforeach; ?>
             </div>
 
             <hr class="my-4">
 
             <div class="d-flex justify-content-between align-items-center">
                 <div class="form-text">
-                    Set both values to 0 to disable SLA for a priority. Times count only business hours.
+                    Set both values to 0 (or leave empty) to disable SLA for a priority. Type-specific values of 0 inherit the default. Times count only business hours.
                 </div>
                 <button type="submit" class="btn text-white" style="background:var(--ld-primary);">
                     <i class="bi bi-check-lg me-1"></i>Save Policies
@@ -92,6 +83,78 @@ $breadcrumbs  = [
     </div>
 </div>
 <?php endif; ?>
+
+<?php
+/**
+ * Render the priority grid table for a given type tab.
+ *
+ * @param array    $priorities   All priorities
+ * @param array    $typePolicies Policies for this type, keyed by priority_id
+ * @param int      $typeKey      0 for default, or type_id
+ * @param array    $defaults     Default policies (for showing inheritance hints), empty for the default tab
+ */
+function renderSlaPriorityTable(array $priorities, array $typePolicies, int $typeKey, array $defaults = []): void {
+    $isDefault = $typeKey === 0;
+?>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Priority</th>
+                    <th style="width:200px">First Response (minutes)</th>
+                    <th style="width:200px">Resolution (minutes)</th>
+                    <th style="width:200px">Human-readable</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($priorities as $pri): ?>
+                <?php
+                $policy = $typePolicies[(int) $pri['id']] ?? null;
+                $frMin = $policy ? (int) $policy['first_response_minutes'] : 0;
+                $resMin = $policy ? (int) $policy['resolution_minutes'] : 0;
+                $defPolicy = $defaults[(int) $pri['id']] ?? null;
+                $defFr = $defPolicy ? (int) $defPolicy['first_response_minutes'] : 0;
+                $defRes = $defPolicy ? (int) $defPolicy['resolution_minutes'] : 0;
+                $uid = $typeKey . '_' . $pri['id'];
+                ?>
+                <tr>
+                    <td>
+                        <span class="badge" style="background:<?= e($pri['color']) ?>;"><?= e($pri['name']) ?></span>
+                    </td>
+                    <td>
+                        <input type="number" class="form-control form-control-sm sla-input"
+                               name="policies[<?= $typeKey ?>][<?= $pri['id'] ?>][first_response_minutes]"
+                               value="<?= $frMin ?>" min="0"
+                               placeholder="<?= !$isDefault && $defFr > 0 ? e($defFr) : 'e.g. 60' ?>"
+                               data-target="fr_<?= $uid ?>"
+                               data-type-key="<?= $typeKey ?>"
+                               data-default-val="<?= $defFr ?>">
+                    </td>
+                    <td>
+                        <input type="number" class="form-control form-control-sm sla-input"
+                               name="policies[<?= $typeKey ?>][<?= $pri['id'] ?>][resolution_minutes]"
+                               value="<?= $resMin ?>" min="0"
+                               placeholder="<?= !$isDefault && $defRes > 0 ? e($defRes) : 'e.g. 480' ?>"
+                               data-target="res_<?= $uid ?>"
+                               data-type-key="<?= $typeKey ?>"
+                               data-default-val="<?= $defRes ?>">
+                    </td>
+                    <td class="text-muted small">
+                        <?php if (!$isDefault && $frMin === 0 && $resMin === 0 && ($defFr > 0 || $defRes > 0)): ?>
+                            <span id="fr_<?= $uid ?>" class="text-info"><?= $defFr > 0 ? formatMinutes($defFr) : '—' ?></span> /
+                            <span id="res_<?= $uid ?>" class="text-info"><?= $defRes > 0 ? formatMinutes($defRes) : '—' ?></span>
+                            <span class="badge bg-info bg-opacity-10 text-info ms-1">default</span>
+                        <?php else: ?>
+                            <span id="fr_<?= $uid ?>"><?= $frMin > 0 ? formatMinutes($frMin) : '—' ?></span> /
+                            <span id="res_<?= $uid ?>"><?= $resMin > 0 ? formatMinutes($resMin) : '—' ?></span>
+                        <?php endif; ?>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+<?php } ?>
 
 <script>
 function formatMins(m) {
@@ -108,7 +171,21 @@ function formatMins(m) {
 document.querySelectorAll('.sla-input').forEach(function(input) {
     input.addEventListener('input', function() {
         var target = document.getElementById(this.dataset.target);
-        if (target) target.textContent = formatMins(this.value);
+        if (!target) return;
+        var val = parseInt(this.value) || 0;
+        var typeKey = this.dataset.typeKey;
+        var defVal = parseInt(this.dataset.defaultVal) || 0;
+
+        if (val > 0) {
+            target.textContent = formatMins(val);
+            target.className = 'text-muted small';
+        } else if (typeKey !== '0' && defVal > 0) {
+            target.textContent = formatMins(defVal);
+            target.className = 'text-info';
+        } else {
+            target.textContent = '—';
+            target.className = 'text-muted small';
+        }
     });
 });
 </script>

@@ -2196,6 +2196,11 @@ $router->post('/admin/tickets/create', function () {
         'INSERT INTO ticket_timeline (ticket_id, user_id, action, details) VALUES (?, ?, ?, ?)'
     )->execute([$ticketId, Auth::id(), 'created', 'Ticket created by ' . Auth::fullName() . '.']);
 
+    // Initialize SLA timers if priority is set
+    if ($priId) {
+        Sla::initializeForTicket($db, $ticketId, $priId, $typeId);
+    }
+
     // Automations
     runAutomations($db, $ticketId, 'ticket_created');
 
@@ -3082,7 +3087,7 @@ $router->post('/admin/tickets/{id}/update', function (array $p) {
         $changes[] = 'priority';
 
         if ($newPriority) {
-            Sla::onPriorityChanged($db, $id, $newPriority);
+            Sla::onPriorityChanged($db, $id, $newPriority, $ticket['type_id'] ? (int) $ticket['type_id'] : null);
         }
     }
 
@@ -3158,6 +3163,9 @@ $router->post('/admin/tickets/{id}/update', function (array $p) {
             'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
         )->execute([$id, Auth::id(), 'type_changed', "Type changed from {$oldTypeName} to {$newTypeName}"]);
         $changes[] = 'type';
+
+        // Recalculate SLA for new type
+        Sla::onTypeChanged($db, $id, $newType);
     }
 
     // Run automations on ticket update
@@ -4508,15 +4516,18 @@ $router->get('/admin/settings/sla-policies', function () {
     Auth::requireRole('admin');
     $db = Database::connect();
     $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
+    $types = $db->query('SELECT * FROM ticket_types ORDER BY name')->fetchAll();
 
-    // Load existing policies
+    // Load existing policies keyed by [typeKey][priorityId]
+    // typeKey 0 = default (type_id IS NULL)
     $policyStmt = $db->query('SELECT * FROM sla_policies');
     $policies = [];
     while ($row = $policyStmt->fetch()) {
-        $policies[(int) $row['priority_id']] = $row;
+        $typeKey = $row['type_id'] ? (int) $row['type_id'] : 0;
+        $policies[$typeKey][(int) $row['priority_id']] = $row;
     }
 
-    render('admin/settings/sla-policies', ['priorities' => $priorities, 'policies' => $policies]);
+    render('admin/settings/sla-policies', ['priorities' => $priorities, 'policies' => $policies, 'types' => $types]);
 });
 
 $router->post('/admin/settings/sla-policies', function () {
@@ -4529,22 +4540,23 @@ $router->post('/admin/settings/sla-policies', function () {
     $db = Database::connect();
     $policiesData = $_POST['policies'] ?? [];
 
-    $upsert = $db->prepare(
-        'INSERT INTO sla_policies (priority_id, first_response_minutes, resolution_minutes)
-         VALUES (?, ?, ?)
-         ON DUPLICATE KEY UPDATE first_response_minutes = VALUES(first_response_minutes), resolution_minutes = VALUES(resolution_minutes)'
+    // Delete all existing policies and re-insert (simplest for the nested type+priority structure)
+    $db->exec('DELETE FROM sla_policies');
+
+    $insert = $db->prepare(
+        'INSERT INTO sla_policies (type_id, priority_id, first_response_minutes, resolution_minutes) VALUES (?, ?, ?, ?)'
     );
-    $delete = $db->prepare('DELETE FROM sla_policies WHERE priority_id = ?');
 
-    foreach ($policiesData as $priorityId => $data) {
-        $priorityId = (int) $priorityId;
-        $firstResponse = (int) ($data['first_response_minutes'] ?? 0);
-        $resolution = (int) ($data['resolution_minutes'] ?? 0);
+    foreach ($policiesData as $typeKey => $priorities) {
+        $typeId = (int) $typeKey === 0 ? null : (int) $typeKey;
+        foreach ($priorities as $priorityId => $data) {
+            $priorityId = (int) $priorityId;
+            $firstResponse = (int) ($data['first_response_minutes'] ?? 0);
+            $resolution = (int) ($data['resolution_minutes'] ?? 0);
 
-        if ($firstResponse > 0 && $resolution > 0) {
-            $upsert->execute([$priorityId, $firstResponse, $resolution]);
-        } else {
-            $delete->execute([$priorityId]);
+            if ($firstResponse > 0 && $resolution > 0) {
+                $insert->execute([$typeId, $priorityId, $firstResponse, $resolution]);
+            }
         }
     }
 

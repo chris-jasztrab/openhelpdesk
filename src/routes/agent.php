@@ -1497,7 +1497,7 @@ $router->post('/agent/tickets/{id}/update', function (array $p) {
         $changes[] = 'priority';
 
         if ($newPriority) {
-            Sla::onPriorityChanged($db, $id, $newPriority);
+            Sla::onPriorityChanged($db, $id, $newPriority, $ticket['type_id'] ? (int) $ticket['type_id'] : null);
         }
     }
 
@@ -1573,6 +1573,9 @@ $router->post('/agent/tickets/{id}/update', function (array $p) {
             'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
         )->execute([$id, Auth::id(), 'type_changed', "Type changed from {$oldTypeName} to {$newTypeName}"]);
         $changes[] = 'type';
+
+        // Recalculate SLA for new type
+        Sla::onTypeChanged($db, $id, $newType);
     }
 
     // Run automations on ticket update

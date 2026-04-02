@@ -427,7 +427,7 @@ $router->post('/portal/tickets/create', function () {
 
     // Initialize SLA timers if priority is set and SLA is configured
     if ($priorityId) {
-        Sla::initializeForTicket($db, $ticketId, $priorityId);
+        Sla::initializeForTicket($db, $ticketId, $priorityId, $typeId);
     }
 
     $msg = 'Ticket #' . $ticketId . ' created successfully.';

@@ -209,21 +209,44 @@ class Sla
     }
 
     /**
-     * Initialize SLA for a newly created ticket.
-     * Sets first_response_due_at and resolution_due_at based on priority's SLA policy.
+     * Find the best-matching SLA policy for a type+priority combination.
+     * Checks for a type-specific policy first, then falls back to the default (NULL type).
      */
-    public static function initializeForTicket(PDO $db, int $ticketId, int $priorityId): void
+    private static function findPolicy(PDO $db, ?int $typeId, int $priorityId): ?array
+    {
+        if ($typeId !== null) {
+            $stmt = $db->prepare(
+                'SELECT first_response_minutes, resolution_minutes FROM sla_policies WHERE type_id = ? AND priority_id = ?'
+            );
+            $stmt->execute([$typeId, $priorityId]);
+            $policy = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($policy) {
+                return $policy;
+            }
+        }
+        // Fallback: default policy (type_id IS NULL)
+        $stmt = $db->prepare(
+            'SELECT first_response_minutes, resolution_minutes FROM sla_policies WHERE type_id IS NULL AND priority_id = ?'
+        );
+        $stmt->execute([$priorityId]);
+        $policy = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $policy ?: null;
+    }
+
+    /**
+     * Initialize SLA for a newly created ticket.
+     * Sets first_response_due_at and resolution_due_at based on the best-matching SLA policy.
+     */
+    public static function initializeForTicket(PDO $db, int $ticketId, int $priorityId, ?int $typeId = null): void
     {
         $biz = self::getBusinessSchedule();
         if ($biz === null) {
             return; // No business hours configured
         }
 
-        $policy = $db->prepare('SELECT first_response_minutes, resolution_minutes FROM sla_policies WHERE priority_id = ?');
-        $policy->execute([$priorityId]);
-        $sla = $policy->fetch(PDO::FETCH_ASSOC);
+        $sla = self::findPolicy($db, $typeId, $priorityId);
         if (!$sla) {
-            return; // No SLA policy for this priority
+            return; // No SLA policy for this type+priority
         }
 
         $excluded = self::getExcludedDates($db);
@@ -324,16 +347,14 @@ class Sla
     /**
      * Recalculate SLA due dates when priority changes.
      */
-    public static function onPriorityChanged(PDO $db, int $ticketId, int $newPriorityId): void
+    public static function onPriorityChanged(PDO $db, int $ticketId, int $newPriorityId, ?int $typeId = null): void
     {
         $biz = self::getBusinessSchedule();
         if ($biz === null) {
             return;
         }
 
-        $policy = $db->prepare('SELECT first_response_minutes, resolution_minutes FROM sla_policies WHERE priority_id = ?');
-        $policy->execute([$newPriorityId]);
-        $sla = $policy->fetch(PDO::FETCH_ASSOC);
+        $sla = self::findPolicy($db, $typeId, $newPriorityId);
 
         if (!$sla) {
             // No policy for new priority — clear SLA
@@ -351,6 +372,62 @@ class Sla
             return;
         }
 
+        $excluded = self::getExcludedDates($db);
+        $createdAt = new DateTimeImmutable($ticket['created_at'], new DateTimeZone($biz['tz']));
+        $responseDue = self::addBusinessMinutes($createdAt, (int) $sla['first_response_minutes'], $biz['tz'], $biz['schedule'], $excluded);
+        $resolutionDue = self::addBusinessMinutes($createdAt, (int) $sla['resolution_minutes'], $biz['tz'], $biz['schedule'], $excluded);
+
+        $db->prepare(
+            'UPDATE tickets SET first_response_due_at = ?, resolution_due_at = ? WHERE id = ?'
+        )->execute([
+            $responseDue->format('Y-m-d H:i:s'),
+            $resolutionDue->format('Y-m-d H:i:s'),
+            $ticketId,
+        ]);
+
+        // Recalculate state immediately
+        $stmt = $db->prepare(
+            'SELECT id, created_at, first_response_due_at, resolution_due_at, first_responded_at, sla_state, sla_paused_at FROM tickets WHERE id = ?'
+        );
+        $stmt->execute([$ticketId]);
+        $updated = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($updated) {
+            $newState = self::computeSlaState($updated);
+            if ($newState !== null) {
+                $db->prepare('UPDATE tickets SET sla_state = ? WHERE id = ?')->execute([$newState, $ticketId]);
+            }
+        }
+    }
+
+    /**
+     * Recalculate SLA due dates when ticket type changes.
+     */
+    public static function onTypeChanged(PDO $db, int $ticketId, ?int $newTypeId): void
+    {
+        $biz = self::getBusinessSchedule();
+        if ($biz === null) {
+            return;
+        }
+
+        $stmt = $db->prepare('SELECT created_at, priority_id, first_responded_at FROM tickets WHERE id = ?');
+        $stmt->execute([$ticketId]);
+        $ticket = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$ticket || empty($ticket['priority_id'])) {
+            return; // No priority set — no SLA to calculate
+        }
+
+        $priorityId = (int) $ticket['priority_id'];
+        $sla = self::findPolicy($db, $newTypeId, $priorityId);
+
+        if (!$sla) {
+            // No policy for new type+priority — clear SLA
+            $db->prepare(
+                'UPDATE tickets SET first_response_due_at = NULL, resolution_due_at = NULL, sla_state = NULL WHERE id = ?'
+            )->execute([$ticketId]);
+            return;
+        }
+
+        // Recalculate from ticket creation time
         $excluded = self::getExcludedDates($db);
         $createdAt = new DateTimeImmutable($ticket['created_at'], new DateTimeZone($biz['tz']));
         $responseDue = self::addBusinessMinutes($createdAt, (int) $sla['first_response_minutes'], $biz['tz'], $biz['schedule'], $excluded);

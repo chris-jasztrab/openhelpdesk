@@ -1844,7 +1844,7 @@ function runEscalationRule(\PDO $db, array $rule, array $ticket): void
                 $db->prepare('INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, ?, ?, 1)')
                    ->execute([$ticketId, 'priority_changed', "Priority set to {$name} by escalation rule"]);
                 if ($newPriority) {
-                    \Sla::onPriorityChanged($db, $ticketId, $newPriority);
+                    \Sla::onPriorityChanged($db, $ticketId, $newPriority, $ticket['type_id'] ? (int) $ticket['type_id'] : null);
                 }
                 break;
 
@@ -2662,7 +2662,7 @@ function runAutomations(PDO $db, int $ticketId, string $triggerEvent): void
                         $s = $db->prepare('SELECT name FROM ticket_priorities WHERE id = ?');
                         $s->execute([$priorityId]);
                         $priorityName = $s->fetchColumn() ?: 'Unknown';
-                        Sla::onPriorityChanged($db, $ticketId, $priorityId);
+                        Sla::onPriorityChanged($db, $ticketId, $priorityId, $ticket['type_id'] ? (int) $ticket['type_id'] : null);
                     }
                     $db->prepare(
                         'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, ?, ?, 1)'

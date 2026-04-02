@@ -665,7 +665,7 @@ $router->post('/api/v1/tickets', function () {
 
     // Initialise SLA if priority is set
     if ($priorityId) {
-        Sla::initializeForTicket($db, $ticketId, $priorityId);
+        Sla::initializeForTicket($db, $ticketId, $priorityId, $typeId);
     }
 
     // Return the new ticket with joins
@@ -868,7 +868,7 @@ $router->post('/api/v1/tickets/{id}/update', function (array $p) {
             )->execute([$ticketId, $userId, 'priority_changed', "Priority changed from {$oldName} to {$newName}"]);
             $changes[] = 'priority';
             if ($newPriority) {
-                Sla::onPriorityChanged($db, $ticketId, $newPriority);
+                Sla::onPriorityChanged($db, $ticketId, $newPriority, $ticket['type_id'] ? (int) $ticket['type_id'] : null);
             }
         }
     }

@@ -238,14 +238,18 @@ CREATE TABLE IF NOT EXISTS `notifications` (
     FOREIGN KEY (`mentioned_by`) REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- SLA policies (per priority)
+-- SLA policies (per ticket type + priority, with default fallback)
 CREATE TABLE IF NOT EXISTS `sla_policies` (
     `id`                     INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    `priority_id`            INT UNSIGNED NOT NULL UNIQUE,
+    `type_id`                INT UNSIGNED NULL,
+    `type_id_norm`           INT UNSIGNED GENERATED ALWAYS AS (COALESCE(type_id, 0)) STORED,
+    `priority_id`            INT UNSIGNED NOT NULL,
     `first_response_minutes` INT UNSIGNED NOT NULL DEFAULT 60,
     `resolution_minutes`     INT UNSIGNED NOT NULL DEFAULT 480,
     `created_at`             TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     `updated_at`             TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY `uniq_type_priority` (`type_id_norm`, `priority_id`),
+    FOREIGN KEY (`type_id`)     REFERENCES `ticket_types`(`id`) ON DELETE CASCADE,
     FOREIGN KEY (`priority_id`) REFERENCES `ticket_priorities`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
