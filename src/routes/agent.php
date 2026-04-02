@@ -250,7 +250,8 @@ $router->get('/agent/tickets', function () {
     $sql = "SELECT t.*,
                 tp.name AS priority_name, tp.color AS priority_color,
                 l.name  AS location_name,
-                tt.name AS type_name, tt.color AS type_color, tt.group_id AS type_group_id,
+                tt.name AS type_name, tt.color AS type_color,
+                tt.is_confidential AS type_confidential, tt.group_id AS type_group_id,
                 g.name  AS group_name,
                 CONCAT(c.first_name, ' ', c.last_name) AS creator_name,
                 CONCAT(a.first_name, ' ', a.last_name) AS agent_name

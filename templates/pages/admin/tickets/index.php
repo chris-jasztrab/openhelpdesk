@@ -414,6 +414,9 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                     <?php if (in_array('due_date', $visibleColumns)): ?>
                     <th style="white-space:nowrap;"><a href="<?= sortUrl('due_date', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Due <?= sortIcon('due_date', $sort, $dir) ?></a></th>
                     <?php endif; ?>
+                    <?php if (in_array('confidential', $visibleColumns)): ?>
+                    <th style="white-space:nowrap;text-align:center;">Confidential</th>
+                    <?php endif; ?>
                 </tr>
             </thead>
             <tbody>
@@ -530,6 +533,15 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                                 </span>
                             <?php else: ?>
                                 —
+                            <?php endif; ?>
+                        </td>
+                        <?php endif; ?>
+                        <?php if (in_array('confidential', $visibleColumns)): ?>
+                        <td style="white-space:nowrap;text-align:center;">
+                            <?php if (!empty($t['type_confidential'])): ?>
+                            <i class="bi bi-shield-lock text-danger" title="Confidential"></i>
+                            <?php else: ?>
+                            <span class="text-muted">—</span>
                             <?php endif; ?>
                         </td>
                         <?php endif; ?>

@@ -595,27 +595,34 @@ function label(string $key, string $default = ''): string
 function ticketColumnDefinitions(): array
 {
     return [
-        'status'     => 'Status',
-        'priority'   => 'Priority',
-        'type'       => 'Type',
-        'agent'      => 'Assigned To',
-        'group'      => 'Group',
-        'creator'    => 'Created By',
-        'location'   => 'Location',
-        'sla'        => 'SLA',
-        'created_at' => 'Created',
-        'due_date'   => 'Due',
+        'status'       => 'Status',
+        'priority'     => 'Priority',
+        'type'         => 'Type',
+        'agent'        => 'Assigned To',
+        'group'        => 'Group',
+        'creator'      => 'Created By',
+        'location'     => 'Location',
+        'sla'          => 'SLA',
+        'created_at'   => 'Created',
+        'due_date'     => 'Due',
+        'confidential' => 'Confidential',
     ];
+}
+
+/** Columns hidden by default — users must opt-in via the Columns picker. */
+function ticketColumnsHiddenByDefault(): array
+{
+    return ['confidential'];
 }
 
 function getUserColumns(int $userId): array
 {
     $json = getSetting("ticket_columns:{$userId}", '');
     if ($json === '') {
-        return array_keys(ticketColumnDefinitions());
+        return array_diff(array_keys(ticketColumnDefinitions()), ticketColumnsHiddenByDefault());
     }
     $cols = json_decode($json, true);
-    return is_array($cols) ? $cols : array_keys(ticketColumnDefinitions());
+    return is_array($cols) ? $cols : array_diff(array_keys(ticketColumnDefinitions()), ticketColumnsHiddenByDefault());
 }
 
 function setUserColumns(int $userId, array $columns): void
