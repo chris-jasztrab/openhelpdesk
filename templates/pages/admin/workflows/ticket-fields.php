@@ -622,9 +622,9 @@ document.addEventListener('DOMContentLoaded', function () {
         var isDisplayOnly  = displayOnlyTypes.indexOf(field.field_type) !== -1;
         var noPlaceholder  = noPlaceholderTypes.indexOf(field.field_type) !== -1;
         document.getElementById('modalOptionsRow').style.display      = isDisplayOnly ? 'none' : '';
-        document.getElementById('modalTypeRow').style.display         = isDisplayOnly ? 'none' : '';
+        document.getElementById('modalTypeRow').style.display         = '';
         document.getElementById('modalPlaceholderWrap').style.display = noPlaceholder ? 'none' : '';
-        document.getElementById('modalHr').style.display              = isDisplayOnly ? 'none' : '';
+        document.getElementById('modalHr').style.display              = '';
 
         document.querySelectorAll('.field-section').forEach(function (s) { s.classList.remove('active'); });
 
