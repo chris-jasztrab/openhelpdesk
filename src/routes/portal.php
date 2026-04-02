@@ -158,11 +158,10 @@ $router->get('/portal/tickets/create', function () {
         }
     }
 
-    // Load visible custom form fields
-    $customFields = $db->query(
-        'SELECT * FROM ticket_form_fields WHERE is_visible = 1 AND deleted_at IS NULL ORDER BY sort_order'
-    )->fetchAll();
-    $fieldOptions = [];
+    // Unified field list (system + custom) for rendering
+    $unifiedFields = getUnifiedFieldList($db, true);
+    $customFields  = array_map(fn($u) => $u['field'], array_filter($unifiedFields, fn($u) => $u['kind'] === 'custom'));
+    $fieldOptions  = [];
     foreach ($customFields as $f) {
         if (in_array($f['field_type'], ['dropdown', 'dependent'], true)) {
             $s = $db->prepare(
@@ -197,6 +196,7 @@ $router->get('/portal/tickets/create', function () {
         'fieldOptions'      => $fieldOptions,
         'sharedTemplates'   => $sharedTemplates,
         'fieldTypeMap'      => $fieldTypeMap,
+        'unifiedFields'     => $unifiedFields,
     ]);
 });
 

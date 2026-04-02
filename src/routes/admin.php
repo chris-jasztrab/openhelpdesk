@@ -2062,11 +2062,10 @@ $router->get('/admin/tickets/create', function () {
         'SELECT * FROM ticket_templates ORDER BY name'
     )->fetchAll();
 
-    // Custom form fields for type-specific forms
-    $customFields = $db->query(
-        'SELECT * FROM ticket_form_fields WHERE deleted_at IS NULL ORDER BY sort_order'
-    )->fetchAll();
-    $fieldOptions = [];
+    // Unified field list (system + custom) for rendering
+    $unifiedFields = getUnifiedFieldList($db, false);
+    $customFields  = array_map(fn($u) => $u['field'], array_filter($unifiedFields, fn($u) => $u['kind'] === 'custom'));
+    $fieldOptions  = [];
     foreach ($customFields as $f) {
         if (in_array($f['field_type'], ['dropdown', 'dependent'], true)) {
             $s = $db->prepare(
@@ -2079,16 +2078,17 @@ $router->get('/admin/tickets/create', function () {
     $fieldTypeMap = getFieldTypeMap($db);
 
     render('admin/tickets/create', [
-        'types'        => $types,
-        'priorities'   => $priorities,
-        'locations'    => $locations,
-        'groups'       => $groups,
-        'agents'       => $agents,
-        'templates'    => $templates,
-        'isAgent'      => false,
-        'customFields' => $customFields,
-        'fieldOptions' => $fieldOptions,
-        'fieldTypeMap' => $fieldTypeMap,
+        'types'         => $types,
+        'priorities'    => $priorities,
+        'locations'     => $locations,
+        'groups'        => $groups,
+        'agents'        => $agents,
+        'templates'     => $templates,
+        'isAgent'       => false,
+        'customFields'  => $customFields,
+        'fieldOptions'  => $fieldOptions,
+        'fieldTypeMap'  => $fieldTypeMap,
+        'unifiedFields' => $unifiedFields,
     ]);
 });
 
@@ -7766,6 +7766,9 @@ $router->get('/admin/workflows/ticket-fields', function () {
     Auth::requireRole('admin');
     $db = Database::connect();
 
+    // One-time migration to unified sort order numbering
+    normalizeFieldSortOrders($db);
+
     $fields = $db->query('SELECT * FROM ticket_form_fields WHERE deleted_at IS NULL ORDER BY sort_order')->fetchAll();
 
     // Load options for each field that needs them
@@ -7888,7 +7891,7 @@ $router->post('/admin/workflows/ticket-fields/add', function () {
     exit;
 });
 
-// Reorder fields (AJAX)
+// Reorder fields (AJAX) — unified system + custom
 $router->post('/admin/workflows/ticket-fields/reorder', function () {
     Auth::requireRole('admin');
     header('Content-Type: application/json');
@@ -7901,10 +7904,16 @@ $router->post('/admin/workflows/ticket-fields/reorder', function () {
         exit;
     }
 
+    $systemKeys = ['ticket_type', 'location', 'priority', 'tags', 'attachments'];
     $db   = Database::connect();
-    $stmt = $db->prepare('UPDATE ticket_form_fields SET sort_order = ? WHERE id = ?');
-    foreach ($order as $i => $fid) {
-        $stmt->execute([$i, (int) $fid]);
+    $cfStmt = $db->prepare('UPDATE ticket_form_fields SET sort_order = ? WHERE id = ?');
+
+    foreach ($order as $i => $item) {
+        if (in_array($item, $systemKeys, true)) {
+            setSetting("sys_field_sort_order_{$item}", (string) $i);
+        } else {
+            $cfStmt->execute([$i, (int) $item]);
+        }
     }
 
     echo json_encode(['success' => true]);

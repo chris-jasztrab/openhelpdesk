@@ -107,13 +107,19 @@ $statusOptions = [
                 </div>
             </div>
 
-            <!-- Classification -->
+            <!-- Classification & Custom Fields (unified order) -->
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-transparent fw-semibold">
-                    <i class="bi bi-tags me-1"></i>Classification
+                    <i class="bi bi-tags me-1"></i>Classification & Details
                 </div>
                 <div class="card-body">
                     <div class="row g-3">
+                    <?php
+                    $portalMode = false;
+                    foreach ($unifiedFields as $uf):
+                        if ($uf['kind'] === 'system'):
+                    ?>
+                        <?php if ($uf['key'] === 'ticket_type'): ?>
                         <div class="col-md-6">
                             <label for="type_id" class="form-label fw-semibold">Type</label>
                             <select class="form-select" id="type_id" name="type_id">
@@ -122,18 +128,6 @@ $statusOptions = [
                                     <option value="<?= $t['id'] ?>"
                                         <?= old('type_id', '') == $t['id'] ? 'selected' : '' ?>>
                                         <?= e($t['name']) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label for="priority_id" class="form-label fw-semibold">Priority</label>
-                            <select class="form-select" id="priority_id" name="priority_id">
-                                <option value="">— None —</option>
-                                <?php foreach ($priorities as $pri): ?>
-                                    <option value="<?= $pri['id'] ?>"
-                                        <?= old('priority_id', '') == $pri['id'] ? 'selected' : '' ?>>
-                                        <?= e($pri['name']) ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
@@ -149,6 +143,20 @@ $statusOptions = [
                                 <?php endforeach; ?>
                             </select>
                         </div>
+                        <?php elseif ($uf['key'] === 'priority'): ?>
+                        <div class="col-md-6">
+                            <label for="priority_id" class="form-label fw-semibold">Priority</label>
+                            <select class="form-select" id="priority_id" name="priority_id">
+                                <option value="">— None —</option>
+                                <?php foreach ($priorities as $pri): ?>
+                                    <option value="<?= $pri['id'] ?>"
+                                        <?= old('priority_id', '') == $pri['id'] ? 'selected' : '' ?>>
+                                        <?= e($pri['name']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <?php elseif ($uf['key'] === 'location'): ?>
                         <div class="col-md-6">
                             <label for="location_id" class="form-label fw-semibold"><?= label('location.singular') ?></label>
                             <select class="form-select" id="location_id" name="location_id">
@@ -166,6 +174,34 @@ $statusOptions = [
                             <input type="date" class="form-control" id="due_date" name="due_date"
                                    value="<?= e(old('due_date', '')) ?>">
                         </div>
+                        <?php elseif ($uf['key'] === 'tags'): ?>
+                        <?php if (getSetting('tags_enabled', '1') === '1'): ?>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Tags</label>
+                            <div class="d-flex flex-wrap gap-2 mb-2" id="tagBadges"></div>
+                            <div class="input-group" style="max-width:320px;">
+                                <span class="input-group-text text-muted">#</span>
+                                <input type="text" class="form-control" id="tagInput"
+                                       placeholder="Add a tag and press Enter"
+                                       autocomplete="off">
+                            </div>
+                            <div id="tagHiddenFields"></div>
+                            <div class="form-text mt-1">Press Enter or comma to add a tag.</div>
+                        </div>
+                        <?php endif; ?>
+                        <?php elseif ($uf['key'] === 'attachments'): ?>
+                        <!-- Attachments not shown on admin create form -->
+                        <?php endif; ?>
+                    <?php else:
+                        $cf    = $uf['field'];
+                        $cfKey = 'field_' . $cf['id'];
+                        $cfOpts = $fieldOptions[$cf['id']] ?? [];
+                    ?>
+                        <div class="col-12">
+                            <?php include ROOT_DIR . '/templates/partials/custom-field-input.php'; ?>
+                        </div>
+                    <?php endif;
+                    endforeach; ?>
                     </div>
                 </div>
             </div>
@@ -245,170 +281,6 @@ $statusOptions = [
                 </div>
             </div>
 
-            <?php if (getSetting('tags_enabled', '1') === '1'): ?>
-            <!-- Tags -->
-            <div class="card border-0 shadow-sm mb-4">
-                <div class="card-header bg-transparent fw-semibold">
-                    <i class="bi bi-tag me-1"></i>Tags
-                </div>
-                <div class="card-body">
-                    <div class="d-flex flex-wrap gap-2 mb-2" id="tagBadges"></div>
-                    <div class="input-group" style="max-width:320px;">
-                        <span class="input-group-text text-muted">#</span>
-                        <input type="text" class="form-control" id="tagInput"
-                               placeholder="Add a tag and press Enter"
-                               autocomplete="off">
-                    </div>
-                    <div id="tagHiddenFields"></div>
-                    <div class="form-text mt-1">Press Enter or comma to add a tag.</div>
-                </div>
-            </div>
-            <?php endif; ?>
-
-            <?php if (!empty($customFields)): ?>
-            <!-- Custom Fields -->
-            <div style="max-height:0; overflow:hidden; transition:max-height 0.4s ease;" id="customFieldsCardWrap">
-            <div class="card shadow-sm mb-4" id="customFieldsCard"
-                 style="border:none; border-left:3px solid var(--ld-primary, #0d6efd);">
-                <div class="card-header bg-transparent fw-semibold">
-                    <i class="bi bi-sliders me-1"></i>Additional Information
-                </div>
-                <div class="card-body">
-                    <?php foreach ($customFields as $cf):
-                        $cfKey  = 'field_' . $cf['id'];
-                        $cfOpts = $fieldOptions[$cf['id']] ?? [];
-                    ?>
-                    <?php if ($cf['field_type'] === 'text_block'):
-                        $tbCfg = $cf['config'] ? (is_string($cf['config']) ? json_decode($cf['config'], true) : $cf['config']) : [];
-                    ?>
-                    <div class="mb-3 custom-field-wrap" data-field-id="<?= (int) $cf['id'] ?>">
-                        <?php if (!empty($cf['label'])): ?>
-                        <p class="fw-semibold mb-1"><?= e($cf['label']) ?></p>
-                        <?php endif; ?>
-                        <div class="border rounded p-3 bg-light text-secondary small" style="white-space:pre-wrap;"><?= e($tbCfg['content'] ?? '') ?></div>
-                    </div>
-                    <?php elseif ($cf['field_type'] === 'image'):
-                        $imgCfg = $cf['config'] ? (is_string($cf['config']) ? json_decode($cf['config'], true) : $cf['config']) : [];
-                    ?>
-                    <div class="mb-3 custom-field-wrap" data-field-id="<?= (int) $cf['id'] ?>">
-                        <?php if (!empty($imgCfg['image_path'])): ?>
-                        <img src="/uploads/field-images/<?= e($imgCfg['image_path']) ?>"
-                             alt="<?= e($cf['label']) ?>" class="img-fluid rounded" style="max-height:400px;">
-                        <?php if (!empty($cf['label'])): ?>
-                        <p class="text-muted small mt-1"><?= e($cf['label']) ?></p>
-                        <?php endif; ?>
-                        <?php endif; ?>
-                    </div>
-                    <?php else: ?>
-                    <div class="mb-3 custom-field-wrap" data-field-id="<?= (int) $cf['id'] ?>">
-                        <label class="form-label fw-semibold">
-                            <?= e($cf['label']) ?>
-                            <?php if ($cf['is_required']): ?><span class="text-danger ms-1">*</span><?php endif; ?>
-                        </label>
-
-                        <?php if ($cf['field_type'] === 'text'): ?>
-                        <input type="text" class="form-control" name="<?= e($cfKey) ?>"
-                               placeholder="<?= e($cf['placeholder'] ?? '') ?>"
-                               value="<?= e(old($cfKey)) ?>">
-
-                        <?php elseif ($cf['field_type'] === 'textarea'): ?>
-                        <textarea class="form-control" name="<?= e($cfKey) ?>" rows="3"
-                                  placeholder="<?= e($cf['placeholder'] ?? '') ?>"><?= e(old($cfKey)) ?></textarea>
-
-                        <?php elseif ($cf['field_type'] === 'checkbox'): ?>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" name="<?= e($cfKey) ?>" value="1"
-                                   id="<?= e($cfKey) ?>" <?= old($cfKey) ? 'checked' : '' ?>>
-                            <label class="form-check-label" for="<?= e($cfKey) ?>">Yes</label>
-                        </div>
-
-                        <?php elseif ($cf['field_type'] === 'dropdown'): ?>
-                        <select class="form-select" name="<?= e($cfKey) ?>">
-                            <option value="">— Select —</option>
-                            <?php foreach ($cfOpts as $opt): ?>
-                            <option value="<?= (int) $opt['id'] ?>"
-                                <?= old($cfKey) == $opt['id'] ? 'selected' : '' ?>>
-                                <?= e($opt['label']) ?>
-                            </option>
-                            <?php endforeach; ?>
-                        </select>
-
-                        <?php elseif ($cf['field_type'] === 'date'): ?>
-                        <input type="date" class="form-control" name="<?= e($cfKey) ?>"
-                               value="<?= e(old($cfKey)) ?>">
-
-                        <?php elseif ($cf['field_type'] === 'date_range'): ?>
-                        <div class="row g-2">
-                            <div class="col">
-                                <label class="form-label small">From</label>
-                                <input type="date" class="form-control" name="<?= e($cfKey) ?>_from"
-                                       value="<?= e(old($cfKey . '_from')) ?>">
-                            </div>
-                            <div class="col">
-                                <label class="form-label small">To</label>
-                                <input type="date" class="form-control" name="<?= e($cfKey) ?>_to"
-                                       value="<?= e(old($cfKey . '_to')) ?>">
-                            </div>
-                        </div>
-
-                        <?php elseif ($cf['field_type'] === 'number'): ?>
-                        <input type="number" step="1" class="form-control" name="<?= e($cfKey) ?>"
-                               placeholder="<?= e($cf['placeholder'] ?? '') ?>"
-                               value="<?= e(old($cfKey)) ?>">
-
-                        <?php elseif ($cf['field_type'] === 'decimal'): ?>
-                        <input type="number" step="0.01" class="form-control" name="<?= e($cfKey) ?>"
-                               placeholder="<?= e($cf['placeholder'] ?? '') ?>"
-                               value="<?= e(old($cfKey)) ?>">
-
-                        <?php elseif ($cf['field_type'] === 'dependent'):
-                            $config  = $cf['config'] ? (is_string($cf['config']) ? json_decode($cf['config'], true) : $cf['config']) : [];
-                            $levels  = (int) ($config['levels']   ?? 3);
-                            $l1Label = $config['l1_label'] ?? 'Category';
-                            $l2Label = $config['l2_label'] ?? 'Subcategory';
-                            $l3Label = $config['l3_label'] ?? 'Item';
-                            $l1Opts  = array_filter($cfOpts, fn($o) => !$o['parent_option_id']);
-                        ?>
-                        <div class="row g-2" id="dep_wrap_<?= (int) $cf['id'] ?>">
-                            <div class="col-md-4">
-                                <label class="form-label small"><?= e($l1Label) ?></label>
-                                <select class="form-select form-select-sm dep-l1"
-                                        name="<?= e($cfKey) ?>_l1"
-                                        data-field="<?= (int) $cf['id'] ?>">
-                                    <option value="">— Select —</option>
-                                    <?php foreach ($l1Opts as $opt): ?>
-                                    <option value="<?= (int) $opt['id'] ?>"><?= e($opt['label']) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <div class="col-md-4" id="dep_l2_wrap_<?= (int) $cf['id'] ?>" style="display:none;">
-                                <label class="form-label small"><?= e($l2Label) ?></label>
-                                <select class="form-select form-select-sm dep-l2"
-                                        name="<?= e($cfKey) ?>_l2"
-                                        data-field="<?= (int) $cf['id'] ?>">
-                                    <option value="">— Select —</option>
-                                </select>
-                            </div>
-                            <?php if ($levels >= 3): ?>
-                            <div class="col-md-4" id="dep_l3_wrap_<?= (int) $cf['id'] ?>" style="display:none;">
-                                <label class="form-label small"><?= e($l3Label) ?></label>
-                                <select class="form-select form-select-sm dep-l3"
-                                        name="<?= e($cfKey) ?>_l3"
-                                        data-field="<?= (int) $cf['id'] ?>">
-                                    <option value="">— Select —</option>
-                                </select>
-                            </div>
-                            <?php endif; ?>
-                        </div>
-                        <?php endif; ?>
-                    </div>
-                    <?php endif; ?>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-            </div><!-- /customFieldsCardWrap -->
-            <?php endif; ?>
-
             <div class="d-flex gap-2">
                 <button type="submit" class="btn text-white px-4" style="background:var(--ld-primary);">
                     <i class="bi bi-plus-lg me-1"></i>Create Ticket
@@ -424,27 +296,17 @@ $statusOptions = [
 // ── Custom field type filtering ────────────────────────────────
 <?php if (!empty($customFields)): ?>
 (function() {
-    var fieldTypeMap        = <?= json_encode($fieldTypeMap ?: new stdClass()) ?>;
-    var typeSelect          = document.getElementById('type_id');
-    var customFieldCardWrap = document.getElementById('customFieldsCardWrap');
+    var fieldTypeMap = <?= json_encode($fieldTypeMap ?: new stdClass()) ?>;
+    var typeSelect   = document.getElementById('type_id');
 
     function filterFieldsByType() {
         var selectedType = parseInt(typeSelect.value) || 0;
-        var anyVisible   = false;
         document.querySelectorAll('.custom-field-wrap').forEach(function(wrap) {
             var fieldId = wrap.dataset.fieldId;
             var types   = fieldTypeMap[fieldId] || [];
             var show    = selectedType > 0 && (types.length === 0 || types.indexOf(selectedType) !== -1);
             wrap.style.display = show ? '' : 'none';
-            if (show) anyVisible = true;
         });
-        if (customFieldCardWrap) {
-            if (anyVisible) {
-                customFieldCardWrap.style.maxHeight = customFieldCardWrap.scrollHeight + 'px';
-            } else {
-                customFieldCardWrap.style.maxHeight = '0';
-            }
-        }
     }
 
     typeSelect.addEventListener('change', filterFieldsByType);

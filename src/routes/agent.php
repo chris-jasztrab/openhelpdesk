@@ -611,11 +611,10 @@ $router->get('/agent/tickets/create', function () {
     )->fetchAll();
     $templates  = $db->query('SELECT * FROM ticket_templates ORDER BY name')->fetchAll();
 
-    // Custom form fields for type-specific forms
-    $customFields = $db->query(
-        'SELECT * FROM ticket_form_fields WHERE deleted_at IS NULL ORDER BY sort_order'
-    )->fetchAll();
-    $fieldOptions = [];
+    // Unified field list (system + custom) for rendering
+    $unifiedFields = getUnifiedFieldList($db, false);
+    $customFields  = array_map(fn($u) => $u['field'], array_filter($unifiedFields, fn($u) => $u['kind'] === 'custom'));
+    $fieldOptions  = [];
     foreach ($customFields as $f) {
         if (in_array($f['field_type'], ['dropdown', 'dependent'], true)) {
             $s = $db->prepare(
@@ -628,17 +627,18 @@ $router->get('/agent/tickets/create', function () {
     $fieldTypeMap = getFieldTypeMap($db);
 
     render('admin/tickets/create', [
-        'types'        => $types,
-        'priorities'   => $priorities,
-        'locations'    => $locations,
-        'groups'       => $groups,
-        'agents'       => $agents,
-        'templates'    => $templates,
-        'isAgent'      => true,
-        'formAction'   => '/admin/tickets/create',
-        'customFields' => $customFields,
-        'fieldOptions' => $fieldOptions,
-        'fieldTypeMap' => $fieldTypeMap,
+        'types'         => $types,
+        'priorities'    => $priorities,
+        'locations'     => $locations,
+        'groups'        => $groups,
+        'agents'        => $agents,
+        'templates'     => $templates,
+        'isAgent'       => true,
+        'formAction'    => '/admin/tickets/create',
+        'customFields'  => $customFields,
+        'fieldOptions'  => $fieldOptions,
+        'fieldTypeMap'  => $fieldTypeMap,
+        'unifiedFields' => $unifiedFields,
     ]);
 });
 

@@ -17,18 +17,42 @@ $fieldTypeMeta = [
     'date_range' => ['label' => 'Date Range',     'icon' => 'bi-calendar-range'],
 ];
 
-// Built-in (system) fields — label and (for priority/tags) required are configurable
-$systemFieldsTop = [
+// Pinned fields — always at the very top, not draggable
+$pinnedFields = [
     ['key' => 'subject',     'label' => $sysFs['label_subject'],     'icon' => 'bi-input-cursor-text', 'badge' => 'Required', 'editable' => true,  'has_required' => false],
     ['key' => 'description', 'label' => $sysFs['label_description'], 'icon' => 'bi-textarea-t',        'badge' => 'Required', 'editable' => true,  'has_required' => false],
-    ['key' => 'ticket_type', 'label' => $sysFs['label_ticket_type'], 'icon' => 'bi-tag',               'badge' => 'Required', 'editable' => true,  'has_required' => false],
-    ['key' => 'location',    'label' => label('location.singular'),  'icon' => 'bi-geo-alt',            'badge' => 'Auto',     'editable' => false, 'has_required' => false],
-    ['key' => 'priority',    'label' => $sysFs['label_priority'],    'icon' => 'bi-flag',               'badge' => $sysFs['required_priority'] === '1' ? 'Required' : 'Optional', 'editable' => true, 'has_required' => true],
-    ['key' => 'tags',        'label' => $sysFs['label_tags'],        'icon' => 'bi-hash',               'badge' => $sysFs['required_tags'] === '1' ? 'Required' : 'Optional',     'editable' => true, 'has_required' => true],
 ];
-$systemFieldsBottom = [
-    ['key' => 'attachments', 'label' => $sysFs['label_attachments'], 'icon' => 'bi-paperclip', 'badge' => 'Optional', 'editable' => true, 'has_required' => false],
+
+// System fields that participate in unified ordering
+$orderableSystemMeta = [
+    'ticket_type' => ['label' => $sysFs['label_ticket_type'], 'icon' => 'bi-tag',       'badge' => 'Required', 'editable' => true,  'has_required' => false],
+    'location'    => ['label' => label('location.singular'),   'icon' => 'bi-geo-alt',    'badge' => 'Auto',     'editable' => false, 'has_required' => false],
+    'priority'    => ['label' => $sysFs['label_priority'],     'icon' => 'bi-flag',       'badge' => $sysFs['required_priority'] === '1' ? 'Required' : 'Optional', 'editable' => true, 'has_required' => true],
+    'tags'        => ['label' => $sysFs['label_tags'],         'icon' => 'bi-hash',       'badge' => $sysFs['required_tags'] === '1' ? 'Required' : 'Optional',     'editable' => true, 'has_required' => true],
+    'attachments' => ['label' => $sysFs['label_attachments'],  'icon' => 'bi-paperclip',  'badge' => 'Optional', 'editable' => true,  'has_required' => false],
 ];
+
+// Build unified list for the form builder
+$defaults = systemFieldSortDefaults();
+$unifiedBuilderList = [];
+foreach ($orderableSystemMeta as $key => $meta) {
+    if ($key === 'tags' && getSetting('tags_enabled', '1') !== '1') continue;
+    $unifiedBuilderList[] = [
+        'kind'       => 'system',
+        'key'        => $key,
+        'sort_order' => (int) getSetting("sys_field_sort_order_{$key}", (string) $defaults[$key]),
+        'meta'       => $meta,
+    ];
+}
+foreach ($fields as $f) {
+    $unifiedBuilderList[] = [
+        'kind'       => 'custom',
+        'key'        => (string) $f['id'],
+        'sort_order' => (int) $f['sort_order'],
+        'field'      => $f,
+    ];
+}
+usort($unifiedBuilderList, fn($a, $b) => $a['sort_order'] <=> $b['sort_order']);
 ?>
 <style>
     .field-row {
@@ -50,13 +74,20 @@ $systemFieldsBottom = [
     .field-row .drag-handle:active { cursor: grabbing; }
     .field-row-label { flex: 1; font-size: .9rem; font-weight: 500; }
 
-    /* System rows — slightly muted */
+    /* Pinned system rows — slightly muted, not draggable */
     .field-row.system-row {
         background: #f8fafc;
         border-style: dashed;
         opacity: .85;
     }
     .field-row.system-row .drag-handle { visibility: hidden; }
+
+    /* Orderable system rows — draggable, distinctive background */
+    .field-row.system-row-orderable {
+        background: #f0f4ff;
+        border: 1px solid #c7d2fe;
+        border-radius: .5rem;
+    }
 
     /* Section divider */
     .custom-section-label {
@@ -101,6 +132,7 @@ $systemFieldsBottom = [
 
     [data-bs-theme="dark"] .field-row { background: var(--bs-secondary-bg); border-color: #373b3e; }
     [data-bs-theme="dark"] .field-row.system-row { background: var(--bs-tertiary-bg); }
+    [data-bs-theme="dark"] .field-row.system-row-orderable { background: #1e293b; border-color: #475569; }
     [data-bs-theme="dark"] .opt-pill { background: #2b3035; border-color: #495057; }
     [data-bs-theme="dark"] .custom-empty { border-color: #495057; }
 </style>
@@ -136,109 +168,102 @@ $systemFieldsBottom = [
     </div>
     <div class="card-body p-3">
 
-        <!-- Built-in fields (top) -->
+        <!-- Pinned fields (Subject & Description) — not draggable -->
         <div class="custom-section-label">
-            <i class="bi bi-lock me-1"></i>System Fields
-            <span class="text-muted fw-normal">&nbsp;— click <i class="bi bi-pencil"></i> to rename</span>
+            <i class="bi bi-pin-angle me-1"></i>Pinned Fields
+            <span class="text-muted fw-normal">&nbsp;— always first on the form</span>
         </div>
-        <?php foreach ($systemFieldsTop as $sf): ?>
+        <?php foreach ($pinnedFields as $pf): ?>
         <div class="field-row system-row">
             <i class="bi bi-grip-vertical drag-handle"></i>
-            <i class="bi <?= e($sf['icon']) ?> text-muted" style="font-size:1rem;flex-shrink:0;"></i>
-            <span class="field-row-label sys-field-label-text" data-key="<?= e($sf['key']) ?>"><?= e($sf['label']) ?></span>
-            <span class="badge bg-secondary" style="font-size:.65rem;">System</span>
-            <?php
-                $badgeClass = match($sf['badge']) {
-                    'Required' => 'bg-danger',
-                    'Auto'     => 'bg-info',
-                    default    => 'bg-light text-secondary border'
-                };
-            ?>
-            <span class="badge <?= $badgeClass ?> sys-field-badge" style="font-size:.65rem;" data-key="<?= e($sf['key']) ?>"><?= e($sf['badge']) ?></span>
-            <?php if ($sf['editable']): ?>
+            <i class="bi <?= e($pf['icon']) ?> text-muted" style="font-size:1rem;flex-shrink:0;"></i>
+            <span class="field-row-label sys-field-label-text" data-key="<?= e($pf['key']) ?>"><?= e($pf['label']) ?></span>
+            <span class="badge bg-secondary" style="font-size:.65rem;">Pinned</span>
+            <span class="badge bg-danger" style="font-size:.65rem;"><?= e($pf['badge']) ?></span>
             <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 edit-sys-field-btn"
-                    data-key="<?= e($sf['key']) ?>"
-                    data-label="<?= e($sf['label']) ?>"
-                    data-has-required="<?= $sf['has_required'] ? '1' : '0' ?>"
-                    data-required="<?= isset($sysFs['required_' . $sf['key']]) ? $sysFs['required_' . $sf['key']] : '0' ?>">
+                    data-key="<?= e($pf['key']) ?>"
+                    data-label="<?= e($pf['label']) ?>"
+                    data-has-required="0"
+                    data-required="0">
                 <i class="bi bi-pencil"></i>
             </button>
-            <?php endif; ?>
         </div>
         <?php endforeach; ?>
 
-        <!-- Custom fields (sortable) -->
+        <!-- Unified sortable list — system + custom fields interleaved -->
         <div class="custom-section-label mt-3">
-            <i class="bi bi-sliders me-1"></i>Custom Fields
+            <i class="bi bi-arrows-move me-1"></i>Form Fields
             <span class="text-muted fw-normal">&nbsp;— drag <i class="bi bi-grip-vertical"></i> to reorder</span>
         </div>
-        <div id="customFieldList">
-            <?php if (empty($fields)): ?>
+        <div id="unifiedFieldList">
+            <?php if (empty($unifiedBuilderList)): ?>
             <div class="custom-empty" id="emptyState">
                 <i class="bi bi-layout-text-window-reverse fs-2 d-block mb-2 text-muted"></i>
                 No custom fields yet. Use <strong>Add Custom Field</strong> above to add fields to the form.
             </div>
             <?php else: ?>
-            <?php foreach ($fields as $field):
-                $meta = $fieldTypeMeta[$field['field_type']] ?? ['label' => $field['field_type'], 'icon' => 'bi-question'];
-            ?>
-            <?php
-                $typeIds = $fieldTypeMap[$field['id']] ?? [];
-                $typeNames = [];
-                if ($typeIds) {
-                    foreach ($ticketTypes as $tt) {
-                        if (in_array((int) $tt['id'], $typeIds, true)) $typeNames[] = $tt['name'];
+            <?php foreach ($unifiedBuilderList as $item): ?>
+                <?php if ($item['kind'] === 'system'):
+                    $sf = $item['meta'];
+                    $badgeClass = match($sf['badge']) {
+                        'Required' => 'bg-danger',
+                        'Auto'     => 'bg-info',
+                        default    => 'bg-light text-secondary border'
+                    };
+                ?>
+                <div class="field-row system-row-orderable" data-system-key="<?= e($item['key']) ?>">
+                    <i class="bi bi-grip-vertical drag-handle"></i>
+                    <i class="bi <?= e($sf['icon']) ?> text-muted" style="font-size:1rem;flex-shrink:0;"></i>
+                    <span class="field-row-label sys-field-label-text" data-key="<?= e($item['key']) ?>"><?= e($sf['label']) ?></span>
+                    <span class="badge bg-secondary" style="font-size:.65rem;">System</span>
+                    <span class="badge <?= $badgeClass ?> sys-field-badge" style="font-size:.65rem;" data-key="<?= e($item['key']) ?>"><?= e($sf['badge']) ?></span>
+                    <?php if ($sf['editable']): ?>
+                    <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 edit-sys-field-btn"
+                            data-key="<?= e($item['key']) ?>"
+                            data-label="<?= e($sf['label']) ?>"
+                            data-has-required="<?= $sf['has_required'] ? '1' : '0' ?>"
+                            data-required="<?= isset($sysFs['required_' . $item['key']]) ? $sysFs['required_' . $item['key']] : '0' ?>">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <?php endif; ?>
+                </div>
+                <?php else:
+                    $field = $item['field'];
+                    $meta = $fieldTypeMeta[$field['field_type']] ?? ['label' => $field['field_type'], 'icon' => 'bi-question'];
+                    $typeIds = $fieldTypeMap[$field['id']] ?? [];
+                    $typeNames = [];
+                    if ($typeIds) {
+                        foreach ($ticketTypes as $tt) {
+                            if (in_array((int) $tt['id'], $typeIds, true)) $typeNames[] = $tt['name'];
+                        }
                     }
-                }
-            ?>
-            <div class="field-row" data-field-id="<?= (int) $field['id'] ?>" data-field-type="<?= e($field['field_type']) ?>">
-                <i class="bi bi-grip-vertical drag-handle"></i>
-                <span class="badge bg-secondary" style="font-size:.68rem;"><?= e($meta['label']) ?></span>
-                <span class="field-row-label"><?= e($field['label']) ?></span>
-                <?php if (!empty($typeNames)): ?>
-                <span class="badge bg-info type-badge" style="font-size:.65rem;" title="<?= e(implode(', ', $typeNames)) ?>">
-                    <?= count($typeNames) <= 2 ? e(implode(', ', $typeNames)) : count($typeNames) . ' types' ?>
-                </span>
+                ?>
+                <div class="field-row" data-field-id="<?= (int) $field['id'] ?>" data-field-type="<?= e($field['field_type']) ?>">
+                    <i class="bi bi-grip-vertical drag-handle"></i>
+                    <span class="badge bg-secondary" style="font-size:.68rem;"><?= e($meta['label']) ?></span>
+                    <span class="field-row-label"><?= e($field['label']) ?></span>
+                    <?php if (!empty($typeNames)): ?>
+                    <span class="badge bg-info type-badge" style="font-size:.65rem;" title="<?= e(implode(', ', $typeNames)) ?>">
+                        <?= count($typeNames) <= 2 ? e(implode(', ', $typeNames)) : count($typeNames) . ' types' ?>
+                    </span>
+                    <?php endif; ?>
+                    <?php if ($field['is_required']): ?>
+                    <span class="badge bg-danger" style="font-size:.65rem;">Required</span>
+                    <?php endif; ?>
+                    <?php if (!$field['is_visible']): ?>
+                    <i class="bi bi-eye-slash text-muted" title="Hidden from portal users"></i>
+                    <?php endif; ?>
+                    <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2 edit-field-btn" data-field-id="<?= (int) $field['id'] ?>">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2 delete-field-btn" data-field-id="<?= (int) $field['id'] ?>">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
                 <?php endif; ?>
-                <?php if ($field['is_required']): ?>
-                <span class="badge bg-danger" style="font-size:.65rem;">Required</span>
-                <?php endif; ?>
-                <?php if (!$field['is_visible']): ?>
-                <i class="bi bi-eye-slash text-muted" title="Hidden from portal users"></i>
-                <?php endif; ?>
-                <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2 edit-field-btn" data-field-id="<?= (int) $field['id'] ?>">
-                    <i class="bi bi-pencil"></i>
-                </button>
-                <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2 delete-field-btn" data-field-id="<?= (int) $field['id'] ?>">
-                    <i class="bi bi-trash"></i>
-                </button>
-            </div>
             <?php endforeach; ?>
             <?php endif; ?>
         </div>
-
-        <!-- Built-in fields (bottom) -->
-        <div class="custom-section-label mt-3">
-            <i class="bi bi-lock me-1"></i>System Fields (continued)
-        </div>
-        <?php foreach ($systemFieldsBottom as $sf): ?>
-        <div class="field-row system-row">
-            <i class="bi bi-grip-vertical drag-handle"></i>
-            <i class="bi <?= e($sf['icon']) ?> text-muted" style="font-size:1rem;flex-shrink:0;"></i>
-            <span class="field-row-label sys-field-label-text" data-key="<?= e($sf['key']) ?>"><?= e($sf['label']) ?></span>
-            <span class="badge bg-secondary" style="font-size:.65rem;">System</span>
-            <span class="badge bg-light text-secondary border sys-field-badge" style="font-size:.65rem;" data-key="<?= e($sf['key']) ?>"><?= e($sf['badge']) ?></span>
-            <?php if ($sf['editable']): ?>
-            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 edit-sys-field-btn"
-                    data-key="<?= e($sf['key']) ?>"
-                    data-label="<?= e($sf['label']) ?>"
-                    data-has-required="<?= $sf['has_required'] ? '1' : '0' ?>"
-                    data-required="0">
-                <i class="bi bi-pencil"></i>
-            </button>
-            <?php endif; ?>
-        </div>
-        <?php endforeach; ?>
 
     </div>
 </div>
@@ -441,7 +466,7 @@ $systemFieldsBottom = [
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    var list       = document.getElementById('customFieldList');
+    var list       = document.getElementById('unifiedFieldList');
     var countBadge = document.getElementById('fieldCountBadge');
     var modal      = new bootstrap.Modal(document.getElementById('fieldModal'));
 
@@ -485,8 +510,10 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function saveOrder() {
-        var rows  = list.querySelectorAll('.field-row[data-field-id]');
-        var order = Array.from(rows).map(function (r) { return r.dataset.fieldId; });
+        var rows  = list.querySelectorAll('[data-field-id], [data-system-key]');
+        var order = Array.from(rows).map(function (r) {
+            return r.dataset.systemKey || r.dataset.fieldId;
+        });
         fetch('/admin/workflows/ticket-fields/reorder', {
             method:      'POST',
             credentials: 'same-origin',

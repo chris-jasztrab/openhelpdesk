@@ -189,6 +189,98 @@ function getFieldTypeMap(PDO $db): array
     return $map;
 }
 
+/* ── Unified field list (system + custom, sorted) ────────────── */
+
+/**
+ * Default sort_order values for orderable system fields.
+ * Subject and Description are always pinned first and are NOT included.
+ */
+function systemFieldSortDefaults(): array
+{
+    return [
+        'ticket_type' => 100,
+        'location'    => 200,
+        'priority'    => 300,
+        'tags'        => 400,
+        'attachments' => 900,
+    ];
+}
+
+/**
+ * Build a unified, sorted list of system fields and custom fields.
+ * Subject and Description are excluded — they are always pinned at the top.
+ *
+ * Each entry: ['kind' => 'system'|'custom', 'key' => string, 'sort_order' => int, 'field' => array|null]
+ */
+function getUnifiedFieldList(PDO $db, bool $visibleOnly = false): array
+{
+    $defaults = systemFieldSortDefaults();
+    $unified  = [];
+
+    foreach ($defaults as $key => $defaultOrder) {
+        if ($key === 'tags' && getSetting('tags_enabled', '1') !== '1') {
+            continue;
+        }
+        $unified[] = [
+            'kind'       => 'system',
+            'key'        => $key,
+            'sort_order' => (int) getSetting("sys_field_sort_order_{$key}", (string) $defaultOrder),
+            'field'      => null,
+        ];
+    }
+
+    $visibleClause = $visibleOnly ? 'AND f.is_visible = 1' : '';
+    $rows = $db->query(
+        "SELECT f.*
+         FROM ticket_form_fields f
+         WHERE f.deleted_at IS NULL {$visibleClause}
+         ORDER BY f.sort_order"
+    )->fetchAll();
+
+    foreach ($rows as $cf) {
+        $unified[] = [
+            'kind'       => 'custom',
+            'key'        => 'field_' . $cf['id'],
+            'sort_order' => (int) $cf['sort_order'],
+            'field'      => $cf,
+        ];
+    }
+
+    usort($unified, function ($a, $b) {
+        $cmp = $a['sort_order'] <=> $b['sort_order'];
+        return $cmp !== 0 ? $cmp : ($a['kind'] === 'system' ? 0 : 1) <=> ($b['kind'] === 'system' ? 0 : 1);
+    });
+
+    return $unified;
+}
+
+/**
+ * One-time migration: when sys_field_sort_order_ticket_type has never been set,
+ * renumber all custom field sort_orders to fit into the unified numbering scheme.
+ * Custom fields get placed between tags (400) and attachments (900).
+ */
+function normalizeFieldSortOrders(PDO $db): void
+{
+    if (getSetting('sys_field_sort_order_ticket_type', '') !== '') {
+        return; // Already initialized
+    }
+
+    // Set system field defaults
+    foreach (systemFieldSortDefaults() as $key => $val) {
+        setSetting("sys_field_sort_order_{$key}", (string) $val);
+    }
+
+    // Renumber custom fields starting at 410 (between tags=400 and attachments=900)
+    $fields = $db->query(
+        'SELECT id FROM ticket_form_fields WHERE deleted_at IS NULL ORDER BY sort_order'
+    )->fetchAll();
+    $stmt = $db->prepare('UPDATE ticket_form_fields SET sort_order = ? WHERE id = ?');
+    $start = 410;
+    foreach ($fields as $i => $f) {
+        $stmt->execute([$start + $i, (int) $f['id']]);
+    }
+}
+
 /* ── Flash messages ───────────────────────────────────────────── */
 
 function flash(string $key, string $message): void
