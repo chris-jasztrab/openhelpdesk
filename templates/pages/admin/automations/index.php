@@ -164,6 +164,12 @@ $renderConditions = function (array $conditions) use ($renderCond): string {
                         </td>
                         <td>
                             <div class="d-flex gap-1">
+                                <button type="button" class="btn btn-sm btn-outline-warning" title="Run on existing tickets"
+                                        data-bs-toggle="modal" data-bs-target="#runAutomationModal"
+                                        data-id="<?= $auto['id'] ?>"
+                                        data-name="<?= e($auto['name']) ?>">
+                                    <i class="bi bi-play-fill"></i>
+                                </button>
                                 <a href="/admin/settings/automations/<?= $auto['id'] ?>/edit" class="btn btn-sm btn-outline-primary" title="Edit">
                                     <i class="bi bi-pencil"></i>
                                 </a>
@@ -208,11 +214,45 @@ $renderConditions = function (array $conditions) use ($renderCond): string {
         </div>
     </div>
 </div>
+<!-- Run Automation Modal -->
+<div class="modal fade" id="runAutomationModal" tabindex="-1" aria-labelledby="runAutomationModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="runAutomationModalLabel">
+                    <i class="bi bi-play-fill me-2 text-warning"></i>Run Automation
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2">Run <strong id="runAutomationName"></strong> against all existing open tickets?</p>
+                <p class="text-muted small mb-0">
+                    The automation's conditions will be evaluated against every non-closed ticket.
+                    Actions will be applied to all matching tickets.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <form method="POST" id="runAutomationForm" action="">
+                    <?= csrfField() ?>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning px-4">
+                        <i class="bi bi-play-fill me-1"></i>Run Now
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 <script>
 document.getElementById('deleteAutomationModal').addEventListener('show.bs.modal', function (e) {
     var btn = e.relatedTarget;
     document.getElementById('deleteAutomationName').textContent = btn.dataset.name;
     document.getElementById('deleteAutomationForm').action = '/admin/settings/automations/' + btn.dataset.id + '/delete';
+});
+document.getElementById('runAutomationModal').addEventListener('show.bs.modal', function (e) {
+    var btn = e.relatedTarget;
+    document.getElementById('runAutomationName').textContent = btn.dataset.name;
+    document.getElementById('runAutomationForm').action = '/admin/settings/automations/' + btn.dataset.id + '/run';
 });
 </script>
 
