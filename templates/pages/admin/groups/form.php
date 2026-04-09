@@ -84,6 +84,17 @@ $roleColors = ['admin' => 'danger', 'agent' => 'primary'];
                 <div class="form-text">Members can opt out individually via their profile Email Notifications settings.</div>
             </div>
 
+            <div class="mb-3">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="is_confidential" name="is_confidential" value="1"
+                           <?= (int) old('is_confidential', (string) ($editing['is_confidential'] ?? '0')) ? 'checked' : '' ?>>
+                    <label class="form-check-label fw-semibold" for="is_confidential">
+                        <i class="bi bi-shield-lock me-1"></i>Confidential
+                    </label>
+                </div>
+                <div class="form-text">When enabled, every current member of the group will receive an email alert whenever new members are added. The first member added is silent — alerts begin once the group has at least one existing member.</div>
+            </div>
+
             <hr class="my-4">
 
             <div class="d-flex gap-2">

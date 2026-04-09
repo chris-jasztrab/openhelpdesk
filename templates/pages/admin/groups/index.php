@@ -42,6 +42,9 @@ $breadcrumbs  = [
                     <tr>
                         <td class="fw-semibold">
                             <i class="bi bi-people-fill text-muted me-1"></i><?= e($g['name']) ?>
+                            <?php if (!empty($g['is_confidential'])): ?>
+                            <i class="bi bi-shield-lock text-warning ms-1" title="Confidential — members are alerted when new users are added"></i>
+                            <?php endif; ?>
                         </td>
                         <td class="text-muted small" style="max-width:300px;"><?= e($g['description'] ? mb_strimwidth($g['description'], 0, 80, '...') : '—') ?></td>
                         <td>

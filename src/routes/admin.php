@@ -1322,21 +1322,25 @@ $router->post('/admin/groups/create', function () {
         redirect('/admin/groups/create');
     }
 
-    $notifyNew = isset($_POST['notify_new_ticket']) ? 1 : 0;
+    $notifyNew      = isset($_POST['notify_new_ticket']) ? 1 : 0;
+    $isConfidential = isset($_POST['is_confidential']) ? 1 : 0;
 
     $db = Database::connect();
-    $db->prepare('INSERT INTO `groups` (name, description, sort_order, notify_new_ticket) VALUES (?, ?, ?, ?)')
-        ->execute([$name, $desc, $order, $notifyNew]);
+    $db->prepare('INSERT INTO `groups` (name, description, sort_order, notify_new_ticket, is_confidential) VALUES (?, ?, ?, ?, ?)')
+        ->execute([$name, $desc, $order, $notifyNew, $isConfidential]);
     $groupId = (int) $db->lastInsertId();
 
     // Assign members
-    $userIds = isset($_POST['members']) && is_array($_POST['members']) ? $_POST['members'] : [];
+    $userIds = isset($_POST['members']) && is_array($_POST['members']) ? array_map('intval', $_POST['members']) : [];
     if (!empty($userIds)) {
         $stmt = $db->prepare('INSERT INTO group_user_map (group_id, user_id) VALUES (?, ?)');
         foreach ($userIds as $uid) {
-            $stmt->execute([$groupId, (int) $uid]);
+            $stmt->execute([$groupId, $uid]);
         }
     }
+
+    // No notification on create — there are no prior members to alert.
+    // Per spec, alerts only fire after the first person is in the group.
 
     flash('success', 'Group created.');
     redirect('/admin/groups');
@@ -1382,19 +1386,36 @@ $router->post('/admin/groups/{id}/edit', function (array $p) {
         redirect("/admin/groups/{$id}/edit");
     }
 
-    $notifyNew = isset($_POST['notify_new_ticket']) ? 1 : 0;
+    $notifyNew      = isset($_POST['notify_new_ticket']) ? 1 : 0;
+    $isConfidential = isset($_POST['is_confidential']) ? 1 : 0;
 
     $db = Database::connect();
-    $db->prepare('UPDATE `groups` SET name=?, description=?, sort_order=?, notify_new_ticket=? WHERE id=?')
-        ->execute([$name, $desc, $order, $notifyNew, $id]);
+
+    // Snapshot existing members BEFORE the delete-and-replace,
+    // so we can detect newly added users for confidential alerts.
+    $existingStmt = $db->prepare('SELECT user_id FROM group_user_map WHERE group_id = ?');
+    $existingStmt->execute([$id]);
+    $existingMemberIds = array_map('intval', $existingStmt->fetchAll(PDO::FETCH_COLUMN));
+
+    $db->prepare('UPDATE `groups` SET name=?, description=?, sort_order=?, notify_new_ticket=?, is_confidential=? WHERE id=?')
+        ->execute([$name, $desc, $order, $notifyNew, $isConfidential, $id]);
 
     // Sync members: delete existing, insert new
     $db->prepare('DELETE FROM group_user_map WHERE group_id = ?')->execute([$id]);
-    $userIds = isset($_POST['members']) && is_array($_POST['members']) ? $_POST['members'] : [];
+    $userIds = isset($_POST['members']) && is_array($_POST['members']) ? array_map('intval', $_POST['members']) : [];
     if (!empty($userIds)) {
         $stmt = $db->prepare('INSERT INTO group_user_map (group_id, user_id) VALUES (?, ?)');
         foreach ($userIds as $uid) {
-            $stmt->execute([$id, (int) $uid]);
+            $stmt->execute([$id, $uid]);
+        }
+    }
+
+    // Confidential alert: if the group is now confidential, had at least one
+    // prior member, and new members were added, notify all current members.
+    if ($isConfidential && !empty($existingMemberIds)) {
+        $addedIds = array_values(array_diff($userIds, $existingMemberIds));
+        if (!empty($addedIds)) {
+            notifyConfidentialGroupMembership($db, $id, $addedIds);
         }
     }
 

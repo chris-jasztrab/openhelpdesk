@@ -862,6 +862,11 @@ function getEmailTpl(string $name, array $rawTokens): array
             'intro'   => '{{admin_name}} ({{admin_email}}) has accessed confidential ticket #{{ticket_id}} "{{subject}}" at {{timestamp}} from IP {{ip_address}}. This access has been recorded in the audit log.',
             'button'  => 'View Ticket',
         ],
+        'confidential_group_membership_changed' => [
+            'subject' => '[Security Notice] New members added to confidential group "{{group_name}}"',
+            'intro'   => '{{actor_name}} ({{actor_email}}) added the following user(s) to the confidential group "{{group_name}}" at {{timestamp}} from IP {{ip_address}}: {{added_users}}. You are receiving this alert because you are a member of this confidential group.',
+            'button'  => 'View Group',
+        ],
     ];
 
     $d = $defaults[$key] ?? ['subject' => '', 'intro' => '', 'button' => 'View Ticket'];
@@ -2364,6 +2369,118 @@ function notifyConfidentialAccess(PDO $db, int $ticketId): void
             $ticketId
         );
     }
+}
+
+/**
+ * Notify all current members of a confidential group when new members are added.
+ *
+ * Called from the admin group edit handler. Only fires when the group is
+ * marked confidential AND there were existing members BEFORE the edit AND
+ * at least one new member was added — that policy is enforced by the caller.
+ *
+ * @param PDO   $db
+ * @param int   $groupId
+ * @param int[] $addedUserIds  Newly added user IDs (i.e. were not in the group prior to this edit)
+ */
+function notifyConfidentialGroupMembership(PDO $db, int $groupId, array $addedUserIds): void
+{
+    if (empty($addedUserIds)) {
+        return;
+    }
+
+    // Load group
+    $gStmt = $db->prepare('SELECT id, name, is_confidential FROM `groups` WHERE id = ?');
+    $gStmt->execute([$groupId]);
+    $group = $gStmt->fetch();
+    if (!$group || empty($group['is_confidential'])) {
+        return;
+    }
+
+    // Current members (post-edit) — these are the recipients of the alert
+    $mStmt = $db->prepare(
+        'SELECT u.id, u.first_name, u.last_name, u.email, u.role
+         FROM group_user_map gum
+         JOIN users u ON u.id = gum.user_id
+         WHERE gum.group_id = ?'
+    );
+    $mStmt->execute([$groupId]);
+    $members = $mStmt->fetchAll();
+    if (empty($members)) {
+        return;
+    }
+
+    // Names of the newly added users (for the email body)
+    $placeholders = implode(',', array_fill(0, count($addedUserIds), '?'));
+    $aStmt = $db->prepare(
+        "SELECT id, first_name, last_name, email FROM users WHERE id IN ($placeholders)"
+    );
+    $aStmt->execute($addedUserIds);
+    $addedUsers = $aStmt->fetchAll();
+    if (empty($addedUsers)) {
+        return;
+    }
+
+    $addedNamesList = array_map(
+        static fn($u) => trim($u['first_name'] . ' ' . $u['last_name']) . ' <' . $u['email'] . '>',
+        $addedUsers
+    );
+    $addedNamesText = implode(', ', $addedNamesList);
+
+    $actorName  = Auth::fullName();
+    $actorEmail = Auth::user()['email'] ?? '';
+    $ip         = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    $timestamp  = date('Y-m-d H:i:s');
+    $appUrl     = env('APP_URL', 'http://localhost:8000');
+
+    $tpl = getEmailTpl('confidential-group-membership-changed', [
+        'group_name'  => $group['name'],
+        'group_id'    => $groupId,
+        'added_users' => $addedNamesText,
+        'actor_name'  => $actorName,
+        'actor_email' => $actorEmail,
+        'ip_address'  => $ip,
+        'timestamp'   => $timestamp,
+    ]);
+
+    foreach ($members as $user) {
+        $rolePrefix = match ($user['role']) {
+            'admin'      => '/admin',
+            'power_user' => '/agent',
+            'agent'      => '/agent',
+            default      => '/portal',
+        };
+        $groupUrl = $appUrl . $rolePrefix . '/groups/' . $groupId . '/edit';
+
+        $emailHtml = renderEmail('confidential-group-membership-alert', [
+            'groupId'     => $groupId,
+            'groupName'   => $group['name'],
+            'addedUsers'  => $addedUsers,
+            'actorName'   => $actorName,
+            'actorEmail'  => $actorEmail,
+            'ipAddress'   => $ip,
+            'timestamp'   => $timestamp,
+            'groupUrl'    => $groupUrl,
+            'introText'   => $tpl['intro'],
+            'buttonLabel' => $tpl['button'],
+            'footerText'  => $tpl['footer'] ?? '',
+        ]);
+
+        sendMail(
+            $user['email'],
+            $user['first_name'] . ' ' . $user['last_name'],
+            $tpl['subject'],
+            $emailHtml
+        );
+    }
+
+    // Audit log
+    logAudit(
+        'confidential_group_membership_changed',
+        $groupId,
+        'group',
+        $actorName . ' (ID: ' . Auth::id() . ') added ' . count($addedUsers)
+            . ' member(s) to confidential group "' . $group['name'] . '": ' . $addedNamesText
+    );
 }
 
 /* ── Sidebar helpers ──────────────────────────────────────────── */
