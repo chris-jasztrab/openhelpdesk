@@ -1371,7 +1371,21 @@ $router->get('/admin/groups/{id}/edit', function (array $p) {
 $router->post('/admin/groups/{id}/edit', function (array $p) {
     Auth::requireRole('admin');
     $id = (int) $p['id'];
+
+    // Log CSRF failures on confidential groups too — this could indicate an attack
     if (!verifyCsrf($_POST['_token'] ?? '')) {
+        $cdb = Database::connect();
+        $cs  = $cdb->prepare('SELECT name, is_confidential FROM `groups` WHERE id = ?');
+        $cs->execute([$id]);
+        $cg = $cs->fetch();
+        if ($cg && !empty($cg['is_confidential'])) {
+            logAudit(
+                'confidential_group_csrf_failure',
+                $id,
+                'group',
+                Auth::fullName() . ' (ID: ' . Auth::id() . ') submitted an edit to confidential group "' . $cg['name'] . '" with an invalid CSRF token'
+            );
+        }
         flash('error', 'Invalid request.');
         redirect("/admin/groups/{$id}/edit");
     }
@@ -1380,29 +1394,78 @@ $router->post('/admin/groups/{id}/edit', function (array $p) {
     $desc  = trim($_POST['description'] ?? '');
     $order = (int) ($_POST['sort_order'] ?? 0);
 
+    $notifyNew      = isset($_POST['notify_new_ticket']) ? 1 : 0;
+    $isConfidential = isset($_POST['is_confidential']) ? 1 : 0;
+    $userIds        = isset($_POST['members']) && is_array($_POST['members']) ? array_map('intval', $_POST['members']) : [];
+
+    $db = Database::connect();
+
+    // Snapshot prior state BEFORE any writes:
+    //   1. existing member IDs (needed to compute the diff for alerts)
+    //   2. prior is_confidential (so we can audit-log even if the user is un-confidentialing
+    //      the group in the same edit)
+    $priorStmt = $db->prepare('SELECT is_confidential FROM `groups` WHERE id = ?');
+    $priorStmt->execute([$id]);
+    $wasConfidential = (int) $priorStmt->fetchColumn();
+
+    $existingStmt = $db->prepare('SELECT user_id FROM group_user_map WHERE group_id = ?');
+    $existingStmt->execute([$id]);
+    $existingMemberIds = array_map('intval', $existingStmt->fetchAll(PDO::FETCH_COLUMN));
+
+    $addedIds   = array_values(array_diff($userIds, $existingMemberIds));
+    $removedIds = array_values(array_diff($existingMemberIds, $userIds));
+
+    // Audit: log the ATTEMPT to add members to a confidential group BEFORE any DB writes,
+    // so the attempt is recorded even if validation or the update later fails.
+    // Triggers when EITHER prior or new state is confidential.
+    if (($wasConfidential || $isConfidential) && !empty($addedIds)) {
+        $aPlaceholders   = implode(',', array_fill(0, count($addedIds), '?'));
+        $aStmt           = $db->prepare("SELECT id, first_name, last_name, email FROM users WHERE id IN ($aPlaceholders)");
+        $aStmt->execute($addedIds);
+        $addedUsersForLog = $aStmt->fetchAll();
+        $addedNames       = implode(', ', array_map(
+            static fn($u) => trim($u['first_name'] . ' ' . $u['last_name']) . ' <' . $u['email'] . '>',
+            $addedUsersForLog
+        ));
+        logAudit(
+            'confidential_group_member_add_attempted',
+            $id,
+            'group',
+            Auth::fullName() . ' (ID: ' . Auth::id() . ') is attempting to add ' . count($addedIds)
+                . ' member(s) to confidential group "' . $name . '" (ID: ' . $id . '): ' . $addedNames
+        );
+    }
+
+    // Same for removals from a confidential group, since the user asked for full audit coverage
+    if (($wasConfidential || $isConfidential) && !empty($removedIds)) {
+        $rPlaceholders     = implode(',', array_fill(0, count($removedIds), '?'));
+        $rStmt             = $db->prepare("SELECT id, first_name, last_name, email FROM users WHERE id IN ($rPlaceholders)");
+        $rStmt->execute($removedIds);
+        $removedUsersForLog = $rStmt->fetchAll();
+        $removedNames       = implode(', ', array_map(
+            static fn($u) => trim($u['first_name'] . ' ' . $u['last_name']) . ' <' . $u['email'] . '>',
+            $removedUsersForLog
+        ));
+        logAudit(
+            'confidential_group_member_remove_attempted',
+            $id,
+            'group',
+            Auth::fullName() . ' (ID: ' . Auth::id() . ') is attempting to remove ' . count($removedIds)
+                . ' member(s) from confidential group "' . $name . '" (ID: ' . $id . '): ' . $removedNames
+        );
+    }
+
     if ($name === '') {
         flashInput($_POST);
         flash('error', 'Group name is required.');
         redirect("/admin/groups/{$id}/edit");
     }
 
-    $notifyNew      = isset($_POST['notify_new_ticket']) ? 1 : 0;
-    $isConfidential = isset($_POST['is_confidential']) ? 1 : 0;
-
-    $db = Database::connect();
-
-    // Snapshot existing members BEFORE the delete-and-replace,
-    // so we can detect newly added users for confidential alerts.
-    $existingStmt = $db->prepare('SELECT user_id FROM group_user_map WHERE group_id = ?');
-    $existingStmt->execute([$id]);
-    $existingMemberIds = array_map('intval', $existingStmt->fetchAll(PDO::FETCH_COLUMN));
-
     $db->prepare('UPDATE `groups` SET name=?, description=?, sort_order=?, notify_new_ticket=?, is_confidential=? WHERE id=?')
         ->execute([$name, $desc, $order, $notifyNew, $isConfidential, $id]);
 
     // Sync members: delete existing, insert new
     $db->prepare('DELETE FROM group_user_map WHERE group_id = ?')->execute([$id]);
-    $userIds = isset($_POST['members']) && is_array($_POST['members']) ? array_map('intval', $_POST['members']) : [];
     if (!empty($userIds)) {
         $stmt = $db->prepare('INSERT INTO group_user_map (group_id, user_id) VALUES (?, ?)');
         foreach ($userIds as $uid) {
@@ -1412,11 +1475,8 @@ $router->post('/admin/groups/{id}/edit', function (array $p) {
 
     // Confidential alert: if the group is now confidential, had at least one
     // prior member, and new members were added, notify all current members.
-    if ($isConfidential && !empty($existingMemberIds)) {
-        $addedIds = array_values(array_diff($userIds, $existingMemberIds));
-        if (!empty($addedIds)) {
-            notifyConfidentialGroupMembership($db, $id, $addedIds);
-        }
+    if ($isConfidential && !empty($existingMemberIds) && !empty($addedIds)) {
+        notifyConfidentialGroupMembership($db, $id, $addedIds);
     }
 
     flash('success', 'Group updated.');

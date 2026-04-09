@@ -46,6 +46,13 @@ $roleColors = ['admin' => 'danger', 'agent' => 'primary'];
             <div class="mb-3">
                 <label class="form-label fw-semibold">Members</label>
                 <p class="text-muted small mb-2">Select agents and admins to include in this group.</p>
+
+                <div id="confidentialWarning" class="alert alert-warning d-none mb-3">
+                    <i class="bi bi-shield-lock-fill me-1"></i>
+                    <strong>Confidential group.</strong>
+                    Every current member will receive an email alert listing any new members you add and your identity (name, email, IP, timestamp). Every attempt is recorded in the audit log. The first member added to an empty group is silent.
+                </div>
+
                 <?php if (empty($users)): ?>
                     <div class="alert alert-info mb-0">
                         <i class="bi bi-info-circle me-1"></i>No agents or admins found. <a href="/admin/users/create">Create a user</a> first.
@@ -106,3 +113,96 @@ $roleColors = ['admin' => 'danger', 'agent' => 'primary'];
         </form>
     </div>
 </div>
+
+<!-- Confirm-add-to-confidential-group modal -->
+<div class="modal fade" id="confidentialAddModal" tabindex="-1" aria-labelledby="confidentialAddModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header" style="background:linear-gradient(135deg,#92400e,#b45309); color:#fff;">
+                <h5 class="modal-title fw-bold" id="confidentialAddModalLabel">
+                    <i class="bi bi-shield-lock-fill me-2"></i>Confidential Group — Confirm Member Addition
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2">You are about to add <strong><span id="confidentialAddCount">0</span></strong> new member(s) to a confidential group:</p>
+                <ul id="confidentialAddList" class="mb-3"></ul>
+                <div class="alert alert-warning mb-0">
+                    <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                    All <strong>current members</strong> of this group will immediately receive an email alert naming the new member(s), your name and email, your IP address, and the timestamp. This action and the attempt itself are recorded in the audit log.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning text-white" id="confirmConfidentialAddBtn">
+                    <i class="bi bi-check-lg me-1"></i>Confirm & Notify Members
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    var confCb        = document.getElementById('is_confidential');
+    var warningBanner = document.getElementById('confidentialWarning');
+    var form          = confCb ? confCb.closest('form') : null;
+    if (!confCb || !warningBanner || !form) return;
+
+    // Existing member IDs at page load (server-side state, before any UI changes)
+    var existingMemberIds = <?= json_encode(array_map('intval', $memberIds ?? [])) ?>;
+
+    function toggleBanner() {
+        if (confCb.checked) warningBanner.classList.remove('d-none');
+        else warningBanner.classList.add('d-none');
+    }
+    confCb.addEventListener('change', toggleBanner);
+    toggleBanner();
+
+    // Compute which checked members are NEW relative to the saved state
+    function getNewlyAddedMembers() {
+        var added = [];
+        var checkboxes = form.querySelectorAll('input[name="members[]"]');
+        checkboxes.forEach(function (cb) {
+            if (cb.checked && existingMemberIds.indexOf(parseInt(cb.value, 10)) === -1) {
+                var label = form.querySelector('label[for="' + cb.id + '"]');
+                added.push({
+                    id: cb.value,
+                    name: label ? label.textContent.trim().replace(/\s+/g, ' ') : ('User #' + cb.value)
+                });
+            }
+        });
+        return added;
+    }
+
+    var modalEl       = document.getElementById('confidentialAddModal');
+    var modalInstance = null;
+    var confirmed     = false;
+
+    form.addEventListener('submit', function (e) {
+        if (confirmed) return;             // already passed the confirm step
+        if (!confCb.checked) return;       // not confidential — no warning needed
+        var added = getNewlyAddedMembers();
+        if (added.length === 0) return;    // no new additions — no warning needed
+
+        // Intercept and show the modal
+        e.preventDefault();
+        document.getElementById('confidentialAddCount').textContent = added.length;
+        var listEl = document.getElementById('confidentialAddList');
+        listEl.innerHTML = '';
+        added.forEach(function (u) {
+            var li = document.createElement('li');
+            li.textContent = u.name;
+            listEl.appendChild(li);
+        });
+        if (!modalInstance) modalInstance = new bootstrap.Modal(modalEl);
+        modalInstance.show();
+    });
+
+    document.getElementById('confirmConfidentialAddBtn').addEventListener('click', function () {
+        confirmed = true;
+        if (modalInstance) modalInstance.hide();
+        form.submit();
+    });
+})();
+</script>
