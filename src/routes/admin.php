@@ -1127,6 +1127,12 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
                 'group_id'  => $groupId ? (string) $groupId : '',
                 // is_confidential intentionally omitted (unchecked = removal)
             ];
+            logAudit(
+                'confidential_flag_removal_attempted',
+                $id,
+                'ticket_type',
+                Auth::fullName() . ' (ID: ' . Auth::id() . ') attempted to remove the confidential flag from ticket type "' . $priorType['name'] . '" (ID: ' . $id . ') — re-authentication required'
+            );
             render('admin/confidential-reauth', [
                 'action'            => 'remove_flag',
                 'targetType'        => 'ticket type',
@@ -1238,6 +1244,12 @@ $router->post('/admin/types/{id}/delete', function (array $p) {
             if ($action === 'reassign') {
                 $hiddenFields['new_type_id'] = $_POST['new_type_id'] ?? '';
             }
+            logAudit(
+                'confidential_delete_attempted',
+                $id,
+                'ticket_type',
+                Auth::fullName() . ' (ID: ' . Auth::id() . ') attempted to delete confidential ticket type "' . $typeName . '" (ID: ' . $id . ') — re-authentication required'
+            );
             render('admin/confidential-reauth', [
                 'action'            => 'delete',
                 'targetType'        => 'ticket type',
@@ -1544,6 +1556,12 @@ $router->post('/admin/groups/{id}/edit', function (array $p) {
                 // is_confidential intentionally omitted (unchecked = removal)
             ];
             $hiddenArrayFields = ['members' => array_map('strval', $userIds)];
+            logAudit(
+                'confidential_flag_removal_attempted',
+                $id,
+                'group',
+                Auth::fullName() . ' (ID: ' . Auth::id() . ') attempted to remove the confidential flag from group "' . $priorGroup['name'] . '" (ID: ' . $id . ') — re-authentication required'
+            );
             render('admin/confidential-reauth', [
                 'action'            => 'remove_flag',
                 'targetType'        => 'group',
@@ -1679,6 +1697,12 @@ $router->post('/admin/groups/{id}/delete', function (array $p) {
 
     if (!empty($group['is_confidential'])) {
         if (empty($_POST['_confidential_reauth'])) {
+            logAudit(
+                'confidential_delete_attempted',
+                $id,
+                'group',
+                Auth::fullName() . ' (ID: ' . Auth::id() . ') attempted to delete confidential group "' . $group['name'] . '" (ID: ' . $id . ') — re-authentication required'
+            );
             render('admin/confidential-reauth', [
                 'action'            => 'delete',
                 'targetType'        => 'group',
