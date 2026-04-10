@@ -11,6 +11,28 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.4.0 — 2026-04-10
+
+### Confidential Tamper Protection
+- **Re-Authentication Required** — removing the confidential flag from a group or ticket type now requires the admin to re-enter their password before the change is applied
+- **Re-Authentication on Delete** — deleting a confidential group or confidential ticket type also requires password re-authentication
+- **Attempt Logging** — every attempt to remove a confidential flag or delete a confidential entity is recorded in the audit log the moment the re-auth page is shown, even if the admin cancels without authenticating
+- **Failed Auth Logging** — incorrect password attempts during re-authentication are separately logged in the audit log
+- **Email Alerts on Flag Removal** — all members of the affected group receive an email alert when the confidential flag is removed from their group or a linked ticket type, including the admin's name, email, IP address, and timestamp
+- **Email Alerts on Deletion** — all members receive an email alert when a confidential group or confidential ticket type is deleted, with the same identity details
+- **Red Security Alert Emails** — new email templates (`confidential-flag-removed`, `confidential-entity-deleted`) with red danger styling, distinct from the amber membership-change alerts
+- **Documentation** — admin help documentation (Admin → Docs → Users & Roles) updated with comprehensive Confidential Groups section covering all security measures: membership alerts, ticket redaction, re-authentication gates, access notifications, audit logging, and the new tamper protection
+
+### Audit Log Actions Added
+- `confidential_flag_removal_attempted` — admin unchecked the confidential flag (re-auth page shown)
+- `confidential_flag_removal_auth_failed` — admin entered wrong password on re-auth
+- `confidential_flag_removed` — admin successfully removed the confidential flag after re-auth
+- `confidential_delete_attempted` — admin attempted to delete a confidential entity (re-auth page shown)
+- `confidential_delete_auth_failed` — admin entered wrong password when deleting
+- `confidential_entity_deleted` — admin successfully deleted a confidential entity after re-auth
+
+---
+
 ## 2.3.0 — 2026-04-01
 
 ### Confidential Ticket Types
