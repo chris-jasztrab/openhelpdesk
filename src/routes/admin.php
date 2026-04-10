@@ -1106,8 +1106,70 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
         flash('error', 'Type name is required.');
         redirect("/admin/types/{$id}/edit");
     }
-    Database::connect()->prepare('UPDATE ticket_types SET name=?, color=?, group_id=?, is_confidential=?, sort_order=? WHERE id=?')
+
+    $db = Database::connect();
+
+    // Snapshot prior confidential state
+    $priorStmt = $db->prepare('SELECT name, is_confidential, group_id FROM ticket_types WHERE id = ?');
+    $priorStmt->execute([$id]);
+    $priorType = $priorStmt->fetch();
+    $wasConfidential = $priorType ? (int) $priorType['is_confidential'] : 0;
+    $priorGroupId    = $priorType ? (int) $priorType['group_id'] : 0;
+
+    // Re-auth gate: removing confidential flag requires password verification
+    if ($wasConfidential && !$isConfidential) {
+        if (empty($_POST['_confidential_reauth'])) {
+            $hiddenFields = [
+                '_token'    => $_POST['_token'] ?? '',
+                'name'      => $name,
+                'color'     => $color,
+                'sort_order' => (string) $order,
+                'group_id'  => $groupId ? (string) $groupId : '',
+                // is_confidential intentionally omitted (unchecked = removal)
+            ];
+            render('admin/confidential-reauth', [
+                'action'            => 'remove_flag',
+                'targetType'        => 'ticket type',
+                'targetName'        => $priorType['name'],
+                'formAction'        => "/admin/types/{$id}/edit",
+                'cancelUrl'         => "/admin/types/{$id}/edit",
+                'hiddenFields'      => $hiddenFields,
+                'hiddenArrayFields' => [],
+            ]);
+            return;
+        }
+
+        // Verify password
+        $pwStmt = $db->prepare('SELECT password FROM users WHERE id = ?');
+        $pwStmt->execute([Auth::id()]);
+        $pwUser = $pwStmt->fetch();
+        if (!$pwUser || !password_verify($_POST['reauth_password'] ?? '', $pwUser['password'])) {
+            logAudit(
+                'confidential_flag_removal_auth_failed',
+                $id,
+                'ticket_type',
+                Auth::fullName() . ' (ID: ' . Auth::id() . ') failed re-authentication when attempting to remove confidential flag from ticket type "' . $priorType['name'] . '"'
+            );
+            flash('error', 'Incorrect password. The confidential flag was not removed.');
+            redirect("/admin/types/{$id}/edit");
+        }
+    }
+
+    $db->prepare('UPDATE ticket_types SET name=?, color=?, group_id=?, is_confidential=?, sort_order=? WHERE id=?')
         ->execute([$name, $color, $groupId, $isConfidential, $order, $id]);
+
+    // Confidential flag removal: audit log + notify all group members
+    if ($wasConfidential && !$isConfidential && $priorGroupId) {
+        logAudit(
+            'confidential_flag_removed',
+            $id,
+            'ticket_type',
+            Auth::fullName() . ' (ID: ' . Auth::id() . ') removed the confidential flag from ticket type "' . $name . '" (ID: ' . $id . ') after re-authentication'
+        );
+        $appUrl = env('APP_URL', 'http://localhost:8000');
+        notifyConfidentialFlagRemoved($db, 'ticket type', $name, $priorGroupId, $appUrl . '/admin/types/' . $id . '/edit');
+    }
+
     flash('success', 'Ticket type updated.');
     redirect('/admin/types');
 });
@@ -1158,12 +1220,60 @@ $router->post('/admin/types/{id}/delete', function (array $p) {
     $id     = (int) $p['id'];
     $action = $_POST['action'] ?? '';
 
-    $typeStmt = $db->prepare('SELECT name FROM ticket_types WHERE id = ?');
+    $typeStmt = $db->prepare('SELECT name, is_confidential, group_id FROM ticket_types WHERE id = ?');
     $typeStmt->execute([$id]);
-    $typeName = $typeStmt->fetchColumn();
-    if (!$typeName) {
+    $typeRow = $typeStmt->fetch();
+    if (!$typeRow) {
         flash('error', 'Ticket type not found.');
         redirect('/admin/types');
+    }
+    $typeName        = $typeRow['name'];
+    $wasConfidential = (int) $typeRow['is_confidential'];
+    $typeGroupId     = (int) $typeRow['group_id'];
+
+    // Re-auth gate: deleting a confidential ticket type requires password verification
+    if ($wasConfidential && $typeGroupId) {
+        if (empty($_POST['_confidential_reauth'])) {
+            $hiddenFields = ['_token' => $_POST['_token'] ?? '', 'action' => $action];
+            if ($action === 'reassign') {
+                $hiddenFields['new_type_id'] = $_POST['new_type_id'] ?? '';
+            }
+            render('admin/confidential-reauth', [
+                'action'            => 'delete',
+                'targetType'        => 'ticket type',
+                'targetName'        => $typeName,
+                'formAction'        => "/admin/types/{$id}/delete",
+                'cancelUrl'         => "/admin/types/{$id}/delete-confirm",
+                'hiddenFields'      => $hiddenFields,
+                'hiddenArrayFields' => [],
+            ]);
+            return;
+        }
+
+        // Verify password
+        $pwStmt = $db->prepare('SELECT password FROM users WHERE id = ?');
+        $pwStmt->execute([Auth::id()]);
+        $pwUser = $pwStmt->fetch();
+        if (!$pwUser || !password_verify($_POST['reauth_password'] ?? '', $pwUser['password'])) {
+            logAudit(
+                'confidential_delete_auth_failed',
+                $id,
+                'ticket_type',
+                Auth::fullName() . ' (ID: ' . Auth::id() . ') failed re-authentication when attempting to delete confidential ticket type "' . $typeName . '"'
+            );
+            flash('error', 'Incorrect password. The confidential ticket type was not deleted.');
+            redirect("/admin/types/{$id}/delete-confirm");
+        }
+
+        // Snapshot group members BEFORE deletion for email alerts
+        $mStmt = $db->prepare(
+            'SELECT u.id, u.first_name, u.last_name, u.email, u.role
+             FROM group_user_map gum
+             JOIN users u ON u.id = gum.user_id
+             WHERE gum.group_id = ?'
+        );
+        $mStmt->execute([$typeGroupId]);
+        $members = $mStmt->fetchAll();
     }
 
     // Check if any tickets use this type
@@ -1190,6 +1300,18 @@ $router->post('/admin/types/{id}/delete', function (array $p) {
     }
 
     $db->prepare('DELETE FROM ticket_types WHERE id = ?')->execute([$id]);
+
+    // Audit log + email alert for confidential type deletion
+    if ($wasConfidential && $typeGroupId && !empty($members)) {
+        logAudit(
+            'confidential_entity_deleted',
+            $id,
+            'ticket_type',
+            Auth::fullName() . ' (ID: ' . Auth::id() . ') deleted confidential ticket type "' . $typeName . '" (ID: ' . $id . ') after re-authentication'
+        );
+        notifyConfidentialEntityDeleted($db, 'ticket type', $typeName, $members);
+    }
+
     flash('success', "Ticket type \"{$typeName}\" deleted.");
     redirect('/admin/types');
 });
@@ -1404,9 +1526,51 @@ $router->post('/admin/groups/{id}/edit', function (array $p) {
     //   1. existing member IDs (needed to compute the diff for alerts)
     //   2. prior is_confidential (so we can audit-log even if the user is un-confidentialing
     //      the group in the same edit)
-    $priorStmt = $db->prepare('SELECT is_confidential FROM `groups` WHERE id = ?');
+    $priorStmt = $db->prepare('SELECT name, is_confidential FROM `groups` WHERE id = ?');
     $priorStmt->execute([$id]);
-    $wasConfidential = (int) $priorStmt->fetchColumn();
+    $priorGroup = $priorStmt->fetch();
+    $wasConfidential = $priorGroup ? (int) $priorGroup['is_confidential'] : 0;
+
+    // Re-auth gate: removing confidential flag requires password verification
+    if ($wasConfidential && !$isConfidential) {
+        if (empty($_POST['_confidential_reauth'])) {
+            // Show re-auth form — preserve all form data as hidden fields
+            $hiddenFields = [
+                '_token'            => $_POST['_token'] ?? '',
+                'name'              => $name,
+                'description'       => $desc,
+                'sort_order'        => (string) $order,
+                'notify_new_ticket' => $notifyNew ? '1' : '',
+                // is_confidential intentionally omitted (unchecked = removal)
+            ];
+            $hiddenArrayFields = ['members' => array_map('strval', $userIds)];
+            render('admin/confidential-reauth', [
+                'action'            => 'remove_flag',
+                'targetType'        => 'group',
+                'targetName'        => $priorGroup['name'],
+                'formAction'        => "/admin/groups/{$id}/edit",
+                'cancelUrl'         => "/admin/groups/{$id}/edit",
+                'hiddenFields'      => $hiddenFields,
+                'hiddenArrayFields' => $hiddenArrayFields,
+            ]);
+            return;
+        }
+
+        // Verify password
+        $pwStmt = $db->prepare('SELECT password FROM users WHERE id = ?');
+        $pwStmt->execute([Auth::id()]);
+        $pwUser = $pwStmt->fetch();
+        if (!$pwUser || !password_verify($_POST['reauth_password'] ?? '', $pwUser['password'])) {
+            logAudit(
+                'confidential_flag_removal_auth_failed',
+                $id,
+                'group',
+                Auth::fullName() . ' (ID: ' . Auth::id() . ') failed re-authentication when attempting to remove confidential flag from group "' . $priorGroup['name'] . '"'
+            );
+            flash('error', 'Incorrect password. The confidential flag was not removed.');
+            redirect("/admin/groups/{$id}/edit");
+        }
+    }
 
     $existingStmt = $db->prepare('SELECT user_id FROM group_user_map WHERE group_id = ?');
     $existingStmt->execute([$id]);
@@ -1479,6 +1643,18 @@ $router->post('/admin/groups/{id}/edit', function (array $p) {
         notifyConfidentialGroupMembership($db, $id, $addedIds);
     }
 
+    // Confidential flag removal: audit log + notify all members
+    if ($wasConfidential && !$isConfidential) {
+        logAudit(
+            'confidential_flag_removed',
+            $id,
+            'group',
+            Auth::fullName() . ' (ID: ' . Auth::id() . ') removed the confidential flag from group "' . $name . '" (ID: ' . $id . ') after re-authentication'
+        );
+        $appUrl = env('APP_URL', 'http://localhost:8000');
+        notifyConfidentialFlagRemoved($db, 'group', $name, $id, $appUrl . '/admin/groups/' . $id . '/edit');
+    }
+
     flash('success', 'Group updated.');
     redirect('/admin/groups');
 });
@@ -1489,7 +1665,73 @@ $router->post('/admin/groups/{id}/delete', function (array $p) {
         flash('error', 'Invalid request.');
         redirect('/admin/groups');
     }
-    Database::connect()->prepare('DELETE FROM `groups` WHERE id = ?')->execute([(int) $p['id']]);
+    $id = (int) $p['id'];
+    $db = Database::connect();
+
+    // Check if the group is confidential — require re-auth before deletion
+    $gStmt = $db->prepare('SELECT name, is_confidential FROM `groups` WHERE id = ?');
+    $gStmt->execute([$id]);
+    $group = $gStmt->fetch();
+    if (!$group) {
+        flash('error', 'Group not found.');
+        redirect('/admin/groups');
+    }
+
+    if (!empty($group['is_confidential'])) {
+        if (empty($_POST['_confidential_reauth'])) {
+            render('admin/confidential-reauth', [
+                'action'            => 'delete',
+                'targetType'        => 'group',
+                'targetName'        => $group['name'],
+                'formAction'        => "/admin/groups/{$id}/delete",
+                'cancelUrl'         => '/admin/groups',
+                'hiddenFields'      => ['_token' => $_POST['_token'] ?? ''],
+                'hiddenArrayFields' => [],
+            ]);
+            return;
+        }
+
+        // Verify password
+        $pwStmt = $db->prepare('SELECT password FROM users WHERE id = ?');
+        $pwStmt->execute([Auth::id()]);
+        $pwUser = $pwStmt->fetch();
+        if (!$pwUser || !password_verify($_POST['reauth_password'] ?? '', $pwUser['password'])) {
+            logAudit(
+                'confidential_delete_auth_failed',
+                $id,
+                'group',
+                Auth::fullName() . ' (ID: ' . Auth::id() . ') failed re-authentication when attempting to delete confidential group "' . $group['name'] . '"'
+            );
+            flash('error', 'Incorrect password. The confidential group was not deleted.');
+            redirect('/admin/groups');
+        }
+
+        // Snapshot members BEFORE deletion for email alerts
+        $mStmt = $db->prepare(
+            'SELECT u.id, u.first_name, u.last_name, u.email, u.role
+             FROM group_user_map gum
+             JOIN users u ON u.id = gum.user_id
+             WHERE gum.group_id = ?'
+        );
+        $mStmt->execute([$id]);
+        $members = $mStmt->fetchAll();
+
+        logAudit(
+            'confidential_entity_deleted',
+            $id,
+            'group',
+            Auth::fullName() . ' (ID: ' . Auth::id() . ') deleted confidential group "' . $group['name'] . '" (ID: ' . $id . ') after re-authentication'
+        );
+
+        $db->prepare('DELETE FROM `groups` WHERE id = ?')->execute([$id]);
+
+        notifyConfidentialEntityDeleted($db, 'group', $group['name'], $members);
+
+        flash('success', 'Confidential group deleted.');
+        redirect('/admin/groups');
+    }
+
+    $db->prepare('DELETE FROM `groups` WHERE id = ?')->execute([$id]);
     flash('success', 'Group deleted.');
     redirect('/admin/groups');
 });

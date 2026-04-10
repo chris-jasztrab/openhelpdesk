@@ -144,6 +144,104 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-shield-lock text-warning me-2"></i>Confidential Groups</h5>
+<p class="text-muted mb-2">Any group can be marked <strong>Confidential</strong> to enable a suite of security measures that protect sensitive membership and ticket data. When a group is confidential, every significant action is authenticated, logged, and reported to group members via email.</p>
+
+<h6 class="fw-semibold mt-3 mb-2">Enabling confidential mode</h6>
+<ol class="text-muted mb-3">
+    <li>Go to <a href="/admin/groups"><strong>Admin → Settings → Groups</strong></a> and create or edit a group.</li>
+    <li>Check the <strong><i class="bi bi-shield-lock me-1"></i>Confidential</strong> checkbox and save.</li>
+</ol>
+
+<h6 class="fw-semibold mt-3 mb-2">Security measures in effect</h6>
+<div class="table-responsive mb-3">
+<table class="table table-sm mb-0">
+    <thead class="table-light"><tr><th style="width:30%;">Protection</th><th>Details</th></tr></thead>
+    <tbody class="text-muted">
+        <tr>
+            <td><strong>Membership change alerts</strong></td>
+            <td>When members are added to a confidential group, all <em>existing</em> members receive an email alert listing the new member(s), the admin who made the change, their email, IP address, and timestamp. The first member added to an empty group is silent — alerts begin once the group already has at least one member.</td>
+        </tr>
+        <tr>
+            <td><strong>Membership change audit log</strong></td>
+            <td>Every attempt to add or remove members from a confidential group is recorded in the <a href="/admin/audit-log">audit log</a> <em>before</em> the database write, so the attempt is preserved even if the update later fails.</td>
+        </tr>
+        <tr>
+            <td><strong>Add-member confirmation dialog</strong></td>
+            <td>When adding new members to a confidential group in the edit form, a modal confirmation dialog warns the admin that existing members will be notified and the action will be logged. The admin must explicitly confirm before the form is submitted.</td>
+        </tr>
+        <tr>
+            <td><strong>CSRF failure logging</strong></td>
+            <td>If a form submission to edit a confidential group has an invalid CSRF token (possible attack indicator), the attempt is logged in the audit log with the admin's identity.</td>
+        </tr>
+    </tbody>
+</table>
+</div>
+
+<h6 class="fw-semibold mt-3 mb-2">Confidential ticket types</h6>
+<p class="text-muted mb-2">When a ticket type is linked to a group and marked <strong>Confidential</strong>, additional protections apply to tickets of that type:</p>
+<div class="table-responsive mb-3">
+<table class="table table-sm mb-0">
+    <thead class="table-light"><tr><th style="width:30%;">Protection</th><th>Details</th></tr></thead>
+    <tbody class="text-muted">
+        <tr>
+            <td><strong>Ticket redaction</strong></td>
+            <td>Admins who are <em>not</em> members of the ticket type's group see the ticket redacted (subject and details hidden) in all ticket listings.</td>
+        </tr>
+        <tr>
+            <td><strong>Re-authentication gate</strong></td>
+            <td>Admins outside the group who attempt to view a confidential ticket must re-enter their password. Access is granted for a 5-minute window per ticket.</td>
+        </tr>
+        <tr>
+            <td><strong>Access notification</strong></td>
+            <td>When an admin outside the group views a confidential ticket (after re-authentication), every member of the group receives an email alert with the admin's name, email, IP address, and timestamp.</td>
+        </tr>
+        <tr>
+            <td><strong>Access audit log</strong></td>
+            <td>Each confidential ticket access is recorded in the audit log and as an internal timeline entry on the ticket itself.</td>
+        </tr>
+        <tr>
+            <td><strong>Agent access control</strong></td>
+            <td>Agents and power users who are not members of the ticket type's group cannot view confidential tickets at all — they are fully hidden from their ticket list.</td>
+        </tr>
+    </tbody>
+</table>
+</div>
+
+<h6 class="fw-semibold mt-3 mb-2">Tamper protection</h6>
+<p class="text-muted mb-2">To prevent security bypass, confidential groups and ticket types have additional safeguards against removal or deletion of the confidential flag:</p>
+<div class="table-responsive mb-3">
+<table class="table table-sm mb-0">
+    <thead class="table-light"><tr><th style="width:30%;">Action</th><th>Required</th></tr></thead>
+    <tbody class="text-muted">
+        <tr>
+            <td><strong>Remove confidential flag from a group</strong></td>
+            <td>Password re-authentication, audit log entry, and email alert to all group members.</td>
+        </tr>
+        <tr>
+            <td><strong>Remove confidential flag from a ticket type</strong></td>
+            <td>Password re-authentication, audit log entry, and email alert to all members of the linked group.</td>
+        </tr>
+        <tr>
+            <td><strong>Delete a confidential group</strong></td>
+            <td>Password re-authentication, audit log entry, and email alert to all group members before the group is removed.</td>
+        </tr>
+        <tr>
+            <td><strong>Delete a confidential ticket type</strong></td>
+            <td>Password re-authentication, audit log entry, and email alert to all members of the linked group before the type is removed.</td>
+        </tr>
+    </tbody>
+</table>
+</div>
+
+<div class="alert alert-warning small mb-0"><i class="bi bi-exclamation-triangle-fill me-2"></i>
+    All confidential security events — access, membership changes, flag removal, and deletion — are permanently recorded in the <a href="/admin/audit-log">audit log</a> and cannot be erased through the admin interface.
+</div>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-shield-lock text-primary me-2"></i>Profile &amp; Password</h5>
 <p class="text-muted mb-2">Any logged-in user can update their own profile and password from the profile menu (top-right avatar). Agents and admins can also update their display name and email from their profile page.</p>
 <div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>

@@ -867,6 +867,18 @@ function getEmailTpl(string $name, array $rawTokens): array
             'intro'   => '{{actor_name}} ({{actor_email}}) added the following user(s) to the confidential group "{{group_name}}" at {{timestamp}} from IP {{ip_address}}: {{added_users}}. You are receiving this alert because you are a member of this confidential group.',
             'button'  => 'View Group',
         ],
+        'confidential_flag_removed' => [
+            'subject' => '[Security Alert] Confidential status removed from {{target_type}} "{{target_name}}"',
+            'intro'   => '{{actor_name}} ({{actor_email}}) removed the confidential flag from {{target_type}} "{{target_name}}" at {{timestamp}} from IP {{ip_address}}. This action was authenticated and recorded in the audit log.',
+            'button'  => 'View Details',
+            'footer'  => '',
+        ],
+        'confidential_entity_deleted' => [
+            'subject' => '[Security Alert] Confidential {{target_type}} "{{target_name}}" was deleted',
+            'intro'   => '{{actor_name}} ({{actor_email}}) deleted the confidential {{target_type}} "{{target_name}}" at {{timestamp}} from IP {{ip_address}}. This action was authenticated and recorded in the audit log.',
+            'button'  => '',
+            'footer'  => '',
+        ],
     ];
 
     $d = $defaults[$key] ?? ['subject' => '', 'intro' => '', 'button' => 'View Ticket'];
@@ -2481,6 +2493,117 @@ function notifyConfidentialGroupMembership(PDO $db, int $groupId, array $addedUs
         $actorName . ' (ID: ' . Auth::id() . ') added ' . count($addedUsers)
             . ' member(s) to confidential group "' . $group['name'] . '": ' . $addedNamesText
     );
+}
+
+/**
+ * Notify all members of a confidential group when the confidential flag is
+ * removed from the group itself or from a ticket type linked to the group.
+ *
+ * @param PDO    $db
+ * @param string $targetType  'group' or 'ticket type'
+ * @param string $targetName  Name of the group or ticket type
+ * @param int    $groupId     The group whose members should be notified
+ * @param string $viewUrl     URL for the "View Details" button (empty to omit)
+ */
+function notifyConfidentialFlagRemoved(PDO $db, string $targetType, string $targetName, int $groupId, string $viewUrl = ''): void
+{
+    $mStmt = $db->prepare(
+        'SELECT u.id, u.first_name, u.last_name, u.email, u.role
+         FROM group_user_map gum
+         JOIN users u ON u.id = gum.user_id
+         WHERE gum.group_id = ?'
+    );
+    $mStmt->execute([$groupId]);
+    $members = $mStmt->fetchAll();
+    if (empty($members)) {
+        return;
+    }
+
+    $actorName  = Auth::fullName();
+    $actorEmail = Auth::user()['email'] ?? '';
+    $ip         = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    $timestamp  = date('Y-m-d H:i:s');
+
+    $tpl = getEmailTpl('confidential_flag_removed', [
+        'target_type' => $targetType,
+        'target_name' => $targetName,
+        'actor_name'  => $actorName,
+        'actor_email' => $actorEmail,
+        'ip_address'  => $ip,
+        'timestamp'   => $timestamp,
+    ]);
+
+    foreach ($members as $user) {
+        $emailHtml = renderEmail('confidential-flag-removed', [
+            'targetType'  => $targetType,
+            'targetName'  => $targetName,
+            'actorName'   => $actorName,
+            'actorEmail'  => $actorEmail,
+            'ipAddress'   => $ip,
+            'timestamp'   => $timestamp,
+            'viewUrl'     => $viewUrl,
+            'introText'   => $tpl['intro'],
+            'buttonLabel' => $tpl['button'],
+            'footerText'  => $tpl['footer'] ?? '',
+        ]);
+
+        sendMail(
+            $user['email'],
+            $user['first_name'] . ' ' . $user['last_name'],
+            $tpl['subject'],
+            $emailHtml
+        );
+    }
+}
+
+/**
+ * Notify all members of a confidential group when the group or a linked
+ * confidential ticket type is deleted entirely.
+ *
+ * @param PDO    $db
+ * @param string $targetType  'group' or 'ticket type'
+ * @param string $targetName  Name of the deleted entity
+ * @param array  $members     Pre-fetched member rows (id, first_name, last_name, email, role)
+ */
+function notifyConfidentialEntityDeleted(PDO $db, string $targetType, string $targetName, array $members): void
+{
+    if (empty($members)) {
+        return;
+    }
+
+    $actorName  = Auth::fullName();
+    $actorEmail = Auth::user()['email'] ?? '';
+    $ip         = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    $timestamp  = date('Y-m-d H:i:s');
+
+    $tpl = getEmailTpl('confidential_entity_deleted', [
+        'target_type' => $targetType,
+        'target_name' => $targetName,
+        'actor_name'  => $actorName,
+        'actor_email' => $actorEmail,
+        'ip_address'  => $ip,
+        'timestamp'   => $timestamp,
+    ]);
+
+    foreach ($members as $user) {
+        $emailHtml = renderEmail('confidential-entity-deleted', [
+            'targetType'  => $targetType,
+            'targetName'  => $targetName,
+            'actorName'   => $actorName,
+            'actorEmail'  => $actorEmail,
+            'ipAddress'   => $ip,
+            'timestamp'   => $timestamp,
+            'introText'   => $tpl['intro'],
+            'footerText'  => $tpl['footer'] ?? '',
+        ]);
+
+        sendMail(
+            $user['email'],
+            $user['first_name'] . ' ' . $user['last_name'],
+            $tpl['subject'],
+            $emailHtml
+        );
+    }
 }
 
 /* ── Sidebar helpers ──────────────────────────────────────────── */
