@@ -88,8 +88,9 @@ $breadcrumbs = [
                             ['key' => 'notify_note_added',        'icon' => 'bi-sticky',                'label' => 'Internal note added',         'desc' => 'Email when an internal note is added to a ticket assigned to you.'],
                         ];
                         $otherOptions = [
-                            ['key' => 'notify_ticket_cc',         'icon' => 'bi-person-lines-fill',    'label' => 'CC updates',         'desc' => "Email when a ticket you're CC'd on receives a reply."],
-                            ['key' => 'notify_escalation',        'icon' => 'bi-exclamation-triangle', 'label' => 'Escalation alerts',  'desc' => 'Email when an escalation rule fires and targets you.'],
+                            ['key' => 'notify_ticket_cc',         'icon' => 'bi-person-lines-fill',    'label' => 'CC updates',              'desc' => "Email when a ticket you're CC'd on receives a reply."],
+                            ['key' => 'notify_escalation',        'icon' => 'bi-exclamation-triangle', 'label' => 'Escalation alerts',       'desc' => 'Email when an escalation rule fires and targets you.'],
+                            ['key' => 'notify_ticket_assigned',   'icon' => 'bi-person-check',         'label' => 'My ticket assigned',      'desc' => 'Email when a ticket you submitted is assigned to an agent, letting you know who is handling it.'],
                         ];
                     ?>
                         <p class="text-muted small fw-semibold mb-1 mt-1">Agent Notifications</p>
@@ -127,6 +128,7 @@ $breadcrumbs = [
                     <?php else: // portal user
                         $portalOptions = [
                             ['key' => 'notify_ticket_created',    'icon' => 'bi-ticket-detailed',     'label' => 'Ticket submitted',       'desc' => 'Confirmation email when you open a new ticket.'],
+                            ['key' => 'notify_ticket_assigned',   'icon' => 'bi-person-check',         'label' => 'Ticket assigned',        'desc' => 'Email when one of your tickets is assigned to an agent, letting you know who is handling it.'],
                             ['key' => 'notify_ticket_updated',    'icon' => 'bi-chat-left-text',       'label' => 'Agent replies',          'desc' => 'Email when an agent replies to one of your tickets.'],
                             ['key' => 'notify_ticket_cc',         'icon' => 'bi-person-lines-fill',    'label' => 'CC updates',             'desc' => "Email when a ticket you're CC'd on receives a reply."],
                             ['key' => 'notify_ticket_merged',     'icon' => 'bi-arrows-collapse',      'label' => 'Ticket merged',          'desc' => 'Email when one of your tickets is merged into another.'],

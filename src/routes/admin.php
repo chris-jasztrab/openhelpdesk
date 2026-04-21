@@ -2557,6 +2557,15 @@ $router->post('/admin/tickets/create', function () {
     // Notify group members watching new tickets
     notifyGroupMembers($db, $ticketId);
 
+    // Send confirmation email to the requester (gated by global + user prefs)
+    notifyRequesterTicketCreated($db, $ticketId);
+
+    // If an assignee was chosen at creation time, notify them and the requester
+    if ($assignedTo) {
+        notifyAssignedAgent($db, $ticketId, $assignedTo);
+        notifyRequesterTicketAssigned($db, $ticketId, $assignedTo);
+    }
+
     flash('success', 'Ticket #' . $ticketId . ' created.');
     $redirectBase = Auth::role() === 'agent' ? '/agent' : '/admin';
     redirect("{$redirectBase}/tickets/{$ticketId}");
@@ -3459,7 +3468,10 @@ $router->post('/admin/tickets/{id}/update', function (array $p) {
             'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
         )->execute([$id, Auth::id(), 'assigned', "Assigned to {$agentName}"]);
         $changes[] = 'assignment';
-        if ($newAssigned) { notifyAssignedAgent($db, $id, $newAssigned); }
+        if ($newAssigned) {
+            notifyAssignedAgent($db, $id, $newAssigned);
+            notifyRequesterTicketAssigned($db, $id, $newAssigned);
+        }
     }
 
     // Group change
@@ -4657,7 +4669,7 @@ $router->get('/admin/settings/email-notifications', function () {
     $keys = [
         'agent_new_ticket', 'agent_assigned_group', 'agent_assigned_agent',
         'agent_requester_reply', 'agent_note_added',
-        'requester_new_ticket', 'requester_agent_comment',
+        'requester_new_ticket', 'requester_ticket_assigned', 'requester_agent_comment',
         'requester_ticket_resolved', 'requester_ticket_closed',
         'cc_new_ticket', 'cc_note_added',
     ];
@@ -4680,7 +4692,7 @@ $router->post('/admin/settings/email-notifications', function () {
     $keys = [
         'agent_new_ticket', 'agent_assigned_group', 'agent_assigned_agent',
         'agent_requester_reply', 'agent_note_added',
-        'requester_new_ticket', 'requester_agent_comment',
+        'requester_new_ticket', 'requester_ticket_assigned', 'requester_agent_comment',
         'requester_ticket_resolved', 'requester_ticket_closed',
         'cc_new_ticket', 'cc_note_added',
     ];

@@ -11,6 +11,22 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.6.0 — 2026-04-21
+
+### Requester Email Notifications — Acknowledgement & Assignment
+- **Ticket Submitted Acknowledgement** — the ticket creator now reliably receives a confirmation email from every creation path (portal form, admin/agent form, email-to-ticket, mobile API). Previously only the portal form and inbound email dispatched an ack, and the portal path bypassed the global toggle.
+- **Ticket Assigned Notification** — when an agent is assigned to a ticket (either at creation or later via the ticket detail page), the requester now receives an email naming the agent who will be handling their ticket. Uses a new `ticket-assigned-requester` email template customizable in Admin → Settings → Email Templates.
+- Assignment email is skipped when the requester is also the assignee (they already receive the agent-side assignment email).
+- **Per-User Opt-Out** — new `Ticket assigned` toggle added to the profile notification preferences for portal users, and `My ticket assigned` added to the "Other Notifications" section for agents/admins who also submit tickets.
+- **Global Default** — new `Ticket Assigned to Agent` switch added to Admin → Settings → Email Notifications under Ticket Requester Notifications, alongside the existing new-ticket/resolved/closed toggles.
+- Both notifications use the project's standard two-level gating: the admin-level switch must be on AND the user's individual preference must be on.
+- Consolidated the previously duplicated inline acknowledgement logic in `portal.php` and `process-replies.php` into a single `notifyRequesterTicketCreated()` helper.
+
+### Database
+- Migration `020_notify_ticket_assigned.php` adds a `notify_ticket_assigned TINYINT(1) NOT NULL DEFAULT 1` column to `users`.
+
+---
+
 ## 2.5.0 — 2026-04-21
 
 ### Full-Website Backup

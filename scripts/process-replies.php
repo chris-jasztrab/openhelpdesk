@@ -163,36 +163,9 @@ foreach ($messages as $msg) {
 
         logMsg('INFO', "  Created Ticket #{$newTicketId} (subject: \"{$ticketSubject}\").");
 
-        // Send ticket-created confirmation email to sender
-        $fullName  = trim($senderUser['first_name'] . ' ' . $senderUser['last_name']) ?: $fromAddr;
-        $ticketUrl = appUrl() . '/portal/tickets/' . $newTicketId;
-
-        $tpl = getEmailTpl('ticket-created', [
-            'ticket_id'  => $newTicketId,
-            'subject'    => $ticketSubject,
-            'type'       => '',
-            'location'   => '',
-            'priority'   => '',
-            'user_name'  => $fullName,
-            'first_name' => $senderUser['first_name'],
-            'last_name'  => $senderUser['last_name'],
-        ]);
-
-        $emailHtml = renderEmail('ticket-created', [
-            'ticketId'     => $newTicketId,
-            'subject'      => $ticketSubject,
-            'description'  => $body,
-            'typeName'     => '',
-            'locationName' => '',
-            'priorityName' => '',
-            'ticketUrl'    => $ticketUrl,
-            'introText'    => $tpl['intro'],
-            'buttonLabel'  => $tpl['button'],
-            'footerText'   => $tpl['footer'],
-        ]);
-
-        sendMail($fromAddr, $fullName, $tpl['subject'], $emailHtml, '', $newTicketId);
-        logMsg('INFO', "  Confirmation email sent to {$fromAddr}.");
+        // Send ticket-created confirmation email to sender (gated by global + user prefs)
+        notifyRequesterTicketCreated($db, $newTicketId);
+        logMsg('INFO', "  Confirmation email dispatched to {$fromAddr} (subject to prefs).");
 
         markMessageRead($accessToken, $mailbox, $msgId);
         $processed++;

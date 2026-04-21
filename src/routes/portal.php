@@ -359,68 +359,8 @@ $router->post('/portal/tickets/create', function () {
     $attachments = handleAttachmentUploads('attachments');
     saveAttachments($db, $ticketId, null, Auth::id(), $attachments);
 
-    // Send confirmation email to ticket creator
-    $creator   = Auth::user();
-    $appUrl    = env('APP_URL', 'http://localhost:8000');
-    $ticketUrl = $appUrl . '/portal/tickets/' . $ticketId;
-
-    // Look up names for type, location, priority
-    $typeName     = '';
-    $locationName = '';
-    $priorityName = '';
-    if ($typeId) {
-        $tStmt = $db->prepare('SELECT name FROM ticket_types WHERE id = ?');
-        $tStmt->execute([$typeId]);
-        $typeName = $tStmt->fetchColumn() ?: '';
-    }
-    if ($locationId) {
-        $lStmt = $db->prepare('SELECT name FROM locations WHERE id = ?');
-        $lStmt->execute([$locationId]);
-        $locationName = $lStmt->fetchColumn() ?: '';
-    }
-    if ($priorityId) {
-        $pStmt = $db->prepare('SELECT name FROM ticket_priorities WHERE id = ?');
-        $pStmt->execute([$priorityId]);
-        $priorityName = $pStmt->fetchColumn() ?: '';
-    }
-
-    $tpl = getEmailTpl('ticket-created', [
-        'ticket_id'  => $ticketId,
-        'subject'    => $subject,
-        'type'       => $typeName,
-        'location'   => $locationName,
-        'priority'   => $priorityName,
-        'user_name'  => $creator['first_name'] . ' ' . $creator['last_name'],
-        'first_name' => $creator['first_name'],
-        'last_name'  => $creator['last_name'],
-    ]);
-
-    $emailHtml = renderEmail('ticket-created', [
-        'ticketId'     => $ticketId,
-        'subject'      => $subject,
-        'description'  => $description,
-        'typeName'     => $typeName,
-        'locationName' => $locationName,
-        'priorityName' => $priorityName,
-        'ticketUrl'    => $ticketUrl,
-        'introText'    => $tpl['intro'],
-        'buttonLabel'  => $tpl['button'],
-        'footerText'   => $tpl['footer'],
-    ]);
-
-    // Only send if user hasn't opted out of ticket-created emails
-    $notifyPref = $db->prepare('SELECT notify_ticket_created FROM users WHERE id = ?');
-    $notifyPref->execute([Auth::id()]);
-    if ((bool)($notifyPref->fetchColumn() ?? 1)) {
-        sendMail(
-            $creator['email'],
-            $creator['first_name'] . ' ' . $creator['last_name'],
-            $tpl['subject'],
-            $emailHtml,
-            '',
-            $ticketId
-        );
-    }
+    // Send confirmation email to ticket creator (gated by global + user prefs)
+    notifyRequesterTicketCreated($db, $ticketId);
 
     // Notify group members watching new tickets
     notifyGroupMembers($db, $ticketId);

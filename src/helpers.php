@@ -837,6 +837,11 @@ function getEmailTpl(string $name, array $rawTokens): array
             'intro'   => 'A ticket has been assigned to you.',
             'button'  => 'View Ticket',
         ],
+        'ticket_assigned_requester' => [
+            'subject' => '[Ticket #{{ticket_id}}] Assigned: {{subject}}',
+            'intro'   => 'Your ticket has been assigned to {{agent_name}} and will be handled shortly.',
+            'button'  => 'View Ticket',
+        ],
         'ticket_assigned_group' => [
             'subject' => '[Ticket #{{ticket_id}}] Assigned to your group: {{subject}}',
             'intro'   => 'A ticket has been assigned to your group.',
@@ -982,6 +987,172 @@ function notifyTicketCreator(PDO $db, int $ticketId, string $message, string $au
         'introText'   => $tpl['intro'],
         'buttonLabel' => $tpl['button'],
         'footerText'  => $tpl['footer'],
+    ]);
+
+    sendMail(
+        $row['email'],
+        $row['first_name'] . ' ' . $row['last_name'],
+        $tpl['subject'],
+        $emailHtml,
+        '',
+        $ticketId
+    );
+}
+
+/**
+ * Send a confirmation email to the requester when their ticket is created.
+ * Works from any creation path (portal form, admin/agent form, API, email-to-ticket).
+ * Gated by the global `requester_new_ticket` setting AND the user's
+ * `notify_ticket_created` preference.
+ */
+function notifyRequesterTicketCreated(PDO $db, int $ticketId): void
+{
+    if (!emailNotifyEnabled('requester_new_ticket')) {
+        return;
+    }
+
+    $stmt = $db->prepare(
+        'SELECT t.subject, t.description, t.type_id, t.location_id, t.priority_id,
+                u.id AS user_id, u.email, u.first_name, u.last_name, u.notify_ticket_created
+         FROM tickets t
+         JOIN users u ON t.created_by = u.id
+         WHERE t.id = ?'
+    );
+    $stmt->execute([$ticketId]);
+    $row = $stmt->fetch();
+    if (!$row || !(bool) ($row['notify_ticket_created'] ?? 1)) {
+        return;
+    }
+
+    $typeName = $locationName = $priorityName = '';
+    if ($row['type_id']) {
+        $s = $db->prepare('SELECT name FROM ticket_types WHERE id = ?');
+        $s->execute([$row['type_id']]);
+        $typeName = $s->fetchColumn() ?: '';
+    }
+    if ($row['location_id']) {
+        $s = $db->prepare('SELECT name FROM locations WHERE id = ?');
+        $s->execute([$row['location_id']]);
+        $locationName = $s->fetchColumn() ?: '';
+    }
+    if ($row['priority_id']) {
+        $s = $db->prepare('SELECT name FROM ticket_priorities WHERE id = ?');
+        $s->execute([$row['priority_id']]);
+        $priorityName = $s->fetchColumn() ?: '';
+    }
+
+    $appUrl    = env('APP_URL', 'http://localhost:8000');
+    $ticketUrl = $appUrl . '/portal/tickets/' . $ticketId;
+
+    $tpl = getEmailTpl('ticket-created', [
+        'ticket_id'  => $ticketId,
+        'subject'    => $row['subject'],
+        'type'       => $typeName,
+        'location'   => $locationName,
+        'priority'   => $priorityName,
+        'user_name'  => $row['first_name'] . ' ' . $row['last_name'],
+        'first_name' => $row['first_name'],
+        'last_name'  => $row['last_name'],
+    ]);
+
+    $emailHtml = renderEmail('ticket-created', [
+        'ticketId'     => $ticketId,
+        'subject'      => $row['subject'],
+        'description'  => $row['description'],
+        'typeName'     => $typeName,
+        'locationName' => $locationName,
+        'priorityName' => $priorityName,
+        'ticketUrl'    => $ticketUrl,
+        'introText'    => $tpl['intro'],
+        'buttonLabel'  => $tpl['button'],
+        'footerText'   => $tpl['footer'],
+    ]);
+
+    sendMail(
+        $row['email'],
+        $row['first_name'] . ' ' . $row['last_name'],
+        $tpl['subject'],
+        $emailHtml,
+        '',
+        $ticketId
+    );
+}
+
+/**
+ * Email the requester when their ticket is assigned to an agent, telling them
+ * who will be handling it. Gated by the global `requester_ticket_assigned`
+ * setting AND the requester's `notify_ticket_assigned` preference. Skips when
+ * the requester is the assigned agent (they get the agent-side email).
+ */
+function notifyRequesterTicketAssigned(PDO $db, int $ticketId, int $agentId): void
+{
+    if (!emailNotifyEnabled('requester_ticket_assigned')) {
+        return;
+    }
+
+    $stmt = $db->prepare(
+        'SELECT t.subject, t.type_id, t.priority_id,
+                u.id AS user_id, u.email, u.first_name, u.last_name, u.notify_ticket_assigned
+         FROM tickets t
+         JOIN users u ON t.created_by = u.id
+         WHERE t.id = ?'
+    );
+    $stmt->execute([$ticketId]);
+    $row = $stmt->fetch();
+    if (!$row) {
+        return;
+    }
+    if ((int) $row['user_id'] === $agentId) {
+        return; // requester is the assigned agent
+    }
+    if (!(bool) ($row['notify_ticket_assigned'] ?? 1)) {
+        return;
+    }
+
+    $a = $db->prepare('SELECT first_name, last_name FROM users WHERE id = ?');
+    $a->execute([$agentId]);
+    $agent = $a->fetch();
+    if (!$agent) {
+        return;
+    }
+    $agentName = trim($agent['first_name'] . ' ' . $agent['last_name']);
+
+    $typeName = $priorityName = '';
+    if ($row['type_id']) {
+        $s = $db->prepare('SELECT name FROM ticket_types WHERE id = ?');
+        $s->execute([$row['type_id']]);
+        $typeName = $s->fetchColumn() ?: '';
+    }
+    if ($row['priority_id']) {
+        $s = $db->prepare('SELECT name FROM ticket_priorities WHERE id = ?');
+        $s->execute([$row['priority_id']]);
+        $priorityName = $s->fetchColumn() ?: '';
+    }
+
+    $appUrl    = env('APP_URL', 'http://localhost:8000');
+    $ticketUrl = $appUrl . '/portal/tickets/' . $ticketId;
+
+    $tpl = getEmailTpl('ticket-assigned-requester', [
+        'ticket_id'  => $ticketId,
+        'subject'    => $row['subject'],
+        'agent_name' => $agentName,
+        'type'       => $typeName,
+        'priority'   => $priorityName,
+        'user_name'  => $row['first_name'] . ' ' . $row['last_name'],
+        'first_name' => $row['first_name'],
+        'last_name'  => $row['last_name'],
+    ]);
+
+    $emailHtml = renderEmail('ticket-assigned-requester', [
+        'ticketId'     => $ticketId,
+        'subject'      => $row['subject'],
+        'agentName'    => $agentName,
+        'typeName'     => $typeName,
+        'priorityName' => $priorityName,
+        'ticketUrl'    => $ticketUrl,
+        'introText'    => $tpl['intro'],
+        'buttonLabel'  => $tpl['button'],
+        'footerText'   => $tpl['footer'],
     ]);
 
     sendMail(

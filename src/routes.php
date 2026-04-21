@@ -1205,7 +1205,8 @@ $router->post('/profile', function () {
             notify_requester_replied = ?,
             notify_note_added        = ?,
             notify_ticket_solved     = ?,
-            notify_ticket_closed     = ?
+            notify_ticket_closed     = ?,
+            notify_ticket_assigned   = ?
          WHERE id = ?'
     )->execute([
         isset($_POST['notify_ticket_created'])    ? 1 : 0,
@@ -1221,6 +1222,7 @@ $router->post('/profile', function () {
         isset($_POST['notify_note_added'])        ? 1 : 0,
         isset($_POST['notify_ticket_solved'])     ? 1 : 0,
         isset($_POST['notify_ticket_closed'])     ? 1 : 0,
+        isset($_POST['notify_ticket_assigned'])   ? 1 : 0,
         $userId,
     ]);
 

@@ -131,6 +131,20 @@ $on = function (string $key) use ($settings): string {
                 <li class="list-group-item px-4 py-3">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
+                            <div class="fw-semibold">Ticket Assigned to Agent</div>
+                            <div class="text-muted" style="font-size:.875rem;">Notify the ticket creator when their ticket is assigned to an agent, letting them know who is handling it.</div>
+                        </div>
+                        <div class="form-check form-switch ms-4 mt-1">
+                            <input class="form-check-input" type="checkbox" role="switch"
+                                   id="requester_ticket_assigned" name="requester_ticket_assigned"
+                                   <?= $on('requester_ticket_assigned') ?>>
+                        </div>
+                    </div>
+                </li>
+
+                <li class="list-group-item px-4 py-3">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
                             <div class="fw-semibold">Agent Adds Comment to Ticket</div>
                             <div class="text-muted" style="font-size:.875rem;">Notify the ticket creator when an agent adds a public comment.</div>
                         </div>

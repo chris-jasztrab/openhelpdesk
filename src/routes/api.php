@@ -668,6 +668,13 @@ $router->post('/api/v1/tickets', function () {
         Sla::initializeForTicket($db, $ticketId, $priorityId, $typeId);
     }
 
+    // Send confirmation email to requester and notify assignee if one was chosen
+    notifyRequesterTicketCreated($db, $ticketId);
+    if ($assignedTo) {
+        notifyAssignedAgent($db, $ticketId, $assignedTo);
+        notifyRequesterTicketAssigned($db, $ticketId, $assignedTo);
+    }
+
     // Return the new ticket with joins
     $stmt = $db->prepare(
         "SELECT t.*, tp.name AS priority_name, tp.color AS priority_color,
