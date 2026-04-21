@@ -492,15 +492,31 @@ $router->get('/portal/tickets/{id}', function (array $p) {
         }
     }
 
+    $isOwner = (int) $ticket['created_by'] === (int) $uid;
+
+    // Escalation context (owners only — only the requester can escalate their own ticket)
+    $hasEscalationPath  = false;
+    $nextEscalationStep = null;
+    if ($isOwner && $ticket['type_id']) {
+        $hStmt = $db->prepare('SELECT COUNT(*) FROM ticket_escalation_steps WHERE ticket_type_id = ?');
+        $hStmt->execute([$ticket['type_id']]);
+        $hasEscalationPath = (int) $hStmt->fetchColumn() > 0;
+        if ($hasEscalationPath) {
+            $nextEscalationStep = nextEscalationStep($db, (int) $ticket['type_id'], (int) ($ticket['escalation_level'] ?? 0), (int) $uid);
+        }
+    }
+
     render('portal/tickets/view', [
-        'ticket'       => $ticket,
-        'timeline'     => $timeline,
-        'attachments'  => $attachments,
-        'ccUsers'      => $ccUsers,
-        'customFields' => $customFields,
-        'fieldValues'  => $fieldValues,
-        'fieldOptions' => $fieldOptions,
-        'isOwner'      => (int) $ticket['created_by'] === (int) $uid,
+        'ticket'             => $ticket,
+        'timeline'           => $timeline,
+        'attachments'        => $attachments,
+        'ccUsers'            => $ccUsers,
+        'customFields'       => $customFields,
+        'fieldValues'        => $fieldValues,
+        'fieldOptions'       => $fieldOptions,
+        'isOwner'            => $isOwner,
+        'hasEscalationPath'  => $hasEscalationPath,
+        'nextEscalationStep' => $nextEscalationStep,
     ]);
 });
 

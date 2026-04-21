@@ -211,19 +211,21 @@ $router->post('/api/tickets/{id}/assign', function (array $p) {
  * ------------------------------------------------------------------ */
 $router->get('/api/tickets/{id}/escalate/preview', function (array $p) {
     Auth::requireAuth();
-    if (!in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)) {
-        http_response_code(403); echo json_encode(['error' => 'Forbidden']); exit;
-    }
     header('Content-Type: application/json');
 
     $ticketId = (int) $p['id'];
     $db = Database::connect();
-    _apiRequireTicketAccess($db, $ticketId);
 
-    $stmt = $db->prepare('SELECT id, type_id, status, merged_into_ticket_id, escalation_level FROM tickets WHERE id = ?');
+    $stmt = $db->prepare('SELECT id, type_id, status, created_by, merged_into_ticket_id, escalation_level FROM tickets WHERE id = ?');
     $stmt->execute([$ticketId]);
     $ticket = $stmt->fetch();
     if (!$ticket) { http_response_code(404); echo json_encode(['error' => 'Ticket not found']); exit; }
+
+    if (in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)) {
+        _apiRequireTicketAccess($db, $ticketId);
+    } elseif ((int) $ticket['created_by'] !== (int) Auth::id()) {
+        http_response_code(403); echo json_encode(['error' => 'Forbidden']); exit;
+    }
 
     if (in_array($ticket['status'], ['resolved', 'closed'], true) || $ticket['merged_into_ticket_id']) {
         echo json_encode(['eligible' => false, 'reason' => 'This ticket is closed or merged and cannot be escalated.']);
@@ -253,9 +255,6 @@ $router->get('/api/tickets/{id}/escalate/preview', function (array $p) {
 
 $router->post('/api/tickets/{id}/escalate', function (array $p) {
     Auth::requireAuth();
-    if (!in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)) {
-        http_response_code(403); echo json_encode(['error' => 'Forbidden']); exit;
-    }
     if (!verifyCsrf($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '')) {
         http_response_code(403); echo json_encode(['error' => 'Invalid CSRF token']); exit;
     }
@@ -269,12 +268,17 @@ $router->post('/api/tickets/{id}/escalate', function (array $p) {
     }
 
     $db = Database::connect();
-    _apiRequireTicketAccess($db, $ticketId);
 
-    $stmt = $db->prepare('SELECT id, type_id, status, assigned_to, merged_into_ticket_id, escalation_level FROM tickets WHERE id = ?');
+    $stmt = $db->prepare('SELECT id, type_id, status, assigned_to, created_by, merged_into_ticket_id, escalation_level FROM tickets WHERE id = ?');
     $stmt->execute([$ticketId]);
     $ticket = $stmt->fetch();
     if (!$ticket) { http_response_code(404); echo json_encode(['error' => 'Ticket not found']); exit; }
+
+    if (in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)) {
+        _apiRequireTicketAccess($db, $ticketId);
+    } elseif ((int) $ticket['created_by'] !== (int) Auth::id()) {
+        http_response_code(403); echo json_encode(['error' => 'Forbidden']); exit;
+    }
 
     if (in_array($ticket['status'], ['resolved', 'closed'], true) || $ticket['merged_into_ticket_id']) {
         http_response_code(422);

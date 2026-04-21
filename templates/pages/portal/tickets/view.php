@@ -9,7 +9,7 @@ $breadcrumbs  = [
 ];
 $statusColors = ['open' => 'primary', 'in_progress' => 'warning', 'pending' => 'info', 'waiting_on_customer' => 'warning', 'waiting_on_third_party' => 'dark', 'resolved' => 'success', 'closed' => 'secondary'];
 $statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 'Pending', 'waiting_on_customer' => 'Waiting on Customer', 'waiting_on_third_party' => 'Waiting on Third Party', 'resolved' => 'Resolved', 'closed' => 'Closed'];
-$actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-person-check text-primary', 'status_changed' => 'bi-arrow-repeat text-warning', 'priority_changed' => 'bi-flag text-danger', 'comment' => 'bi-chat-dots text-info', 'edited' => 'bi-pencil text-secondary'];
+$actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-person-check text-primary', 'status_changed' => 'bi-arrow-repeat text-warning', 'priority_changed' => 'bi-flag text-danger', 'comment' => 'bi-chat-dots text-info', 'edited' => 'bi-pencil text-secondary', 'escalated' => 'bi-arrow-up-circle text-danger'];
 ?>
 <link rel="stylesheet" href="https://cdn.ckeditor.com/ckeditor5/43.3.1/ckeditor5.css">
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -32,6 +32,30 @@ $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-p
         <a href="/portal/tickets/<?= $ticket['id'] ?>/edit" class="btn btn-outline-primary btn-sm">
             <i class="bi bi-pencil me-1"></i>Edit
         </a>
+        <?php
+            $escCanEscalate = !in_array($ticket['status'], ['resolved', 'closed'], true) && empty($ticket['merged_into_ticket_id']);
+            if (!$escCanEscalate) {
+                $escTitle = 'Closed tickets cannot be escalated.';
+            } elseif (!$ticket['type_id']) {
+                $escTitle = 'A ticket type must be set before this ticket can be escalated.';
+            } elseif (!$hasEscalationPath) {
+                $escTitle = 'No escalation path is configured for this ticket type yet.';
+            } elseif (!$nextEscalationStep) {
+                $escTitle = 'This ticket is already at the top of its escalation chain.';
+            } else {
+                $escTitle = 'Escalate this ticket — it will be reassigned to ' . $nextEscalationStep['user_name'] . ' (Level ' . $nextEscalationStep['step_order'] . ').';
+            }
+            $escalateDisabled = !$escCanEscalate || !$nextEscalationStep;
+        ?>
+        <button type="button"
+                id="escalateBtn"
+                class="btn btn-outline-danger btn-sm"
+                title="<?= e($escTitle) ?>"
+                <?= $escalateDisabled ? 'disabled' : '' ?>
+                data-bs-toggle="modal"
+                data-bs-target="#escalateModal">
+            <i class="bi bi-arrow-up-circle me-1"></i>Escalate
+        </button>
         <button type="button" class="btn btn-outline-secondary btn-sm"
                 data-bs-toggle="modal" data-bs-target="#closeTicketModal">
             <i class="bi bi-x-circle me-1"></i>Close Ticket
@@ -41,6 +65,85 @@ $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-p
             <i class="bi bi-arrow-left me-1"></i>Back
         </a>
     </div>
+
+    <?php if ($isOwner && $nextEscalationStep): ?>
+    <div class="modal fade" id="escalateModal" tabindex="-1" aria-labelledby="escalateModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h6 class="modal-title fw-semibold" id="escalateModalLabel">
+                        <i class="bi bi-arrow-up-circle me-2 text-danger"></i>Escalate Ticket
+                    </h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-3">
+                        If you feel this ticket needs more attention, you can escalate it to the next person in the escalation chain for this ticket type.
+                    </p>
+                    <div class="p-3 bg-body-tertiary rounded mb-3">
+                        <div class="small text-muted mb-1">This ticket will be escalated to:</div>
+                        <div>
+                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle me-1">
+                                Level <?= (int) $nextEscalationStep['step_order'] ?>
+                            </span>
+                            <strong><?= e($nextEscalationStep['user_name']) ?></strong>
+                        </div>
+                        <?php if (!empty($nextEscalationStep['label'])): ?>
+                        <div class="text-muted small mt-1"><?= e($nextEscalationStep['label']) ?></div>
+                        <?php endif; ?>
+                    </div>
+
+                    <label for="escalateReason" class="form-label small text-muted">Reason <span class="text-muted">(optional — helps the person you're escalating to)</span></label>
+                    <textarea id="escalateReason" class="form-control" rows="3" maxlength="2000"
+                              placeholder="What isn't working? What have you tried or been told so far?"></textarea>
+
+                    <div id="escalateError" class="alert alert-danger mt-3 d-none" role="alert"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" id="escalateConfirmBtn" class="btn btn-danger">
+                        <i class="bi bi-arrow-up-circle me-1"></i>Escalate
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+    (function () {
+        var btn = document.getElementById('escalateConfirmBtn');
+        var err = document.getElementById('escalateError');
+        var txt = document.getElementById('escalateReason');
+        if (!btn) return;
+        var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
+        btn.addEventListener('click', function () {
+            err.classList.add('d-none');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Escalating…';
+            fetch('/api/tickets/<?= (int) $ticket['id'] ?>/escalate', {
+                method:  'POST',
+                headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
+                body:    JSON.stringify({reason: (txt && txt.value) ? txt.value.trim() : ''}),
+            }).then(function (r) { return r.json().then(function (b) { return {ok: r.ok, body: b}; }); })
+              .then(function (res) {
+                  if (!res.ok || !res.body.success) {
+                      err.textContent = (res.body && res.body.error) || 'Escalation failed.';
+                      err.classList.remove('d-none');
+                      btn.disabled = false;
+                      btn.innerHTML = '<i class="bi bi-arrow-up-circle me-1"></i>Retry';
+                      return;
+                  }
+                  window.location.reload();
+              })
+              .catch(function () {
+                  err.textContent = 'Network error. Please try again.';
+                  err.classList.remove('d-none');
+                  btn.disabled = false;
+                  btn.innerHTML = '<i class="bi bi-arrow-up-circle me-1"></i>Retry';
+              });
+        });
+    })();
+    </script>
+    <?php endif; ?>
 </div>
 
 <div class="row g-4">
