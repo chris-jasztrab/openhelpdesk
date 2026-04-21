@@ -21,8 +21,11 @@ function _agentRequireTicketAccess(PDO $db, array $ticket): void
         return; // admins: confidential access handled by re-auth flow in the route
     }
 
+    $ticketId = isset($ticket['id']) ? (int) $ticket['id'] : null;
+    $userId   = (int) Auth::id();
+
     $gs = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
-    $gs->execute([Auth::id()]);
+    $gs->execute([$userId]);
     $agentGroups = array_map('intval', $gs->fetchAll(PDO::FETCH_COLUMN));
 
     if (empty($agentGroups)) {
@@ -33,8 +36,8 @@ function _agentRequireTicketAccess(PDO $db, array $ticket): void
             $cType = $cStmt->fetch();
             if ($cType && $cType['is_confidential'] && $cType['group_id']) {
                 $inGroup = $db->prepare('SELECT 1 FROM group_user_map WHERE group_id = ? AND user_id = ?');
-                $inGroup->execute([$cType['group_id'], Auth::id()]);
-                if (!$inGroup->fetchColumn()) {
+                $inGroup->execute([$cType['group_id'], $userId]);
+                if (!$inGroup->fetchColumn() && !ticketAccessExempt($db, $userId, $ticketId)) {
                     flash('error', 'You do not have access to this ticket.');
                     redirect('/agent/tickets');
                 }
@@ -47,7 +50,8 @@ function _agentRequireTicketAccess(PDO $db, array $ticket): void
         return; // unassigned ticket: visible to all agents
     }
 
-    if (!in_array((int) $ticket['group_id'], $agentGroups, true)) {
+    if (!in_array((int) $ticket['group_id'], $agentGroups, true)
+        && !ticketAccessExempt($db, $userId, $ticketId)) {
         flash('error', 'You do not have access to this ticket.');
         redirect('/agent/tickets');
     }
@@ -1652,7 +1656,10 @@ $router->get('/agent/attachments/{id}/download', function (array $p) {
         redirect('/agent/tickets');
     }
 
-    _agentRequireTicketAccess($db, ['group_id' => $att['ticket_group_id']]);
+    _agentRequireTicketAccess($db, [
+        'id'       => (int) $att['ticket_id'],
+        'group_id' => $att['ticket_group_id'],
+    ]);
 
     $filePath = ATTACHMENT_STORAGE_PATH . $att['stored_name'];
     if (!file_exists($filePath)) {

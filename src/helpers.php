@@ -3440,3 +3440,28 @@ function nextEscalationStep(PDO $db, int $ticketTypeId, int $currentLevel, int $
     }
     return null;
 }
+
+/**
+ * Group-based ticket visibility override: an agent who is the current
+ * assignee or an explicit watcher of a ticket should always be able to
+ * open it, even if the ticket's group is outside their group memberships.
+ * Escalation and manual assignment can hand a ticket to someone outside
+ * the group; without this exemption they'd get the notification email
+ * but a 403 on the link.
+ */
+function ticketAccessExempt(PDO $db, int $userId, ?int $ticketId): bool
+{
+    if (!$userId || !$ticketId) {
+        return false;
+    }
+
+    $s = $db->prepare('SELECT 1 FROM tickets WHERE id = ? AND assigned_to = ?');
+    $s->execute([$ticketId, $userId]);
+    if ($s->fetchColumn()) {
+        return true;
+    }
+
+    $s = $db->prepare('SELECT 1 FROM ticket_watchers WHERE ticket_id = ? AND user_id = ?');
+    $s->execute([$ticketId, $userId]);
+    return (bool) $s->fetchColumn();
+}

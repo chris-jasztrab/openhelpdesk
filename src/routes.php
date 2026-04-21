@@ -22,8 +22,10 @@ function _apiRequireTicketAccess(PDO $db, int $ticketId): void
         return; // admins: unrestricted
     }
 
+    $userId = (int) Auth::id();
+
     $gs = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
-    $gs->execute([Auth::id()]);
+    $gs->execute([$userId]);
     $agentGroups = array_map('intval', $gs->fetchAll(PDO::FETCH_COLUMN));
 
     $ts = $db->prepare('SELECT group_id, type_id FROM tickets WHERE id = ?');
@@ -41,8 +43,8 @@ function _apiRequireTicketAccess(PDO $db, int $ticketId): void
             $cType = $cStmt->fetch();
             if ($cType && $cType['is_confidential'] && $cType['group_id']) {
                 $inGroup = $db->prepare('SELECT 1 FROM group_user_map WHERE group_id = ? AND user_id = ?');
-                $inGroup->execute([$cType['group_id'], Auth::id()]);
-                if (!$inGroup->fetchColumn()) {
+                $inGroup->execute([$cType['group_id'], $userId]);
+                if (!$inGroup->fetchColumn() && !ticketAccessExempt($db, $userId, $ticketId)) {
                     http_response_code(403);
                     header('Content-Type: application/json');
                     echo json_encode(['error' => 'You do not have access to this ticket.']);
@@ -57,7 +59,8 @@ function _apiRequireTicketAccess(PDO $db, int $ticketId): void
         return; // unassigned ticket: visible to all agents
     }
 
-    if (!in_array((int) $ticket['group_id'], $agentGroups, true)) {
+    if (!in_array((int) $ticket['group_id'], $agentGroups, true)
+        && !ticketAccessExempt($db, $userId, $ticketId)) {
         http_response_code(403);
         header('Content-Type: application/json');
         echo json_encode(['error' => 'You do not have access to this ticket.']);
