@@ -857,6 +857,16 @@ function getEmailTpl(string $name, array $rawTokens): array
             'intro'   => '{{escalated_by_name}} has escalated this ticket to you. Please review and take it forward.',
             'button'  => 'View Ticket',
         ],
+        'ticket_stale_agent' => [
+            'subject' => '[Ticket #{{ticket_id}}] Stale — {{hours_since_update}}h without activity: {{subject}}',
+            'intro'   => 'A ticket assigned to you has had no activity for {{hours_since_update}} hours.',
+            'button'  => 'View Ticket',
+        ],
+        'ticket_stale_requester' => [
+            'subject' => '[Ticket #{{ticket_id}}] Status update: {{subject}}',
+            'intro'   => 'We wanted to let you know that we\'re still tracking your ticket, even though there\'s no new update yet.',
+            'button'  => 'View Ticket',
+        ],
         'ticket_status_resolved' => [
             'subject' => '[Ticket #{{ticket_id}}] Resolved: {{subject}}',
             'intro'   => 'Your support ticket has been resolved. If you have further questions, you can reopen it by replying.',
@@ -3464,4 +3474,217 @@ function ticketAccessExempt(PDO $db, int $userId, ?int $ticketId): bool
     $s = $db->prepare('SELECT 1 FROM ticket_watchers WHERE ticket_id = ? AND user_id = ?');
     $s->execute([$ticketId, $userId]);
     return (bool) $s->fetchColumn();
+}
+
+/* ── Stale ticket notifications ─────────────────────────────────────── */
+
+/**
+ * Resolve the effective stale threshold (hours) for a ticket.
+ * Per-type override wins; otherwise the global setting; otherwise 72h.
+ */
+function staleThresholdHoursForType(PDO $db, ?int $typeId): int
+{
+    if ($typeId) {
+        $stmt = $db->prepare('SELECT stale_threshold_hours FROM ticket_types WHERE id = ?');
+        $stmt->execute([$typeId]);
+        $val = $stmt->fetchColumn();
+        if ($val !== false && $val !== null && $val !== '') {
+            return (int) $val;
+        }
+    }
+    return (int) (getSetting('stale_threshold_hours', '72') ?: '72');
+}
+
+/**
+ * Pretty label for a ticket status (matches the UI badges).
+ */
+function ticketStatusLabel(string $status): string
+{
+    return match ($status) {
+        'open'                   => 'Open',
+        'in_progress'            => 'In Progress',
+        'pending'                => 'Pending',
+        'waiting_on_customer'    => 'Waiting on Customer',
+        'waiting_on_third_party' => 'Waiting on Third Party',
+        'resolved'               => 'Resolved',
+        'closed'                 => 'Closed',
+        default                  => ucfirst(str_replace('_', ' ', $status)),
+    };
+}
+
+/**
+ * Email the assigned agent (or all members of the assigned group) that a
+ * ticket has gone stale. Respects global + per-user notification prefs.
+ */
+function notifyStaleTicketAgent(PDO $db, array $ticket, int $hoursSinceUpdate, int $thresholdHours): void
+{
+    if (!emailNotifyEnabled('ticket_stale_agent')) {
+        return;
+    }
+
+    $ticketId = (int) $ticket['id'];
+    $typeName = $priorityName = $submitterName = '';
+    if (!empty($ticket['type_id'])) {
+        $s = $db->prepare('SELECT name FROM ticket_types WHERE id = ?');
+        $s->execute([$ticket['type_id']]);
+        $typeName = $s->fetchColumn() ?: '';
+    }
+    if (!empty($ticket['priority_id'])) {
+        $s = $db->prepare('SELECT name FROM ticket_priorities WHERE id = ?');
+        $s->execute([$ticket['priority_id']]);
+        $priorityName = $s->fetchColumn() ?: '';
+    }
+    if (!empty($ticket['created_by'])) {
+        $s = $db->prepare('SELECT first_name, last_name FROM users WHERE id = ?');
+        $s->execute([$ticket['created_by']]);
+        $row = $s->fetch();
+        $submitterName = $row ? trim($row['first_name'] . ' ' . $row['last_name']) : '';
+    }
+
+    // Determine recipients: assigned agent, or all members of the assigned group.
+    $recipients = [];
+    if (!empty($ticket['assigned_to'])) {
+        $s = $db->prepare(
+            'SELECT id, first_name, last_name, email, role, notify_assigned_to_me
+             FROM users WHERE id = ?'
+        );
+        $s->execute([(int) $ticket['assigned_to']]);
+        $row = $s->fetch();
+        if ($row && (bool) ($row['notify_assigned_to_me'] ?? 1)) {
+            $recipients[] = $row;
+        }
+    } elseif (!empty($ticket['group_id'])) {
+        $s = $db->prepare(
+            'SELECT u.id, u.first_name, u.last_name, u.email, u.role, u.notify_assigned_to_group
+             FROM group_user_map gum
+             JOIN users u ON u.id = gum.user_id
+             WHERE gum.group_id = ?'
+        );
+        $s->execute([(int) $ticket['group_id']]);
+        foreach ($s->fetchAll() as $row) {
+            if ((bool) ($row['notify_assigned_to_group'] ?? 1)) {
+                $recipients[] = $row;
+            }
+        }
+    }
+
+    if (empty($recipients)) {
+        return;
+    }
+
+    $appUrl      = env('APP_URL', 'http://localhost:8000');
+    $statusLabel = ticketStatusLabel((string) $ticket['status']);
+
+    foreach ($recipients as $agent) {
+        $rolePrefix = match ($agent['role']) {
+            'admin' => '/admin',
+            default => '/agent',
+        };
+        $ticketUrl = $appUrl . $rolePrefix . '/tickets/' . $ticketId;
+
+        $tpl = getEmailTpl('ticket_stale_agent', [
+            'ticket_id'           => $ticketId,
+            'subject'             => $ticket['subject'],
+            'type'                => $typeName,
+            'priority'            => $priorityName,
+            'submitter'           => $submitterName,
+            'hours_since_update'  => (string) $hoursSinceUpdate,
+            'threshold_hours'     => (string) $thresholdHours,
+            'user_name'           => $agent['first_name'] . ' ' . $agent['last_name'],
+            'first_name'          => $agent['first_name'],
+            'last_name'           => $agent['last_name'],
+        ]);
+
+        $emailHtml = renderEmail('ticket-stale-agent', [
+            'ticketId'         => $ticketId,
+            'subject'          => $ticket['subject'],
+            'typeName'         => $typeName,
+            'priorityName'     => $priorityName,
+            'submitterName'    => $submitterName,
+            'hoursSinceUpdate' => $hoursSinceUpdate,
+            'thresholdHours'   => $thresholdHours,
+            'statusLabel'      => $statusLabel,
+            'ticketUrl'        => $ticketUrl,
+            'introText'        => $tpl['intro'],
+            'buttonLabel'      => $tpl['button'],
+            'footerText'       => $tpl['footer'],
+        ]);
+
+        sendMail(
+            $agent['email'],
+            $agent['first_name'] . ' ' . $agent['last_name'],
+            $tpl['subject'],
+            $emailHtml,
+            '',
+            $ticketId
+        );
+    }
+}
+
+/**
+ * Email the requester that their ticket is stale — essentially a
+ * "we haven't forgotten you" update even though nothing has changed.
+ */
+function notifyStaleTicketRequester(PDO $db, array $ticket, int $hoursSinceUpdate): void
+{
+    if (!emailNotifyEnabled('ticket_stale_requester')) {
+        return;
+    }
+
+    $ticketId = (int) $ticket['id'];
+    if (empty($ticket['created_by'])) {
+        return;
+    }
+
+    $s = $db->prepare(
+        'SELECT id, first_name, last_name, email, notify_ticket_updated
+         FROM users WHERE id = ?'
+    );
+    $s->execute([(int) $ticket['created_by']]);
+    $user = $s->fetch();
+    if (!$user || !(bool) ($user['notify_ticket_updated'] ?? 1)) {
+        return;
+    }
+
+    $assigneeName = '';
+    if (!empty($ticket['assigned_to'])) {
+        $a = $db->prepare('SELECT first_name, last_name FROM users WHERE id = ?');
+        $a->execute([(int) $ticket['assigned_to']]);
+        $row = $a->fetch();
+        $assigneeName = $row ? trim($row['first_name'] . ' ' . $row['last_name']) : '';
+    }
+
+    $appUrl      = env('APP_URL', 'http://localhost:8000');
+    $ticketUrl   = $appUrl . '/portal/tickets/' . $ticketId;
+    $statusLabel = ticketStatusLabel((string) $ticket['status']);
+
+    $tpl = getEmailTpl('ticket_stale_requester', [
+        'ticket_id'          => $ticketId,
+        'subject'            => $ticket['subject'],
+        'hours_since_update' => (string) $hoursSinceUpdate,
+        'user_name'          => $user['first_name'] . ' ' . $user['last_name'],
+        'first_name'         => $user['first_name'],
+        'last_name'          => $user['last_name'],
+    ]);
+
+    $emailHtml = renderEmail('ticket-stale-requester', [
+        'ticketId'         => $ticketId,
+        'subject'          => $ticket['subject'],
+        'statusLabel'      => $statusLabel,
+        'assigneeName'     => $assigneeName,
+        'hoursSinceUpdate' => $hoursSinceUpdate,
+        'ticketUrl'        => $ticketUrl,
+        'introText'        => $tpl['intro'],
+        'buttonLabel'      => $tpl['button'],
+        'footerText'       => $tpl['footer'],
+    ]);
+
+    sendMail(
+        $user['email'],
+        $user['first_name'] . ' ' . $user['last_name'],
+        $tpl['subject'],
+        $emailHtml,
+        '',
+        $ticketId
+    );
 }

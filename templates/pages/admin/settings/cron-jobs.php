@@ -50,6 +50,16 @@ $cronJobs = [
         'note'        => 'Only required if you have scheduled reports configured in Admin → Reports → Scheduled Reports.',
     ],
     [
+        'title'       => 'Stale Ticket Notifications',
+        'icon'        => 'bi-hourglass-split',
+        'description' => 'Finds active tickets that have had no activity for longer than the configured stale threshold and emails both the assigned agent and the requester. Skips resolved, closed, and waiting-on-customer/third-party statuses.',
+        'frequency'   => 'Every hour',
+        'command'     => '0 * * * * php ' . ROOT_DIR . '/scripts/process-stale-tickets.php >> ' . ROOT_DIR . '/storage/logs/stale-tickets.log 2>&1',
+        'log'         => ROOT_DIR . '/storage/logs/stale-tickets.log',
+        'required'    => false,
+        'note'        => 'Configure the threshold and per-type overrides in Admin → Settings → Stale Tickets.',
+    ],
+    [
         'title'       => 'App Secret Expiry Reminders',
         'icon'        => 'bi-key',
         'description' => 'Sends email reminders to all administrators when the Microsoft Graph app secret is approaching its expiry date. Reminds at 30 days, 7 days, and on the day of expiry.',

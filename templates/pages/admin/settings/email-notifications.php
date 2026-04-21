@@ -102,6 +102,20 @@ $on = function (string $key) use ($settings): string {
                     </div>
                 </li>
 
+                <li class="list-group-item px-4 py-3">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="fw-semibold">Ticket Stale (No Activity)</div>
+                            <div class="text-muted" style="font-size:.875rem;">Notify the assigned agent (or group members if unassigned) when a ticket has had no activity for longer than the configured threshold. Configure in <a href="/admin/settings/stale-tickets">Stale Tickets</a>.</div>
+                        </div>
+                        <div class="form-check form-switch ms-4 mt-1">
+                            <input class="form-check-input" type="checkbox" role="switch"
+                                   id="ticket_stale_agent" name="ticket_stale_agent"
+                                   <?= $on('ticket_stale_agent') ?>>
+                        </div>
+                    </div>
+                </li>
+
             </ul>
         </div>
     </div>
@@ -180,6 +194,20 @@ $on = function (string $key) use ($settings): string {
                             <input class="form-check-input" type="checkbox" role="switch"
                                    id="requester_ticket_closed" name="requester_ticket_closed"
                                    <?= $on('requester_ticket_closed') ?>>
+                        </div>
+                    </div>
+                </li>
+
+                <li class="list-group-item px-4 py-3">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="fw-semibold">Stale Ticket Check-In</div>
+                            <div class="text-muted" style="font-size:.875rem;">Send the requester a "we haven't forgotten you" update when their ticket has had no activity for longer than the configured threshold. Configure in <a href="/admin/settings/stale-tickets">Stale Tickets</a>.</div>
+                        </div>
+                        <div class="form-check form-switch ms-4 mt-1">
+                            <input class="form-check-input" type="checkbox" role="switch"
+                                   id="ticket_stale_requester" name="ticket_stale_requester"
+                                   <?= $on('ticket_stale_requester') ?>>
                         </div>
                     </div>
                 </li>

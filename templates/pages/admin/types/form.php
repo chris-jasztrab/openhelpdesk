@@ -73,6 +73,18 @@ $action = $isEdit ? "/admin/types/{$editing['id']}/edit" : '/admin/types/create'
                 <div class="form-text">Only members of the assigned group can view these tickets. Admins outside the group must re-authenticate to access them, and all access is logged and notified to group members.</div>
             </div>
 
+            <div class="mb-3">
+                <label for="stale_threshold_hours" class="form-label fw-semibold">
+                    <i class="bi bi-hourglass-split me-1"></i>Stale Threshold (hours)
+                </label>
+                <input type="number" min="0" class="form-control" id="stale_threshold_hours" name="stale_threshold_hours"
+                       value="<?= e(old('stale_threshold_hours', (string) ($editing['stale_threshold_hours'] ?? ''))) ?>"
+                       placeholder="Uses global setting">
+                <div class="form-text">
+                    Override the global stale threshold for this ticket type. Leave blank to use the global setting (Admin → Settings → Stale Tickets).
+                </div>
+            </div>
+
             <hr class="my-4">
 
             <div class="d-flex gap-2">

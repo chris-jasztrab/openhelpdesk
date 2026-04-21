@@ -1064,13 +1064,15 @@ $router->post('/admin/types/create', function () {
     $order   = (int) ($_POST['sort_order'] ?? 0);
     $groupId        = !empty($_POST['group_id']) ? (int) $_POST['group_id'] : null;
     $isConfidential = !empty($_POST['is_confidential']) && $groupId ? 1 : 0;
+    $staleRaw       = trim((string) ($_POST['stale_threshold_hours'] ?? ''));
+    $staleHours     = $staleRaw === '' ? null : max(0, (int) $staleRaw);
     if ($name === '') {
         flashInput($_POST);
         flash('error', 'Type name is required.');
         redirect('/admin/types/create');
     }
-    Database::connect()->prepare('INSERT INTO ticket_types (name, color, group_id, is_confidential, sort_order) VALUES (?, ?, ?, ?, ?)')
-        ->execute([$name, $color, $groupId, $isConfidential, $order]);
+    Database::connect()->prepare('INSERT INTO ticket_types (name, color, group_id, is_confidential, sort_order, stale_threshold_hours) VALUES (?, ?, ?, ?, ?, ?)')
+        ->execute([$name, $color, $groupId, $isConfidential, $order, $staleHours]);
     flash('success', 'Ticket type created.');
     redirect('/admin/types');
 });
@@ -1101,6 +1103,8 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
     $order   = (int) ($_POST['sort_order'] ?? 0);
     $groupId        = !empty($_POST['group_id']) ? (int) $_POST['group_id'] : null;
     $isConfidential = !empty($_POST['is_confidential']) && $groupId ? 1 : 0;
+    $staleRaw       = trim((string) ($_POST['stale_threshold_hours'] ?? ''));
+    $staleHours     = $staleRaw === '' ? null : max(0, (int) $staleRaw);
     if ($name === '') {
         flashInput($_POST);
         flash('error', 'Type name is required.');
@@ -1125,6 +1129,7 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
                 'color'     => $color,
                 'sort_order' => (string) $order,
                 'group_id'  => $groupId ? (string) $groupId : '',
+                'stale_threshold_hours' => $staleHours === null ? '' : (string) $staleHours,
                 // is_confidential intentionally omitted (unchecked = removal)
             ];
             logAudit(
@@ -1161,8 +1166,8 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
         }
     }
 
-    $db->prepare('UPDATE ticket_types SET name=?, color=?, group_id=?, is_confidential=?, sort_order=? WHERE id=?')
-        ->execute([$name, $color, $groupId, $isConfidential, $order, $id]);
+    $db->prepare('UPDATE ticket_types SET name=?, color=?, group_id=?, is_confidential=?, sort_order=?, stale_threshold_hours=? WHERE id=?')
+        ->execute([$name, $color, $groupId, $isConfidential, $order, $staleHours, $id]);
 
     // Confidential flag removal: audit log + notify all group members
     if ($wasConfidential && !$isConfidential && $priorGroupId) {
@@ -4669,8 +4674,10 @@ $router->get('/admin/settings/email-notifications', function () {
     $keys = [
         'agent_new_ticket', 'agent_assigned_group', 'agent_assigned_agent',
         'agent_requester_reply', 'agent_note_added',
+        'ticket_stale_agent',
         'requester_new_ticket', 'requester_ticket_assigned', 'requester_agent_comment',
         'requester_ticket_resolved', 'requester_ticket_closed',
+        'ticket_stale_requester',
         'cc_new_ticket', 'cc_note_added',
     ];
 
@@ -4692,8 +4699,10 @@ $router->post('/admin/settings/email-notifications', function () {
     $keys = [
         'agent_new_ticket', 'agent_assigned_group', 'agent_assigned_agent',
         'agent_requester_reply', 'agent_note_added',
+        'ticket_stale_agent',
         'requester_new_ticket', 'requester_ticket_assigned', 'requester_agent_comment',
         'requester_ticket_resolved', 'requester_ticket_closed',
+        'ticket_stale_requester',
         'cc_new_ticket', 'cc_note_added',
     ];
 
@@ -9076,4 +9085,64 @@ $router->post('/admin/settings/escalation-paths/{typeId}', function (array $p) {
     logAudit('escalation_path_saved', $typeId, 'ticket_type', 'Steps: ' . count($steps));
     flash('success', 'Escalation path saved (' . count($steps) . ' step' . (count($steps) === 1 ? '' : 's') . ').');
     redirect('/admin/settings/escalation-paths/' . $typeId);
+});
+
+/* ==================================================================
+ * ADMIN – Stale Ticket Notifications
+ * ================================================================== */
+
+$router->get('/admin/settings/stale-tickets', function () {
+    Auth::requireRole('admin');
+    $db = Database::connect();
+
+    $settings = [
+        'stale_threshold_hours'              => getSetting('stale_threshold_hours', '72'),
+        'stale_recheck_hours'                => getSetting('stale_recheck_hours', '24'),
+        'email_notify:ticket_stale_agent'     => getSetting('email_notify:ticket_stale_agent', '1'),
+        'email_notify:ticket_stale_requester' => getSetting('email_notify:ticket_stale_requester', '1'),
+    ];
+
+    $types = $db->query(
+        'SELECT id, name, color, stale_threshold_hours FROM ticket_types ORDER BY sort_order, name'
+    )->fetchAll();
+
+    render('admin/settings/stale-tickets', ['settings' => $settings, 'types' => $types]);
+});
+
+$router->post('/admin/settings/stale-tickets', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/stale-tickets');
+    }
+
+    $threshold = max(0, (int) ($_POST['stale_threshold_hours'] ?? 72));
+    $recheck   = max(1, (int) ($_POST['stale_recheck_hours']   ?? 24));
+
+    setSetting('stale_threshold_hours', (string) $threshold);
+    setSetting('stale_recheck_hours',   (string) $recheck);
+    setSetting('email_notify:ticket_stale_agent',     isset($_POST['notify_agent'])     ? '1' : '0');
+    setSetting('email_notify:ticket_stale_requester', isset($_POST['notify_requester']) ? '1' : '0');
+
+    flash('success', 'Stale ticket settings saved.');
+    redirect('/admin/settings/stale-tickets');
+});
+
+$router->post('/admin/settings/stale-tickets/run-now', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/stale-tickets');
+    }
+    $script = ROOT_DIR . '/scripts/process-stale-tickets.php';
+    $cmd    = escapeshellarg(phpBinary()) . ' ' . escapeshellarg($script) . ' 2>&1';
+    $outputLines = [];
+    $returnCode  = 0;
+    exec($cmd, $outputLines, $returnCode);
+    $_SESSION['_stale_run'] = [
+        'lines' => $outputLines,
+        'code'  => $returnCode,
+        'time'  => date('Y-m-d H:i:s'),
+    ];
+    redirect('/admin/settings/stale-tickets');
 });

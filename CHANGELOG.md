@@ -11,6 +11,18 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.8.0 — 2026-04-21
+
+### Stale Ticket Notifications
+- **Stale-Ticket Cron** — new `scripts/process-stale-tickets.php` runs hourly, finds active tickets (`open`, `in_progress`, `pending`) that have had no activity for longer than a configurable threshold, and emails both the assigned agent (or group if unassigned) and the requester. Tickets in `waiting_on_customer`, `waiting_on_third_party`, `resolved`, or `closed` are skipped — the clock only runs while the ticket is genuinely waiting on the team.
+- **Requester Reassurance** — the requester gets a "we haven't forgotten you" check-in email even when there's no real update, closing the communication gap that silent tickets create.
+- **Per-Type Overrides** — each ticket type can override the global stale threshold (leave blank to inherit). Useful for urgent types (e.g. "Facilities Emergency" at 4h) versus slow-burn types (e.g. "Project Intake" at 14 days).
+- **Configuration UI** — new **Admin → Settings → Stale Tickets** page sets the global threshold, re-notify window, and toggles for agent/requester emails. Includes a one-click "Run Now" button and visibility into the current per-type overrides. A new stale-threshold field also appears on the Ticket Type editor.
+- **Smart Re-Nag** — subsequent runs only re-notify a given ticket after the configured re-check window (default 24h), dedup'd via a `stale_notification_sent` entry in the ticket timeline, so stale tickets don't spam inboxes every hour.
+- **Timeline Entry** — every stale notification writes an internal timeline entry so agents can see when the reminder fired and how stale the ticket was at that moment.
+
+---
+
 ## 2.7.3 — 2026-04-21
 
 ### Access Control
