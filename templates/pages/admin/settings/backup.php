@@ -33,8 +33,10 @@ $breadcrumbs  = [
             <div class="card-body">
                 <p class="text-muted mb-3">
                     Generates a <code>.zip</code> file containing a full SQL dump of your database
-                    and all uploaded files (ticket attachments, branding assets, user avatars).
+                    plus a complete snapshot of the entire website directory &mdash; source code,
+                    templates, configuration, dependencies, and all uploaded files.
                     The backup is saved to <code>storage/backups/</code> on the server and can be downloaded below.
+                    Large backups may take several minutes.
                 </p>
                 <form method="POST" action="/admin/settings/backup/create">
                     <?= csrfField() ?>
@@ -102,9 +104,11 @@ $breadcrumbs  = [
             <div class="card-body">
                 <ul class="text-muted small mb-0" style="line-height:1.9;">
                     <li><strong>database.sql</strong> — full dump of all tables including tickets, users, settings, SLA policies, KB articles, and automations.</li>
-                    <li><strong>attachments/</strong> — all ticket file attachments.</li>
-                    <li><strong>uploads/</strong> — branding assets (logo) and user avatars.</li>
+                    <li><strong>website/</strong> — complete copy of the application directory: PHP source, templates, <code>config/</code>, <code>.env</code>, <code>vendor/</code>, scripts, ticket attachments, branding assets, avatars, and logs.</li>
                 </ul>
+                <p class="text-muted small mb-0 mt-2">
+                    <em>Excluded:</em> <code>storage/backups/</code> itself (prevents recursion).
+                </p>
             </div>
         </div>
 
@@ -118,9 +122,11 @@ $breadcrumbs  = [
                     <li>Import <code>database.sql</code> into your MySQL database:<br>
                         <code class="d-block mt-1 p-1 bg-light rounded">mysql -u user -p dbname &lt; database.sql</code>
                     </li>
-                    <li>Copy the <code>attachments/</code> contents to <code>storage/attachments/</code>.</li>
-                    <li>Copy the <code>uploads/</code> contents to <code>public/uploads/</code>.</li>
-                    <li>Ensure your <code>.env</code> is configured correctly.</li>
+                    <li>Copy the contents of <code>website/</code> to your site directory (e.g. <code>/var/www/freshwpl/</code>).</li>
+                    <li>Restore file ownership so the web server can read/write uploads:<br>
+                        <code class="d-block mt-1 p-1 bg-light rounded">chown -R www-data:www-data /var/www/freshwpl</code>
+                    </li>
+                    <li>Confirm <code>.env</code> still matches the target environment (DB credentials, mail, URL).</li>
                 </ol>
             </div>
         </div>

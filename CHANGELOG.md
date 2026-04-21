@@ -11,6 +11,17 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.5.0 — 2026-04-21
+
+### Full-Website Backup
+- **Entire Site Snapshot** — the admin backup now archives the complete application directory under a `website/` prefix in the zip, not just attachments and uploads
+- Includes PHP source, templates, `config/`, `.env`, `vendor/`, scripts, ticket attachments, branding assets, avatars, and logs — everything needed to restore the site to a fresh server alongside `database.sql`
+- Only `storage/backups/` itself is excluded, to prevent the in-progress archive from recursing into itself and pulling in prior backups
+- Bumped the backup request time limit from 300 s to 1800 s and raised the memory limit to 512 MB to accommodate larger archives
+- Admin → Settings → Backup page copy, "What's Included" card, and restore instructions updated to reflect the new scope
+
+---
+
 ## 2.4.0 — 2026-04-10
 
 ### Confidential Tamper Protection

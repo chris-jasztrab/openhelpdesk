@@ -8689,7 +8689,8 @@ $router->post('/admin/settings/backup/create', function () {
         redirect('/admin/settings/backup');
     }
 
-    set_time_limit(300);
+    set_time_limit(1800);
+    @ini_set('memory_limit', '512M');
 
     $db        = Database::connect();
     $backupDir = ROOT_DIR . '/storage/backups/';
@@ -8738,26 +8739,28 @@ $router->post('/admin/settings/backup/create', function () {
         $sql .= "SET FOREIGN_KEY_CHECKS=1;\n";
         $zip->addFromString('database.sql', $sql);
 
-        // --- Uploaded files ---
-        $fileDirs = [
-            ROOT_DIR . '/storage/attachments/' => 'attachments',
-            ROOT_DIR . '/public/uploads/'      => 'uploads',
-        ];
-        foreach ($fileDirs as $dir => $zipPrefix) {
-            if (!is_dir($dir)) {
+        // --- Full website snapshot ---
+        // Walks the entire application directory and adds every file under a
+        // "website/" prefix inside the zip. The storage/backups/ folder is the
+        // one mandatory exclusion — without it the in-progress zip would try
+        // to archive itself (and every prior backup).
+        $websiteRoot    = rtrim(str_replace('\\', '/', ROOT_DIR), '/');
+        $backupAbsolute = rtrim(str_replace('\\', '/', realpath($backupDir) ?: $backupDir), '/');
+
+        $it = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator(ROOT_DIR, RecursiveDirectoryIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::SELF_FIRST
+        );
+        foreach ($it as $entry) {
+            $path = str_replace('\\', '/', $entry->getPathname());
+            if (strpos($path, $backupAbsolute) === 0) {
                 continue;
             }
-            $it = new RecursiveIteratorIterator(
-                new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS),
-                RecursiveIteratorIterator::SELF_FIRST
-            );
-            foreach ($it as $entry) {
-                $rel = $zipPrefix . '/' . str_replace('\\', '/', substr($entry->getPathname(), strlen($dir)));
-                if ($entry->isDir()) {
-                    $zip->addEmptyDir($rel);
-                } else {
-                    $zip->addFile($entry->getPathname(), $rel);
-                }
+            $rel = 'website/' . substr($path, strlen($websiteRoot) + 1);
+            if ($entry->isDir()) {
+                $zip->addEmptyDir($rel);
+            } elseif ($entry->isFile() && is_readable($entry->getPathname())) {
+                $zip->addFile($entry->getPathname(), $rel);
             }
         }
 
