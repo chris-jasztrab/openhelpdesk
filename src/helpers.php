@@ -852,6 +852,11 @@ function getEmailTpl(string $name, array $rawTokens): array
             'intro'   => 'An escalation rule has been triggered for a ticket that requires your attention.',
             'button'  => 'View Ticket',
         ],
+        'ticket_escalated_agent' => [
+            'subject' => '[Ticket #{{ticket_id}}] Escalated to you (Level {{step_order}}): {{subject}}',
+            'intro'   => '{{escalated_by_name}} has escalated this ticket to you. Please review and take it forward.',
+            'button'  => 'View Ticket',
+        ],
         'ticket_status_resolved' => [
             'subject' => '[Ticket #{{ticket_id}}] Resolved: {{subject}}',
             'intro'   => 'Your support ticket has been resolved. If you have further questions, you can reopen it by replying.',
@@ -3256,4 +3261,163 @@ function parseEmailCommands(string $body): array
         'status'        => $status,
         'priority_slug' => $prioritySlug,
     ];
+}
+
+/**
+ * Email the new assignee when a ticket is manually escalated to them.
+ *
+ * Mirrors notifyAssignedAgent() but uses the ticket_escalated_agent
+ * template and includes escalation-specific context (who escalated it,
+ * which level, optional reason, who it moved from).
+ */
+function notifyEscalation(
+    PDO $db,
+    int $ticketId,
+    int $toUserId,
+    int $escalatedById,
+    int $stepOrder,
+    ?string $stepLabel,
+    ?string $reason,
+    ?int $fromUserId
+): void {
+    if (!emailNotifyEnabled('agent_escalated')) {
+        return;
+    }
+
+    $uStmt = $db->prepare(
+        'SELECT id, first_name, last_name, email, role, notify_assigned_to_me
+         FROM users WHERE id = ?'
+    );
+    $uStmt->execute([$toUserId]);
+    $agent = $uStmt->fetch();
+    if (!$agent || !(bool) ($agent['notify_assigned_to_me'] ?? 1)) {
+        return;
+    }
+
+    $tStmt = $db->prepare(
+        'SELECT t.subject, t.description, t.type_id, t.priority_id, t.created_by
+         FROM tickets t WHERE t.id = ?'
+    );
+    $tStmt->execute([$ticketId]);
+    $ticket = $tStmt->fetch();
+    if (!$ticket) {
+        return;
+    }
+
+    $byStmt = $db->prepare('SELECT first_name, last_name FROM users WHERE id = ?');
+    $byStmt->execute([$escalatedById]);
+    $by = $byStmt->fetch();
+    $escalatedByName = $by ? trim($by['first_name'] . ' ' . $by['last_name']) : 'An agent';
+
+    $fromName = '';
+    if ($fromUserId) {
+        $fStmt = $db->prepare('SELECT first_name, last_name FROM users WHERE id = ?');
+        $fStmt->execute([$fromUserId]);
+        $f = $fStmt->fetch();
+        $fromName = $f ? trim($f['first_name'] . ' ' . $f['last_name']) : '';
+    }
+
+    $submitterName = '';
+    if ($ticket['created_by']) {
+        $sStmt = $db->prepare('SELECT first_name, last_name FROM users WHERE id = ?');
+        $sStmt->execute([$ticket['created_by']]);
+        $s = $sStmt->fetch();
+        $submitterName = $s ? trim($s['first_name'] . ' ' . $s['last_name']) : '';
+    }
+
+    $typeName = $priorityName = '';
+    if ($ticket['type_id']) {
+        $s = $db->prepare('SELECT name FROM ticket_types WHERE id = ?');
+        $s->execute([$ticket['type_id']]);
+        $typeName = $s->fetchColumn() ?: '';
+    }
+    if ($ticket['priority_id']) {
+        $s = $db->prepare('SELECT name FROM ticket_priorities WHERE id = ?');
+        $s->execute([$ticket['priority_id']]);
+        $priorityName = $s->fetchColumn() ?: '';
+    }
+
+    $rolePrefix = match ($agent['role']) {
+        'admin' => '/admin',
+        default => '/agent',
+    };
+    $appUrl    = env('APP_URL', 'http://localhost:8000');
+    $ticketUrl = $appUrl . $rolePrefix . '/tickets/' . $ticketId;
+
+    $tpl = getEmailTpl('ticket_escalated_agent', [
+        'ticket_id'         => $ticketId,
+        'subject'           => $ticket['subject'],
+        'type'              => $typeName,
+        'priority'          => $priorityName,
+        'submitter'         => $submitterName,
+        'user_name'         => $agent['first_name'] . ' ' . $agent['last_name'],
+        'first_name'        => $agent['first_name'],
+        'last_name'         => $agent['last_name'],
+        'escalated_by_name' => $escalatedByName,
+        'step_order'        => $stepOrder,
+        'step_label'        => (string) ($stepLabel ?? ''),
+        'from_agent_name'   => $fromName,
+        'reason'            => (string) ($reason ?? ''),
+    ]);
+
+    $emailHtml = renderEmail('ticket-escalated', [
+        'ticketId'        => $ticketId,
+        'subject'         => $ticket['subject'],
+        'typeName'        => $typeName,
+        'priorityName'    => $priorityName,
+        'submitterName'   => $submitterName,
+        'escalatedByName' => $escalatedByName,
+        'stepOrder'       => $stepOrder,
+        'stepLabel'       => (string) ($stepLabel ?? ''),
+        'fromAgentName'   => $fromName,
+        'reason'          => (string) ($reason ?? ''),
+        'ticketUrl'       => $ticketUrl,
+        'introText'       => $tpl['intro'],
+        'buttonLabel'     => $tpl['button'],
+        'footerText'      => $tpl['footer'],
+    ]);
+
+    sendMail(
+        $agent['email'],
+        $agent['first_name'] . ' ' . $agent['last_name'],
+        $tpl['subject'],
+        $emailHtml,
+        '',
+        $ticketId
+    );
+}
+
+/**
+ * Look up the next escalation step for a ticket, returning metadata
+ * needed to perform the escalation. Skips steps whose target user no
+ * longer exists or where the target is the current actor (per design:
+ * can't escalate to yourself — jump to the next step).
+ *
+ * Returns null if no further step exists.
+ *
+ * @return array{user_id:int, step_order:int, label:?string, user_name:string}|null
+ */
+function nextEscalationStep(PDO $db, int $ticketTypeId, int $currentLevel, int $actorId): ?array
+{
+    $stmt = $db->prepare(
+        "SELECT s.user_id, s.step_order, s.label,
+                CONCAT(u.first_name, ' ', u.last_name) AS user_name
+         FROM ticket_escalation_steps s
+         JOIN users u ON s.user_id = u.id
+         WHERE s.ticket_type_id = ? AND s.step_order > ?
+         ORDER BY s.step_order ASC"
+    );
+    $stmt->execute([$ticketTypeId, $currentLevel]);
+    while ($row = $stmt->fetch()) {
+        if ((int) $row['user_id'] === $actorId) {
+            continue; // skip self
+        }
+        return [
+            'user_id'    => (int) $row['user_id'],
+            'step_order' => (int) $row['step_order'],
+            'label'      => $row['label'] !== null && $row['label'] !== '' ? $row['label'] : null,
+            'user_name'  => $row['user_name'],
+        ];
+    }
+    return null;
 }

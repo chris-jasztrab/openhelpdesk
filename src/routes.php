@@ -207,6 +207,154 @@ $router->post('/api/tickets/{id}/assign', function (array $p) {
 });
 
 /* ------------------------------------------------------------------
+ * Escalate Ticket (JSON API) — manual escalation up the path
+ * ------------------------------------------------------------------ */
+$router->get('/api/tickets/{id}/escalate/preview', function (array $p) {
+    Auth::requireAuth();
+    if (!in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)) {
+        http_response_code(403); echo json_encode(['error' => 'Forbidden']); exit;
+    }
+    header('Content-Type: application/json');
+
+    $ticketId = (int) $p['id'];
+    $db = Database::connect();
+    _apiRequireTicketAccess($db, $ticketId);
+
+    $stmt = $db->prepare('SELECT id, type_id, status, merged_into_ticket_id, escalation_level FROM tickets WHERE id = ?');
+    $stmt->execute([$ticketId]);
+    $ticket = $stmt->fetch();
+    if (!$ticket) { http_response_code(404); echo json_encode(['error' => 'Ticket not found']); exit; }
+
+    if (in_array($ticket['status'], ['resolved', 'closed'], true) || $ticket['merged_into_ticket_id']) {
+        echo json_encode(['eligible' => false, 'reason' => 'This ticket is closed or merged and cannot be escalated.']);
+        exit;
+    }
+    if (!$ticket['type_id']) {
+        echo json_encode(['eligible' => false, 'reason' => 'Set a ticket type first — escalation paths are defined per type.']);
+        exit;
+    }
+
+    $next = nextEscalationStep($db, (int) $ticket['type_id'], (int) $ticket['escalation_level'], (int) Auth::id());
+    if (!$next) {
+        echo json_encode(['eligible' => false, 'reason' => 'No further escalation step is defined for this ticket type.']);
+        exit;
+    }
+
+    echo json_encode([
+        'eligible'         => true,
+        'next_user_id'     => $next['user_id'],
+        'next_user_name'   => $next['user_name'],
+        'next_step_order'  => $next['step_order'],
+        'next_step_label'  => $next['label'],
+        'current_level'    => (int) $ticket['escalation_level'],
+    ]);
+    exit;
+});
+
+$router->post('/api/tickets/{id}/escalate', function (array $p) {
+    Auth::requireAuth();
+    if (!in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)) {
+        http_response_code(403); echo json_encode(['error' => 'Forbidden']); exit;
+    }
+    if (!verifyCsrf($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '')) {
+        http_response_code(403); echo json_encode(['error' => 'Invalid CSRF token']); exit;
+    }
+    header('Content-Type: application/json');
+
+    $ticketId = (int) $p['id'];
+    $input    = json_decode(file_get_contents('php://input'), true) ?: [];
+    $reason   = trim((string) ($input['reason'] ?? ''));
+    if ($reason !== '' && mb_strlen($reason) > 2000) {
+        $reason = mb_substr($reason, 0, 2000);
+    }
+
+    $db = Database::connect();
+    _apiRequireTicketAccess($db, $ticketId);
+
+    $stmt = $db->prepare('SELECT id, type_id, status, assigned_to, merged_into_ticket_id, escalation_level FROM tickets WHERE id = ?');
+    $stmt->execute([$ticketId]);
+    $ticket = $stmt->fetch();
+    if (!$ticket) { http_response_code(404); echo json_encode(['error' => 'Ticket not found']); exit; }
+
+    if (in_array($ticket['status'], ['resolved', 'closed'], true) || $ticket['merged_into_ticket_id']) {
+        http_response_code(422);
+        echo json_encode(['error' => 'This ticket is closed or merged and cannot be escalated.']);
+        exit;
+    }
+    if (!$ticket['type_id']) {
+        http_response_code(422);
+        echo json_encode(['error' => 'Set a ticket type first — escalation paths are defined per type.']);
+        exit;
+    }
+
+    $actorId = (int) Auth::id();
+    $next = nextEscalationStep($db, (int) $ticket['type_id'], (int) $ticket['escalation_level'], $actorId);
+    if (!$next) {
+        http_response_code(422);
+        echo json_encode(['error' => 'No further escalation step is defined for this ticket type.']);
+        exit;
+    }
+
+    $fromUserId = $ticket['assigned_to'] ? (int) $ticket['assigned_to'] : null;
+    $toUserId   = $next['user_id'];
+    $stepOrder  = $next['step_order'];
+
+    $db->beginTransaction();
+    try {
+        $db->prepare('UPDATE tickets SET assigned_to = ?, escalation_level = ? WHERE id = ?')
+           ->execute([$toUserId, $stepOrder, $ticketId]);
+
+        $detail = 'Escalated to ' . $next['user_name'] . ' (Level ' . $stepOrder;
+        if (!empty($next['label'])) {
+            $detail .= ' — ' . $next['label'];
+        }
+        $detail .= ')';
+        if ($reason !== '') {
+            $detail .= "\nReason: " . $reason;
+        }
+
+        $db->prepare(
+            'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
+        )->execute([$ticketId, $actorId, 'escalated', $detail]);
+
+        $db->prepare(
+            'INSERT INTO ticket_escalations (ticket_id, from_user_id, to_user_id, step_order, reason, escalated_by)
+             VALUES (?, ?, ?, ?, ?, ?)'
+        )->execute([$ticketId, $fromUserId, $toUserId, $stepOrder, $reason !== '' ? $reason : null, $actorId]);
+
+        // Keep the previous assignee in the loop as a watcher (visible backup).
+        if ($fromUserId && $fromUserId !== $toUserId) {
+            $db->prepare('INSERT IGNORE INTO ticket_watchers (ticket_id, user_id) VALUES (?, ?)')
+               ->execute([$ticketId, $fromUserId]);
+        }
+
+        $db->commit();
+    } catch (Throwable $e) {
+        $db->rollBack();
+        http_response_code(500);
+        echo json_encode(['error' => 'Failed to escalate: ' . $e->getMessage()]);
+        exit;
+    }
+
+    logAudit('ticket_escalated', $ticketId, 'ticket', 'Level ' . $stepOrder . ' → ' . $next['user_name']
+        . ($reason !== '' ? ' | Reason: ' . $reason : ''));
+
+    notifyEscalation($db, $ticketId, $toUserId, $actorId, $stepOrder, $next['label'], $reason !== '' ? $reason : null, $fromUserId);
+
+    runAutomations($db, $ticketId, 'ticket_updated');
+
+    echo json_encode([
+        'success'         => true,
+        'to_user_id'      => $toUserId,
+        'to_user_name'    => $next['user_name'],
+        'step_order'      => $stepOrder,
+        'step_label'      => $next['label'],
+        'escalation_level'=> $stepOrder,
+    ]);
+    exit;
+});
+
+/* ------------------------------------------------------------------
  * Quick Set Type (JSON API)
  * ------------------------------------------------------------------ */
 $router->post('/api/tickets/{id}/set-type', function (array $p) {
@@ -1945,6 +2093,10 @@ $router->get('/agent', function () {
     $stmt->execute($groupParams);
     $resolvedToday = (int) $stmt->fetchColumn();
 
+    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets WHERE assigned_to = ? AND escalation_level > 0 AND status IN ('open','in_progress','pending')" . $groupRestriction);
+    $stmt->execute(array_merge([$agentId], $groupParams));
+    $escalatedToMe = (int) $stmt->fetchColumn();
+
     // Recent tickets (open/in_progress/pending, newest first)
     $trRestriction = $groupRestriction ? str_replace('AND group_id', 'AND t.group_id', $groupRestriction) : '';
     $stmt = $db->prepare(
@@ -2010,6 +2162,7 @@ $router->get('/agent', function () {
         'myTickets'          => $myTickets,
         'pending'            => $pending,
         'resolvedToday'      => $resolvedToday,
+        'escalatedToMe'      => $escalatedToMe,
         'recentTickets'      => $recent,
         'autoShowTour'       => $autoShowTour,
         'types'              => $dashTypes,

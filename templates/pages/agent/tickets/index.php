@@ -299,6 +299,15 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                     </label>
                 </div>
             </div>
+            <div class="mb-3">
+                <label class="form-label small fw-semibold mb-1">Escalation</label>
+                <div class="filter-checklist">
+                    <label class="filter-check-item">
+                        <input type="checkbox" name="escalated_to_me" value="1" <?= !empty($filters['escalated_to_me']) ? 'checked' : '' ?>>
+                        <span class="text-muted fst-italic"><i class="bi bi-arrow-up-circle me-1"></i>Escalated to Me</span>
+                    </label>
+                </div>
+            </div>
             <div class="d-flex gap-2">
                 <button type="submit" class="btn btn-sm text-white flex-grow-1" style="background:var(--ld-primary);">
                     <i class="bi bi-funnel me-1"></i>Apply

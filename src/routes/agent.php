@@ -124,6 +124,7 @@ $router->get('/agent/tickets', function () {
     $fSearch      = trim($_GET['q'] ?? '');
     $fWatched     = !empty($_GET['watched']) ? '1' : '';
     $fResolvedToday = !empty($_GET['resolved_today']);
+    $fEscalatedToMe = !empty($_GET['escalated_to_me']);
 
     $where  = [];
     $params = [];
@@ -204,6 +205,11 @@ $router->get('/agent/tickets', function () {
 
     if ($fResolvedToday) {
         $where[] = "t.status = 'resolved' AND DATE(t.updated_at) = CURDATE()";
+    }
+
+    if ($fEscalatedToMe) {
+        $where[]  = "t.assigned_to = ? AND t.escalation_level > 0 AND t.status IN ('open','in_progress','pending')";
+        $params[] = Auth::id();
     }
 
     // Group-based visibility: agents who belong to groups can only see those groups' tickets.
@@ -353,6 +359,7 @@ $router->get('/agent/tickets', function () {
         'q'             => $fSearch,
         'watched'       => $fWatched,
         'resolved_today' => $fResolvedToday,
+        'escalated_to_me' => $fEscalatedToMe,
     ];
 
     // Load saved filters (own + shared)
@@ -925,7 +932,35 @@ $router->get('/agent/tickets/{id}', function (array $p) {
     $watchStmt->execute([$ticket['id'], Auth::id()]);
     $isWatching = (bool) $watchStmt->fetchColumn();
 
-    render('agent/tickets/view', ['ticket' => $ticket, 'timeline' => $timeline, 'agents' => $agents, 'priorities' => $priorities, 'ticketTypes' => $ticketTypes, 'attachments' => $attachments, 'ccUsers' => $ccUsers, 'groups' => $groups, 'customFields' => $customFields, 'fieldValues' => $fieldValues, 'fieldOptions' => $fieldOptions, 'isWatching' => $isWatching]);
+    // Escalation history (oldest → newest)
+    $escStmt = $db->prepare(
+        "SELECT te.step_order, te.reason, te.created_at,
+                CONCAT(u_to.first_name,  ' ', u_to.last_name)  AS to_name,
+                CONCAT(u_by.first_name,  ' ', u_by.last_name)  AS by_name,
+                CONCAT(u_fr.first_name,  ' ', u_fr.last_name)  AS from_name
+         FROM ticket_escalations te
+         LEFT JOIN users u_to ON te.to_user_id   = u_to.id
+         LEFT JOIN users u_by ON te.escalated_by = u_by.id
+         LEFT JOIN users u_fr ON te.from_user_id = u_fr.id
+         WHERE te.ticket_id = ?
+         ORDER BY te.created_at ASC"
+    );
+    $escStmt->execute([$ticket['id']]);
+    $escalationHistory = $escStmt->fetchAll();
+
+    // Does this ticket's type have an escalation path configured, and is there a next step from here?
+    $hasEscalationPath = false;
+    $nextEscalationStep = null;
+    if ($ticket['type_id']) {
+        $hStmt = $db->prepare('SELECT COUNT(*) FROM ticket_escalation_steps WHERE ticket_type_id = ?');
+        $hStmt->execute([$ticket['type_id']]);
+        $hasEscalationPath = (int) $hStmt->fetchColumn() > 0;
+        if ($hasEscalationPath) {
+            $nextEscalationStep = nextEscalationStep($db, (int) $ticket['type_id'], (int) ($ticket['escalation_level'] ?? 0), (int) Auth::id());
+        }
+    }
+
+    render('agent/tickets/view', ['ticket' => $ticket, 'timeline' => $timeline, 'agents' => $agents, 'priorities' => $priorities, 'ticketTypes' => $ticketTypes, 'attachments' => $attachments, 'ccUsers' => $ccUsers, 'groups' => $groups, 'customFields' => $customFields, 'fieldValues' => $fieldValues, 'fieldOptions' => $fieldOptions, 'isWatching' => $isWatching, 'escalationHistory' => $escalationHistory, 'hasEscalationPath' => $hasEscalationPath, 'nextEscalationStep' => $nextEscalationStep]);
 });
 
 /* ==================================================================

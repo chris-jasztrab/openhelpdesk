@@ -8940,3 +8940,140 @@ function handleAvatarUpload(): ?string
     move_uploaded_file($_FILES['avatar']['tmp_name'], $uploadDir . $filename);
     return $filename;
 }
+
+/* ==================================================================
+ * ADMIN — Escalation Paths (manual, per-ticket-type chain)
+ * ================================================================== */
+
+$router->get('/admin/settings/escalation-paths', function () {
+    Auth::requireRole('admin');
+    $db = Database::connect();
+
+    $types = $db->query(
+        'SELECT t.id, t.name, t.color,
+                (SELECT COUNT(*) FROM ticket_escalation_steps s WHERE s.ticket_type_id = t.id) AS step_count
+         FROM ticket_types t
+         ORDER BY t.sort_order, t.name'
+    )->fetchAll();
+
+    render('admin/settings/escalation-paths/index', ['types' => $types]);
+});
+
+$router->get('/admin/settings/escalation-paths/{typeId}', function (array $p) {
+    Auth::requireRole('admin');
+    $typeId = (int) $p['typeId'];
+    $db = Database::connect();
+
+    $tStmt = $db->prepare('SELECT * FROM ticket_types WHERE id = ?');
+    $tStmt->execute([$typeId]);
+    $type = $tStmt->fetch();
+    if (!$type) {
+        flash('error', 'Ticket type not found.');
+        redirect('/admin/settings/escalation-paths');
+    }
+
+    $sStmt = $db->prepare(
+        "SELECT s.id, s.step_order, s.user_id, s.label,
+                CONCAT(u.first_name, ' ', u.last_name) AS user_name,
+                u.email AS user_email, u.role AS user_role
+         FROM ticket_escalation_steps s
+         JOIN users u ON s.user_id = u.id
+         WHERE s.ticket_type_id = ?
+         ORDER BY s.step_order ASC"
+    );
+    $sStmt->execute([$typeId]);
+    $steps = $sStmt->fetchAll();
+
+    $agents = $db->query(
+        "SELECT id, CONCAT(first_name, ' ', last_name) AS name, email, role
+         FROM users
+         WHERE role IN ('agent','admin','power_user')
+         ORDER BY first_name, last_name"
+    )->fetchAll();
+
+    render('admin/settings/escalation-paths/form', [
+        'type'   => $type,
+        'steps'  => $steps,
+        'agents' => $agents,
+    ]);
+});
+
+$router->post('/admin/settings/escalation-paths/{typeId}', function (array $p) {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/escalation-paths');
+    }
+    $typeId = (int) $p['typeId'];
+    $db = Database::connect();
+
+    $tStmt = $db->prepare('SELECT id FROM ticket_types WHERE id = ?');
+    $tStmt->execute([$typeId]);
+    if (!$tStmt->fetch()) {
+        flash('error', 'Ticket type not found.');
+        redirect('/admin/settings/escalation-paths');
+    }
+
+    $rawUsers  = $_POST['user_id'] ?? [];
+    $rawLabels = $_POST['label']   ?? [];
+    if (!is_array($rawUsers)) { $rawUsers  = []; }
+    if (!is_array($rawLabels)) { $rawLabels = []; }
+
+    // Deduplicate: preserve the first occurrence of each user (so re-orders that
+    // accidentally add the same agent twice don't break the UNIQUE key).
+    $seen  = [];
+    $steps = [];
+    foreach ($rawUsers as $i => $uid) {
+        $uid = (int) $uid;
+        if ($uid <= 0 || isset($seen[$uid])) { continue; }
+        $seen[$uid] = true;
+        $label = trim((string) ($rawLabels[$i] ?? ''));
+        if (mb_strlen($label) > 100) { $label = mb_substr($label, 0, 100); }
+        $steps[] = ['user_id' => $uid, 'label' => $label === '' ? null : $label];
+    }
+
+    // Validate every selected user is an agent-tier role.
+    if (!empty($steps)) {
+        $ids = array_map(fn($s) => $s['user_id'], $steps);
+        $ph  = implode(',', array_fill(0, count($ids), '?'));
+        $cStmt = $db->prepare(
+            "SELECT id, role, CONCAT(first_name, ' ', last_name) AS name FROM users WHERE id IN ($ph)"
+        );
+        $cStmt->execute($ids);
+        $byId = [];
+        foreach ($cStmt->fetchAll() as $u) { $byId[(int) $u['id']] = $u; }
+        foreach ($steps as $s) {
+            $u = $byId[$s['user_id']] ?? null;
+            if (!$u) {
+                flash('error', 'One of the selected users was not found.');
+                redirect('/admin/settings/escalation-paths/' . $typeId);
+            }
+            if (!in_array($u['role'], ['agent', 'admin', 'power_user'], true)) {
+                flash('error', $u['name'] . ' is not an agent. Only agents, power users, and admins can be escalation targets. Change their role first in User Management.');
+                redirect('/admin/settings/escalation-paths/' . $typeId);
+            }
+        }
+    }
+
+    $db->beginTransaction();
+    try {
+        $db->prepare('DELETE FROM ticket_escalation_steps WHERE ticket_type_id = ?')->execute([$typeId]);
+        $ins = $db->prepare(
+            'INSERT INTO ticket_escalation_steps (ticket_type_id, step_order, user_id, label) VALUES (?, ?, ?, ?)'
+        );
+        $order = 1;
+        foreach ($steps as $s) {
+            $ins->execute([$typeId, $order, $s['user_id'], $s['label']]);
+            $order++;
+        }
+        $db->commit();
+    } catch (Throwable $e) {
+        $db->rollBack();
+        flash('error', 'Failed to save path: ' . $e->getMessage());
+        redirect('/admin/settings/escalation-paths/' . $typeId);
+    }
+
+    logAudit('escalation_path_saved', $typeId, 'ticket_type', 'Steps: ' . count($steps));
+    flash('success', 'Escalation path saved (' . count($steps) . ' step' . (count($steps) === 1 ? '' : 's') . ').');
+    redirect('/admin/settings/escalation-paths/' . $typeId);
+});

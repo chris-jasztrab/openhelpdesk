@@ -79,6 +79,23 @@ $allColumns     = ticketColumnDefinitions();
         </div>
         </a>
     </div>
+    <?php if (!empty($escalatedToMe)): ?>
+    <div class="col-md-3">
+        <a href="/agent/tickets?escalated_to_me=1" class="text-decoration-none">
+        <div class="card stat-card h-100 border-danger-subtle">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="stat-icon bg-danger bg-opacity-10 text-danger">
+                    <i class="bi bi-arrow-up-circle"></i>
+                </div>
+                <div>
+                    <div class="text-muted small">Escalated to Me</div>
+                    <div class="fs-4 fw-bold"><?= $escalatedToMe ?></div>
+                </div>
+            </div>
+        </div>
+        </a>
+    </div>
+    <?php endif; ?>
 </div>
 
 <div class="card border-0 shadow-sm" id="tour-recent-tickets">

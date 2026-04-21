@@ -11,6 +11,25 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.7.0 — 2026-04-21
+
+### Manual Ticket Escalation
+- **Escalation Paths per Ticket Type** — admins can now define an ordered chain of agents per ticket type under Admin → Settings → Escalation Paths. The topmost row is Level 1; drag-to-reorder is supported. Each step accepts an optional label such as "Branch Supervisor" or "Service Manager" so agents know who they're escalating to.
+- **Escalate Button** — agents see a red `Escalate` button in the ticket action bar. Clicking it opens a confirmation modal showing the next person in the path (with level and label) and an optional reason textarea. Confirming reassigns the ticket, increments the escalation level, and notifies the new assignee.
+- **Previous Assignee Kept in the Loop** — when a ticket is escalated, the prior assignee is automatically added as a watcher so they continue to receive updates without having to ask for them.
+- **No-Escalate Guards** — the button is disabled (with a tooltip explanation) on tickets that are closed, merged, have no type set, have no path configured, or are already at the top of their chain. The server enforces the same rules.
+- **Self-Skip** — if the current user appears in the chain at or beyond their current level, the logic skips past themselves to the next step (you can't escalate to yourself).
+- **Escalation History in Ticket View** — the ticket detail page now shows an Escalation History card listing every escalation event, who triggered it, who it went to, any reason, and the timestamp. An Escalation Level badge appears in the Details sidebar when a ticket has been escalated.
+- **"Escalated to Me" Stat Card** — agents see a red stat card on the dashboard counting open tickets that have been escalated to them, linking to a pre-filtered ticket list. A matching checkbox appears in the ticket-list filter panel under "Escalation".
+- **Email Notification** — the new assignee receives a distinct red-themed `ticket-escalated` email that names who escalated it, the level, the previous assignee, and the reason. Template customizable in Admin → Settings → Email Templates via the `ticket_escalated_agent` key.
+- **Audit Trail** — every escalation writes a timeline entry, a row in `ticket_escalations`, and an `audit_log` entry under the action `ticket_escalated`.
+- **Separate from SLA-Driven "Escalation Rules"** — this manual path feature is a distinct settings page from the existing time-driven automated escalation engine. Both coexist; the settings nav now lists them as "Escalation Paths" and "Escalation Rules".
+
+### Database
+- Migration `021_escalation_paths.php` adds `tickets.escalation_level TINYINT UNSIGNED NOT NULL DEFAULT 0`, the `ticket_escalation_steps` table (ordered chain per ticket type), and the `ticket_escalations` table (audit log of every escalation event).
+
+---
+
 ## 2.6.0 — 2026-04-21
 
 ### Requester Email Notifications — Acknowledgement & Assignment

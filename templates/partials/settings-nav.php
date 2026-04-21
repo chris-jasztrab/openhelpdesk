@@ -28,7 +28,8 @@ $settingsNavGroups = [
     ],
     'Automation' => [
         ['label' => 'Automations',        'url' => '/admin/settings/automations',        'icon' => 'bi-lightning'],
-        ['label' => 'Escalations',        'url' => '/admin/settings/escalations',        'icon' => 'bi-alarm'],
+        ['label' => 'Escalation Paths',   'url' => '/admin/settings/escalation-paths',   'icon' => 'bi-signpost-split'],
+        ['label' => 'Escalation Rules',   'url' => '/admin/settings/escalations',        'icon' => 'bi-alarm'],
         ['label' => 'Scheduled Reports',  'url' => '/admin/settings/scheduled-reports',  'icon' => 'bi-calendar-check'],
         ['label' => 'Cron Jobs',          'url' => '/admin/settings/cron-jobs',          'icon' => 'bi-clock-history'],
     ],

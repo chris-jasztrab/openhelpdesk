@@ -75,6 +75,7 @@ CREATE TABLE IF NOT EXISTS `tickets` (
     `status`       ENUM('open','in_progress','pending','waiting_on_customer','waiting_on_third_party','resolved','closed') NOT NULL DEFAULT 'open',
     `priority_id`  INT UNSIGNED DEFAULT NULL,
     `assigned_to`  INT UNSIGNED DEFAULT NULL,
+    `escalation_level` TINYINT UNSIGNED NOT NULL DEFAULT 0,
     `group_id`     INT UNSIGNED DEFAULT NULL,
     `first_response_due_at` DATETIME DEFAULT NULL,
     `resolution_due_at`     DATETIME DEFAULT NULL,
@@ -138,6 +139,40 @@ CREATE TABLE IF NOT EXISTS `ticket_watchers` (
     PRIMARY KEY (`ticket_id`, `user_id`),
     FOREIGN KEY (`ticket_id`) REFERENCES `tickets`(`id`) ON DELETE CASCADE,
     FOREIGN KEY (`user_id`)   REFERENCES `users`(`id`)   ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Escalation path: ordered chain of agents per ticket type (manual escalation).
+-- Separate from `escalation_rules` (time-driven auto engine).
+CREATE TABLE IF NOT EXISTS `ticket_escalation_steps` (
+    `id`             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `ticket_type_id` INT UNSIGNED NOT NULL,
+    `step_order`     INT UNSIGNED NOT NULL,
+    `user_id`        INT UNSIGNED NOT NULL,
+    `label`          VARCHAR(100) DEFAULT NULL,
+    `created_at`     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY `uq_type_order` (`ticket_type_id`, `step_order`),
+    KEY `idx_type` (`ticket_type_id`),
+    KEY `idx_user` (`user_id`),
+    FOREIGN KEY (`ticket_type_id`) REFERENCES `ticket_types`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`user_id`)        REFERENCES `users`(`id`)        ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Escalation audit trail: one row per manual escalation click
+CREATE TABLE IF NOT EXISTS `ticket_escalations` (
+    `id`             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `ticket_id`      INT UNSIGNED NOT NULL,
+    `from_user_id`   INT UNSIGNED DEFAULT NULL,
+    `to_user_id`     INT UNSIGNED NOT NULL,
+    `step_order`     INT UNSIGNED NOT NULL,
+    `reason`         TEXT DEFAULT NULL,
+    `escalated_by`   INT UNSIGNED NOT NULL,
+    `created_at`     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    KEY `idx_ticket` (`ticket_id`),
+    KEY `idx_to_user` (`to_user_id`),
+    FOREIGN KEY (`ticket_id`)    REFERENCES `tickets`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`from_user_id`) REFERENCES `users`(`id`)   ON DELETE SET NULL,
+    FOREIGN KEY (`to_user_id`)   REFERENCES `users`(`id`)   ON DELETE CASCADE,
+    FOREIGN KEY (`escalated_by`) REFERENCES `users`(`id`)   ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Canned responses (saved reply snippets; user_id NULL = global admin-managed)

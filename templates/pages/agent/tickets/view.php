@@ -9,8 +9,8 @@ $breadcrumbs  = [
 ];
 $statusColors = ['open' => 'primary', 'in_progress' => 'warning', 'pending' => 'info', 'waiting_on_customer' => 'warning', 'waiting_on_third_party' => 'dark', 'resolved' => 'success', 'closed' => 'secondary'];
 $statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 'Pending', 'waiting_on_customer' => 'Waiting on Customer', 'waiting_on_third_party' => 'Waiting on Third Party', 'resolved' => 'Resolved', 'closed' => 'Closed'];
-$actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-person-check text-primary', 'status_changed' => 'bi-arrow-repeat text-warning', 'priority_changed' => 'bi-flag text-danger', 'comment' => 'bi-chat-dots text-info', 'internal_note' => 'bi-lock text-secondary', 'sla_set' => 'bi-stopwatch text-primary', 'sla_paused' => 'bi-pause-circle text-warning', 'sla_resumed' => 'bi-play-circle text-success', 'merged' => 'bi-arrow-right-circle text-secondary', 'split' => 'bi-scissors text-warning', 'edited' => 'bi-pencil text-secondary'];
-$actionLabels = ['created' => 'Created', 'assigned' => 'Assigned', 'status_changed' => 'Status Changed', 'priority_changed' => 'Priority Changed', 'comment' => 'Comment', 'internal_note' => 'Internal Note', 'sla_set' => 'SLA Set', 'sla_paused' => 'SLA Paused', 'sla_resumed' => 'SLA Resumed', 'merged' => 'Merged', 'split' => 'Split', 'edited' => 'Edited by Requester'];
+$actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-person-check text-primary', 'status_changed' => 'bi-arrow-repeat text-warning', 'priority_changed' => 'bi-flag text-danger', 'comment' => 'bi-chat-dots text-info', 'internal_note' => 'bi-lock text-secondary', 'sla_set' => 'bi-stopwatch text-primary', 'sla_paused' => 'bi-pause-circle text-warning', 'sla_resumed' => 'bi-play-circle text-success', 'merged' => 'bi-arrow-right-circle text-secondary', 'split' => 'bi-scissors text-warning', 'edited' => 'bi-pencil text-secondary', 'escalated' => 'bi-arrow-up-circle text-danger'];
+$actionLabels = ['created' => 'Created', 'assigned' => 'Assigned', 'status_changed' => 'Status Changed', 'priority_changed' => 'Priority Changed', 'comment' => 'Comment', 'internal_note' => 'Internal Note', 'sla_set' => 'SLA Set', 'sla_paused' => 'SLA Paused', 'sla_resumed' => 'SLA Resumed', 'merged' => 'Merged', 'split' => 'Split', 'edited' => 'Edited by Requester', 'escalated' => 'Escalated'];
 $slaStateColors = ['on_track' => 'success', 'warning' => 'warning', 'breached' => 'danger'];
 $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' => 'Breached'];
 ?>
@@ -81,6 +81,31 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
             </button>
         </form>
         <?php if (!$ticket['merged_into_ticket_id']): ?>
+        <?php
+            $canEscalate = !in_array($ticket['status'], ['resolved', 'closed'], true);
+            $escTitle = 'Escalate this ticket to the next person in the path';
+            if (!$canEscalate) {
+                $escTitle = 'Closed tickets cannot be escalated.';
+            } elseif (!$ticket['type_id']) {
+                $escTitle = 'Set a ticket type first — escalation paths are defined per type.';
+            } elseif (!$hasEscalationPath) {
+                $escTitle = 'No escalation path is configured for this ticket type.';
+            } elseif (!$nextEscalationStep) {
+                $escTitle = 'No further escalation step is available — you are at the top of the chain (or the next step is you).';
+            } else {
+                $escTitle .= ' — next: ' . $nextEscalationStep['user_name'] . ' (Level ' . $nextEscalationStep['step_order'] . ')';
+            }
+            $escalateDisabled = !$canEscalate || !$nextEscalationStep;
+        ?>
+        <button type="button"
+                id="escalateBtn"
+                class="btn btn-outline-danger"
+                title="<?= e($escTitle) ?>"
+                <?= $escalateDisabled ? 'disabled' : '' ?>
+                data-bs-toggle="modal"
+                data-bs-target="#escalateModal">
+            <i class="bi bi-arrow-up-circle me-1"></i>Escalate
+        </button>
         <a href="/agent/tickets/<?= (int) $ticket['id'] ?>/split" id="tour-split-btn" class="btn btn-outline-warning">
             <i class="bi bi-scissors me-1"></i>Split
         </a>
@@ -325,6 +350,89 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
         </div>
     </div>
 
+    <!-- Escalate Ticket Modal -->
+    <?php if (!$ticket['merged_into_ticket_id'] && $nextEscalationStep): ?>
+    <div class="modal fade" id="escalateModal" tabindex="-1" aria-labelledby="escalateModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h6 class="modal-title fw-semibold" id="escalateModalLabel">
+                        <i class="bi bi-arrow-up-circle me-2 text-danger"></i>Escalate Ticket
+                    </h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-3">
+                        This ticket will be reassigned to:
+                    </p>
+                    <div class="p-3 bg-body-tertiary rounded mb-3">
+                        <div>
+                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle me-1">
+                                Level <?= (int) $nextEscalationStep['step_order'] ?>
+                            </span>
+                            <strong><?= e($nextEscalationStep['user_name']) ?></strong>
+                        </div>
+                        <?php if (!empty($nextEscalationStep['label'])): ?>
+                        <div class="text-muted small mt-1"><?= e($nextEscalationStep['label']) ?></div>
+                        <?php endif; ?>
+                    </div>
+
+                    <label for="escalateReason" class="form-label small text-muted">Reason <span class="text-muted">(optional, but recommended)</span></label>
+                    <textarea id="escalateReason" class="form-control" rows="3" maxlength="2000"
+                              placeholder="Why are you escalating? What have you tried?"></textarea>
+
+                    <div id="escalateError" class="alert alert-danger mt-3 d-none" role="alert"></div>
+
+                    <p class="small text-muted mt-3 mb-0">
+                        <i class="bi bi-info-circle me-1"></i>The current assignee will be added as a watcher so they stay in the loop.
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" id="escalateConfirmBtn" class="btn btn-danger">
+                        <i class="bi bi-arrow-up-circle me-1"></i>Escalate to <?= e($nextEscalationStep['user_name']) ?>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+    (function () {
+        var btn  = document.getElementById('escalateConfirmBtn');
+        var err  = document.getElementById('escalateError');
+        var txt  = document.getElementById('escalateReason');
+        if (!btn) return;
+        var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
+        btn.addEventListener('click', function () {
+            err.classList.add('d-none');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Escalating…';
+            fetch('/api/tickets/<?= (int) $ticket['id'] ?>/escalate', {
+                method:  'POST',
+                headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
+                body:    JSON.stringify({reason: (txt && txt.value) ? txt.value.trim() : ''}),
+            }).then(function (r) { return r.json().then(function (b) { return {ok: r.ok, body: b}; }); })
+              .then(function (res) {
+                  if (!res.ok || !res.body.success) {
+                      err.textContent = (res.body && res.body.error) || 'Escalation failed.';
+                      err.classList.remove('d-none');
+                      btn.disabled = false;
+                      btn.innerHTML = '<i class="bi bi-arrow-up-circle me-1"></i>Retry';
+                      return;
+                  }
+                  window.location.reload();
+              })
+              .catch(function () {
+                  err.textContent = 'Network error. Please try again.';
+                  err.classList.remove('d-none');
+                  btn.disabled = false;
+                  btn.innerHTML = '<i class="bi bi-arrow-up-circle me-1"></i>Retry';
+              });
+        });
+    })();
+    </script>
+    <?php endif; ?>
+
     <!-- Canned Response Picker Modal -->
     <div class="modal fade" id="cannedModal" tabindex="-1" aria-labelledby="cannedModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg">
@@ -388,6 +496,15 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
                     <dt class="text-muted small">Group</dt>
                     <dd><?= e($ticket['group_name'] ?? 'None') ?></dd>
 
+                    <?php if ((int) ($ticket['escalation_level'] ?? 0) > 0): ?>
+                    <dt class="text-muted small">Escalation</dt>
+                    <dd>
+                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle">
+                            <i class="bi bi-arrow-up-circle me-1"></i>Level <?= (int) $ticket['escalation_level'] ?>
+                        </span>
+                    </dd>
+                    <?php endif; ?>
+
                     <dt class="text-muted small">Created By</dt>
                     <dd>
                         <?= e($ticket['creator_name'] ?? '—') ?>
@@ -429,6 +546,35 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
                 </dl>
             </div>
         </div>
+
+        <!-- Escalation History -->
+        <?php if (!empty($escalationHistory)): ?>
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white border-bottom">
+                <h5 class="mb-0 fw-semibold"><i class="bi bi-arrow-up-circle me-2 text-danger"></i>Escalation History</h5>
+            </div>
+            <div class="card-body p-3 small">
+                <ol class="list-unstyled mb-0">
+                    <?php foreach ($escalationHistory as $h): ?>
+                    <li class="mb-2 pb-2 border-bottom">
+                        <div>
+                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle me-1">Level <?= (int) $h['step_order'] ?></span>
+                            <strong><?= e($h['to_name'] ?? '—') ?></strong>
+                        </div>
+                        <div class="text-muted" style="font-size:.8rem;">
+                            by <?= e($h['by_name'] ?? '—') ?>
+                            <?php if (!empty($h['from_name'])): ?> (from <?= e($h['from_name']) ?>)<?php endif; ?>
+                            · <?= date('M j, Y g:i A', strtotime($h['created_at'])) ?>
+                        </div>
+                        <?php if (!empty($h['reason'])): ?>
+                        <div class="mt-1" style="white-space:pre-wrap;"><?= e($h['reason']) ?></div>
+                        <?php endif; ?>
+                    </li>
+                    <?php endforeach; ?>
+                </ol>
+            </div>
+        </div>
+        <?php endif; ?>
 
         <!-- Custom Fields -->
         <?php if (!empty($customFields)): ?>
