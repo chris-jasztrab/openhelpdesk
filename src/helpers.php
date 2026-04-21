@@ -3393,12 +3393,31 @@ function notifyEscalation(
  * longer exists or where the target is the current actor (per design:
  * can't escalate to yourself — jump to the next step).
  *
+ * If the ticket's current assignee appears in the escalation matrix,
+ * their step_order is treated as a floor so that escalation jumps to
+ * the step *after* them (you never "escalate" sideways or downward to
+ * someone already on the ticket).
+ *
  * Returns null if no further step exists.
  *
  * @return array{user_id:int, step_order:int, label:?string, user_name:string}|null
  */
-function nextEscalationStep(PDO $db, int $ticketTypeId, int $currentLevel, int $actorId): ?array
+function nextEscalationStep(PDO $db, int $ticketTypeId, int $currentLevel, int $actorId, ?int $currentAssigneeId = null): ?array
 {
+    $effectiveLevel = $currentLevel;
+    if ($currentAssigneeId) {
+        $aStmt = $db->prepare(
+            'SELECT step_order FROM ticket_escalation_steps
+             WHERE ticket_type_id = ? AND user_id = ?
+             ORDER BY step_order DESC LIMIT 1'
+        );
+        $aStmt->execute([$ticketTypeId, $currentAssigneeId]);
+        $assigneeStep = $aStmt->fetchColumn();
+        if ($assigneeStep !== false && (int) $assigneeStep > $effectiveLevel) {
+            $effectiveLevel = (int) $assigneeStep;
+        }
+    }
+
     $stmt = $db->prepare(
         "SELECT s.user_id, s.step_order, s.label,
                 CONCAT(u.first_name, ' ', u.last_name) AS user_name
@@ -3407,7 +3426,7 @@ function nextEscalationStep(PDO $db, int $ticketTypeId, int $currentLevel, int $
          WHERE s.ticket_type_id = ? AND s.step_order > ?
          ORDER BY s.step_order ASC"
     );
-    $stmt->execute([$ticketTypeId, $currentLevel]);
+    $stmt->execute([$ticketTypeId, $effectiveLevel]);
     while ($row = $stmt->fetch()) {
         if ((int) $row['user_id'] === $actorId) {
             continue; // skip self

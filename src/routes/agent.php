@@ -956,7 +956,13 @@ $router->get('/agent/tickets/{id}', function (array $p) {
         $hStmt->execute([$ticket['type_id']]);
         $hasEscalationPath = (int) $hStmt->fetchColumn() > 0;
         if ($hasEscalationPath) {
-            $nextEscalationStep = nextEscalationStep($db, (int) $ticket['type_id'], (int) ($ticket['escalation_level'] ?? 0), (int) Auth::id());
+            $nextEscalationStep = nextEscalationStep(
+                $db,
+                (int) $ticket['type_id'],
+                (int) ($ticket['escalation_level'] ?? 0),
+                (int) Auth::id(),
+                !empty($ticket['assigned_to']) ? (int) $ticket['assigned_to'] : null
+            );
         }
     }
 

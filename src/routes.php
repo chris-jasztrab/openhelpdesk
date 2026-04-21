@@ -216,7 +216,7 @@ $router->get('/api/tickets/{id}/escalate/preview', function (array $p) {
     $ticketId = (int) $p['id'];
     $db = Database::connect();
 
-    $stmt = $db->prepare('SELECT id, type_id, status, created_by, merged_into_ticket_id, escalation_level FROM tickets WHERE id = ?');
+    $stmt = $db->prepare('SELECT id, type_id, status, assigned_to, created_by, merged_into_ticket_id, escalation_level FROM tickets WHERE id = ?');
     $stmt->execute([$ticketId]);
     $ticket = $stmt->fetch();
     if (!$ticket) { http_response_code(404); echo json_encode(['error' => 'Ticket not found']); exit; }
@@ -236,7 +236,13 @@ $router->get('/api/tickets/{id}/escalate/preview', function (array $p) {
         exit;
     }
 
-    $next = nextEscalationStep($db, (int) $ticket['type_id'], (int) $ticket['escalation_level'], (int) Auth::id());
+    $next = nextEscalationStep(
+        $db,
+        (int) $ticket['type_id'],
+        (int) $ticket['escalation_level'],
+        (int) Auth::id(),
+        $ticket['assigned_to'] ? (int) $ticket['assigned_to'] : null
+    );
     if (!$next) {
         echo json_encode(['eligible' => false, 'reason' => 'No further escalation step is defined for this ticket type.']);
         exit;
@@ -292,7 +298,13 @@ $router->post('/api/tickets/{id}/escalate', function (array $p) {
     }
 
     $actorId = (int) Auth::id();
-    $next = nextEscalationStep($db, (int) $ticket['type_id'], (int) $ticket['escalation_level'], $actorId);
+    $next = nextEscalationStep(
+        $db,
+        (int) $ticket['type_id'],
+        (int) $ticket['escalation_level'],
+        $actorId,
+        $ticket['assigned_to'] ? (int) $ticket['assigned_to'] : null
+    );
     if (!$next) {
         http_response_code(422);
         echo json_encode(['error' => 'No further escalation step is defined for this ticket type.']);

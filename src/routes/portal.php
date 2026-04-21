@@ -502,7 +502,13 @@ $router->get('/portal/tickets/{id}', function (array $p) {
         $hStmt->execute([$ticket['type_id']]);
         $hasEscalationPath = (int) $hStmt->fetchColumn() > 0;
         if ($hasEscalationPath) {
-            $nextEscalationStep = nextEscalationStep($db, (int) $ticket['type_id'], (int) ($ticket['escalation_level'] ?? 0), (int) $uid);
+            $nextEscalationStep = nextEscalationStep(
+                $db,
+                (int) $ticket['type_id'],
+                (int) ($ticket['escalation_level'] ?? 0),
+                (int) $uid,
+                !empty($ticket['assigned_to']) ? (int) $ticket['assigned_to'] : null
+            );
         }
     }
 
