@@ -10,66 +10,100 @@ $breadcrumbs  = [
 
 $cronJobs = [
     [
-        'title'       => 'SLA Recalculation',
-        'icon'        => 'bi-stopwatch',
-        'description' => 'Recalculates SLA status (breached / at-risk) for all active tickets. Should run frequently so SLA breaches are detected promptly.',
-        'frequency'   => 'Every 5 minutes',
-        'command'     => '*/5 * * * * php ' . ROOT_DIR . '/public/sla-cron.php >> ' . ROOT_DIR . '/storage/logs/sla-cron.log 2>&1',
-        'log'         => ROOT_DIR . '/storage/logs/sla-cron.log',
-        'required'    => true,
-        'note'        => 'Can also be triggered via HTTP: <code>GET /sla-cron.php?token=YOUR_SECRET_TOKEN</code>. Set <code>SLA_CRON_TOKEN</code> in your <code>.env</code> file when using HTTP mode.',
+        'title'            => 'SLA Recalculation',
+        'icon'             => 'bi-stopwatch',
+        'description'      => 'Recalculates SLA status (breached / at-risk) for all active tickets. Should run frequently so SLA breaches are detected promptly.',
+        'frequency'        => 'Every 5 minutes',
+        'interval_seconds' => 300,
+        'command'          => '*/5 * * * * php ' . ROOT_DIR . '/public/sla-cron.php >> ' . ROOT_DIR . '/storage/logs/sla-cron.log 2>&1',
+        'log'              => ROOT_DIR . '/storage/logs/sla-cron.log',
+        'required'         => true,
+        'note'             => 'Can also be triggered via HTTP: <code>GET /sla-cron.php?token=YOUR_SECRET_TOKEN</code>. Set <code>SLA_CRON_TOKEN</code> in your <code>.env</code> file when using HTTP mode.',
     ],
     [
-        'title'       => 'Inbound Email Replies',
-        'icon'        => 'bi-envelope-arrow-down',
-        'description' => 'Polls the configured Microsoft 365 mailbox via the Graph API for new replies and appends them to the matching ticket timeline.',
-        'frequency'   => 'Every 5 minutes',
-        'command'     => '*/5 * * * * php ' . ROOT_DIR . '/scripts/process-replies.php >> ' . ROOT_DIR . '/storage/logs/graph-mail.log 2>&1',
-        'log'         => ROOT_DIR . '/storage/logs/graph-mail.log',
-        'required'    => false,
-        'note'        => 'Only required if you have Microsoft Graph / inbound email configured in Admin → Settings → Email / SMTP.',
+        'title'            => 'Inbound Email Replies',
+        'icon'             => 'bi-envelope-arrow-down',
+        'description'      => 'Polls the configured Microsoft 365 mailbox via the Graph API for new replies and appends them to the matching ticket timeline.',
+        'frequency'        => 'Every 5 minutes',
+        'interval_seconds' => 300,
+        'command'          => '*/5 * * * * php ' . ROOT_DIR . '/scripts/process-replies.php >> ' . ROOT_DIR . '/storage/logs/graph-mail.log 2>&1',
+        'log'              => ROOT_DIR . '/storage/logs/graph-mail.log',
+        'required'         => false,
+        'note'             => 'Only required if you have Microsoft Graph / inbound email configured in Admin → Settings → Email / SMTP.',
     ],
     [
-        'title'       => 'Escalation Rules',
-        'icon'        => 'bi-alarm',
-        'description' => 'Evaluates all enabled escalation rules against open tickets and fires any configured actions (reassign, notify, change priority, etc.).',
-        'frequency'   => 'Every 15 minutes',
-        'command'     => '*/15 * * * * php ' . ROOT_DIR . '/scripts/process-escalations.php >> ' . ROOT_DIR . '/storage/logs/escalations.log 2>&1',
-        'log'         => ROOT_DIR . '/storage/logs/escalations.log',
-        'required'    => false,
-        'note'        => 'Only required if you have escalation rules configured in Admin → Settings → Escalations.',
+        'title'            => 'Escalation Rules',
+        'icon'             => 'bi-alarm',
+        'description'      => 'Evaluates all enabled escalation rules against open tickets and fires any configured actions (reassign, notify, change priority, etc.).',
+        'frequency'        => 'Every 15 minutes',
+        'interval_seconds' => 900,
+        'command'          => '*/15 * * * * php ' . ROOT_DIR . '/scripts/process-escalations.php >> ' . ROOT_DIR . '/storage/logs/escalations.log 2>&1',
+        'log'              => ROOT_DIR . '/storage/logs/escalations.log',
+        'required'         => false,
+        'note'             => 'Only required if you have escalation rules configured in Admin → Settings → Escalations.',
     ],
     [
-        'title'       => 'Scheduled Reports',
-        'icon'        => 'bi-envelope-paper',
-        'description' => 'Checks for any scheduled reports that are due and emails summaries to the configured recipients.',
-        'frequency'   => 'Every 30 minutes',
-        'command'     => '*/30 * * * * php ' . ROOT_DIR . '/scripts/process-scheduled-reports.php >> ' . ROOT_DIR . '/storage/logs/scheduled-reports.log 2>&1',
-        'log'         => ROOT_DIR . '/storage/logs/scheduled-reports.log',
-        'required'    => false,
-        'note'        => 'Only required if you have scheduled reports configured in Admin → Reports → Scheduled Reports.',
+        'title'            => 'Scheduled Reports',
+        'icon'             => 'bi-envelope-paper',
+        'description'      => 'Checks for any scheduled reports that are due and emails summaries to the configured recipients.',
+        'frequency'        => 'Every 30 minutes',
+        'interval_seconds' => 1800,
+        'command'          => '*/30 * * * * php ' . ROOT_DIR . '/scripts/process-scheduled-reports.php >> ' . ROOT_DIR . '/storage/logs/scheduled-reports.log 2>&1',
+        'log'              => ROOT_DIR . '/storage/logs/scheduled-reports.log',
+        'required'         => false,
+        'note'             => 'Only required if you have scheduled reports configured in Admin → Reports → Scheduled Reports.',
     ],
     [
-        'title'       => 'Stale Ticket Notifications',
-        'icon'        => 'bi-hourglass-split',
-        'description' => 'Finds active tickets that have had no activity for longer than the configured stale threshold and emails both the assigned agent and the requester. Skips resolved, closed, and waiting-on-customer/third-party statuses.',
-        'frequency'   => 'Every hour',
-        'command'     => '0 * * * * php ' . ROOT_DIR . '/scripts/process-stale-tickets.php >> ' . ROOT_DIR . '/storage/logs/stale-tickets.log 2>&1',
-        'log'         => ROOT_DIR . '/storage/logs/stale-tickets.log',
-        'required'    => false,
-        'note'        => 'Configure the threshold and per-type overrides in Admin → Settings → Stale Tickets.',
+        'title'            => 'Stale Ticket Notifications',
+        'icon'             => 'bi-hourglass-split',
+        'description'      => 'Finds active tickets that have had no activity for longer than the configured stale threshold and emails both the assigned agent and the requester. Skips resolved, closed, and waiting-on-customer/third-party statuses.',
+        'frequency'        => 'Every hour',
+        'interval_seconds' => 3600,
+        'command'          => '0 * * * * php ' . ROOT_DIR . '/scripts/process-stale-tickets.php >> ' . ROOT_DIR . '/storage/logs/stale-tickets.log 2>&1',
+        'log'              => ROOT_DIR . '/storage/logs/stale-tickets.log',
+        'required'         => false,
+        'note'             => 'Configure the threshold and per-type overrides in Admin → Settings → Stale Tickets.',
     ],
     [
-        'title'       => 'App Secret Expiry Reminders',
-        'icon'        => 'bi-key',
-        'description' => 'Sends email reminders to all administrators when the Microsoft Graph app secret is approaching its expiry date. Reminds at 30 days, 7 days, and on the day of expiry.',
-        'frequency'   => 'Once daily',
-        'command'     => '0 8 * * * php ' . ROOT_DIR . '/scripts/process-secret-reminders.php >> ' . ROOT_DIR . '/storage/logs/secret-reminders.log 2>&1',
-        'log'         => ROOT_DIR . '/storage/logs/secret-reminders.log',
-        'required'    => false,
-        'note'        => 'Only required if you have a Microsoft Graph app secret expiry date configured in Admin → Settings → Email / SMTP.',
+        'title'            => 'App Secret Expiry Reminders',
+        'icon'             => 'bi-key',
+        'description'      => 'Sends email reminders to all administrators when the Microsoft Graph app secret is approaching its expiry date. Reminds at 30 days, 7 days, and on the day of expiry.',
+        'frequency'        => 'Once daily',
+        'interval_seconds' => 86400,
+        'command'          => '0 8 * * * php ' . ROOT_DIR . '/scripts/process-secret-reminders.php >> ' . ROOT_DIR . '/storage/logs/secret-reminders.log 2>&1',
+        'log'              => ROOT_DIR . '/storage/logs/secret-reminders.log',
+        'required'         => false,
+        'note'             => 'Only required if you have a Microsoft Graph app secret expiry date configured in Admin → Settings → Email / SMTP.',
     ],
 ];
+
+// ── Helpers for the "last run" status badge ─────────────────────────
+$fmtAgo = static function (int $seconds): string {
+    if ($seconds < 60)    return $seconds . 's ago';
+    if ($seconds < 3600)  return (int) floor($seconds / 60)   . 'm ago';
+    if ($seconds < 86400) return (int) floor($seconds / 3600) . 'h ago';
+    return (int) floor($seconds / 86400) . 'd ago';
+};
+
+// Returns ['status' => ok|stale|missing, 'age' => int seconds|null, 'mtime' => int|null]
+// A job is considered "running" if its log was touched within 2x its expected interval.
+$cronStatus = static function (array $job): array {
+    $path = $job['log'] ?? '';
+    if ($path === '' || !is_file($path)) {
+        return ['status' => 'missing', 'age' => null, 'mtime' => null];
+    }
+    $mtime = @filemtime($path);
+    if ($mtime === false) {
+        return ['status' => 'missing', 'age' => null, 'mtime' => null];
+    }
+    $age       = max(0, time() - $mtime);
+    $threshold = (int) (($job['interval_seconds'] ?? 3600) * 2);
+    return [
+        'status' => $age <= $threshold ? 'ok' : 'stale',
+        'age'    => $age,
+        'mtime'  => $mtime,
+    ];
+};
 ?>
 <div class="mb-4">
     <h2 class="fw-bold mb-0">Settings</h2>
@@ -85,23 +119,98 @@ $cronJobs = [
     </p>
 </div>
 
+<?php
+$summary = ['ok' => 0, 'stale' => 0, 'missing' => 0];
+foreach ($cronJobs as $j) {
+    $summary[$cronStatus($j)['status']]++;
+}
+?>
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="rounded-circle d-flex align-items-center justify-content-center"
+                     style="width:42px;height:42px;background:rgba(25,135,84,.1);">
+                    <i class="bi bi-check-circle-fill text-success fs-5"></i>
+                </div>
+                <div>
+                    <div class="fw-bold fs-4 lh-1"><?= (int) $summary['ok'] ?></div>
+                    <div class="text-muted small">Running</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="rounded-circle d-flex align-items-center justify-content-center"
+                     style="width:42px;height:42px;background:rgba(255,193,7,.15);">
+                    <i class="bi bi-exclamation-triangle-fill text-warning fs-5"></i>
+                </div>
+                <div>
+                    <div class="fw-bold fs-4 lh-1"><?= (int) $summary['stale'] ?></div>
+                    <div class="text-muted small">Stale (overdue)</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="rounded-circle d-flex align-items-center justify-content-center"
+                     style="width:42px;height:42px;background:rgba(108,117,125,.1);">
+                    <i class="bi bi-dash-circle-fill text-secondary fs-5"></i>
+                </div>
+                <div>
+                    <div class="fw-bold fs-4 lh-1"><?= (int) $summary['missing'] ?></div>
+                    <div class="text-muted small">Not configured</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="alert alert-info d-flex gap-3 align-items-start mb-4">
     <i class="bi bi-info-circle-fill fs-5 mt-1 flex-shrink-0"></i>
     <div class="small">
         <strong>How to edit your crontab:</strong> Run <code>crontab -e</code> on your server, paste the desired
         cron lines, save, and exit. All paths below are absolute paths for your installation.
         Click any command to copy it to the clipboard.
+        <br>
+        <strong>Status detection:</strong> Each job is checked by the modified time of its log file.
+        A job shows <span class="badge bg-success">Running</span> if its log was written within 2× its expected interval,
+        <span class="badge bg-warning text-dark">Stale</span> if it's older than that,
+        or <span class="badge bg-light text-muted border">Not configured</span> if no log file exists.
+        A manual "Run Now" counts as a run for detection purposes.
     </div>
 </div>
 
 <?php foreach ($cronJobs as $job): ?>
+    <?php
+    $st     = $cronStatus($job);
+    $ageStr = $st['age'] !== null ? $fmtAgo((int) $st['age']) : '';
+    $mtStr  = $st['mtime'] !== null ? date('Y-m-d H:i:s', (int) $st['mtime']) : '';
+    ?>
 <div class="card border-0 shadow-sm mb-4">
     <div class="card-header bg-white py-3 d-flex align-items-center gap-3">
         <i class="bi <?= e($job['icon']) ?> fs-5 text-primary"></i>
         <div class="flex-grow-1">
             <h6 class="mb-0 fw-semibold"><?= e($job['title']) ?></h6>
         </div>
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2 flex-wrap justify-content-end">
+            <?php if ($st['status'] === 'ok'): ?>
+                <span class="badge bg-success" title="Log last written <?= e($mtStr) ?>">
+                    <i class="bi bi-check-circle me-1"></i>Running · <?= e($ageStr) ?>
+                </span>
+            <?php elseif ($st['status'] === 'stale'): ?>
+                <span class="badge bg-warning text-dark" title="Log last written <?= e($mtStr) ?>; exceeds 2× expected interval">
+                    <i class="bi bi-exclamation-triangle me-1"></i>Stale · <?= e($ageStr) ?>
+                </span>
+            <?php else: ?>
+                <span class="badge bg-light text-muted border" title="No log file yet — job has never written output">
+                    <i class="bi bi-dash-circle me-1"></i>Not configured
+                </span>
+            <?php endif; ?>
             <span class="badge bg-light text-dark border small">
                 <i class="bi bi-repeat me-1"></i><?= e($job['frequency']) ?>
             </span>
@@ -130,8 +239,13 @@ $cronJobs = [
         <p class="text-muted small mt-3 mb-0"><i class="bi bi-info-circle me-1"></i><?= $job['note'] ?></p>
         <?php endif; ?>
 
-        <div class="mt-3 pt-3 border-top">
+        <div class="mt-3 pt-3 border-top d-flex flex-wrap gap-3 align-items-center justify-content-between">
             <span class="text-muted small"><i class="bi bi-file-text me-1"></i>Log file: <code><?= e($job['log']) ?></code></span>
+            <?php if ($st['mtime'] !== null): ?>
+            <span class="text-muted small"><i class="bi bi-clock-history me-1"></i>Last run: <?= e($mtStr) ?></span>
+            <?php else: ?>
+            <span class="text-muted small fst-italic"><i class="bi bi-clock-history me-1"></i>No runs recorded</span>
+            <?php endif; ?>
         </div>
     </div>
 </div>
