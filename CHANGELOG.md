@@ -11,6 +11,14 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.8.2 — 2026-04-22
+
+### Portal Privacy
+- **Confidential Tickets Excluded from Location Visibility** — users with `can_view_location_tickets = 1` no longer see confidential-type tickets submitted by others at their location. The portal ticket list, ticket detail view, comment endpoint, and attachment download now all exclude tickets whose `ticket_type.is_confidential = 1` from the location-based access path. Confidential types remain restricted to their assigned group (and the requester still sees their own ticket via `created_by`, regardless of confidentiality).
+- **Attachment Download Alignment** — the portal attachment download previously checked ownership only, so users with location visibility could view a ticket but not download its files. The endpoint now mirrors the view-access rule, allowing downloads for location-visible tickets while still respecting the new confidentiality carve-out and internal-note exclusion.
+
+---
+
 ## 2.8.1 — 2026-04-22
 
 ### Cron Jobs
