@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.8.4 — 2026-04-23
+
+### Escalations
+- **Escalation Rule Recipients Can Open the Ticket** — when an escalation rule's `notify_user` or `notify_assigned_agent` action fires, the target agent/admin is now auto-added to `ticket_watchers` so they can actually open the ticket from the email link. Previously, if the recipient wasn't in the ticket's group (and wasn't the current assignee), clicking through produced a 403 — a confusing experience for a system-generated alert. Mirrors the behaviour of manual matrix-based escalation, which already added watchers. Portal users are not added (they use a separate access path).
+
+---
+
 ## 2.8.3 — 2026-04-23
 
 ### Portal Privacy

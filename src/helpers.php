@@ -2123,6 +2123,13 @@ function runEscalationRule(\PDO $db, array $rule, array $ticket): void
                 if (!$targetUser) break;
                 if (!(bool)($targetUser['notify_escalation'] ?? 1)) break; // opted out
 
+                // Ensure the recipient can actually open the ticket from the email link,
+                // even if they're outside the ticket's group. Mirrors manual-escalation behaviour.
+                if (in_array($targetUser['role'], ['admin', 'agent'], true)) {
+                    $db->prepare('INSERT IGNORE INTO ticket_watchers (ticket_id, user_id) VALUES (?, ?)')
+                       ->execute([$ticketId, $targetUserId]);
+                }
+
                 // Fetch ticket subject for message
                 $s = $db->prepare('SELECT subject FROM tickets WHERE id = ?');
                 $s->execute([$ticketId]);
