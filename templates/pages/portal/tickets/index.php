@@ -114,6 +114,12 @@ $sortParams = array_filter($filters, fn($v) => $v !== '' && $v !== 'mine');
                             <a href="/portal/tickets/<?= $t['id'] ?>" class="text-decoration-none fw-semibold text-dark">
                                 <?= e($t['subject']) ?>
                             </a>
+                            <?php if ((int) ($t['escalation_level'] ?? 0) > 0): ?>
+                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle ms-1"
+                                  title="This ticket has been escalated to Level <?= (int) $t['escalation_level'] ?>.">
+                                <i class="bi bi-arrow-up-circle me-1"></i>Escalated L<?= (int) $t['escalation_level'] ?>
+                            </span>
+                            <?php endif; ?>
                         </td>
                         <td>
                             <span class="badge bg-<?= $statusColors[$t['status']] ?? 'secondary' ?>">

@@ -19,6 +19,12 @@ $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-p
             <span class="badge bg-<?= $statusColors[$ticket['status']] ?? 'secondary' ?> fs-6">
                 <?= e($statusLabels[$ticket['status']] ?? $ticket['status']) ?>
             </span>
+            <?php if ((int) ($ticket['escalation_level'] ?? 0) > 0): ?>
+            <span class="badge bg-danger-subtle text-danger border border-danger-subtle fs-6"
+                  title="This ticket has been escalated.">
+                <i class="bi bi-arrow-up-circle me-1"></i>Escalated — Level <?= (int) $ticket['escalation_level'] ?>
+            </span>
+            <?php endif; ?>
             <?php if ($ticket['priority_name']): ?>
             <span class="badge fs-6" style="background:<?= e($ticket['priority_color']) ?>;">
                 <?= e($ticket['priority_name']) ?>
@@ -372,6 +378,15 @@ $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-p
 
                     <dt class="text-muted small">Assigned To</dt>
                     <dd><?= e($ticket['agent_name'] ?: 'Unassigned') ?></dd>
+
+                    <?php if ((int) ($ticket['escalation_level'] ?? 0) > 0): ?>
+                    <dt class="text-muted small">Escalation</dt>
+                    <dd>
+                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle">
+                            <i class="bi bi-arrow-up-circle me-1"></i>Level <?= (int) $ticket['escalation_level'] ?>
+                        </span>
+                    </dd>
+                    <?php endif; ?>
 
                     <dt class="text-muted small">Created</dt>
                     <dd><?= date('M j, Y g:i A', strtotime($ticket['created_at'])) ?></dd>
