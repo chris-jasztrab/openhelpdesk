@@ -31,12 +31,14 @@ $router->get('/portal/tickets', function () {
 
     if ($canViewLocation && $fScope === 'location') {
         // Show all non-merged tickets at the user's location, but never surface
-        // confidential-type tickets via location visibility — those stay restricted
-        // to their type's group (and the requester's own view of their own ticket).
+        // confidential-type tickets or types flagged as hidden from location
+        // visibility (e.g. Collections, HR) — those stay restricted to agents
+        // and the requester's own view of their own ticket.
         $locationCond = 't.location_id = ? AND t.merged_into_ticket_id IS NULL
                         AND NOT EXISTS (
                             SELECT 1 FROM ticket_types ct
-                            WHERE ct.id = t.type_id AND ct.is_confidential = 1
+                            WHERE ct.id = t.type_id
+                              AND (ct.is_confidential = 1 OR ct.show_to_location_visibility = 0)
                         )';
         $where  = ['(' . $ownCond . ' OR (' . $locationCond . '))'];
         $params = [$uid, $uid, (int) $userPerms['location_id']];
@@ -411,11 +413,13 @@ $router->get('/portal/tickets/{id}', function (array $p) {
     $accessCond   = '(t.created_by = ? OR t.id IN (SELECT DISTINCT merged_into_ticket_id FROM tickets WHERE created_by = ? AND merged_into_ticket_id IS NOT NULL))';
     $accessParams = [$tid, $uid, $uid];
     if ($userPerms['can_view_location_tickets'] && $userPerms['location_id']) {
-        // Location visibility never includes confidential-type tickets — those stay
-        // restricted to their type's group (requester still sees their own via created_by).
+        // Location visibility never includes confidential-type tickets, nor
+        // types whose admin has opted out of location-visibility sharing
+        // (e.g. Collections, HR). Requesters still see their own via created_by.
         $accessCond   = '(' . $accessCond . ' OR (t.location_id = ? AND NOT EXISTS (
                             SELECT 1 FROM ticket_types ct
-                            WHERE ct.id = t.type_id AND ct.is_confidential = 1
+                            WHERE ct.id = t.type_id
+                              AND (ct.is_confidential = 1 OR ct.show_to_location_visibility = 0)
                         )))';
         $accessParams[] = (int) $userPerms['location_id'];
     }
@@ -567,10 +571,12 @@ $router->post('/portal/tickets/{id}/comment', function (array $p) {
     $accessCond   = '(tickets.created_by = ? OR tickets.id IN (SELECT DISTINCT merged_into_ticket_id FROM tickets t2 WHERE t2.created_by = ? AND t2.merged_into_ticket_id IS NOT NULL))';
     $accessParams = [$id, $uid, $uid];
     if ($userPerms['can_view_location_tickets'] && $userPerms['location_id']) {
-        // Mirror the view-access rule: location visibility excludes confidential types.
+        // Mirror the view-access rule: location visibility excludes confidential
+        // types and types opted out of location-visibility sharing.
         $accessCond   = '(' . $accessCond . ' OR (tickets.location_id = ? AND NOT EXISTS (
                             SELECT 1 FROM ticket_types ct
-                            WHERE ct.id = tickets.type_id AND ct.is_confidential = 1
+                            WHERE ct.id = tickets.type_id
+                              AND (ct.is_confidential = 1 OR ct.show_to_location_visibility = 0)
                         )))';
         $accessParams[] = (int) $userPerms['location_id'];
     }
@@ -946,7 +952,8 @@ $router->get('/portal/attachments/{id}/download', function (array $p) {
     if ($userPerms['can_view_location_tickets'] && $userPerms['location_id']) {
         $accessCond   = '(' . $accessCond . ' OR (t.location_id = ? AND NOT EXISTS (
                             SELECT 1 FROM ticket_types ct
-                            WHERE ct.id = t.type_id AND ct.is_confidential = 1
+                            WHERE ct.id = t.type_id
+                              AND (ct.is_confidential = 1 OR ct.show_to_location_visibility = 0)
                         )))';
         $accessParams[] = (int) $userPerms['location_id'];
     }

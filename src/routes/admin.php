@@ -1064,6 +1064,7 @@ $router->post('/admin/types/create', function () {
     $order   = (int) ($_POST['sort_order'] ?? 0);
     $groupId        = !empty($_POST['group_id']) ? (int) $_POST['group_id'] : null;
     $isConfidential = !empty($_POST['is_confidential']) && $groupId ? 1 : 0;
+    $showToLocVis   = !empty($_POST['show_to_location_visibility']) ? 1 : 0;
     $staleRaw       = trim((string) ($_POST['stale_threshold_hours'] ?? ''));
     $staleHours     = $staleRaw === '' ? null : max(0, (int) $staleRaw);
     if ($name === '') {
@@ -1071,8 +1072,8 @@ $router->post('/admin/types/create', function () {
         flash('error', 'Type name is required.');
         redirect('/admin/types/create');
     }
-    Database::connect()->prepare('INSERT INTO ticket_types (name, color, group_id, is_confidential, sort_order, stale_threshold_hours) VALUES (?, ?, ?, ?, ?, ?)')
-        ->execute([$name, $color, $groupId, $isConfidential, $order, $staleHours]);
+    Database::connect()->prepare('INSERT INTO ticket_types (name, color, group_id, is_confidential, show_to_location_visibility, sort_order, stale_threshold_hours) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        ->execute([$name, $color, $groupId, $isConfidential, $showToLocVis, $order, $staleHours]);
     flash('success', 'Ticket type created.');
     redirect('/admin/types');
 });
@@ -1103,6 +1104,7 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
     $order   = (int) ($_POST['sort_order'] ?? 0);
     $groupId        = !empty($_POST['group_id']) ? (int) $_POST['group_id'] : null;
     $isConfidential = !empty($_POST['is_confidential']) && $groupId ? 1 : 0;
+    $showToLocVis   = !empty($_POST['show_to_location_visibility']) ? 1 : 0;
     $staleRaw       = trim((string) ($_POST['stale_threshold_hours'] ?? ''));
     $staleHours     = $staleRaw === '' ? null : max(0, (int) $staleRaw);
     if ($name === '') {
@@ -1130,6 +1132,7 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
                 'sort_order' => (string) $order,
                 'group_id'  => $groupId ? (string) $groupId : '',
                 'stale_threshold_hours' => $staleHours === null ? '' : (string) $staleHours,
+                'show_to_location_visibility' => $showToLocVis ? '1' : '',
                 // is_confidential intentionally omitted (unchecked = removal)
             ];
             logAudit(
@@ -1166,8 +1169,8 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
         }
     }
 
-    $db->prepare('UPDATE ticket_types SET name=?, color=?, group_id=?, is_confidential=?, sort_order=?, stale_threshold_hours=? WHERE id=?')
-        ->execute([$name, $color, $groupId, $isConfidential, $order, $staleHours, $id]);
+    $db->prepare('UPDATE ticket_types SET name=?, color=?, group_id=?, is_confidential=?, show_to_location_visibility=?, sort_order=?, stale_threshold_hours=? WHERE id=?')
+        ->execute([$name, $color, $groupId, $isConfidential, $showToLocVis, $order, $staleHours, $id]);
 
     // Confidential flag removal: audit log + notify all group members
     if ($wasConfidential && !$isConfidential && $priorGroupId) {

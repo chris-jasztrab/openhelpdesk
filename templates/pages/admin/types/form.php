@@ -74,6 +74,21 @@ $action = $isEdit ? "/admin/types/{$editing['id']}/edit" : '/admin/types/create'
             </div>
 
             <div class="mb-3">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="show_to_location_visibility" name="show_to_location_visibility" value="1"
+                           <?= (int) old('show_to_location_visibility', (string) ($editing['show_to_location_visibility'] ?? '1')) ? 'checked' : '' ?>>
+                    <label class="form-check-label fw-semibold" for="show_to_location_visibility">
+                        <i class="bi bi-people me-1"></i>Visible to Location Ticket Visibility users
+                    </label>
+                </div>
+                <div class="form-text">
+                    When checked (the default), tickets of this type appear to portal users at the same location who have <strong>Location Ticket Visibility</strong> enabled on their account.
+                    Uncheck for types that should stay restricted to agents — e.g. <em>Collections</em>, <em>Human Resources</em>, or other sensitive categories where broad visibility is inappropriate.
+                    Requesters always see their own ticket regardless of this setting.
+                </div>
+            </div>
+
+            <div class="mb-3">
                 <label for="stale_threshold_hours" class="form-label fw-semibold">
                     <i class="bi bi-hourglass-split me-1"></i>Stale Threshold (hours)
                 </label>

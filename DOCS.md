@@ -237,10 +237,24 @@ Navigate to `/admin/users` to see all users with their avatar, name, email, role
 | Work Phone | No | |
 | Assigned Location | No | Select from configured locations |
 | Avatar | No | JPG, PNG, GIF, or WEBP. Max 2 MB. |
+| Location Ticket Visibility | No | When enabled, this user can view all tickets at their assigned location, even as an end user. See [Location Ticket Visibility](#location-ticket-visibility) below. |
 
 **Editing a user** at `/admin/users/{id}/edit` -- same fields, but password is optional (leave blank to keep the current one). You can also remove the avatar via a checkbox.
 
 **Deleting a user** -- click the trash icon on the user list. You cannot delete your own account.
+
+#### Location Ticket Visibility
+
+End users normally only see tickets they submitted themselves. The **Location Ticket Visibility** toggle on the user edit page lets an admin promote a specific end user to see every ticket at their assigned location — useful for branch managers, department heads, or administrative staff who need situational awareness without being made agents.
+
+When enabled, the portal ticket list at `/portal/tickets` gains a **scope switcher**: *My tickets* (default) vs. *All tickets at my location*. The user can open, read, comment on, and download attachments for any ticket at their location — subject to the per-ticket-type carve-outs below.
+
+**Ticket types are not all shared equally.** Two flags on the ticket type control whether a type participates in location visibility:
+
+- **Confidential** (`is_confidential`) — hard restriction. Confidential tickets are only visible to members of the type's assigned group and are **never** exposed via location visibility. Admins outside the group must re-authenticate to access them, and all access is logged.
+- **Visible to Location Ticket Visibility users** (`show_to_location_visibility`) — soft restriction. Unchecking this hides the type from location-visibility users without imposing the heavier group-lock / re-auth / audit-log machinery. Intended for routine-but-sensitive categories like **Collections**, **Human Resources**, or **Payroll**, where the tickets shouldn't be broadcast to everyone at the site but don't need the full confidential lockdown.
+
+In both cases the requester still sees their own ticket in the *My tickets* scope, regardless of type.
 
 ---
 
@@ -316,10 +330,28 @@ Manage ticket priority levels at `/admin/priorities`:
 
 Manage ticket categories at `/admin/types`:
 
-| Field | Required |
-|-------|----------|
-| Type Name | Yes |
-| Sort Order | No |
+| Field | Required | Notes |
+|-------|----------|-------|
+| Type Name | Yes | e.g. IT, Facilities, Collections |
+| Color | No | Used for the coloured badge on ticket lists and detail views. |
+| Sort Order | No | Lower numbers appear first in dropdowns and lists. |
+| Default Group | No | When set, only agents in this group are offered as assignees for tickets of this type. Required before enabling **Confidential**. |
+| Confidential | No | Hard group-lock. Only members of the **Default Group** can view tickets of this type; admins outside the group must re-authenticate and all access is logged and notified to the group. Confidential types are automatically excluded from Location Ticket Visibility. Removing this flag from an existing type also requires re-authentication. |
+| Visible to Location Ticket Visibility users | No | Checked by default. Uncheck for types that should stay restricted to agents — e.g. **Collections**, **Human Resources**, **Payroll** — so they don't surface to end users who have [Location Ticket Visibility](#location-ticket-visibility) enabled. This is a lighter-weight alternative to **Confidential** when you don't need the group-lock, re-auth, or access-log machinery. |
+| Stale Threshold (hours) | No | Per-type override for the global stale-ticket threshold. Leave blank to inherit the global setting from **Settings → Stale Tickets**. |
+
+**Confidential vs. Visible to Location Ticket Visibility users — which should I use?**
+
+| Use case | Confidential | Visible to Loc. Vis. users |
+|----------|:---:|:---:|
+| Restrict view to one group's agents | ✅ | — |
+| Force admins outside the group to re-auth | ✅ | — |
+| Log and notify on every access | ✅ | — |
+| Hide from end users with location visibility | ✅ (automatic) | ✅ (if unchecked) |
+| Still visible to any agent in the system | — | ✅ |
+| Example types | HR investigations, discipline, legal holds | Collections, general HR, payroll |
+
+Pick **Confidential** when the tickets must stay inside a specific department and every access needs to be auditable. Pick **Visible to Location Ticket Visibility users = off** when you simply don't want the tickets broadcast to non-agent staff at the location, but any agent may still work them.
 
 ### Groups
 
