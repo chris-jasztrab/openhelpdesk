@@ -59,9 +59,9 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
         {
             element: '#tour-portal-stats',
             popover: {
-                title:       'Your Ticket Summary',
-                description: '<strong>Open Tickets</strong> shows requests that are still being worked on. ' +
-                             '<strong>Resolved</strong> shows tickets that have been completed.',
+                title:       'Your Summary',
+                description: '<strong>Active requests</strong> are ones the team is still working on. ' +
+                             '<strong>Done</strong> shows requests that have been completed.',
                 side:  'bottom',
                 align: 'start'
             }
@@ -69,9 +69,9 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
         {
             element: '#tour-portal-recent',
             popover: {
-                title:       'Recent Tickets',
-                description: 'Your most recent support requests appear here. ' +
-                             'Click any row to view the full ticket and see updates from the support team.',
+                title:       'Your Active Requests',
+                description: 'Your most recent help requests appear here. ' +
+                             'Click any row to open it and see updates from the team.',
                 side:  'top',
                 align: 'start'
             }
@@ -80,7 +80,7 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
             element: '.sidebar',
             popover: {
                 title:       'Navigation',
-                description: 'Use the sidebar to switch between <strong>Dashboard</strong>, <strong>My Tickets</strong>, and the <strong>Knowledge Base</strong> — ' +
+                description: 'Use the sidebar to switch between <strong>Dashboard</strong>, <strong>My Requests</strong>, and the <strong>Knowledge Base</strong> — ' +
                              'a library of help articles that may already answer your question.',
                 side:  'right',
                 align: 'center'
@@ -89,9 +89,9 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
         {
             element: '#tour-portal-new-ticket',
             popover: {
-                title:       'Submit a Request',
-                description: 'Click <strong>New Ticket</strong> to contact the support team. ' +
-                             'Describe your issue and we\'ll get back to you as soon as possible.',
+                title:       'Start a New Request',
+                description: 'Click <strong>New Help Request</strong> to reach the team. ' +
+                             'Describe your issue and someone will reply as soon as possible.',
                 side:  'bottom',
                 align: 'end',
                 onNextClick: function () {
@@ -106,16 +106,16 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
     var ticketsSteps = [
         {
             popover: {
-                title:       'My Tickets',
-                description: 'This page lists all of your support requests. ' +
-                             'You can search, filter by status or priority, and sort the list to find what you need.'
+                title:       'My Requests',
+                description: 'This page lists all of your help requests. ' +
+                             'You can search, filter by status or urgency, and sort the list to find what you need.'
             }
         },
         {
             element: '#tour-portal-filter-bar',
             popover: {
                 title:       'Filter &amp; Search',
-                description: 'Use the <strong>Search</strong> box to find a ticket by subject keyword. ' +
+                description: 'Use the <strong>Search</strong> box to find a request by subject keyword. ' +
                              'Use the <strong>Status</strong> and <strong>Priority</strong> dropdowns to narrow the list, ' +
                              'then click <strong>Filter</strong> to apply.',
                 side:  'bottom',
@@ -125,17 +125,17 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
         {
             element: '#tour-portal-ticket-table',
             popover: {
-                title:       'Ticket List',
-                description: 'Each row shows the ticket number, subject, current status, priority, who it\'s assigned to, and when it was submitted. ' +
-                             'Click any row to open the ticket and view updates.',
+                title:       'Your Requests',
+                description: 'Each row shows the request number, subject, current status, priority, who it\'s assigned to, and when it was submitted. ' +
+                             'Click any row to open the request and see updates.',
                 side:  'top',
                 align: 'start'
             }
         },
         {
             popover: {
-                title:       'Let\'s Create a Ticket',
-                description: 'Now let\'s walk through submitting a support request.',
+                title:       'Let\'s Submit a Request',
+                description: 'Now let\'s walk through submitting a help request.',
                 onNextClick: function () {
                     isNavigating = true;
                     localStorage.setItem('ld_portal_tour_page', 'create');
@@ -148,8 +148,8 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
     var createSteps = [
         {
             popover: {
-                title:       'New Ticket Form',
-                description: 'Fill in this form to submit a support request. Let\'s walk through each field.'
+                title:       'New Help Request',
+                description: 'Fill in this form to send a help request to the team. Let\'s walk through each field.'
             }
         },
         {
@@ -184,16 +184,16 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
         },
         {
             popover: {
-                title:       'Editing a Ticket',
-                description: 'After submitting a ticket, you can update the <strong>Subject</strong> or <strong>Description</strong> at any time. ' +
-                             'Just open the ticket and click the <strong>Edit</strong> button — useful if you forgot a detail or need to clarify something.'
+                title:       'Editing a Request',
+                description: 'After submitting, you can update the <strong>Subject</strong> or <strong>Description</strong> at any time. ' +
+                             'Just open the request and click the <strong>Edit</strong> button — useful if you forgot a detail or need to clarify something.'
             }
         },
         {
             popover: {
-                title:       'Closing a Ticket',
-                description: 'If your issue is resolved and the ticket is still open, you can close it yourself. ' +
-                             'Open the ticket and click <strong>Close Ticket</strong> to let the support team know it\'s taken care of.'
+                title:       'Closing a Request',
+                description: 'If your issue is resolved and the request is still open, you can close it yourself. ' +
+                             'Open the request and click <strong>Close this request</strong> to let the team know it\'s taken care of.'
             }
         },
         {
@@ -220,8 +220,8 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
             element: '#tour-portal-notifications',
             popover: {
                 title:       'Email Notifications',
-                description: 'Use these toggles to control exactly which emails you receive from the support team — ' +
-                             'such as confirmation when you submit a ticket, replies, or satisfaction surveys.<br><br>' +
+                description: 'Use these toggles to control exactly which emails you receive from the team — ' +
+                             'such as confirmation when you submit a request, replies, or satisfaction surveys.<br><br>' +
                              'Turn off anything you don\'t need.',
                 side:  'top',
                 align: 'start'
@@ -230,8 +230,8 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
         {
             popover: {
                 title:       '🎉 You\'re all set!',
-                description: 'That\'s the full tour! You now know how to submit, edit, and close tickets, track their status, find help articles in the Knowledge Base, and manage your notification preferences.<br><br>' +
-                             'You can also <strong>reply directly to ticket emails</strong> to add a comment without logging in.'
+                description: 'That\'s the full tour! You now know how to submit, edit, and close help requests, track their status, find help articles in the Knowledge Base, and manage your notification preferences.<br><br>' +
+                             'You can also <strong>reply directly to request emails</strong> to add a comment without logging in.'
             }
         }
     ];

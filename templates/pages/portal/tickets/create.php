@@ -1,11 +1,11 @@
 <?php
 $layout       = 'app';
-$pageTitle    = 'New Ticket';
+$pageTitle    = label('portal.action.new', 'New Help Request');
 $sidebarItems = portalSidebar('tickets');
 $breadcrumbs  = [
-    ['label' => 'Portal', 'url' => '/portal'],
-    ['label' => 'My Tickets', 'url' => '/portal/tickets'],
-    ['label' => 'New Ticket'],
+    ['label' => label('portal.nav.help', 'Help'), 'url' => '/portal'],
+    ['label' => label('portal.request.my_plural', 'My Requests'), 'url' => '/portal/tickets'],
+    ['label' => label('portal.action.new', 'New Help Request')],
 ];
 ?>
 <link rel="stylesheet" href="https://cdn.ckeditor.com/ckeditor5/43.3.1/ckeditor5.css">
@@ -48,7 +48,7 @@ foreach ($sharedTemplates as $t) {
 }
 endif; ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2 class="fw-bold mb-0">New Ticket</h2>
+    <h2 class="fw-bold mb-0"><?= e(label('portal.action.new', 'New Help Request')) ?></h2>
     <div class="d-flex align-items-center gap-2">
         <?php if (!empty($sharedTemplates)): ?>
         <select id="portalTemplateSelect" class="form-select form-select-sm" style="width:auto;max-width:200px;" title="Start from a template">
@@ -142,18 +142,21 @@ endif; ?>
             <div class="row g-3 mb-3">
                 <div class="col-md-6">
                     <label for="priority_id" class="form-label fw-semibold">
-                        <?= e(getSetting('sys_field_label_priority', 'Priority')) ?>
+                        <?= e(label('portal.field.priority_label', 'How urgent is this?')) ?>
                         <?php if ($priorityRequired): ?><span class="text-danger">*</span><?php endif; ?>
                     </label>
                     <select class="form-select" id="priority_id" name="priority_id"
                             <?= $priorityRequired ? 'required' : '' ?>>
-                        <option value="">— Select priority —</option>
+                        <option value="">— Let our team decide —</option>
                         <?php foreach ($priorities as $p): ?>
                         <option value="<?= $p['id'] ?>" <?= old('priority_id') == $p['id'] ? 'selected' : '' ?>>
                             <?= e($p['name']) ?>
                         </option>
                         <?php endforeach; ?>
                     </select>
+                    <?php if (!$priorityRequired): ?>
+                    <div class="form-text"><?= e(label('portal.field.priority_help', 'Pick a level if you know — otherwise leave blank and our team will set it.')) ?></div>
+                    <?php endif; ?>
                 </div>
             </div>
                 <?php elseif ($uf['key'] === 'tags'): ?>
@@ -195,7 +198,7 @@ endif; ?>
 
             <div class="d-flex gap-2">
                 <button type="submit" class="btn text-white" style="background:var(--ld-primary);">
-                    <i class="bi bi-send me-1"></i>Submit Ticket
+                    <i class="bi bi-send me-1"></i><?= e(label('portal.action.submit', 'Submit Request')) ?>
                 </button>
                 <a href="/portal/tickets" class="btn btn-outline-secondary">Cancel</a>
             </div>

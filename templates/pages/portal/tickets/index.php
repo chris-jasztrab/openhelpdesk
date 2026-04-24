@@ -1,23 +1,31 @@
 <?php
 $layout       = 'app';
-$pageTitle    = 'My Tickets';
+$pageTitle    = label('portal.request.my_plural', 'My Requests');
 $sidebarItems = portalSidebar('tickets');
 $breadcrumbs  = [
-    ['label' => 'Portal', 'url' => '/portal'],
-    ['label' => 'My Tickets'],
+    ['label' => label('portal.nav.help', 'Help'), 'url' => '/portal'],
+    ['label' => label('portal.request.my_plural', 'My Requests')],
 ];
 $statusColors = ['open' => 'primary', 'in_progress' => 'warning', 'pending' => 'info', 'waiting_on_customer' => 'warning', 'waiting_on_third_party' => 'dark', 'resolved' => 'success', 'closed' => 'secondary'];
-$statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 'Pending', 'waiting_on_customer' => 'Waiting on Customer', 'waiting_on_third_party' => 'Waiting on Third Party', 'resolved' => 'Resolved', 'closed' => 'Closed'];
+$statusLabels = [
+    'open'                   => label('portal.status.open', 'Submitted'),
+    'in_progress'            => label('portal.status.in_progress', "We're working on it"),
+    'pending'                => label('portal.status.pending', "We're waiting on someone else"),
+    'waiting_on_customer'    => label('portal.status.waiting_on_customer', 'Waiting on you'),
+    'waiting_on_third_party' => label('portal.status.waiting_on_third_party', "We're waiting on someone else"),
+    'resolved'               => label('portal.status.resolved', 'Done'),
+    'closed'                 => label('portal.status.closed', 'Closed'),
+];
 $isDefault  = $filters['status'] === 'open' && $filters['priority'] === '' && $filters['q'] === '' && $filters['scope'] === 'mine';
 $hasFilters = !$isDefault;
 $sortParams = array_filter($filters, fn($v) => $v !== '' && $v !== 'mine');
 ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2 class="fw-bold mb-0">My Tickets</h2>
+    <h2 class="fw-bold mb-0"><?= e(label('portal.request.my_plural', 'My Requests')) ?></h2>
     <div class="d-flex gap-2 align-items-center">
         <?php if ($hasFilters): ?><span class="badge bg-secondary fs-6"><?= $totalTickets ?> filtered of <?= $allTickets ?> total</span><?php else: ?><span class="badge bg-secondary fs-6"><?= $totalTickets ?> total</span><?php endif; ?>
         <a href="/portal/tickets/create" class="btn text-white" style="background:var(--ld-primary);">
-            <i class="bi bi-plus-circle me-1"></i>New Ticket
+            <i class="bi bi-plus-circle me-1"></i><?= e(label('portal.action.new', 'New Help Request')) ?>
         </a>
     </div>
 </div>
@@ -68,7 +76,7 @@ $sortParams = array_filter($filters, fn($v) => $v !== '' && $v !== 'mine');
                     <a href="?<?= http_build_query(array_merge(array_filter($filters, fn($v) => $v !== '' && $v !== 'mine'), ['scope' => 'mine'])) ?>"
                        class="btn <?= $filters['scope'] !== 'location' ? 'text-white' : 'btn-outline-secondary' ?>"
                        <?= $filters['scope'] !== 'location' ? 'style="background:var(--ld-primary);"' : '' ?>>
-                        <i class="bi bi-person me-1"></i>My Tickets
+                        <i class="bi bi-person me-1"></i><?= e(label('portal.request.my_plural', 'My Requests')) ?>
                     </a>
                     <a href="?<?= http_build_query(array_merge(array_filter($filters, fn($v) => $v !== '' && $v !== 'mine'), ['scope' => 'location'])) ?>"
                        class="btn <?= $filters['scope'] === 'location' ? 'text-white' : 'btn-outline-secondary' ?>"
@@ -101,9 +109,9 @@ $sortParams = array_filter($filters, fn($v) => $v !== '' && $v !== 'mine');
                 <tr><td colspan="7" class="text-center py-4 text-muted">
                     <i class="bi bi-inbox fs-3 d-block mb-2"></i>
                     <?php if ($userHasAnyTickets): ?>
-                    Change your filters to see your tickets, or <a href="/portal/tickets/create">create a new ticket</a>.
+                    Change your filters to see your requests, or <a href="/portal/tickets/create">start a new help request</a>.
                     <?php else: ?>
-                    No tickets yet. <a href="/portal/tickets/create">Create your first ticket</a>.
+                    No help requests yet. <a href="/portal/tickets/create">Submit your first one</a>.
                     <?php endif; ?>
                 </td></tr>
                 <?php else: ?>

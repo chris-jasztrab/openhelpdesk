@@ -1,14 +1,22 @@
 <?php
 $layout       = 'app';
-$pageTitle    = 'Ticket #' . $ticket['id'];
+$pageTitle    = 'Request #' . $ticket['id'];
 $sidebarItems = portalSidebar('tickets');
 $breadcrumbs  = [
-    ['label' => 'Portal', 'url' => '/portal'],
-    ['label' => 'My Tickets', 'url' => '/portal/tickets'],
+    ['label' => label('portal.nav.help', 'Help'), 'url' => '/portal'],
+    ['label' => label('portal.request.my_plural', 'My Requests'), 'url' => '/portal/tickets'],
     ['label' => '#' . $ticket['id']],
 ];
 $statusColors = ['open' => 'primary', 'in_progress' => 'warning', 'pending' => 'info', 'waiting_on_customer' => 'warning', 'waiting_on_third_party' => 'dark', 'resolved' => 'success', 'closed' => 'secondary'];
-$statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 'Pending', 'waiting_on_customer' => 'Waiting on Customer', 'waiting_on_third_party' => 'Waiting on Third Party', 'resolved' => 'Resolved', 'closed' => 'Closed'];
+$statusLabels = [
+    'open'                   => label('portal.status.open', 'Submitted'),
+    'in_progress'            => label('portal.status.in_progress', "We're working on it"),
+    'pending'                => label('portal.status.pending', "We're waiting on someone else"),
+    'waiting_on_customer'    => label('portal.status.waiting_on_customer', 'Waiting on you'),
+    'waiting_on_third_party' => label('portal.status.waiting_on_third_party', "We're waiting on someone else"),
+    'resolved'               => label('portal.status.resolved', 'Done'),
+    'closed'                 => label('portal.status.closed', 'Closed'),
+];
 $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-person-check text-primary', 'status_changed' => 'bi-arrow-repeat text-warning', 'priority_changed' => 'bi-flag text-danger', 'comment' => 'bi-chat-dots text-info', 'edited' => 'bi-pencil text-secondary', 'escalated' => 'bi-arrow-up-circle text-danger'];
 ?>
 <link rel="stylesheet" href="https://cdn.ckeditor.com/ckeditor5/43.3.1/ckeditor5.css">
@@ -30,7 +38,7 @@ $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-p
                 <?= e($ticket['priority_name']) ?>
             </span>
             <?php endif; ?>
-            <span class="text-muted">Ticket #<?= $ticket['id'] ?></span>
+            <span class="text-muted">Request #<?= $ticket['id'] ?></span>
         </div>
     </div>
     <div class="d-flex gap-2">
@@ -64,7 +72,7 @@ $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-p
         </button>
         <button type="button" class="btn btn-outline-secondary btn-sm"
                 data-bs-toggle="modal" data-bs-target="#closeTicketModal">
-            <i class="bi bi-x-circle me-1"></i>Close Ticket
+            <i class="bi bi-x-circle me-1"></i><?= e(label('portal.action.close', 'Close this request')) ?>
         </button>
         <?php endif; ?>
         <a href="/portal/tickets" class="btn btn-outline-secondary btn-sm">
@@ -78,13 +86,13 @@ $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-p
             <div class="modal-content">
                 <div class="modal-header">
                     <h6 class="modal-title fw-semibold" id="escalateModalLabel">
-                        <i class="bi bi-arrow-up-circle me-2 text-danger"></i>Escalate Ticket
+                        <i class="bi bi-arrow-up-circle me-2 text-danger"></i>Escalate this request
                     </h6>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <p class="mb-3">
-                        If you feel this ticket needs more attention, you can escalate it to the next person in the escalation chain for this ticket type.
+                        If you feel this request needs more attention, you can escalate it to the next person in the escalation chain.
                     </p>
                     <div class="p-3 bg-body-tertiary rounded mb-3">
                         <div class="small text-muted mb-1">This ticket will be escalated to:</div>
@@ -151,6 +159,23 @@ $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-p
     </script>
     <?php endif; ?>
 </div>
+
+<?php if ($isOwner && $ticket['status'] === 'open'): ?>
+<div class="alert border-0 shadow-sm mb-4" role="note"
+     style="background:#eef2ff;border-left:4px solid var(--ld-primary) !important;">
+    <div class="d-flex gap-3">
+        <i class="bi bi-info-circle-fill fs-4" style="color:var(--ld-primary);" aria-hidden="true"></i>
+        <div>
+            <h6 class="fw-semibold mb-2"><?= e(label('portal.what_next.title', 'What happens next?')) ?></h6>
+            <ul class="mb-0 ps-3 small">
+                <li><?= e(label('portal.what_next.line1', 'Your request is in the queue.')) ?></li>
+                <li><?= e(label('portal.what_next.line2', 'Someone from the team will review it and reply here.')) ?></li>
+                <li><?= e(label('portal.what_next.line3', "You'll get an email when there's an update — no need to phone or email to confirm.")) ?></li>
+            </ul>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <div class="row g-4">
     <!-- Left column: Description + Tags + Timeline -->
@@ -412,25 +437,25 @@ $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-p
     </div>
 </div>
 
-<!-- Close Ticket Modal -->
+<!-- Close Request Modal -->
 <div class="modal fade" id="closeTicketModal" tabindex="-1" aria-labelledby="closeTicketModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title fw-bold" id="closeTicketModalLabel">
-                    <i class="bi bi-x-circle me-2"></i>Close Ticket
+                    <i class="bi bi-x-circle me-2"></i><?= e(label('portal.action.close', 'Close this request')) ?>
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <p class="mb-0">Are you sure you want to close this ticket?</p>
+                <p class="mb-0">Are you sure you want to close this request?</p>
             </div>
             <div class="modal-footer">
                 <form method="POST" action="/portal/tickets/<?= $ticket['id'] ?>/close">
                     <?= csrfField() ?>
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-secondary px-4">
-                        <i class="bi bi-x-circle me-1"></i>Close Ticket
+                        <i class="bi bi-x-circle me-1"></i><?= e(label('portal.action.close', 'Close this request')) ?>
                     </button>
                 </form>
             </div>

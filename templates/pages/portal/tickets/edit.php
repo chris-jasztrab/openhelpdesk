@@ -1,10 +1,10 @@
 <?php
 $layout       = 'app';
-$pageTitle    = 'Edit Ticket #' . $ticket['id'];
+$pageTitle    = 'Edit request #' . $ticket['id'];
 $sidebarItems = portalSidebar('tickets');
 $breadcrumbs  = [
-    ['label' => 'Portal', 'url' => '/portal'],
-    ['label' => 'My Tickets', 'url' => '/portal/tickets'],
+    ['label' => label('portal.nav.help', 'Help'), 'url' => '/portal'],
+    ['label' => label('portal.request.my_plural', 'My Requests'), 'url' => '/portal/tickets'],
     ['label' => '#' . $ticket['id'], 'url' => '/portal/tickets/' . $ticket['id']],
     ['label' => 'Edit'],
 ];
@@ -38,7 +38,7 @@ $breadcrumbs  = [
 [data-bs-theme="dark"] .ck.ck-color-grid__tile:hover { border-color: #fff !important; }
 </style>
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2 class="fw-bold mb-0">Edit Ticket #<?= $ticket['id'] ?></h2>
+    <h2 class="fw-bold mb-0">Edit request #<?= $ticket['id'] ?></h2>
     <a href="/portal/tickets/<?= $ticket['id'] ?>" class="btn btn-sm btn-outline-secondary">
         <i class="bi bi-arrow-left me-1"></i>Back
     </a>

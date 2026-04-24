@@ -1,12 +1,20 @@
 <?php
 $layout       = 'app';
-$pageTitle    = 'Portal';
+$pageTitle    = label('portal.nav.help', 'Help');
 $sidebarItems = portalSidebar('dashboard');
 $breadcrumbs  = [
-    ['label' => 'Portal'],
+    ['label' => label('portal.nav.help', 'Help')],
 ];
 $statusColors = ['open' => 'primary', 'in_progress' => 'warning', 'pending' => 'info', 'waiting_on_customer' => 'warning', 'waiting_on_third_party' => 'dark', 'resolved' => 'success', 'closed' => 'secondary'];
-$statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 'Pending', 'waiting_on_customer' => 'Waiting on Customer', 'waiting_on_third_party' => 'Waiting on Third Party', 'resolved' => 'Resolved', 'closed' => 'Closed'];
+$statusLabels = [
+    'open'                   => label('portal.status.open', 'Submitted'),
+    'in_progress'            => label('portal.status.in_progress', "We're working on it"),
+    'pending'                => label('portal.status.pending', "We're waiting on someone else"),
+    'waiting_on_customer'    => label('portal.status.waiting_on_customer', 'Waiting on you'),
+    'waiting_on_third_party' => label('portal.status.waiting_on_third_party', "We're waiting on someone else"),
+    'resolved'               => label('portal.status.resolved', 'Done'),
+    'closed'                 => label('portal.status.closed', 'Closed'),
+];
 ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
@@ -14,19 +22,19 @@ $statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 
         <p class="text-muted mb-0">How can we help you today?</p>
     </div>
     <a href="/portal/tickets/create" id="tour-portal-new-ticket" class="btn text-white" style="background:var(--ld-primary);">
-        <i class="bi bi-plus-circle me-1"></i>New Ticket
+        <i class="bi bi-plus-circle me-1"></i><?= e(label('portal.action.new', 'New Help Request')) ?>
     </a>
 </div>
 
 <div class="card border-0 shadow-sm mt-4" id="tour-portal-recent">
     <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
-        <h5 class="mb-0 fw-semibold"><i class="bi bi-ticket-detailed me-2"></i>Open Tickets</h5>
+        <h5 class="mb-0 fw-semibold"><i class="bi bi-ticket-detailed me-2"></i><?= e(label('portal.dashboard.recent_tickets', 'Your Active Requests')) ?></h5>
         <a href="/portal/tickets" class="btn btn-sm btn-outline-primary">View All</a>
     </div>
     <?php if (empty($recentTickets)): ?>
     <div class="card-body text-center py-5 text-muted">
         <i class="bi bi-inbox fs-1 d-block mb-2"></i>
-        <p class="mb-0">You have no open tickets. Click "New Ticket" to get started.</p>
+        <p class="mb-0"><?= e(label('portal.no_tickets', 'You have no active requests.')) ?> Click "<?= e(label('portal.action.new', 'New Help Request')) ?>" to get started.</p>
     </div>
     <?php else: ?>
     <div class="table-responsive">

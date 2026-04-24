@@ -244,7 +244,7 @@ $router->post('/portal/tickets/create', function () {
 
     if ($subject === '' || $description === '' || $typeId === null) {
         flashInput($_POST);
-        flash('error', 'Subject, description, and ticket type are required.');
+        flash('error', 'Subject, description, and type are required.');
         redirect('/portal/tickets/create');
     }
 
@@ -379,7 +379,7 @@ $router->post('/portal/tickets/create', function () {
         Sla::initializeForTicket($db, $ticketId, $priorityId, $typeId);
     }
 
-    $msg = 'Ticket #' . $ticketId . ' created successfully.';
+    $msg = 'Help request #' . $ticketId . ' submitted.';
     if (!empty($attachments)) {
         $msg .= ' ' . count($attachments) . ' file(s) attached.';
     }

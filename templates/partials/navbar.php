@@ -33,7 +33,7 @@
                 <?php endif; ?>
                 <li class="nav-item">
                     <a class="nav-link <?= isActive('/portal') ? 'active' : '' ?>" href="/portal">
-                        <i class="bi bi-house me-1"></i>Portal
+                        <i class="bi bi-life-preserver me-1"></i><?= e(label('portal.nav.help', 'Help')) ?>
                     </a>
                 </li>
             </ul>
