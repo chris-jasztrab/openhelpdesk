@@ -7,6 +7,10 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <style>
+        :root {
+            --ld-primary: <?= e(getSetting('branding_primary_color', '#4f46e5')) ?>;
+            --ld-primary-hover: <?= e(getSetting('branding_primary_hover', '#4338ca')) ?>;
+        }
         body {
             min-height: 100vh;
             background: linear-gradient(135deg, <?= e(getSetting('branding_navbar_start', '#1e1b4b')) ?> 0%, <?= e(getSetting('branding_navbar_end', '#312e81')) ?> 50%, <?= e(getSetting('branding_primary_color', '#4f46e5')) ?> 100%);
