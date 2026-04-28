@@ -11,6 +11,22 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.11.0 — 2026-04-28
+
+### Accessibility (AODA / WCAG 2.0 AA — foundational pass)
+- **Skip-to-main-content link** added as the first focusable element in every layout (`base.php`, `app.php`, `public.php`). Auth layout, which is a single-screen with no nav, gets a `<main>` landmark only. Keyboard and screen-reader users can now bypass the navbar and sidebar on every page.
+- **`<main>` landmark** wraps the primary content region of every layout. The agent/admin layout's icon-only sidebar `<nav>` got `aria-label="Section navigation"`; sidebar links got `aria-label`/`aria-current="page"` so screen readers announce the destination instead of just "link". The shared navbar now carries `aria-label="Primary"` and the public help-center navbar matches.
+- **Navbar icon and decorative-element fixes** — the brand `<img>` alt is now empty (the brand name is rendered in the adjacent `<span>`), all decorative Bootstrap Icons (`<i class="bi …">`) inside nav links, dropdown items, alert blocks, and modal titles got `aria-hidden="true"`, and the avatar circle / hamburger toggle got proper `aria-label`s.
+- **Notification bell announces its count** — replaced `title="Notifications"` with `aria-label="Notifications, N unread"` (or "none unread") on initial render and on every poll, so screen-reader users hear the unread count without visiting the page. The numeric badge is now `aria-hidden` since the count lives in the link's accessible name.
+- **Global search box is now a labelled combobox** — both the in-app navbar search and the public KB search got a visually-hidden `<label>`, `role="combobox"`, `aria-expanded` toggling on open/close, `aria-controls`, `aria-autocomplete="list"`, and `aria-haspopup="listbox"`. The results dropdown is `role="listbox"` and tabs in the in-app search now have `role="tab"` + `aria-selected` wired to clicks.
+- **`/` keyboard shortcut tightened** to comply with WCAG 2.1.4 (Character Key Shortcuts): it no longer fires when a `contenteditable` element (CKEditor toolbar focus) is active, and it now bails when any modifier key is held — both common conflict points with screen-reader virtual cursors. Power-user behaviour is unchanged when no input is focused.
+- **Flash messages get explicit live regions** — `role="status"` + `aria-live="polite"` on success/info, `role="alert"` + `aria-live="assertive"` on error, plus `aria-atomic="true"` everywhere so screen readers re-announce the full message instead of just the diff. Dismiss buttons now have `aria-label="Dismiss"`.
+- **`prefers-reduced-motion` honoured** — the bell-ring, bell-glow, and admin tour-pulse animations are disabled, and the filter-panel slide-in is suppressed, when the user has Reduce Motion enabled in their OS. A general `transition`/`animation` clamp catches any other animated elements in the layout. Addresses WCAG 2.3.3 (animation from interactions) and 2.2.2 (pause, stop, hide).
+- **Login form** — added `autocomplete="email"` and `autocomplete="current-password"` to help password managers, marked alert icons `aria-hidden`, and gave the success/error alerts proper live-region semantics. Form labels were already paired correctly via `<label for>`.
+- **Out of scope for this pass (next iteration if requested)**: per-page heading hierarchy, table-header `scope`/`aria-sort` on the agent ticket list, form-level `aria-invalid`/`aria-describedby` for inline errors, CKEditor reply-composer labelling, mention-autocomplete keyboard navigation, color-contrast review of the admin-configurable branding palette, and KB Markdown image alt enforcement.
+
+---
+
 ## 2.10.6 — 2026-04-28
 
 ### Security Hardening

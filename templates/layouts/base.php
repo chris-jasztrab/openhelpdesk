@@ -72,14 +72,32 @@
         [data-bs-theme="dark"] textarea.bg-white,
         [data-bs-theme="dark"] select.bg-white { background-color: var(--bs-body-bg) !important; }
         [data-bs-theme="dark"] .badge.bg-light { border-color: #495057 !important; }
+
+        /* Skip-to-main link (WCAG 2.4.1) */
+        .skip-link {
+            position: absolute; top: -40px; left: 0;
+            background: var(--ld-primary); color: #fff;
+            padding: 8px 16px; text-decoration: none; z-index: 2000;
+            border-radius: 0 0 4px 0; font-weight: 600;
+        }
+        .skip-link:focus { top: 0; color: #fff; outline: 2px solid #fff; outline-offset: -4px; }
+        main:focus { outline: none; }
+
+        /* Respect prefers-reduced-motion (WCAG 2.3.3 / 2.2.2) */
+        @media (prefers-reduced-motion: reduce) {
+            .ld-bell-ring .bi-bell,
+            .ld-bell-active .bi-bell { animation: none !important; }
+            *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+        }
     </style>
 </head>
 <body>
+    <a class="skip-link" href="#main-content">Skip to main content</a>
     <?php require ROOT_DIR . '/templates/partials/navbar.php'; ?>
 
-    <div class="container py-4">
+    <main id="main-content" tabindex="-1" class="container py-4">
         <?php if (!empty($breadcrumbs)): ?>
-        <nav aria-label="breadcrumb">
+        <nav aria-label="Breadcrumb">
             <ol class="breadcrumb">
                 <?php foreach ($breadcrumbs as $crumb): ?>
                     <?php if (isset($crumb['url'])): ?>
@@ -94,7 +112,7 @@
 
         <?php require ROOT_DIR . '/templates/partials/flash.php'; ?>
         <?= $content ?>
-    </div>
+    </main>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>

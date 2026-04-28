@@ -77,7 +77,7 @@ if ($threshold === 'day') {
                 <?= $modalStyle === 'danger' ? 'bg-danger bg-opacity-10' : 'bg-warning bg-opacity-10' ?>">
                 <h5 class="modal-title fw-semibold d-flex align-items-center gap-2" id="secretExpiryModalLabel">
                     <i class="bi <?= $icon ?>
-                        <?= $modalStyle === 'danger' ? 'text-danger' : 'text-warning' ?>"></i>
+                        <?= $modalStyle === 'danger' ? 'text-danger' : 'text-warning' ?>" aria-hidden="true"></i>
                     <?= $title ?>
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -85,14 +85,14 @@ if ($threshold === 'day') {
             <div class="modal-body py-4">
                 <p class="mb-3"><?= $message ?></p>
                 <p class="mb-0 small text-muted">
-                    <i class="bi bi-info-circle me-1"></i>
+                    <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
                     Go to <strong>Azure Portal → App Registration → Certificates &amp; secrets</strong> to create a new secret,
                     then update it under <a href="/admin/settings#graph-secret" class="alert-link">Inbound Mail Settings</a>.
                 </p>
             </div>
             <div class="modal-footer border-0 pt-0">
                 <a href="/admin/settings#graph-secret" class="btn btn-<?= $modalStyle ?> text-white">
-                    <i class="bi bi-gear me-1"></i>Go to Settings
+                    <i class="bi bi-gear me-1" aria-hidden="true"></i>Go to Settings
                 </a>
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
                     Dismiss

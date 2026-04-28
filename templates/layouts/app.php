@@ -287,9 +287,30 @@
             0%   { transform: scale(1);   opacity: .35; }
             75%, 100% { transform: scale(2.2); opacity: 0; }
         }
+
+        /* Skip-to-main link (WCAG 2.4.1) */
+        .skip-link {
+            position: absolute; top: -40px; left: 0;
+            background: var(--ld-primary); color: #fff;
+            padding: 8px 16px; text-decoration: none; z-index: 2000;
+            border-radius: 0 0 4px 0; font-weight: 600;
+        }
+        .skip-link:focus { top: 0; color: #fff; outline: 2px solid #fff; outline-offset: -4px; }
+        main:focus { outline: none; }
+
+        /* Respect prefers-reduced-motion (WCAG 2.3.3 / 2.2.2) */
+        @media (prefers-reduced-motion: reduce) {
+            .ld-bell-ring .bi-bell,
+            .ld-bell-active .bi-bell,
+            .ld-tour-pulse-wrap::before,
+            .ld-tour-pulse-wrap::after { animation: none !important; }
+            .filter-panel { transition: none !important; }
+            *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+        }
     </style>
 </head>
 <body>
+    <a class="skip-link" href="#main-content">Skip to main content</a>
     <?php require ROOT_DIR . '/templates/partials/navbar.php'; ?>
 
     <?php if (Auth::role() === 'admin' && getSetting('show_onboarding', '0') === '1'): ?>
@@ -310,22 +331,24 @@
 
     <!-- Sidebar -->
     <aside class="sidebar">
-        <nav class="nav flex-column">
+        <nav class="nav flex-column" aria-label="Section navigation">
             <?php foreach ($sidebarItems as $item): ?>
             <a class="nav-link <?= ($item['active'] ?? false) ? 'active' : '' ?>"
                href="<?= e($item['url']) ?>"
+               aria-label="<?= e($item['label']) ?>"
+               <?= ($item['active'] ?? false) ? 'aria-current="page"' : '' ?>
                title="<?= e($item['label']) ?>"
                data-bs-toggle="tooltip" data-bs-placement="right">
-                <i class="bi <?= e($item['icon']) ?>"></i>
+                <i class="bi <?= e($item['icon']) ?>" aria-hidden="true"></i>
             </a>
             <?php endforeach; ?>
         </nav>
     </aside>
 
     <!-- Main content -->
-    <div class="main-content">
+    <main id="main-content" tabindex="-1" class="main-content">
         <?php if (!empty($breadcrumbs)): ?>
-        <nav aria-label="breadcrumb" class="mb-3">
+        <nav aria-label="Breadcrumb" class="mb-3">
             <ol class="breadcrumb">
                 <?php foreach ($breadcrumbs as $crumb): ?>
                     <?php if (isset($crumb['url'])): ?>
@@ -341,7 +364,7 @@
         <?php require ROOT_DIR . '/templates/partials/flash.php'; ?>
         <?php if (Auth::check() && Auth::role() === 'admin') require ROOT_DIR . '/templates/partials/secret-expiry-modal.php'; ?>
         <?= $content ?>
-    </div>
+    </main>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function(el){new bootstrap.Tooltip(el)});</script>

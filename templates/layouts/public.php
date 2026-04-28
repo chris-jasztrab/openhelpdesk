@@ -34,28 +34,43 @@
         #pub-search-results a:hover { background: #f8fafc; }
         #pub-search-results .text-muted { font-size: .75rem; }
         .pub-footer { background: #1e293b; color: rgba(255,255,255,.5); font-size: .8rem; padding: 1.5rem 0; margin-top: 3rem; }
+
+        /* Skip-to-main link (WCAG 2.4.1) */
+        .skip-link {
+            position: absolute; top: -40px; left: 0;
+            background: var(--ld-primary); color: #fff;
+            padding: 8px 16px; text-decoration: none; z-index: 2000;
+            border-radius: 0 0 4px 0; font-weight: 600;
+        }
+        .skip-link:focus { top: 0; color: #fff; outline: 2px solid #fff; outline-offset: -4px; }
+        main:focus { outline: none; }
     </style>
 </head>
 <body>
-    <nav class="pub-navbar">
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+    <nav class="pub-navbar" aria-label="Primary">
         <div class="container d-flex align-items-center gap-3">
             <a class="navbar-brand me-3" href="/kb">
-                <i class="bi bi-book me-1"></i><?= e(getSetting('branding_app_name', 'LocalDesk')) ?> Help Center
+                <i class="bi bi-book me-1" aria-hidden="true"></i><?= e(getSetting('branding_app_name', 'LocalDesk')) ?> Help Center
             </a>
 
-            <div class="pub-search-wrap flex-grow-1 position-relative">
+            <div class="pub-search-wrap flex-grow-1 position-relative" role="search">
+                <label for="pubSearchInput" class="visually-hidden">Search knowledge base articles</label>
                 <input type="text" id="pubSearchInput" class="form-control form-control-sm"
-                       placeholder="Search articles…" autocomplete="off">
-                <div id="pub-search-results" style="display:none;"></div>
+                       placeholder="Search articles…" autocomplete="off"
+                       role="combobox" aria-expanded="false"
+                       aria-controls="pub-search-results"
+                       aria-autocomplete="list" aria-haspopup="listbox">
+                <div id="pub-search-results" role="listbox" aria-label="Search results" style="display:none;"></div>
             </div>
 
             <a class="btn-login ms-2" href="/login">Staff Login</a>
         </div>
     </nav>
 
-    <div class="container py-4">
+    <main id="main-content" tabindex="-1" class="container py-4">
         <?php if (!empty($breadcrumbs)): ?>
-        <nav aria-label="breadcrumb" class="mb-3">
+        <nav aria-label="Breadcrumb" class="mb-3">
             <ol class="breadcrumb">
                 <?php foreach ($breadcrumbs as $crumb): ?>
                     <?php if (isset($crumb['url'])): ?>
@@ -69,15 +84,15 @@
         <?php endif; ?>
 
         <?php if (!empty($_SESSION['_flash_success'] ?? null)): ?>
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <div class="alert alert-success alert-dismissible fade show" role="alert" aria-live="polite" aria-atomic="true">
             <?= e($_SESSION['_flash_success']) ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
         <?php unset($_SESSION['_flash_success']); ?>
         <?php endif; ?>
 
         <?= $content ?>
-    </div>
+    </main>
 
     <footer class="pub-footer">
         <div class="container d-flex justify-content-between align-items-center">
@@ -94,29 +109,36 @@
         if (!input) return;
         function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
         let timer;
+        function setOpen(open) {
+            results.style.display = open ? 'block' : 'none';
+            input.setAttribute('aria-expanded', open ? 'true' : 'false');
+        }
         input.addEventListener('input', function () {
             clearTimeout(timer);
             const q = this.value.trim();
-            if (q.length < 2) { results.style.display = 'none'; return; }
+            if (q.length < 2) { setOpen(false); return; }
             timer = setTimeout(function () {
                 fetch('/kb/search?q=' + encodeURIComponent(q))
                     .then(r => r.json())
                     .then(data => {
-                        if (!data.length) { results.style.display = 'none'; return; }
+                        if (!data.length) { setOpen(false); return; }
                         results.innerHTML = data.map(a =>
-                            `<a href="/kb/articles/${encodeURIComponent(a.slug)}">
+                            `<a href="/kb/articles/${encodeURIComponent(a.slug)}" role="option">
                                 <div>${esc(a.title)}</div>
                                 <div class="text-muted">${esc(a.category_name)} › ${esc(a.folder_name)}</div>
                             </a>`
                         ).join('');
-                        results.style.display = 'block';
+                        setOpen(true);
                     });
             }, 250);
         });
         document.addEventListener('click', function (e) {
             if (!input.contains(e.target) && !results.contains(e.target)) {
-                results.style.display = 'none';
+                setOpen(false);
             }
+        });
+        input.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') setOpen(false);
         });
     })();
     </script>

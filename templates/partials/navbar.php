@@ -1,17 +1,18 @@
-<nav class="navbar navbar-expand-lg navbar-dark sticky-top" style="height:var(--ld-navbar-height,56px);">
+<nav class="navbar navbar-expand-lg navbar-dark sticky-top" style="height:var(--ld-navbar-height,56px);" aria-label="Primary">
     <div class="container-fluid">
         <?php $brandLogo = getSetting('branding_logo', ''); $brandName = getSetting('branding_app_name', 'LocalDesk'); $brandIcon = getSetting('branding_navbar_icon', 'bi-headset'); ?>
         <a class="navbar-brand d-flex align-items-center gap-2" href="/">
             <?php if ($brandLogo && file_exists(ROOT_DIR . '/public/uploads/branding/' . $brandLogo)): ?>
-                <img src="/uploads/branding/<?= e($brandLogo) ?>" alt="<?= e($brandName) ?>" style="height:32px;">
+                <img src="/uploads/branding/<?= e($brandLogo) ?>" alt="" style="height:32px;">
             <?php else: ?>
-                <i class="bi <?= e($brandIcon) ?> fs-4"></i>
+                <i class="bi <?= e($brandIcon) ?> fs-4" aria-hidden="true"></i>
             <?php endif; ?>
             <span><?= e($brandName) ?></span>
         </a>
 
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-            <span class="navbar-toggler-icon"></span>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon" aria-hidden="true"></span>
         </button>
 
         <div class="collapse navbar-collapse" id="navbarNav">
@@ -19,46 +20,50 @@
             <ul class="navbar-nav me-auto">
                 <?php if (Auth::role() === 'admin'): ?>
                 <li class="nav-item">
-                    <a class="nav-link <?= isActive('/admin') ? 'active' : '' ?>" href="/admin">
-                        <i class="bi bi-shield-lock me-1"></i>Admin
+                    <a class="nav-link <?= isActive('/admin') ? 'active' : '' ?>" href="/admin" <?= isActive('/admin') ? 'aria-current="page"' : '' ?>>
+                        <i class="bi bi-shield-lock me-1" aria-hidden="true"></i>Admin
                     </a>
                 </li>
                 <?php endif; ?>
                 <?php if (in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)): ?>
                 <li class="nav-item">
-                    <a class="nav-link <?= isActive('/agent') ? 'active' : '' ?>" href="/agent">
-                        <i class="bi bi-headset me-1"></i>Agent Panel
+                    <a class="nav-link <?= isActive('/agent') ? 'active' : '' ?>" href="/agent" <?= isActive('/agent') ? 'aria-current="page"' : '' ?>>
+                        <i class="bi bi-headset me-1" aria-hidden="true"></i>Agent Panel
                     </a>
                 </li>
                 <?php endif; ?>
                 <li class="nav-item">
-                    <a class="nav-link <?= isActive('/portal') ? 'active' : '' ?>" href="/portal">
-                        <i class="bi bi-life-preserver me-1"></i><?= e(label('portal.nav.help', 'Help')) ?>
+                    <a class="nav-link <?= isActive('/portal') ? 'active' : '' ?>" href="/portal" <?= isActive('/portal') ? 'aria-current="page"' : '' ?>>
+                        <i class="bi bi-life-preserver me-1" aria-hidden="true"></i><?= e(label('portal.nav.help', 'Help')) ?>
                     </a>
                 </li>
             </ul>
 
             <!-- Global Search -->
             <div class="position-relative mx-3 flex-grow-1 d-none d-lg-block" style="max-width:420px;" id="ld-search-wrap"
-                 data-role="<?= e(Auth::role() ?? 'user') ?>">
+                 data-role="<?= e(Auth::role() ?? 'user') ?>" role="search">
+                <label for="ld-search-input" class="visually-hidden">Search tickets, contacts, and knowledge base</label>
                 <div class="input-group input-group-sm">
-                    <span class="input-group-text border-0 text-white text-opacity-50" style="background:rgba(255,255,255,.1);">
+                    <span class="input-group-text border-0 text-white text-opacity-50" style="background:rgba(255,255,255,.1);" aria-hidden="true">
                         <i class="bi bi-search"></i>
                     </span>
                     <input type="text" id="ld-search-input" class="form-control form-control-sm border-0 text-white"
                            placeholder="Search... ( / )" autocomplete="off"
+                           role="combobox" aria-expanded="false"
+                           aria-controls="ld-search-results"
+                           aria-autocomplete="list" aria-haspopup="listbox"
                            style="background:rgba(255,255,255,.1);box-shadow:none;">
                 </div>
                 <div id="ld-search-dropdown" class="d-none position-absolute w-100 bg-white rounded-3 shadow-lg mt-1" style="z-index:1055;max-height:420px;overflow-y:auto;">
-                    <div class="d-flex border-bottom px-3 pt-2 gap-1" id="ld-search-tabs">
-                        <button type="button" class="btn btn-sm px-2 py-1 ld-search-tab active" data-type="all">Everything</button>
-                        <button type="button" class="btn btn-sm px-2 py-1 ld-search-tab" data-type="tickets">Tickets</button>
+                    <div class="d-flex border-bottom px-3 pt-2 gap-1" id="ld-search-tabs" role="tablist" aria-label="Search filters">
+                        <button type="button" class="btn btn-sm px-2 py-1 ld-search-tab active" data-type="all" role="tab" aria-selected="true">Everything</button>
+                        <button type="button" class="btn btn-sm px-2 py-1 ld-search-tab" data-type="tickets" role="tab" aria-selected="false">Tickets</button>
                         <?php if (in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)): ?>
-                        <button type="button" class="btn btn-sm px-2 py-1 ld-search-tab" data-type="contacts">Contacts</button>
+                        <button type="button" class="btn btn-sm px-2 py-1 ld-search-tab" data-type="contacts" role="tab" aria-selected="false">Contacts</button>
                         <?php endif; ?>
-                        <button type="button" class="btn btn-sm px-2 py-1 ld-search-tab" data-type="kb">Knowledge Base Articles</button>
+                        <button type="button" class="btn btn-sm px-2 py-1 ld-search-tab" data-type="kb" role="tab" aria-selected="false">Knowledge Base Articles</button>
                     </div>
-                    <div id="ld-search-results" class="p-2">
+                    <div id="ld-search-results" class="p-2" role="listbox" aria-label="Search results">
                         <div class="text-center text-muted py-3 small">Type to search...</div>
                     </div>
                 </div>
@@ -70,10 +75,11 @@
                 if (in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)):
                 ?>
                 <li class="nav-item" id="ld-notif-bell" data-count="<?= $notifCount ?>">
-                    <a class="nav-link position-relative <?= $notifCount > 0 ? 'ld-bell-active' : '' ?>" href="/notifications" title="Notifications">
-                        <i class="bi bi-bell fs-5"></i>
+                    <?php $notifLabel = $notifCount === 0 ? 'Notifications, none unread' : 'Notifications, ' . ($notifCount > 99 ? '99+' : $notifCount) . ' unread'; ?>
+                    <a class="nav-link position-relative <?= $notifCount > 0 ? 'ld-bell-active' : '' ?>" href="/notifications" aria-label="<?= e($notifLabel) ?>">
+                        <i class="bi bi-bell fs-5" aria-hidden="true"></i>
                         <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger <?= $notifCount > 0 ? '' : 'd-none' ?>"
-                              id="ld-notif-badge" style="font-size:.65rem;">
+                              id="ld-notif-badge" style="font-size:.65rem;" aria-hidden="true">
                             <?= $notifCount > 99 ? '99+' : $notifCount ?>
                         </span>
                     </a>
@@ -81,28 +87,30 @@
                 <?php endif; ?>
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle d-flex align-items-center gap-2" href="#"
-                       role="button" data-bs-toggle="dropdown">
+                       role="button" data-bs-toggle="dropdown"
+                       aria-haspopup="true" aria-expanded="false"
+                       aria-label="<?= e(Auth::fullName()) ?> account menu">
                         <div class="rounded-circle bg-light text-dark d-flex align-items-center justify-content-center"
-                             style="width:32px;height:32px;font-size:.85rem;font-weight:600;">
+                             style="width:32px;height:32px;font-size:.85rem;font-weight:600;" aria-hidden="true">
                             <?= Auth::initials() ?>
                         </div>
-                        <span class="d-none d-lg-inline"><?= e(Auth::fullName()) ?></span>
+                        <span class="d-none d-lg-inline" aria-hidden="true"><?= e(Auth::fullName()) ?></span>
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end">
                         <li><span class="dropdown-item-text text-muted small"><?= e(Auth::user()['email'] ?? '') ?></span></li>
                         <li><span class="dropdown-item-text"><span class="badge bg-primary"><?= e(ucfirst(Auth::role() ?? '')) ?></span></span></li>
                         <li><hr class="dropdown-divider"></li>
                         <?php if (Auth::role() === 'admin'): ?>
-                        <li><a class="dropdown-item" href="/admin?tour=1"><i class="bi bi-play-circle me-2"></i>Restart Tour</a></li>
+                        <li><a class="dropdown-item" href="/admin?tour=1"><i class="bi bi-play-circle me-2" aria-hidden="true"></i>Restart Tour</a></li>
                         <?php endif; ?>
                         <?php if (in_array(Auth::role(), ['agent', 'power_user'], true)): ?>
-                        <li><a class="dropdown-item" href="/agent?tour=1"><i class="bi bi-play-circle me-2"></i>Restart Tour</a></li>
+                        <li><a class="dropdown-item" href="/agent?tour=1"><i class="bi bi-play-circle me-2" aria-hidden="true"></i>Restart Tour</a></li>
                         <?php endif; ?>
                         <?php if (Auth::role() === 'user'): ?>
-                        <li><a class="dropdown-item" href="/portal?tour=1"><i class="bi bi-play-circle me-2"></i>Restart Tour</a></li>
+                        <li><a class="dropdown-item" href="/portal?tour=1"><i class="bi bi-play-circle me-2" aria-hidden="true"></i>Restart Tour</a></li>
                         <?php endif; ?>
-                        <li><a class="dropdown-item" href="/profile"><i class="bi bi-person-circle me-2"></i>My Profile</a></li>
-                        <li><a class="dropdown-item text-danger" href="/logout"><i class="bi bi-box-arrow-right me-2"></i>Sign Out</a></li>
+                        <li><a class="dropdown-item" href="/profile"><i class="bi bi-person-circle me-2" aria-hidden="true"></i>My Profile</a></li>
+                        <li><a class="dropdown-item text-danger" href="/logout"><i class="bi bi-box-arrow-right me-2" aria-hidden="true"></i>Sign Out</a></li>
                         <li><hr class="dropdown-divider"></li>
                         <li><span class="dropdown-item-text text-muted" style="font-size:.7rem;">v<?= APP_VERSION ?></span></li>
                     </ul>
@@ -111,7 +119,7 @@
             <?php else: ?>
             <ul class="navbar-nav ms-auto">
                 <li class="nav-item">
-                    <a class="nav-link" href="/login"><i class="bi bi-box-arrow-in-right me-1"></i>Sign In</a>
+                    <a class="nav-link" href="/login"><i class="bi bi-box-arrow-in-right me-1" aria-hidden="true"></i>Sign In</a>
                 </li>
             </ul>
             <?php endif; ?>
@@ -133,7 +141,9 @@
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
                     var n = data.count || 0;
-                    badge.textContent = n > 99 ? '99+' : n;
+                    var display = n > 99 ? '99+' : String(n);
+                    badge.textContent = display;
+                    link.setAttribute('aria-label', n === 0 ? 'Notifications, none unread' : 'Notifications, ' + display + ' unread');
                     if (n > 0) {
                         badge.classList.remove('d-none');
                         link.classList.add('ld-bell-active');
@@ -270,6 +280,12 @@
             });
     }
 
+    function setOpen(open) {
+        if (open) dropdown.classList.remove('d-none');
+        else dropdown.classList.add('d-none');
+        input.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+
     // Debounced input
     input.addEventListener('input', function () {
         clearTimeout(timer);
@@ -278,14 +294,18 @@
 
     // Show dropdown on focus
     input.addEventListener('focus', function () {
-        dropdown.classList.remove('d-none');
+        setOpen(true);
     });
 
     // Tab switching
     tabs.forEach(function (tab) {
         tab.addEventListener('click', function () {
-            tabs.forEach(function (t) { t.classList.remove('active'); });
+            tabs.forEach(function (t) {
+                t.classList.remove('active');
+                t.setAttribute('aria-selected', 'false');
+            });
             tab.classList.add('active');
+            tab.setAttribute('aria-selected', 'true');
             activeType = tab.dataset.type;
             doSearch();
         });
@@ -294,19 +314,25 @@
     // Close on click outside
     document.addEventListener('click', function (e) {
         if (!wrap.contains(e.target)) {
-            dropdown.classList.add('d-none');
+            setOpen(false);
         }
     });
 
     // Close on Escape, focus on /
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') {
-            dropdown.classList.add('d-none');
+            setOpen(false);
             input.blur();
         }
-        if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA' && document.activeElement.tagName !== 'SELECT') {
-            e.preventDefault();
-            input.focus();
+        // WCAG 2.1.4 — only fire single-key shortcut when no input is focused,
+        // no editor (contenteditable) is focused, and no modifier is held.
+        if (e.key === '/' && !e.altKey && !e.ctrlKey && !e.metaKey) {
+            var ae = document.activeElement;
+            var tag = ae && ae.tagName;
+            if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT' && !(ae && ae.isContentEditable)) {
+                e.preventDefault();
+                input.focus();
+            }
         }
     });
 })();

@@ -4,21 +4,21 @@ $pageTitle = 'Sign In';
 ?>
 <div style="max-width:420px;width:100%;">
     <div class="text-center mb-4">
-        <h1 class="text-white fw-bold"><i class="bi <?= e(getSetting('branding_navbar_icon', 'bi-headset')) ?>"></i> <?= e(getSetting('branding_app_name', 'LocalDesk')) ?></h1>
+        <h1 class="text-white fw-bold"><i class="bi <?= e(getSetting('branding_navbar_icon', 'bi-headset')) ?>" aria-hidden="true"></i> <?= e(getSetting('branding_app_name', 'LocalDesk')) ?></h1>
         <p class="text-white-50">Sign in to your account</p>
     </div>
 
     <div class="card shadow-lg border-0" style="border-radius:1rem;">
         <div class="card-body p-4">
             <?php if (!empty($_GET['setup'])): ?>
-            <div class="alert alert-success d-flex align-items-center" role="alert">
-                <i class="bi bi-check-circle-fill me-2"></i>
+            <div class="alert alert-success d-flex align-items-center" role="status" aria-live="polite">
+                <i class="bi bi-check-circle-fill me-2" aria-hidden="true"></i>
                 <span>Setup complete! Sign in with your new admin account.</span>
             </div>
             <?php endif; ?>
             <?php if (!empty($error)): ?>
-            <div class="alert alert-danger d-flex align-items-center" role="alert">
-                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            <div class="alert alert-danger d-flex align-items-center" role="alert" aria-live="assertive">
+                <i class="bi bi-exclamation-triangle-fill me-2" aria-hidden="true"></i>
                 <span><?= e($error) ?></span>
             </div>
             <?php endif; ?>
@@ -29,25 +29,25 @@ $pageTitle = 'Sign In';
                 <div class="mb-3">
                     <label for="email" class="form-label fw-semibold">Email Address</label>
                     <div class="input-group">
-                        <span class="input-group-text"><i class="bi bi-envelope"></i></span>
+                        <span class="input-group-text" aria-hidden="true"><i class="bi bi-envelope"></i></span>
                         <input type="email" class="form-control" id="email" name="email"
                                value="<?= e($email ?? '') ?>" placeholder="you@example.com"
-                               required autofocus>
+                               required autofocus autocomplete="email">
                     </div>
                 </div>
 
                 <div class="mb-4">
                     <label for="password" class="form-label fw-semibold">Password</label>
                     <div class="input-group">
-                        <span class="input-group-text"><i class="bi bi-lock"></i></span>
+                        <span class="input-group-text" aria-hidden="true"><i class="bi bi-lock"></i></span>
                         <input type="password" class="form-control" id="password" name="password"
-                               placeholder="Enter your password" required>
+                               placeholder="Enter your password" required autocomplete="current-password">
                     </div>
                 </div>
 
                 <button type="submit" class="btn w-100 py-2 fw-semibold text-white"
                         style="background-color:var(--ld-primary);border-color:var(--ld-primary);">
-                    <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
+                    <i class="bi bi-box-arrow-in-right me-2" aria-hidden="true"></i>Sign In
                 </button>
             </form>
 
@@ -70,8 +70,8 @@ $pageTitle = 'Sign In';
             <?php endif; ?>
 
             <?php if (!empty($_GET['sso_error'])): ?>
-            <div class="alert alert-danger d-flex align-items-center mt-3 mb-0 py-2 small" role="alert">
-                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            <div class="alert alert-danger d-flex align-items-center mt-3 mb-0 py-2 small" role="alert" aria-live="assertive">
+                <i class="bi bi-exclamation-triangle-fill me-2" aria-hidden="true"></i>
                 <span>
                     <?= match($_GET['sso_error']) {
                         'disabled'     => 'SSO is not currently enabled.',

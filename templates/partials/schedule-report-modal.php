@@ -8,14 +8,14 @@
  */
 ?>
 <!-- Schedule Report Modal -->
-<div class="modal fade" id="scheduleReportModal" tabindex="-1" aria-labelledby="scheduleReportModalLabel">
+<div class="modal fade" id="scheduleReportModal" tabindex="-1" aria-labelledby="scheduleReportModalLabel" aria-modal="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header border-0 pb-0">
                 <h5 class="modal-title fw-semibold" id="scheduleReportModalLabel">
-                    <i class="bi bi-calendar-plus me-2 text-primary"></i>Schedule Report
+                    <i class="bi bi-calendar-plus me-2 text-primary" aria-hidden="true"></i>Schedule Report
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST" action="/admin/settings/scheduled-reports/create" id="scheduleReportForm">
                 <?= csrfField() ?>
@@ -99,7 +99,7 @@
                 <div class="modal-footer border-0 pt-0">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn text-white" style="background:var(--ld-primary);">
-                        <i class="bi bi-calendar-check me-1"></i>Create Schedule
+                        <i class="bi bi-calendar-check me-1" aria-hidden="true"></i>Create Schedule
                     </button>
                 </div>
             </form>
