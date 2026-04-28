@@ -188,6 +188,60 @@ function _apiEnforceTicketAccess(PDO $db, array $user, array $ticket): void
 }
 
 /**
+ * Login throttle.
+ *
+ * Two independent limits on failed attempts inside a 15-minute sliding window:
+ *   - 5 failures for a given email (defends one account from a guesser)
+ *   - 10 failures from a given IP  (defends against credential stuffing across many emails)
+ *
+ * On the first successful login from this IP for this email we wipe the
+ * failed-attempt rows for that pair, so a legitimate user who fat-fingers
+ * the password a couple of times then logs in cleanly is not locked out
+ * for the rest of the window.
+ */
+const _API_LOGIN_WINDOW_MINUTES        = 15;
+const _API_LOGIN_MAX_FAILURES_PER_EMAIL = 5;
+const _API_LOGIN_MAX_FAILURES_PER_IP    = 10;
+
+function _apiLoginThrottleCheck(PDO $db, string $email, string $ip): void
+{
+    $window = _API_LOGIN_WINDOW_MINUTES;
+
+    $byEmail = $db->prepare(
+        "SELECT COUNT(*) FROM login_attempts
+          WHERE email = ? AND succeeded = 0
+            AND attempted_at >= (NOW() - INTERVAL {$window} MINUTE)"
+    );
+    $byEmail->execute([$email]);
+    if ((int) $byEmail->fetchColumn() >= _API_LOGIN_MAX_FAILURES_PER_EMAIL) {
+        _apiJson(['error' => 'Too many failed login attempts. Please try again in a few minutes.'], 429);
+    }
+
+    $byIp = $db->prepare(
+        "SELECT COUNT(*) FROM login_attempts
+          WHERE ip = ? AND succeeded = 0
+            AND attempted_at >= (NOW() - INTERVAL {$window} MINUTE)"
+    );
+    $byIp->execute([$ip]);
+    if ((int) $byIp->fetchColumn() >= _API_LOGIN_MAX_FAILURES_PER_IP) {
+        _apiJson(['error' => 'Too many failed login attempts. Please try again in a few minutes.'], 429);
+    }
+}
+
+function _apiLoginRecordAttempt(PDO $db, string $email, string $ip, bool $succeeded): void
+{
+    $db->prepare(
+        'INSERT INTO login_attempts (email, ip, succeeded) VALUES (?, ?, ?)'
+    )->execute([$email, $ip, $succeeded ? 1 : 0]);
+
+    if ($succeeded) {
+        $db->prepare(
+            'DELETE FROM login_attempts WHERE email = ? AND ip = ? AND succeeded = 0'
+        )->execute([$email, $ip]);
+    }
+}
+
+/**
  * Block API access to confidential tickets for users who are not in the type's group.
  * Call after _apiEnforceTicketAccess().
  */
@@ -229,12 +283,15 @@ $router->post('/api/v1/auth/login', function () {
     $email    = trim($input['email'] ?? '');
     $password = $input['password'] ?? '';
     $device   = trim(substr($input['device_name'] ?? 'Mobile App', 0, 255));
+    $ip       = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 
     if ($email === '' || $password === '') {
         _apiJson(['error' => 'email and password are required'], 422);
     }
 
-    $db   = Database::connect();
+    $db = Database::connect();
+    _apiLoginThrottleCheck($db, $email, $ip);
+
     $stmt = $db->prepare(
         'SELECT id, first_name, last_name, email, password, role, avatar
            FROM users WHERE email = ?'
@@ -243,8 +300,11 @@ $router->post('/api/v1/auth/login', function () {
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$user || !password_verify($password, $user['password'])) {
+        _apiLoginRecordAttempt($db, $email, $ip, false);
         _apiJson(['error' => 'Invalid credentials'], 401);
     }
+
+    _apiLoginRecordAttempt($db, $email, $ip, true);
 
     $token     = bin2hex(random_bytes(32)); // 64-char hex — returned to client, never stored
     $tokenHash = hash('sha256', $token);
