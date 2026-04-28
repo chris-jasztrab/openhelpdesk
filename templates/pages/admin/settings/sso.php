@@ -84,7 +84,8 @@ $redirectUri = appUrl() . '/auth/microsoft/callback';
                 </label>
                 <div class="input-group">
                     <input type="password" class="form-control font-monospace" id="sso_client_secret" name="sso_client_secret"
-                           value="<?= e($ssoClientSecret ?? '') ?>"
+                           value=""
+                           autocomplete="new-password"
                            placeholder="<?= ($ssoClientSecret ?? '') !== '' ? '••••••••••••••••' : 'Paste secret value here' ?>">
                     <button type="button" class="btn btn-outline-secondary"
                             onclick="var f=document.getElementById('sso_client_secret');f.type=f.type==='password'?'text':'password';">

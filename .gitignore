@@ -18,5 +18,7 @@ kb_articles.csv
 .phpunit.result.cache
 test-results*.txt
 
-# Rescue script — never commit a live copy to the repo
+# Rescue script — canonical copy lives in scripts/admin/rescue.php.
+# Never commit a working copy at the webroot or project root.
 /public/rescue.php
+/rescue.php

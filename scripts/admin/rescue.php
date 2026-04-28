@@ -2,9 +2,17 @@
 /**
  * LocalDesk — Account Rescue Script
  *
- * DROP THIS FILE in the public/ directory of your LocalDesk installation,
- * visit  http://yoursite/rescue.php  in a browser, make your changes,
- * then DELETE THIS FILE immediately.
+ * Canonical location: scripts/admin/rescue.php (NOT web-accessible).
+ *
+ * To use:
+ *   1. COPY this file into the public/ directory of your installation
+ *      (`cp scripts/admin/rescue.php public/rescue.php`).
+ *   2. Visit http://yoursite/rescue.php in a browser and make your changes.
+ *   3. DELETE the copy in public/ immediately afterwards
+ *      (`rm public/rescue.php`). It is unauthenticated by design.
+ *
+ * `/public/rescue.php` is gitignored so a working copy can never be
+ * committed by accident. This canonical copy lives outside the webroot.
  *
  * This script is intentionally standalone — it does not use the app's
  * framework so it works even when the app itself is broken.
