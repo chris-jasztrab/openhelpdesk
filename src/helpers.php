@@ -738,10 +738,24 @@ function sendMail(string $toEmail, string $toName, string $subject, string $html
         }
 
         if ($smtpDebugEnabled) {
-            $mail->SMTPDebug  = \PHPMailer\PHPMailer\SMTP::DEBUG_SERVER;
-            $mail->Debugoutput = function (string $str, int $level) use ($smtpLogFile): void {
+            // Trust model for the SMTP debug log:
+            //   - Stays at DEBUG_SERVER. At this level PHPMailer's SMTP::client_send()
+            //     replaces AUTH LOGIN / AUTH PLAIN / XOAUTH2 payloads with the literal
+            //     string "[credentials hidden]" (vendor/phpmailer/phpmailer/src/SMTP.php).
+            //     Bumping this to DEBUG_LOWLEVEL would defeat that and write the
+            //     base64-encoded credentials to disk — DO NOT raise it.
+            //   - As a belt-and-braces measure we also scrub the configured password
+            //     literal from every debug line, in case a misbehaving server ever
+            //     echoes it back in a banner, error, or response trailer.
+            $mail->SMTPDebug = \PHPMailer\PHPMailer\SMTP::DEBUG_SERVER;
+            $passwordForRedaction = $password;
+            $mail->Debugoutput = function (string $str, int $level) use ($smtpLogFile, $passwordForRedaction): void {
+                $line = trim($str);
+                if ($passwordForRedaction !== '') {
+                    $line = str_replace($passwordForRedaction, '[redacted]', $line);
+                }
                 file_put_contents($smtpLogFile,
-                    '[' . date('H:i:s') . '][L' . $level . '] ' . trim($str) . "\n",
+                    '[' . date('H:i:s') . '][L' . $level . '] ' . $line . "\n",
                     FILE_APPEND | LOCK_EX);
             };
         }
