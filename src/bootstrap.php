@@ -42,6 +42,31 @@ session_set_cookie_params([
 ]);
 session_start();
 
+// Baseline security response headers. Set before any output so they apply to
+// every response (HTML, JSON, redirects). CSP is intentionally permissive
+// enough for the current Bootstrap-from-CDN + inline-handler templates; tighten
+// once those are migrated to nonces or local assets.
+if (!headers_sent()) {
+    header('X-Frame-Options: DENY');
+    header('X-Content-Type-Options: nosniff');
+    header('Referrer-Policy: strict-origin-when-cross-origin');
+    header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
+    if ($isHttps) {
+        header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
+    }
+    header(
+        "Content-Security-Policy: default-src 'self'; "
+      . "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+      . "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+      . "font-src 'self' data: https://cdn.jsdelivr.net; "
+      . "img-src 'self' data: blob:; "
+      . "connect-src 'self'; "
+      . "frame-ancestors 'none'; "
+      . "base-uri 'self'; "
+      . "form-action 'self'"
+    );
+}
+
 // Create router, load routes, dispatch
 $router = new Router();
 require ROOT_DIR . '/src/routes.php';

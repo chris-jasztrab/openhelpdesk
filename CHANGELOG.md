@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.10.2 — 2026-04-28
+
+### Security Hardening
+- **Baseline HTTP security response headers** — `src/bootstrap.php` now emits `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` (geolocation/microphone/camera disabled), `Strict-Transport-Security` (when the request is HTTPS), and a baseline `Content-Security-Policy` (`default-src 'self'`, scripts/styles limited to `'self'` + the jsDelivr CDN we already load Bootstrap from, `frame-ancestors 'none'`, `form-action 'self'`, `base-uri 'self'`). The CSP currently permits `'unsafe-inline'` for scripts and styles to accommodate existing inline event handlers and styles in templates; this can be tightened to a nonce-based policy in a follow-up. Closes the clickjacking and MIME-sniffing exposure surfaced by a security review — the rest of the baseline (CSRF, prepared statements, `password_hash`, `session_regenerate_id`, `HttpOnly`/`SameSite=Lax`/`Secure` cookies, `htmlspecialchars`-based output encoding, MIME-whitelisted out-of-webroot uploads, SHA-256-hashed API tokens) was already in place.
+
+---
+
 ## 2.10.1 — 2026-04-27
 
 ### Bug Fixes
