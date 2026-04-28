@@ -735,9 +735,16 @@ $router->post('/api/v1/tickets', function () {
         notifyRequesterTicketAssigned($db, $ticketId, $assignedTo);
     }
 
-    // Return the new ticket with joins
+    // Return the new ticket with joins.
+    // Columns are enumerated rather than t.* so that any future ticket column
+    // (e.g. an internal-only flag) doesn't auto-leak through the API.
     $stmt = $db->prepare(
-        "SELECT t.*, tp.name AS priority_name, tp.color AS priority_color,
+        "SELECT t.id, t.subject, t.description, t.legacy_id, t.browser_info, t.os_info,
+                t.created_by, t.created_at, t.due_date, t.type_id, t.location_id,
+                t.status, t.priority_id, t.assigned_to, t.escalation_level, t.group_id,
+                t.first_response_due_at, t.resolution_due_at, t.first_responded_at,
+                t.sla_state, t.sla_paused_at, t.updated_at, t.merged_into_ticket_id,
+                tp.name AS priority_name, tp.color AS priority_color,
                 tt.name AS type_name, l.name AS location_name, g.name AS group_name,
                 CONCAT(c.first_name, ' ', c.last_name) AS creator_name,
                 CONCAT(a.first_name, ' ', a.last_name) AS agent_name
@@ -768,8 +775,14 @@ $router->get('/api/v1/tickets/{id}', function (array $p) {
     $db       = Database::connect();
     $ticketId = (int) $p['id'];
 
+    // Columns are enumerated rather than t.* so that any future ticket column
+    // (e.g. an internal-only flag) doesn't auto-leak through the API.
     $stmt = $db->prepare(
-        "SELECT t.*,
+        "SELECT t.id, t.subject, t.description, t.legacy_id, t.browser_info, t.os_info,
+                t.created_by, t.created_at, t.due_date, t.type_id, t.location_id,
+                t.status, t.priority_id, t.assigned_to, t.escalation_level, t.group_id,
+                t.first_response_due_at, t.resolution_due_at, t.first_responded_at,
+                t.sla_state, t.sla_paused_at, t.updated_at, t.merged_into_ticket_id,
                 tp.name AS priority_name, tp.color AS priority_color,
                 tt.name AS type_name,
                 l.name  AS location_name,
@@ -865,6 +878,8 @@ $router->post('/api/v1/tickets/{id}/update', function (array $p) {
     $ticketId = (int) $p['id'];
     $userId   = (int) $user['id'];
 
+    // Internal-only fetch — drives access checks and old-vs-new comparisons.
+    // Never returned to the client; the response is the {updated:[...]} list at the bottom.
     $stmt = $db->prepare('SELECT * FROM tickets WHERE id = ?');
     $stmt->execute([$ticketId]);
     $ticket = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -1098,6 +1113,8 @@ $router->post('/api/v1/tickets/{id}/replies', function (array $p) {
     $ticketId = (int) $p['id'];
     $userId   = (int) $user['id'];
 
+    // Internal-only fetch — drives access checks and SLA/first-response logic.
+    // Never returned to the client; the response is the timeline row built below.
     $tStmt = $db->prepare('SELECT * FROM tickets WHERE id = ?');
     $tStmt->execute([$ticketId]);
     $ticket = $tStmt->fetch(PDO::FETCH_ASSOC);
@@ -1177,9 +1194,12 @@ $router->post('/api/v1/tickets/{id}/replies', function (array $p) {
         notifyWatchers($db, $ticketId, $message, $authorName);
     }
 
-    // Return the created timeline entry
+    // Return the created timeline entry. Columns are enumerated to match
+    // GET /api/v1/tickets/{id}/timeline so any future timeline column doesn't
+    // auto-leak through this endpoint.
     $stmt = $db->prepare(
-        "SELECT tl.*, u.first_name, u.last_name, u.email, u.avatar
+        "SELECT tl.id, tl.action, tl.details, tl.is_internal, tl.created_at, tl.user_id,
+                u.first_name, u.last_name, u.email, u.avatar
            FROM ticket_timeline tl
            LEFT JOIN users u ON tl.user_id = u.id
           WHERE tl.id = ?"
