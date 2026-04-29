@@ -32,8 +32,18 @@
                     </a>
                 </li>
                 <?php endif; ?>
+                <?php
+                $_role = Auth::role();
+                if ($_role === 'admin') {
+                    $_helpUrl = '/admin/docs';
+                } elseif (in_array($_role, ['agent', 'power_user'], true)) {
+                    $_helpUrl = '/agent/help';
+                } else {
+                    $_helpUrl = '/portal';
+                }
+                ?>
                 <li class="nav-item">
-                    <a class="nav-link <?= isActive('/portal') ? 'active' : '' ?>" href="/portal" <?= isActive('/portal') ? 'aria-current="page"' : '' ?>>
+                    <a class="nav-link <?= isActive($_helpUrl) ? 'active' : '' ?>" href="<?= e($_helpUrl) ?>" <?= isActive($_helpUrl) ? 'aria-current="page"' : '' ?>>
                         <i class="bi bi-life-preserver me-1" aria-hidden="true"></i><?= e(label('portal.nav.help', 'Help')) ?>
                     </a>
                 </li>

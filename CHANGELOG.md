@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.14.1 — 2026-04-29
+
+### Fixes
+- **Navbar "Help" link is now role-aware.** The plain-language portal rename in 2.13 / f0e5955 ("Portal" → "Help") was applied globally, so admins and agents who clicked Help got dropped onto the patron-facing portal instead of staff documentation. Help now routes to `/admin/docs` for admins, `/agent/help` for agents and power users, and `/portal` for end users (unchanged — this is the patron support screen by design).
+
+---
+
 ## 2.13.0 — 2026-04-29
 
 ### Features
