@@ -11,6 +11,18 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.12.1 — 2026-04-29
+
+### Documentation
+- **Help docs caught up with the last 19 days of feature work.** Previously the in-app docs at `/admin/docs/*` lagged behind 22 user-facing commits dating back to 2026-04-10. Updated:
+  - **Automations & Escalations** (`automations.php`) — restructured into five clearly-distinct sections (Automation Rules, Group Auto-Assignment, Escalation Rules, Manual Escalation Paths, Stale Ticket Notifications) so admins stop conflating the four time/skill/event/manual systems. New full coverage of the 5 auto-assign strategies (manual / round-robin / load-based / skill-based / first-available) and their fallback behaviour, the per-ticket-type escalation chain that drives the Escalate button (skip-current-assignee logic, watcher exemption, distinction from time-based rules), and the stale-ticket cron with global + per-type thresholds and dedup window. Replaced the misleading "Escalate stale tickets" example that was actually about unassigned tickets.
+  - **User Portal** (`portal.php`) — documented the plain-language vocabulary translation (Help Requests / Submitted / We're working on it), the requester self-escalation button (with owner check), the new Escalated-L# badge on portal list rows + ticket detail, the "What happens next?" callout for newly-submitted requests, and the requester-side submit-ack and assignment-notification emails. Pointed admins at `/admin/settings/labels` for label customisation.
+  - **Tickets** (`tickets.php`) — added Escalating a Ticket card explaining the red Escalate button and where to configure paths, a new card describing the lighter location-visibility opt-out flag with a comparison table against the heavier `is_confidential` flow, and a per-type stale-threshold note linking back to the stale-tickets section.
+  - **Users & Roles** (`users.php`) — new Agent Skills card (catalogue management, mapping to agents, required-skills-per-type, future manager-delegation note), new Agent Availability card explaining the `is_available` toggle and which strategies read it, added auto-assignment cross-link inside the existing Groups section, and added the requester-side "My ticket assigned to an agent" preference to the notification table.
+  - **Docs index search** (`index.php`) — added 24 new keyword entries so search lands on the right anchor for skills, availability, auto-assign strategies, manual escalation paths, stale-ticket settings, requester escalation, and the location-visibility opt-out.
+
+---
+
 ## 2.12.0 — 2026-04-29
 
 ### Features

@@ -139,6 +139,33 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
     <li>When creating or editing a ticket, assign it to a group so the right agents can see it.</li>
     <li>To give an agent unrestricted access to all tickets without making them an admin, remove them from all groups.</li>
 </ol>
+<div class="alert alert-info small mt-3 mb-0"><i class="bi bi-info-circle me-2"></i>
+    Each group also has an <strong>Auto-Assignment Strategy</strong> for routing new tickets to a specific member (Round Robin, Load-Based, Skill-Based, First Available). See <a href="/admin/docs/automations#group-auto-assign" class="alert-link">Group Auto-Assignment</a> for the full breakdown.
+</div>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-mortarboard text-primary me-2"></i>Agent Skills</h5>
+<p class="text-muted mb-2"><strong>Skills</strong> are admin-managed labels (e.g. "Billing", "Network", "French", "Cataloguing") that agents can hold. They drive the <a href="/admin/docs/automations#group-auto-assign">Skill-Based</a> auto-assignment strategy: when a new ticket arrives in a group whose strategy is Skill-Based, only members whose skills cover every skill required by the ticket type are eligible.</p>
+<p class="text-muted mb-2"><strong>Manage the catalogue</strong> at <a href="/admin/skills"><strong>Admin → Settings → Agent Skills</strong></a>. Each skill has a name, optional description, and sort order. From the skill editor you can also tick which agents hold the skill.</p>
+<p class="text-muted mb-2"><strong>Required skills per ticket type</strong> are configured on the Ticket Type form. A ticket type can require zero, one, or several skills.</p>
+<div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
+    Today, only admins can create skills and decide which agents hold them. A future release will let group managers maintain skills for their own team without admin involvement.
+</div>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-toggle-on text-primary me-2"></i>Agent Availability</h5>
+<p class="text-muted mb-2">Each agent / power user / admin has an <strong>"I'm available for new tickets"</strong> toggle on their My Profile page. It defaults to on and is read by the <a href="/admin/docs/automations#group-auto-assign">First Available</a> auto-assignment strategy only.</p>
+<ul class="text-muted mb-0">
+    <li>Flipping yourself off-duty stops First Available from routing new tickets to you. The other strategies (Round Robin, Load-Based, Skill-Based) ignore the flag.</li>
+    <li>Direct manual assignment is never blocked by the flag — a colleague can still assign you a ticket if they choose.</li>
+    <li>Use it for shift changes, breaks, vacation cover, or follow-the-sun rotations. There is no scheduled-on/scheduled-off; the flag is a manual switch.</li>
+</ul>
 </div>
 </div>
 
@@ -276,9 +303,10 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <table class="table table-sm mb-0">
     <thead class="table-light"><tr><th>Preference</th><th>Email sent when…</th></tr></thead>
     <tbody class="text-muted">
-        <tr><td><strong>New ticket assigned to me</strong></td><td>A ticket is assigned to the user.</td></tr>
+        <tr><td><strong>New ticket assigned to me</strong></td><td>A ticket is assigned to the user (agent-side).</td></tr>
         <tr><td><strong>Ticket updated</strong></td><td>A public reply is added to a ticket they are involved with.</td></tr>
         <tr><td><strong>@mentioned in a note</strong></td><td>Another agent @mentions them in an internal note or reply.</td></tr>
+        <tr><td><strong>My ticket assigned to an agent</strong></td><td>(Requester-side) Their submitted ticket has been picked up — the email tells them who is handling it.</td></tr>
     </tbody>
 </table>
 </div>

@@ -217,6 +217,50 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-arrow-up-right-circle text-danger me-2"></i>Escalating a Ticket</h5>
+<p class="text-muted mb-2">A red <strong>Escalate</strong> button on the ticket view reassigns the ticket to the next agent in its ticket type's escalation path (the previous assignee stays on as a watcher). The button is hidden for ticket types that don't have a path configured.</p>
+<ul class="text-muted mb-3">
+    <li><strong>Where to configure</strong> — <a href="/admin/settings/escalation-paths"><strong>Admin → Settings → Escalation Paths</strong></a>. Each ticket type has its own ordered chain.</li>
+    <li><strong>Who can escalate</strong> — agents, power users, and admins on any ticket they can access; portal users on their own tickets.</li>
+    <li><strong>Skip-current-assignee logic</strong> — if the current assignee already appears in the path (they <em>are</em> Tier 2), Escalate jumps to the step after them rather than re-routing to an earlier level.</li>
+    <li><strong>Tracking</strong> — escalated tickets show on the agent dashboard's "Escalated to Me" card and on a dedicated ticket-list filter.</li>
+</ul>
+<p class="text-muted mb-0">See the <a href="/admin/docs/automations#escalation-paths">Automations doc</a> for full configuration guidance and how this differs from the time-based <a href="/admin/docs/automations#escalation-rules">Escalation Rules</a>.</p>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-eye-slash text-primary me-2"></i>Hiding a Type from Location-Visibility Users</h5>
+<p class="text-muted mb-2">Each ticket type has a <strong>Visible to Location Ticket Visibility users</strong> checkbox. By default it's on, matching pre-2.x behaviour. Unchecking it hides every ticket of that type from portal users who have the <a href="/admin/docs/users">Location Ticket Visibility</a> permission, while still letting agents and admins work on the queue normally.</p>
+<p class="text-muted mb-2">This is the lighter alternative to <strong>Confidential</strong> ticket types (described below). Use it for routine-but-sensitive types like Collections, HR, or Payroll where you simply don't want supervisors / branch leads to see the contents — without invoking the heavier confidential flow (group lock, re-authentication, audit log, email alerts).</p>
+<div class="table-responsive mb-0">
+<table class="table table-sm mb-0">
+    <thead class="table-light"><tr><th>Flag</th><th>What it does</th></tr></thead>
+    <tbody class="text-muted">
+        <tr>
+            <td><strong>Visible to Location Ticket Visibility</strong> <span class="badge bg-secondary ms-1">light</span></td>
+            <td>Hides the type from portal users with the location-visibility permission. No effect on agents / admins. No re-auth or email notification overhead.</td>
+        </tr>
+        <tr>
+            <td><strong>Confidential</strong> <span class="badge bg-warning text-dark ms-1">strict</span></td>
+            <td>Locks tickets to a specific group, redacts them for non-group admins, requires password re-auth + audit log + email notification when an outside admin views one. See below.</td>
+        </tr>
+    </tbody>
+</table>
+</div>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-hourglass-split text-warning me-2"></i>Per-Type Stale Threshold</h5>
+<p class="text-muted mb-0">Each ticket type can override the global stale-notification threshold. Leave the override blank to inherit the value set under <a href="/admin/settings/stale-tickets">Stale Tickets</a>; set a number to use that instead for tickets of this type. Useful when, say, "Critical Outage" tickets should nag after 4 hours but "Suggestion Box" tickets shouldn't nag at all (set to a high value or disable globally). See the <a href="/admin/docs/automations#stale-tickets">Stale Ticket Notifications</a> section for the full picture.</p>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-shield-lock text-primary me-2"></i>Confidential Ticket Types</h5>
 <p class="text-muted mb-2">Ticket types can be marked as <strong>Confidential</strong> to restrict access to sensitive tickets (e.g., HR, Legal). This feature ensures that only authorised group members can view the ticket details.</p>
 
