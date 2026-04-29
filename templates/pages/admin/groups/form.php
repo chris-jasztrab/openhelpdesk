@@ -104,6 +104,58 @@ $roleColors = ['admin' => 'danger', 'agent' => 'primary'];
 
             <hr class="my-4">
 
+            <div class="mb-3">
+                <label class="form-label fw-semibold">
+                    <i class="bi bi-shuffle me-1"></i>Auto-Assignment Strategy
+                </label>
+                <p class="text-muted small mb-2">When a ticket is routed to this group without an assignee, pick an agent automatically using one of these strategies.</p>
+                <?php
+                $strategy = old('assign_strategy', (string) ($editing['assign_strategy'] ?? 'manual'));
+                $strategies = [
+                    'manual'          => ['Manual',          'bi-hand-index',     'Leave the ticket unassigned. Agents claim it themselves.'],
+                    'round_robin'     => ['Round Robin',     'bi-arrow-repeat',   'Rotate sequentially through group members so the count of tickets is distributed evenly.'],
+                    'load_based'      => ['Load-Based',      'bi-bar-chart',      'Pick the member with the fewest open tickets. Best when work items vary in length.'],
+                    'skill_based'     => ['Skill-Based',     'bi-mortarboard',    'Pick a member whose skills cover every skill required by the ticket type. Configure skills under Settings → Agent Skills, and required skills on each Ticket Type.'],
+                    'first_available' => ['First Available', 'bi-toggle-on',      'Pick a member who has marked themselves Available on their profile. Useful for shift coverage.'],
+                ];
+                ?>
+                <div class="row g-2">
+                    <?php foreach ($strategies as $val => [$label, $icon, $desc]): ?>
+                    <div class="col-md-6">
+                        <div class="form-check border rounded p-2 ps-4 h-100">
+                            <input class="form-check-input" type="radio" name="assign_strategy"
+                                   value="<?= e($val) ?>" id="strategy_<?= e($val) ?>"
+                                   <?= $strategy === $val ? 'checked' : '' ?>>
+                            <label class="form-check-label w-100" for="strategy_<?= e($val) ?>">
+                                <span class="fw-semibold"><i class="bi <?= e($icon) ?> me-1"></i><?= e($label) ?></span>
+                                <span class="d-block text-muted small"><?= e($desc) ?></span>
+                            </label>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+
+            <div class="mb-3" id="fallbackRow">
+                <label for="assign_fallback" class="form-label fw-semibold">If no agent matches</label>
+                <select class="form-select" id="assign_fallback" name="assign_fallback" style="max-width:280px;">
+                    <?php
+                    $fallback = old('assign_fallback', (string) ($editing['assign_fallback'] ?? 'load_based'));
+                    $fallbackOptions = [
+                        'load_based'  => 'Pick the least-loaded member',
+                        'round_robin' => 'Rotate via round-robin',
+                        'none'        => 'Leave the ticket unassigned',
+                    ];
+                    foreach ($fallbackOptions as $val => $label):
+                    ?>
+                    <option value="<?= e($val) ?>" <?= $fallback === $val ? 'selected' : '' ?>><?= e($label) ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <div class="form-text">Used when Skill-Based finds nobody with the required skills, or First Available finds nobody marked available.</div>
+            </div>
+
+            <hr class="my-4">
+
             <div class="d-flex gap-2">
                 <button type="submit" class="btn text-white" style="background:var(--ld-primary);">
                     <i class="bi bi-check-lg me-1"></i><?= $isEdit ? 'Update Group' : 'Create Group' ?>
@@ -113,6 +165,23 @@ $roleColors = ['admin' => 'danger', 'agent' => 'primary'];
         </form>
     </div>
 </div>
+
+<script>
+(function () {
+    var fallbackRow = document.getElementById('fallbackRow');
+    if (!fallbackRow) return;
+    function syncFallbackVisibility() {
+        var sel = document.querySelector('input[name="assign_strategy"]:checked');
+        var v = sel ? sel.value : 'manual';
+        var needs = (v === 'skill_based' || v === 'first_available');
+        fallbackRow.style.display = needs ? '' : 'none';
+    }
+    document.querySelectorAll('input[name="assign_strategy"]').forEach(function (r) {
+        r.addEventListener('change', syncFallbackVisibility);
+    });
+    syncFallbackVisibility();
+})();
+</script>
 
 <!-- Confirm-add-to-confidential-group modal -->
 <div class="modal fade" id="confidentialAddModal" tabindex="-1" aria-labelledby="confidentialAddModalLabel" aria-hidden="true">

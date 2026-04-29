@@ -100,6 +100,33 @@ $action = $isEdit ? "/admin/types/{$editing['id']}/edit" : '/admin/types/create'
                 </div>
             </div>
 
+            <div class="mb-3">
+                <label class="form-label fw-semibold">
+                    <i class="bi bi-mortarboard me-1"></i>Required Skills
+                </label>
+                <?php if (empty($skills)): ?>
+                    <div class="alert alert-info py-2 mb-0 small">
+                        No skills defined yet. <a href="/admin/skills/create">Create a skill</a> if you want to use Skill-Based routing for this ticket type.
+                    </div>
+                <?php else: ?>
+                    <div class="row g-2">
+                        <?php foreach ($skills as $sk): ?>
+                        <div class="col-md-6">
+                            <div class="form-check border rounded p-2 ps-4">
+                                <input class="form-check-input" type="checkbox" name="required_skills[]"
+                                       value="<?= $sk['id'] ?>" id="rskill_<?= $sk['id'] ?>"
+                                       <?= in_array((int) $sk['id'], $requiredSkillIds, true) ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="rskill_<?= $sk['id'] ?>"><?= e($sk['name']) ?></label>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <div class="form-text">
+                        Used by groups whose auto-assign strategy is <strong>Skill-Based</strong>. A new ticket of this type will only be auto-assigned to a group member who has every checked skill. Leave all unchecked to let any group member receive these tickets under skill-based routing (the strategy then falls back to the group's configured fallback).
+                    </div>
+                <?php endif; ?>
+            </div>
+
             <hr class="my-4">
 
             <div class="d-flex gap-2">

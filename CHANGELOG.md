@@ -11,6 +11,27 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.12.0 — 2026-04-29
+
+### Features
+- **Auto-assign tickets to a group's members** — each Group now has an Auto-Assignment Strategy (Settings → Groups → Edit). A new ticket that arrives with a group set but no assignee runs the group's strategy:
+  - **Round Robin** — rotate sequentially through group members. Distribution is even by ticket *count* and remembers the last picked agent on `groups.assign_last_user_id`.
+  - **Load-Based** — pick the member with the fewest open (non-resolved/closed) tickets. Best when work items vary in length.
+  - **Skill-Based** — pick a member whose declared skills cover every skill required by the ticket type. Configure the global skill list under Settings → Agent Skills, attach skills to agents on the same screen, and mark required skills on each Ticket Type form. Falls back to the group's configured fallback (load-based / round-robin / leave unassigned) when nobody qualifies.
+  - **First Available** — pick a member who has flipped the new "I'm available for new tickets" switch on their profile. Useful for shift / follow-the-sun coverage. Same fallback chain as Skill-Based.
+  - **Manual** (default) — preserves today's behaviour: ticket is left unassigned for an agent to claim.
+  
+  Wiring details: portal-created tickets now inherit `group_id` from `ticket_types.group_id` (which already drove confidentiality / which-agents-can-be-assigned, but wasn't being copied to the ticket itself). Auto-assign fires from the portal `POST /portal/tickets/create` path, the API `POST /api/v1/tickets` path, and from the agent / admin "split ticket" paths whenever the assignee is left blank but a group is set. Auto-assignments are recorded as an internal timeline entry ("Auto-assigned to NAME via STRATEGY"), and the standard "ticket assigned" emails go out to the chosen agent and to the requester. Direct manual assignment is unaffected.
+  
+- **Agent Skills** — new `agent_skills` table + admin CRUD at Settings → Agent Skills. Each skill carries a name + description and is mapped to agents (`user_skill_map`) and to ticket types (`ticket_type_skill_map`). Only used by the Skill-Based strategy today; can be repurposed later for routing rules / search filters.
+
+- **Agent availability flag** — new `users.is_available` toggle on the My Profile page (agents / admins / power users only). Defaults to on. Only the First Available strategy reads it; round-robin, load-based, and skill-based ignore it so flipping yourself "away" doesn't break direct assignment from elsewhere.
+
+### Database
+- Migration **025** adds `groups.assign_strategy` / `assign_last_user_id` / `assign_fallback`, `users.is_available`, and the `agent_skills`, `user_skill_map`, `ticket_type_skill_map` tables. Idempotent (guarded column adds + `CREATE TABLE IF NOT EXISTS`).
+
+---
+
 ## 2.11.0 — 2026-04-28
 
 ### Accessibility (AODA / WCAG 2.0 AA — foundational pass)

@@ -1049,8 +1049,10 @@ $router->get('/admin/types', function () {
 
 $router->get('/admin/types/create', function () {
     Auth::requireRole('admin');
-    $groups = Database::connect()->query('SELECT id, name FROM `groups` ORDER BY sort_order, name')->fetchAll();
-    render('admin/types/form', ['editing' => null, 'groups' => $groups]);
+    $db     = Database::connect();
+    $groups = $db->query('SELECT id, name FROM `groups` ORDER BY sort_order, name')->fetchAll();
+    $skills = $db->query('SELECT id, name FROM agent_skills ORDER BY sort_order, name')->fetchAll();
+    render('admin/types/form', ['editing' => null, 'groups' => $groups, 'skills' => $skills, 'requiredSkillIds' => []]);
 });
 
 $router->post('/admin/types/create', function () {
@@ -1067,13 +1069,22 @@ $router->post('/admin/types/create', function () {
     $showToLocVis   = !empty($_POST['show_to_location_visibility']) ? 1 : 0;
     $staleRaw       = trim((string) ($_POST['stale_threshold_hours'] ?? ''));
     $staleHours     = $staleRaw === '' ? null : max(0, (int) $staleRaw);
+    $skillIds       = array_filter(array_map('intval', (array) ($_POST['required_skills'] ?? [])));
     if ($name === '') {
         flashInput($_POST);
         flash('error', 'Type name is required.');
         redirect('/admin/types/create');
     }
-    Database::connect()->prepare('INSERT INTO ticket_types (name, color, group_id, is_confidential, show_to_location_visibility, sort_order, stale_threshold_hours) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    $db = Database::connect();
+    $db->prepare('INSERT INTO ticket_types (name, color, group_id, is_confidential, show_to_location_visibility, sort_order, stale_threshold_hours) VALUES (?, ?, ?, ?, ?, ?, ?)')
         ->execute([$name, $color, $groupId, $isConfidential, $showToLocVis, $order, $staleHours]);
+    $typeId = (int) $db->lastInsertId();
+    if ($skillIds) {
+        $stmt = $db->prepare('INSERT IGNORE INTO ticket_type_skill_map (ticket_type_id, skill_id) VALUES (?, ?)');
+        foreach ($skillIds as $sid) {
+            $stmt->execute([$typeId, $sid]);
+        }
+    }
     flash('success', 'Ticket type created.');
     redirect('/admin/types');
 });
@@ -1089,7 +1100,11 @@ $router->get('/admin/types/{id}/edit', function (array $p) {
         redirect('/admin/types');
     }
     $groups = $db->query('SELECT id, name FROM `groups` ORDER BY sort_order, name')->fetchAll();
-    render('admin/types/form', ['editing' => $editing, 'groups' => $groups]);
+    $skills = $db->query('SELECT id, name FROM agent_skills ORDER BY sort_order, name')->fetchAll();
+    $rsStmt = $db->prepare('SELECT skill_id FROM ticket_type_skill_map WHERE ticket_type_id = ?');
+    $rsStmt->execute([(int) $p['id']]);
+    $requiredSkillIds = array_map('intval', $rsStmt->fetchAll(PDO::FETCH_COLUMN));
+    render('admin/types/form', ['editing' => $editing, 'groups' => $groups, 'skills' => $skills, 'requiredSkillIds' => $requiredSkillIds]);
 });
 
 $router->post('/admin/types/{id}/edit', function (array $p) {
@@ -1171,6 +1186,16 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
 
     $db->prepare('UPDATE ticket_types SET name=?, color=?, group_id=?, is_confidential=?, show_to_location_visibility=?, sort_order=?, stale_threshold_hours=? WHERE id=?')
         ->execute([$name, $color, $groupId, $isConfidential, $showToLocVis, $order, $staleHours, $id]);
+
+    // Required skills (used by Skill-Based group auto-assignment)
+    $skillIds = array_filter(array_map('intval', (array) ($_POST['required_skills'] ?? [])));
+    $db->prepare('DELETE FROM ticket_type_skill_map WHERE ticket_type_id = ?')->execute([$id]);
+    if ($skillIds) {
+        $sStmt = $db->prepare('INSERT IGNORE INTO ticket_type_skill_map (ticket_type_id, skill_id) VALUES (?, ?)');
+        foreach ($skillIds as $sid) {
+            $sStmt->execute([$id, $sid]);
+        }
+    }
 
     // Confidential flag removal: audit log + notify all group members
     if ($wasConfidential && !$isConfidential && $priorGroupId) {
@@ -1467,9 +1492,14 @@ $router->post('/admin/groups/create', function () {
     $notifyNew      = isset($_POST['notify_new_ticket']) ? 1 : 0;
     $isConfidential = isset($_POST['is_confidential']) ? 1 : 0;
 
+    $allowedStrategies = ['manual','round_robin','load_based','skill_based','first_available'];
+    $assignStrategy = in_array($_POST['assign_strategy'] ?? '', $allowedStrategies, true) ? $_POST['assign_strategy'] : 'manual';
+    $allowedFallbacks = ['round_robin','load_based','none'];
+    $assignFallback = in_array($_POST['assign_fallback'] ?? '', $allowedFallbacks, true) ? $_POST['assign_fallback'] : 'load_based';
+
     $db = Database::connect();
-    $db->prepare('INSERT INTO `groups` (name, description, sort_order, notify_new_ticket, is_confidential) VALUES (?, ?, ?, ?, ?)')
-        ->execute([$name, $desc, $order, $notifyNew, $isConfidential]);
+    $db->prepare('INSERT INTO `groups` (name, description, sort_order, notify_new_ticket, is_confidential, assign_strategy, assign_fallback) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        ->execute([$name, $desc, $order, $notifyNew, $isConfidential, $assignStrategy, $assignFallback]);
     $groupId = (int) $db->lastInsertId();
 
     // Assign members
@@ -1651,8 +1681,13 @@ $router->post('/admin/groups/{id}/edit', function (array $p) {
         redirect("/admin/groups/{$id}/edit");
     }
 
-    $db->prepare('UPDATE `groups` SET name=?, description=?, sort_order=?, notify_new_ticket=?, is_confidential=? WHERE id=?')
-        ->execute([$name, $desc, $order, $notifyNew, $isConfidential, $id]);
+    $allowedStrategies = ['manual','round_robin','load_based','skill_based','first_available'];
+    $assignStrategy = in_array($_POST['assign_strategy'] ?? '', $allowedStrategies, true) ? $_POST['assign_strategy'] : 'manual';
+    $allowedFallbacks = ['round_robin','load_based','none'];
+    $assignFallback = in_array($_POST['assign_fallback'] ?? '', $allowedFallbacks, true) ? $_POST['assign_fallback'] : 'load_based';
+
+    $db->prepare('UPDATE `groups` SET name=?, description=?, sort_order=?, notify_new_ticket=?, is_confidential=?, assign_strategy=?, assign_fallback=? WHERE id=?')
+        ->execute([$name, $desc, $order, $notifyNew, $isConfidential, $assignStrategy, $assignFallback, $id]);
 
     // Sync members: delete existing, insert new
     $db->prepare('DELETE FROM group_user_map WHERE group_id = ?')->execute([$id]);
@@ -1766,6 +1801,141 @@ $router->post('/admin/groups/{id}/delete', function (array $p) {
     $db->prepare('DELETE FROM `groups` WHERE id = ?')->execute([$id]);
     flash('success', 'Group deleted.');
     redirect('/admin/groups');
+});
+
+/* ==================================================================
+ * ADMIN – Agent Skills
+ *
+ * Skills back the "Skill-Based" group auto-assignment strategy. Each
+ * skill is a tag (e.g. "Billing", "Network", "French"). Agents declare
+ * which skills they hold; ticket types declare which skills they
+ * require. Routing picks group members whose skill set covers every
+ * required skill.
+ * ================================================================== */
+
+$router->get('/admin/skills', function () {
+    Auth::requireRole('admin');
+    $db = Database::connect();
+    $skills = $db->query(
+        "SELECT s.*,
+                COALESCE(uc.cnt, 0) AS agent_count,
+                COALESCE(tc.cnt, 0) AS type_count
+         FROM agent_skills s
+         LEFT JOIN (SELECT skill_id, COUNT(*) AS cnt FROM user_skill_map GROUP BY skill_id) uc ON uc.skill_id = s.id
+         LEFT JOIN (SELECT skill_id, COUNT(*) AS cnt FROM ticket_type_skill_map GROUP BY skill_id) tc ON tc.skill_id = s.id
+         ORDER BY s.sort_order, s.name"
+    )->fetchAll();
+    render('admin/skills/index', ['skills' => $skills]);
+});
+
+$router->get('/admin/skills/create', function () {
+    Auth::requireRole('admin');
+    $users = Database::connect()->query(
+        "SELECT id, first_name, last_name, role FROM users WHERE role IN ('agent','admin','power_user') ORDER BY first_name, last_name"
+    )->fetchAll();
+    render('admin/skills/form', ['editing' => null, 'users' => $users, 'memberIds' => []]);
+});
+
+$router->post('/admin/skills/create', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/skills/create');
+    }
+    $name  = trim($_POST['name'] ?? '');
+    $desc  = trim($_POST['description'] ?? '');
+    $order = (int) ($_POST['sort_order'] ?? 0);
+    if ($name === '') {
+        flashInput($_POST);
+        flash('error', 'Skill name is required.');
+        redirect('/admin/skills/create');
+    }
+    $db = Database::connect();
+    try {
+        $db->prepare('INSERT INTO agent_skills (name, description, sort_order) VALUES (?, ?, ?)')
+           ->execute([$name, $desc !== '' ? $desc : null, $order]);
+    } catch (PDOException $e) {
+        flash('error', str_contains($e->getMessage(), 'Duplicate entry') ? 'A skill with that name already exists.' : 'Database error.');
+        flashInput($_POST);
+        redirect('/admin/skills/create');
+    }
+    $skillId = (int) $db->lastInsertId();
+    $userIds = array_filter(array_map('intval', (array) ($_POST['members'] ?? [])));
+    if ($userIds) {
+        $stmt = $db->prepare('INSERT INTO user_skill_map (user_id, skill_id) VALUES (?, ?)');
+        foreach ($userIds as $uid) {
+            $stmt->execute([$uid, $skillId]);
+        }
+    }
+    flash('success', 'Skill created.');
+    redirect('/admin/skills');
+});
+
+$router->get('/admin/skills/{id}/edit', function (array $p) {
+    Auth::requireRole('admin');
+    $db = Database::connect();
+    $stmt = $db->prepare('SELECT * FROM agent_skills WHERE id = ?');
+    $stmt->execute([(int) $p['id']]);
+    $editing = $stmt->fetch();
+    if (!$editing) {
+        flash('error', 'Skill not found.');
+        redirect('/admin/skills');
+    }
+    $users = $db->query(
+        "SELECT id, first_name, last_name, role FROM users WHERE role IN ('agent','admin','power_user') ORDER BY first_name, last_name"
+    )->fetchAll();
+    $mStmt = $db->prepare('SELECT user_id FROM user_skill_map WHERE skill_id = ?');
+    $mStmt->execute([(int) $p['id']]);
+    $memberIds = array_map('intval', $mStmt->fetchAll(PDO::FETCH_COLUMN));
+    render('admin/skills/form', ['editing' => $editing, 'users' => $users, 'memberIds' => $memberIds]);
+});
+
+$router->post('/admin/skills/{id}/edit', function (array $p) {
+    Auth::requireRole('admin');
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect("/admin/skills/{$id}/edit");
+    }
+    $name  = trim($_POST['name'] ?? '');
+    $desc  = trim($_POST['description'] ?? '');
+    $order = (int) ($_POST['sort_order'] ?? 0);
+    if ($name === '') {
+        flashInput($_POST);
+        flash('error', 'Skill name is required.');
+        redirect("/admin/skills/{$id}/edit");
+    }
+    $db = Database::connect();
+    try {
+        $db->prepare('UPDATE agent_skills SET name = ?, description = ?, sort_order = ? WHERE id = ?')
+           ->execute([$name, $desc !== '' ? $desc : null, $order, $id]);
+    } catch (PDOException $e) {
+        flash('error', str_contains($e->getMessage(), 'Duplicate entry') ? 'A skill with that name already exists.' : 'Database error.');
+        flashInput($_POST);
+        redirect("/admin/skills/{$id}/edit");
+    }
+    $userIds = array_filter(array_map('intval', (array) ($_POST['members'] ?? [])));
+    $db->prepare('DELETE FROM user_skill_map WHERE skill_id = ?')->execute([$id]);
+    if ($userIds) {
+        $stmt = $db->prepare('INSERT INTO user_skill_map (user_id, skill_id) VALUES (?, ?)');
+        foreach ($userIds as $uid) {
+            $stmt->execute([$uid, $id]);
+        }
+    }
+    flash('success', 'Skill updated.');
+    redirect('/admin/skills');
+});
+
+$router->post('/admin/skills/{id}/delete', function (array $p) {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/skills');
+    }
+    $id = (int) $p['id'];
+    Database::connect()->prepare('DELETE FROM agent_skills WHERE id = ?')->execute([$id]);
+    flash('success', 'Skill deleted.');
+    redirect('/admin/skills');
 });
 
 /* ==================================================================
@@ -2490,6 +2660,10 @@ $router->post('/admin/tickets/create', function () {
     )->execute([$subject, $desc, $createdBy, $typeId, $locationId, $status, $priId, $assignedTo, $groupId, $dueDate]);
     $ticketId = (int) $db->lastInsertId();
 
+    if ($assignedTo === null && $groupId !== null) {
+        autoAssignTicket($db, $ticketId);
+    }
+
     // Tags
     if (!empty($tagNames)) {
         $findTag   = $db->prepare('SELECT id FROM ticket_tags WHERE name = ?');
@@ -3163,6 +3337,10 @@ $router->post('/admin/tickets/{id}/split', function (array $p) {
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
         )->execute([$subject, $desc, Auth::id(), $typeId, $sourceTicket['location_id'], 'open', $priId, $assignTo, $groupId]);
         $newId = (int) $db->lastInsertId();
+
+        if ($assignTo === null && $groupId !== null) {
+            autoAssignTicket($db, $newId);
+        }
 
         // Timeline entry on new ticket
         $db->prepare(

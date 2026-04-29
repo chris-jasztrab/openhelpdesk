@@ -488,6 +488,213 @@ function setSetting(string $key, string $value): void
     )->execute([$key, $value]);
 }
 
+/* ── Auto-assignment helpers ──────────────────────────────────── */
+
+/**
+ * Pick an agent for a ticket using the strategy configured on the ticket's group.
+ *
+ * Called from the portal/agent ticket-create paths after the row is inserted.
+ * Returns the chosen user_id and updates `tickets.assigned_to` + writes a
+ * timeline entry; returns null when nothing changes (no group, group set to
+ * 'manual', or the strategy + fallback found no eligible agent).
+ *
+ * Strategies:
+ *   round_robin     — rotate sequentially through group members; remembers the
+ *                     last picked agent on `groups.assign_last_user_id`.
+ *   load_based      — pick the member with the fewest open tickets
+ *                     (status NOT IN resolved/closed). Ties broken by user_id.
+ *   skill_based     — pick a member whose skills cover every skill required by
+ *                     the ticket type. Ties broken by load. Falls back to the
+ *                     group's assign_fallback when no member qualifies.
+ *   first_available — pick a member with users.is_available = 1, load-balanced.
+ *                     Falls back to assign_fallback when nobody is available.
+ *
+ * Only agent / admin / power_user group members are considered — portal-role
+ * users in a group are ignored. The eligible pool intentionally ignores the
+ * is_available flag for round_robin and load_based; flipping that flag should
+ * only affect the "first_available" strategy. Skill-based requires the skill
+ * match but does NOT also require availability — a configurable combination
+ * is a follow-up.
+ */
+function autoAssignTicket(PDO $db, int $ticketId): ?int
+{
+    $tStmt = $db->prepare(
+        'SELECT t.id, t.group_id, t.assigned_to, t.type_id,
+                g.assign_strategy, g.assign_last_user_id, g.assign_fallback
+         FROM tickets t
+         LEFT JOIN `groups` g ON t.group_id = g.id
+         WHERE t.id = ?'
+    );
+    $tStmt->execute([$ticketId]);
+    $ticket = $tStmt->fetch();
+    if (!$ticket || $ticket['group_id'] === null || $ticket['assigned_to'] !== null) {
+        return null;
+    }
+
+    $strategy = $ticket['assign_strategy'] ?? 'manual';
+    if ($strategy === 'manual') {
+        return null;
+    }
+
+    $groupId = (int) $ticket['group_id'];
+    $typeId  = $ticket['type_id'] !== null ? (int) $ticket['type_id'] : null;
+
+    $members = _autoAssignGroupMembers($db, $groupId);
+    if (empty($members)) {
+        return null;
+    }
+
+    $picked = null;
+    if ($strategy === 'round_robin') {
+        $picked = _autoAssignRoundRobin($members, $ticket['assign_last_user_id'] !== null ? (int) $ticket['assign_last_user_id'] : null);
+    } elseif ($strategy === 'load_based') {
+        $picked = _autoAssignLeastLoaded($db, $members);
+    } elseif ($strategy === 'skill_based') {
+        $picked = _autoAssignBySkill($db, $members, $typeId);
+    } elseif ($strategy === 'first_available') {
+        $picked = _autoAssignFirstAvailable($db, $members);
+    }
+
+    if ($picked === null) {
+        $fallback = $ticket['assign_fallback'] ?? 'load_based';
+        if ($fallback === 'round_robin') {
+            $picked = _autoAssignRoundRobin($members, $ticket['assign_last_user_id'] !== null ? (int) $ticket['assign_last_user_id'] : null);
+        } elseif ($fallback === 'load_based') {
+            $picked = _autoAssignLeastLoaded($db, $members);
+        }
+    }
+
+    if ($picked === null) {
+        return null;
+    }
+
+    $db->prepare('UPDATE tickets SET assigned_to = ? WHERE id = ?')->execute([$picked, $ticketId]);
+    $db->prepare('UPDATE `groups` SET assign_last_user_id = ? WHERE id = ?')->execute([$picked, $groupId]);
+
+    $nameStmt = $db->prepare('SELECT first_name, last_name FROM users WHERE id = ?');
+    $nameStmt->execute([$picked]);
+    $u = $nameStmt->fetch();
+    $agentName = $u ? trim($u['first_name'] . ' ' . $u['last_name']) : "User #{$picked}";
+    $strategyLabel = [
+        'round_robin'     => 'round-robin',
+        'load_based'      => 'least-loaded',
+        'skill_based'     => 'skill match',
+        'first_available' => 'first available',
+    ][$strategy] ?? $strategy;
+
+    $db->prepare(
+        'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, ?, ?, 1)'
+    )->execute([
+        $ticketId,
+        'auto_assigned',
+        "Auto-assigned to {$agentName} via {$strategyLabel}.",
+    ]);
+
+    return (int) $picked;
+}
+
+/**
+ * Internal: returns sorted list of [id => int] for agent/admin/power_user
+ * group members, ordered by user_id so round-robin picks are deterministic.
+ */
+function _autoAssignGroupMembers(PDO $db, int $groupId): array
+{
+    $stmt = $db->prepare(
+        "SELECT u.id
+         FROM group_user_map gum
+         JOIN users u ON gum.user_id = u.id
+         WHERE gum.group_id = ? AND u.role IN ('agent','admin','power_user')
+         ORDER BY u.id"
+    );
+    $stmt->execute([$groupId]);
+    return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+}
+
+function _autoAssignRoundRobin(array $members, ?int $lastUserId): ?int
+{
+    if (empty($members)) {
+        return null;
+    }
+    if ($lastUserId === null) {
+        return $members[0];
+    }
+    $idx = array_search($lastUserId, $members, true);
+    if ($idx === false) {
+        return $members[0];
+    }
+    return $members[($idx + 1) % count($members)];
+}
+
+function _autoAssignLeastLoaded(PDO $db, array $members): ?int
+{
+    if (empty($members)) {
+        return null;
+    }
+    $placeholders = implode(',', array_fill(0, count($members), '?'));
+    $stmt = $db->prepare(
+        "SELECT u.id, COALESCE(c.cnt, 0) AS open_count
+         FROM users u
+         LEFT JOIN (
+             SELECT assigned_to, COUNT(*) AS cnt
+             FROM tickets
+             WHERE assigned_to IN ($placeholders)
+               AND status NOT IN ('resolved','closed')
+             GROUP BY assigned_to
+         ) c ON c.assigned_to = u.id
+         WHERE u.id IN ($placeholders)
+         ORDER BY open_count ASC, u.id ASC
+         LIMIT 1"
+    );
+    $stmt->execute(array_merge($members, $members));
+    $row = $stmt->fetch();
+    return $row ? (int) $row['id'] : null;
+}
+
+function _autoAssignBySkill(PDO $db, array $members, ?int $typeId): ?int
+{
+    if (empty($members) || $typeId === null) {
+        return null;
+    }
+    $reqStmt = $db->prepare('SELECT skill_id FROM ticket_type_skill_map WHERE ticket_type_id = ?');
+    $reqStmt->execute([$typeId]);
+    $required = array_map('intval', $reqStmt->fetchAll(PDO::FETCH_COLUMN));
+    if (empty($required)) {
+        return null;
+    }
+    $mPlace = implode(',', array_fill(0, count($members), '?'));
+    $sPlace = implode(',', array_fill(0, count($required), '?'));
+    $stmt = $db->prepare(
+        "SELECT user_id
+         FROM user_skill_map
+         WHERE user_id IN ($mPlace) AND skill_id IN ($sPlace)
+         GROUP BY user_id
+         HAVING COUNT(DISTINCT skill_id) = ?"
+    );
+    $stmt->execute(array_merge($members, $required, [count($required)]));
+    $eligible = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    if (empty($eligible)) {
+        return null;
+    }
+    return _autoAssignLeastLoaded($db, $eligible);
+}
+
+function _autoAssignFirstAvailable(PDO $db, array $members): ?int
+{
+    if (empty($members)) {
+        return null;
+    }
+    $placeholders = implode(',', array_fill(0, count($members), '?'));
+    $stmt = $db->prepare(
+        "SELECT id FROM users WHERE id IN ($placeholders) AND is_available = 1 ORDER BY id"
+    );
+    $stmt->execute($members);
+    $available = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    if (empty($available)) {
+        return null;
+    }
+    return _autoAssignLeastLoaded($db, $available);
+}
+
 /* ── Timezone helpers ─────────────────────────────────────────── */
 
 /**

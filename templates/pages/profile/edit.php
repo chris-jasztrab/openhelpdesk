@@ -44,6 +44,28 @@ $breadcrumbs = [
                 </div>
             </div>
 
+            <?php if (in_array($user['role'], ['agent', 'admin', 'power_user'], true)): ?>
+            <!-- Availability (drives "First Available" group auto-assign) -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-transparent fw-semibold">
+                    <i class="bi bi-toggle-on me-1"></i>Availability
+                </div>
+                <div class="card-body">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch"
+                               id="is_available" name="is_available" value="1"
+                               <?= !empty($profileUser['is_available'] ?? 1) ? 'checked' : '' ?>>
+                        <label class="form-check-label fw-semibold" for="is_available">
+                            I'm available for new tickets
+                        </label>
+                    </div>
+                    <div class="form-text">
+                        When this is on, groups configured for the <strong>First Available</strong> auto-assign strategy can route new tickets to you. Turn it off when you're on break, in a meeting, or out of office. Direct assignments and the other strategies (round-robin, load-based, skill-based) are unaffected.
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+
             <!-- Appearance -->
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-transparent fw-semibold">

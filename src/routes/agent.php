@@ -1251,6 +1251,12 @@ $router->post('/agent/tickets/{id}/split', function (array $p) {
         )->execute([$subject, $desc, Auth::id(), $typeId, $sourceTicket['location_id'], 'open', $priId, $assignTo, $groupId]);
         $newId = (int) $db->lastInsertId();
 
+        // If the agent left the assignee blank but picked a group, run the
+        // group's auto-assign strategy. No-op when assignTo is already set.
+        if ($assignTo === null && $groupId !== null) {
+            autoAssignTicket($db, $newId);
+        }
+
         // Timeline entry on new ticket
         $db->prepare(
             'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'

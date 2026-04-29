@@ -706,6 +706,17 @@ $router->post('/api/v1/tickets', function () {
         }
     }
 
+    // For portal-role API callers (no group permission), inherit group from
+    // ticket type so the auto-assign helper has somewhere to route to.
+    if ($groupId === null && $typeId !== null) {
+        $gStmt = $db->prepare('SELECT group_id FROM ticket_types WHERE id = ?');
+        $gStmt->execute([$typeId]);
+        $gid = $gStmt->fetchColumn();
+        if ($gid) {
+            $groupId = (int) $gid;
+        }
+    }
+
     $db->prepare(
         'INSERT INTO tickets
              (subject, description, created_by, status, type_id, priority_id,
@@ -726,6 +737,13 @@ $router->post('/api/v1/tickets', function () {
     // Initialise SLA if priority is set
     if ($priorityId) {
         Sla::initializeForTicket($db, $ticketId, $priorityId, $typeId);
+    }
+
+    if ($assignedTo === null && $groupId !== null) {
+        $picked = autoAssignTicket($db, $ticketId);
+        if ($picked !== null) {
+            $assignedTo = $picked;
+        }
     }
 
     // Send confirmation email to requester and notify assignee if one was chosen

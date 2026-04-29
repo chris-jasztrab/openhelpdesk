@@ -29,16 +29,27 @@ $breadcrumbs  = [
                     <th>Name</th>
                     <th>Description</th>
                     <th>Members</th>
+                    <th>Auto-Assign</th>
                     <th>Sort Order</th>
                     <th>Created</th>
                     <th style="width:110px">Actions</th>
                 </tr>
             </thead>
             <tbody>
+                <?php
+                $strategyLabels = [
+                    'manual'          => ['Manual',          'secondary'],
+                    'round_robin'     => ['Round Robin',     'info'],
+                    'load_based'      => ['Load-Based',      'info'],
+                    'skill_based'     => ['Skill-Based',     'info'],
+                    'first_available' => ['First Available', 'info'],
+                ];
+                ?>
                 <?php if (empty($groups)): ?>
-                <tr><td colspan="6" class="text-center py-4 text-muted">No groups found.</td></tr>
+                <tr><td colspan="7" class="text-center py-4 text-muted">No groups found.</td></tr>
                 <?php else: ?>
                     <?php foreach ($groups as $g): ?>
+                    <?php [$sLabel, $sColor] = $strategyLabels[$g['assign_strategy'] ?? 'manual'] ?? ['Manual', 'secondary']; ?>
                     <tr>
                         <td class="fw-semibold">
                             <i class="bi bi-people-fill text-muted me-1"></i><?= e($g['name']) ?>
@@ -49,6 +60,9 @@ $breadcrumbs  = [
                         <td class="text-muted small" style="max-width:300px;"><?= e($g['description'] ? mb_strimwidth($g['description'], 0, 80, '...') : '—') ?></td>
                         <td>
                             <span class="badge bg-primary bg-opacity-10 text-primary"><?= (int) $g['member_count'] ?> member<?= (int) $g['member_count'] !== 1 ? 's' : '' ?></span>
+                        </td>
+                        <td>
+                            <span class="badge bg-<?= e($sColor) ?> bg-opacity-10 text-<?= e($sColor) ?>"><?= e($sLabel) ?></span>
                         </td>
                         <td class="text-muted"><?= (int) $g['sort_order'] ?></td>
                         <td class="text-muted small"><?= date('M j, Y', strtotime($g['created_at'])) ?></td>

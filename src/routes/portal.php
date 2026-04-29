@@ -239,8 +239,22 @@ $router->post('/portal/tickets/create', function () {
         $locationId = $profileLocationId;
     }
 
-    // Assignment is handled by agents/admins, not portal users
+    // Assignment is handled by agents/admins, not portal users.
+    // The auto-assign helper (called after INSERT) may pick an agent based on
+    // the destination group's strategy; until then leave unassigned.
     $assignedTo = null;
+
+    // Derive group from the ticket type so the auto-assign helper has a
+    // group to consult. Portal users never pick a group directly.
+    $groupId = null;
+    if ($typeId !== null) {
+        $gStmt = $db->prepare('SELECT group_id FROM ticket_types WHERE id = ?');
+        $gStmt->execute([$typeId]);
+        $gid = $gStmt->fetchColumn();
+        if ($gid) {
+            $groupId = (int) $gid;
+        }
+    }
 
     if ($subject === '' || $description === '' || $typeId === null) {
         flashInput($_POST);
@@ -286,15 +300,19 @@ $router->post('/portal/tickets/create', function () {
     }
 
     $stmt = $db->prepare(
-        'INSERT INTO tickets (subject, description, browser_info, os_info, created_by, type_id, location_id, status, priority_id, assigned_to)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        'INSERT INTO tickets (subject, description, browser_info, os_info, created_by, type_id, location_id, status, priority_id, assigned_to, group_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     );
     $stmt->execute([
         $subject, $description,
         $browserInfo ?: null, $osInfo ?: null,
-        Auth::id(), $typeId, $locationId, 'open', $priorityId, $assignedTo,
+        Auth::id(), $typeId, $locationId, 'open', $priorityId, $assignedTo, $groupId,
     ]);
     $ticketId = (int) $db->lastInsertId();
+
+    // Strategy-based auto-assignment. No-op when the group's strategy is
+    // 'manual' or no group was derived from the ticket type.
+    $autoAssignedTo = autoAssignTicket($db, $ticketId);
 
     // Attach tags (create if they don't exist)
     if (!empty($tagNames)) {
@@ -373,6 +391,13 @@ $router->post('/portal/tickets/create', function () {
 
     // Notify group members watching new tickets
     notifyGroupMembers($db, $ticketId);
+
+    // If auto-assignment picked an agent, send the standard "ticket assigned"
+    // notifications so the chosen agent and the requester are in the loop.
+    if ($autoAssignedTo !== null) {
+        notifyAssignedAgent($db, $ticketId, $autoAssignedTo);
+        notifyRequesterTicketAssigned($db, $ticketId, $autoAssignedTo);
+    }
 
     // Initialize SLA timers if priority is set and SLA is configured
     if ($priorityId) {

@@ -15,6 +15,7 @@ $settingsNavGroups = [
         ['label' => 'Priorities',             'url' => '/admin/priorities', 'icon' => 'bi-flag'],
         ['label' => 'Ticket Types',           'url' => '/admin/types',      'icon' => 'bi-tags'],
         ['label' => 'Groups',                 'url' => '/admin/groups',     'icon' => 'bi-people-fill'],
+        ['label' => 'Agent Skills',           'url' => '/admin/skills',     'icon' => 'bi-mortarboard'],
     ],
     'Security' => [
         ['label' => 'SSO / Microsoft 365', 'url' => '/admin/settings/sso', 'icon' => 'bi-shield-lock'],

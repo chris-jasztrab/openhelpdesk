@@ -1357,6 +1357,14 @@ $router->post('/profile', function () {
     $theme = in_array($_POST['theme'] ?? '', ['light', 'dark'], true) ? $_POST['theme'] : 'light';
     setSetting('ui_theme:' . $userId, $theme);
 
+    // Availability flag (only meaningful for agents/admins/power users; the
+    // form only exposes the toggle to those roles, but we accept submissions
+    // from any authenticated user to keep the handler simple).
+    if (in_array(Auth::role(), ['agent', 'admin', 'power_user'], true)) {
+        $isAvailable = isset($_POST['is_available']) ? 1 : 0;
+        $db->prepare('UPDATE users SET is_available = ? WHERE id = ?')->execute([$isAvailable, $userId]);
+    }
+
     // Save notification preferences
     $db->prepare(
         'UPDATE users SET
