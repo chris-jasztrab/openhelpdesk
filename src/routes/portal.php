@@ -310,9 +310,9 @@ $router->post('/portal/tickets/create', function () {
     ]);
     $ticketId = (int) $db->lastInsertId();
 
-    // Strategy-based auto-assignment. No-op when the group's strategy is
-    // 'manual' or no group was derived from the ticket type.
-    $autoAssignedTo = autoAssignTicket($db, $ticketId);
+    // AI classification (if enabled & non-confidential type) + strategy-based
+    // auto-assignment. Both no-op cleanly when their preconditions aren't met.
+    $autoAssignedTo = runPostTicketCreateHooks($db, $ticketId);
 
     // Attach tags (create if they don't exist)
     if (!empty($tagNames)) {

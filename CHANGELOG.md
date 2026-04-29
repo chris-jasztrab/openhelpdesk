@@ -11,6 +11,29 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.15.0 — 2026-04-29
+
+### Features
+- **AI ticket classification (Phase 1).** Each new ticket can now be read by a large language model that infers which agent skills it needs, lets the existing Skill-Based auto-assign machinery route it accordingly, and (optionally) bumps priority when sentiment reads "angry" or "urgent". Pluggable provider — ships with Anthropic Claude (default `claude-haiku-4-5`) and OpenAI (default `gpt-4o-mini`). Settings page at `Admin → Settings → AI Classification`.
+  - **Provider abstraction** in `src/AI.php`: `AIClassifier` interface + `AnthropicClassifier` (Messages API) + `OpenAIClassifier` (Chat Completions with `response_format=json_object`) + `AIClassifierFactory`. Both providers send the same system prompt and emit the same verdict shape: `skill_ids`, `confidence`, `sentiment`, `reasoning`, `latency_ms`, plus prompt/output token counts. `SoftAIException` + a centralised cURL wrapper means the feature degrades cleanly on any failure.
+  - **Auto-populated model dropdowns.** The settings page lists models from each provider's `/v1/models` endpoint and caches them in the `settings` table. Admin clicks **Refresh model list** and new releases appear without a code change. Built-in fallback options are always present so a fresh install isn't empty.
+  - **Test connection** button per-provider sends a 1-skill probe ticket and reports the round-trip latency.
+  - **New `ai_skill_based` group strategy.** Reads `tickets.ai_classification_id` (set eagerly during ticket creation), takes the AI's suggested `skill_ids` if `confidence ≥ ai_confidence_threshold` (default 0.7), and assigns the least-loaded group member who holds all of them. Below threshold or no match → falls through to the group's existing fallback (load-based / round-robin / leave unassigned). An admin override on the ticket wins over the AI suggestion.
+  - **Eager classify-on-create, even for non-AI strategies.** A new `runPostTicketCreateHooks()` chokepoint replaces the direct `autoAssignTicket()` calls in every creation path (portal, admin, agent, API, email-to-ticket). This means sentiment-driven priority bumps fire whether or not the destination group is on `ai_skill_based`.
+  - **Privacy is non-negotiable.** Ticket types marked `is_confidential` are short-circuited *before* any HTTP call — there is no admin override. Subjects are truncated to 200 chars, bodies to 4,000, HTML stripped. API keys live in the `settings` table (same as SMTP password) and are masked after first save.
+  - **Audit + telemetry.** Every classification persists provider, model, latency, prompt/output tokens, raw response, suggested skills, override (if any) — with `overridden_by` / `overridden_at` / `override_reason`. Internal timeline entries on every classification (`ai_classified`), priority bump (`ai_priority_bumped`), and human override (`ai_override`). `logAudit` entries for `ai_settings_saved`, `ai_backfill_run`, `ai_classification_override`. Recent Classifications strip on the settings page surfaces the last 10 verdicts at a glance.
+  - **Sentiment-driven priority bump.** When the AI flags `angry` or `urgent` and the toggle is on, ticket priority moves up one notch (or to the highest priority if it had none). Idempotent — a timeline marker prevents double-bumping. "Frustrated" alone surfaces for reporting but does not bump.
+  - **Override modal on the ticket detail page.** Sidebar gains an **AI Classification** card showing the suggestion, sentiment, confidence, reasoning, and provider/model/latency. Buttons: **Override** (modal with skill checkboxes scoped to the ticket's group + global skills, optional reason field) and **Re-classify** (re-runs the call after a subject/body edit; creates a fresh row, history preserved). When AI is enabled but the ticket has no verdict yet, a **Classify now** button appears.
+  - **Backfill** — `scripts/ai-classify-backfill.php --limit=N --statuses=open,in_progress,pending [--dry-run]` plus a UI button on the settings page (capped at 200 in-request, schedule the script via cron for larger runs).
+
+### Database
+- Migration **027** adds `ai_classifications` (one row per classification, with override columns), `tickets.ai_classification_id`, `tickets.ai_sentiment` (denormalised + indexed for filtering), and widens `groups.assign_strategy` to include `ai_skill_based`. Seeds default settings keys (provider, threshold, max-tokens, timeout, sentiment-bump toggle, inbound-email toggle). Idempotent.
+
+### Documentation
+- New **AI Classification** doc at `/admin/docs/ai` covering setup, privacy, providers, confidence threshold, sentiment bump, override / re-classify, backfill, failure modes, audit/telemetry, and a cost sanity-check. Linked from the docs index, the docs side-nav, and the Group Auto-Assignment strategies table. 7 new search-keyword entries on the docs index landing on the AI page.
+
+---
+
 ## 2.14.1 — 2026-04-29
 
 ### Fixes

@@ -129,11 +129,12 @@ $roleColors = ['admin' => 'danger', 'agent' => 'primary'];
                 <?php
                 $strategy = old('assign_strategy', (string) ($editing['assign_strategy'] ?? 'manual'));
                 $strategies = [
-                    'manual'          => ['Manual',          'bi-hand-index',     'Leave the ticket unassigned. Agents claim it themselves.'],
-                    'round_robin'     => ['Round Robin',     'bi-arrow-repeat',   'Rotate sequentially through group members so the count of tickets is distributed evenly.'],
-                    'load_based'      => ['Load-Based',      'bi-bar-chart',      'Pick the member with the fewest open tickets. Best when work items vary in length.'],
-                    'skill_based'     => ['Skill-Based',     'bi-mortarboard',    'Pick a member whose skills cover every skill required by the ticket type. Configure skills under Settings → Agent Skills, and required skills on each Ticket Type.'],
-                    'first_available' => ['First Available', 'bi-toggle-on',      'Pick a member who has marked themselves Available on their profile. Useful for shift coverage.'],
+                    'manual'          => ['Manual',           'bi-hand-index',     'Leave the ticket unassigned. Agents claim it themselves.'],
+                    'round_robin'     => ['Round Robin',      'bi-arrow-repeat',   'Rotate sequentially through group members so the count of tickets is distributed evenly.'],
+                    'load_based'      => ['Load-Based',       'bi-bar-chart',      'Pick the member with the fewest open tickets. Best when work items vary in length.'],
+                    'skill_based'     => ['Skill-Based',      'bi-mortarboard',    'Pick a member whose skills cover every skill required by the ticket type. Configure skills under Settings → Agent Skills, and required skills on each Ticket Type.'],
+                    'ai_skill_based'  => ['AI Skill-Based',   'bi-cpu',            'Use the configured AI provider to read the ticket and infer which skills it needs. Falls back to the fallback below if confidence is too low or AI is disabled. Configure under Settings → AI Classification.'],
+                    'first_available' => ['First Available',  'bi-toggle-on',      'Pick a member who has marked themselves Available on their profile. Useful for shift coverage.'],
                 ];
                 ?>
                 <div class="row g-2">

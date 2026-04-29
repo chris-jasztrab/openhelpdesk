@@ -551,6 +551,8 @@ function autoAssignTicket(PDO $db, int $ticketId): ?int
         $picked = _autoAssignLeastLoaded($db, $members);
     } elseif ($strategy === 'skill_based') {
         $picked = _autoAssignBySkill($db, $members, $typeId);
+    } elseif ($strategy === 'ai_skill_based') {
+        $picked = _autoAssignByAiSkill($db, $members, $ticketId);
     } elseif ($strategy === 'first_available') {
         $picked = _autoAssignFirstAvailable($db, $members);
     }
@@ -579,6 +581,7 @@ function autoAssignTicket(PDO $db, int $ticketId): ?int
         'round_robin'     => 'round-robin',
         'load_based'      => 'least-loaded',
         'skill_based'     => 'skill match',
+        'ai_skill_based'  => 'AI skill match',
         'first_available' => 'first available',
     ][$strategy] ?? $strategy;
 
@@ -678,6 +681,80 @@ function _autoAssignBySkill(PDO $db, array $members, ?int $typeId): ?int
     return _autoAssignLeastLoaded($db, $eligible);
 }
 
+/**
+ * AI-Skill-Based: read the classification persisted by classifyTicketWithAI()
+ * (called eagerly via runPostTicketCreateHooks before auto-assign runs).
+ * If the stored confidence ≥ threshold and at least one suggested skill
+ * matches a group member, pick the least-loaded among them. Otherwise
+ * return null and let the caller fall back to the group's fallback
+ * strategy. AI failures / low confidence / disabled-feature all degrade
+ * cleanly through the same null path.
+ */
+function _autoAssignByAiSkill(PDO $db, array $members, int $ticketId): ?int
+{
+    if (empty($members)) {
+        return null;
+    }
+    $stmt = $db->prepare(
+        "SELECT c.suggested_skill_ids, c.overridden_skill_ids, c.confidence
+         FROM ai_classifications c
+         JOIN tickets t ON t.ai_classification_id = c.id
+         WHERE t.id = ?"
+    );
+    $stmt->execute([$ticketId]);
+    $row = $stmt->fetch();
+    if (!$row) {
+        return null;
+    }
+    $threshold = (float) getSetting('ai_confidence_threshold', '0.7');
+    if ((float) $row['confidence'] < $threshold) {
+        return null;
+    }
+    // Admin override (if any) wins over the AI's original suggestion
+    $overridden = $row['overridden_skill_ids'] !== null && $row['overridden_skill_ids'] !== ''
+        ? json_decode((string) $row['overridden_skill_ids'], true)
+        : null;
+    $skillIds = is_array($overridden) ? $overridden : json_decode((string) $row['suggested_skill_ids'], true);
+    if (!is_array($skillIds) || empty($skillIds)) {
+        return null;
+    }
+    $required = array_values(array_filter(array_map('intval', $skillIds)));
+    if (empty($required)) {
+        return null;
+    }
+    $mPlace = implode(',', array_fill(0, count($members), '?'));
+    $sPlace = implode(',', array_fill(0, count($required), '?'));
+    $matchStmt = $db->prepare(
+        "SELECT user_id
+         FROM user_skill_map
+         WHERE user_id IN ($mPlace) AND skill_id IN ($sPlace)
+         GROUP BY user_id
+         HAVING COUNT(DISTINCT skill_id) = ?"
+    );
+    $matchStmt->execute(array_merge($members, $required, [count($required)]));
+    $eligible = array_map('intval', $matchStmt->fetchAll(PDO::FETCH_COLUMN));
+    if (empty($eligible)) {
+        return null;
+    }
+    return _autoAssignLeastLoaded($db, $eligible);
+}
+
+/**
+ * Run all post-create hooks on a freshly-created ticket. Today: AI
+ * classification (if enabled and the type isn't confidential), then
+ * auto-assign. Single chokepoint so every creation path (portal, admin,
+ * API, email-to-ticket, agent) gets identical behaviour.
+ *
+ * Returns the auto-assigned user_id (if any) so callers can fire
+ * notification emails. Classification side-effects (timeline entry,
+ * sentiment, priority bump) happen as part of classifyTicketWithAI().
+ */
+function runPostTicketCreateHooks(PDO $db, int $ticketId): ?int
+{
+    classifyTicketWithAI($ticketId);
+    return autoAssignTicket($db, $ticketId);
+}
+
 function _autoAssignFirstAvailable(PDO $db, array $members): ?int
 {
     if (empty($members)) {
@@ -693,6 +770,207 @@ function _autoAssignFirstAvailable(PDO $db, array $members): ?int
         return null;
     }
     return _autoAssignLeastLoaded($db, $available);
+}
+
+/* ── AI ticket classification ─────────────────────────────────── */
+
+/**
+ * Classify a ticket via the configured AI provider.
+ *
+ * Persists the result in `ai_classifications`, points
+ * `tickets.ai_classification_id` and `tickets.ai_sentiment` at it,
+ * applies the optional sentiment-driven priority bump, and posts an
+ * internal timeline entry. Returns the verdict array on success or
+ * null when AI is disabled / the ticket type is confidential / the
+ * provider call fails — callers always proceed with the fallback flow
+ * regardless.
+ *
+ * Idempotent for the same ticket: re-running classification creates a
+ * new row and re-points the ticket; the previous row stays in place so
+ * we have history.
+ *
+ * @return array|null Verdict on success, null on skip/failure.
+ */
+function classifyTicketWithAI(int $ticketId): ?array
+{
+    $classifier = AIClassifierFactory::fromSettings();
+    if ($classifier === null) {
+        return null;
+    }
+
+    $db = Database::connect();
+    $stmt = $db->prepare(
+        "SELECT t.id, t.subject, t.description, t.type_id, t.group_id, t.priority_id,
+                tt.is_confidential AS type_is_confidential,
+                COALESCE(tt.group_id, t.group_id) AS effective_group_id
+         FROM tickets t
+         LEFT JOIN ticket_types tt ON tt.id = t.type_id
+         WHERE t.id = ?"
+    );
+    $stmt->execute([$ticketId]);
+    $ticket = $stmt->fetch();
+    if (!$ticket) {
+        return null;
+    }
+    if ((int) ($ticket['type_is_confidential'] ?? 0) === 1) {
+        // Hard rule: never send confidential ticket bodies to a third party.
+        return null;
+    }
+
+    // Candidate skill list = global skills + skills owned by the ticket's
+    // destination group (same set the manager UI exposes).
+    $groupId = $ticket['effective_group_id'] !== null ? (int) $ticket['effective_group_id'] : null;
+    if ($groupId !== null) {
+        $sStmt = $db->prepare(
+            "SELECT id, name, description FROM agent_skills
+             WHERE group_id IS NULL OR group_id = ?
+             ORDER BY (group_id IS NULL) DESC, sort_order, name"
+        );
+        $sStmt->execute([$groupId]);
+    } else {
+        $sStmt = $db->query(
+            "SELECT id, name, description FROM agent_skills WHERE group_id IS NULL ORDER BY sort_order, name"
+        );
+    }
+    $skills = $sStmt->fetchAll();
+
+    $maxTokens  = (int) getSetting('ai_max_tokens', '500');
+    $timeoutSec = (int) getSetting('ai_timeout_seconds', '5');
+
+    try {
+        $verdict = $classifier->classify(
+            (string) $ticket['subject'],
+            (string) $ticket['description'],
+            $skills,
+            $maxTokens,
+            $timeoutSec
+        );
+    } catch (\Throwable $e) {
+        // Soft-fail: log but never break ticket creation.
+        error_log('[AI classify] ticket #' . $ticketId . ' failed: ' . $e->getMessage());
+        return null;
+    }
+
+    $providerKey = getSetting('ai_provider', 'anthropic');
+    $modelKey    = $providerKey === 'anthropic'
+        ? (string) getSetting('ai_anthropic_model', 'claude-haiku-4-5')
+        : (string) getSetting('ai_openai_model',    'gpt-4o-mini');
+
+    $insertStmt = $db->prepare(
+        'INSERT INTO ai_classifications
+            (ticket_id, provider, model, suggested_skill_ids, confidence,
+             sentiment, reasoning, raw_output, latency_ms, prompt_tokens, output_tokens)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    );
+    $insertStmt->execute([
+        $ticketId,
+        (string) $providerKey,
+        $modelKey,
+        json_encode($verdict['skill_ids'] ?? [], JSON_UNESCAPED_SLASHES),
+        (float) ($verdict['confidence'] ?? 0),
+        (string) ($verdict['sentiment'] ?? 'neutral'),
+        (string) ($verdict['reasoning'] ?? ''),
+        json_encode($verdict['raw'] ?? null, JSON_UNESCAPED_SLASHES),
+        (int) ($verdict['latency_ms']    ?? 0),
+        (int) ($verdict['prompt_tokens'] ?? 0),
+        (int) ($verdict['output_tokens'] ?? 0),
+    ]);
+    $classificationId = (int) $db->lastInsertId();
+
+    $db->prepare(
+        'UPDATE tickets SET ai_classification_id = ?, ai_sentiment = ? WHERE id = ?'
+    )->execute([$classificationId, (string) ($verdict['sentiment'] ?? 'neutral'), $ticketId]);
+
+    // Sentiment-driven priority bump (configurable). Only fires when:
+    //   - the toggle is on, AND
+    //   - sentiment is angry or urgent, AND
+    //   - the current priority is below the highest-sort_order priority
+    if (getSetting('ai_sentiment_priority_bump', '1') === '1'
+        && in_array($verdict['sentiment'] ?? 'neutral', ['angry', 'urgent'], true)) {
+        _maybeBumpPriorityFromSentiment($db, $ticketId, (string) $verdict['sentiment']);
+    }
+
+    // Internal timeline entry — never visible to portal users.
+    $skillNames = [];
+    if (!empty($verdict['skill_ids']) && !empty($skills)) {
+        $byId = [];
+        foreach ($skills as $s) { $byId[(int) $s['id']] = $s['name']; }
+        foreach ($verdict['skill_ids'] as $sid) {
+            $sid = (int) $sid;
+            if (isset($byId[$sid])) { $skillNames[] = $byId[$sid]; }
+        }
+    }
+    $confPct = (int) round(((float) ($verdict['confidence'] ?? 0)) * 100);
+    $details = 'AI ('
+        . $providerKey . '/' . $modelKey . ') classified as: '
+        . (empty($skillNames) ? '(no skill match)' : implode(', ', $skillNames))
+        . ' — ' . $confPct . '% confidence, sentiment ' . ($verdict['sentiment'] ?? 'neutral')
+        . '. ' . ($verdict['latency_ms'] ?? 0) . 'ms.';
+    $db->prepare(
+        "INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal)
+         VALUES (?, NULL, 'ai_classified', ?, 1)"
+    )->execute([$ticketId, $details]);
+
+    return $verdict;
+}
+
+/**
+ * Bump a ticket's priority up one notch when AI flags angry/urgent
+ * sentiment. Idempotent — never bumps past the highest-sort_order
+ * priority, never re-bumps an already-handled ticket within the
+ * same classification (timeline marker prevents loops).
+ */
+function _maybeBumpPriorityFromSentiment(PDO $db, int $ticketId, string $sentiment): void
+{
+    // Already bumped for this ticket recently? Skip.
+    $dedup = $db->prepare(
+        "SELECT 1 FROM ticket_timeline WHERE ticket_id = ? AND action = 'ai_priority_bumped' LIMIT 1"
+    );
+    $dedup->execute([$ticketId]);
+    if ($dedup->fetchColumn()) {
+        return;
+    }
+
+    $tStmt = $db->prepare('SELECT priority_id FROM tickets WHERE id = ?');
+    $tStmt->execute([$ticketId]);
+    $current = $tStmt->fetchColumn();
+    $current = $current !== false ? (int) $current : 0;
+
+    // Priorities ordered by sort_order — pick the next one above current
+    $allP = $db->query('SELECT id, name, sort_order FROM ticket_priorities ORDER BY sort_order ASC')->fetchAll();
+    if (empty($allP)) {
+        return;
+    }
+
+    $currentSort = -1;
+    foreach ($allP as $p) {
+        if ((int) $p['id'] === $current) { $currentSort = (int) $p['sort_order']; break; }
+    }
+    // If no current priority, jump to the highest-sort priority. Otherwise
+    // pick the immediate-next priority above the current one.
+    $next = null;
+    if ($currentSort === -1) {
+        $next = end($allP) ?: null;
+    } else {
+        foreach ($allP as $p) {
+            if ((int) $p['sort_order'] > $currentSort) {
+                $next = $p; break;
+            }
+        }
+    }
+    if (!$next || (int) $next['id'] === $current) {
+        return;
+    }
+
+    $db->prepare('UPDATE tickets SET priority_id = ? WHERE id = ?')
+       ->execute([(int) $next['id'], $ticketId]);
+    $db->prepare(
+        "INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal)
+         VALUES (?, NULL, 'ai_priority_bumped', ?, 1)"
+    )->execute([
+        $ticketId,
+        'AI sentiment "' . $sentiment . '" bumped priority to "' . $next['name'] . '".'
+    ]);
 }
 
 /* ── Group manager / skill ownership helpers ──────────────────── */

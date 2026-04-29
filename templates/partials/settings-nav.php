@@ -29,6 +29,7 @@ $settingsNavGroups = [
     ],
     'Automation' => [
         ['label' => 'Automations',        'url' => '/admin/settings/automations',        'icon' => 'bi-lightning'],
+        ['label' => 'AI Classification',  'url' => '/admin/settings/ai',                 'icon' => 'bi-cpu'],
         ['label' => 'Escalation Paths',   'url' => '/admin/settings/escalation-paths',   'icon' => 'bi-signpost-split'],
         ['label' => 'Escalation Rules',   'url' => '/admin/settings/escalations',        'icon' => 'bi-alarm'],
         ['label' => 'Stale Tickets',      'url' => '/admin/settings/stale-tickets',      'icon' => 'bi-hourglass-split'],

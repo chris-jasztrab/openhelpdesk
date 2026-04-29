@@ -1251,11 +1251,9 @@ $router->post('/agent/tickets/{id}/split', function (array $p) {
         )->execute([$subject, $desc, Auth::id(), $typeId, $sourceTicket['location_id'], 'open', $priId, $assignTo, $groupId]);
         $newId = (int) $db->lastInsertId();
 
-        // If the agent left the assignee blank but picked a group, run the
-        // group's auto-assign strategy. No-op when assignTo is already set.
-        if ($assignTo === null && $groupId !== null) {
-            autoAssignTicket($db, $newId);
-        }
+        // AI classification (if enabled & non-confidential) + auto-assign.
+        // Both no-op cleanly when their preconditions aren't met.
+        runPostTicketCreateHooks($db, $newId);
 
         // Timeline entry on new ticket
         $db->prepare(

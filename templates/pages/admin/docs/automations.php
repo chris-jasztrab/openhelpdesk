@@ -153,6 +153,10 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
             <td><strong>First Available</strong></td>
             <td>Pick a member who has flipped the <em>"I'm available for new tickets"</em> switch on their profile (least-loaded among them). Good for shift / follow-the-sun coverage. Falls back when nobody is available.</td>
         </tr>
+        <tr>
+            <td><strong>AI Skill-Based</strong> <span class="badge bg-primary ms-1">new</span></td>
+            <td>Same as Skill-Based, but instead of reading the ticket type's required-skills, an LLM reads the ticket's actual subject + body and infers which skills it needs. See <a href="/admin/docs/ai">AI Classification</a> for setup. Confidential ticket types are never sent to the AI provider.</td>
+        </tr>
     </tbody>
 </table>
 </div>

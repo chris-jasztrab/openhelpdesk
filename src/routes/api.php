@@ -739,11 +739,12 @@ $router->post('/api/v1/tickets', function () {
         Sla::initializeForTicket($db, $ticketId, $priorityId, $typeId);
     }
 
-    if ($assignedTo === null && $groupId !== null) {
-        $picked = autoAssignTicket($db, $ticketId);
-        if ($picked !== null) {
-            $assignedTo = $picked;
-        }
+    // AI classification (if enabled & non-confidential type) + auto-assign.
+    // Always runs — sentiment-driven priority bumps still fire on tickets that
+    // arrive with an explicit assignee.
+    $picked = runPostTicketCreateHooks($db, $ticketId);
+    if ($assignedTo === null && $picked !== null) {
+        $assignedTo = $picked;
     }
 
     // Send confirmation email to requester and notify assignee if one was chosen

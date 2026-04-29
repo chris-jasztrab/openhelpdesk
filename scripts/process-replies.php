@@ -163,6 +163,14 @@ foreach ($messages as $msg) {
 
         logMsg('INFO', "  Created Ticket #{$newTicketId} (subject: \"{$ticketSubject}\").");
 
+        // AI classification (if enabled, non-confidential type, and the
+        // ai_classify_inbound_email toggle is on) + auto-assign.
+        if (getSetting('ai_classify_inbound_email', '1') === '1') {
+            runPostTicketCreateHooks($db, $newTicketId);
+        } else {
+            autoAssignTicket($db, $newTicketId);
+        }
+
         // Send ticket-created confirmation email to sender (gated by global + user prefs)
         notifyRequesterTicketCreated($db, $newTicketId);
         logMsg('INFO', "  Confirmation email dispatched to {$fromAddr} (subject to prefs).");

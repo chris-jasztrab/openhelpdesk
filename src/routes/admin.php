@@ -76,6 +76,323 @@ $router->post('/admin/settings/sso/clear-log', function () {
 });
 
 /* ==================================================================
+ * ADMIN – AI Classification settings
+ *
+ * Controls the AI provider, key, model, confidence threshold, and the
+ * sentiment-driven priority bump. The model dropdown is auto-populated
+ * from the provider's API so a new Anthropic / OpenAI model release
+ * does NOT require a code change.
+ * ================================================================== */
+
+$router->get('/admin/settings/ai', function () {
+    Auth::requireRole('admin');
+
+    $anthropicCache = json_decode((string) getSetting('ai_anthropic_models_cache', '[]'), true) ?: [];
+    $openaiCache    = json_decode((string) getSetting('ai_openai_models_cache',    '[]'), true) ?: [];
+
+    // Recent classifications for the activity strip on the page
+    $db = Database::connect();
+    $recent = $db->query(
+        "SELECT c.id, c.ticket_id, c.provider, c.model, c.confidence, c.sentiment,
+                c.latency_ms, c.created_at, t.subject
+         FROM ai_classifications c
+         LEFT JOIN tickets t ON t.id = c.ticket_id
+         ORDER BY c.id DESC
+         LIMIT 10"
+    )->fetchAll();
+
+    render('admin/settings/ai', [
+        'aiEnabled'                => getSetting('ai_enabled', '0'),
+        'aiProvider'               => getSetting('ai_provider', 'anthropic'),
+        'aiAnthropicKey'           => getSetting('ai_anthropic_api_key', ''),
+        'aiAnthropicModel'         => getSetting('ai_anthropic_model', 'claude-haiku-4-5'),
+        'aiAnthropicModels'        => $anthropicCache,
+        'aiAnthropicCachedAt'      => getSetting('ai_anthropic_models_cached_at', ''),
+        'aiOpenaiKey'              => getSetting('ai_openai_api_key', ''),
+        'aiOpenaiModel'            => getSetting('ai_openai_model', 'gpt-4o-mini'),
+        'aiOpenaiModels'           => $openaiCache,
+        'aiOpenaiCachedAt'         => getSetting('ai_openai_models_cached_at', ''),
+        'aiConfidenceThreshold'    => getSetting('ai_confidence_threshold', '0.7'),
+        'aiMaxTokens'              => getSetting('ai_max_tokens', '500'),
+        'aiTimeoutSeconds'         => getSetting('ai_timeout_seconds', '5'),
+        'aiSentimentPriorityBump'  => getSetting('ai_sentiment_priority_bump', '1'),
+        'aiClassifyInboundEmail'   => getSetting('ai_classify_inbound_email', '1'),
+        'recent'                   => $recent,
+    ]);
+});
+
+$router->post('/admin/settings/ai', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/ai');
+    }
+
+    $enabled         = isset($_POST['ai_enabled']) ? '1' : '0';
+    $provider        = in_array($_POST['ai_provider'] ?? '', ['anthropic', 'openai'], true) ? $_POST['ai_provider'] : 'anthropic';
+    $anthropicKey    = $_POST['ai_anthropic_api_key'] ?? '';
+    $anthropicModel  = trim($_POST['ai_anthropic_model'] ?? '');
+    $openaiKey       = $_POST['ai_openai_api_key'] ?? '';
+    $openaiModel     = trim($_POST['ai_openai_model']    ?? '');
+    $threshold       = (float) ($_POST['ai_confidence_threshold'] ?? '0.7');
+    $maxTokens       = (int)   ($_POST['ai_max_tokens']     ?? '500');
+    $timeout         = (int)   ($_POST['ai_timeout_seconds'] ?? '5');
+    $sentimentBump   = isset($_POST['ai_sentiment_priority_bump']) ? '1' : '0';
+    $classifyInbound = isset($_POST['ai_classify_inbound_email']) ? '1' : '0';
+
+    if ($threshold < 0.0) { $threshold = 0.0; }
+    if ($threshold > 1.0) { $threshold = 1.0; }
+    if ($maxTokens < 50)  { $maxTokens = 50; }
+    if ($maxTokens > 4000){ $maxTokens = 4000; }
+    if ($timeout < 2)     { $timeout = 2; }
+    if ($timeout > 30)    { $timeout = 30; }
+
+    if ($enabled === '1') {
+        $key = $provider === 'anthropic' ? $anthropicKey : $openaiKey;
+        if (trim($key) === '' && (
+            ($provider === 'anthropic' && getSetting('ai_anthropic_api_key', '') === '') ||
+            ($provider === 'openai'    && getSetting('ai_openai_api_key',    '') === '')
+        )) {
+            flash('error', 'Cannot enable AI classification — set an API key for the chosen provider first.');
+            redirect('/admin/settings/ai');
+        }
+    }
+
+    setSetting('ai_enabled',                 $enabled);
+    setSetting('ai_provider',                $provider);
+    if ($anthropicModel !== '') { setSetting('ai_anthropic_model', $anthropicModel); }
+    if ($openaiModel    !== '') { setSetting('ai_openai_model',    $openaiModel); }
+    setSetting('ai_confidence_threshold',    (string) $threshold);
+    setSetting('ai_max_tokens',              (string) $maxTokens);
+    setSetting('ai_timeout_seconds',         (string) $timeout);
+    setSetting('ai_sentiment_priority_bump', $sentimentBump);
+    setSetting('ai_classify_inbound_email',  $classifyInbound);
+
+    // Only overwrite a key if the admin provided a new value
+    if ($anthropicKey !== '') { setSetting('ai_anthropic_api_key', $anthropicKey); }
+    if ($openaiKey    !== '') { setSetting('ai_openai_api_key',    $openaiKey); }
+
+    logAudit('ai_settings_saved', null, 'settings', 'AI provider=' . $provider . ' enabled=' . $enabled);
+    flash('success', 'AI classification settings saved.');
+    redirect('/admin/settings/ai');
+});
+
+$router->post('/admin/settings/ai/refresh-models', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/ai');
+    }
+    $provider = $_POST['provider'] ?? '';
+    if ($provider === 'anthropic') {
+        $key = (string) getSetting('ai_anthropic_api_key', '');
+        if ($key === '') {
+            flash('error', 'Set the Anthropic API key first.');
+            redirect('/admin/settings/ai');
+        }
+        $cli = AIClassifierFactory::forProvider('anthropic', $key, (string) getSetting('ai_anthropic_model', 'claude-haiku-4-5'));
+        try {
+            $models = $cli->listModels(15);
+            setSetting('ai_anthropic_models_cache',     json_encode($models, JSON_UNESCAPED_SLASHES));
+            setSetting('ai_anthropic_models_cached_at', date('c'));
+            flash('success', 'Anthropic model list refreshed (' . count($models) . ' models).');
+        } catch (\Throwable $e) {
+            flash('error', 'Anthropic refresh failed: ' . $e->getMessage());
+        }
+    } elseif ($provider === 'openai') {
+        $key = (string) getSetting('ai_openai_api_key', '');
+        if ($key === '') {
+            flash('error', 'Set the OpenAI API key first.');
+            redirect('/admin/settings/ai');
+        }
+        $cli = AIClassifierFactory::forProvider('openai', $key, (string) getSetting('ai_openai_model', 'gpt-4o-mini'));
+        try {
+            $models = $cli->listModels(15);
+            setSetting('ai_openai_models_cache',     json_encode($models, JSON_UNESCAPED_SLASHES));
+            setSetting('ai_openai_models_cached_at', date('c'));
+            flash('success', 'OpenAI model list refreshed (' . count($models) . ' models).');
+        } catch (\Throwable $e) {
+            flash('error', 'OpenAI refresh failed: ' . $e->getMessage());
+        }
+    } else {
+        flash('error', 'Unknown provider.');
+    }
+    redirect('/admin/settings/ai');
+});
+
+/**
+ * Manually re-classify a single ticket. Useful when an admin edited
+ * the subject / body and wants the AI to take another look. Creates
+ * a fresh ai_classifications row (history is preserved).
+ */
+$router->post('/admin/tickets/{id}/classify', function (array $p) {
+    Auth::requireRole('admin', 'agent', 'power_user');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/tickets/' . (int) $p['id']);
+    }
+    $ticketId = (int) $p['id'];
+    if (getSetting('ai_enabled', '0') !== '1') {
+        flash('error', 'AI classification is disabled in settings.');
+        redirect('/admin/tickets/' . $ticketId);
+    }
+    set_time_limit(0);
+    $verdict = classifyTicketWithAI($ticketId);
+    if ($verdict === null) {
+        flash('error', 'Re-classification failed (provider error or confidential type).');
+    } else {
+        $confPct = (int) round(((float) ($verdict['confidence'] ?? 0)) * 100);
+        flash('success', "Re-classified — {$confPct}% confidence, sentiment " . ($verdict['sentiment'] ?? 'neutral') . '.');
+    }
+    redirect('/admin/tickets/' . $ticketId);
+});
+
+/**
+ * Override the AI's suggested skill set for a ticket. Stored on the
+ * existing ai_classifications row so we keep both signals (what AI
+ * said vs. what the human decided) for reporting.
+ */
+$router->post('/admin/tickets/{id}/classification/override', function (array $p) {
+    Auth::requireRole('admin', 'agent', 'power_user');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/tickets/' . (int) $p['id']);
+    }
+    $ticketId = (int) $p['id'];
+    $db = Database::connect();
+
+    $tStmt = $db->prepare('SELECT ai_classification_id, group_id FROM tickets WHERE id = ?');
+    $tStmt->execute([$ticketId]);
+    $ticket = $tStmt->fetch();
+    if (!$ticket || empty($ticket['ai_classification_id'])) {
+        flash('error', 'No AI classification on this ticket.');
+        redirect('/admin/tickets/' . $ticketId);
+    }
+    $classificationId = (int) $ticket['ai_classification_id'];
+
+    $rawSkillIds = $_POST['skill_ids'] ?? [];
+    if (!is_array($rawSkillIds)) { $rawSkillIds = []; }
+    $skillIds = array_values(array_unique(array_filter(array_map('intval', $rawSkillIds))));
+
+    // Re-derive the allowed skill set so a user can't override with
+    // skills outside the ticket's group / global pool.
+    $groupId = $ticket['group_id'] !== null ? (int) $ticket['group_id'] : null;
+    if ($groupId !== null) {
+        $skStmt = $db->prepare(
+            "SELECT id FROM agent_skills WHERE group_id IS NULL OR group_id = ?"
+        );
+        $skStmt->execute([$groupId]);
+    } else {
+        $skStmt = $db->query("SELECT id FROM agent_skills WHERE group_id IS NULL");
+    }
+    $allowed = array_flip(array_map('intval', $skStmt->fetchAll(PDO::FETCH_COLUMN)));
+    $skillIds = array_values(array_filter($skillIds, static fn($sid) => isset($allowed[$sid])));
+
+    $reason = trim((string) ($_POST['reason'] ?? ''));
+    if (mb_strlen($reason) > 500) { $reason = mb_substr($reason, 0, 500); }
+
+    $db->prepare(
+        'UPDATE ai_classifications
+         SET overridden_skill_ids = ?, overridden_by = ?, overridden_at = NOW(), override_reason = ?
+         WHERE id = ?'
+    )->execute([
+        json_encode($skillIds, JSON_UNESCAPED_SLASHES),
+        Auth::id(),
+        $reason !== '' ? $reason : null,
+        $classificationId,
+    ]);
+
+    // Timeline entry — visible to agents, not portal users
+    $skillNames = [];
+    if (!empty($skillIds)) {
+        $ph = implode(',', array_fill(0, count($skillIds), '?'));
+        $nStmt = $db->prepare("SELECT name FROM agent_skills WHERE id IN ($ph)");
+        $nStmt->execute($skillIds);
+        $skillNames = $nStmt->fetchAll(PDO::FETCH_COLUMN);
+    }
+    $detail = Auth::fullName() . ' overrode AI skill suggestion to: '
+            . (empty($skillNames) ? '(none)' : implode(', ', $skillNames))
+            . ($reason !== '' ? ' — ' . $reason : '');
+    $db->prepare(
+        "INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal)
+         VALUES (?, ?, 'ai_override', ?, 1)"
+    )->execute([$ticketId, Auth::id(), $detail]);
+
+    logAudit('ai_classification_override', $classificationId, 'ai_classification', "Ticket #{$ticketId}: " . $detail);
+    flash('success', 'AI suggestion overridden.');
+    redirect('/admin/tickets/' . $ticketId);
+});
+
+$router->post('/admin/settings/ai/backfill', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/ai');
+    }
+    $limit = max(1, min(200, (int) ($_POST['limit'] ?? 25)));
+    if (getSetting('ai_enabled', '0') !== '1') {
+        flash('error', 'Enable AI classification first.');
+        redirect('/admin/settings/ai');
+    }
+
+    // Run inline. With a 25-ticket default and 250ms inter-call sleep
+    // plus 5-sec per-call timeout, worst case is ~140 seconds — within
+    // PHP's default 300s limit. For larger backfills, schedule the CLI
+    // script via cron.
+    set_time_limit(0);
+
+    $db = Database::connect();
+    $stmt = $db->prepare(
+        "SELECT t.id FROM tickets t
+         LEFT JOIN ticket_types tt ON tt.id = t.type_id
+         WHERE t.ai_classification_id IS NULL
+           AND t.status IN ('open','in_progress','pending')
+           AND COALESCE(tt.is_confidential, 0) = 0
+         ORDER BY t.id DESC
+         LIMIT {$limit}"
+    );
+    $stmt->execute();
+    $ids = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+
+    $ok = 0; $fail = 0;
+    foreach ($ids as $tid) {
+        try {
+            if (classifyTicketWithAI($tid) !== null) { $ok++; } else { $fail++; }
+        } catch (\Throwable $e) {
+            $fail++;
+        }
+        usleep(250000);
+    }
+    logAudit('ai_backfill_run', null, 'settings', "Backfill processed {$ok} ok / {$fail} failed (limit {$limit})");
+    flash('success', "Backfill complete — classified {$ok} ticket(s), {$fail} skipped/failed.");
+    redirect('/admin/settings/ai');
+});
+
+$router->post('/admin/settings/ai/test', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/ai');
+    }
+    $provider = $_POST['provider'] ?? getSetting('ai_provider', 'anthropic');
+    if ($provider === 'anthropic') {
+        $key = (string) getSetting('ai_anthropic_api_key', '');
+        $model = (string) getSetting('ai_anthropic_model', 'claude-haiku-4-5');
+    } else {
+        $key = (string) getSetting('ai_openai_api_key', '');
+        $model = (string) getSetting('ai_openai_model', 'gpt-4o-mini');
+    }
+    if ($key === '') {
+        flash('error', 'Set the API key first.');
+        redirect('/admin/settings/ai');
+    }
+    $cli = AIClassifierFactory::forProvider($provider, $key, $model);
+    $result = $cli->testConnection(15);
+    flash($result['ok'] ? 'success' : 'error', $result['message']);
+    redirect('/admin/settings/ai');
+});
+
+/* ==================================================================
  * ADMIN – Onboarding
  * ================================================================== */
 
@@ -2694,9 +3011,10 @@ $router->post('/admin/tickets/create', function () {
     )->execute([$subject, $desc, $createdBy, $typeId, $locationId, $status, $priId, $assignedTo, $groupId, $dueDate]);
     $ticketId = (int) $db->lastInsertId();
 
-    if ($assignedTo === null && $groupId !== null) {
-        autoAssignTicket($db, $ticketId);
-    }
+    // Always run post-create hooks: AI classification (if enabled & non-confidential)
+    // happens regardless of who's assigned; auto-assign no-ops when assigned_to is
+    // already set or the group strategy is manual.
+    runPostTicketCreateHooks($db, $ticketId);
 
     // Tags
     if (!empty($tagNames)) {
@@ -3079,7 +3397,51 @@ $router->get('/admin/tickets/{id}', function (array $p) {
     $watchStmt->execute([$ticket['id'], Auth::id()]);
     $isWatching = (bool) $watchStmt->fetchColumn();
 
-    render('admin/tickets/view', ['ticket' => $ticket, 'timeline' => $timeline, 'agents' => $agents, 'priorities' => $priorities, 'ticketTypes' => $ticketTypes, 'attachments' => $attachments, 'ccUsers' => $ccUsers, 'groups' => $groups, 'customFields' => $customFields, 'fieldValues' => $fieldValues, 'fieldOptions' => $fieldOptions, 'isWatching' => $isWatching]);
+    // AI classification (if any) — drives the badge / override modal in the sidebar
+    $aiClassification = null;
+    $aiSkillsForOverride = [];
+    if (!empty($ticket['ai_classification_id'])) {
+        $cStmt = $db->prepare(
+            "SELECT id, ticket_id, provider, model, suggested_skill_ids,
+                    overridden_skill_ids, overridden_by, overridden_at, override_reason,
+                    confidence, sentiment, reasoning, latency_ms, prompt_tokens, output_tokens, created_at
+             FROM ai_classifications WHERE id = ?"
+        );
+        $cStmt->execute([(int) $ticket['ai_classification_id']]);
+        $aiClassification = $cStmt->fetch() ?: null;
+
+        if ($aiClassification) {
+            $sugIds = json_decode((string) ($aiClassification['suggested_skill_ids']  ?? '[]'), true) ?: [];
+            $ovrIds = json_decode((string) ($aiClassification['overridden_skill_ids'] ?? '[]'), true) ?: [];
+            $aiClassification['suggested_skill_ids']  = array_map('intval', $sugIds);
+            $aiClassification['overridden_skill_ids'] = array_map('intval', $ovrIds);
+
+            // Skill list for the override modal: same shape as the manager UI
+            // (global skills + skills owned by this ticket's group).
+            $groupId = $ticket['group_id'] !== null ? (int) $ticket['group_id'] : null;
+            if ($groupId !== null) {
+                $skStmt = $db->prepare(
+                    "SELECT id, name, group_id FROM agent_skills
+                     WHERE group_id IS NULL OR group_id = ?
+                     ORDER BY (group_id IS NULL) DESC, sort_order, name"
+                );
+                $skStmt->execute([$groupId]);
+            } else {
+                $skStmt = $db->query("SELECT id, name, group_id FROM agent_skills WHERE group_id IS NULL ORDER BY sort_order, name");
+            }
+            $aiSkillsForOverride = $skStmt->fetchAll();
+        }
+    }
+
+    render('admin/tickets/view', [
+        'ticket' => $ticket, 'timeline' => $timeline, 'agents' => $agents,
+        'priorities' => $priorities, 'ticketTypes' => $ticketTypes,
+        'attachments' => $attachments, 'ccUsers' => $ccUsers, 'groups' => $groups,
+        'customFields' => $customFields, 'fieldValues' => $fieldValues,
+        'fieldOptions' => $fieldOptions, 'isWatching' => $isWatching,
+        'aiClassification' => $aiClassification, 'aiSkillsForOverride' => $aiSkillsForOverride,
+        'aiEnabled' => getSetting('ai_enabled', '0') === '1',
+    ]);
 });
 
 /* ==================================================================
@@ -3372,9 +3734,7 @@ $router->post('/admin/tickets/{id}/split', function (array $p) {
         )->execute([$subject, $desc, Auth::id(), $typeId, $sourceTicket['location_id'], 'open', $priId, $assignTo, $groupId]);
         $newId = (int) $db->lastInsertId();
 
-        if ($assignTo === null && $groupId !== null) {
-            autoAssignTicket($db, $newId);
-        }
+        runPostTicketCreateHooks($db, $newId);
 
         // Timeline entry on new ticket
         $db->prepare(

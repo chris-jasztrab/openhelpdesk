@@ -415,6 +415,157 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
             </div>
         </div>
 
+        <!-- AI Classification card -->
+        <?php if (!empty($aiEnabled) || !empty($aiClassification)): ?>
+        <?php
+        $aiSentColors = [
+            'neutral'    => 'secondary',
+            'positive'   => 'success',
+            'frustrated' => 'warning',
+            'angry'      => 'danger',
+            'urgent'     => 'danger',
+        ];
+        $aiSugIds   = $aiClassification['suggested_skill_ids']  ?? [];
+        $aiOvrIds   = $aiClassification['overridden_skill_ids'] ?? [];
+        $aiHasOvr   = !empty($aiOvrIds);
+        $aiEffIds   = $aiHasOvr ? $aiOvrIds : $aiSugIds;
+        $aiSkillName = function ($id) use ($aiSkillsForOverride) {
+            foreach ($aiSkillsForOverride as $s) {
+                if ((int) $s['id'] === (int) $id) { return $s['name']; }
+            }
+            return '#' . (int) $id;
+        };
+        ?>
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between">
+                <h5 class="mb-0 fw-semibold"><i class="bi bi-cpu me-2"></i>AI Classification</h5>
+                <?php if ($aiClassification): ?>
+                    <span class="badge bg-info bg-opacity-10 text-info"><?= (int) round(((float) $aiClassification['confidence']) * 100) ?>%</span>
+                <?php endif; ?>
+            </div>
+            <div class="card-body small">
+                <?php if (empty($aiClassification)): ?>
+                    <p class="text-muted mb-3">This ticket hasn't been classified yet.</p>
+                    <form method="POST" action="/admin/tickets/<?= (int) $ticket['id'] ?>/classify">
+                        <?= csrfField() ?>
+                        <button type="submit" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-play-circle me-1"></i>Classify now
+                        </button>
+                    </form>
+                <?php else: ?>
+                <dl class="mb-3">
+                    <dt class="text-muted">Suggested skills</dt>
+                    <dd>
+                        <?php if (empty($aiSugIds)): ?>
+                            <span class="text-muted">(none — confidence too low or no match)</span>
+                        <?php else: foreach ($aiSugIds as $sid): ?>
+                            <span class="badge bg-secondary bg-opacity-10 text-secondary me-1"><?= e($aiSkillName($sid)) ?></span>
+                        <?php endforeach; endif; ?>
+                    </dd>
+
+                    <?php if ($aiHasOvr): ?>
+                    <dt class="text-muted mt-2">Human override</dt>
+                    <dd>
+                        <?php if (empty($aiOvrIds)): ?>
+                            <span class="text-muted">(cleared)</span>
+                        <?php else: foreach ($aiOvrIds as $sid): ?>
+                            <span class="badge bg-primary bg-opacity-10 text-primary me-1"><?= e($aiSkillName($sid)) ?></span>
+                        <?php endforeach; endif; ?>
+                        <?php if (!empty($aiClassification['override_reason'])): ?>
+                            <div class="text-muted small mt-1"><i class="bi bi-chat-quote me-1"></i><?= e($aiClassification['override_reason']) ?></div>
+                        <?php endif; ?>
+                    </dd>
+                    <?php endif; ?>
+
+                    <dt class="text-muted mt-2">Sentiment</dt>
+                    <dd>
+                        <?php $sc = $aiSentColors[$aiClassification['sentiment'] ?? 'neutral'] ?? 'secondary'; ?>
+                        <span class="badge bg-<?= $sc ?> bg-opacity-10 text-<?= $sc ?>"><?= e($aiClassification['sentiment'] ?? 'neutral') ?></span>
+                    </dd>
+
+                    <?php if (!empty($aiClassification['reasoning'])): ?>
+                    <dt class="text-muted mt-2">AI reasoning</dt>
+                    <dd class="text-muted fst-italic">"<?= e($aiClassification['reasoning']) ?>"</dd>
+                    <?php endif; ?>
+
+                    <dt class="text-muted mt-2">Provider</dt>
+                    <dd class="text-muted small"><?= e($aiClassification['provider']) ?> · <?= e($aiClassification['model']) ?> · <?= (int) $aiClassification['latency_ms'] ?>ms</dd>
+                </dl>
+
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#aiOverrideModal">
+                        <i class="bi bi-pencil me-1"></i>Override
+                    </button>
+                    <form method="POST" action="/admin/tickets/<?= (int) $ticket['id'] ?>/classify" class="d-inline">
+                        <?= csrfField() ?>
+                        <button type="submit" class="btn btn-sm btn-outline-secondary"
+                                onclick="return confirm('Re-classify this ticket using the current subject and body?');">
+                            <i class="bi bi-arrow-repeat me-1"></i>Re-classify
+                        </button>
+                    </form>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <?php if ($aiClassification): ?>
+        <!-- Override modal -->
+        <div class="modal fade" id="aiOverrideModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <form method="POST" action="/admin/tickets/<?= (int) $ticket['id'] ?>/classification/override">
+                        <?= csrfField() ?>
+                        <div class="modal-header">
+                            <h5 class="modal-title fw-bold"><i class="bi bi-pencil me-2"></i>Override AI Skill Suggestion</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="text-muted small mb-3">Tick the skills this ticket actually needs. Your selection replaces the AI's suggestion for routing purposes; the original AI verdict stays on the record.</p>
+
+                            <?php if (empty($aiSkillsForOverride)): ?>
+                                <div class="alert alert-warning">No skills available for this ticket's group.</div>
+                            <?php else: ?>
+                                <div class="row g-2 mb-3">
+                                    <?php foreach ($aiSkillsForOverride as $s): ?>
+                                    <div class="col-md-6">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox"
+                                                   name="skill_ids[]" value="<?= (int) $s['id'] ?>"
+                                                   id="ovr_<?= (int) $s['id'] ?>"
+                                                   <?= in_array((int) $s['id'], $aiEffIds, true) ? 'checked' : '' ?>>
+                                            <label class="form-check-label small" for="ovr_<?= (int) $s['id'] ?>">
+                                                <?= e($s['name']) ?>
+                                                <?php if (empty($s['group_id'])): ?>
+                                                    <span class="badge bg-secondary bg-opacity-10 text-secondary ms-1">Global</span>
+                                                <?php endif; ?>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php endif; ?>
+
+                            <div class="mb-2">
+                                <label for="override_reason" class="form-label small fw-semibold">Reason (optional)</label>
+                                <input type="text" class="form-control form-control-sm" id="override_reason" name="reason"
+                                       placeholder="Why the AI got it wrong (e.g. 'AI missed the printer reference')"
+                                       value="<?= e($aiClassification['override_reason'] ?? '') ?>"
+                                       maxlength="500">
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn text-white" style="background:var(--ld-primary);">
+                                <i class="bi bi-check-lg me-1"></i>Save override
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+        <?php endif; ?>
+
         <!-- Custom Fields -->
         <?php if (!empty($customFields)): ?>
         <div class="card border-0 shadow-sm mb-4">
