@@ -11,6 +11,30 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.13.0 — 2026-04-29
+
+### Features
+- **Group Managers — delegated agent-skill management.** Lets a regular group member with the new `is_manager` flag maintain agent skills for their own team without going through an admin. Use case: the librarian who runs Reference can decide who's qualified for "Cataloguing" or "French" without filing a ticket with IT. Built in two layers:
+  - **Skill ownership scope** — `agent_skills.group_id` (nullable). NULL = global skill (admin-only, system-wide vocabulary, default for all pre-existing rows). Set = skill owned by one group; managers of that group can edit it. The admin Skill editor at `/admin/skills` now has a Scope dropdown (Global / Owned by group: …); the index gains a Scope column.
+  - **Manager flag on group membership** — `group_user_map.is_manager`. The group editor at `/admin/groups/{id}/edit` now has a per-member sub-checkbox **Manager**. JS auto-disables it when Member is unticked. Admin changes are audit-logged as `group_managers_changed`.
+- **New `/manager` area** for delegated skill management. Surfaces in the user-dropdown menu as **Manage My Team** for any user flagged on at least one membership row (admins always see it).
+  - **`/manager`** — landing page listing the groups the current user manages with member + skill counts.
+  - **`/manager/groups/{id}/team`** — checkbox grid of the group's members (rows) × assignable skills (columns: skills owned by this group plus global skills). Tick to grant, untick to revoke. Skills owned by *other* groups are intentionally hidden — managers never see another team's vocabulary. Server re-derives the allowed skill / member set on POST so a manager can't sneak in IDs they don't own. One bulk save; per-user `manager_skill_assignments_changed` audit entries record what changed.
+  - **`/manager/groups/{id}/skills`** — group's own skill catalogue. List view shows owned skills (editable) and global skills (read-only with an Admin-only lock badge for context). Create / edit / delete routes underneath, all gated by `canEditSkill()` so a manager can't reach across into a sibling group's skills via URL fiddling. `manager_skill_created` / `manager_skill_updated` / `manager_skill_deleted` audit entries.
+- **Permission helpers in `src/helpers.php`** — `userManagedGroupIds()`, `canManageGroupSkills($userId, $groupId)`, `canEditSkill($userId, $skillId)`. Admins always pass; non-admins must hold `is_manager = 1` on the relevant membership row. Global skills (`group_id IS NULL`) never become editable for non-admins regardless of group membership.
+
+### Permission boundaries (intentional)
+Managers can: assign existing skills (their group's + global) to their members, create/edit/delete skills owned by their group. Managers cannot: edit global skills, edit other groups' skills, edit ticket-type required-skills (still admin-only — that's a routing-policy decision), add/remove group members, promote/demote other managers.
+
+### Database
+- Migration **026** adds `group_user_map.is_manager` (default 0 — preserves today's behaviour) and `agent_skills.group_id` (nullable FK to `groups`, ON DELETE SET NULL — orphan-safe). Idempotent.
+
+### Documentation
+- New **Group Managers** section in `/admin/docs/users` (anchor `#group-managers`) covering designation, what managers can/can't do, auto-assign integration, and the audit-log entries to look for. Updated **Agent Skills** card to describe the new Scope concept (Global vs group-owned). Cross-link added from the Group Auto-Assignment doc to the Group Managers section.
+- 4 new search-keyword entries on the docs index landing on `#group-managers`.
+
+---
+
 ## 2.12.1 — 2026-04-29
 
 ### Documentation

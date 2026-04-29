@@ -695,6 +695,65 @@ function _autoAssignFirstAvailable(PDO $db, array $members): ?int
     return _autoAssignLeastLoaded($db, $available);
 }
 
+/* ── Group manager / skill ownership helpers ──────────────────── */
+
+/**
+ * Returns the IDs of every group where $userId is flagged as a manager.
+ * Admins implicitly manage every group, but this helper returns only the
+ * explicit memberships so route-level "did the user actually get
+ * delegated?" checks stay honest. Use canManageGroupSkills() for the
+ * admin-bypass version.
+ */
+function userManagedGroupIds(int $userId): array
+{
+    $stmt = Database::connect()->prepare(
+        'SELECT group_id FROM group_user_map WHERE user_id = ? AND is_manager = 1'
+    );
+    $stmt->execute([$userId]);
+    return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+}
+
+/**
+ * Authorisation gate for everything a group manager can do (assign
+ * skills to their members, edit skills they own, etc.).
+ *
+ * Admins always pass. Otherwise the user must hold the is_manager
+ * flag on the membership row for $groupId.
+ */
+function canManageGroupSkills(int $userId, int $groupId): bool
+{
+    if (Auth::role() === 'admin') {
+        return true;
+    }
+    $stmt = Database::connect()->prepare(
+        'SELECT is_manager FROM group_user_map WHERE user_id = ? AND group_id = ?'
+    );
+    $stmt->execute([$userId, $groupId]);
+    return (int) ($stmt->fetchColumn() ?: 0) === 1;
+}
+
+/**
+ * Can $userId edit the skill row $skillId?
+ *
+ * Admins always pass. For non-admins, the skill must be group-scoped
+ * (agent_skills.group_id IS NOT NULL) AND the user must manage that
+ * group. Global skills (group_id NULL) are admin-only by design — they
+ * represent the system-wide vocabulary.
+ */
+function canEditSkill(int $userId, int $skillId): bool
+{
+    if (Auth::role() === 'admin') {
+        return true;
+    }
+    $stmt = Database::connect()->prepare('SELECT group_id FROM agent_skills WHERE id = ?');
+    $stmt->execute([$skillId]);
+    $gid = $stmt->fetchColumn();
+    if ($gid === false || $gid === null) {
+        return false;
+    }
+    return canManageGroupSkills($userId, (int) $gid);
+}
+
 /* ── Timezone helpers ─────────────────────────────────────────── */
 
 /**

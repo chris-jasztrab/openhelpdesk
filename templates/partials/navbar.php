@@ -109,6 +109,28 @@
                         <?php if (Auth::role() === 'user'): ?>
                         <li><a class="dropdown-item" href="/portal?tour=1"><i class="bi bi-play-circle me-2" aria-hidden="true"></i>Restart Tour</a></li>
                         <?php endif; ?>
+                        <?php
+                        // "Manage My Team" appears for admins (always) and any user
+                        // who is flagged as a manager on at least one group.
+                        $_showManagerLink = false;
+                        if (Auth::role() === 'admin') {
+                            $_showManagerLink = true;
+                        } elseif (Auth::id()) {
+                            try {
+                                $_mStmt = Database::connect()->prepare(
+                                    'SELECT 1 FROM group_user_map WHERE user_id = ? AND is_manager = 1 LIMIT 1'
+                                );
+                                $_mStmt->execute([Auth::id()]);
+                                $_showManagerLink = (bool) $_mStmt->fetchColumn();
+                            } catch (\Throwable $e) {
+                                // Table column may be missing pre-migration; fail silent.
+                                $_showManagerLink = false;
+                            }
+                        }
+                        ?>
+                        <?php if ($_showManagerLink): ?>
+                        <li><a class="dropdown-item" href="/manager"><i class="bi bi-stars me-2" aria-hidden="true"></i>Manage My Team</a></li>
+                        <?php endif; ?>
                         <li><a class="dropdown-item" href="/profile"><i class="bi bi-person-circle me-2" aria-hidden="true"></i>My Profile</a></li>
                         <li><a class="dropdown-item text-danger" href="/logout"><i class="bi bi-box-arrow-right me-2" aria-hidden="true"></i>Sign Out</a></li>
                         <li><hr class="dropdown-divider"></li>

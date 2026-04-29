@@ -2238,6 +2238,11 @@ $router->get('/admin', function () {
 require ROOT_DIR . '/src/routes/admin.php';
 
 /* ------------------------------------------------------------------
+ * Group manager area (delegated skill management)
+ * ------------------------------------------------------------------ */
+require ROOT_DIR . '/src/routes/manager.php';
+
+/* ------------------------------------------------------------------
  * Mobile REST API
  * ------------------------------------------------------------------ */
 require ROOT_DIR . '/src/routes/api.php';

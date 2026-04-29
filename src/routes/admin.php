@@ -1469,7 +1469,7 @@ $router->get('/admin/groups/create', function () {
     $users = Database::connect()->query(
         "SELECT id, first_name, last_name, role FROM users WHERE role IN ('agent','admin','power_user') ORDER BY first_name, last_name"
     )->fetchAll();
-    render('admin/groups/form', ['editing' => null, 'users' => $users, 'memberIds' => []]);
+    render('admin/groups/form', ['editing' => null, 'users' => $users, 'memberIds' => [], 'managerIds' => []]);
 });
 
 $router->post('/admin/groups/create', function () {
@@ -1503,11 +1503,12 @@ $router->post('/admin/groups/create', function () {
     $groupId = (int) $db->lastInsertId();
 
     // Assign members
-    $userIds = isset($_POST['members']) && is_array($_POST['members']) ? array_map('intval', $_POST['members']) : [];
+    $userIds    = isset($_POST['members'])  && is_array($_POST['members'])  ? array_map('intval', $_POST['members'])  : [];
+    $managerSet = isset($_POST['managers']) && is_array($_POST['managers']) ? array_flip(array_map('intval', $_POST['managers'])) : [];
     if (!empty($userIds)) {
-        $stmt = $db->prepare('INSERT INTO group_user_map (group_id, user_id) VALUES (?, ?)');
+        $stmt = $db->prepare('INSERT INTO group_user_map (group_id, user_id, is_manager) VALUES (?, ?, ?)');
         foreach ($userIds as $uid) {
-            $stmt->execute([$groupId, $uid]);
+            $stmt->execute([$groupId, $uid, isset($managerSet[$uid]) ? 1 : 0]);
         }
     }
 
@@ -1533,11 +1534,19 @@ $router->get('/admin/groups/{id}/edit', function (array $p) {
         "SELECT id, first_name, last_name, role FROM users WHERE role IN ('agent','admin','power_user') ORDER BY first_name, last_name"
     )->fetchAll();
 
-    $memberStmt = $db->prepare('SELECT user_id FROM group_user_map WHERE group_id = ?');
+    $memberStmt = $db->prepare('SELECT user_id, is_manager FROM group_user_map WHERE group_id = ?');
     $memberStmt->execute([$editing['id']]);
-    $memberIds = $memberStmt->fetchAll(PDO::FETCH_COLUMN);
+    $memberIds  = [];
+    $managerIds = [];
+    foreach ($memberStmt->fetchAll() as $row) {
+        $uid = (int) $row['user_id'];
+        $memberIds[] = $uid;
+        if ((int) $row['is_manager'] === 1) {
+            $managerIds[] = $uid;
+        }
+    }
 
-    render('admin/groups/form', ['editing' => $editing, 'users' => $users, 'memberIds' => $memberIds]);
+    render('admin/groups/form', ['editing' => $editing, 'users' => $users, 'memberIds' => $memberIds, 'managerIds' => $managerIds]);
 });
 
 $router->post('/admin/groups/{id}/edit', function (array $p) {
@@ -1569,6 +1578,7 @@ $router->post('/admin/groups/{id}/edit', function (array $p) {
     $notifyNew      = isset($_POST['notify_new_ticket']) ? 1 : 0;
     $isConfidential = isset($_POST['is_confidential']) ? 1 : 0;
     $userIds        = isset($_POST['members']) && is_array($_POST['members']) ? array_map('intval', $_POST['members']) : [];
+    $managerSet     = isset($_POST['managers']) && is_array($_POST['managers']) ? array_flip(array_map('intval', $_POST['managers'])) : [];
 
     $db = Database::connect();
 
@@ -1689,13 +1699,30 @@ $router->post('/admin/groups/{id}/edit', function (array $p) {
     $db->prepare('UPDATE `groups` SET name=?, description=?, sort_order=?, notify_new_ticket=?, is_confidential=?, assign_strategy=?, assign_fallback=? WHERE id=?')
         ->execute([$name, $desc, $order, $notifyNew, $isConfidential, $assignStrategy, $assignFallback, $id]);
 
-    // Sync members: delete existing, insert new
+    // Snapshot the prior manager set before we overwrite the membership rows,
+    // so we can audit-log what changed.
+    $priorManagerStmt = $db->prepare('SELECT user_id FROM group_user_map WHERE group_id = ? AND is_manager = 1');
+    $priorManagerStmt->execute([$id]);
+    $priorManagerIds = array_map('intval', $priorManagerStmt->fetchAll(PDO::FETCH_COLUMN));
+
+    // Sync members: delete existing, insert new (with is_manager flag)
     $db->prepare('DELETE FROM group_user_map WHERE group_id = ?')->execute([$id]);
     if (!empty($userIds)) {
-        $stmt = $db->prepare('INSERT INTO group_user_map (group_id, user_id) VALUES (?, ?)');
+        $stmt = $db->prepare('INSERT INTO group_user_map (group_id, user_id, is_manager) VALUES (?, ?, ?)');
         foreach ($userIds as $uid) {
-            $stmt->execute([$id, $uid]);
+            $stmt->execute([$id, $uid, isset($managerSet[$uid]) ? 1 : 0]);
         }
+    }
+
+    // Audit any change to the manager set so admins can see who delegated rights
+    $newManagerIds   = array_keys($managerSet);
+    $managersAdded   = array_diff($newManagerIds, $priorManagerIds);
+    $managersRemoved = array_diff($priorManagerIds, $newManagerIds);
+    if (!empty($managersAdded) || !empty($managersRemoved)) {
+        $detail = 'Group "' . $name . '" (ID: ' . $id . ') manager set changed.';
+        if (!empty($managersAdded))   { $detail .= ' Added: ' . implode(',', $managersAdded) . '.'; }
+        if (!empty($managersRemoved)) { $detail .= ' Removed: ' . implode(',', $managersRemoved) . '.'; }
+        logAudit('group_managers_changed', $id, 'group', $detail);
     }
 
     // Confidential alert: if the group is now confidential, had at least one
@@ -1818,9 +1845,11 @@ $router->get('/admin/skills', function () {
     $db = Database::connect();
     $skills = $db->query(
         "SELECT s.*,
+                g.name AS group_name,
                 COALESCE(uc.cnt, 0) AS agent_count,
                 COALESCE(tc.cnt, 0) AS type_count
          FROM agent_skills s
+         LEFT JOIN `groups` g ON g.id = s.group_id
          LEFT JOIN (SELECT skill_id, COUNT(*) AS cnt FROM user_skill_map GROUP BY skill_id) uc ON uc.skill_id = s.id
          LEFT JOIN (SELECT skill_id, COUNT(*) AS cnt FROM ticket_type_skill_map GROUP BY skill_id) tc ON tc.skill_id = s.id
          ORDER BY s.sort_order, s.name"
@@ -1830,10 +1859,12 @@ $router->get('/admin/skills', function () {
 
 $router->get('/admin/skills/create', function () {
     Auth::requireRole('admin');
-    $users = Database::connect()->query(
+    $db = Database::connect();
+    $users = $db->query(
         "SELECT id, first_name, last_name, role FROM users WHERE role IN ('agent','admin','power_user') ORDER BY first_name, last_name"
     )->fetchAll();
-    render('admin/skills/form', ['editing' => null, 'users' => $users, 'memberIds' => []]);
+    $groups = $db->query("SELECT id, name FROM `groups` ORDER BY sort_order, name")->fetchAll();
+    render('admin/skills/form', ['editing' => null, 'users' => $users, 'memberIds' => [], 'groups' => $groups]);
 });
 
 $router->post('/admin/skills/create', function () {
@@ -1842,9 +1873,10 @@ $router->post('/admin/skills/create', function () {
         flash('error', 'Invalid request.');
         redirect('/admin/skills/create');
     }
-    $name  = trim($_POST['name'] ?? '');
-    $desc  = trim($_POST['description'] ?? '');
-    $order = (int) ($_POST['sort_order'] ?? 0);
+    $name    = trim($_POST['name'] ?? '');
+    $desc    = trim($_POST['description'] ?? '');
+    $order   = (int) ($_POST['sort_order'] ?? 0);
+    $groupId = isset($_POST['group_id']) && $_POST['group_id'] !== '' ? (int) $_POST['group_id'] : null;
     if ($name === '') {
         flashInput($_POST);
         flash('error', 'Skill name is required.');
@@ -1852,8 +1884,8 @@ $router->post('/admin/skills/create', function () {
     }
     $db = Database::connect();
     try {
-        $db->prepare('INSERT INTO agent_skills (name, description, sort_order) VALUES (?, ?, ?)')
-           ->execute([$name, $desc !== '' ? $desc : null, $order]);
+        $db->prepare('INSERT INTO agent_skills (name, description, sort_order, group_id) VALUES (?, ?, ?, ?)')
+           ->execute([$name, $desc !== '' ? $desc : null, $order, $groupId]);
     } catch (PDOException $e) {
         flash('error', str_contains($e->getMessage(), 'Duplicate entry') ? 'A skill with that name already exists.' : 'Database error.');
         flashInput($_POST);
@@ -1887,7 +1919,8 @@ $router->get('/admin/skills/{id}/edit', function (array $p) {
     $mStmt = $db->prepare('SELECT user_id FROM user_skill_map WHERE skill_id = ?');
     $mStmt->execute([(int) $p['id']]);
     $memberIds = array_map('intval', $mStmt->fetchAll(PDO::FETCH_COLUMN));
-    render('admin/skills/form', ['editing' => $editing, 'users' => $users, 'memberIds' => $memberIds]);
+    $groups = $db->query("SELECT id, name FROM `groups` ORDER BY sort_order, name")->fetchAll();
+    render('admin/skills/form', ['editing' => $editing, 'users' => $users, 'memberIds' => $memberIds, 'groups' => $groups]);
 });
 
 $router->post('/admin/skills/{id}/edit', function (array $p) {
@@ -1897,9 +1930,10 @@ $router->post('/admin/skills/{id}/edit', function (array $p) {
         flash('error', 'Invalid request.');
         redirect("/admin/skills/{$id}/edit");
     }
-    $name  = trim($_POST['name'] ?? '');
-    $desc  = trim($_POST['description'] ?? '');
-    $order = (int) ($_POST['sort_order'] ?? 0);
+    $name    = trim($_POST['name'] ?? '');
+    $desc    = trim($_POST['description'] ?? '');
+    $order   = (int) ($_POST['sort_order'] ?? 0);
+    $groupId = isset($_POST['group_id']) && $_POST['group_id'] !== '' ? (int) $_POST['group_id'] : null;
     if ($name === '') {
         flashInput($_POST);
         flash('error', 'Skill name is required.');
@@ -1907,8 +1941,8 @@ $router->post('/admin/skills/{id}/edit', function (array $p) {
     }
     $db = Database::connect();
     try {
-        $db->prepare('UPDATE agent_skills SET name = ?, description = ?, sort_order = ? WHERE id = ?')
-           ->execute([$name, $desc !== '' ? $desc : null, $order, $id]);
+        $db->prepare('UPDATE agent_skills SET name = ?, description = ?, sort_order = ?, group_id = ? WHERE id = ?')
+           ->execute([$name, $desc !== '' ? $desc : null, $order, $groupId, $id]);
     } catch (PDOException $e) {
         flash('error', str_contains($e->getMessage(), 'Duplicate entry') ? 'A skill with that name already exists.' : 'Database error.');
         flashInput($_POST);

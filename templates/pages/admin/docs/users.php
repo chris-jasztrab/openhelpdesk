@@ -149,11 +149,54 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-mortarboard text-primary me-2"></i>Agent Skills</h5>
 <p class="text-muted mb-2"><strong>Skills</strong> are admin-managed labels (e.g. "Billing", "Network", "French", "Cataloguing") that agents can hold. They drive the <a href="/admin/docs/automations#group-auto-assign">Skill-Based</a> auto-assignment strategy: when a new ticket arrives in a group whose strategy is Skill-Based, only members whose skills cover every skill required by the ticket type are eligible.</p>
-<p class="text-muted mb-2"><strong>Manage the catalogue</strong> at <a href="/admin/skills"><strong>Admin → Settings → Agent Skills</strong></a>. Each skill has a name, optional description, and sort order. From the skill editor you can also tick which agents hold the skill.</p>
-<p class="text-muted mb-2"><strong>Required skills per ticket type</strong> are configured on the Ticket Type form. A ticket type can require zero, one, or several skills.</p>
-<div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
-    Today, only admins can create skills and decide which agents hold them. A future release will let group managers maintain skills for their own team without admin involvement.
+<p class="text-muted mb-2"><strong>Manage the catalogue</strong> at <a href="/admin/skills"><strong>Admin → Settings → Agent Skills</strong></a>. Each skill has a name, optional description, sort order, and a <strong>Scope</strong>:</p>
+<ul class="text-muted mb-2">
+    <li><strong>Global</strong> (default) — admin-curated, visible everywhere, only admins can edit it.</li>
+    <li><strong>Owned by a group</strong> — delegated to that group's <a href="#group-managers">managers</a>, who can edit it and assign it to their team without admin access.</li>
+</ul>
+<p class="text-muted mb-0"><strong>Required skills per ticket type</strong> are configured on the Ticket Type form (still admin-only — required-skills define routing policy, which is system-wide). A ticket type can require zero, one, or several skills, and the requirements can reference both global and group-scoped skills.</p>
 </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4" id="group-managers">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-stars text-primary me-2"></i>Group Managers</h5>
+<p class="text-muted mb-2">A <strong>group manager</strong> is a regular member of a group with extra delegation rights: they can maintain agent skills for their team without going through an admin. Pattern: the librarian who runs Reference can decide who's qualified for "Cataloguing" or "French" without filing a ticket with IT.</p>
+
+<h6 class="fw-semibold mt-3 mb-2">Designating managers</h6>
+<ol class="text-muted mb-3">
+    <li>Go to <a href="/admin/groups"><strong>Admin → Settings → Groups</strong></a> and edit the group.</li>
+    <li>In the Members section, every member row has a <strong>Manager</strong> sub-checkbox. Tick it for the people you want to delegate to.</li>
+    <li>Save. The change is recorded as <code>group_managers_changed</code> in the audit log.</li>
+</ol>
+<p class="text-muted mb-3">Multiple managers per group are supported — branch teams already have rotating leads, so flag as many as makes sense. Members must be ticked first; the Manager flag automatically clears if Member is unticked.</p>
+
+<h6 class="fw-semibold mt-3 mb-2">What a manager can do</h6>
+<p class="text-muted mb-2">Managers see a new <strong><i class="bi bi-stars"></i> Manage My Team</strong> entry in the user-dropdown menu (top-right). It lands them on <a href="/manager">/manager</a>, which lists the groups they manage. From there:</p>
+<ul class="text-muted mb-3">
+    <li><strong>Team Skills grid</strong> (<code>/manager/groups/{id}/team</code>) — checkbox table where rows are members of the group and columns are the assignable skills (group-owned + global). Tick to grant, untick to revoke. One save button. Skills owned by other groups are hidden — they aren't theirs to manage.</li>
+    <li><strong>Group Skills catalogue</strong> (<code>/manager/groups/{id}/skills</code>) — create / edit / delete skills owned by their group. Global skills appear here read-only for context with an "Admin-only" lock badge.</li>
+</ul>
+
+<h6 class="fw-semibold mt-3 mb-2">What a manager cannot do</h6>
+<ul class="text-muted mb-3">
+    <li>Edit or delete <strong>global</strong> skills — those are admin-only by design (system-wide vocabulary).</li>
+    <li>Edit skills owned by <strong>other</strong> groups — they can't even see them.</li>
+    <li>Edit which skills a Ticket Type <strong>requires</strong> — that's a routing-policy decision, still admin-only on the Ticket Type form.</li>
+    <li>Add or remove members from the group — admins still control membership.</li>
+    <li>Promote / demote other managers — only admins toggle the Manager flag.</li>
+</ul>
+
+<h6 class="fw-semibold mt-3 mb-2">Auto-assign integration</h6>
+<p class="text-muted mb-3">A skill is a skill regardless of who taught it — group-scoped skills satisfy ticket-type requirements exactly the same way global skills do. So if the IT group's manager creates an "ILS" skill and assigns it to two team members, the Skill-Based auto-assign strategy will route ILS tickets to those two whenever the IT group is the destination.</p>
+
+<h6 class="fw-semibold mt-3 mb-2">Audit log</h6>
+<p class="text-muted mb-2">Every manager action goes through <code>logAudit()</code> with the manager as actor:</p>
+<ul class="text-muted mb-0 small">
+    <li><code>manager_skill_assignments_changed</code> — manager added/removed skills on a member.</li>
+    <li><code>manager_skill_created</code> / <code>manager_skill_updated</code> / <code>manager_skill_deleted</code> — manager touched the group's skill catalogue.</li>
+    <li><code>group_managers_changed</code> — admin changed the manager set on a group.</li>
+</ul>
 </div>
 </div>
 

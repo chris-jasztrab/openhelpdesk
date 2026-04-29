@@ -176,7 +176,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <h5 class="fw-semibold mb-3"><i class="bi bi-tags text-primary me-2"></i>Skills &amp; Availability</h5>
 <p class="text-muted mb-2">Two pieces feed Skill-Based and First Available:</p>
 <ul class="text-muted mb-3">
-    <li><strong>Agent Skills</strong> are managed at <a href="/admin/skills"><strong>Admin → Settings → Agent Skills</strong></a>. Each skill has a name and description. From the skill editor you can also tick which agents hold the skill.</li>
+    <li><strong>Agent Skills</strong> are managed at <a href="/admin/skills"><strong>Admin → Settings → Agent Skills</strong></a>. Each skill has a name, description, and a <strong>scope</strong> — Global (admin-curated) or owned by a specific group. <a href="/admin/docs/users#group-managers">Group managers</a> can edit skills their group owns and assign them to teammates without admin involvement.</li>
     <li><strong>Required skills per ticket type</strong> are configured on the <a href="/admin/types">Ticket Types</a> form. A ticket type can require zero, one, or several skills — Skill-Based assignment matches members who hold them <em>all</em>.</li>
     <li><strong>"Available for new tickets"</strong> is a per-user toggle on the My Profile page (agent / admin / power user only). Defaults to on. Only First Available reads it; the other strategies ignore it.</li>
 </ul>

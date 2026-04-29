@@ -43,6 +43,18 @@ $roleColors = ['admin' => 'danger', 'agent' => 'primary'];
                        value="<?= e(old('sort_order', (string) ($editing['sort_order'] ?? 0))) ?>" min="0" style="max-width:120px;">
             </div>
 
+            <div class="mb-3">
+                <label for="group_id" class="form-label fw-semibold">Scope</label>
+                <select class="form-select" id="group_id" name="group_id" style="max-width:400px;">
+                    <?php $currentGroup = old('group_id', (string) ($editing['group_id'] ?? '')); ?>
+                    <option value="" <?= $currentGroup === '' ? 'selected' : '' ?>>Global — admin-only (default)</option>
+                    <?php foreach (($groups ?? []) as $g): ?>
+                    <option value="<?= (int) $g['id'] ?>" <?= (string) $currentGroup === (string) $g['id'] ? 'selected' : '' ?>>Owned by group: <?= e($g['name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <div class="form-text">Global skills are managed by admins only. A group-scoped skill can be edited by managers of that group, who can also assign it to their team via the Manage My Team page.</div>
+            </div>
+
             <hr class="my-4">
 
             <div class="mb-3">

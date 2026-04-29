@@ -58,17 +58,34 @@ $roleColors = ['admin' => 'danger', 'agent' => 'primary'];
                         <i class="bi bi-info-circle me-1"></i>No agents or admins found. <a href="/admin/users/create">Create a user</a> first.
                     </div>
                 <?php else: ?>
+                    <p class="text-muted small mb-3">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Tick <strong>Manager</strong> next to a member to delegate skill management for this group — they'll be able to assign skills to teammates and (optionally) maintain the group's own skill catalogue without needing admin access. See <a href="/admin/docs/users#group-managers">Users & Roles → Group Managers</a>.
+                    </p>
                     <div class="row g-2">
                         <?php foreach ($users as $u): ?>
                         <div class="col-md-6 col-lg-4">
-                            <div class="form-check border rounded p-2 ps-4">
-                                <input class="form-check-input" type="checkbox" name="members[]"
-                                       value="<?= $u['id'] ?>" id="member_<?= $u['id'] ?>"
-                                       <?= in_array($u['id'], $memberIds) ? 'checked' : '' ?>>
-                                <label class="form-check-label w-100" for="member_<?= $u['id'] ?>">
-                                    <?= e($u['first_name'] . ' ' . $u['last_name']) ?>
-                                    <span class="badge bg-<?= $roleColors[$u['role']] ?? 'secondary' ?> bg-opacity-10 text-<?= $roleColors[$u['role']] ?? 'secondary' ?> ms-1"><?= e(ucfirst($u['role'])) ?></span>
-                                </label>
+                            <div class="form-check border rounded p-2 ps-4 d-flex flex-column gap-1">
+                                <div>
+                                    <input class="form-check-input member-cb" type="checkbox" name="members[]"
+                                           value="<?= $u['id'] ?>" id="member_<?= $u['id'] ?>"
+                                           data-uid="<?= (int) $u['id'] ?>"
+                                           <?= in_array($u['id'], $memberIds) ? 'checked' : '' ?>>
+                                    <label class="form-check-label w-100" for="member_<?= $u['id'] ?>">
+                                        <?= e($u['first_name'] . ' ' . $u['last_name']) ?>
+                                        <span class="badge bg-<?= $roleColors[$u['role']] ?? 'secondary' ?> bg-opacity-10 text-<?= $roleColors[$u['role']] ?? 'secondary' ?> ms-1"><?= e(ucfirst($u['role'])) ?></span>
+                                    </label>
+                                </div>
+                                <div class="form-check ms-3">
+                                    <input class="form-check-input manager-cb" type="checkbox" name="managers[]"
+                                           value="<?= $u['id'] ?>" id="manager_<?= $u['id'] ?>"
+                                           data-uid="<?= (int) $u['id'] ?>"
+                                           <?= in_array($u['id'], $managerIds ?? []) ? 'checked' : '' ?>
+                                           <?= in_array($u['id'], $memberIds) ? '' : 'disabled' ?>>
+                                    <label class="form-check-label small text-muted" for="manager_<?= $u['id'] ?>">
+                                        <i class="bi bi-stars" aria-hidden="true"></i> Manager
+                                    </label>
+                                </div>
                             </div>
                         </div>
                         <?php endforeach; ?>
@@ -167,6 +184,27 @@ $roleColors = ['admin' => 'danger', 'agent' => 'primary'];
 </div>
 
 <script>
+// Manager checkbox is only meaningful when the user is a member.
+// Sync availability so admins can't accidentally flag a non-member as
+// manager (and so unchecking Member also clears the Manager state).
+(function () {
+    document.querySelectorAll('.member-cb').forEach(function (mcb) {
+        var uid = mcb.dataset.uid;
+        var managerCb = document.getElementById('manager_' + uid);
+        if (!managerCb) return;
+        function sync() {
+            if (mcb.checked) {
+                managerCb.disabled = false;
+            } else {
+                managerCb.disabled = true;
+                managerCb.checked = false;
+            }
+        }
+        mcb.addEventListener('change', sync);
+        sync();
+    });
+})();
+
 (function () {
     var fallbackRow = document.getElementById('fallbackRow');
     if (!fallbackRow) return;

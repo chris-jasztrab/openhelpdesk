@@ -24,6 +24,8 @@ $breadcrumbs  = [
 <div class="alert alert-info">
     <i class="bi bi-info-circle me-1"></i>
     Skills back the <strong>Skill-Based</strong> auto-assign strategy. Tag agents with the skills they hold, then mark which skills each Ticket Type requires. New tickets routed to a Skill-Based group will only be auto-assigned to members whose skill set covers every required skill.
+    <br><br>
+    <strong>Scope</strong> — leave a skill <em>Global</em> to keep it admin-only and visible everywhere. Pick a <em>group</em> to delegate ownership: managers of that group can edit the skill and assign it to their team without admin involvement. See <a href="/admin/docs/users#group-managers" class="alert-link">Group Managers</a>.
 </div>
 
 <div class="card border-0 shadow-sm">
@@ -32,21 +34,29 @@ $breadcrumbs  = [
             <thead class="table-light">
                 <tr>
                     <th>Name</th>
+                    <th>Scope</th>
                     <th>Description</th>
                     <th>Agents</th>
                     <th>Required by Types</th>
-                    <th>Sort Order</th>
+                    <th>Sort</th>
                     <th style="width:110px">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($skills)): ?>
-                <tr><td colspan="6" class="text-center py-4 text-muted">No skills defined yet.</td></tr>
+                <tr><td colspan="7" class="text-center py-4 text-muted">No skills defined yet.</td></tr>
                 <?php else: ?>
                     <?php foreach ($skills as $s): ?>
                     <tr>
                         <td class="fw-semibold">
                             <i class="bi bi-mortarboard text-muted me-1"></i><?= e($s['name']) ?>
+                        </td>
+                        <td>
+                            <?php if (empty($s['group_id'])): ?>
+                                <span class="badge bg-secondary bg-opacity-10 text-secondary"><i class="bi bi-globe me-1"></i>Global</span>
+                            <?php else: ?>
+                                <span class="badge bg-primary bg-opacity-10 text-primary"><i class="bi bi-people me-1"></i><?= e($s['group_name'] ?? 'Group') ?></span>
+                            <?php endif; ?>
                         </td>
                         <td class="text-muted small" style="max-width:300px;"><?= e($s['description'] ? mb_strimwidth($s['description'], 0, 80, '...') : '—') ?></td>
                         <td>
