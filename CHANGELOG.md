@@ -11,6 +11,18 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.15.3 — 2026-04-30
+
+### Documentation
+- **AI Classification doc page expanded** with three new sections capturing real-world setup pain points:
+  - **Testing It Works** — the three-tier validation path (single-ticket Classify-now button → 25-ticket UI backfill → CLI sweep with `--dry-run`).
+  - **Debugging Connection Issues** — explains the new `/admin/settings/ai/debug` page added in 2.15.1 / 2.15.2, with a Models-vs-Message-vs-Both decision and a status-code-to-root-cause cheatsheet (401 / 403 / 400 credit-balance / 404 model-not-found / 429 / 5xx / cURL).
+  - **Workspace Spend Caps** — documents the gotcha where org-level credits look fine but a workspace's $0 default spend cap blocks every billable call. Two fixes: raise the workspace cap, or generate a new key in the Default workspace.
+  - **Cost comparison table** added to the Choosing a Provider section — Haiku / Sonnet / Opus per-ticket and per-1,000-ticket pricing with guidance on when to upgrade. Surfaces the easy-to-make mistake of saving Opus by accident.
+  - 4 new search-keyword entries on the docs index landing on these new sections.
+
+---
+
 ## 2.15.2 — 2026-04-30
 
 ### Fixes

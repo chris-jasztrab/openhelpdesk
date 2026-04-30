@@ -60,6 +60,37 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="alert alert-info small mt-3 mb-0"><i class="bi bi-info-circle me-2"></i>
     The model dropdown is auto-populated from each provider's API. Click <strong>Refresh model list</strong> on <a href="/admin/settings/ai">Settings → AI Classification</a> after a provider releases something new — no code change needed.
 </div>
+
+<h6 class="fw-semibold mt-4 mb-2">Cost comparison (Anthropic)</h6>
+<p class="text-muted small mb-2">Approximate per-classification cost at ~500 input + ~100 output tokens (typical ticket).</p>
+<div class="table-responsive">
+<table class="table table-sm mb-0">
+    <thead class="table-light"><tr><th>Model</th><th>Per ticket</th><th>Per 1,000 tickets</th><th>When to use</th></tr></thead>
+    <tbody class="text-muted">
+        <tr>
+            <td><code>claude-haiku-4-5</code> <span class="badge bg-secondary ms-1">recommended</span></td>
+            <td>~$0.001</td>
+            <td>~$1</td>
+            <td>Day-to-day classification. Fast and accurate enough for the skill-matching task.</td>
+        </tr>
+        <tr>
+            <td><code>claude-sonnet-4-6</code></td>
+            <td>~$0.005</td>
+            <td>~$5</td>
+            <td>If Haiku misclassifies repeatedly on tickets with overlapping skill names or subtle context.</td>
+        </tr>
+        <tr>
+            <td><code>claude-opus-4-7</code></td>
+            <td>~$0.015</td>
+            <td>~$15</td>
+            <td>Overkill for routine classification — use only if you've measured Sonnet getting things wrong on real tickets.</td>
+        </tr>
+    </tbody>
+</table>
+</div>
+<div class="alert alert-warning small mt-3 mb-0"><i class="bi bi-exclamation-triangle me-2"></i>
+    Default to Haiku unless you have evidence it's wrong. A fresh install picks Haiku, but if you accidentally tested with Opus and saved that, your $25 of Anthropic credit will burn through ~10× faster.
+</div>
 </div>
 </div>
 
@@ -74,6 +105,61 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
     <li>Tick <strong>Enable AI ticket classification</strong> at the top, save.</li>
     <li>Edit each group whose tickets should be auto-routed via AI: <a href="/admin/groups">Admin → Settings → Groups → Edit</a> → set strategy to <strong>AI Skill-Based</strong>.</li>
     <li>Optionally run <strong>Classify existing tickets</strong> at the bottom of the AI settings page to back-fill open tickets created before the feature was on.</li>
+</ol>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-flask text-primary me-2"></i>Testing It Works</h5>
+<p class="text-muted mb-2">Three ways to validate the integration in escalating order of scope:</p>
+<ol class="text-muted mb-0">
+    <li><strong>Single-ticket smoke test.</strong> Open any ticket detail page → look at the right-hand sidebar → click <strong>Classify now</strong> (or <strong>Re-classify</strong>) on the AI Classification card. The card refreshes with the suggestion, confidence, sentiment, and AI reasoning. Best for "does this work the way I think it does?" before you spend any volume.</li>
+    <li><strong>Small batch (10–25 tickets).</strong> On <a href="/admin/settings/ai">Settings → AI Classification</a>, scroll to <strong>Classify existing tickets</strong>, set the count to 25, click <strong>Run backfill</strong>. Picks up open / in-progress / pending tickets that don't already have a classification, skips confidential types automatically, returns a summary of <code>classified: X / failed: Y</code>.</li>
+    <li><strong>Full sweep via cron.</strong> For larger backfills run the CLI directly: <code>php scripts/ai-classify-backfill.php --limit=200 --dry-run</code> first to preview, then drop <code>--dry-run</code>. Use <code>--statuses=open,in_progress,pending,resolved,closed</code> to include closed tickets if you're testing classification accuracy against historical data.</li>
+</ol>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-bug text-warning me-2"></i>Debugging Connection Issues</h5>
+<p class="text-muted mb-2">When the regular <strong>Test connection</strong> button comes back with a generic message and you can't tell why, use the <strong>Debug</strong> page (orange button on the AI settings page, or visit <a href="/admin/settings/ai/debug">/admin/settings/ai/debug</a>). It bypasses the classifier abstraction and makes raw HTTP calls so you see the full response — status code, response headers, body, latency, cURL error.</p>
+
+<h6 class="fw-semibold mt-3 mb-2">What it can tell you</h6>
+<ul class="text-muted mb-3">
+    <li><strong>Models list only</strong> — uses a free <code>GET /v1/models</code> endpoint that doesn't consume credits. If this works, your key is valid and your auth is fine. If it doesn't, the problem is the key itself or your network.</li>
+    <li><strong>Message only</strong> — sends a tiny <code>POST /v1/messages</code> probe. Verifies actual generation billing. If this fails after Models works, the problem is billing/quota/spend-cap, not auth.</li>
+    <li><strong>Both</strong> — runs both calls in sequence so you can see which one breaks.</li>
+</ul>
+
+<h6 class="fw-semibold mt-3 mb-2">Decoding common errors</h6>
+<div class="table-responsive">
+<table class="table table-sm mb-0">
+    <thead class="table-light"><tr><th>Status</th><th>Message</th><th>Root cause</th></tr></thead>
+    <tbody class="text-muted">
+        <tr><td>200</td><td>—</td><td>Working. If LocalDesk's classifier still fails, the issue is in the LocalDesk side — check error logs.</td></tr>
+        <tr><td>401</td><td>Unauthorized</td><td>Wrong key, revoked key, or whitespace in the pasted value. Generate a new one.</td></tr>
+        <tr><td>403</td><td>Forbidden</td><td>Workspace permission issue or region block.</td></tr>
+        <tr><td>400</td><td>"credit balance is too low"</td><td>Workspace spend cap is $0 even though the org has credits. See the next card for the fix.</td></tr>
+        <tr><td>404</td><td>"model_not_found"</td><td>The saved model name is wrong/deprecated. Run a Models test alone to see the valid list, then update the dropdown.</td></tr>
+        <tr><td>429</td><td>"rate_limit"</td><td>Hitting the workspace's per-minute cap. Slow down or raise the cap.</td></tr>
+        <tr><td>5xx</td><td>—</td><td>Provider is having problems. Try again in a few minutes.</td></tr>
+        <tr><td>0 / cURL error</td><td>—</td><td>DNS, firewall, or outbound HTTPS blocked from the server. Test <code>curl https://api.anthropic.com</code> from the host shell.</td></tr>
+    </tbody>
+</table>
+</div>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-wallet2 text-warning me-2"></i>Workspace Spend Caps (the gotcha)</h5>
+<p class="text-muted mb-2">Anthropic supports <strong>workspaces</strong> under your organization. The org-level credit balance shows up on the main billing page, but each workspace can have its own monthly spend limit — and a freshly-created workspace defaults to <strong>$0</strong>. The result: you add $25 to your org, see "$25 remaining," but the API still returns "credit balance is too low" because your API key is scoped to a workspace whose spend cap blocks every billable call.</p>
+<p class="text-muted mb-2">If <strong>Models list</strong> works on the debug page but <strong>Message</strong> returns the credit error, this is almost certainly the cause. Two ways to fix it:</p>
+<ol class="text-muted mb-0">
+    <li><strong>Raise the workspace's spend limit.</strong> In <a href="https://console.anthropic.com/" target="_blank" rel="noopener">Anthropic Console</a> → <strong>Workspaces</strong> → click your workspace → <strong>Limits</strong> tab → set a monthly cap (or leave blank to inherit the org limit).</li>
+    <li><strong>Generate a new key in the Default workspace.</strong> Click <strong>API keys</strong> in the Console → <strong>Create Key</strong> → make sure the workspace selector says Default → paste the new key into <a href="/admin/settings/ai">LocalDesk's AI settings page</a>.</li>
 </ol>
 </div>
 </div>
