@@ -57,11 +57,11 @@ if (!headers_sent()) {
     }
     header(
         "Content-Security-Policy: default-src 'self'; "
-      . "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-      . "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-      . "font-src 'self' data: https://cdn.jsdelivr.net; "
+      . "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdn.ckeditor.com; "
+      . "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdn.ckeditor.com; "
+      . "font-src 'self' data: https://cdn.jsdelivr.net https://cdn.ckeditor.com; "
       . "img-src 'self' data: blob:; "
-      . "connect-src 'self'; "
+      . "connect-src 'self' https://cdn.ckeditor.com; "
       . "frame-ancestors 'none'; "
       . "base-uri 'self'; "
       . "form-action 'self'"

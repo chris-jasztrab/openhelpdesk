@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.15.4 — 2026-04-30
+
+### Fixes
+- **Description editor missing from new-ticket form (agent + admin).** The CSP added in 2.14.x only allowed scripts/styles from `'self'` and `cdn.jsdelivr.net`, but the new-ticket form loads CKEditor 5 from `cdn.ckeditor.com` (introduced earlier in 2.x). The browser silently blocked the editor's JS and CSS, leaving the "Description *" label visible with empty space below it — looking like the field had been removed. Added `https://cdn.ckeditor.com` to `script-src`, `style-src`, `font-src`, and `connect-src`. Affects every page that uses the WYSIWYG editor (admin/agent new-ticket forms).
+
+---
+
 ## 2.15.3 — 2026-04-30
 
 ### Documentation
