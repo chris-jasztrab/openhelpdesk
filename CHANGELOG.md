@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.16.0 — 2026-04-30
+
+### Features
+- **Search box on the settings sidebar.** As the list of admin settings has grown (40+ pages across Email, Scheduling, Organization, Security, Customization, Automation, Data, System), finding the right page meant scanning the whole sidebar. Added a live-filter search input pinned to the top of the settings nav. Filters by label, group name, or synonym keywords (e.g. "smtp" / "graph" / "azure" → Email pages, "saml" / "oauth" / "entra" → SSO, "logo" / "favicon" → Branding, "csv" / "migrate" → Import pages, "claude" / "gpt" / "llm" → AI Classification, "macro" / "snippet" → Canned Responses). Group headers auto-hide when no children match; a "No settings match." message shows when nothing does. Query persists across page navigation via `sessionStorage`. Keyboard shortcuts: `/` or `Ctrl/Cmd+K` to focus, `Esc` to clear and unfocus. Available on every page that uses the settings sidebar.
+
+---
+
 ## 2.15.4 — 2026-04-30
 
 ### Fixes
