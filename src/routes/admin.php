@@ -554,7 +554,7 @@ $router->post('/admin/onboarding/dismiss', function () {
 
 $validDocPages = [
     'getting-started', 'tickets', 'users', 'email',
-    'sla', 'automations', 'branding', 'portal', 'import', 'kb', 'sso',
+    'sla', 'automations', 'ai', 'branding', 'portal', 'import', 'kb', 'sso',
 ];
 
 $router->get('/admin/docs', function () {
@@ -580,6 +580,7 @@ $router->get('/admin/docs/{page}', function (array $p) use ($validDocPages) {
         'email'           => 'Email & Notifications',
         'sla'             => 'SLA Policies',
         'automations'     => 'Automations',
+        'ai'              => 'AI Classification',
         'branding'        => 'Branding',
         'portal'          => 'Portal',
         'import'          => 'Importing Tickets',

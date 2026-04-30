@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.17.2 — 2026-04-30
+
+### Fixes
+- **AI Classification doc page returned an empty docs index instead of the doc itself.** The page at `templates/pages/admin/docs/ai.php` shipped in 2.14.x along with the index card, side-nav link, and 11 search-keyword entries — but `/admin/docs/ai` 302'd back to `/admin/docs` because the dynamic doc route in `src/routes/admin.php` validates the URL slug against an explicit allowlist (`$validDocPages`) and `'ai'` was never added. Anyone who clicked the AI Classification card on the docs index, the AI Classification entry in the sidebar, or any of the AI search results landed on the docs index with no error and no doc — looked like the content was missing. Added `'ai'` to the allowlist and `'ai' => 'AI Classification'` to the `$titles` map so the breadcrumb and `<title>` render correctly.
+
+---
+
 ## 2.17.1 — 2026-04-30
 
 ### Fixes
