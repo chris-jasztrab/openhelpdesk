@@ -421,11 +421,15 @@ $router->post('/admin/settings/ai/debug', function () {
             CURLOPT_HTTPHEADER     => $headers,
             CURLOPT_CUSTOMREQUEST  => $method,
             CURLOPT_HEADERFUNCTION => function ($_ch, $line) use (&$respHeaders) {
-                $line = rtrim($line);
-                if ($line !== '' && str_contains($line, ':')) {
-                    $respHeaders[] = $line;
+                // cURL aborts with "Failed writing header" if we don't return
+                // the EXACT byte count we received. Capture length BEFORE any
+                // trimming and return the original length unconditionally.
+                $len   = strlen($line);
+                $clean = rtrim($line);
+                if ($clean !== '' && str_contains($clean, ':')) {
+                    $respHeaders[] = $clean;
                 }
-                return strlen($line) + 2;
+                return $len;
             },
         ]);
         if ($body !== null) {

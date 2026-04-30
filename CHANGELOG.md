@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.15.2 — 2026-04-30
+
+### Fixes
+- **AI debug page eating its own responses.** The `/admin/settings/ai/debug` header-capture callback was returning `strlen(rtrim($line)) + 2` instead of the original byte count cURL handed it. cURL rejects any return value that doesn't match exactly and aborts with "Failed writing header" — which surfaced on the page as a 200 status with empty headers + empty body, masking the actual successful response from Anthropic. Capture original length before trimming and return it unconditionally. The classifier itself (used in production routing) was never affected — different cURL helper, no header callback.
+
+---
+
 ## 2.15.1 — 2026-04-30
 
 ### Tooling
