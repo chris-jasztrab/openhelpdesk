@@ -75,13 +75,14 @@ $settingsNavGroups = [
          'keywords' => 'reset wipe purge delete-all destructive maintenance'],
     ],
 ];
-$currentPath = currentPath();
+$currentPath          = currentPath();
+$settingsSearchIndex  = require ROOT_DIR . '/config/settings_index.php';
 ?>
 <div class="d-flex gap-4 align-items-start">
     <div class="flex-shrink-0" style="width:190px;">
         <div class="card border-0 shadow-sm" style="position:sticky;top:1rem;">
             <div class="card-body p-2">
-                <div class="px-1 pb-2">
+                <div class="px-1 pb-2 position-relative">
                     <div class="position-relative">
                         <i class="bi bi-search position-absolute"
                            style="left:.55rem;top:50%;transform:translateY(-50%);font-size:.75rem;color:var(--bs-secondary-color);pointer-events:none;"></i>
@@ -92,6 +93,12 @@ $currentPath = currentPath();
                                autocomplete="off"
                                style="padding-left:1.75rem;font-size:.8rem;">
                     </div>
+
+                    <!-- Chrome-style results dropdown for individual settings (floats over page content) -->
+                    <div id="settingsSearchResults" class="card border shadow-lg"
+                         role="listbox" aria-label="Settings search results"
+                         style="display:none;position:absolute;top:calc(100% + 4px);left:.25rem;z-index:1050;width:380px;max-height:60vh;overflow-y:auto;font-size:.825rem;"></div>
+
                     <div id="settingsNavNoMatch" class="text-muted small px-2 pt-2" style="display:none;font-size:.75rem;">
                         No settings match.
                     </div>

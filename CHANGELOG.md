@@ -11,6 +11,16 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.17.0 — 2026-04-30
+
+### Features
+- **Chrome-style settings search — finds individual settings, not just pages.** Building on 2.16.0's nav-page filter, the sidebar search box now also searches a registry of every individual configurable setting (86 entries across all admin pages). Typing "smtp host" finds the SMTP Host field on the Email / SMTP page; "azure secret" finds both the Graph client secret and the SSO client secret with a breadcrumb showing which is which; "primary color" jumps straight to the Branding color picker. Results appear in a floating Chrome-style dropdown next to the sidebar showing label + breadcrumb (group › page › section) + short description, with the matched query highlighted (`<mark>`). Sorting prioritizes label-prefix matches, then label-contains, then section/page/description matches, then keyword-only matches.
+- **Click a result → land on the field.** Result rows link to the destination page with the field's `id` as the URL hash (e.g. `/admin/settings#smtp_host`). On the destination page, JS scrolls the field into view and flashes a yellow highlight for ~2.4s so it's instantly findable, even on dense pages like Inbound Mail or Branding. Works for any anchor on any settings page (re-triggers on `hashchange` too).
+- **Keyboard-driven.** ArrowUp/ArrowDown to move through results, Enter to navigate, Esc to clear. `/` or Ctrl/Cmd+K to focus from anywhere on the page (already-typing inputs are ignored). Mouse-hover and keyboard selection stay in sync.
+- **Settings registry is declarative and easy to extend.** New file `config/settings_index.php` lists every searchable field as `{label, description, group, page_label, page_url, section, anchor, keywords}`. Adding a new setting means: give the input a stable `id`, then append one row to the registry. No JS or template changes needed for new settings — the search just finds them.
+
+---
+
 ## 2.16.0 — 2026-04-30
 
 ### Features
