@@ -7720,48 +7720,19 @@ $router->post('/admin/settings/danger-zone/reset', function () {
 
     $db = Database::connect();
 
-    // Truncate all data tables in safe order (disable FK checks first)
+    // Discover every table in the current database and truncate them all.
+    // Hardcoding the list drifts every time a migration adds a table — the
+    // 12-table gap that built up between mig 005 and mig 027 left orphaned
+    // api_tokens, agent_skills, ai_classifications, etc. surviving the reset.
+    // schema_migrations is preserved so we don't re-run migrations on the
+    // empty schema.
+    $tables = $db->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
+    $tables = array_filter($tables, static fn($t) => $t !== 'schema_migrations');
+
     $db->exec('SET FOREIGN_KEY_CHECKS = 0');
-
-    $tables = [
-        'escalation_log',
-        'csat_surveys',
-        'audit_log',
-        'notifications',
-        'ticket_field_values',
-        'ticket_form_field_options',
-        'ticket_form_fields',
-        'ticket_tag_map',
-        'ticket_tags',
-        'ticket_attachments',
-        'ticket_cc',
-        'ticket_presence',
-        'ticket_timeline',
-        'tickets',
-        'ticket_templates',
-        'saved_filters',
-        'group_user_map',
-        'groups',
-        'kb_article_ratings',
-        'kb_article_revisions',
-        'kb_articles',
-        'kb_folders',
-        'kb_categories',
-        'escalation_rules',
-        'scheduled_reports',
-        'automations',
-        'sla_policies',
-        'ticket_priorities',
-        'ticket_types',
-        'locations',
-        'settings',
-        'users',
-    ];
-
     foreach ($tables as $table) {
         $db->exec("TRUNCATE TABLE `{$table}`");
     }
-
     $db->exec('SET FOREIGN_KEY_CHECKS = 1');
 
     // Destroy the current session so the admin is logged out

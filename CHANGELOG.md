@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.17.3 — 2026-04-30
+
+### Fixes
+- **"Reset to Fresh State" left 12 tables of orphaned data behind, including a working API-auth bypass.** The danger-zone reset in `src/routes/admin.php` truncated a hardcoded 33-table list that hadn't been updated since the early schema. Tables added by later migrations — `api_tokens` (005), `ticket_form_field_type_map` (016), `ticket_escalations` and `ticket_escalation_steps` (021), `login_attempts` (024), `agent_skills` / `user_skill_map` / `ticket_type_skill_map` (025), `ai_classifications` (027) — plus tables that had always been in `schema.sql` but were missed (`ticket_watchers`, `canned_responses`, `holidays`) survived the reset with all their rows intact. Because the route runs with `FOREIGN_KEY_CHECKS=0`, nothing errored; the data just lingered. The `api_tokens` case is the worst: tokens issued to the previous admin (`user_id=1`) stayed valid against the freshly-created admin (also `user_id=1` because AUTO_INCREMENT resets on truncate), so the mobile API would silently authenticate the old token as the new admin. Replaced the hardcoded list with `SHOW TABLES` (excluding `schema_migrations` so the migration tracker doesn't get wiped and re-run), so future migrations can't reintroduce this drift.
+
+---
+
 ## 2.17.2 — 2026-04-30
 
 ### Fixes
