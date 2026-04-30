@@ -368,6 +368,145 @@ $router->post('/admin/settings/ai/backfill', function () {
     redirect('/admin/settings/ai');
 });
 
+/**
+ * Debug page — bypasses the classifier abstraction and makes raw HTTP
+ * calls so you can see exactly what each provider returns. Useful when
+ * the saved-key Test Connection button comes back with a generic error.
+ */
+$router->get('/admin/settings/ai/debug', function () {
+    Auth::requireRole('admin');
+    render('admin/settings/ai-debug', [
+        'savedAnthropicKey'   => getSetting('ai_anthropic_api_key', '') !== '',
+        'savedAnthropicModel' => (string) getSetting('ai_anthropic_model', 'claude-haiku-4-5'),
+        'savedOpenaiKey'      => getSetting('ai_openai_api_key', '') !== '',
+        'savedOpenaiModel'    => (string) getSetting('ai_openai_model', 'gpt-4o-mini'),
+        'result'              => null,
+    ]);
+});
+
+$router->post('/admin/settings/ai/debug', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/ai/debug');
+    }
+
+    $provider = in_array($_POST['provider'] ?? '', ['anthropic', 'openai'], true) ? $_POST['provider'] : 'anthropic';
+    $testType = in_array($_POST['test_type'] ?? '', ['models', 'message', 'both'], true) ? $_POST['test_type'] : 'both';
+
+    // Use the pasted key when provided, otherwise fall back to the saved one
+    $pastedKey   = trim((string) ($_POST['api_key'] ?? ''));
+    $pastedModel = trim((string) ($_POST['model']   ?? ''));
+    if ($provider === 'anthropic') {
+        $apiKey = $pastedKey !== '' ? $pastedKey : (string) getSetting('ai_anthropic_api_key', '');
+        $model  = $pastedModel !== '' ? $pastedModel : (string) getSetting('ai_anthropic_model', 'claude-haiku-4-5');
+    } else {
+        $apiKey = $pastedKey !== '' ? $pastedKey : (string) getSetting('ai_openai_api_key', '');
+        $model  = $pastedModel !== '' ? $pastedModel : (string) getSetting('ai_openai_model', 'gpt-4o-mini');
+    }
+
+    if ($apiKey === '') {
+        flash('error', 'No API key — paste one or save one first.');
+        redirect('/admin/settings/ai/debug');
+    }
+
+    // ── Raw cURL helper that captures EVERYTHING — status, headers, body, timing
+    $rawCall = static function (string $method, string $url, array $headers, ?string $body) {
+        $ch = curl_init($url);
+        $respHeaders = [];
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 20,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_HTTPHEADER     => $headers,
+            CURLOPT_CUSTOMREQUEST  => $method,
+            CURLOPT_HEADERFUNCTION => function ($_ch, $line) use (&$respHeaders) {
+                $line = rtrim($line);
+                if ($line !== '' && str_contains($line, ':')) {
+                    $respHeaders[] = $line;
+                }
+                return strlen($line) + 2;
+            },
+        ]);
+        if ($body !== null) {
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+        }
+        $started   = microtime(true);
+        $response  = curl_exec($ch);
+        $latencyMs = (int) round((microtime(true) - $started) * 1000);
+        $httpCode  = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err       = curl_error($ch);
+        curl_close($ch);
+        return [
+            'method'     => $method,
+            'url'        => $url,
+            'http_code'  => $httpCode,
+            'latency_ms' => $latencyMs,
+            'curl_error' => $err,
+            'headers'    => $respHeaders,
+            'body'       => is_string($response) ? $response : '',
+        ];
+    };
+
+    $maskKey = static function (string $k): string {
+        $len = strlen($k);
+        if ($len <= 12) { return str_repeat('•', $len); }
+        return substr($k, 0, 8) . str_repeat('•', max(4, $len - 12)) . substr($k, -4);
+    };
+
+    $calls = [];
+
+    if ($provider === 'anthropic') {
+        $headers = [
+            'Content-Type: application/json',
+            'x-api-key: ' . $apiKey,
+            'anthropic-version: 2023-06-01',
+        ];
+        if ($testType === 'models' || $testType === 'both') {
+            $calls[] = ['label' => 'GET /v1/models'] + $rawCall('GET', 'https://api.anthropic.com/v1/models', $headers, null);
+        }
+        if ($testType === 'message' || $testType === 'both') {
+            $payload = json_encode([
+                'model'      => $model,
+                'max_tokens' => 50,
+                'messages'   => [['role' => 'user', 'content' => 'Say "ok" and nothing else.']],
+            ], JSON_UNESCAPED_SLASHES);
+            $calls[] = ['label' => 'POST /v1/messages — minimal probe'] + $rawCall('POST', 'https://api.anthropic.com/v1/messages', $headers, $payload);
+        }
+    } else {
+        $headers = [
+            'Content-Type: application/json',
+            'Authorization: Bearer ' . $apiKey,
+        ];
+        if ($testType === 'models' || $testType === 'both') {
+            $calls[] = ['label' => 'GET /v1/models'] + $rawCall('GET', 'https://api.openai.com/v1/models', $headers, null);
+        }
+        if ($testType === 'message' || $testType === 'both') {
+            $payload = json_encode([
+                'model'    => $model,
+                'messages' => [['role' => 'user', 'content' => 'Say "ok" and nothing else.']],
+                'max_tokens' => 50,
+            ], JSON_UNESCAPED_SLASHES);
+            $calls[] = ['label' => 'POST /v1/chat/completions — minimal probe'] + $rawCall('POST', 'https://api.openai.com/v1/chat/completions', $headers, $payload);
+        }
+    }
+
+    render('admin/settings/ai-debug', [
+        'savedAnthropicKey'   => getSetting('ai_anthropic_api_key', '') !== '',
+        'savedAnthropicModel' => (string) getSetting('ai_anthropic_model', 'claude-haiku-4-5'),
+        'savedOpenaiKey'      => getSetting('ai_openai_api_key', '') !== '',
+        'savedOpenaiModel'    => (string) getSetting('ai_openai_model', 'gpt-4o-mini'),
+        'result' => [
+            'provider'     => $provider,
+            'model'        => $model,
+            'used_pasted'  => $pastedKey !== '',
+            'masked_key'   => $maskKey($apiKey),
+            'calls'        => $calls,
+            'php_curl_ver' => curl_version()['version'] ?? 'unknown',
+        ],
+    ]);
+});
+
 $router->post('/admin/settings/ai/test', function () {
     Auth::requireRole('admin');
     if (!verifyCsrf($_POST['_token'] ?? '')) {

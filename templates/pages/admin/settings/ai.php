@@ -22,11 +22,16 @@ $sentimentColors = [
 
 <?php require ROOT_DIR . '/templates/partials/settings-nav.php'; ?>
 
-<div class="mb-4">
-    <h5 class="fw-semibold mb-1"><i class="bi bi-cpu me-2"></i>AI Classification</h5>
-    <p class="text-muted mb-0" style="font-size:.875rem;">
-        Use a large language model to read each new ticket and decide which agent skills it needs, then route it via the existing <a href="/admin/docs/automations#group-auto-assign">Skill-Based</a> auto-assign machinery. Confidential ticket types are <strong>never</strong> sent to the provider. See <a href="/admin/docs/ai">AI Classification docs</a>.
-    </p>
+<div class="mb-4 d-flex justify-content-between align-items-start flex-wrap gap-2">
+    <div>
+        <h5 class="fw-semibold mb-1"><i class="bi bi-cpu me-2"></i>AI Classification</h5>
+        <p class="text-muted mb-0" style="font-size:.875rem;">
+            Use a large language model to read each new ticket and decide which agent skills it needs, then route it via the existing <a href="/admin/docs/automations#group-auto-assign">Skill-Based</a> auto-assign machinery. Confidential ticket types are <strong>never</strong> sent to the provider. See <a href="/admin/docs/ai">AI Classification docs</a>.
+        </p>
+    </div>
+    <a href="/admin/settings/ai/debug" class="btn btn-outline-warning btn-sm">
+        <i class="bi bi-bug me-1"></i>Debug
+    </a>
 </div>
 
 <form method="POST" action="/admin/settings/ai">

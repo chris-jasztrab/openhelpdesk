@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.15.1 — 2026-04-30
+
+### Tooling
+- **AI API debug page** at `Admin → Settings → AI Classification → Debug` (also `/admin/settings/ai/debug`). Bypasses the classifier abstraction and makes raw HTTP calls so admins can see exactly what the provider returns: status code, response headers, full body, latency, cURL error text. Helps diagnose the hard-to-untangle cases where Test Connection comes back with a generic message — workspace spend caps, expired keys, model-not-found, regional 403s, network egress blocks, etc. Lets the admin paste a one-off key/model without saving (so they can test a candidate before committing it to settings) and choose between `models` (free), `messages` (verifies billing), or both. Decision-tree cheatsheet at the bottom of the page maps common HTTP codes to root causes.
+
+---
+
 ## 2.15.0 — 2026-04-29
 
 ### Features
