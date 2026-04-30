@@ -3228,9 +3228,6 @@ $router->post('/admin/tickets/create', function () {
         Sla::initializeForTicket($db, $ticketId, $priId, $typeId);
     }
 
-    // Automations
-    runAutomations($db, $ticketId, 'ticket_created');
-
     // Notify group members watching new tickets
     notifyGroupMembers($db, $ticketId);
 

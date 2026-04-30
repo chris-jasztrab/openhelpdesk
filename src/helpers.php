@@ -740,18 +740,28 @@ function _autoAssignByAiSkill(PDO $db, array $members, int $ticketId): ?int
 }
 
 /**
- * Run all post-create hooks on a freshly-created ticket. Today: AI
- * classification (if enabled and the type isn't confidential), then
- * auto-assign. Single chokepoint so every creation path (portal, admin,
- * API, email-to-ticket, agent) gets identical behaviour.
+ * Run all post-create hooks on a freshly-created ticket. Order matters:
+ *
+ *   1. AI classification — writes suggested_skill_ids/sentiment so
+ *      ai_skill_based routing has data to work with.
+ *   2. Automations (ticket_created) — may set group_id, type_id, etc.
+ *      based on subject/description rules.
+ *   3. Auto-assign — needs group_id (set by step 2) and may consult
+ *      the classification (set by step 1).
+ *
+ * Single chokepoint so every creation path (portal, admin, API,
+ * email-to-ticket, agent split) gets identical behaviour.
  *
  * Returns the auto-assigned user_id (if any) so callers can fire
  * notification emails. Classification side-effects (timeline entry,
- * sentiment, priority bump) happen as part of classifyTicketWithAI().
+ * sentiment, priority bump) happen as part of classifyTicketWithAI();
+ * automation side-effects (timeline entries per action) happen inside
+ * runAutomations().
  */
 function runPostTicketCreateHooks(PDO $db, int $ticketId): ?int
 {
     classifyTicketWithAI($ticketId);
+    runAutomations($db, $ticketId, 'ticket_created');
     return autoAssignTicket($db, $ticketId);
 }
 

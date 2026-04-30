@@ -379,9 +379,6 @@ $router->post('/portal/tickets/create', function () {
         }
     }
 
-    // Run automations for new ticket
-    runAutomations($db, $ticketId, 'ticket_created');
-
     // Handle file attachments
     $attachments = handleAttachmentUploads('attachments');
     saveAttachments($db, $ticketId, null, Auth::id(), $attachments);

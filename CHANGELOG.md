@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.17.1 — 2026-04-30
+
+### Fixes
+- **AI skill-based auto-assignment never fired when group was set by an automation rule.** The `runPostTicketCreateHooks()` chokepoint ran AI classification and auto-assign back-to-back, but `runAutomations(..., 'ticket_created')` was called separately *after* the hook in admin.php and portal.php. So automation rules that set `group_id` (e.g. "Assign IT Tickets to IT Group") fired too late: `autoAssignTicket()` had already short-circuited at the early-return for null `group_id` and never read the AI classification. Folded `runAutomations()` into the hook between classification and auto-assign so the order is `classify → run rules → assign`. Removed the duplicate calls from admin.php and portal.php. Side benefit: tickets created via the API path and via inbound email (`scripts/process-replies.php`) now also evaluate `ticket_created` automations, which the existing function-level comment already promised ("single chokepoint so every creation path gets identical behaviour") but didn't deliver. Repro case was ticket #44973: classified as Sierra ILS at 0.78 confidence, IT group set by automation, but `assigned_to` stayed NULL because routing ran before the group was set.
+
+---
+
 ## 2.17.0 — 2026-04-30
 
 ### Features
