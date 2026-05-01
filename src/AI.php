@@ -216,9 +216,9 @@ TXT;
         return <<<TXT
 You are a help-desk operations consultant. Given an organization's profile, the ticket types they triage, the groups (queues/teams) tickets are routed to, and the agent skills they already have, suggest practical new agent skills that would help route tickets within this organization.
 
-Output one JSON object only — no markdown, no prose.
+Output ONE JSON object — no markdown fences, no prose, no commentary before or after. The top-level key MUST be exactly "skills" (lowercase plural).
 
-Schema:
+Schema (use these EXACT key names):
 {
   "skills": [
     {
@@ -288,52 +288,109 @@ TXT;
     }
 
     /**
-     * Parse the AI's skill-suggestion response. Drops malformed entries
-     * and any name that already exists (case-insensitive) in $existingNames.
-     * Resolves the "group" string against $groupNameToId for convenience.
+     * Parse the AI's skill-suggestion response. Tolerant of variation in the
+     * top-level shape because models don't always honour the requested key
+     * names — accepts {"skills": [...]}, {"suggestions": [...]}, raw arrays,
+     * and anything else where we can find a list of objects with a name field.
+     *
+     * Drops malformed entries and any name that already exists
+     * (case-insensitive) in $existingNames. Resolves the "group" string
+     * against $groupNameToId for convenience.
      *
      * @return array<int, array{name:string, description:string, group_id:?int, group_name:?string}>
      */
     public function parseSkillSuggestions(string $raw, array $existingNames, array $groupNameToId): array
     {
         $stripped = trim($raw);
+        // Strip ```json fences if the model added them
         if (preg_match('/```(?:json)?\s*([\s\S]*?)\s*```/i', $stripped, $m)) {
             $stripped = trim($m[1]);
         }
-        if (!str_starts_with($stripped, '{')) {
-            $start = strpos($stripped, '{');
-            $end   = strrpos($stripped, '}');
-            if ($start === false || $end === false || $end <= $start) {
-                throw new SoftAIException('AI response did not contain JSON: ' . mb_substr($raw, 0, 200));
+        // Pull the first JSON value (object OR array) out of any prose wrapper
+        if ($stripped === '' || ($stripped[0] !== '{' && $stripped[0] !== '[')) {
+            $candidates = [];
+            $objStart = strpos($stripped, '{');
+            $objEnd   = strrpos($stripped, '}');
+            if ($objStart !== false && $objEnd !== false && $objEnd > $objStart) {
+                $candidates[] = substr($stripped, $objStart, $objEnd - $objStart + 1);
             }
-            $stripped = substr($stripped, $start, $end - $start + 1);
+            $arrStart = strpos($stripped, '[');
+            $arrEnd   = strrpos($stripped, ']');
+            if ($arrStart !== false && $arrEnd !== false && $arrEnd > $arrStart) {
+                $candidates[] = substr($stripped, $arrStart, $arrEnd - $arrStart + 1);
+            }
+            if (!$candidates) {
+                error_log('[AI suggest skills] non-JSON response: ' . mb_substr($raw, 0, 500));
+                throw new SoftAIException('AI response did not contain JSON. First 200 chars: ' . mb_substr($raw, 0, 200));
+            }
+            $stripped = $candidates[0];
         }
 
         $decoded = json_decode($stripped, true);
-        if (!is_array($decoded) || !isset($decoded['skills']) || !is_array($decoded['skills'])) {
-            throw new SoftAIException('AI suggestion JSON missing "skills" array');
+        if (!is_array($decoded)) {
+            error_log('[AI suggest skills] JSON decode failed: ' . json_last_error_msg() . ' — raw: ' . mb_substr($raw, 0, 500));
+            throw new SoftAIException('AI returned malformed JSON (' . json_last_error_msg() . '). First 200 chars: ' . mb_substr($raw, 0, 200));
+        }
+
+        $skillsList = $this->extractSkillsArray($decoded);
+        if ($skillsList === null) {
+            error_log('[AI suggest skills] no skills array in response — keys: ' . implode(',', array_keys($decoded)) . ' — raw: ' . mb_substr($raw, 0, 500));
+            $topKeys = array_slice(array_keys($decoded), 0, 6);
+            throw new SoftAIException('AI returned JSON but no recognizable skills list (top-level keys: ' . (empty($topKeys) ? '(empty object)' : implode(', ', $topKeys)) . '). First 200 chars: ' . mb_substr($raw, 0, 200));
         }
 
         $existingLower = array_map(static fn($n) => mb_strtolower(trim((string) $n)), $existingNames);
         $seen = [];
         $out  = [];
-        foreach ($decoded['skills'] as $row) {
+        foreach ($skillsList as $row) {
             if (!is_array($row)) { continue; }
-            $name = trim((string) ($row['name'] ?? ''));
+
+            // Name lives under name | skill | skill_name | title (model preference varies)
+            $name = '';
+            foreach (['name', 'skill', 'skill_name', 'title', 'label'] as $k) {
+                if (isset($row[$k]) && is_string($row[$k]) && trim($row[$k]) !== '') {
+                    $name = trim($row[$k]);
+                    break;
+                }
+            }
             if ($name === '') { continue; }
             $key = mb_strtolower($name);
             if (in_array($key, $existingLower, true) || isset($seen[$key])) { continue; }
             $seen[$key] = true;
 
-            $desc = trim((string) ($row['description'] ?? ''));
+            // Description under description | desc | summary
+            $desc = '';
+            foreach (['description', 'desc', 'summary', 'details'] as $k) {
+                if (isset($row[$k]) && is_string($row[$k])) {
+                    $desc = trim($row[$k]);
+                    break;
+                }
+            }
             $desc = mb_substr($desc, 0, 500);
 
-            $groupName = isset($row['group']) && is_string($row['group']) ? trim($row['group']) : '';
-            $groupId   = null;
+            // Group under group | group_name | owning_group | team — accept null/string
+            $groupName = '';
+            foreach (['group', 'group_name', 'owning_group', 'team'] as $k) {
+                if (array_key_exists($k, $row) && is_string($row[$k])) {
+                    $groupName = trim($row[$k]);
+                    break;
+                }
+            }
+            $groupId = null;
             if ($groupName !== '' && isset($groupNameToId[$groupName])) {
                 $groupId = (int) $groupNameToId[$groupName];
             } else {
-                $groupName = '';
+                // Try a case-insensitive match before giving up
+                if ($groupName !== '') {
+                    foreach ($groupNameToId as $gName => $gId) {
+                        if (mb_strtolower($gName) === mb_strtolower($groupName)) {
+                            $groupId   = (int) $gId;
+                            $groupName = (string) $gName;
+                            break;
+                        }
+                    }
+                }
+                if ($groupId === null) { $groupName = ''; }
             }
 
             $out[] = [
@@ -345,6 +402,45 @@ TXT;
         }
 
         return $out;
+    }
+
+    /**
+     * Find the array-of-skill-objects inside whatever shape the model returned.
+     * Tries the documented "skills" key first, then common alternatives, then
+     * falls back to scanning all top-level array values for a list of objects
+     * with a name-ish field.
+     */
+    private function extractSkillsArray(array $decoded): ?array
+    {
+        // Top-level array: e.g. [{name: ...}, {name: ...}]
+        if (array_is_list($decoded)) {
+            return $decoded;
+        }
+
+        $preferredKeys = [
+            'skills', 'suggestions', 'suggested_skills', 'agent_skills',
+            'recommendations', 'recommended_skills', 'items', 'results',
+            'data', 'list',
+        ];
+        foreach ($preferredKeys as $k) {
+            if (isset($decoded[$k]) && is_array($decoded[$k]) && array_is_list($decoded[$k])) {
+                return $decoded[$k];
+            }
+        }
+
+        // Last resort: pick the first list-of-objects-with-name value at the top level.
+        foreach ($decoded as $value) {
+            if (!is_array($value) || !array_is_list($value) || empty($value)) { continue; }
+            $first = $value[0] ?? null;
+            if (!is_array($first)) { continue; }
+            foreach (['name', 'skill', 'skill_name', 'title', 'label'] as $nameKey) {
+                if (isset($first[$nameKey])) {
+                    return $value;
+                }
+            }
+        }
+
+        return null;
     }
 
     protected function curlGetJson(string $url, array $headers, int $timeoutSec): array

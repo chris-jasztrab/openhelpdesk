@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.20.1 — 2026-05-01
+
+### Fixes
+- **AI skill suggestion failed with `AI suggestion JSON missing "skills" array` no matter which mode was picked.** The parser in `src/AI.php` required the model's response to be a JSON object with the exact top-level key `"skills"` and rejected everything else — but real model responses don't always honour the requested key name. Anthropic's Messages API has no JSON-mode enforcement at all, so Claude could (and apparently did) return the array under `"suggestions"`, `"agent_skills"`, or as a top-level array `[...]`. OpenAI with `response_format: json_object` was forced to return *some* object but the key name still wasn't constrained. Either way the parser blew up before any of the suggestions could be shown. Two fixes layered together: (1) Hardened the prompt — the system message now says "the top-level key MUST be exactly 'skills' (lowercase plural)" with the schema marked "EXACT key names". (2) Made the parser tolerant — it now accepts the documented `skills` key first, then falls back through `suggestions`, `suggested_skills`, `agent_skills`, `recommendations`, `items`, `results`, `data`, `list`; accepts a top-level array as well; and as a last resort scans every top-level array value for a list-of-objects with a `name`-ish field. Per-row keys are similarly tolerant (`name`/`skill`/`skill_name`/`title`/`label`, `description`/`desc`/`summary`/`details`, `group`/`group_name`/`owning_group`/`team`), and group names now match case-insensitively. When parsing still fails, the SoftAIException message now includes the top-level keys it found and the first 200 chars of the raw response so admins can see what the model actually returned, and the full raw response (truncated to 500 chars) is logged via `error_log()` for diagnosis.
+
+---
+
 ## 2.20.0 — 2026-05-01
 
 ### Features
