@@ -603,6 +603,37 @@ $router->get('/admin/docs/{page}', function (array $p) use ($validDocPages) {
  * ADMIN – User Management
  * ================================================================== */
 
+$router->get('/admin/users/online', function () {
+    Auth::requireRole('admin');
+    $db = Database::connect();
+
+    // Single source of truth for the online window. Anyone whose last_seen is
+    // within the last 60 seconds is considered "currently online" — matches
+    // the heartbeat cadence (30s) with one missed-ping headroom.
+    $onlineWindow = 60;
+
+    // Drop rows older than 24h to keep the table tidy. The 60s online window
+    // is enforced separately below; we just don't want stale rows piling up.
+    $db->exec('DELETE FROM user_presence WHERE last_seen < DATE_SUB(NOW(), INTERVAL 1 DAY)');
+
+    $stmt = $db->prepare(
+        "SELECT u.id, u.first_name, u.last_name, u.email, u.role,
+                p.last_seen, p.ip_address, p.user_agent,
+                TIMESTAMPDIFF(SECOND, p.last_seen, NOW()) AS seconds_ago
+           FROM user_presence p
+           JOIN users u ON u.id = p.user_id
+          WHERE p.last_seen >= DATE_SUB(NOW(), INTERVAL ? SECOND)
+          ORDER BY p.last_seen DESC"
+    );
+    $stmt->execute([$onlineWindow]);
+    $online = $stmt->fetchAll();
+
+    render('admin/users/online', [
+        'online'       => $online,
+        'onlineWindow' => $onlineWindow,
+    ]);
+});
+
 $router->get('/admin/users', function () {
     Auth::requireRole('admin');
     $db   = Database::connect();

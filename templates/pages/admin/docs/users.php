@@ -140,7 +140,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
     <li>To give an agent unrestricted access to all tickets without making them an admin, remove them from all groups.</li>
 </ol>
 <div class="alert alert-info small mt-3 mb-0"><i class="bi bi-info-circle me-2"></i>
-    Each group also has an <strong>Auto-Assignment Strategy</strong> for routing new tickets to a specific member (Round Robin, Load-Based, Skill-Based, First Available). See <a href="/admin/docs/automations#group-auto-assign" class="alert-link">Group Auto-Assignment</a> for the full breakdown.
+    Each group also has an <strong>Auto-Assignment Strategy</strong> for routing new tickets to a specific member (Round Robin, Load-Based, Skill-Based, First Available, AI Skill-Based). See <a href="/admin/docs/automations#group-auto-assign" class="alert-link">Group Auto-Assignment</a> for the full breakdown.
 </div>
 </div>
 </div>
@@ -202,12 +202,13 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-toggle-on text-primary me-2"></i>Agent Availability</h5>
-<p class="text-muted mb-2">Each agent / power user / admin has an <strong>"I'm available for new tickets"</strong> toggle on their My Profile page. It defaults to on and is read by the <a href="/admin/docs/automations#group-auto-assign">First Available</a> auto-assignment strategy only.</p>
+<h5 class="fw-semibold mb-3"><i class="bi bi-circle-fill text-success me-2"></i>Online Presence</h5>
+<p class="text-muted mb-2">Every authenticated user's browser pings <code>/api/presence</code> every 30 seconds. Anyone whose last ping was within 60 seconds is considered <strong>online</strong> and is shown live at <a href="/admin/users/online"><strong>Admin → Users → Who's Online</strong></a>. The same data feeds the <a href="/admin/docs/automations#group-auto-assign">First Available</a> auto-assignment strategy.</p>
 <ul class="text-muted mb-0">
-    <li>Flipping yourself off-duty stops First Available from routing new tickets to you. The other strategies (Round Robin, Load-Based, Skill-Based) ignore the flag.</li>
-    <li>Direct manual assignment is never blocked by the flag — a colleague can still assign you a ticket if they choose.</li>
-    <li>Use it for shift changes, breaks, vacation cover, or follow-the-sun rotations. There is no scheduled-on/scheduled-off; the flag is a manual switch.</li>
+    <li>There is no manual "I'm available" toggle anymore (removed in 2.21.0). To stop receiving First Available auto-assignments, close the browser tab — the row clears within 60s.</li>
+    <li>Direct manual assignment is never blocked by online status — a colleague can assign you a ticket whether you're online or not.</li>
+    <li>The heartbeat pauses while a tab is hidden (background tab, screen off). Active tabs in any window count as online.</li>
+    <li>Other strategies (Round Robin, Load-Based, Skill-Based) ignore presence — they always pick from the full group.</li>
 </ul>
 </div>
 </div>

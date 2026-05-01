@@ -11,6 +11,21 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.21.0 — 2026-05-01
+
+### Features
+- **Global online-presence tracking + admin "Who's Online" page.** Every authenticated user's browser now heartbeats `POST /api/presence` every 30 seconds (paused while the tab is hidden, cleared via `sendBeacon` to `/api/presence/leave` on `pagehide`). The new `user_presence` table — added by migration **028** — stores `(user_id, last_seen, ip_address, user_agent)` with `last_seen` indexed for fast online-window queries. Anyone whose `last_seen` is within the last **60 seconds** (one missed-ping headroom on the 30s cadence) is treated as currently online. New page at `/admin/users/online` (linked from the Users header and reachable as **Admin → Users → Who's Online**) lists everyone online right now with avatar/initials, name, role badge, "X seconds ago" last-seen, IP, and a parsed "Chrome on Windows"-style browser label, with a green pulsing dot indicator and a 15-second auto-refresh. Heartbeat code lives in [templates/layouts/app.php](templates/layouts/app.php) and only runs for authenticated users on the main `app` layout, so login/auth/public pages don't ping. The endpoint deliberately skips CSRF — it's idempotent, takes no body, and a `sendBeacon` from `pagehide` can't easily set custom headers; auth + same-origin cookie is sufficient.
+
+### Changes
+- **First Available auto-assign now reads online presence instead of the manual `is_available` toggle.** `_autoAssignFirstAvailable()` in [src/helpers.php](src/helpers.php) now picks group members whose `user_presence.last_seen` is within the last 60 seconds, then load-balances among them via `_autoAssignLeastLoaded()`. Falls back via the group's existing `assign_fallback` setting (round-robin / load-based / leave unassigned) when nobody is online. The pre-2.21 behaviour required agents to remember to flip an "I'm available for new tickets" switch on their profile and flip it back when they returned — easy to forget in either direction. Closing the tab is now the single source of truth; opening it again re-registers presence on the next heartbeat (≤ 30s).
+- **Removed the manual "I'm available for new tickets" toggle from My Profile** (cards, save handler, and admin docs all updated). The `users.is_available` column is left in place — historical data is harmless and migration 025 still creates it for fresh installs — but nothing reads or writes it anymore.
+- **Admin docs refreshed.** [Admin → Docs → Users](templates/pages/admin/docs/users.php) replaces the old "Agent Availability" card with an "Online Presence" card explaining the heartbeat cadence and pointing at the live page. [Admin → Docs → Automations](templates/pages/admin/docs/automations.php) updates the First Available strategy description and the fallback / skills-and-availability sections accordingly.
+
+### Internal
+- Migration **028** is idempotent (CREATE TABLE IF NOT EXISTS) and adds an index on `last_seen` so the 60s online-window query stays cheap as the table grows. A 24-hour cleanup runs lazily on every load of `/admin/users/online` to keep the table tidy without scheduling a separate job.
+
+---
+
 ## 2.20.3 — 2026-05-01
 
 ### Fixes

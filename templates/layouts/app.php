@@ -376,5 +376,51 @@
     <script src="https://cdn.jsdelivr.net/npm/driver.js@1.3.4/dist/driver.js.iife.js"></script>
     <?php require ROOT_DIR . '/templates/partials/portal-tour.php'; ?>
     <?php endif; ?>
+    <?php if (Auth::check()): ?>
+    <script>
+    /* Global presence heartbeat — pings /api/presence every 30s while the
+       page is open and visible. Used by the admin Who's Online panel and
+       the First Available auto-assign strategy. Stops while the tab is
+       hidden (saves a request and reflects "not really watching") and
+       fires a sendBeacon on pagehide so the row is cleared promptly when
+       the tab closes. */
+    (function () {
+        var url = '/api/presence';
+        var leaveUrl = '/api/presence/leave';
+        var intervalMs = 30000;
+        var timer = null;
+
+        function ping() {
+            try {
+                fetch(url, { method: 'POST', credentials: 'same-origin', cache: 'no-store', keepalive: true })
+                    .catch(function () { /* swallow; offline is fine */ });
+            } catch (e) { /* ignore */ }
+        }
+        function start() {
+            if (timer) return;
+            ping();
+            timer = setInterval(ping, intervalMs);
+        }
+        function stop() {
+            if (!timer) return;
+            clearInterval(timer);
+            timer = null;
+        }
+
+        if (document.visibilityState === 'visible') start();
+        document.addEventListener('visibilitychange', function () {
+            if (document.visibilityState === 'visible') start();
+            else stop();
+        });
+        window.addEventListener('pagehide', function () {
+            stop();
+            try {
+                if (navigator.sendBeacon) navigator.sendBeacon(leaveUrl);
+                else fetch(leaveUrl, { method: 'POST', credentials: 'same-origin', keepalive: true });
+            } catch (e) { /* ignore */ }
+        });
+    })();
+    </script>
+    <?php endif; ?>
 </body>
 </html>

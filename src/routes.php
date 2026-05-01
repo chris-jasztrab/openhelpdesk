@@ -721,6 +721,42 @@ $router->post('/api/tickets/{id}/presence/leave', function (array $p) {
 });
 
 /* ------------------------------------------------------------------
+ * Global User Presence (Logged-in / app-open tracking)
+ * ------------------------------------------------------------------
+ * The base layout heartbeats every 30s for any authenticated user.
+ * `last_seen` within the last 60s is treated as "currently online" by
+ * the admin Who's Online page and the First Available auto-assign
+ * strategy.
+ *
+ * No CSRF on the heartbeat: it's idempotent, takes no body, and a
+ * sendBeacon-style leave call can't easily attach custom headers.
+ * Auth + same-origin cookie is sufficient.
+ * ------------------------------------------------------------------ */
+$router->post('/api/presence', function () {
+    Auth::requireAuth();
+    $db = Database::connect();
+    $ip = $_SERVER['REMOTE_ADDR'] ?? null;
+    $ua = isset($_SERVER['HTTP_USER_AGENT']) ? mb_substr((string) $_SERVER['HTTP_USER_AGENT'], 0, 255) : null;
+    $db->prepare(
+        'INSERT INTO user_presence (user_id, last_seen, ip_address, user_agent)
+         VALUES (?, NOW(), ?, ?)
+         ON DUPLICATE KEY UPDATE last_seen = NOW(), ip_address = VALUES(ip_address), user_agent = VALUES(user_agent)'
+    )->execute([Auth::id(), $ip, $ua]);
+    header('Content-Type: application/json');
+    echo json_encode(['ok' => true]);
+    exit;
+});
+
+$router->post('/api/presence/leave', function () {
+    Auth::requireAuth();
+    $db = Database::connect();
+    $db->prepare('DELETE FROM user_presence WHERE user_id = ?')->execute([Auth::id()]);
+    header('Content-Type: application/json');
+    echo json_encode(['ok' => true]);
+    exit;
+});
+
+/* ------------------------------------------------------------------
  * Global Search (JSON API)
  * ------------------------------------------------------------------ */
 $router->get('/search', function () {
@@ -1356,14 +1392,6 @@ $router->post('/profile', function () {
     // Save theme preference
     $theme = in_array($_POST['theme'] ?? '', ['light', 'dark'], true) ? $_POST['theme'] : 'light';
     setSetting('ui_theme:' . $userId, $theme);
-
-    // Availability flag (only meaningful for agents/admins/power users; the
-    // form only exposes the toggle to those roles, but we accept submissions
-    // from any authenticated user to keep the handler simple).
-    if (in_array(Auth::role(), ['agent', 'admin', 'power_user'], true)) {
-        $isAvailable = isset($_POST['is_available']) ? 1 : 0;
-        $db->prepare('UPDATE users SET is_available = ? WHERE id = ?')->execute([$isAvailable, $userId]);
-    }
 
     // Save notification preferences
     $db->prepare(

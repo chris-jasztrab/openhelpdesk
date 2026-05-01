@@ -151,7 +151,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
         </tr>
         <tr>
             <td><strong>First Available</strong></td>
-            <td>Pick a member who has flipped the <em>"I'm available for new tickets"</em> switch on their profile (least-loaded among them). Good for shift / follow-the-sun coverage. Falls back when nobody is available.</td>
+            <td>Pick a group member who currently has the app open in a browser — i.e. their heartbeat has fired in the last 60 seconds (least-loaded among them). The list of who's online is visible at <a href="/admin/users/online">Admin → Users → Who's Online</a>. Good for shift / follow-the-sun coverage. Falls back when nobody is online.</td>
         </tr>
         <tr>
             <td><strong>AI Skill-Based</strong> <span class="badge bg-primary ms-1">new</span></td>
@@ -166,7 +166,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-arrow-down-circle text-primary me-2"></i>Fallback Behaviour</h5>
-<p class="text-muted mb-2">Skill-Based and First Available can both come up empty (no member has the required skills, or nobody is on duty). When that happens, the group's <strong>Fallback</strong> setting decides what to do next:</p>
+<p class="text-muted mb-2">Skill-Based and First Available can both come up empty (no member has the required skills, or nobody is currently online). When that happens, the group's <strong>Fallback</strong> setting decides what to do next:</p>
 <ul class="text-muted mb-0">
     <li><strong>Load-Based</strong> <span class="badge bg-secondary ms-1">default</span> — assign the least-loaded member of the group regardless of skill / availability.</li>
     <li><strong>Round Robin</strong> — rotate through the group ignoring skill / availability.</li>
@@ -182,7 +182,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <ul class="text-muted mb-3">
     <li><strong>Agent Skills</strong> are managed at <a href="/admin/skills"><strong>Admin → Settings → Agent Skills</strong></a>. Each skill has a name, description, and a <strong>scope</strong> — Global (admin-curated) or owned by a specific group. <a href="/admin/docs/users#group-managers">Group managers</a> can edit skills their group owns and assign them to teammates without admin involvement.</li>
     <li><strong>Required skills per ticket type</strong> are configured on the <a href="/admin/types">Ticket Types</a> form. A ticket type can require zero, one, or several skills — Skill-Based assignment matches members who hold them <em>all</em>.</li>
-    <li><strong>"Available for new tickets"</strong> is a per-user toggle on the My Profile page (agent / admin / power user only). Defaults to on. Only First Available reads it; the other strategies ignore it.</li>
+    <li><strong>Online presence</strong> drives First Available — anyone with the app open in a browser tab heartbeats every 30s, and anyone whose last heartbeat was within the last 60s is treated as online. There's no manual "available" toggle anymore (was removed in 2.21.0); just close the tab when you're off duty. Live list at <a href="/admin/users/online">Admin → Users → Who's Online</a>.</li>
 </ul>
 <div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
     Auto-assignment only fires when the ticket already has a group. Portal-created tickets inherit the group from <a href="/admin/types">Ticket Types → Default Group</a>, so make sure types you want auto-routed have a default group set.

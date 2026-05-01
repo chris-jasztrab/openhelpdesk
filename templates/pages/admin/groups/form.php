@@ -134,7 +134,7 @@ $roleColors = ['admin' => 'danger', 'agent' => 'primary'];
                     'load_based'      => ['Load-Based',       'bi-bar-chart',      'Pick the member with the fewest open tickets. Best when work items vary in length.'],
                     'skill_based'     => ['Skill-Based',      'bi-mortarboard',    'Pick a member whose skills cover every skill required by the ticket type. Configure skills under Settings → Agent Skills, and required skills on each Ticket Type.'],
                     'ai_skill_based'  => ['AI Skill-Based',   'bi-cpu',            'Use the configured AI provider to read the ticket and infer which skills it needs. Falls back to the fallback below if confidence is too low or AI is disabled. Configure under Settings → AI Classification.'],
-                    'first_available' => ['First Available',  'bi-toggle-on',      'Pick a member who has marked themselves Available on their profile. Useful for shift coverage.'],
+                    'first_available' => ['First Available',  'bi-circle-fill',    'Pick a member who currently has the app open in a browser (heartbeat within the last 60s). Useful for shift coverage and follow-the-sun.'],
                 ];
                 ?>
                 <div class="row g-2">
@@ -169,7 +169,7 @@ $roleColors = ['admin' => 'danger', 'agent' => 'primary'];
                     <option value="<?= e($val) ?>" <?= $fallback === $val ? 'selected' : '' ?>><?= e($label) ?></option>
                     <?php endforeach; ?>
                 </select>
-                <div class="form-text">Used when Skill-Based finds nobody with the required skills, or First Available finds nobody marked available.</div>
+                <div class="form-text">Used when Skill-Based finds nobody with the required skills, or First Available finds nobody currently online.</div>
             </div>
 
             <hr class="my-4">

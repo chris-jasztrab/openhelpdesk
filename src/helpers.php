@@ -571,15 +571,16 @@ function setSetting(string $key, string $value): void
  *   skill_based     — pick a member whose skills cover every skill required by
  *                     the ticket type. Ties broken by load. Falls back to the
  *                     group's assign_fallback when no member qualifies.
- *   first_available — pick a member with users.is_available = 1, load-balanced.
- *                     Falls back to assign_fallback when nobody is available.
+ *   first_available — pick a member who currently has the app open in a
+ *                     browser (heartbeat within the last 60s — see
+ *                     user_presence), load-balanced. Falls back to
+ *                     assign_fallback when nobody is online.
  *
  * Only agent / admin / power_user group members are considered — portal-role
  * users in a group are ignored. The eligible pool intentionally ignores the
- * is_available flag for round_robin and load_based; flipping that flag should
- * only affect the "first_available" strategy. Skill-based requires the skill
- * match but does NOT also require availability — a configurable combination
- * is a follow-up.
+ * online status for round_robin and load_based; presence only affects the
+ * "first_available" strategy. Skill-based requires the skill match but does
+ * NOT also require online status — a configurable combination is a follow-up.
  */
 function autoAssignTicket(PDO $db, int $ticketId): ?int
 {
@@ -830,6 +831,14 @@ function runPostTicketCreateHooks(PDO $db, int $ticketId): ?int
     return autoAssignTicket($db, $ticketId);
 }
 
+/**
+ * First-Available routing: pick a group member who currently has the app
+ * open in a browser. "Currently online" = a row in user_presence whose
+ * last_seen is within the last 60 seconds (matches the layout's 30s
+ * heartbeat with one missed-ping headroom). Replaces the pre-2.21
+ * is_available toggle, which required agents to manually flip themselves
+ * available; now availability is inferred from real activity.
+ */
 function _autoAssignFirstAvailable(PDO $db, array $members): ?int
 {
     if (empty($members)) {
@@ -837,7 +846,12 @@ function _autoAssignFirstAvailable(PDO $db, array $members): ?int
     }
     $placeholders = implode(',', array_fill(0, count($members), '?'));
     $stmt = $db->prepare(
-        "SELECT id FROM users WHERE id IN ($placeholders) AND is_available = 1 ORDER BY id"
+        "SELECT u.id
+           FROM users u
+           JOIN user_presence p ON p.user_id = u.id
+          WHERE u.id IN ($placeholders)
+            AND p.last_seen >= DATE_SUB(NOW(), INTERVAL 60 SECOND)
+          ORDER BY u.id"
     );
     $stmt->execute($members);
     $available = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
