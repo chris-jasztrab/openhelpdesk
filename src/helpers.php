@@ -1437,12 +1437,12 @@ function getEmailTpl(string $name, array $rawTokens): array
         ],
         'ticket_status_resolved' => [
             'subject' => '[Ticket #{{ticket_id}}] Resolved: {{subject}}',
-            'intro'   => 'Your support ticket has been resolved. If you have further questions, you can reopen it by replying.',
+            'intro'   => 'Your support ticket has been resolved. If you have further questions, please reply to this email and we\'ll follow up.',
             'button'  => 'View Ticket',
         ],
         'ticket_status_closed' => [
             'subject' => '[Ticket #{{ticket_id}}] Closed: {{subject}}',
-            'intro'   => 'Your support ticket has been closed. Thank you for contacting us.',
+            'intro'   => 'Your support ticket has been closed. Thank you for contacting us. If you need further assistance, please submit a new ticket.',
             'button'  => 'View Ticket',
         ],
         'confidential_ticket_accessed' => [
@@ -2354,8 +2354,8 @@ function notifyRequesterStatusChanged(PDO $db, int $ticketId, string $newStatus)
     $ticketUrl = $appUrl . '/portal/tickets/' . $ticketId;
 
     $defaultIntros = [
-        'resolved' => 'Your support ticket has been resolved. If you have further questions, you can reopen it by replying.',
-        'closed'   => 'Your support ticket has been closed. Thank you for contacting us.',
+        'resolved' => 'Your support ticket has been resolved. If you have further questions, please reply to this email and we\'ll follow up.',
+        'closed'   => 'Your support ticket has been closed. Thank you for contacting us. If you need further assistance, please submit a new ticket.',
     ];
 
     $tpl = getEmailTpl('ticket-status-' . $newStatus, [

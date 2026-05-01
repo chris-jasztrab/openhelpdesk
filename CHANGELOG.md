@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.17.4 — 2026-05-01
+
+### Fixes
+- **Resolved-ticket emails told requesters they could "reopen by replying" — replies didn't actually reopen anything.** The default intro for the `ticket_status_resolved` notification (in `src/helpers.php`, both the template registry and the `notifyRequesterStatusChanged()` fallback) said *"If you have further questions, you can reopen it by replying."* But `scripts/process-replies.php` only changes a ticket's status when the sender is an agent/admin AND includes an explicit `#open` hashtag command. A requester replying "thanks" or "actually one more question" got their reply appended as a comment with the ticket still sitting in `resolved` — and on `closed` tickets, the reply was silently dropped at the `status === 'closed'` skip-guard with no acknowledgement at all. Reworded the resolved intro to *"please reply to this email and we'll follow up"* (truthful: replies do become comments that agents see) and the closed intro to *"please submit a new ticket"* (truthful: replies to closed tickets are dropped, so directing users to the portal sets correct expectations). Note: admins who customised either template via the email-templates UI will keep their override; this only changes the default for installs that haven't edited it.
+
+---
+
 ## 2.17.3 — 2026-04-30
 
 ### Fixes
