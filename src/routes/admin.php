@@ -2433,6 +2433,122 @@ $router->post('/admin/skills/{id}/delete', function (array $p) {
     redirect('/admin/skills');
 });
 
+/* ------------------------------------------------------------------
+ * Skill Suggestion (AI-assisted)
+ *
+ * GET /admin/skills/suggest — gather org type + ticket types + groups
+ *   + existing skills, ask the configured AI provider to suggest a set
+ *   of skills, render them with checkboxes for the admin to cherry-pick.
+ *
+ * POST /admin/skills/suggest — bulk-insert the rows the admin checked.
+ *   Skips any name that already exists; group_id is optional.
+ * ------------------------------------------------------------------ */
+
+$router->get('/admin/skills/suggest', function () {
+    Auth::requireRole('admin');
+
+    if (getSetting('ai_enabled', '0') !== '1') {
+        flash('error', 'AI is not enabled. Configure it in Settings → AI Classification before using skill suggestions.');
+        redirect('/admin/skills');
+    }
+
+    $db = Database::connect();
+    $ticketTypes   = $db->query('SELECT id, name FROM ticket_types ORDER BY sort_order, name')->fetchAll();
+    $groups        = $db->query("SELECT id, name FROM `groups` ORDER BY sort_order, name")->fetchAll();
+    $existingSkills = $db->query('SELECT id, name, description FROM agent_skills ORDER BY name')->fetchAll();
+
+    $orgSlug  = getSetting('organization_type', 'other');
+    $orgLabel = organizationTypeLabel($orgSlug);
+
+    try {
+        $suggestions = AIClassifierFactory::suggestSkillsFromSettings(
+            $orgLabel,
+            $ticketTypes,
+            $groups,
+            $existingSkills
+        );
+    } catch (SoftAIException $e) {
+        flash('error', 'AI suggestion failed: ' . $e->getMessage());
+        redirect('/admin/skills');
+    } catch (\Throwable $e) {
+        error_log('[AI suggest skills] failed: ' . $e->getMessage());
+        flash('error', 'AI suggestion failed: ' . $e->getMessage());
+        redirect('/admin/skills');
+    }
+
+    render('admin/skills/suggest', [
+        'suggestions'    => $suggestions,
+        'orgLabel'       => $orgLabel,
+        'ticketTypes'    => $ticketTypes,
+        'groups'         => $groups,
+        'existingSkills' => $existingSkills,
+    ]);
+});
+
+$router->post('/admin/skills/suggest', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/skills');
+    }
+
+    $rows = isset($_POST['skills']) && is_array($_POST['skills']) ? $_POST['skills'] : [];
+    if (!$rows) {
+        flash('error', 'Select at least one suggested skill to add.');
+        redirect('/admin/skills/suggest');
+    }
+
+    $db = Database::connect();
+    // Pull existing names + valid group ids once so we can de-dupe and
+    // reject hand-tampered group ids without round-tripping per row.
+    $existingLower = array_map(
+        static fn($n) => mb_strtolower(trim((string) $n)),
+        $db->query('SELECT name FROM agent_skills')->fetchAll(PDO::FETCH_COLUMN)
+    );
+    $validGroupIds = array_map('intval', $db->query('SELECT id FROM `groups`')->fetchAll(PDO::FETCH_COLUMN));
+
+    $insert = $db->prepare('INSERT INTO agent_skills (name, description, sort_order, group_id) VALUES (?, ?, 0, ?)');
+
+    $added   = 0;
+    $skipped = 0;
+    foreach ($rows as $row) {
+        if (!is_array($row)) { continue; }
+        // `_keep` is the row's "include this suggestion" checkbox. Only act on
+        // rows the admin explicitly opted in to (defends against JS-disabled
+        // browsers where unchecked rows still submit their other inputs).
+        if (empty($row['_keep'])) { continue; }
+        $name = trim((string) ($row['name'] ?? ''));
+        if ($name === '') { $skipped++; continue; }
+        if (in_array(mb_strtolower($name), $existingLower, true)) { $skipped++; continue; }
+
+        $desc    = trim((string) ($row['description'] ?? ''));
+        $groupId = isset($row['group_id']) && $row['group_id'] !== '' ? (int) $row['group_id'] : null;
+        if ($groupId !== null && !in_array($groupId, $validGroupIds, true)) {
+            $groupId = null;
+        }
+
+        try {
+            $insert->execute([
+                mb_substr($name, 0, 100),
+                $desc !== '' ? mb_substr($desc, 0, 500) : null,
+                $groupId,
+            ]);
+            $added++;
+            $existingLower[] = mb_strtolower($name);
+        } catch (PDOException $e) {
+            // Likely a duplicate-name race; just skip and continue.
+            $skipped++;
+        }
+    }
+
+    if ($added > 0) {
+        flash('success', "Added {$added} skill" . ($added === 1 ? '' : 's') . '.' . ($skipped > 0 ? " Skipped {$skipped} duplicate or invalid row" . ($skipped === 1 ? '' : 's') . '.' : ''));
+    } else {
+        flash('error', 'No skills were added.' . ($skipped > 0 ? " Skipped {$skipped} duplicate or invalid row" . ($skipped === 1 ? '' : 's') . '.' : ''));
+    }
+    redirect('/admin/skills');
+});
+
 /* ==================================================================
  * ADMIN – Ticket Templates
  * ================================================================== */
@@ -8444,61 +8560,21 @@ $router->post('/admin/settings/tags', function () {
  * ADMIN – Organization Settings
  *
  * Stored as a single key (`organization_type`) in the `settings` table.
- * Values are stable slugs (e.g. `public_library`); the human label lives
- * only in `$orgTypeGroups` below so it can be relabelled without
- * orphaning saved data. Keep this list in sync with the page template.
+ * Values are stable slugs (e.g. `public_library`); the human labels live
+ * only in `organizationTypeGroups()` (helpers.php) so they can be
+ * relabelled without orphaning saved data.
  * ================================================================== */
 
-$orgTypeGroups = [
-    'Library' => [
-        'public_library'    => 'Public Library',
-        'academic_library'  => 'Academic Library',
-        'special_library'   => 'Special / Research Library',
-    ],
-    'Education' => [
-        'k12_school'        => 'K–12 School / School District',
-        'higher_education'  => 'College / University',
-        'private_school'    => 'Private / Independent School',
-    ],
-    'Government' => [
-        'government_federal'   => 'Government — Federal',
-        'government_state'     => 'Government — State / Provincial',
-        'government_municipal' => 'Government — Municipal / Local',
-    ],
-    'Healthcare' => [
-        'hospital'        => 'Hospital / Health System',
-        'clinic'          => 'Clinic / Medical Practice',
-    ],
-    'Business' => [
-        'corporation'     => 'Corporation / Enterprise',
-        'small_business'  => 'Small Business',
-        'manufacturing'   => 'Manufacturing',
-        'retail'          => 'Retail / E-commerce',
-        'financial'       => 'Financial Services / Banking',
-        'legal'           => 'Legal / Law Firm',
-        'hospitality'     => 'Hospitality / Travel',
-        'technology'      => 'Technology / Software',
-    ],
-    'Community' => [
-        'non_profit'      => 'Non-Profit / Charity',
-        'religious'       => 'Religious / Faith-Based',
-        'museum'          => 'Museum / Cultural Institution',
-        'association'     => 'Association / Membership Group',
-    ],
-    'Other' => [
-        'other'           => 'Other',
-    ],
-];
-
-$router->get('/admin/settings/organization', function () use ($orgTypeGroups) {
+$router->get('/admin/settings/organization', function () {
     Auth::requireRole('admin');
     $settings = [
         'organization_type' => getSetting('organization_type', 'other'),
     ];
+    $orgTypeGroups = organizationTypeGroups();
     render('admin/settings/organization', compact('settings', 'orgTypeGroups'));
 });
 
-$router->post('/admin/settings/organization', function () use ($orgTypeGroups) {
+$router->post('/admin/settings/organization', function () {
     Auth::requireRole('admin');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -8507,7 +8583,7 @@ $router->post('/admin/settings/organization', function () use ($orgTypeGroups) {
 
     $submitted = $_POST['organization_type'] ?? '';
     $validValues = [];
-    foreach ($orgTypeGroups as $opts) {
+    foreach (organizationTypeGroups() as $opts) {
         $validValues = array_merge($validValues, array_keys($opts));
     }
 

@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.19.0 — 2026-05-01
+
+### Features
+- **Admin → Settings → Agent Skills → "Suggest with AI".** New button on the skills index page that asks the configured AI provider (Anthropic or OpenAI, whichever is set in `Settings → AI Classification`) to suggest a tailored set of agent skills for this organization. The prompt feeds the model the `organization_type` setting, every defined ticket type, every defined group, and the names of skills already in place — so suggestions are scoped to what the org actually triages and won't duplicate what already exists. The response page renders each suggestion as an editable row (name, description, owning group dropdown) with a checkbox for cherry-picking — admins can rename, retarget, or drop any suggestion before bulk-creating the lot. Group ownership defaults to the AI's recommendation when it matches an existing group name exactly, and falls back to "Global" when it doesn't. The route requires AI to be enabled and a key configured; if either is missing, the admin is bounced back with a flash explaining what to fix. Internals: `BaseAIClassifier` gained a generic `chat()` method (provider-agnostic free-form prompt) plus `skillSuggestionSystemPrompt()` / `skillSuggestionUserPrompt()` / `parseSkillSuggestions()` helpers; `AIClassifierFactory::suggestSkillsFromSettings()` is the one-call public entry point. The org-type slug→label table moved from a closure-scoped `$orgTypeGroups` in `routes/admin.php` into reusable `organizationTypeGroups()` / `organizationTypeLabel()` helpers in `helpers.php` so this and future features can resolve labels without redefining the list.
+
+---
+
 ## 2.18.0 — 2026-05-01
 
 ### Features

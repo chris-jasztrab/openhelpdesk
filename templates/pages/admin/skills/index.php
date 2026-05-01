@@ -16,9 +16,14 @@ $breadcrumbs  = [
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h5 class="fw-bold mb-0">Agent Skills</h5>
-    <a href="/admin/skills/create" class="btn text-white" style="background:var(--ld-primary);">
-        <i class="bi bi-mortarboard me-1"></i>Add Skill
-    </a>
+    <div class="d-flex gap-2">
+        <a href="/admin/skills/suggest" class="btn btn-outline-primary" title="Use AI to suggest skills based on your ticket types, groups, and organization type">
+            <i class="bi bi-magic me-1"></i>Suggest with AI
+        </a>
+        <a href="/admin/skills/create" class="btn text-white" style="background:var(--ld-primary);">
+            <i class="bi bi-mortarboard me-1"></i>Add Skill
+        </a>
+    </div>
 </div>
 
 <div class="alert alert-info">

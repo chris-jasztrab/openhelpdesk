@@ -466,6 +466,71 @@ function slugify(string $text): string
     return trim($text, '-');
 }
 
+/* ── Organization type ───────────────────────────────────────── */
+
+/**
+ * The single source of truth for the `organization_type` setting's
+ * allowed values + sector groupings + display labels. Used by the
+ * organization settings page, the AI skill-suggestion route, and any
+ * future feature that needs to know what kind of org this install is.
+ *
+ * Keep slugs (array keys) stable — they're persisted in the `settings`
+ * table — but labels can be relabelled freely.
+ */
+function organizationTypeGroups(): array
+{
+    return [
+        'Library' => [
+            'public_library'    => 'Public Library',
+            'academic_library'  => 'Academic Library',
+            'special_library'   => 'Special / Research Library',
+        ],
+        'Education' => [
+            'k12_school'        => 'K–12 School / School District',
+            'higher_education'  => 'College / University',
+            'private_school'    => 'Private / Independent School',
+        ],
+        'Government' => [
+            'government_federal'   => 'Government — Federal',
+            'government_state'     => 'Government — State / Provincial',
+            'government_municipal' => 'Government — Municipal / Local',
+        ],
+        'Healthcare' => [
+            'hospital'        => 'Hospital / Health System',
+            'clinic'          => 'Clinic / Medical Practice',
+        ],
+        'Business' => [
+            'corporation'     => 'Corporation / Enterprise',
+            'small_business'  => 'Small Business',
+            'manufacturing'   => 'Manufacturing',
+            'retail'          => 'Retail / E-commerce',
+            'financial'       => 'Financial Services / Banking',
+            'legal'           => 'Legal / Law Firm',
+            'hospitality'     => 'Hospitality / Travel',
+            'technology'      => 'Technology / Software',
+        ],
+        'Community' => [
+            'non_profit'      => 'Non-Profit / Charity',
+            'religious'       => 'Religious / Faith-Based',
+            'museum'          => 'Museum / Cultural Institution',
+            'association'     => 'Association / Membership Group',
+        ],
+        'Other' => [
+            'other'           => 'Other',
+        ],
+    ];
+}
+
+function organizationTypeLabel(string $slug): string
+{
+    foreach (organizationTypeGroups() as $opts) {
+        if (isset($opts[$slug])) {
+            return $opts[$slug];
+        }
+    }
+    return 'Other';
+}
+
 /* ── Settings helpers ─────────────────────────────────────────── */
 
 function getSetting(string $key, string $default = ''): string

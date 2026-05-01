@@ -196,6 +196,134 @@ TXT;
         return ['decoded' => $decoded, 'latency_ms' => $latency];
     }
 
+    /**
+     * Free-form chat completion against the provider. Used by features
+     * that aren't ticket classification (e.g. skill suggestion). Returns
+     * the raw assistant text — caller is responsible for parsing.
+     *
+     * Implemented per-provider since the request/response shapes differ.
+     *
+     * @throws SoftAIException
+     */
+    abstract public function chat(string $systemPrompt, string $userPrompt, int $maxTokens, int $timeoutSec): string;
+
+    /**
+     * Build the system + user prompts for the "suggest skills for this
+     * organisation" feature on the Agent Skills admin page.
+     */
+    public function skillSuggestionSystemPrompt(): string
+    {
+        return <<<TXT
+You are a help-desk operations consultant. Given an organization's profile, the ticket types they triage, the groups (queues/teams) tickets are routed to, and the agent skills they already have, suggest practical new agent skills that would help route tickets within this organization.
+
+Output one JSON object only — no markdown, no prose.
+
+Schema:
+{
+  "skills": [
+    {
+      "name": "<short skill name, 1-3 words>",
+      "description": "<one short sentence on what this skill represents>",
+      "group": "<exact name of one of the provided groups, or null for global>"
+    },
+    ...
+  ]
+}
+
+Rules:
+- Suggest 8 to 15 distinct skills covering the most common areas of expertise this kind of organization will need to cover its ticket types.
+- Do NOT duplicate skills the org already has (case-insensitive name match). If everything common is already covered, return fewer.
+- Names should be concise, specific, and human-friendly (e.g. "Network", "Billing", "Cataloging", "Sierra ILS"). Avoid generic catch-alls like "Support" or "General".
+- For each skill, suggest a "group" only if a clear owning team exists in the provided groups list — otherwise return null. The string must match a provided group name EXACTLY (case-sensitive).
+- Tailor suggestions to the organization type. A public library should get library-flavoured skills (Cataloging, ILS, Programming, Patron Services); a hospital should get healthcare-flavoured skills (EMR, HIPAA, Clinical Apps); etc.
+- Output JSON only, no commentary.
+TXT;
+    }
+
+    public function skillSuggestionUserPrompt(string $orgTypeLabel, array $ticketTypes, array $groups, array $existingSkills): string
+    {
+        $fmtList = static function (array $rows, string $emptyText): string {
+            if (!$rows) { return $emptyText . "\n"; }
+            $out = '';
+            foreach ($rows as $r) {
+                $line = '- ' . trim((string) ($r['name'] ?? ''));
+                if (!empty($r['description'])) {
+                    $line .= ' — ' . str_replace(["\n", "\r"], ' ', mb_substr((string) $r['description'], 0, 160));
+                }
+                $out .= $line . "\n";
+            }
+            return $out;
+        };
+
+        $typesBlock    = $fmtList($ticketTypes,    '(none defined yet)');
+        $groupsBlock   = $fmtList($groups,         '(none defined yet)');
+        $existingBlock = $fmtList($existingSkills, '(none)');
+
+        $org = trim($orgTypeLabel) !== '' ? $orgTypeLabel : 'Unspecified';
+
+        return "Organization type: {$org}\n\nTicket types this org triages:\n{$typesBlock}\nGroups (queues/teams) tickets are routed to:\n{$groupsBlock}\nAgent skills already defined (do not duplicate):\n{$existingBlock}\nSuggest skills now. Respond with JSON only.";
+    }
+
+    /**
+     * Parse the AI's skill-suggestion response. Drops malformed entries
+     * and any name that already exists (case-insensitive) in $existingNames.
+     * Resolves the "group" string against $groupNameToId for convenience.
+     *
+     * @return array<int, array{name:string, description:string, group_id:?int, group_name:?string}>
+     */
+    public function parseSkillSuggestions(string $raw, array $existingNames, array $groupNameToId): array
+    {
+        $stripped = trim($raw);
+        if (preg_match('/```(?:json)?\s*([\s\S]*?)\s*```/i', $stripped, $m)) {
+            $stripped = trim($m[1]);
+        }
+        if (!str_starts_with($stripped, '{')) {
+            $start = strpos($stripped, '{');
+            $end   = strrpos($stripped, '}');
+            if ($start === false || $end === false || $end <= $start) {
+                throw new SoftAIException('AI response did not contain JSON: ' . mb_substr($raw, 0, 200));
+            }
+            $stripped = substr($stripped, $start, $end - $start + 1);
+        }
+
+        $decoded = json_decode($stripped, true);
+        if (!is_array($decoded) || !isset($decoded['skills']) || !is_array($decoded['skills'])) {
+            throw new SoftAIException('AI suggestion JSON missing "skills" array');
+        }
+
+        $existingLower = array_map(static fn($n) => mb_strtolower(trim((string) $n)), $existingNames);
+        $seen = [];
+        $out  = [];
+        foreach ($decoded['skills'] as $row) {
+            if (!is_array($row)) { continue; }
+            $name = trim((string) ($row['name'] ?? ''));
+            if ($name === '') { continue; }
+            $key = mb_strtolower($name);
+            if (in_array($key, $existingLower, true) || isset($seen[$key])) { continue; }
+            $seen[$key] = true;
+
+            $desc = trim((string) ($row['description'] ?? ''));
+            $desc = mb_substr($desc, 0, 500);
+
+            $groupName = isset($row['group']) && is_string($row['group']) ? trim($row['group']) : '';
+            $groupId   = null;
+            if ($groupName !== '' && isset($groupNameToId[$groupName])) {
+                $groupId = (int) $groupNameToId[$groupName];
+            } else {
+                $groupName = '';
+            }
+
+            $out[] = [
+                'name'        => mb_substr($name, 0, 100),
+                'description' => $desc,
+                'group_id'    => $groupId,
+                'group_name'  => $groupName !== '' ? $groupName : null,
+            ];
+        }
+
+        return $out;
+    }
+
     protected function curlGetJson(string $url, array $headers, int $timeoutSec): array
     {
         $ch = curl_init($url);
@@ -275,6 +403,38 @@ class AnthropicClassifier extends BaseAIClassifier
         $verdict['prompt_tokens']  = (int) ($decoded['usage']['input_tokens']  ?? 0);
         $verdict['output_tokens']  = (int) ($decoded['usage']['output_tokens'] ?? 0);
         return $verdict;
+    }
+
+    public function chat(string $systemPrompt, string $userPrompt, int $maxTokens, int $timeoutSec): string
+    {
+        $resp = $this->curlPostJson(
+            'https://api.anthropic.com/v1/messages',
+            [
+                'model'      => $this->model,
+                'max_tokens' => $maxTokens,
+                'system'     => $systemPrompt,
+                'messages'   => [
+                    ['role' => 'user', 'content' => $userPrompt],
+                ],
+            ],
+            [
+                'Content-Type: application/json',
+                'x-api-key: ' . $this->apiKey,
+                'anthropic-version: 2023-06-01',
+            ],
+            $timeoutSec
+        );
+
+        $text = '';
+        foreach (($resp['decoded']['content'] ?? []) as $block) {
+            if (($block['type'] ?? '') === 'text') {
+                $text .= $block['text'] ?? '';
+            }
+        }
+        if ($text === '') {
+            throw new SoftAIException('Anthropic returned no text content');
+        }
+        return $text;
     }
 
     public function listModels(int $timeoutSec = 10): array
@@ -361,6 +521,34 @@ class OpenAIClassifier extends BaseAIClassifier
         $verdict['prompt_tokens'] = (int) ($decoded['usage']['prompt_tokens']     ?? 0);
         $verdict['output_tokens'] = (int) ($decoded['usage']['completion_tokens'] ?? 0);
         return $verdict;
+    }
+
+    public function chat(string $systemPrompt, string $userPrompt, int $maxTokens, int $timeoutSec): string
+    {
+        $resp = $this->curlPostJson(
+            'https://api.openai.com/v1/chat/completions',
+            [
+                'model' => $this->model,
+                'messages' => [
+                    ['role' => 'system', 'content' => $systemPrompt],
+                    ['role' => 'user',   'content' => $userPrompt],
+                ],
+                'max_tokens'      => $maxTokens,
+                'response_format' => ['type' => 'json_object'],
+                'temperature'     => 0.2,
+            ],
+            [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $this->apiKey,
+            ],
+            $timeoutSec
+        );
+
+        $text = (string) ($resp['decoded']['choices'][0]['message']['content'] ?? '');
+        if ($text === '') {
+            throw new SoftAIException('OpenAI returned no message content');
+        }
+        return $text;
     }
 
     public function listModels(int $timeoutSec = 10): array
@@ -454,5 +642,44 @@ class AIClassifierFactory
         if ($provider === 'anthropic') { return new AnthropicClassifier($apiKey, $model); }
         if ($provider === 'openai')    { return new OpenAIClassifier($apiKey, $model); }
         return null;
+    }
+
+    /**
+     * Ask the configured provider to suggest skills given the org's profile.
+     * Returns the parsed list of suggestions; throws SoftAIException on
+     * any provider/parse error so the caller can surface a flash message.
+     *
+     * @param array $ticketTypes    [['name' => ..., 'description' => ?...], ...]
+     * @param array $groups         [['id' => int, 'name' => ...], ...]
+     * @param array $existingSkills [['name' => ..., 'description' => ?...], ...]
+     * @return array<int, array{name:string, description:string, group_id:?int, group_name:?string}>
+     * @throws SoftAIException
+     */
+    public static function suggestSkillsFromSettings(string $orgTypeLabel, array $ticketTypes, array $groups, array $existingSkills): array
+    {
+        $classifier = self::fromSettings();
+        if (!$classifier instanceof BaseAIClassifier) {
+            throw new SoftAIException('AI is not enabled or is not configured. Configure it in Settings → AI Classification.');
+        }
+
+        $existingNames   = array_map(static fn($s) => (string) ($s['name'] ?? ''), $existingSkills);
+        $groupNameToId   = [];
+        foreach ($groups as $g) {
+            if (!empty($g['name'])) {
+                $groupNameToId[(string) $g['name']] = (int) $g['id'];
+            }
+        }
+
+        $maxTokens  = max(800, (int) getSetting('ai_max_tokens', '500'));
+        $timeoutSec = max(15,  (int) getSetting('ai_timeout_seconds', '5'));
+
+        $raw = $classifier->chat(
+            $classifier->skillSuggestionSystemPrompt(),
+            $classifier->skillSuggestionUserPrompt($orgTypeLabel, $ticketTypes, $groups, $existingSkills),
+            $maxTokens,
+            $timeoutSec
+        );
+
+        return $classifier->parseSkillSuggestions($raw, $existingNames, $groupNameToId);
     }
 }
