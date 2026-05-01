@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.20.0 — 2026-05-01
+
+### Features
+- **Admin → Settings → Agent Skills → "Suggest with AI" — added a "Data-mine past tickets" mode.** The "Suggest with AI" button now opens a launcher modal with two options. *Basic* (the default, unchanged from 2.19.0) feeds the AI only the org profile, ticket types, groups, and existing skills. *Data-mine past tickets* additionally feeds the AI a sample of recent ticket subjects so suggestions reflect the actual issues this install handles day-to-day — useful for established installs where the right skills aren't obvious from the org profile alone (e.g. surfacing "Sierra ILS" or "Polaris" from years of ticket history rather than just "ILS"). The admin picks the sample size from a dropdown — 100, 250, 500 (default), 1,000, 2,500, or 5,000 most recent tickets — so installs with millions of tickets can scope the analysis without dragging down the request. Confidential ticket types are always excluded (same hard rule `classifyTicketWithAI()` enforces — never send confidential bodies to a third-party API), only subjects are read (descriptions stay local), each subject is truncated to 140 chars, and the prompt block is hard-capped at 60 KB so even the 5,000-ticket option can't blow up the request — extra subjects are dropped before being sent. Mining mode also raises the per-call timeout floor to 45 s since larger prompts take longer for the model to digest. The results page surfaces a "Method" panel showing whether basic or mining mode was used and how many subjects were actually included, and the *Regenerate* link preserves the chosen mode + sample size so re-running gives a comparable result.
+
+---
+
 ## 2.19.0 — 2026-05-01
 
 ### Features

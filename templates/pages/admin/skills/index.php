@@ -17,9 +17,11 @@ $breadcrumbs  = [
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h5 class="fw-bold mb-0">Agent Skills</h5>
     <div class="d-flex gap-2">
-        <a href="/admin/skills/suggest" class="btn btn-outline-primary" title="Use AI to suggest skills based on your ticket types, groups, and organization type">
+        <button type="button" class="btn btn-outline-primary"
+                data-bs-toggle="modal" data-bs-target="#suggestSkillsModal"
+                title="Use AI to suggest skills based on your setup">
             <i class="bi bi-magic me-1"></i>Suggest with AI
-        </a>
+        </button>
         <a href="/admin/skills/create" class="btn text-white" style="background:var(--ld-primary);">
             <i class="bi bi-mortarboard me-1"></i>Add Skill
         </a>
@@ -122,6 +124,100 @@ document.getElementById('deleteSkillModal').addEventListener('show.bs.modal', fu
     document.getElementById('deleteSkillName').textContent = btn.dataset.name;
     document.getElementById('deleteSkillForm').action = '/admin/skills/' + btn.dataset.id + '/delete';
 });
+</script>
+
+<div class="modal fade" id="suggestSkillsModal" tabindex="-1" aria-labelledby="suggestSkillsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <form method="GET" action="/admin/skills/suggest" id="suggestSkillsForm">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold" id="suggestSkillsModalLabel">
+                        <i class="bi bi-magic me-2 text-primary"></i>Suggest Skills with AI
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted mb-3">
+                        Pick how the AI should generate suggestions. Either way, your
+                        <strong>organization type</strong>, <strong>ticket types</strong>, <strong>groups</strong>, and
+                        <strong>existing skills</strong> are always included so duplicates are avoided.
+                    </p>
+
+                    <div class="form-check border rounded p-3 mb-2">
+                        <input class="form-check-input" type="radio" name="mode" id="modeBasic" value="basic" checked>
+                        <label class="form-check-label w-100" for="modeBasic">
+                            <strong>Basic</strong> — use only my organization profile
+                            <div class="text-muted small mt-1">Fast. Good first pass when starting from scratch. Doesn't need any tickets to exist yet.</div>
+                        </label>
+                    </div>
+
+                    <div class="form-check border rounded p-3">
+                        <input class="form-check-input" type="radio" name="mode" id="modeMine" value="mine">
+                        <label class="form-check-label w-100" for="modeMine">
+                            <strong>Data-mine past tickets</strong> — also analyze recent ticket subjects
+                            <div class="text-muted small mt-1">
+                                Better for established installs. The AI sees a sample of your most recent
+                                non-confidential ticket subjects and can spot real-world themes (specific
+                                vendors, products, error patterns) you might want skills for.
+                            </div>
+
+                            <div class="mt-3 ps-2 border-start" id="sampleSizeWrap" style="opacity:.5;">
+                                <label for="sampleSize" class="form-label fw-semibold mb-1">Sample size</label>
+                                <select class="form-select form-select-sm" name="n" id="sampleSize" disabled style="max-width:240px;">
+                                    <option value="100">100 most recent tickets</option>
+                                    <option value="250">250 most recent tickets</option>
+                                    <option value="500" selected>500 most recent tickets</option>
+                                    <option value="1000">1,000 most recent tickets</option>
+                                    <option value="2500">2,500 most recent tickets</option>
+                                    <option value="5000">5,000 most recent tickets</option>
+                                </select>
+                                <div class="form-text">
+                                    Larger samples give the AI more signal but take longer and may be sampled
+                                    down to fit the prompt. Confidential ticket types are always excluded.
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div class="alert alert-warning mt-3 mb-0 small d-none" id="suggestLoadingNote">
+                        <i class="bi bi-hourglass-split me-1"></i>
+                        Generating suggestions can take 5–30 seconds. Please wait — don't close this tab.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn text-white" style="background:var(--ld-primary);" id="suggestSubmitBtn">
+                        <i class="bi bi-magic me-1"></i>Generate Suggestions
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+(function () {
+    var modeBasic   = document.getElementById('modeBasic');
+    var modeMine    = document.getElementById('modeMine');
+    var sampleSize  = document.getElementById('sampleSize');
+    var wrap        = document.getElementById('sampleSizeWrap');
+    function syncSampleSize() {
+        var on = modeMine.checked;
+        sampleSize.disabled = !on;
+        wrap.style.opacity  = on ? '1' : '.5';
+    }
+    modeBasic.addEventListener('change', syncSampleSize);
+    modeMine.addEventListener('change',  syncSampleSize);
+    syncSampleSize();
+
+    // When the form is submitted, swap the button to a loading state and
+    // surface the "this can take a while" hint.
+    document.getElementById('suggestSkillsForm').addEventListener('submit', function () {
+        var btn = document.getElementById('suggestSubmitBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Generating…';
+        document.getElementById('suggestLoadingNote').classList.remove('d-none');
+    });
+})();
 </script>
 
 <?php require ROOT_DIR . '/templates/partials/settings-nav-end.php'; ?>

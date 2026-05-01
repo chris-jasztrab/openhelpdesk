@@ -2460,12 +2460,41 @@ $router->get('/admin/skills/suggest', function () {
     $orgSlug  = getSetting('organization_type', 'other');
     $orgLabel = organizationTypeLabel($orgSlug);
 
+    // Mode + sample-size knobs from the launcher modal. mode=basic uses only
+    // org/types/groups; mode=mine also feeds the AI a sample of recent
+    // ticket subjects so suggestions reflect what this install actually deals
+    // with day-to-day. n is clamped to a safe range — the AI prompt has its
+    // own 60K-char cap on the subjects block, so very large n won't blow up
+    // the request, just take longer to query.
+    $mode = ($_GET['mode'] ?? 'basic') === 'mine' ? 'mine' : 'basic';
+    $n    = max(50, min(5000, (int) ($_GET['n'] ?? 500)));
+
+    $recentSubjects = [];
+    $minedCount     = 0;
+    if ($mode === 'mine') {
+        // Skip confidential ticket types so subjects aren't leaked to a
+        // third-party API — same rule classifyTicketWithAI() enforces.
+        $sub = $db->prepare(
+            "SELECT t.subject
+             FROM tickets t
+             LEFT JOIN ticket_types tt ON tt.id = t.type_id
+             WHERE COALESCE(tt.is_confidential, 0) = 0
+               AND t.subject IS NOT NULL AND t.subject <> ''
+             ORDER BY t.id DESC
+             LIMIT {$n}"
+        );
+        $sub->execute();
+        $recentSubjects = array_map('strval', $sub->fetchAll(PDO::FETCH_COLUMN));
+        $minedCount     = count($recentSubjects);
+    }
+
     try {
         $suggestions = AIClassifierFactory::suggestSkillsFromSettings(
             $orgLabel,
             $ticketTypes,
             $groups,
-            $existingSkills
+            $existingSkills,
+            $recentSubjects
         );
     } catch (SoftAIException $e) {
         flash('error', 'AI suggestion failed: ' . $e->getMessage());
@@ -2482,6 +2511,9 @@ $router->get('/admin/skills/suggest', function () {
         'ticketTypes'    => $ticketTypes,
         'groups'         => $groups,
         'existingSkills' => $existingSkills,
+        'mode'           => $mode,
+        'sampleSize'     => $n,
+        'minedCount'     => $minedCount,
     ]);
 });
 

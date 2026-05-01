@@ -236,11 +236,12 @@ Rules:
 - Names should be concise, specific, and human-friendly (e.g. "Network", "Billing", "Cataloging", "Sierra ILS"). Avoid generic catch-alls like "Support" or "General".
 - For each skill, suggest a "group" only if a clear owning team exists in the provided groups list — otherwise return null. The string must match a provided group name EXACTLY (case-sensitive).
 - Tailor suggestions to the organization type. A public library should get library-flavoured skills (Cataloging, ILS, Programming, Patron Services); a hospital should get healthcare-flavoured skills (EMR, HIPAA, Clinical Apps); etc.
+- If a sample of recent ticket subjects is provided, use it to identify real-world issue themes the org actually deals with — frequently appearing topics (specific products, vendors, error patterns, workflows) are strong candidates for new skills.
 - Output JSON only, no commentary.
 TXT;
     }
 
-    public function skillSuggestionUserPrompt(string $orgTypeLabel, array $ticketTypes, array $groups, array $existingSkills): string
+    public function skillSuggestionUserPrompt(string $orgTypeLabel, array $ticketTypes, array $groups, array $existingSkills, array $recentSubjects = []): string
     {
         $fmtList = static function (array $rows, string $emptyText): string {
             if (!$rows) { return $emptyText . "\n"; }
@@ -261,7 +262,29 @@ TXT;
 
         $org = trim($orgTypeLabel) !== '' ? $orgTypeLabel : 'Unspecified';
 
-        return "Organization type: {$org}\n\nTicket types this org triages:\n{$typesBlock}\nGroups (queues/teams) tickets are routed to:\n{$groupsBlock}\nAgent skills already defined (do not duplicate):\n{$existingBlock}\nSuggest skills now. Respond with JSON only.";
+        $base = "Organization type: {$org}\n\nTicket types this org triages:\n{$typesBlock}\nGroups (queues/teams) tickets are routed to:\n{$groupsBlock}\nAgent skills already defined (do not duplicate):\n{$existingBlock}";
+
+        if ($recentSubjects) {
+            // Hard cap on the subjects block so a "look at the last 5000 tickets"
+            // request can't blow up the prompt. Subjects past the cap are dropped.
+            $maxChars = 60000;
+            $subjBlock = '';
+            $included  = 0;
+            foreach ($recentSubjects as $subject) {
+                $clean = str_replace(["\n", "\r", "\t"], ' ', trim((string) $subject));
+                if ($clean === '') { continue; }
+                $clean = mb_substr($clean, 0, 140);
+                $line  = '- ' . $clean . "\n";
+                if (strlen($subjBlock) + strlen($line) > $maxChars) { break; }
+                $subjBlock .= $line;
+                $included++;
+            }
+            if ($included > 0) {
+                $base .= "\n\nSample of {$included} recent ticket subjects from this org (most recent first — use to identify real-world issue themes):\n" . $subjBlock;
+            }
+        }
+
+        return $base . "\nSuggest skills now. Respond with JSON only.";
     }
 
     /**
@@ -649,13 +672,14 @@ class AIClassifierFactory
      * Returns the parsed list of suggestions; throws SoftAIException on
      * any provider/parse error so the caller can surface a flash message.
      *
-     * @param array $ticketTypes    [['name' => ..., 'description' => ?...], ...]
-     * @param array $groups         [['id' => int, 'name' => ...], ...]
-     * @param array $existingSkills [['name' => ..., 'description' => ?...], ...]
+     * @param array $ticketTypes     [['name' => ..., 'description' => ?...], ...]
+     * @param array $groups          [['id' => int, 'name' => ...], ...]
+     * @param array $existingSkills  [['name' => ..., 'description' => ?...], ...]
+     * @param array $recentSubjects  Optional sample of recent ticket subjects to ground the suggestions in real org data.
      * @return array<int, array{name:string, description:string, group_id:?int, group_name:?string}>
      * @throws SoftAIException
      */
-    public static function suggestSkillsFromSettings(string $orgTypeLabel, array $ticketTypes, array $groups, array $existingSkills): array
+    public static function suggestSkillsFromSettings(string $orgTypeLabel, array $ticketTypes, array $groups, array $existingSkills, array $recentSubjects = []): array
     {
         $classifier = self::fromSettings();
         if (!$classifier instanceof BaseAIClassifier) {
@@ -671,11 +695,14 @@ class AIClassifierFactory
         }
 
         $maxTokens  = max(800, (int) getSetting('ai_max_tokens', '500'));
-        $timeoutSec = max(15,  (int) getSetting('ai_timeout_seconds', '5'));
+        // Mining mode pushes a much larger prompt; raise the timeout floor
+        // proportionally so a slow API doesn't break the user-facing flow.
+        $baseTimeout = max(15, (int) getSetting('ai_timeout_seconds', '5'));
+        $timeoutSec  = $recentSubjects ? max($baseTimeout, 45) : $baseTimeout;
 
         $raw = $classifier->chat(
             $classifier->skillSuggestionSystemPrompt(),
-            $classifier->skillSuggestionUserPrompt($orgTypeLabel, $ticketTypes, $groups, $existingSkills),
+            $classifier->skillSuggestionUserPrompt($orgTypeLabel, $ticketTypes, $groups, $existingSkills, $recentSubjects),
             $maxTokens,
             $timeoutSec
         );

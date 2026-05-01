@@ -25,14 +25,22 @@ $breadcrumbs  = [
     <strong>Add Selected Skills</strong>.
 </div>
 
+<?php
+$mode        = $mode ?? 'basic';
+$sampleSize  = (int) ($sampleSize ?? 0);
+$minedCount  = (int) ($minedCount ?? 0);
+$regenerateHref = $mode === 'mine'
+    ? '/admin/skills/suggest?mode=mine&n=' . $sampleSize
+    : '/admin/skills/suggest?mode=basic';
+?>
 <div class="card border-0 shadow-sm mb-4">
     <div class="card-body p-3">
         <div class="row g-3 small">
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="text-muted text-uppercase small fw-semibold mb-1">Organization Type</div>
                 <div><i class="bi bi-building me-1 text-muted"></i><?= e($orgLabel) ?></div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="text-muted text-uppercase small fw-semibold mb-1">Ticket Types (<?= count($ticketTypes) ?>)</div>
                 <?php if (empty($ticketTypes)): ?>
                     <span class="text-muted">None defined</span>
@@ -42,7 +50,7 @@ $breadcrumbs  = [
                     <?php endforeach; ?>
                 <?php endif; ?>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="text-muted text-uppercase small fw-semibold mb-1">Groups (<?= count($groups) ?>)</div>
                 <?php if (empty($groups)): ?>
                     <span class="text-muted">None defined</span>
@@ -50,6 +58,21 @@ $breadcrumbs  = [
                     <?php foreach ($groups as $g): ?>
                         <span class="badge bg-primary bg-opacity-10 text-primary me-1 mb-1"><?= e($g['name']) ?></span>
                     <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+            <div class="col-md-3">
+                <div class="text-muted text-uppercase small fw-semibold mb-1">Method</div>
+                <?php if ($mode === 'mine'): ?>
+                    <div>
+                        <i class="bi bi-database-fill-check me-1 text-success"></i>
+                        Data-mined <strong><?= number_format($minedCount) ?></strong> recent ticket
+                        subject<?= $minedCount === 1 ? '' : 's' ?>
+                    </div>
+                <?php else: ?>
+                    <div>
+                        <i class="bi bi-lightbulb me-1 text-muted"></i>
+                        Organization profile only
+                    </div>
                 <?php endif; ?>
             </div>
         </div>
@@ -136,7 +159,7 @@ $breadcrumbs  = [
             <i class="bi bi-check-lg me-1"></i>Add Selected Skills
         </button>
         <a href="/admin/skills" class="btn btn-outline-secondary">Cancel</a>
-        <a href="/admin/skills/suggest" class="btn btn-outline-primary ms-auto" title="Ask the AI again — results will vary">
+        <a href="<?= e($regenerateHref) ?>" class="btn btn-outline-primary ms-auto" title="Ask the AI again with the same settings — results will vary">
             <i class="bi bi-arrow-clockwise me-1"></i>Regenerate
         </a>
     </div>
