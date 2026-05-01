@@ -2335,6 +2335,27 @@ $router->post('/admin/groups/{id}/delete', function (array $p) {
  * required skill.
  * ================================================================== */
 
+/**
+ * Build a `[user_id => [group_id, ...]]` map for the skill edit/create form.
+ * Used by the JS scope filter to hide users who aren't in the chosen
+ * owning group, so the "Agents with this skill" list only shows people
+ * who actually belong to the group the skill is being scoped to.
+ */
+function _skillFormUserGroups(PDO $db): array
+{
+    $rows = $db->query(
+        "SELECT gum.user_id, gum.group_id
+           FROM group_user_map gum
+           JOIN users u ON u.id = gum.user_id
+          WHERE u.role IN ('agent','admin','power_user')"
+    )->fetchAll();
+    $map = [];
+    foreach ($rows as $r) {
+        $map[(int) $r['user_id']][] = (int) $r['group_id'];
+    }
+    return $map;
+}
+
 $router->get('/admin/skills', function () {
     Auth::requireRole('admin');
     $db = Database::connect();
@@ -2359,7 +2380,8 @@ $router->get('/admin/skills/create', function () {
         "SELECT id, first_name, last_name, role FROM users WHERE role IN ('agent','admin','power_user') ORDER BY first_name, last_name"
     )->fetchAll();
     $groups = $db->query("SELECT id, name FROM `groups` ORDER BY sort_order, name")->fetchAll();
-    render('admin/skills/form', ['editing' => null, 'users' => $users, 'memberIds' => [], 'groups' => $groups]);
+    $userGroups = _skillFormUserGroups($db);
+    render('admin/skills/form', ['editing' => null, 'users' => $users, 'memberIds' => [], 'groups' => $groups, 'userGroups' => $userGroups]);
 });
 
 $router->post('/admin/skills/create', function () {
@@ -2415,7 +2437,8 @@ $router->get('/admin/skills/{id}/edit', function (array $p) {
     $mStmt->execute([(int) $p['id']]);
     $memberIds = array_map('intval', $mStmt->fetchAll(PDO::FETCH_COLUMN));
     $groups = $db->query("SELECT id, name FROM `groups` ORDER BY sort_order, name")->fetchAll();
-    render('admin/skills/form', ['editing' => $editing, 'users' => $users, 'memberIds' => $memberIds, 'groups' => $groups]);
+    $userGroups = _skillFormUserGroups($db);
+    render('admin/skills/form', ['editing' => $editing, 'users' => $users, 'memberIds' => $memberIds, 'groups' => $groups, 'userGroups' => $userGroups]);
 });
 
 $router->post('/admin/skills/{id}/edit', function (array $p) {

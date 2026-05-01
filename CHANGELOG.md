@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.21.2 — 2026-05-01
+
+### Changes
+- **Admin → Settings → Agent Skills → Edit/Add — "Agents with this skill" now filters to members of the selected owning group.** Previously the list always showed every agent / admin / power user in the system, so an admin scoping a skill to (say) "Circulation" still saw every IT and Cataloguing agent in the checkbox grid — easy to grant the skill to someone who isn't even in the group, which then made Skill-Based routing pick people who couldn't actually see those tickets. The form now ships a `[user_id => [group_id, ...]]` map (built by `_skillFormUserGroups()` in [src/routes/admin.php](src/routes/admin.php) from `group_user_map`, scoped to agent / admin / power user roles), tags each checkbox card with `data-group-ids`, and a small inline script in [templates/pages/admin/skills/form.php](templates/pages/admin/skills/form.php) hides + unchecks cards that don't belong to the group when the Scope dropdown changes. Selecting "Global — admin-only" restores the full list (global skills are admin-managed and not group-scoped). When a group is selected, the help text updates to "Showing only members of 'GroupName'…" so the filter is obvious. If the group has no members, an inline warning points at the Groups page to add members first. Filtering also runs on initial page load, so editing an existing group-scoped skill opens with the right list pre-filtered. Note: hidden cards are unchecked, so saving after a scope change cleanly removes any legacy memberships the skill picked up before this fix — that's the intended cleanup. The manager-side skill form (managers editing skills their own group owns) is naturally single-group and unchanged.
+
+---
+
 ## 2.21.1 — 2026-05-01
 
 ### Fixes
