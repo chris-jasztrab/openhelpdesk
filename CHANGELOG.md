@@ -11,6 +11,17 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.20.3 — 2026-05-01
+
+### Fixes
+- **AI skill suggestion still threw "Control character error, possibly incorrectly encoded" after 2.20.2.** The first 200 chars of the failing response were clean JSON, so the offending byte was deeper in. Three layered causes, each fixed:
+  1. **Token-limit truncation.** `suggestSkillsFromSettings()` was capping output at `max(800, ai_max_tokens)` — but a real suggestion JSON (8–15 skills × name + description + group + structure) easily runs 1.5–3K tokens. Anthropic was cutting off mid-string, which often splits a multi-byte UTF-8 character — and `json_decode()` reports a split-multibyte fragment as exactly this control-char error. Raised the floor to 4000 tokens for suggestion calls (classification stays at the user's `ai_max_tokens` setting, default 500, since verdict JSON is tiny).
+  2. **Invalid UTF-8 wasn't tolerated.** `json_decode()` was called without flags, so a single bad byte killed the whole response. Now layered: strict decode → retry with `JSON_INVALID_UTF8_SUBSTITUTE` → retry with sanitizer + flag → retry with `mb_scrub()` + sanitizer + flag. Each fallback is byte-identical for already-valid JSON, so this only kicks in when something is genuinely broken.
+  3. **The sanitizer didn't handle invalid `\`-escapes.** Models occasionally emit Windows paths or stray escapes inside descriptions ("C:\Users\foo", "use \z to..."). `\U`, `\D`, `\z` etc. aren't valid JSON escape characters and `json_decode()` rejects them. The sanitizer now tracks string-literal context and re-escapes any backslash that isn't followed by a valid JSON escape char (`"`, `\`, `/`, `b`, `f`, `n`, `r`, `t`) or a well-formed `\uXXXX`.
+- **Better diagnostics on terminal failure.** When all four decode passes fail, the full raw response (truncated at 8 KB instead of 500 chars) is now written to PHP's error log, and the user-facing exception message points at the log so admins know where to look.
+
+---
+
 ## 2.20.2 — 2026-05-01
 
 ### Fixes

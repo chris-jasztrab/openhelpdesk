@@ -326,20 +326,34 @@ TXT;
             $stripped = $candidates[0];
         }
 
+        // Try strict decode first. If it fails, walk through a series of
+        // increasingly permissive fallbacks before giving up. Models emit
+        // every variety of broken JSON: raw control chars inside strings,
+        // invalid \-escapes, truncated multi-byte UTF-8 from token-limit
+        // cuts, stray non-UTF-8 bytes — try to recover from each.
         $decoded = json_decode($stripped, true);
         if (!is_array($decoded)) {
-            // Common failure: model emitted a literal newline / tab / control
-            // char inside a string value (JSON requires those escaped). Walk
-            // the string once, escape any raw control char that's inside a
-            // string literal, and retry the decode before giving up.
-            $sanitized = $this->escapeJsonStringControlChars($stripped);
-            if ($sanitized !== $stripped) {
-                $decoded = json_decode($sanitized, true);
-            }
+            // Substitute invalid UTF-8 bytes with U+FFFD (handles truncated
+            // multi-byte chars when output_tokens caps mid-character).
+            $decoded = json_decode($stripped, true, 512, JSON_INVALID_UTF8_SUBSTITUTE);
         }
         if (!is_array($decoded)) {
-            error_log('[AI suggest skills] JSON decode failed: ' . json_last_error_msg() . ' — raw: ' . mb_substr($raw, 0, 1000));
-            throw new SoftAIException('AI returned malformed JSON (' . json_last_error_msg() . '). First 200 chars: ' . mb_substr($raw, 0, 200));
+            // Escape raw control chars + invalid \-escapes inside string
+            // literals (handles inlined newlines, stray "\U" / "\D" etc.).
+            $sanitized = $this->escapeJsonStringControlChars($stripped);
+            $decoded   = json_decode($sanitized, true, 512, JSON_INVALID_UTF8_SUBSTITUTE);
+        }
+        if (!is_array($decoded)) {
+            // Last-ditch: scrub invalid UTF-8 to ?, then sanitize, then decode.
+            $scrubbed = function_exists('mb_scrub') ? mb_scrub($stripped, 'UTF-8') : $stripped;
+            $sanitized = $this->escapeJsonStringControlChars($scrubbed);
+            $decoded   = json_decode($sanitized, true, 512, JSON_INVALID_UTF8_SUBSTITUTE);
+        }
+        if (!is_array($decoded)) {
+            // Log the FULL raw response (truncated only at 8 KB) so a follow-up
+            // diagnosis has the actual offending bytes, not just the head.
+            error_log('[AI suggest skills] JSON decode failed: ' . json_last_error_msg() . ' — raw len=' . strlen($raw) . ' — raw: ' . mb_substr($raw, 0, 8000));
+            throw new SoftAIException('AI returned malformed JSON (' . json_last_error_msg() . '). First 200 chars: ' . mb_substr($raw, 0, 200) . ' — full response logged to PHP error log for diagnosis.');
         }
 
         $skillsList = $this->extractSkillsArray($decoded);
@@ -415,39 +429,84 @@ TXT;
     }
 
     /**
-     * Walk a JSON string and escape any literal control character (raw
-     * newline, tab, etc.) that appears inside a string literal — JSON
-     * requires those escaped as \n / \t / \uXXXX. Models occasionally emit
-     * raw multi-line strings (especially in description fields) which then
-     * fail json_decode() with "Control character error".
+     * Walk a JSON string and fix two classes of mistakes that models
+     * commonly make inside string literals:
+     *
+     *   1. Raw control bytes (newline, tab, etc., bytes < 0x20) — JSON
+     *      requires these escaped as \n / \t / \uXXXX.
+     *   2. Invalid backslash escapes (e.g. "C:\Users", where \U is not a
+     *      valid JSON escape) — re-escapes the backslash itself.
      *
      * Outside of string literals the original bytes are preserved, so this
      * is safe to run on already-valid JSON (it returns the input unchanged).
      */
     private function escapeJsonStringControlChars(string $json): string
     {
+        // The seven valid characters that may follow a backslash inside a
+        // JSON string literal (per RFC 8259). \uXXXX is handled separately
+        // since it expects four hex digits to follow.
+        static $validEscapeChars = ['"' => 1, '\\' => 1, '/' => 1,
+                                    'b' => 1, 'f' => 1, 'n' => 1, 'r' => 1, 't' => 1];
+
         $out      = '';
         $inString = false;
-        $escape   = false;
         $len      = strlen($json);
-        for ($i = 0; $i < $len; $i++) {
+        $i        = 0;
+        while ($i < $len) {
             $ch = $json[$i];
-            if ($escape) {
-                $out   .= $ch;
-                $escape = false;
+
+            if (!$inString) {
+                if ($ch === '"') { $inString = true; }
+                $out .= $ch;
+                $i++;
                 continue;
             }
-            if ($inString && $ch === '\\') {
-                $out   .= $ch;
-                $escape = true;
-                continue;
-            }
+
+            // ---- inside a string literal ----
+
             if ($ch === '"') {
-                $inString = !$inString;
-                $out     .= $ch;
+                $inString = false;
+                $out .= $ch;
+                $i++;
                 continue;
             }
-            if ($inString && ord($ch) < 0x20) {
+
+            if ($ch === '\\') {
+                $next = $i + 1 < $len ? $json[$i + 1] : '';
+                if ($next === '') {
+                    // Trailing backslash with nothing after — re-escape it
+                    $out .= '\\\\';
+                    $i++;
+                    continue;
+                }
+                if (isset($validEscapeChars[$next])) {
+                    // Valid 1-char escape — pass both bytes through
+                    $out .= $ch . $next;
+                    $i  += 2;
+                    continue;
+                }
+                if ($next === 'u') {
+                    // \uXXXX needs four hex digits — pass through if valid,
+                    // re-escape the backslash if not.
+                    $hex = substr($json, $i + 2, 4);
+                    if (strlen($hex) === 4 && ctype_xdigit($hex)) {
+                        $out .= $ch . $next . $hex;
+                        $i  += 6;
+                        continue;
+                    }
+                    $out .= '\\\\';
+                    $i++;
+                    continue;
+                }
+                // Anything else (\D, \U, \z, etc.) is an invalid JSON escape.
+                // Re-escape the backslash; the next char will be processed
+                // as a normal string byte on the next iteration.
+                $out .= '\\\\';
+                $i++;
+                continue;
+            }
+
+            if (ord($ch) < 0x20) {
                 switch ($ch) {
                     case "\n": $out .= '\\n'; break;
                     case "\r": $out .= '\\r'; break;
@@ -456,9 +515,12 @@ TXT;
                     case "\f": $out .= '\\f'; break;
                     default:   $out .= sprintf('\\u%04x', ord($ch)); break;
                 }
+                $i++;
                 continue;
             }
+
             $out .= $ch;
+            $i++;
         }
         return $out;
     }
@@ -849,7 +911,14 @@ class AIClassifierFactory
             }
         }
 
-        $maxTokens  = max(800, (int) getSetting('ai_max_tokens', '500'));
+        // Suggestion JSON is much larger than a classification verdict —
+        // 8-15 skills × (name + description + group + structure) easily runs
+        // 1.5-3K tokens. The classification setting (`ai_max_tokens`,
+        // default 500) is way too tight here; the response gets truncated
+        // mid-string, often splitting a multi-byte UTF-8 char and producing
+        // the "Control character error, possibly incorrectly encoded" that
+        // json_decode reports. Floor at 4000 to leave headroom.
+        $maxTokens  = max(4000, (int) getSetting('ai_max_tokens', '500'));
         // Mining mode pushes a much larger prompt; raise the timeout floor
         // proportionally so a slow API doesn't break the user-facing flow.
         $baseTimeout = max(15, (int) getSetting('ai_timeout_seconds', '5'));
