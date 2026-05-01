@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.20.2 — 2026-05-01
+
+### Fixes
+- **AI skill suggestion failed with "Control character error, possibly incorrectly encoded" when the model emitted a multi-line description.** Repro from a real Anthropic response: `{"skills": [{"name": "Vega Discover", "description": "Manages and troubleshoots\nthe Vega Discover ...", ...}]}`. JSON forbids raw control bytes (< 0x20) inside string literals — they have to be escaped as `\n` / `\t` / `\uXXXX` — but the model occasionally inlines a literal newline anyway, especially on longer description fields. `json_decode()` blew up before the parser ever saw the rows. Added a single-pass sanitizer that walks the response, tracks whether the cursor is inside a string literal (handling backslash escapes correctly), and re-escapes any raw control byte found there. The parser now tries `json_decode()` first, runs the sanitizer + retries on failure, and only surfaces an error if both passes fail. Already-valid JSON (escapes intact) is left byte-for-byte unchanged. The error_log() snippet on terminal failure was also widened to 1000 chars (was 500) so the offending part of longer responses is captured.
+
+---
+
 ## 2.20.1 — 2026-05-01
 
 ### Fixes

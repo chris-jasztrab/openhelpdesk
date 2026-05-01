@@ -328,7 +328,17 @@ TXT;
 
         $decoded = json_decode($stripped, true);
         if (!is_array($decoded)) {
-            error_log('[AI suggest skills] JSON decode failed: ' . json_last_error_msg() . ' — raw: ' . mb_substr($raw, 0, 500));
+            // Common failure: model emitted a literal newline / tab / control
+            // char inside a string value (JSON requires those escaped). Walk
+            // the string once, escape any raw control char that's inside a
+            // string literal, and retry the decode before giving up.
+            $sanitized = $this->escapeJsonStringControlChars($stripped);
+            if ($sanitized !== $stripped) {
+                $decoded = json_decode($sanitized, true);
+            }
+        }
+        if (!is_array($decoded)) {
+            error_log('[AI suggest skills] JSON decode failed: ' . json_last_error_msg() . ' — raw: ' . mb_substr($raw, 0, 1000));
             throw new SoftAIException('AI returned malformed JSON (' . json_last_error_msg() . '). First 200 chars: ' . mb_substr($raw, 0, 200));
         }
 
@@ -401,6 +411,55 @@ TXT;
             ];
         }
 
+        return $out;
+    }
+
+    /**
+     * Walk a JSON string and escape any literal control character (raw
+     * newline, tab, etc.) that appears inside a string literal — JSON
+     * requires those escaped as \n / \t / \uXXXX. Models occasionally emit
+     * raw multi-line strings (especially in description fields) which then
+     * fail json_decode() with "Control character error".
+     *
+     * Outside of string literals the original bytes are preserved, so this
+     * is safe to run on already-valid JSON (it returns the input unchanged).
+     */
+    private function escapeJsonStringControlChars(string $json): string
+    {
+        $out      = '';
+        $inString = false;
+        $escape   = false;
+        $len      = strlen($json);
+        for ($i = 0; $i < $len; $i++) {
+            $ch = $json[$i];
+            if ($escape) {
+                $out   .= $ch;
+                $escape = false;
+                continue;
+            }
+            if ($inString && $ch === '\\') {
+                $out   .= $ch;
+                $escape = true;
+                continue;
+            }
+            if ($ch === '"') {
+                $inString = !$inString;
+                $out     .= $ch;
+                continue;
+            }
+            if ($inString && ord($ch) < 0x20) {
+                switch ($ch) {
+                    case "\n": $out .= '\\n'; break;
+                    case "\r": $out .= '\\r'; break;
+                    case "\t": $out .= '\\t'; break;
+                    case "\b": $out .= '\\b'; break;
+                    case "\f": $out .= '\\f'; break;
+                    default:   $out .= sprintf('\\u%04x', ord($ch)); break;
+                }
+                continue;
+            }
+            $out .= $ch;
+        }
         return $out;
     }
 
