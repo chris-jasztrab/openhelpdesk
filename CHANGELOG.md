@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.18.0 — 2026-05-01
+
+### Features
+- **Admin → Settings → Organization Type.** New page at `/admin/settings/organization` with a single dropdown letting admins pick the kind of organization they're running the helpdesk for. Options are grouped by sector (Library, Education, Government, Healthcare, Business, Community, Other) and cover the most common cases — Public Library, Academic Library, K–12 / School District, College / University, Federal / State / Municipal Government, Hospital, Clinic, Corporation, Small Business, Manufacturing, Retail, Financial Services, Legal, Hospitality, Technology, Non-Profit, Religious / Faith-Based, Museum, Association — with an `Other` fallback. Stored as the slug `organization_type` in the `settings` table (default `other`); the human label is kept in route code only so the list can be relabelled without orphaning saved data. Submitted values are validated against the in-route allowlist before being written. The new page is linked from the Organization group in the settings sidebar (alongside Locations, Priorities, Ticket Types, Groups, Agent Skills) and is registered in `config/settings_index.php` with sector keywords so the Chrome-style settings search finds it from queries like "library", "k12", "non-profit", or "industry".
+
+---
+
 ## 2.17.4 — 2026-05-01
 
 ### Fixes

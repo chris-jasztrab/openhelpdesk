@@ -17,6 +17,8 @@ $settingsNavGroups = [
          'keywords' => 'service level agreement response resolution deadline breach'],
     ],
     'Organization' => [
+        ['label' => 'Organization Type',      'url' => '/admin/settings/organization', 'icon' => 'bi-building',
+         'keywords' => 'organization type sector industry library education government corporate non-profit healthcare'],
         ['label' => label('location.plural'), 'url' => '/admin/locations',  'icon' => 'bi-geo-alt',
          'keywords' => 'site branch office department location'],
         ['label' => 'Priorities',             'url' => '/admin/priorities', 'icon' => 'bi-flag',

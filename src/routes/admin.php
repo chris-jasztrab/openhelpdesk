@@ -8441,6 +8441,87 @@ $router->post('/admin/settings/tags', function () {
 });
 
 /* ==================================================================
+ * ADMIN – Organization Settings
+ *
+ * Stored as a single key (`organization_type`) in the `settings` table.
+ * Values are stable slugs (e.g. `public_library`); the human label lives
+ * only in `$orgTypeGroups` below so it can be relabelled without
+ * orphaning saved data. Keep this list in sync with the page template.
+ * ================================================================== */
+
+$orgTypeGroups = [
+    'Library' => [
+        'public_library'    => 'Public Library',
+        'academic_library'  => 'Academic Library',
+        'special_library'   => 'Special / Research Library',
+    ],
+    'Education' => [
+        'k12_school'        => 'K–12 School / School District',
+        'higher_education'  => 'College / University',
+        'private_school'    => 'Private / Independent School',
+    ],
+    'Government' => [
+        'government_federal'   => 'Government — Federal',
+        'government_state'     => 'Government — State / Provincial',
+        'government_municipal' => 'Government — Municipal / Local',
+    ],
+    'Healthcare' => [
+        'hospital'        => 'Hospital / Health System',
+        'clinic'          => 'Clinic / Medical Practice',
+    ],
+    'Business' => [
+        'corporation'     => 'Corporation / Enterprise',
+        'small_business'  => 'Small Business',
+        'manufacturing'   => 'Manufacturing',
+        'retail'          => 'Retail / E-commerce',
+        'financial'       => 'Financial Services / Banking',
+        'legal'           => 'Legal / Law Firm',
+        'hospitality'     => 'Hospitality / Travel',
+        'technology'      => 'Technology / Software',
+    ],
+    'Community' => [
+        'non_profit'      => 'Non-Profit / Charity',
+        'religious'       => 'Religious / Faith-Based',
+        'museum'          => 'Museum / Cultural Institution',
+        'association'     => 'Association / Membership Group',
+    ],
+    'Other' => [
+        'other'           => 'Other',
+    ],
+];
+
+$router->get('/admin/settings/organization', function () use ($orgTypeGroups) {
+    Auth::requireRole('admin');
+    $settings = [
+        'organization_type' => getSetting('organization_type', 'other'),
+    ];
+    render('admin/settings/organization', compact('settings', 'orgTypeGroups'));
+});
+
+$router->post('/admin/settings/organization', function () use ($orgTypeGroups) {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/organization');
+    }
+
+    $submitted = $_POST['organization_type'] ?? '';
+    $validValues = [];
+    foreach ($orgTypeGroups as $opts) {
+        $validValues = array_merge($validValues, array_keys($opts));
+    }
+
+    if (!in_array($submitted, $validValues, true)) {
+        flash('error', 'Please choose an organization type from the list.');
+        redirect('/admin/settings/organization');
+    }
+
+    setSetting('organization_type', $submitted);
+    flash('success', 'Organization settings saved.');
+    redirect('/admin/settings/organization');
+});
+
+/* ==================================================================
  * ADMIN – CSAT Settings
  * ================================================================== */
 

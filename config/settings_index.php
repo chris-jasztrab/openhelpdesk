@@ -513,4 +513,12 @@ return [
      'section' => 'Danger Zone', 'anchor' => 'resetConfirmInput',
      'keywords' => 'reset wipe purge factory destructive'],
 
+    // =======================================================================
+    // Organization  (/admin/settings/organization)
+    // =======================================================================
+    ['label' => 'Organization Type',            'description' => 'Sector / industry — library, education, government, etc.',
+     'group' => 'Organization', 'page_label' => 'Organization Type', 'page_url' => '/admin/settings/organization',
+     'section' => 'Organization', 'anchor' => 'organization_type',
+     'keywords' => 'organization type sector industry library public academic education school k12 college university government federal state municipal healthcare hospital clinic corporate enterprise small business manufacturing retail financial banking legal hospitality technology non-profit charity religious museum association'],
+
 ];
