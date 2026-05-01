@@ -203,11 +203,12 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-circle-fill text-success me-2"></i>Online Presence</h5>
-<p class="text-muted mb-2">Every authenticated user's browser pings <code>/api/presence</code> every 30 seconds. Anyone whose last ping was within 60 seconds is considered <strong>online</strong> and is shown live at <a href="/admin/users/online"><strong>Admin → Users → Who's Online</strong></a>. The same data feeds the <a href="/admin/docs/automations#group-auto-assign">First Available</a> auto-assignment strategy.</p>
+<p class="text-muted mb-2">Every authenticated user's browser pings <code>/api/presence</code> every 30 seconds for the lifetime of the tab. Anyone whose last ping was within ~2 minutes is considered <strong>online</strong> and is shown live at <a href="/admin/users/online"><strong>Admin → Users → Who's Online</strong></a>. The same data feeds the <a href="/admin/docs/automations#group-auto-assign">First Available</a> auto-assignment strategy.</p>
 <ul class="text-muted mb-0">
-    <li>There is no manual "I'm available" toggle anymore (removed in 2.21.0). To stop receiving First Available auto-assignments, close the browser tab — the row clears within 60s.</li>
+    <li>There is no manual "I'm available" toggle anymore (removed in 2.21.0). To stop receiving First Available auto-assignments, close the browser tab — sendBeacon clears the row immediately.</li>
     <li>Direct manual assignment is never blocked by online status — a colleague can assign you a ticket whether you're online or not.</li>
-    <li>The heartbeat pauses while a tab is hidden (background tab, screen off). Active tabs in any window count as online.</li>
+    <li><strong>Background tabs and minimized windows still count as online.</strong> The heartbeat keeps running; browsers throttle the timer in the background, which is why the online window is 120s — wide enough to cover the throttled cadence.</li>
+    <li>Sleep / hibernate / closing the laptop lid <em>does</em> stop the heartbeat. The browser resumes pinging when the machine wakes; you'll reappear online on the next ping (≤ 30s).</li>
     <li>Other strategies (Round Robin, Load-Based, Skill-Based) ignore presence — they always pick from the full group.</li>
 </ul>
 </div>

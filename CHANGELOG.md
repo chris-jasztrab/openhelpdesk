@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.21.1 — 2026-05-01
+
+### Fixes
+- **Online presence dropped users who minimized their window or switched tabs.** Two compounding bugs from 2.21.0: (1) the heartbeat in [templates/layouts/app.php](templates/layouts/app.php) explicitly stopped its `setInterval` on `visibilitychange → hidden` — meaning a user who tabbed away or minimized Chrome would emit no further pings and fall off the "online" list 60s later; (2) even if the heartbeat had kept running, browsers throttle background-tab `setInterval` callbacks to roughly once per minute, so a single throttled ping could still land outside a 60s online window. Two-part fix: the visibility-change handler no longer stops the timer (it now only fires an *extra* immediate ping when the tab regains focus, to catch up after long throttling gaps), and the server-side online window has been widened from 60s to **120s** in both [_autoAssignFirstAvailable() in src/helpers.php](src/helpers.php) and the [/admin/users/online route](src/routes/admin.php). The 120s window is wide enough to absorb a throttled-to-once-per-minute background tab with one missed-ping margin, so a logged-in agent who minimizes their browser, parks the helpdesk in a background tab, or switches to another window still counts as online — closing the tab is now the only thing that takes them offline (sendBeacon to `/api/presence/leave` on `pagehide` clears the row immediately). Sleep / hibernate / laptop-lid-closed still stops the heartbeat (browsers freeze JS during sleep), but the agent reappears within 30s of waking. Group form description and admin docs ([users.php](templates/pages/admin/docs/users.php), [automations.php](templates/pages/admin/docs/automations.php)) updated to describe the new behaviour explicitly.
+
+---
+
 ## 2.21.0 — 2026-05-01
 
 ### Features

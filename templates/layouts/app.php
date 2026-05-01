@@ -378,17 +378,25 @@
     <?php endif; ?>
     <?php if (Auth::check()): ?>
     <script>
-    /* Global presence heartbeat — pings /api/presence every 30s while the
-       page is open and visible. Used by the admin Who's Online panel and
-       the First Available auto-assign strategy. Stops while the tab is
-       hidden (saves a request and reflects "not really watching") and
-       fires a sendBeacon on pagehide so the row is cleared promptly when
-       the tab closes. */
+    /* Global presence heartbeat — pings /api/presence every 30s for the
+       lifetime of the tab. Used by the admin Who's Online panel and the
+       First Available auto-assign strategy.
+
+       The timer keeps running when the tab is hidden / window is minimized
+       so a backgrounded but logged-in user still counts as online. Browsers
+       throttle setInterval in background tabs (typically to ~once per
+       minute), which is why the server-side online window is 120s — that
+       absorbs the throttled cadence with a missed-ping margin. When the
+       tab regains focus we also fire an immediate ping to catch up after
+       any longer throttling gap.
+
+       sendBeacon to /api/presence/leave on pagehide clears the row
+       promptly when the tab closes (so the user disappears from the list
+       within seconds rather than waiting for the window to expire). */
     (function () {
         var url = '/api/presence';
         var leaveUrl = '/api/presence/leave';
         var intervalMs = 30000;
-        var timer = null;
 
         function ping() {
             try {
@@ -396,24 +404,15 @@
                     .catch(function () { /* swallow; offline is fine */ });
             } catch (e) { /* ignore */ }
         }
-        function start() {
-            if (timer) return;
-            ping();
-            timer = setInterval(ping, intervalMs);
-        }
-        function stop() {
-            if (!timer) return;
-            clearInterval(timer);
-            timer = null;
-        }
 
-        if (document.visibilityState === 'visible') start();
+        ping();
+        setInterval(ping, intervalMs);
+
         document.addEventListener('visibilitychange', function () {
-            if (document.visibilityState === 'visible') start();
-            else stop();
+            if (document.visibilityState === 'visible') ping();
         });
+
         window.addEventListener('pagehide', function () {
-            stop();
             try {
                 if (navigator.sendBeacon) navigator.sendBeacon(leaveUrl);
                 else fetch(leaveUrl, { method: 'POST', credentials: 'same-origin', keepalive: true });

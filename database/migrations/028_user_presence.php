@@ -9,9 +9,11 @@
  *   user_id    — PK; one row per logged-in user. Old rows are upserted, not
  *                duplicated.
  *   last_seen  — DATETIME of the most recent heartbeat. The "Who's Online"
- *                admin page and the First Available auto-assign strategy both
- *                treat anyone with last_seen within the last 60 seconds as
- *                currently online.
+ *                admin page and the First Available auto-assign strategy
+ *                both treat anyone with last_seen within a short window as
+ *                currently online; the exact window lives in
+ *                _autoAssignFirstAvailable() and the /admin/users/online
+ *                route handler so it can be tuned without a migration.
  *   ip_address — VARCHAR(45) so it fits IPv6 in canonical form. Optional;
  *                shown on the admin page so support can tell remote vs
  *                in-building sessions apart.

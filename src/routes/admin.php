@@ -608,9 +608,12 @@ $router->get('/admin/users/online', function () {
     $db = Database::connect();
 
     // Single source of truth for the online window. Anyone whose last_seen is
-    // within the last 60 seconds is considered "currently online" — matches
-    // the heartbeat cadence (30s) with one missed-ping headroom.
-    $onlineWindow = 60;
+    // within the last 120 seconds is considered "currently online". The
+    // heartbeat fires every 30s while a tab is in the foreground, but
+    // browsers throttle setInterval in background tabs to roughly once per
+    // minute — 120s absorbs that with a missed-ping margin so a user who
+    // minimizes their window or tabs away doesn't drop off the list.
+    $onlineWindow = 120;
 
     // Drop rows older than 24h to keep the table tidy. The 60s online window
     // is enforced separately below; we just don't want stale rows piling up.

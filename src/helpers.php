@@ -572,7 +572,7 @@ function setSetting(string $key, string $value): void
  *                     the ticket type. Ties broken by load. Falls back to the
  *                     group's assign_fallback when no member qualifies.
  *   first_available — pick a member who currently has the app open in a
- *                     browser (heartbeat within the last 60s — see
+ *                     browser (heartbeat within the last 120s — see
  *                     user_presence), load-balanced. Falls back to
  *                     assign_fallback when nobody is online.
  *
@@ -834,10 +834,12 @@ function runPostTicketCreateHooks(PDO $db, int $ticketId): ?int
 /**
  * First-Available routing: pick a group member who currently has the app
  * open in a browser. "Currently online" = a row in user_presence whose
- * last_seen is within the last 60 seconds (matches the layout's 30s
- * heartbeat with one missed-ping headroom). Replaces the pre-2.21
- * is_available toggle, which required agents to manually flip themselves
- * available; now availability is inferred from real activity.
+ * last_seen is within the last 120 seconds — generous enough to cover
+ * background-tab throttling (browsers slow setInterval to ~once per
+ * minute when the tab isn't focused) so a minimized window or tabbed-away
+ * agent still counts as online. Replaces the pre-2.21 is_available
+ * toggle, which required agents to manually flip themselves available;
+ * now availability is inferred from real activity.
  */
 function _autoAssignFirstAvailable(PDO $db, array $members): ?int
 {
@@ -850,7 +852,7 @@ function _autoAssignFirstAvailable(PDO $db, array $members): ?int
            FROM users u
            JOIN user_presence p ON p.user_id = u.id
           WHERE u.id IN ($placeholders)
-            AND p.last_seen >= DATE_SUB(NOW(), INTERVAL 60 SECOND)
+            AND p.last_seen >= DATE_SUB(NOW(), INTERVAL 120 SECOND)
           ORDER BY u.id"
     );
     $stmt->execute($members);
