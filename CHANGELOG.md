@@ -11,6 +11,16 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.22.0 — 2026-05-04
+
+### Features
+- **Audit log now records when agents disappear because they closed the browser/tab.** Until now the audit log only captured `login` and `logout` (the deliberate logout link), so an agent who simply closed the helpdesk tab — by far the more common way of "going offline" since 2.21 made closing the tab the source of truth for availability — left no trace. Two new audit actions fill the gap. **`session.tab_closed`** is written from `POST /api/presence/leave` in [src/routes.php](src/routes.php), the endpoint the client already calls via `navigator.sendBeacon` on `pagehide`; the audit detail captures the user-agent string from the dying presence row so a stale "Chrome on Windows" close can be told apart from a quick mobile-Safari close. **`session.timed_out`** is written when the beacon never arrives (browser crash, OS kill, network drop, sleep with no wake before the row ages out) by a new `sweepStalePresence(120)` helper in [src/helpers.php](src/helpers.php) that runs on every heartbeat: it `SELECT … FOR UPDATE`s any `user_presence` rows whose `last_seen` is older than the 120s online window, inserts an audit row for each (with the disappeared user's own `user_id` and last-known `ip_address`, *not* the sweeper's, plus `last_seen=…; ua=…` in the detail field), then deletes the stale rows in the same transaction so concurrent heartbeats can't double-log the same disappearance. Combined, the two events give a complete trail: every appearance has a `login`, every clean departure has a `logout` or `session.tab_closed`, and every silent disappearance has a `session.timed_out` matched to the agent's last known IP.
+
+### Internal
+- **`Auth::logout()` now also clears the user's `user_presence` row** (in [src/Auth.php](src/Auth.php), guarded with try/catch so a DB failure never blocks logout). Without this, a clean `/logout` would leave the presence row sitting around for up to 120s and the new sweep would then write a spurious `session.timed_out` on top of the already-recorded `logout` event. Cleanup runs *before* the session is destroyed so `Auth::id()` is still available. This also fixes a pre-existing minor cosmetic issue where a freshly-logged-out user could keep showing up on **Admin → Users → Who's Online** for up to 120s.
+
+---
+
 ## 2.21.2 — 2026-05-01
 
 ### Changes

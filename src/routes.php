@@ -742,6 +742,7 @@ $router->post('/api/presence', function () {
          VALUES (?, NOW(), ?, ?)
          ON DUPLICATE KEY UPDATE last_seen = NOW(), ip_address = VALUES(ip_address), user_agent = VALUES(user_agent)'
     )->execute([Auth::id(), $ip, $ua]);
+    sweepStalePresence(120);
     header('Content-Type: application/json');
     echo json_encode(['ok' => true]);
     exit;
@@ -749,8 +750,23 @@ $router->post('/api/presence', function () {
 
 $router->post('/api/presence/leave', function () {
     Auth::requireAuth();
-    $db = Database::connect();
-    $db->prepare('DELETE FROM user_presence WHERE user_id = ?')->execute([Auth::id()]);
+    $db  = Database::connect();
+    $uid = Auth::id();
+    $row = null;
+    try {
+        $stmt = $db->prepare('SELECT ip_address, user_agent FROM user_presence WHERE user_id = ?');
+        $stmt->execute([$uid]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    } catch (\Throwable $e) {
+        // ignore — audit detail is best-effort
+    }
+    $db->prepare('DELETE FROM user_presence WHERE user_id = ?')->execute([$uid]);
+    if ($row) {
+        $detail = 'ua=' . (string) ($row['user_agent'] ?? '');
+        logAudit('session.tab_closed', null, null, $detail);
+    } else {
+        logAudit('session.tab_closed');
+    }
     header('Content-Type: application/json');
     echo json_encode(['ok' => true]);
     exit;

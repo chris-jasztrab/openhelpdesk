@@ -3093,6 +3093,61 @@ function logAudit(string $action, ?int $targetId = null, ?string $targetType = n
     }
 }
 
+/**
+ * Find users whose presence row is older than the online window, log a
+ * `session.timed_out` audit entry for each (with the disappeared user's
+ * own user_id and last-known IP, not the sweeper's), and delete the stale
+ * rows. Called on every heartbeat — runs in a transaction with FOR UPDATE
+ * so concurrent heartbeats can't double-log the same disappearance.
+ */
+function sweepStalePresence(int $windowSeconds = 120): void
+{
+    try {
+        $db = Database::connect();
+        $db->beginTransaction();
+        $stmt = $db->prepare(
+            'SELECT user_id, ip_address, user_agent, last_seen
+               FROM user_presence
+              WHERE last_seen < DATE_SUB(NOW(), INTERVAL ? SECOND)
+              FOR UPDATE'
+        );
+        $stmt->execute([$windowSeconds]);
+        $stale = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if ($stale) {
+            $ins = $db->prepare(
+                'INSERT INTO audit_log (user_id, action, detail, ip_address)
+                 VALUES (?, ?, ?, ?)'
+            );
+            $ids = [];
+            foreach ($stale as $row) {
+                $detail = 'last_seen=' . $row['last_seen']
+                    . '; ua=' . (string) ($row['user_agent'] ?? '');
+                $ins->execute([
+                    (int) $row['user_id'],
+                    'session.timed_out',
+                    $detail,
+                    $row['ip_address'],
+                ]);
+                $ids[] = (int) $row['user_id'];
+            }
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $db->prepare("DELETE FROM user_presence WHERE user_id IN ($placeholders)")
+               ->execute($ids);
+        }
+        $db->commit();
+    } catch (\Throwable $e) {
+        try {
+            if (isset($db) && $db->inTransaction()) {
+                $db->rollBack();
+            }
+        } catch (\Throwable $ignored) {
+            // ignore
+        }
+        // Never let presence sweeping break the heartbeat request
+    }
+}
+
 /* ── Confidential ticket helpers ─────────────────────────────── */
 
 /**

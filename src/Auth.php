@@ -63,6 +63,16 @@ class Auth
 
     public static function logout(): void
     {
+        $uid = self::id();
+        if ($uid) {
+            try {
+                Database::connect()
+                    ->prepare('DELETE FROM user_presence WHERE user_id = ?')
+                    ->execute([$uid]);
+            } catch (\Throwable $e) {
+                // Never let presence cleanup block logout
+            }
+        }
         $_SESSION = [];
         if (ini_get('session.use_cookies')) {
             $params = session_get_cookie_params();
