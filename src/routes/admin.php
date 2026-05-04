@@ -554,7 +554,7 @@ $router->post('/admin/onboarding/dismiss', function () {
 
 $validDocPages = [
     'getting-started', 'tickets', 'users', 'email',
-    'sla', 'automations', 'ai', 'branding', 'portal', 'import', 'kb', 'sso',
+    'sla', 'automations', 'flows', 'ai', 'branding', 'portal', 'import', 'kb', 'sso',
 ];
 
 $router->get('/admin/docs', function () {
@@ -580,6 +580,7 @@ $router->get('/admin/docs/{page}', function (array $p) use ($validDocPages) {
         'email'           => 'Email & Notifications',
         'sla'             => 'SLA Policies',
         'automations'     => 'Automations',
+        'flows'           => 'Assignment Flow Diagrams',
         'ai'              => 'AI Classification',
         'branding'        => 'Branding',
         'portal'          => 'Portal',
@@ -3354,6 +3355,7 @@ $router->post('/admin/tickets/create', function () {
     }
 
     $db = Database::connect();
+    $groupId = resolveTicketGroup($db, $groupId, $typeId);
     $db->prepare(
         'INSERT INTO tickets (subject, description, created_by, type_id, location_id, status, priority_id, assigned_to, group_id, due_date)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
@@ -4074,6 +4076,7 @@ $router->post('/admin/tickets/{id}/split', function (array $p) {
         $actor = Auth::fullName();
 
         // Create new ticket (inherit location from source)
+        $groupId = resolveTicketGroup($db, $groupId, $typeId);
         $db->prepare(
             'INSERT INTO tickets (subject, description, created_by, type_id, location_id, status, priority_id, assigned_to, group_id)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
@@ -5324,6 +5327,7 @@ $router->get('/admin/settings', function () {
         'graph_client_secret', 'graph_mailbox', 'graph_secret_expires_at',
         'email_to_ticket_enabled', 'email_to_ticket_auto_create_users',
         'email_to_ticket_default_type_id', 'email_to_ticket_default_priority_id',
+        'default_group_id',
     ];
     $settings = [];
     foreach ($keys as $k) {
@@ -5336,8 +5340,15 @@ $router->get('/admin/settings', function () {
     $db         = Database::connect();
     $types      = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
     $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
+    $groups     = $db->query('SELECT id, name FROM `groups` ORDER BY name')->fetchAll();
 
-    render('admin/settings/index', ['settings' => $settings, 'runOutput' => $runOutput, 'types' => $types, 'priorities' => $priorities]);
+    render('admin/settings/index', [
+        'settings' => $settings,
+        'runOutput' => $runOutput,
+        'types' => $types,
+        'priorities' => $priorities,
+        'groups' => $groups,
+    ]);
 });
 
 $router->post('/admin/settings', function () {
@@ -5412,6 +5423,33 @@ $router->post('/admin/settings/graph', function () {
     @mkdir(ROOT_DIR . '/storage/logs', 0755, true);
 
     flash('success', 'Inbound mail settings saved.');
+    redirect('/admin/settings');
+});
+
+$router->post('/admin/settings/ticket-routing', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings');
+    }
+
+    $raw = trim($_POST['default_group_id'] ?? '');
+    $value = '';
+    if ($raw !== '') {
+        $candidate = (int) $raw;
+        $db = Database::connect();
+        $exists = $db->prepare('SELECT 1 FROM `groups` WHERE id = ?');
+        $exists->execute([$candidate]);
+        if ($exists->fetchColumn()) {
+            $value = (string) $candidate;
+        } else {
+            flash('error', 'Selected default group no longer exists.');
+            redirect('/admin/settings');
+        }
+    }
+    setSetting('default_group_id', $value);
+    logAudit('default_group_changed', null, null, $value === '' ? 'cleared' : "id={$value}");
+    flash('success', 'Default group saved.');
     redirect('/admin/settings');
 });
 
@@ -6480,6 +6518,11 @@ $router->post('/admin/settings/import/confirm', function () {
 
             // --- Resolve group ---
             $groupId = ($row['group'] ?? '') !== '' ? ($existingGroups[strtolower($row['group'])] ?? null) : null;
+            // Legacy CSV often has a blank group cell or names a group that
+            // no longer exists. resolveTicketGroup() falls through to the
+            // type's default group, then the system default_group_id, so an
+            // imported ticket never lands with NULL group.
+            $groupId = resolveTicketGroup($db, $groupId, $typeId);
 
             // --- Parse dates — treat source timestamps as being in the location's timezone ---
             $locationTz  = getLocationTimezone($locationId);

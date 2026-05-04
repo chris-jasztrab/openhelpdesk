@@ -108,8 +108,63 @@ foreach ($tickets as $ticket) {
     }
 }
 
+// ── No-group queue sweep ─────────────────────────────────────────────
+// Recovery layer for tickets that somehow ended up with group_id = NULL
+// despite resolveTicketGroup() being plumbed through every creation path.
+// In normal operation this finds zero tickets — it exists to catch
+// historical strays, hand-edited rows, and any new creation path a future
+// developer adds without remembering to call resolveTicketGroup(). When
+// it fires we log it loudly so the bug is visible.
+$noGroupSwept = 0;
+$defaultGroupId = (int) (getSetting('default_group_id', '') ?: 0);
+if ($defaultGroupId > 0) {
+    $verifyDefault = $db->prepare('SELECT 1 FROM `groups` WHERE id = ?');
+    $verifyDefault->execute([$defaultGroupId]);
+    if ($verifyDefault->fetchColumn()) {
+        $orphans = $db->query(
+            "SELECT id FROM tickets
+              WHERE group_id IS NULL
+                AND status NOT IN ('resolved','closed','merged')"
+        )->fetchAll(PDO::FETCH_COLUMN);
+
+        if ($orphans) {
+            $update = $db->prepare('UPDATE tickets SET group_id = ? WHERE id = ?');
+            $tline  = $db->prepare(
+                "INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal)
+                 VALUES (?, NULL, 'group_set_from_default', ?, 1)"
+            );
+            foreach ($orphans as $orphanId) {
+                $update->execute([$defaultGroupId, (int) $orphanId]);
+                $tline->execute([
+                    (int) $orphanId,
+                    "Stale-ticket sweep found this ticket with no group and routed it to the configured default group (#{$defaultGroupId}). " .
+                    'Investigate which creation path produced a NULL group_id — every supported path should call resolveTicketGroup().',
+                ]);
+                $noGroupSwept++;
+            }
+            logLine("WARN: swept {$noGroupSwept} ticket(s) out of the no-group queue into default group #{$defaultGroupId}.");
+        }
+    } else {
+        logLine("WARN: default_group_id is set to {$defaultGroupId} but that group does not exist. No-group sweep skipped.");
+    }
+} else {
+    // Don't error-log every hour just because the admin hasn't picked a
+    // default yet on a fresh install — but DO surface it if any tickets
+    // are actually stuck there, since that's the situation this exists to
+    // prevent.
+    $stuckCount = (int) $db->query(
+        "SELECT COUNT(*) FROM tickets
+          WHERE group_id IS NULL
+            AND status NOT IN ('resolved','closed','merged')"
+    )->fetchColumn();
+    if ($stuckCount > 0) {
+        logLine("WARN: {$stuckCount} ticket(s) sitting in the no-group queue, but default_group_id is not configured. " .
+            'Set Admin → Settings → Ticket Routing Defaults → Default Group to enable automatic recovery.');
+    }
+}
+
 $elapsed = round(microtime(true) - $startTime, 2);
-logLine("Done. Notified: {$notified}, skipped (cooldown): {$skipped}. Took {$elapsed}s.");
+logLine("Done. Notified: {$notified}, skipped (cooldown): {$skipped}, no-group swept: {$noGroupSwept}. Took {$elapsed}s.");
 
 // ── Persist log to file ───────────────────────────────────────────
 $logDir  = ROOT_DIR . '/storage/logs';

@@ -149,11 +149,17 @@ foreach ($messages as $msg) {
 
         $typeId     = getSetting('email_to_ticket_default_type_id') !== '' ? (int) getSetting('email_to_ticket_default_type_id') : null;
         $priorityId = getSetting('email_to_ticket_default_priority_id') !== '' ? (int) getSetting('email_to_ticket_default_priority_id') : null;
+        // Pre-2.23 the email path skipped group_id entirely, so every
+        // inbound email landed with NULL group — invisible to auto-assign,
+        // stuck in the no-group queue. resolveTicketGroup() now chains
+        // type-default → system default_group_id → first existing group
+        // so an inbound email is always routed somewhere.
+        $groupId    = resolveTicketGroup($db, null, $typeId);
 
         // Create the ticket
         $db->prepare(
-            'INSERT INTO tickets (subject, description, created_by, type_id, status, priority_id) VALUES (?, ?, ?, ?, ?, ?)'
-        )->execute([$ticketSubject, $body, $senderUser['id'], $typeId, 'open', $priorityId]);
+            'INSERT INTO tickets (subject, description, created_by, type_id, status, priority_id, group_id) VALUES (?, ?, ?, ?, ?, ?, ?)'
+        )->execute([$ticketSubject, $body, $senderUser['id'], $typeId, 'open', $priorityId, $groupId]);
         $newTicketId = (int) $db->lastInsertId();
 
         // Timeline entry

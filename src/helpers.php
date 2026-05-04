@@ -828,7 +828,101 @@ function runPostTicketCreateHooks(PDO $db, int $ticketId): ?int
 {
     classifyTicketWithAI($ticketId);
     runAutomations($db, $ticketId, 'ticket_created');
+    backfillTicketGroupFromDefault($db, $ticketId);
     return autoAssignTicket($db, $ticketId);
+}
+
+/**
+ * Resolve which group a brand-new ticket should land in. Layered so
+ * every creation path (portal, agent, admin, email, API, splits) can
+ * call the same helper and never end up with a NULL group:
+ *
+ *   1. Caller's explicit choice (form field, API param) — wins outright.
+ *   2. The ticket type's default group, if one is configured.
+ *   3. The system-wide `default_group_id` setting (Admin → Settings →
+ *      Ticket Routing Defaults). This is the "no ticket gets stuck"
+ *      safety net.
+ *   4. Last-ditch fallback: lowest-id existing group. Only fires if
+ *      `default_group_id` is unset or points at a deleted group AND a
+ *      group exists at all. Returns null only on a pristine install
+ *      with zero groups.
+ *
+ * The returned id is verified to reference a real, currently-existing
+ * group — a stale type.group_id or a stale setting pointing at a
+ * deleted group falls through to the next layer instead of poisoning
+ * the ticket with a dangling FK.
+ */
+function resolveTicketGroup(PDO $db, ?int $explicit, ?int $typeId): ?int
+{
+    $groupExists = static function (PDO $db, ?int $id): bool {
+        if (!$id) return false;
+        $stmt = $db->prepare('SELECT 1 FROM `groups` WHERE id = ?');
+        $stmt->execute([$id]);
+        return (bool) $stmt->fetchColumn();
+    };
+
+    if ($groupExists($db, $explicit)) {
+        return $explicit;
+    }
+
+    if ($typeId !== null) {
+        $stmt = $db->prepare('SELECT group_id FROM ticket_types WHERE id = ?');
+        $stmt->execute([$typeId]);
+        $typeGroup = $stmt->fetchColumn();
+        if ($typeGroup !== false && $typeGroup !== null && $typeGroup !== '') {
+            $tg = (int) $typeGroup;
+            if ($groupExists($db, $tg)) {
+                return $tg;
+            }
+        }
+    }
+
+    $configured = getSetting('default_group_id', '');
+    if ($configured !== '' && $configured !== null) {
+        $cg = (int) $configured;
+        if ($groupExists($db, $cg)) {
+            return $cg;
+        }
+    }
+
+    // Last-ditch fallback: pick the lowest-id existing group. Better
+    // than NULL, and self-heals an install where the admin deleted
+    // every group the default_group_id setting could have pointed at.
+    $first = $db->query('SELECT id FROM `groups` ORDER BY id ASC LIMIT 1')->fetchColumn();
+    return $first ? (int) $first : null;
+}
+
+/**
+ * Final NULL-group safety net inside runPostTicketCreateHooks(). AI
+ * classification and "set group" automations run BEFORE this — so by
+ * the time we get here, anything that's still NULL has slipped past
+ * every other rule. Drop it into the configured default group so
+ * autoAssignTicket() can route it instead of returning null.
+ *
+ * No-op if the ticket already has a group, or if no default group can
+ * be resolved (zero-group install).
+ */
+function backfillTicketGroupFromDefault(PDO $db, int $ticketId): void
+{
+    $stmt = $db->prepare('SELECT group_id, type_id FROM tickets WHERE id = ?');
+    $stmt->execute([$ticketId]);
+    $row = $stmt->fetch();
+    if (!$row || $row['group_id'] !== null) {
+        return;
+    }
+    $typeId = $row['type_id'] !== null ? (int) $row['type_id'] : null;
+    $resolved = resolveTicketGroup($db, null, $typeId);
+    if ($resolved === null) {
+        return;
+    }
+    $db->prepare('UPDATE tickets SET group_id = ? WHERE id = ?')->execute([$resolved, $ticketId]);
+    $db->prepare(
+        'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, ?, ?, 1)'
+    )->execute([
+        $ticketId,
+        'group_set_from_default',
+        'No group was matched by ticket type, AI, or automations — routed to the system default group so the ticket does not sit in the no-group queue.',
+    ]);
 }
 
 /**

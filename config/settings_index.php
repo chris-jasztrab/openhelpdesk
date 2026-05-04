@@ -86,6 +86,11 @@ return [
      'section' => 'Email-to-Ticket', 'anchor' => 'email_to_ticket_auto_create_users',
      'keywords' => 'auto register portal users new'],
 
+    ['label' => 'Default Group (system-wide fallback)', 'description' => 'Catch-all group for tickets that nothing else routed — keeps tickets out of the no-group queue',
+     'group' => 'Tickets', 'page_label' => 'Settings', 'page_url' => '/admin/settings',
+     'section' => 'Ticket Routing Defaults', 'anchor' => 'default_group_id',
+     'keywords' => 'triage fallback unrouted no group queue catch-all default routing'],
+
     ['label' => 'Default Ticket Type (email)',  'description' => 'Type applied to tickets created via email',
      'group' => 'Email', 'page_label' => 'Email / SMTP', 'page_url' => '/admin/settings',
      'section' => 'Email-to-Ticket', 'anchor' => 'email_to_ticket_default_type_id',

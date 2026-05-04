@@ -11,6 +11,29 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.23.0 — 2026-05-04
+
+### Features
+- **No ticket ever gets stuck in the "no group" queue again.** Pre-2.23, six different creation paths could each leave a ticket with `group_id = NULL` — most notoriously the email-to-ticket ingest in [scripts/process-replies.php](scripts/process-replies.php), which simply did not include `group_id` in its INSERT — and `autoAssignTicket()` short-circuits at line 596 of [src/helpers.php](src/helpers.php) the moment it sees a NULL group, so those tickets sat invisible in an unmonitored queue until someone happened to filter for `group_id IS NULL` in the agent list view. Three new layers of defence now prevent that:
+
+  **Layer 1 — `resolveTicketGroup($db, $explicit, $typeId)` in [src/helpers.php](src/helpers.php).** Every creation path calls this helper and uses the result as the inserted `group_id`. The helper chains: caller's explicit choice (form field, API param) → the ticket type's default group → the new system-wide `default_group_id` setting → the lowest-id existing group. Each candidate is verified to reference a currently-existing group before being returned, so a stale `ticket_types.group_id` or a stale setting pointing at a deleted group falls through to the next layer instead of poisoning the new ticket. Wired into all seven creation paths: portal submit ([src/routes/portal.php](src/routes/portal.php)), admin create ([src/routes/admin.php](src/routes/admin.php)), admin split ([src/routes/admin.php](src/routes/admin.php)), agent split ([src/routes/agent.php](src/routes/agent.php)), public REST API ([src/routes/api.php](src/routes/api.php)), email-to-ticket ingest ([scripts/process-replies.php](scripts/process-replies.php)), and the legacy CSV importer ([src/routes/admin.php](src/routes/admin.php)).
+
+  **Layer 2 — `backfillTicketGroupFromDefault()` inside `runPostTicketCreateHooks()`.** AI classification and "set group" automations both run *after* the INSERT, so it's still theoretically possible for a creation path to leave the row with NULL group (or for an automation to clear it — the automation engine supports `set_group` to NULL). The new backfill runs immediately before `autoAssignTicket()` and routes any still-NULL row to the system default, posting an internal timeline entry reading *"No group was matched by ticket type, AI, or automations — routed to the system default group so the ticket does not sit in the no-group queue."* That entry is the breadcrumb triage uses to spot unrouted arrivals.
+
+  **Layer 3 — hourly cron sweep in [scripts/process-stale-tickets.php](scripts/process-stale-tickets.php).** A new section at the end of the existing cron job finds any active ticket (status NOT IN `resolved`/`closed`/`merged`) with `group_id IS NULL`, routes it to the configured default, and logs a `WARN:` line per orphan so the bug shows up in `storage/logs/stale-tickets.log`. If no default is configured *and* there are stuck tickets, it emits a different `WARN:` line pointing the admin at the new setting. In normal operation this finds zero tickets — it's the catch-all for legacy data, hand-edited rows, and any new creation path a future developer adds without remembering to call `resolveTicketGroup()`.
+
+  **New setting at [Admin → Settings → Ticket Routing Defaults → Default Group](/admin/settings#default_group_id).** Migration **029** adds the row to the `settings` key-value store, auto-seeds it to the lowest-id existing group on first run, and back-fills any existing tickets sitting with `group_id IS NULL` into that default — so the upgrade itself drains whatever was already stuck. The save handler validates the picked group still exists before writing the setting (deleting a group used as the default is allowed; the runtime then falls through to the lowest-id-group last-resort layer in `resolveTicketGroup()` rather than failing).
+
+  **Audit + observability.** Saving the setting writes an `default_group_changed` audit entry. Every layer-2 and layer-3 backfill writes the timeline entry described above. The flows are described step-by-step at the new [Admin → Docs → Assignment Flows](/admin/docs/flows) page (Diagram 8 covers the safety net specifically); the existing [Docs → Automations](/admin/docs/automations) page now has a "No Group Safety Net" card explaining the three layers and linking to the flows page. The standalone reference [TICKET_ASSIGNMENT_FLOWS.md](TICKET_ASSIGNMENT_FLOWS.md) and [TICKET_ASSIGNMENT_FLOWS.html](TICKET_ASSIGNMENT_FLOWS.html) have both been updated to match.
+
+### Internal
+- New help docs page [Admin → Docs → Assignment Flows](/admin/docs/flows) at [templates/pages/admin/docs/flows.php](templates/pages/admin/docs/flows.php) embeds all eight ticket-assignment Mermaid diagrams (master flow, the six strategies, the strategy-fallback flow, and the new default-group fallback) — same diagrams that ship in the `TICKET_ASSIGNMENT_FLOWS.{md,html}` reference docs, but now viewable from inside the helpdesk for support staff who never see the repo. Mermaid renders client-side via the same CDN script the standalone HTML uses; no asset commits required, and updates to a diagram's source automatically re-render. The page is reachable from the docs sidebar (new "Assignment Flows" entry between Automations and AI Classification) and from a new info box on the Automations docs page.
+
+### Migrations
+- **029 — default-group fallback.** Idempotent. Seeds `settings.default_group_id` with the lowest-id existing group if it's currently unset/empty, then `UPDATE tickets SET group_id = :default WHERE group_id IS NULL` to drain the historical no-group queue. Verifies the default still references a real group before doing the back-fill, so a stale or zero-group install is handled cleanly.
+
+---
+
 ## 2.22.0 — 2026-05-04
 
 ### Features

@@ -706,16 +706,12 @@ $router->post('/api/v1/tickets', function () {
         }
     }
 
-    // For portal-role API callers (no group permission), inherit group from
-    // ticket type so the auto-assign helper has somewhere to route to.
-    if ($groupId === null && $typeId !== null) {
-        $gStmt = $db->prepare('SELECT group_id FROM ticket_types WHERE id = ?');
-        $gStmt->execute([$typeId]);
-        $gid = $gStmt->fetchColumn();
-        if ($gid) {
-            $groupId = (int) $gid;
-        }
-    }
+    // For portal-role API callers (no group permission) the explicit
+    // $groupId stays null; resolveTicketGroup() then falls through to
+    // the ticket type's default group, then to the system-wide
+    // default_group_id setting, so a portal API ticket never lands
+    // with NULL group.
+    $groupId = resolveTicketGroup($db, $groupId, $typeId);
 
     $db->prepare(
         'INSERT INTO tickets

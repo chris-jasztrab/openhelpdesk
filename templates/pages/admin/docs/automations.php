@@ -123,6 +123,23 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <h5 class="fw-semibold mb-3"><i class="bi bi-person-fill-gear text-primary me-2"></i>How It Works</h5>
 <p class="text-muted mb-2">When a new ticket arrives with a <strong>Group</strong> set but no assignee, LocalDesk can pick a member of that group automatically. Each group chooses its own strategy at <a href="/admin/groups"><strong>Admin → Settings → Groups → Edit</strong></a>.</p>
 <p class="text-muted mb-0">Auto-assignment runs on portal submissions, the public REST API, email-to-ticket, and the admin "Split Ticket" flow whenever the assignee is left blank but a group is set. Direct manual assignment is never overridden.</p>
+<div class="alert alert-info small mt-3 mb-0"><i class="bi bi-diagram-3 me-2"></i>
+For step-by-step diagrams of every strategy, the master flow that runs on every new ticket, and the default-group safety net that prevents tickets getting stuck in the no-group queue, see <a href="/admin/docs/flows" class="alert-link"><strong>Docs → Assignment Flows</strong></a>.
+</div>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-shield-check text-success me-2"></i>The "No Group" Safety Net <span class="badge bg-primary ms-1">2.23</span></h5>
+<p class="text-muted mb-2">Pre-2.23, several creation paths could leave a ticket with no group at all (most notoriously email-to-ticket, which never set <code>group_id</code>). Auto-assign short-circuits on a NULL group, so those tickets sat invisible in a "no group" queue until someone happened to look for them.</p>
+<p class="text-muted mb-2">Three new layers prevent that now:</p>
+<ol class="text-muted mb-2">
+    <li><strong>At creation</strong> — every path calls <code>resolveTicketGroup()</code> which chains caller's pick → ticket type's default group → system default → lowest-id existing group.</li>
+    <li><strong>After post-create hooks</strong> — if AI classification or automations didn't set a group, a final sweep routes the ticket to the system default.</li>
+    <li><strong>Hourly cron</strong> — the stale-ticket processor catches any orphan that slipped through (e.g. legacy data, hand-edited rows) and logs a warning for investigation.</li>
+</ol>
+<p class="text-muted mb-0">Configure the system default at <a href="/admin/settings#default_group_id"><strong>Admin → Settings → Ticket Routing Defaults → Default Group</strong></a>. Best practice is to create (or designate) a generic <em>Triage</em> / <em>Service Desk</em> group, set its assignment strategy to <strong>Load-Based</strong> or <strong>First Available</strong>, and point this setting at it — that way the catch-all queue is also auto-distributed to a human.</p>
 </div>
 </div>
 

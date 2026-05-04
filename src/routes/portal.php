@@ -246,15 +246,9 @@ $router->post('/portal/tickets/create', function () {
 
     // Derive group from the ticket type so the auto-assign helper has a
     // group to consult. Portal users never pick a group directly.
-    $groupId = null;
-    if ($typeId !== null) {
-        $gStmt = $db->prepare('SELECT group_id FROM ticket_types WHERE id = ?');
-        $gStmt->execute([$typeId]);
-        $gid = $gStmt->fetchColumn();
-        if ($gid) {
-            $groupId = (int) $gid;
-        }
-    }
+    // resolveTicketGroup() handles the type-group lookup and falls
+    // through to the system-wide default if the type has none.
+    $groupId = resolveTicketGroup($db, null, $typeId);
 
     if ($subject === '' || $description === '' || $typeId === null) {
         flashInput($_POST);

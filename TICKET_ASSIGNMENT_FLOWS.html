@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Ticket Assignment Workflows</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 30px 40px 80px;
+    color: #1f2328;
+    line-height: 1.55;
+    background: #fff;
+  }
+  h1 { border-bottom: 2px solid #d0d7de; padding-bottom: 8px; }
+  h2 { border-bottom: 1px solid #d0d7de; padding-bottom: 6px; margin-top: 48px; }
+  h3 { margin-top: 32px; color: #0969da; }
+  .diagram {
+    background: #f6f8fa;
+    border: 1px solid #d0d7de;
+    border-radius: 8px;
+    padding: 18px;
+    margin: 16px 0 24px;
+    text-align: center;
+    overflow-x: auto;
+  }
+  table {
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 14px;
+  }
+  th, td {
+    border: 1px solid #d0d7de;
+    padding: 8px 12px;
+    text-align: left;
+  }
+  th { background: #f6f8fa; }
+  code {
+    background: #eaeef2;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+  .note {
+    background: #fff8c5;
+    border-left: 4px solid #d4a72c;
+    padding: 10px 14px;
+    margin: 12px 0;
+    border-radius: 4px;
+  }
+  .toc { background: #f6f8fa; border: 1px solid #d0d7de; padding: 14px 20px; border-radius: 8px; }
+  .toc ul { margin: 4px 0; }
+</style>
+</head>
+<body>
+
+<h1>Ticket Assignment Workflows</h1>
+
+<p>Reference diagrams for every auto-assignment strategy supported by the helpdesk. Logic verified against <code>src/helpers.php</code> (<code>autoAssignTicket</code> and helpers, lines 585–864).</p>
+
+<div class="toc">
+  <strong>Contents</strong>
+  <ul>
+    <li><a href="#cast">Cast used in every example</a></li>
+    <li><a href="#d0">Diagram 0 — Master flow</a></li>
+    <li><a href="#d1">Diagram 1 — Manual</a></li>
+    <li><a href="#d2">Diagram 2 — Round Robin</a></li>
+    <li><a href="#d3">Diagram 3 — Load Based</a></li>
+    <li><a href="#d4">Diagram 4 — Skill Based</a></li>
+    <li><a href="#d5">Diagram 5 — AI Skill Based</a></li>
+    <li><a href="#d6">Diagram 6 — First Available</a></li>
+    <li><a href="#d7">Diagram 7 — Fallback flow</a></li>
+    <li><a href="#d8">Diagram 8 — Default-group fallback</a></li>
+    <li><a href="#compare">Side-by-side comparison</a></li>
+  </ul>
+</div>
+
+<h2 id="cast">Cast used in every example</h2>
+
+<p>One IT group, four agents. Same data across every diagram so you can compare strategies side-by-side.</p>
+
+<p><strong>Group:</strong> <code>IT</code> (id 3). <code>groups.assign_last_user_id</code> = <code>7</code> (Bob got the previous round-robin pick).</p>
+
+<table>
+  <tr><th>Agent</th><th>user_id</th><th>Skills</th><th>Open tickets</th><th>Online?</th></tr>
+  <tr><td>Alice</td><td>5</td><td>Printers, Networking</td><td>3</td><td>yes — 30s ago</td></tr>
+  <tr><td>Bob</td><td>7</td><td>Printers, Servers</td><td>1</td><td>no — 10 min ago</td></tr>
+  <tr><td>Carol</td><td>9</td><td>Servers, Telephony</td><td>5</td><td>yes — 60s ago</td></tr>
+  <tr><td>Dave</td><td>12</td><td>Networking, Telephony</td><td>2</td><td>no — never seen</td></tr>
+</table>
+
+<p><strong>Sample ticket:</strong> Jane Doe submits via portal:</p>
+<ul>
+  <li><strong>Subject:</strong> "Front desk printer is jamming on every print job"</li>
+  <li><strong>Description:</strong> "When I try to print to the front desk printer it jams every time."</li>
+  <li><strong>Type:</strong> "Printer Issue" (default group = IT, required skills = {Printers})</li>
+</ul>
+
+<h2 id="d0">Diagram 0 — Master flow (every ticket goes through this)</h2>
+<p>The chokepoint that runs on every create path (portal, agent, admin, API, email-to-ticket, ticket splits, legacy CSV import). <code>autoAssignTicket</code> runs <em>after</em> AI classification, automations, and the default-group backfill, so all three can affect what it sees. Three layers of defence keep tickets out of the no-group queue: <code>resolveTicketGroup()</code> at INSERT, <code>backfillTicketGroupFromDefault()</code> after hooks, and the hourly cron in <code>scripts/process-stale-tickets.php</code>.</p>
+<div class="diagram"><pre class="mermaid">
+flowchart TD
+    A[End user / agent / API submits ticket] --> B["resolveTicketGroup()<br/>caller's pick → type's group →<br/>default_group_id setting →<br/>lowest-id existing group"]
+    B --> C["INSERT INTO tickets<br/>(group_id rarely NULL)"]
+    C --> D[runPostTicketCreateHooks]
+    D --> E["classifyTicketWithAI<br/>writes ai_classifications row<br/>(skipped if type confidential<br/>or AI provider disabled)"]
+    E --> F["runAutomations 'ticket_created'<br/>may overwrite group_id, type_id,<br/>assigned_to via admin rules"]
+    F --> G["backfillTicketGroupFromDefault<br/>last-ditch NULL-group sweep<br/>routes to default_group_id"]
+    G --> H{assigned_to<br/>already set?}
+    H -->|yes — automation assigned it| ZA[Done — manually targeted by automation]
+    H -->|no| I{group_id null?}
+    I -->|yes — only on a fresh install<br/>with zero groups| ZB[Sits in 'no group' queue<br/>until cron sweep / triage]
+    I -->|no| J["autoAssignTicket<br/>reads groups.assign_strategy"]
+    J --> K{strategy?}
+    K -->|manual| D1[See Diagram 1]
+    K -->|round_robin| D2[See Diagram 2]
+    K -->|load_based| D3[See Diagram 3]
+    K -->|skill_based| D4[See Diagram 4]
+    K -->|ai_skill_based| D5[See Diagram 5]
+    K -->|first_available| D6[See Diagram 6]
+</pre></div>
+
+<div class="note">
+  Auto-assign only runs when <code>group_id</code> is set AND <code>assigned_to</code> is still null. Automations execute <em>before</em> auto-assign — a "set group" automation can redirect the ticket, and a "set assignee" automation can short-circuit auto-assign entirely. The "no group queue" outcome is genuinely rare in 2.23+ — see <a href="#d8">Diagram 8</a> for the full default-group safety net.
+</div>
+
+<h2 id="d1">Diagram 1 — Manual (the default)</h2>
+<p><code>groups.assign_strategy = 'manual'</code>. Ticket is created and parked in the group queue waiting for a human.</p>
+<div class="diagram"><pre class="mermaid">
+flowchart TD
+    A["Jane submits 'Printer Issue'<br/>type's default group = IT"] --> B["tickets row created<br/>group_id=3, assigned_to=NULL"]
+    B --> C["autoAssignTicket reads<br/>assign_strategy = 'manual'"]
+    C --> D[Returns null — no pick]
+    D --> E[Ticket waits in IT queue]
+    E --> F["An IT agent opens the queue,<br/>clicks 'assign to me' (or admin assigns)"]
+</pre></div>
+<p><strong>Outcome:</strong> No auto-assign. Whichever IT agent grabs it first owns it.</p>
+
+<h2 id="d2">Diagram 2 — Round Robin</h2>
+<p>Cycles through the group's members in <code>user_id</code> order. Ignores skill, load, and online status.</p>
+<div class="diagram"><pre class="mermaid">
+flowchart TD
+    A["Jane submits 'Printer Issue'<br/>group_id ← 3 (IT)"] --> B["autoAssign: strategy = round_robin"]
+    B --> C["Get group members ordered by user_id:<br/>Alice 5 → Bob 7 → Carol 9 → Dave 12"]
+    C --> D["Read groups.assign_last_user_id = 7 (Bob)"]
+    D --> E["Find Bob's index in member list = 1"]
+    E --> F["Pick member at index (1+1) mod 4 = 2<br/>→ Carol (id 9)"]
+    F --> G["UPDATE tickets SET assigned_to = 9<br/>UPDATE groups SET assign_last_user_id = 9"]
+    G --> H[Carol gets the ticket]
+    H -.- I["Next ticket → Dave (12)<br/>Then → Alice (5, wraps)<br/>Then → Bob (7)"]
+</pre></div>
+<p><strong>Outcome:</strong> Carol. Bob is least-loaded with the right skill, but round-robin doesn't care.</p>
+
+<h2 id="d3">Diagram 3 — Load Based</h2>
+<p>Picks whichever group member has the fewest currently-open tickets (any status except <code>resolved</code> or <code>closed</code>).</p>
+<div class="diagram"><pre class="mermaid">
+flowchart TD
+    A["Jane submits 'Printer Issue'<br/>group_id ← 3 (IT)"] --> B["autoAssign: strategy = load_based"]
+    B --> C["Get group members: 5, 7, 9, 12"]
+    C --> D["SELECT id, COUNT of open tickets<br/>per assigned_to<br/>WHERE status NOT IN ('resolved','closed')<br/>ORDER BY count ASC, id ASC LIMIT 1"]
+    D --> E["Result counts:<br/>Alice=3, Bob=1, Carol=5, Dave=2<br/>Bob wins (lowest count)"]
+    E --> F[UPDATE tickets SET assigned_to = 7]
+    F --> G[Bob gets the ticket]
+    G -.- H["Tie-break: if Alice and Bob both<br/>had 1 open, Alice wins (lower user_id)"]
+</pre></div>
+<p><strong>Outcome:</strong> Bob. Doesn't check whether he's online or has the right skill — only load.</p>
+
+<h2 id="d4">Diagram 4 — Skill Based (uses ticket-type required skills)</h2>
+<p>Filters group members to those whose skills cover <strong>every</strong> skill required by the ticket type, then picks least-loaded among them.</p>
+<div class="diagram"><pre class="mermaid">
+flowchart TD
+    A["Jane submits 'Printer Issue'<br/>type_id=17, group_id ← 3 (IT)"] --> B["autoAssign: strategy = skill_based"]
+    B --> C["Get group members: 5, 7, 9, 12"]
+    C --> D["Read ticket_type_skill_map<br/>WHERE ticket_type_id = 17<br/>→ required = {Printers}"]
+    D --> E{Any required<br/>skills?}
+    E -->|no — empty list| FB["Fall back to assign_fallback<br/>(Diagram 7)"]
+    E -->|yes| F["Filter members holding ALL required skills<br/>via user_skill_map"]
+    F --> G["Eligible:<br/>Alice (Printers, Networking) ✓<br/>Bob (Printers, Servers) ✓<br/>Carol — no Printers ✗<br/>Dave — no Printers ✗"]
+    G --> H{Any eligible?}
+    H -->|no| FB
+    H -->|yes| I["Least-loaded among eligible:<br/>Alice=3, Bob=1 → Bob wins"]
+    I --> J[Bob gets the ticket]
+</pre></div>
+<p><strong>Outcome:</strong> Bob — has Printers AND fewer open tickets than Alice.</p>
+<div class="note">
+  If the ticket type has no required skills checked, the strategy returns null and the fallback runs. Don't leave required-skills empty unless you mean to delegate to fallback.
+</div>
+
+<h2 id="d5">Diagram 5 — AI Skill Based</h2>
+<p>Same shape as Diagram 4, but the "required skills" come from an AI classifier reading the ticket's content instead of a checkbox on the ticket type.</p>
+<div class="diagram"><pre class="mermaid">
+flowchart TD
+    A["Jane submits ticket<br/>Subject: 'Front desk printer keeps jamming'<br/>Description: 'Jams every print'<br/>Type: 'IT Issue' (general, no required skills)"] --> B["INSERT ticket, group_id ← 3 (IT)"]
+    B --> C[runPostTicketCreateHooks]
+    C --> D{Type confidential?<br/>OR AI disabled?}
+    D -->|yes| FB[Skip classification → fallback Diagram 7]
+    D -->|no| E["classifyTicketWithAI builds candidate list:<br/>SELECT FROM agent_skills<br/>WHERE group_id IS NULL OR group_id = 3"]
+    E --> F["POST subject + description + candidates<br/>to Claude / OpenAI"]
+    F --> G["Persist ai_classifications row:<br/>suggested_skill_ids = [Printers]<br/>confidence = 0.92<br/>sentiment = neutral"]
+    G --> H["autoAssign: strategy = ai_skill_based"]
+    H --> I{confidence ≥<br/>ai_confidence_threshold<br/>default 0.7?}
+    I -->|no| FB
+    I -->|yes| J["Use overridden_skill_ids if admin set them,<br/>else suggested_skill_ids"]
+    J --> K["Filter group members holding ALL inferred skills"]
+    K --> L["Eligible: Alice ✓, Bob ✓"]
+    L --> M{Any eligible?}
+    M -->|no| FB
+    M -->|yes| N["Least-loaded among eligible:<br/>Alice=3, Bob=1 → Bob"]
+    N --> O[Bob gets the ticket]
+</pre></div>
+<p><strong>Outcome:</strong> Bob — same as the explicit <code>skill_based</code> flow, but you didn't have to maintain a "Printer Issue" ticket type with required skills checked. One generic "IT Issue" type is enough.</p>
+
+<h2 id="d6">Diagram 6 — First Available</h2>
+<p>Filters group members to those currently online (presence updated within the last 120 seconds), then picks least-loaded among them.</p>
+<div class="diagram"><pre class="mermaid">
+flowchart TD
+    A["Jane submits 'Printer Issue'<br/>group_id ← 3 (IT)"] --> B["autoAssign: strategy = first_available"]
+    B --> C["Get group members: 5, 7, 9, 12"]
+    C --> D["SELECT user_id FROM user_presence<br/>WHERE user_id IN members<br/>AND last_seen ≥ NOW() - 120 SECOND"]
+    D --> E["Online subset:<br/>Alice (last_seen 30s) ✓<br/>Bob (last_seen 10m) ✗<br/>Carol (last_seen 60s) ✓<br/>Dave (no presence row) ✗"]
+    E --> F{Any online?}
+    F -->|no| FB[Fall back Diagram 7]
+    F -->|yes| G["Least-loaded among online:<br/>Alice=3, Carol=5 → Alice wins"]
+    G --> H[Alice gets the ticket]
+</pre></div>
+<p><strong>Outcome:</strong> Alice. Bob would have won on load alone but he's offline. Skills are not checked.</p>
+<div class="note">
+  120-second window is generous on purpose — browsers throttle background-tab timers to ~once/minute, so 60s would mistakenly mark backgrounded agents as offline.
+</div>
+
+<h2 id="d7">Diagram 7 — Fallback flow (when the primary strategy returns null)</h2>
+<p>Every non-manual strategy can return null (no eligible specialist, no one online, AI confidence too low, etc.). When that happens, <code>autoAssignTicket</code> reads <code>groups.assign_fallback</code> and runs that on the <strong>full group membership</strong>.</p>
+<div class="diagram"><pre class="mermaid">
+flowchart TD
+    A["Primary strategy returned null<br/>(no eligible candidate)"] --> B["Read groups.assign_fallback"]
+    B --> C{fallback?}
+    C -->|round_robin| D["Run round-robin on full group<br/>(Diagram 2 logic)"]
+    C -->|load_based| E["Run least-loaded on full group<br/>(Diagram 3 logic)"]
+    C -->|none| F["Return null<br/>ticket waits in group queue<br/>for human triage"]
+    D --> G[Agent picked → assigned]
+    E --> G
+    F --> H[No assignment]
+</pre></div>
+
+<p><strong>Common scenarios that trigger the fallback:</strong></p>
+<table>
+  <tr><th>Strategy</th><th>Condition that triggers fallback</th></tr>
+  <tr><td><code>skill_based</code></td><td>Type has no required skills, OR no member has all of them</td></tr>
+  <tr><td><code>ai_skill_based</code></td><td>AI disabled, type confidential, AI failure, confidence below threshold, no member matches inferred skills</td></tr>
+  <tr><td><code>first_available</code></td><td>Nobody in the group has been seen in the last 120 seconds</td></tr>
+  <tr><td><code>round_robin</code></td><td>(rare) <code>assign_last_user_id</code> lookup fails — picks first member, no fallback needed</td></tr>
+  <tr><td><code>load_based</code></td><td>(almost never) only fires if member list is empty</td></tr>
+</table>
+
+<h2 id="d8">Diagram 8 — Default-group fallback (the "no ticket gets stuck" safety net)</h2>
+<p>A separate, <em>earlier</em> safety net than Diagram 7. Diagram 7 handles "no eligible <em>agent</em> in this group" — Diagram 8 handles "no <em>group</em> at all." Configured at <strong>Admin → Settings → Ticket Routing Defaults → Default Group</strong>. Three layers fire in sequence:</p>
+
+<ol>
+  <li><strong>At creation</strong> — every creation path calls <code>resolveTicketGroup()</code>, which chains caller's pick → ticket type's default group → <code>default_group_id</code> setting → lowest-id existing group.</li>
+  <li><strong>After post-create hooks</strong> — <code>backfillTicketGroupFromDefault()</code> sweeps any ticket still sitting with NULL group after AI classification and automations.</li>
+  <li><strong>Hourly cron</strong> — <code>scripts/process-stale-tickets.php</code> sweeps any orphans that the previous two layers somehow missed (legacy data, hand-edited rows, future creation paths a developer forgets to plumb).</li>
+</ol>
+
+<div class="diagram"><pre class="mermaid">
+flowchart TD
+    A[Ticket creation path begins] --> B{Caller specified<br/>a group?}
+    B -->|yes| Z[Use that group]
+    B -->|no| C{Type has a<br/>default group?}
+    C -->|yes| Z
+    C -->|no| D{default_group_id<br/>setting configured?}
+    D -->|yes — and group exists| Z
+    D -->|no or stale| E{Any groups<br/>defined at all?}
+    E -->|yes| F[Use the lowest-id<br/>existing group]
+    E -->|no| G["Group stays NULL<br/>(only on a pristine fresh install)"]
+    F --> Z
+    Z[Ticket gets a group] --> H[Continue to Diagram 0]
+    G --> I["Backfill happens later<br/>in runPostTicketCreateHooks<br/>and the hourly cron sweep"]
+</pre></div>
+
+<div class="note">
+  When this fallback fires it leaves an internal timeline entry on the ticket: <em>"No group was matched by ticket type, AI, or automations — routed to the system default group so the ticket does not sit in the no-group queue."</em> Triage spots unrouted arrivals via that note.
+</div>
+
+<h2 id="compare">Side-by-side comparison</h2>
+
+<p><strong>What each strategy considers:</strong></p>
+<table>
+  <tr><th>Strategy</th><th>Skills filter</th><th>Load balance</th><th>Online check</th><th>Source of "required skills"</th></tr>
+  <tr><td><code>manual</code></td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+  <tr><td><code>round_robin</code></td><td>no</td><td>no</td><td>no</td><td>—</td></tr>
+  <tr><td><code>load_based</code></td><td>no</td><td>yes</td><td>no</td><td>—</td></tr>
+  <tr><td><code>skill_based</code></td><td>yes</td><td>yes (within eligible)</td><td>no</td><td><code>ticket_type_skill_map</code></td></tr>
+  <tr><td><code>ai_skill_based</code></td><td>yes</td><td>yes (within eligible)</td><td>no</td><td>AI inference + admin override</td></tr>
+  <tr><td><code>first_available</code></td><td>no</td><td>yes (within online)</td><td>yes (last 120s)</td><td>—</td></tr>
+</table>
+
+<p><strong>Same Jane Doe "Printer Issue" ticket under each strategy:</strong></p>
+<table>
+  <tr><th>Strategy</th><th>Picked agent</th><th>Why</th></tr>
+  <tr><td><code>manual</code></td><td>(nobody)</td><td>sits in queue</td></tr>
+  <tr><td><code>round_robin</code></td><td>Carol (9)</td><td>next after Bob in user_id order</td></tr>
+  <tr><td><code>load_based</code></td><td>Bob (7)</td><td>only 1 open ticket</td></tr>
+  <tr><td><code>skill_based</code></td><td>Bob (7)</td><td>has Printers AND lowest load among eligible</td></tr>
+  <tr><td><code>ai_skill_based</code></td><td>Bob (7)</td><td>AI infers Printers, same eligible set as skill_based</td></tr>
+  <tr><td><code>first_available</code></td><td>Alice (5)</td><td>online, lower load than Carol (the other online agent)</td></tr>
+</table>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({ startOnLoad: true, theme: 'default', flowchart: { curve: 'basis', padding: 20 } });
+</script>
+
+</body>
+</html>

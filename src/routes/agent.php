@@ -1245,6 +1245,7 @@ $router->post('/agent/tickets/{id}/split', function (array $p) {
         $actor = Auth::fullName();
 
         // Create new ticket (inherit location from source)
+        $groupId = resolveTicketGroup($db, $groupId, $typeId);
         $db->prepare(
             'INSERT INTO tickets (subject, description, created_by, type_id, location_id, status, priority_id, assigned_to, group_id)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
