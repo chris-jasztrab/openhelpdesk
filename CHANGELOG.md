@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.25.1 — 2026-05-05
+
+### Fixes
+- **Deep-link preselect now actually selects the type.** 2.25.0 shipped with a wrong null check: the template tested `old('type_id') === null` to decide whether to fall back to `?type_id` / `?type`, but the [old()](src/helpers.php#L305) helper returns `''` (string) when there's no flashed input, never `null` — so the fallback never fired and the dropdown stayed on "— Select type —" even with a valid query param. Switched the check to `=== ''` and cast `$preselectedTypeId` to string so the loose `==` comparison against `$t['id']` lights up the right `<option selected>`. The custom-field filter JS already runs on load, so the type-scoped fields appear automatically once the dropdown is preselected — no extra wiring needed.
+
+---
+
 ## 2.25.0 — 2026-05-05
 
 ### Features

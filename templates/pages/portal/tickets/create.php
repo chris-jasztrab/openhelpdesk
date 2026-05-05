@@ -108,9 +108,10 @@ endif; ?>
                     <label for="type_id" class="form-label fw-semibold"><?= e(getSetting('sys_field_label_ticket_type', 'Ticket Type')) ?> <span class="text-danger">*</span></label>
                     <?php
                     // old() wins (failed POST repopulation); fall back to ?type_id / ?type query param.
+                    // old() returns '' (string) when there's no flashed input, so check empty(), not === null.
                     $selectedTypeId = old('type_id');
-                    if ($selectedTypeId === null && !empty($preselectedTypeId)) {
-                        $selectedTypeId = $preselectedTypeId;
+                    if ($selectedTypeId === '' && !empty($preselectedTypeId)) {
+                        $selectedTypeId = (string) $preselectedTypeId;
                     }
                     ?>
                     <select class="form-select" id="type_id" name="type_id" required>
