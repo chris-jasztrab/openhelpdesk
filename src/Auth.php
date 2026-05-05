@@ -92,6 +92,21 @@ class Auth
     public static function requireAuth(): void
     {
         if (!self::check()) {
+            // Stash the requested URL so the user lands back here after login.
+            // Only capture safe-relative GET targets — POSTs can't be replayed
+            // and absolute / protocol-relative URLs are open-redirect risks.
+            $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+            $uri    = $_SERVER['REQUEST_URI']    ?? '';
+            if (
+                $method === 'GET'
+                && is_string($uri) && $uri !== '' && strlen($uri) <= 2000
+                && $uri[0] === '/'
+                && (!isset($uri[1]) || ($uri[1] !== '/' && $uri[1] !== '\\'))
+                && $uri !== '/login'
+                && strncmp($uri, '/login?', 7) !== 0
+            ) {
+                $_SESSION['intended_url'] = $uri;
+            }
             redirect('/login');
         }
     }

@@ -893,6 +893,20 @@ $router->get('/login', function () {
     if (Auth::check()) {
         redirect('/');
     }
+    // Accept ?next=/path so direct links like /login?next=/portal/tickets/create?type_id=5
+    // round-trip through login. Apply the same safe-relative-URL gate that
+    // consumeIntendedUrl() uses on the read side.
+    if (isset($_GET['next']) && is_string($_GET['next'])) {
+        $next = $_GET['next'];
+        if (
+            $next !== '' && strlen($next) <= 2000
+            && $next[0] === '/'
+            && (!isset($next[1]) || ($next[1] !== '/' && $next[1] !== '\\'))
+            && $next !== '/login' && strncmp($next, '/login?', 7) !== 0
+        ) {
+            $_SESSION['intended_url'] = $next;
+        }
+    }
     render('login');
 });
 
@@ -920,10 +934,11 @@ $router->post('/login', function () {
         if ($tf && $tf['totp_enabled']) {
             unset($_SESSION['user']); // undo session set by Auth::attempt()
             $_SESSION['2fa_pending'] = $uid;
+            // Keep $_SESSION['intended_url'] set — consumed after 2FA succeeds.
             redirect('/2fa');
         }
         logAudit('login');
-        redirect('/');
+        redirect(consumeIntendedUrl());
     }
 
     render('login', ['error' => 'Invalid email or password.', 'email' => $email]);
@@ -1354,7 +1369,7 @@ $router->post('/2fa', function () {
             'avatar'     => $u['avatar'],
         ];
         logAudit('login');
-        redirect('/');
+        redirect(consumeIntendedUrl());
     }
 
     render('2fa', ['error' => 'Invalid code. Please try again.']);

@@ -11,6 +11,14 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.28.0 — 2026-05-05
+
+### Features
+- **Direct-link column on the admin Ticket Types list.** [Admin → Settings → Ticket Types](/admin/types) now renders a *Direct Link* column for each type containing a read-only `font-monospace` input with the path `/portal/tickets/create?type_id={id}` (uses the `type_id` deep-link from 2.25.0 — stable, survives renames, no slug column required), a *Copy* icon-button that puts `window.location.origin + path` on the clipboard via `navigator.clipboard.writeText` (with a `document.execCommand('copy')` fallback for non-secure contexts) and shows a transient green check on success, plus an *Open in new tab* anchor with `target="_blank" rel="noopener"`. Clicking the input itself selects the path so an admin can `Ctrl+C` it without reaching for the icon. Tooltip on the input notes that anonymous visitors will be sent through login first.
+- **Login remembers where you were going.** [Auth::requireAuth()](src/Auth.php#L92) now stashes the requested URL into `$_SESSION['intended_url']` before the redirect to `/login`, and a new [consumeIntendedUrl()](src/helpers.php#L84) helper pops + validates it on the read side. The login POST and the 2FA POST both call `redirect(consumeIntendedUrl())` instead of the previous hardcoded `redirect('/')`, so a visitor who hits a Ticket-Types direct link while signed out lands on the login page, signs in (and, if applicable, completes 2FA — `intended_url` is preserved across the `/2fa` round-trip and only consumed on final success), and is bounced to `/portal/tickets/create?type_id=N` with the type pre-selected. The `/login` GET handler also accepts `?next=/path` for share-friendly direct-to-login URLs and stashes that into the same session key. Open-redirect protection is applied on **both** the write side (`requireAuth` / `?next=`) and the read side (`consumeIntendedUrl`): only paths starting with a single `/` are accepted; absolute URLs (`http://…`), protocol-relative (`//evil.com/x`), backslash-prefix variants (`/\evil.com/x`) that some user-agents normalise, non-GET requests, length > 2000 chars, and `/login` itself are all silently rejected and fall back to `/`. Invalid stashes don't break the flow — they just bounce the user to the home page after login as before.
+
+---
+
 ## 2.27.1 — 2026-05-05
 
 ### Fixes

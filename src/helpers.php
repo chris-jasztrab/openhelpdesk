@@ -73,6 +73,36 @@ function redirect(string $url, int $status = 302): never
     exit;
 }
 
+/**
+ * Pop and validate the post-login return URL stashed by Auth::requireAuth()
+ * (or the /login?next= GET handler). Returns "/" when nothing is stashed or
+ * when the stashed value fails the safe-relative-URL check — prevents an
+ * attacker from crafting an open-redirect via the session.
+ *
+ * Accepts only paths beginning with a single forward slash. Rejects:
+ *   - empty or non-string values
+ *   - absolute URLs ("http://..." / "https://...")
+ *   - protocol-relative URLs ("//evil.com/x")
+ *   - backslash variants ("/\evil.com/x") that some user-agents normalise
+ *   - values longer than 2000 chars (defensive against odd cookie/state)
+ */
+function consumeIntendedUrl(string $fallback = '/'): string
+{
+    $intended = $_SESSION['intended_url'] ?? null;
+    unset($_SESSION['intended_url']);
+
+    if (!is_string($intended) || $intended === '' || strlen($intended) > 2000) {
+        return $fallback;
+    }
+    if ($intended[0] !== '/') {
+        return $fallback;
+    }
+    if (isset($intended[1]) && ($intended[1] === '/' || $intended[1] === '\\')) {
+        return $fallback;
+    }
+    return $intended;
+}
+
 function render(string $view, array $data = []): never
 {
     // Defaults

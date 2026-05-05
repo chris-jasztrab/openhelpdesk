@@ -30,14 +30,17 @@ $breadcrumbs  = [
                     <th>Name</th>
                     <th>Sort Order</th>
                     <th>Created</th>
+                    <th style="min-width:280px">Direct Link</th>
                     <th style="width:110px">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($types)): ?>
-                <tr><td colspan="5" class="text-center py-4 text-muted">No ticket types found.</td></tr>
+                <tr><td colspan="6" class="text-center py-4 text-muted">No ticket types found.</td></tr>
                 <?php else: ?>
-                    <?php foreach ($types as $t): ?>
+                    <?php foreach ($types as $t):
+                        $directPath = '/portal/tickets/create?type_id=' . (int) $t['id'];
+                    ?>
                     <tr>
                         <td>
                             <span class="badge rounded-pill" style="background:<?= e($t['color'] ?: '#6c757d') ?>;min-width:28px;">&nbsp;</span>
@@ -50,6 +53,24 @@ $breadcrumbs  = [
                         </td>
                         <td class="text-muted"><?= (int) $t['sort_order'] ?></td>
                         <td class="text-muted small"><?= date('M j, Y', strtotime($t['created_at'])) ?></td>
+                        <td>
+                            <div class="input-group input-group-sm direct-link-group" style="max-width:420px;">
+                                <input type="text" class="form-control font-monospace direct-link-input"
+                                       value="<?= e($directPath) ?>" readonly
+                                       aria-label="Direct link to <?= e($t['name']) ?> ticket form"
+                                       title="Click to select. Anonymous visitors are sent to login first, then bounced back here.">
+                                <button type="button" class="btn btn-outline-secondary copy-link-btn"
+                                        data-path="<?= e($directPath) ?>"
+                                        title="Copy full URL to clipboard">
+                                    <i class="bi bi-clipboard"></i>
+                                </button>
+                                <a href="<?= e($directPath) ?>" target="_blank" rel="noopener"
+                                   class="btn btn-outline-secondary"
+                                   title="Open in a new tab">
+                                    <i class="bi bi-box-arrow-up-right"></i>
+                                </a>
+                            </div>
+                        </td>
                         <td>
                             <div class="d-flex gap-1">
                                 <a href="/admin/types/<?= $t['id'] ?>/edit" class="btn btn-sm btn-outline-primary" title="Edit">
@@ -72,3 +93,47 @@ $breadcrumbs  = [
 </div>
 
 <?php require ROOT_DIR . '/templates/partials/settings-nav-end.php'; ?>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // Click the URL input to select all — easy "copy with Ctrl+C"
+    document.querySelectorAll('.direct-link-input').forEach(function (inp) {
+        inp.addEventListener('focus', function () { inp.select(); });
+        inp.addEventListener('click', function () { inp.select(); });
+    });
+
+    // Copy-to-clipboard with absolute URL + transient feedback
+    document.querySelectorAll('.copy-link-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var path = btn.dataset.path || '';
+            var absolute = window.location.origin + path;
+            var done = function () {
+                var icon = btn.querySelector('i');
+                if (!icon) return;
+                var prev = icon.className;
+                icon.className = 'bi bi-check-lg text-success';
+                btn.setAttribute('title', 'Copied!');
+                setTimeout(function () {
+                    icon.className = prev;
+                    btn.setAttribute('title', 'Copy full URL to clipboard');
+                }, 1400);
+            };
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(absolute).then(done).catch(function () {
+                    fallbackCopy(absolute); done();
+                });
+            } else {
+                fallbackCopy(absolute); done();
+            }
+        });
+    });
+
+    function fallbackCopy(text) {
+        var ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); } catch (e) {}
+        document.body.removeChild(ta);
+    }
+});
+</script>
