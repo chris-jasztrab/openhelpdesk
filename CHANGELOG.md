@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.26.0 — 2026-05-05
+
+### Features
+- **Ticket Form Builder rethought as a per-type form preview.** The builder at [Admin → Workflows → Ticket Fields](/admin/workflows/ticket-fields) was field-centric: a flat list with a tiny `bg-info` "3 types" badge per row that you had to hover individually to learn which fields ended up on which ticket type's intake form. The page is now type-centric. A horizontal **Preview as** chip strip sits at the top of the Form Fields card with one chip per ticket type plus an *All types* default; each chip shows a live count of how many fields appear on that type's form (pinned + system + global custom + type-scoped custom). Clicking a chip filters the list to exactly those fields — Subject, Description, the system rows, the global custom fields, and the custom fields scoped to the picked type — in the actual `sort_order` users will see them in. While a filter is active, drag-reorder is disabled with an inline indigo banner explaining that ordering is global ("switch to *All types* to reorder") so nobody mistakes per-type filtering for per-type ordering, and rows pick up a subtle left-border accent — gray for *Global*, indigo for *Specific to this type* — so global-vs-scoped is legible at a glance without reading badges. The cluttered `bg-info` "N types" pill in each row is replaced by one of two clearer **scope pills**: a gray *Globe · Global* pill when the field has no `ticket_form_field_type_map` rows, or an indigo *Tag · N types* pill (with a Bootstrap tooltip listing the type names on hover) when it does. The edit modal's *Show for Ticket Types* section is rebuilt as a Bootstrap-styled segmented control — *All ticket types* vs *Only specific types* — that matches the new pill vocabulary; the per-type checkboxes only appear when *Only specific types* is picked, and switching back to *All* clears them so a stale list can't be saved by accident. Saving with *Only specific types* and zero boxes ticked now blocks with a helpful message instead of silently making the field global. Quality-of-life: when a type filter is active and you click *Add Custom Field*, the new field's auto-opened modal is pre-scoped to the filtered type so the field you're previewing genuinely lands on that form. Pure additive UI work — no schema, no controller, no route changes; same Bootstrap 5 / indigo `--ld-primary` palette as the rest of the admin.
+
+---
+
 ## 2.25.1 — 2026-05-05
 
 ### Fixes

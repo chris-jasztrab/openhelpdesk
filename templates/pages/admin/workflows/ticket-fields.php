@@ -130,11 +130,126 @@ usort($unifiedBuilderList, fn($a, $b) => $a['sort_order'] <=> $b['sort_order']);
     #fieldModal .modal-body .field-section { display: none; }
     #fieldModal .modal-body .field-section.active { display: block; }
 
+    /* ── Type filter strip ── */
+    .type-filter-bar {
+        display: flex; align-items: center; gap: .5rem;
+        padding: .65rem .85rem;
+        background: linear-gradient(180deg, #fafbff 0%, #f5f7ff 100%);
+        border-bottom: 1px solid #e2e8f0;
+        flex-wrap: nowrap; overflow-x: auto;
+    }
+    .type-filter-bar::-webkit-scrollbar { height: 6px; }
+    .type-filter-bar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    .type-filter-label {
+        font-size: .72rem; font-weight: 700; letter-spacing: .08em;
+        text-transform: uppercase; color: #64748b;
+        flex-shrink: 0; padding-right: .25rem;
+    }
+    .type-chip {
+        display: inline-flex; align-items: center; gap: .35rem;
+        padding: .3rem .7rem;
+        background: #fff; border: 1px solid #e2e8f0;
+        border-radius: 999px; font-size: .8rem; font-weight: 500;
+        color: #475569; cursor: pointer;
+        transition: all .15s ease;
+        flex-shrink: 0; white-space: nowrap;
+    }
+    .type-chip:hover { border-color: var(--ld-primary); color: var(--ld-primary); }
+    .type-chip .chip-count {
+        font-size: .7rem; font-weight: 600;
+        background: #f1f5f9; color: #64748b;
+        padding: 0 .4rem; border-radius: 999px; min-width: 1.25rem; text-align: center;
+    }
+    .type-chip.active {
+        background: var(--ld-primary); border-color: var(--ld-primary);
+        color: #fff; box-shadow: 0 1px 3px rgba(79,70,229,.25);
+    }
+    .type-chip.active .chip-count { background: rgba(255,255,255,.22); color: #fff; }
+    .type-chip.all-chip i { font-size: .9rem; }
+
+    /* ── Filter-active banner inside card-body ── */
+    .filter-banner {
+        display: flex; align-items: center; gap: .55rem;
+        padding: .55rem .8rem;
+        background: #eef2ff; border: 1px solid #c7d2fe;
+        border-radius: .5rem; margin-bottom: .9rem;
+        font-size: .825rem; color: #3730a3;
+    }
+    .filter-banner .fb-strong { font-weight: 600; color: #1e1b4b; }
+    .filter-banner .fb-clear {
+        margin-left: auto; background: none; border: none;
+        color: #4338ca; font-size: .78rem; font-weight: 500;
+        cursor: pointer; padding: .15rem .4rem; border-radius: .25rem;
+    }
+    .filter-banner .fb-clear:hover { background: #e0e7ff; }
+
+    /* Row scope styling under filter */
+    .field-row.is-global  { border-left: 3px solid #cbd5e1; }
+    .field-row.is-specific { border-left: 3px solid var(--ld-primary); }
+    body.filter-active .field-row .drag-handle { opacity: .25; cursor: not-allowed; pointer-events: none; }
+    body.filter-active .field-row .drag-handle::after {
+        content: "↕ disabled while filtered"; display: none;
+    }
+
+    /* Scope pill in row (replaces "N types" bg-info) */
+    .scope-pill {
+        display: inline-flex; align-items: center; gap: .3rem;
+        font-size: .68rem; font-weight: 500;
+        padding: .2rem .55rem; border-radius: 999px;
+        line-height: 1;
+    }
+    .scope-pill.scope-global  { background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; }
+    .scope-pill.scope-specific { background: #eef2ff; color: #4338ca; border: 1px solid #c7d2fe; cursor: help; }
+    .scope-pill i { font-size: .72rem; }
+
+    /* Modal: segmented scope control */
+    .scope-segment {
+        display: grid; grid-template-columns: 1fr 1fr; gap: .5rem;
+        background: #f1f5f9; border-radius: .55rem; padding: .25rem;
+    }
+    .scope-segment label {
+        text-align: center; cursor: pointer; padding: .55rem .5rem;
+        border-radius: .4rem; font-size: .85rem; font-weight: 500;
+        color: #64748b; transition: all .15s ease; user-select: none;
+        display: flex; align-items: center; justify-content: center; gap: .35rem;
+    }
+    .scope-segment label:hover { color: #334155; }
+    .scope-segment input[type="radio"] { display: none; }
+    .scope-segment input[type="radio"]:checked + span {
+        background: #fff; color: var(--ld-primary);
+        box-shadow: 0 1px 2px rgba(15,23,42,.06);
+    }
+    .scope-segment label > span {
+        display: flex; align-items: center; justify-content: center; gap: .35rem;
+        width: 100%; padding: .5rem; border-radius: .4rem;
+        transition: all .15s ease;
+    }
+    .scope-types-grid {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: .4rem .8rem; margin-top: .85rem;
+        padding: .75rem; background: #f8fafc;
+        border: 1px solid #e2e8f0; border-radius: .5rem;
+    }
+    .scope-types-grid .form-check { margin: 0; }
+    #modalTypeChecksWrap[data-mode="all"] { display: none; }
+
     [data-bs-theme="dark"] .field-row { background: var(--bs-secondary-bg); border-color: #373b3e; }
     [data-bs-theme="dark"] .field-row.system-row { background: var(--bs-tertiary-bg); }
     [data-bs-theme="dark"] .field-row.system-row-orderable { background: #1e293b; border-color: #475569; }
     [data-bs-theme="dark"] .opt-pill { background: #2b3035; border-color: #495057; }
     [data-bs-theme="dark"] .custom-empty { border-color: #495057; }
+    [data-bs-theme="dark"] .type-filter-bar { background: linear-gradient(180deg, #1a1d21 0%, #15171a 100%); border-bottom-color: #373b3e; }
+    [data-bs-theme="dark"] .type-chip { background: #2b3035; border-color: #495057; color: #cbd5e1; }
+    [data-bs-theme="dark"] .type-chip .chip-count { background: #1e293b; color: #94a3b8; }
+    [data-bs-theme="dark"] .filter-banner { background: #1e1b4b; border-color: #4338ca; color: #c7d2fe; }
+    [data-bs-theme="dark"] .filter-banner .fb-strong { color: #e0e7ff; }
+    [data-bs-theme="dark"] .filter-banner .fb-clear { color: #a5b4fc; }
+    [data-bs-theme="dark"] .filter-banner .fb-clear:hover { background: #312e81; }
+    [data-bs-theme="dark"] .scope-pill.scope-global { background: var(--bs-tertiary-bg); border-color: #495057; color: #94a3b8; }
+    [data-bs-theme="dark"] .scope-pill.scope-specific { background: #1e1b4b; border-color: #4338ca; color: #c7d2fe; }
+    [data-bs-theme="dark"] .scope-segment { background: var(--bs-tertiary-bg); }
+    [data-bs-theme="dark"] .scope-segment input[type="radio"]:checked + span { background: var(--bs-secondary-bg); }
+    [data-bs-theme="dark"] .scope-types-grid { background: var(--bs-tertiary-bg); border-color: #495057; }
 </style>
 
 <div class="d-flex align-items-center justify-content-between mb-4">
@@ -166,7 +281,32 @@ usort($unifiedBuilderList, fn($a, $b) => $a['sort_order'] <=> $b['sort_order']);
             <?= count($fields) ?> custom field<?= count($fields) !== 1 ? 's' : '' ?>
         </span>
     </div>
+
+    <!-- Type filter strip — preview the form for any single ticket type -->
+    <div class="type-filter-bar" id="typeFilterBar" role="tablist" aria-label="Filter form fields by ticket type">
+        <span class="type-filter-label"><i class="bi bi-eye me-1"></i>Preview as</span>
+        <button type="button" class="type-chip all-chip active" data-type-id="all" role="tab" aria-selected="true">
+            <i class="bi bi-grid-3x3-gap"></i>All types
+            <span class="chip-count" data-count-for="all"><?= count($ticketTypes) ? '—' : '0' ?></span>
+        </button>
+        <?php foreach ($ticketTypes as $tt): ?>
+        <button type="button" class="type-chip" data-type-id="<?= (int) $tt['id'] ?>" role="tab" aria-selected="false">
+            <?= e($tt['name']) ?>
+            <span class="chip-count" data-count-for="<?= (int) $tt['id'] ?>">—</span>
+        </button>
+        <?php endforeach; ?>
+    </div>
+
     <div class="card-body p-3">
+
+        <!-- Filter-active banner (shown when a specific type is selected) -->
+        <div class="filter-banner" id="filterBanner" style="display:none;" role="status">
+            <i class="bi bi-funnel-fill"></i>
+            <span>Showing the form for <span class="fb-strong" id="filterBannerType"></span> — <span id="filterBannerCount">0</span> fields visible. Reordering applies to all forms; switch to <em>All types</em> to reorder.</span>
+            <button type="button" class="fb-clear" id="filterBannerClear">
+                <i class="bi bi-x-lg me-1"></i>Clear
+            </button>
+        </div>
 
         <!-- Pinned fields (Subject & Description) — not draggable -->
         <div class="custom-section-label">
@@ -238,13 +378,20 @@ usort($unifiedBuilderList, fn($a, $b) => $a['sort_order'] <=> $b['sort_order']);
                         }
                     }
                 ?>
-                <div class="field-row" data-field-id="<?= (int) $field['id'] ?>" data-field-type="<?= e($field['field_type']) ?>">
+                <div class="field-row" data-field-id="<?= (int) $field['id'] ?>" data-field-type="<?= e($field['field_type']) ?>" data-type-ids="<?= e(implode(',', $typeIds)) ?>">
                     <i class="bi bi-grip-vertical drag-handle"></i>
                     <span class="badge bg-secondary" style="font-size:.68rem;"><?= e($meta['label']) ?></span>
                     <span class="field-row-label"><?= e($field['label']) ?></span>
-                    <?php if (!empty($typeNames)): ?>
-                    <span class="badge bg-info type-badge" style="font-size:.65rem;" title="<?= e(implode(', ', $typeNames)) ?>">
-                        <?= count($typeNames) <= 2 ? e(implode(', ', $typeNames)) : count($typeNames) . ' types' ?>
+                    <?php if (empty($typeNames)): ?>
+                    <span class="scope-pill scope-global" title="Shown on every ticket type">
+                        <i class="bi bi-globe2"></i>Global
+                    </span>
+                    <?php else: ?>
+                    <span class="scope-pill scope-specific"
+                          data-bs-toggle="tooltip"
+                          data-bs-placement="top"
+                          title="<?= e(implode(' · ', $typeNames)) ?>">
+                        <i class="bi bi-tag-fill"></i><?= count($typeNames) ?> type<?= count($typeNames) !== 1 ? 's' : '' ?>
                     </span>
                     <?php endif; ?>
                     <?php if ($field['is_required']): ?>
@@ -305,18 +452,32 @@ usort($unifiedBuilderList, fn($a, $b) => $a['sort_order'] <=> $b['sort_order']);
                     </div>
                 </div>
 
-                <!-- Ticket type association -->
+                <!-- Ticket type association — segmented "All / Specific" control -->
                 <div class="mb-3" id="modalTypeRow">
-                    <label class="form-label fw-medium">Show for Ticket Types</label>
-                    <div class="form-text mb-2">Leave all unchecked to show this field for <strong>every</strong> ticket type.</div>
-                    <div class="d-flex flex-wrap gap-2" id="modalTypeChecks">
-                        <?php foreach ($ticketTypes as $tt): ?>
-                        <div class="form-check">
-                            <input class="form-check-input modal-type-cb" type="checkbox"
-                                   id="modalType_<?= (int) $tt['id'] ?>" value="<?= (int) $tt['id'] ?>">
-                            <label class="form-check-label" for="modalType_<?= (int) $tt['id'] ?>"><?= e($tt['name']) ?></label>
+                    <label class="form-label fw-medium d-block mb-2">
+                        <i class="bi bi-tag me-1 text-muted"></i>Show this field on
+                    </label>
+                    <div class="scope-segment" role="radiogroup" aria-label="Field scope">
+                        <label>
+                            <input type="radio" name="modalScope" value="all" id="modalScopeAll" checked>
+                            <span><i class="bi bi-globe2"></i>All ticket types</span>
+                        </label>
+                        <label>
+                            <input type="radio" name="modalScope" value="specific" id="modalScopeSpecific">
+                            <span><i class="bi bi-tag-fill"></i>Only specific types</span>
+                        </label>
+                    </div>
+                    <div id="modalTypeChecksWrap" data-mode="all">
+                        <div class="scope-types-grid" id="modalTypeChecks">
+                            <?php foreach ($ticketTypes as $tt): ?>
+                            <div class="form-check">
+                                <input class="form-check-input modal-type-cb" type="checkbox"
+                                       id="modalType_<?= (int) $tt['id'] ?>" value="<?= (int) $tt['id'] ?>">
+                                <label class="form-check-label" for="modalType_<?= (int) $tt['id'] ?>"><?= e($tt['name']) ?></label>
+                            </div>
+                            <?php endforeach; ?>
                         </div>
-                        <?php endforeach; ?>
+                        <div class="form-text mt-1">Pick at least one. Switch to <em>All ticket types</em> to make it global.</div>
                     </div>
                 </div>
 
@@ -477,12 +638,128 @@ document.addEventListener('DOMContentLoaded', function () {
     /* ─── SortableJS: reorder within custom list only ─── */
     var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
 
-    Sortable.create(list, {
+    var sortableInstance = Sortable.create(list, {
         handle:    '.drag-handle',
         animation: 150,
         filter:    '.custom-empty',
         onEnd:     function () { saveOrder(); }
     });
+
+    /* ─── Type filter: preview the form for any single ticket type ─── */
+    var filterBar       = document.getElementById('typeFilterBar');
+    var filterBanner    = document.getElementById('filterBanner');
+    var filterBannerType  = document.getElementById('filterBannerType');
+    var filterBannerCount = document.getElementById('filterBannerCount');
+    var currentFilterTypeId = null;   // null = "all types"
+
+    function rowMatchesType(row, typeId) {
+        if (typeId === null) return true;
+        // System + pinned rows always show — they appear on every type
+        if (row.classList.contains('system-row') || row.classList.contains('system-row-orderable')) return true;
+        var ids = (row.dataset.typeIds || '').split(',').filter(Boolean).map(Number);
+        return ids.length === 0 || ids.indexOf(typeId) !== -1;
+    }
+
+    function applyTypeFilter(typeId) {
+        currentFilterTypeId = typeId;
+        var pinned = document.querySelectorAll('.field-row.system-row');
+        var allRows = Array.from(pinned).concat(Array.from(list.querySelectorAll('.field-row')));
+        var visible = 0;
+
+        allRows.forEach(function (row) {
+            var match = rowMatchesType(row, typeId);
+            row.style.display = match ? '' : 'none';
+            row.classList.remove('is-global', 'is-specific');
+            if (typeId !== null && match && !row.classList.contains('system-row') && !row.classList.contains('system-row-orderable')) {
+                var ids = (row.dataset.typeIds || '').split(',').filter(Boolean);
+                row.classList.add(ids.length === 0 ? 'is-global' : 'is-specific');
+            }
+            if (match) visible++;
+        });
+
+        // Active chip styling
+        filterBar.querySelectorAll('.type-chip').forEach(function (chip) {
+            var match = (typeId === null && chip.dataset.typeId === 'all')
+                     || (typeId !== null && parseInt(chip.dataset.typeId) === typeId);
+            chip.classList.toggle('active', match);
+            chip.setAttribute('aria-selected', match ? 'true' : 'false');
+        });
+
+        // Banner + body class for drag-disable styling
+        if (typeId === null) {
+            filterBanner.style.display = 'none';
+            document.body.classList.remove('filter-active');
+            sortableInstance.option('disabled', false);
+        } else {
+            var typeName = '';
+            for (var i = 0; i < ticketTypes.length; i++) {
+                if (parseInt(ticketTypes[i].id) === typeId) { typeName = ticketTypes[i].name; break; }
+            }
+            filterBannerType.textContent  = typeName;
+            filterBannerCount.textContent = visible;
+            filterBanner.style.display = '';
+            document.body.classList.add('filter-active');
+            sortableInstance.option('disabled', true);
+        }
+    }
+
+    function countFieldsForType(typeId) {
+        // Pinned (subject + description) + every system row + matching custom fields
+        var n = document.querySelectorAll('.field-row.system-row').length;
+        n += list.querySelectorAll('[data-system-key]').length;
+        list.querySelectorAll('.field-row[data-field-id]').forEach(function (row) {
+            var ids = (row.dataset.typeIds || '').split(',').filter(Boolean).map(Number);
+            if (typeId === null || ids.length === 0 || ids.indexOf(typeId) !== -1) n++;
+        });
+        return n;
+    }
+
+    function refreshChipCounts() {
+        filterBar.querySelectorAll('.type-chip').forEach(function (chip) {
+            var key = chip.dataset.typeId;
+            var countEl = chip.querySelector('.chip-count');
+            if (!countEl) return;
+            if (key === 'all') {
+                countEl.textContent = countFieldsForType(null);
+            } else {
+                countEl.textContent = countFieldsForType(parseInt(key));
+            }
+        });
+    }
+
+    filterBar.addEventListener('click', function (e) {
+        var chip = e.target.closest('.type-chip');
+        if (!chip) return;
+        var key = chip.dataset.typeId;
+        applyTypeFilter(key === 'all' ? null : parseInt(key));
+    });
+
+    document.getElementById('filterBannerClear').addEventListener('click', function () {
+        applyTypeFilter(null);
+    });
+
+    /* ─── Scope segmented control inside the modal ─── */
+    document.querySelectorAll('input[name="modalScope"]').forEach(function (radio) {
+        radio.addEventListener('change', function () {
+            var mode = document.querySelector('input[name="modalScope"]:checked').value;
+            document.getElementById('modalTypeChecksWrap').dataset.mode = mode;
+            // When switching to "All", clear any checked types so the user can't accidentally save a stale list
+            if (mode === 'all') {
+                document.querySelectorAll('.modal-type-cb').forEach(function (cb) { cb.checked = false; });
+            }
+        });
+    });
+
+    /* ─── Initialize Bootstrap tooltips on scope pills ─── */
+    function initTooltips(root) {
+        (root || document).querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
+            bootstrap.Tooltip.getOrCreateInstance(el);
+        });
+    }
+    initTooltips();
+
+    /* ─── Bootstrap chip counts on first paint ─── */
+    refreshChipCounts();
 
     /* ─── Add field from dropdown menu ─── */
     document.querySelectorAll('.add-field-btn').forEach(function (btn) {
@@ -508,6 +785,15 @@ document.addEventListener('DOMContentLoaded', function () {
             list.appendChild(row);
             updateCount();
             openModal(data.field);
+            // If a type filter is active, pre-scope the new field to that type
+            if (currentFilterTypeId !== null) {
+                document.getElementById('modalScopeSpecific').checked = true;
+                document.getElementById('modalScopeAll').checked = false;
+                document.getElementById('modalTypeChecksWrap').dataset.mode = 'specific';
+                var cb = document.getElementById('modalType_' + currentFilterTypeId);
+                if (cb) cb.checked = true;
+            }
+            refreshChipCounts();
         });
     }
 
@@ -541,14 +827,19 @@ document.addEventListener('DOMContentLoaded', function () {
         var meta = fieldTypeMeta[field.field_type] || {label: field.field_type, icon: 'bi-question'};
         var reqBadge = field.is_required  ? '<span class="badge bg-danger" style="font-size:.65rem;">Required</span>' : '';
         var eyeIcon  = !parseInt(field.is_visible) ? '<i class="bi bi-eye-slash text-muted" title="Hidden from portal users"></i>' : '';
+        // Newly added fields default to "Global" (no type association)
+        var scopePill = '<span class="scope-pill scope-global" title="Shown on every ticket type">' +
+                        '<i class="bi bi-globe2"></i>Global</span>';
         var row = document.createElement('div');
         row.className = 'field-row';
         row.dataset.fieldId   = field.id;
         row.dataset.fieldType = field.field_type;
+        row.dataset.typeIds   = '';
         row.innerHTML =
             '<i class="bi bi-grip-vertical drag-handle"></i>' +
             '<span class="badge bg-secondary" style="font-size:.68rem;">' + esc(meta.label) + '</span>' +
             '<span class="field-row-label">' + esc(field.label) + '</span>' +
+            scopePill +
             reqBadge + eyeIcon +
             '<button type="button" class="btn btn-sm btn-outline-primary py-0 px-2 edit-field-btn" data-field-id="' + field.id + '">' +
             '<i class="bi bi-pencil"></i></button>' +
@@ -578,7 +869,12 @@ document.addEventListener('DOMContentLoaded', function () {
         })
         .then(function (r) { return r.json(); })
         .then(function (data) {
-            if (data.success && pendingDeleteRow) { pendingDeleteRow.remove(); updateCount(); }
+            if (data.success && pendingDeleteRow) {
+                pendingDeleteRow.remove();
+                updateCount();
+                refreshChipCounts();
+                if (currentFilterTypeId !== null) applyTypeFilter(currentFilterTypeId);
+            }
         });
     });
 
@@ -641,8 +937,12 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('modalVisible').checked    =
             field.is_visible === undefined ? true : !!parseInt(field.is_visible);
 
-        // Populate type checkboxes
+        // Populate scope segmented control + type checkboxes
         var assignedTypes = fieldTypeMap[field.id] || [];
+        var modeIsSpecific = assignedTypes.length > 0;
+        document.getElementById('modalScopeAll').checked      = !modeIsSpecific;
+        document.getElementById('modalScopeSpecific').checked = modeIsSpecific;
+        document.getElementById('modalTypeChecksWrap').dataset.mode = modeIsSpecific ? 'specific' : 'all';
         document.querySelectorAll('.modal-type-cb').forEach(function (cb) {
             cb.checked = assignedTypes.indexOf(parseInt(cb.value)) !== -1;
         });
@@ -841,11 +1141,18 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!content) { document.getElementById('modalTextBlockContent').focus(); return; }
         }
 
-        // Collect selected ticket type IDs
+        // Collect selected ticket type IDs (only when scope = specific)
+        var scopeMode = document.querySelector('input[name="modalScope"]:checked').value;
         var typeIds = [];
-        document.querySelectorAll('.modal-type-cb:checked').forEach(function (cb) {
-            typeIds.push(parseInt(cb.value));
-        });
+        if (scopeMode === 'specific') {
+            document.querySelectorAll('.modal-type-cb:checked').forEach(function (cb) {
+                typeIds.push(parseInt(cb.value));
+            });
+            if (typeIds.length === 0) {
+                alert('Pick at least one ticket type, or switch to "All ticket types".');
+                return;
+            }
+        }
 
         var payload = {label: label, placeholder: placeholder, is_required: isRequired, is_visible: isVisible, type_ids: typeIds};
 
@@ -895,28 +1202,35 @@ document.addEventListener('DOMContentLoaded', function () {
                     } else if (isVisible && eyeIcon) { eyeIcon.remove(); }
                 }
 
-                // Update type badge
-                var oldTypeBadge = row.querySelector('.type-badge');
-                if (oldTypeBadge) oldTypeBadge.remove();
+                // Update scope pill
+                var oldScopePill = row.querySelector('.scope-pill');
+                if (oldScopePill) oldScopePill.remove();
+                var pill = document.createElement('span');
                 if (typeIds.length > 0) {
                     var names = typeIds.map(function (tid) {
                         var found = ticketTypes.find(function (t) { return parseInt(t.id) === tid; });
                         return found ? found.name : '';
                     }).filter(Boolean);
-                    var tb = document.createElement('span');
-                    tb.className = 'badge bg-info type-badge';
-                    tb.style.fontSize = '.65rem';
-                    tb.title = names.join(', ');
-                    tb.textContent = names.length <= 2 ? names.join(', ') : names.length + ' types';
-                    row.querySelector('.field-row-label').after(tb);
+                    pill.className = 'scope-pill scope-specific';
+                    pill.title = names.join(' · ');
+                    pill.innerHTML = '<i class="bi bi-tag-fill"></i>' + typeIds.length + ' type' + (typeIds.length !== 1 ? 's' : '');
+                } else {
+                    pill.className = 'scope-pill scope-global';
+                    pill.title = 'Shown on every ticket type';
+                    pill.innerHTML = '<i class="bi bi-globe2"></i>Global';
                 }
+                row.querySelector('.field-row-label').after(pill);
 
-                // Update JS map
+                // Update row data + JS map
+                row.dataset.typeIds = typeIds.join(',');
                 if (typeIds.length > 0) {
                     fieldTypeMap[id] = typeIds;
                 } else {
                     delete fieldTypeMap[id];
                 }
+                // Refresh filter chip counts + re-apply current filter
+                refreshChipCounts();
+                applyTypeFilter(currentFilterTypeId);
             }
             modal.hide();
         });
