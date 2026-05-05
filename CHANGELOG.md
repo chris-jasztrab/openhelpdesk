@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.24.1 — 2026-05-05
+
+### Fixes
+- **Showcase image now renders on production.** Migration 030 originally drew its placeholder image at apply-time via the GD extension (`imagecreatetruecolor`/`imagepng`), which silently no-op'd on the production PHP build because `php-gd` isn't installed there — the showcase `image` field landed with a NULL `config` and rendered as nothing. 030 has been rewritten to embed the same 480×140 PNG as a base64 string and write it via `file_put_contents`, removing the GD dependency entirely. New migration **031** repairs already-deployed installs by finding the showcase `image` field (matched on the `(example form)` label suffix used by 030, so it survives ticket-type renames), checking that its config is empty, and writing the placeholder PNG into [public/uploads/field-images/](public/uploads/field-images/) + setting `config.image_path`. Idempotent: skips when the field is already populated, when 030's showcase fields don't exist, or when the upload directory can't be created.
+
+---
+
 ## 2.24.0 — 2026-05-05
 
 ### Features

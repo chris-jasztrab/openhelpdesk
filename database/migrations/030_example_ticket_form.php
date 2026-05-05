@@ -127,38 +127,21 @@ return static function (PDO $pdo): void {
             }
         }
 
-        // 5. Placeholder image for the `image` field. We render a tiny
-        //    PNG via GD so the migration is self-contained — no asset
-        //    files to copy. If GD isn't installed (very rare in PHP
-        //    deployments), the field is left without an image_path and
-        //    the renderer simply shows nothing for it; an admin can
-        //    upload one through Admin → Workflows → Ticket Fields.
+        // 5. Placeholder image for the `image` field. The PNG is embedded
+        //    as base64 below — pre-rendered at migration-authoring time
+        //    so we don't depend on the GD extension at runtime (production
+        //    PHP doesn't ship php-gd by default). 480×140 light-purple
+        //    panel reading "Example image field". An admin can replace
+        //    it from Admin → Workflows → Ticket Fields.
         $uploadDir = dirname(__DIR__, 2) . '/public/uploads/field-images/';
         if (!is_dir($uploadDir)) {
             @mkdir($uploadDir, 0755, true);
         }
 
-        // Note: is_writable() is unreliable on Windows under OneDrive — rely on
-        // imagepng()'s return value to detect actual write failures.
-        if (function_exists('imagecreatetruecolor') && is_dir($uploadDir)) {
-            $w = 480;
-            $h = 140;
-            $img  = imagecreatetruecolor($w, $h);
-            $bg   = imagecolorallocate($img, 240, 235, 250); // light purple
-            $fg   = imagecolorallocate($img, 111, 66, 193);  // brand purple
-            $line = imagecolorallocate($img, 200, 190, 220);
-            imagefilledrectangle($img, 0, 0, $w, $h, $bg);
-            imagerectangle($img, 0, 0, $w - 1, $h - 1, $line);
-            $text1 = 'Example image field';
-            $text2 = '(uploaded via Admin > Ticket Fields)';
-            $tw1 = imagefontwidth(5) * strlen($text1);
-            $tw2 = imagefontwidth(3) * strlen($text2);
-            imagestring($img, 5, (int) (($w - $tw1) / 2), 45, $text1, $fg);
-            imagestring($img, 3, (int) (($w - $tw2) / 2), 80, $text2, $fg);
-
+        $pngB64 = 'iVBORw0KGgoAAAANSUhEUgAAAeAAAACMCAIAAAAr9+1XAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAFlUlEQVR4nO3bS3KbShgGUHzL6/A4kyzAK/FyXF6ON5GpM9dEA4+0kjtQlYrwaFAj4LN0TmWQIkD/zeOjaZSnv3++GwDyPDdN8+v3y95lAPCP4+H03941ADBMQAOEEtAAoQQ0QCgBDRBKQAOEEtAAoQQ0QCgBDRBKQAOEEtAAoQQ0QCgBDRBKQAOEEtAAoQQ0QCgBDRBKQAOEEtAAoQQ0QCgBDRBKQAOEEtAAoQQ0QCgBDRBKQAOEEtAAoQQ0QCgBDRBKQAOEEtAAoQQ0QCgBDRBKQAOEEtAAoQQ0QCgBDRBKQAOEEtAAoQQ0QCgBDRBKQAOEEtAAoQQ0QCgBDRBKQAOEet67AG7p/e2rv/Dj83X7SppWMTcs4LzPvXo0R/sUdOqsKH7mMcw/LNQR0Hco5Eb9+HwdfGDcsXZQvr99vb99LTwXD3gMaRPQ/CQhz546P7p4diGgH0X/LbizpDNSuwwDL4O49l/am1dMZRTmAeZs1enFWIWFfg0ubw946yocbKhQ/JK21phBIo2PhHfo/HJ9/nNZ2E7VZiSdPz5fz386a7bDuvk3UM4L+8vL5V3amr9VM55EhQrH+lXo75IK64qvaKu9lTmQOyag79Aldzqh0J4bbf6NjP7K89vq7Ly8fqfpGybgWHnz+9V5M+gvLGg/DjuPxvJWdW31t+IumeJ4LIOTAM2aETlos+aqG7p2w8FwX6ktHoeAfiz9iYtmKFbWjoxtBn2Ffp0fVIXJ3y2HpYbAjDHF8UBmTndelc5jk9pjBid8txlCjs0yd6ZBtqywrq3BeXbu0tPfP9+/fr/sXQa3UfiPKuVfcXTGkv0fRUz+pSlOm5RnVOYMIftdG/wxyeBPTfr9KuywusJm/ClV3dacYzg2bcVPdzycBDSVfnQoTP7oEHZ3PJzMQfOI+nPQjXQmjxE0QKLj4eQjIUAoAQ0QSkADhBLQAKEENEAoAQ0QSkADhBLQAKEENEAoAQ0QSkADhBLQAKEENEAoAQ0QSkADhBLQAKEENEAoAQ0QSkADhBLQAKEENECo570LuHPvb19N03x8vtZtWLdtXQELS11YZ/We9y171QrXK6mZusAmd7Jxpx6WgF7Rkov44/P1cgvdsXYfN77bz0f4/e1rfpa1t12pqmvjtbqkhRfY/KPHEgKapapv0XYYVd/tSwJiZspcKuw3t288DbYuMe+JgF5L/37u5FEzNIqZ87LcWXNy4fzNJ5vuR9Xgm/LCcXG/pM7h6hc/1p3J1peMBCv6Pnjo+ktuOzM2/3TMv2wag+hN+EgY4ePztX/Tdlxu2n4ydhZ21ixsPrjmtZWPdWeyR4MKJXXya6z1Zt7xbK9cUedg62PnqPOvY2tedjjzjJzzceYj4doL7NrNWYMR9I931T2zzQ0WWNJkATcfBnZ2ONjKwr7Pr7m6ofYw2Uh5ewJ6Ldu8AI69Mheqqmvo0p3J/dSVtOpQt2DfXyNs1u7CmfpmasqOlZjiiHDJvm0u98578cNa9ZgPTj6MTfIOTrvf/BxV7LNzZbpsNvb098/3r98ve5dxt8Y+ap31v3oNrtYM3R7lz2KTC+u+qpW7U269vLdCCnSO0tj31cKac/oyqaLvY10rnI728pmvKf0NZ5ZUXrNcp+HzBo6Hk4DemQsdGHQ8nExxAITykXBnxs7AGCNogFACGiCUgAYIJaABQglogFACGiCUgAYIJaABQglogFACGiCUgAYIJaABQglogFACGiCUgAYIJaABQglogFACGiCUgAYIJaABQglogFACGiCUgAYIJaABQglogFACGiCUgAYIJaABQglogFACGiCUgAYIJaABQglogFACGiCUgAYIJaABQglogFACGiCUgAYIJaABQglogFACGiCUgAYIJaABQglogFDPTdMcD6e9ywCg63+qJbFzX6V7bAAAAABJRU5ErkJggg==';
+        if (is_dir($uploadDir)) {
             $filename = 'field_' . $fieldIds['image'] . '_example.png';
-            $dest = $uploadDir . $filename;
-            if (imagepng($img, $dest)) {
+            if (@file_put_contents($uploadDir . $filename, base64_decode($pngB64)) !== false) {
                 $pdo->prepare(
                     'UPDATE ticket_form_fields SET config = ?, updated_at = NOW() WHERE id = ?'
                 )->execute([json_encode(['image_path' => $filename]), $fieldIds['image']]);
