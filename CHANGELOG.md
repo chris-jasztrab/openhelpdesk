@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.24.0 — 2026-05-05
+
+### Features
+- **"Example Ticket Form" showcase ticket type.** Migration **030** seeds a new ticket type called *Example Ticket Form* (purple `#6f42c1`, sorted last) and wires one custom field of every supported type to it via [ticket_form_field_type_map](database/migrations/016_ticket_form_field_type_map.php) so the showcase fields appear *only* on this type and don't pollute every other ticket form. The roster covers all twelve `field_type` enum values: `text_block` (intro paragraph), `text`, `textarea`, `number`, `decimal`, `date`, `date_range`, `checkbox`, `dropdown` (Option A/B/C), `dependent` (3-level Region → Country → City cascade), `cc`, and `image` (the migration draws a small placeholder PNG via GD into [public/uploads/field-images/](public/uploads/field-images/) at apply-time so the field renders immediately, with no asset file shipped in the repo). Idempotent — keyed off the type name, so re-running the migration is a no-op. Pick the type at [Portal → New Ticket](/portal/tickets/create) or [Admin → Tickets → New](/admin/tickets/new) to see all field types side-by-side. **To remove later:** delete the ticket type row at [Admin → Workflows → Ticket Types](/admin/workflows/ticket-types) — the FK CASCADE on the type-map drops the scoping; to also drop the showcase fields themselves, delete the rows in `ticket_form_fields` with labels matching `%(example form)%`.
+
+---
+
 ## 2.23.0 — 2026-05-04
 
 ### Features
