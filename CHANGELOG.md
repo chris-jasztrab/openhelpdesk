@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.27.1 — 2026-05-05
+
+### Fixes
+- **Live preview iframe was being blocked by the site's framing-deny baseline.** 2.27.0 shipped the form-builder live preview but [src/bootstrap.php](src/bootstrap.php#L51) emits `X-Frame-Options: DENY` and a CSP that ends with `frame-ancestors 'none'` for every response — both block framing outright, even from the same origin, so the iframe rendered as the browser's "helpdeskvm.wpl.ca refused to connect" error page. The `/portal/tickets/create` handler now overrides both headers when `?embed=1` is set: `X-Frame-Options: SAMEORIGIN` and the CSP re-emitted with `frame-ancestors 'self'` (PHP's `header()` replaces same-name headers by default, so the baseline emitted in bootstrap is cleanly superseded). Non-embed page loads keep the strict deny baseline — the relaxation is scoped strictly to the read-only preview response.
+
+---
+
 ## 2.27.0 — 2026-05-05
 
 ### Features

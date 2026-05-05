@@ -217,6 +217,25 @@ $router->get('/portal/tickets/create', function () {
     // for portal users.
     $embedMode = !empty($_GET['embed']);
 
+    // The site-wide baseline (src/bootstrap.php) sets X-Frame-Options: DENY and
+    // CSP frame-ancestors 'none', which blocks even same-origin framing. For embed
+    // mode only, downgrade both to permit same-origin framing so the form-builder
+    // live preview can iframe this page. Headers replace by default in PHP.
+    if ($embedMode && !headers_sent()) {
+        header('X-Frame-Options: SAMEORIGIN');
+        header(
+            "Content-Security-Policy: default-src 'self'; "
+          . "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdn.ckeditor.com; "
+          . "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdn.ckeditor.com; "
+          . "font-src 'self' data: https://cdn.jsdelivr.net https://cdn.ckeditor.com; "
+          . "img-src 'self' data: blob:; "
+          . "connect-src 'self' https://cdn.ckeditor.com; "
+          . "frame-ancestors 'self'; "
+          . "base-uri 'self'; "
+          . "form-action 'self'"
+        );
+    }
+
     render('portal/tickets/create', [
         'types'             => $types,
         'locations'         => $locations,
