@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.25.0 — 2026-05-05
+
+### Features
+- **Deep-link to the new-ticket form with a pre-selected ticket type.** [/portal/tickets/create](src/routes/portal.php#L149) now reads two optional query params and pre-selects the matching `<option>` in the Ticket Type dropdown: `?type_id=N` (numeric ID — exact, survives renames, not human-friendly) and `?type=Name` (case-insensitive name match; hyphens and underscores are normalised to spaces, so `?type=hardware-issue` resolves the same as `?type=Hardware%20Issue` — shareable but breaks if the type is later renamed). ID wins when both are supplied. Unknown values are ignored silently (no error, no preselect) so a stale link still loads the form. `old('type_id')` from a failed POST still takes precedence over the query param so re-submits don't lose the user's pick.
+
+---
+
 ## 2.24.1 — 2026-05-05
 
 ### Fixes

@@ -154,6 +154,25 @@ $router->get('/portal/tickets/create', function () {
     $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
     $tags       = $db->query('SELECT * FROM ticket_tags ORDER BY name')->fetchAll();
 
+    // Deep-link support: ?type_id=N (numeric ID) or ?type=Name (case-insensitive,
+    // hyphens/underscores treated as spaces). ID wins; name is the shareable fallback.
+    $preselectedTypeId = null;
+    if (isset($_GET['type_id']) && ctype_digit((string) $_GET['type_id'])) {
+        $wantId = (int) $_GET['type_id'];
+        foreach ($types as $t) {
+            if ((int) $t['id'] === $wantId) { $preselectedTypeId = $wantId; break; }
+        }
+    }
+    if ($preselectedTypeId === null && !empty($_GET['type'])) {
+        $needle = strtolower(trim(str_replace(['-', '_'], ' ', (string) $_GET['type'])));
+        foreach ($types as $t) {
+            if (strtolower($t['name']) === $needle) {
+                $preselectedTypeId = (int) $t['id'];
+                break;
+            }
+        }
+    }
+
     // Determine the user's location from their profile
     $userStmt = $db->prepare('SELECT location_id FROM users WHERE id = ?');
     $userStmt->execute([Auth::id()]);
@@ -206,6 +225,7 @@ $router->get('/portal/tickets/create', function () {
         'sharedTemplates'   => $sharedTemplates,
         'fieldTypeMap'      => $fieldTypeMap,
         'unifiedFields'     => $unifiedFields,
+        'preselectedTypeId' => $preselectedTypeId,
     ]);
 });
 

@@ -106,10 +106,17 @@ endif; ?>
             <div class="row g-3 mb-3" id="tour-portal-type">
                 <div class="col-md-6">
                     <label for="type_id" class="form-label fw-semibold"><?= e(getSetting('sys_field_label_ticket_type', 'Ticket Type')) ?> <span class="text-danger">*</span></label>
+                    <?php
+                    // old() wins (failed POST repopulation); fall back to ?type_id / ?type query param.
+                    $selectedTypeId = old('type_id');
+                    if ($selectedTypeId === null && !empty($preselectedTypeId)) {
+                        $selectedTypeId = $preselectedTypeId;
+                    }
+                    ?>
                     <select class="form-select" id="type_id" name="type_id" required>
                         <option value="">— Select type —</option>
                         <?php foreach ($types as $t): ?>
-                        <option value="<?= $t['id'] ?>" <?= old('type_id') == $t['id'] ? 'selected' : '' ?>>
+                        <option value="<?= $t['id'] ?>" <?= $selectedTypeId == $t['id'] ? 'selected' : '' ?>>
                             <?= e($t['name']) ?>
                         </option>
                         <?php endforeach; ?>
