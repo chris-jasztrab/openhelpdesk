@@ -47,8 +47,15 @@ foreach ($sharedTemplates as $t) {
     ];
 }
 endif; ?>
+<?php if (!empty($embedMode)): ?>
+<div class="alert alert-info py-2 px-3 mb-3 small d-flex align-items-center gap-2">
+    <i class="bi bi-eye-fill"></i>
+    <span><strong>Preview mode</strong> — this is a live render of the ticket form for the form-builder. Submission is disabled.</span>
+</div>
+<?php endif; ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="fw-bold mb-0"><?= e(label('portal.action.new', 'New Help Request')) ?></h2>
+    <?php if (empty($embedMode)): ?>
     <div class="d-flex align-items-center gap-2">
         <?php if (!empty($sharedTemplates)): ?>
         <select id="portalTemplateSelect" class="form-select form-select-sm" style="width:auto;max-width:200px;" title="Start from a template">
@@ -62,6 +69,7 @@ endif; ?>
             <i class="bi bi-arrow-left me-1"></i>Back
         </a>
     </div>
+    <?php endif; ?>
 </div>
 
 <div class="card border-0 shadow-sm">
@@ -205,12 +213,24 @@ endif; ?>
             <hr class="my-4">
 
             <div class="d-flex gap-2">
-                <button type="submit" class="btn text-white" style="background:var(--ld-primary);">
+                <button type="submit" class="btn text-white"
+                        style="background:var(--ld-primary);<?= !empty($embedMode) ? 'opacity:.55;cursor:not-allowed;' : '' ?>"
+                        <?= !empty($embedMode) ? 'disabled aria-disabled="true" title="Submission disabled in preview"' : '' ?>>
                     <i class="bi bi-send me-1"></i><?= e(label('portal.action.submit', 'Submit Request')) ?>
                 </button>
+                <?php if (empty($embedMode)): ?>
                 <a href="/portal/tickets" class="btn btn-outline-secondary">Cancel</a>
+                <?php endif; ?>
             </div>
         </form>
+        <?php if (!empty($embedMode)): ?>
+        <script>
+            // Block any keyboard / programmatic submit in preview mode
+            document.getElementById('portal-ticket-form').addEventListener('submit', function (e) {
+                e.preventDefault(); e.stopPropagation();
+            });
+        </script>
+        <?php endif; ?>
     </div>
 </div>
 

@@ -212,6 +212,11 @@ $router->get('/portal/tickets/create', function () {
 
     $fieldTypeMap = getFieldTypeMap($db);
 
+    // Embed mode: chrome-less, submit-disabled rendering for the admin form-builder
+    // live-preview iframe. Read-only on purpose — never affects the real form behaviour
+    // for portal users.
+    $embedMode = !empty($_GET['embed']);
+
     render('portal/tickets/create', [
         'types'             => $types,
         'locations'         => $locations,
@@ -226,6 +231,7 @@ $router->get('/portal/tickets/create', function () {
         'fieldTypeMap'      => $fieldTypeMap,
         'unifiedFields'     => $unifiedFields,
         'preselectedTypeId' => $preselectedTypeId,
+        'embedMode'         => $embedMode,
     ]);
 });
 

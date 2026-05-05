@@ -90,6 +90,18 @@
             .sidebar { display: none; }
             .main-content { margin-left: 0; padding: 1rem; }
         }
+
+        /* Embed mode — chrome-less rendering for iframe previews */
+        body.embed-mode { background-color: #ffffff; }
+        body.embed-mode .navbar,
+        body.embed-mode .sidebar,
+        body.embed-mode #ld-tour-resume,
+        body.embed-mode .breadcrumb { display: none !important; }
+        body.embed-mode .main-content {
+            margin-left: 0;
+            padding: 1rem 1.25rem;
+            min-height: auto;
+        }
         @keyframes ld-bell-ring {
             0%   { transform: rotate(0); }
             10%  { transform: rotate(14deg); }
@@ -309,9 +321,9 @@
         }
     </style>
 </head>
-<body>
+<body class="<?= !empty($embedMode) ? 'embed-mode' : '' ?>">
     <a class="skip-link" href="#main-content">Skip to main content</a>
-    <?php require ROOT_DIR . '/templates/partials/navbar.php'; ?>
+    <?php if (empty($embedMode)) require ROOT_DIR . '/templates/partials/navbar.php'; ?>
 
     <?php if (Auth::role() === 'admin' && getSetting('show_onboarding', '0') === '1'): ?>
     <a href="/admin?tour=1" id="ld-tour-resume" title="Continue setup tour">
@@ -330,6 +342,7 @@
     <?php endif; ?>
 
     <!-- Sidebar -->
+    <?php if (empty($embedMode)): ?>
     <aside class="sidebar">
         <nav class="nav flex-column" aria-label="Section navigation">
             <?php foreach ($sidebarItems as $item): ?>
@@ -344,6 +357,7 @@
             <?php endforeach; ?>
         </nav>
     </aside>
+    <?php endif; ?>
 
     <!-- Main content -->
     <main id="main-content" tabindex="-1" class="main-content">

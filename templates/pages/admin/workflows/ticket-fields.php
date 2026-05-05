@@ -250,6 +250,79 @@ usort($unifiedBuilderList, fn($a, $b) => $a['sort_order'] <=> $b['sort_order']);
     [data-bs-theme="dark"] .scope-segment { background: var(--bs-tertiary-bg); }
     [data-bs-theme="dark"] .scope-segment input[type="radio"]:checked + span { background: var(--bs-secondary-bg); }
     [data-bs-theme="dark"] .scope-types-grid { background: var(--bs-tertiary-bg); border-color: #495057; }
+
+    /* ── Split layout: builder + live preview pane ── */
+    .builder-wrap { display: flex; gap: 1rem; align-items: flex-start; }
+    .builder-wrap > .card { flex: 1; min-width: 0; }
+    .preview-pane {
+        flex: 0 0 480px;
+        max-width: 480px;
+        position: sticky;
+        top: calc(var(--ld-navbar-height, 56px) + 1rem);
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: .5rem;
+        box-shadow: 0 1px 3px rgba(15,23,42,.06);
+        display: none;
+        flex-direction: column;
+        overflow: hidden;
+        max-height: calc(100vh - var(--ld-navbar-height, 56px) - 2rem);
+    }
+    .preview-pane.is-open { display: flex; }
+    .preview-pane .preview-head {
+        padding: .65rem .85rem;
+        border-bottom: 1px solid #e2e8f0;
+        background: linear-gradient(180deg, #fafbff 0%, #f5f7ff 100%);
+        display: flex; align-items: center; gap: .55rem;
+        font-size: .85rem; font-weight: 600; color: #1e1b4b;
+    }
+    .preview-pane .preview-head .ph-type {
+        background: #eef2ff; color: #4338ca;
+        padding: .15rem .55rem; border-radius: 999px;
+        font-size: .72rem; border: 1px solid #c7d2fe;
+    }
+    .preview-pane .preview-head .ph-actions { margin-left: auto; display: flex; gap: .25rem; }
+    .preview-pane .preview-head .ph-btn {
+        background: none; border: 1px solid transparent;
+        color: #475569; padding: .15rem .4rem;
+        border-radius: .35rem; cursor: pointer;
+        font-size: .85rem; line-height: 1;
+    }
+    .preview-pane .preview-head .ph-btn:hover { background: #fff; border-color: #e2e8f0; color: #1e1b4b; }
+    .preview-pane iframe {
+        flex: 1; border: 0; width: 100%; min-height: 540px;
+        background: #fff;
+    }
+    .preview-pane .preview-loading {
+        position: absolute; inset: 38px 0 0 0;
+        background: rgba(255,255,255,.85);
+        display: flex; align-items: center; justify-content: center;
+        gap: .5rem; color: #475569; font-size: .85rem;
+        pointer-events: none; opacity: 0;
+        transition: opacity .15s ease;
+    }
+    .preview-pane.is-loading .preview-loading { opacity: 1; }
+
+    @media (max-width: 1199px) {
+        .builder-wrap { flex-direction: column; }
+        .preview-pane { flex: 1 1 auto; max-width: none; width: 100%; position: static; max-height: none; }
+        .preview-pane iframe { min-height: 720px; }
+    }
+
+    /* Toggle button — distinct active state */
+    #togglePreviewBtn { white-space: nowrap; }
+    #togglePreviewBtn.is-active {
+        background: var(--ld-primary); color: #fff; border-color: var(--ld-primary);
+    }
+    #togglePreviewBtn.is-active:hover { background: var(--ld-primary-hover, #4338ca); }
+
+    [data-bs-theme="dark"] .preview-pane { background: var(--bs-secondary-bg); border-color: #373b3e; }
+    [data-bs-theme="dark"] .preview-pane .preview-head { background: linear-gradient(180deg, #1a1d21 0%, #15171a 100%); border-bottom-color: #373b3e; color: #e0e7ff; }
+    [data-bs-theme="dark"] .preview-pane .preview-head .ph-type { background: #1e1b4b; border-color: #4338ca; color: #c7d2fe; }
+    [data-bs-theme="dark"] .preview-pane .preview-head .ph-btn { color: #cbd5e1; }
+    [data-bs-theme="dark"] .preview-pane .preview-head .ph-btn:hover { background: var(--bs-secondary-bg); border-color: #495057; color: #fff; }
+    [data-bs-theme="dark"] .preview-pane iframe { background: #212529; }
+    [data-bs-theme="dark"] .preview-pane .preview-loading { background: rgba(33,37,41,.85); color: #cbd5e1; }
 </style>
 
 <div class="d-flex align-items-center justify-content-between mb-4">
@@ -257,23 +330,31 @@ usort($unifiedBuilderList, fn($a, $b) => $a['sort_order'] <=> $b['sort_order']);
         <h4 class="fw-bold mb-1">Ticket Form Builder</h4>
         <p class="text-muted mb-0 small">Manage and extend the fields shown on the New Ticket form.</p>
     </div>
-    <!-- Add Custom Field dropdown -->
-    <div class="dropdown">
-        <button class="btn btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-            <i class="bi bi-plus-lg me-1"></i>Add Custom Field
+    <div class="d-flex align-items-center gap-2">
+        <!-- Live Preview toggle -->
+        <button class="btn btn-outline-primary" type="button" id="togglePreviewBtn"
+                aria-pressed="false" title="Show a live preview of the portal ticket form">
+            <i class="bi bi-eye me-1"></i>Live Preview
         </button>
-        <ul class="dropdown-menu dropdown-menu-end shadow-sm">
-            <?php foreach ($fieldTypeMeta as $type => $meta): ?>
-            <li>
-                <button class="dropdown-item add-field-btn" type="button" data-type="<?= e($type) ?>">
-                    <i class="bi <?= e($meta['icon']) ?> me-2 text-primary"></i><?= e($meta['label']) ?>
-                </button>
-            </li>
-            <?php endforeach; ?>
-        </ul>
+        <!-- Add Custom Field dropdown -->
+        <div class="dropdown">
+            <button class="btn btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="bi bi-plus-lg me-1"></i>Add Custom Field
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                <?php foreach ($fieldTypeMeta as $type => $meta): ?>
+                <li>
+                    <button class="dropdown-item add-field-btn" type="button" data-type="<?= e($type) ?>">
+                        <i class="bi <?= e($meta['icon']) ?> me-2 text-primary"></i><?= e($meta['label']) ?>
+                    </button>
+                </li>
+                <?php endforeach; ?>
+            </ul>
+        </div>
     </div>
 </div>
 
+<div class="builder-wrap">
 <div class="card shadow-sm">
     <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between py-2 px-3">
         <span class="fw-semibold small">Form Fields</span>
@@ -414,6 +495,33 @@ usort($unifiedBuilderList, fn($a, $b) => $a['sort_order'] <=> $b['sort_order']);
 
     </div>
 </div>
+
+<!-- ── Live Preview pane ── -->
+<aside class="preview-pane" id="previewPane" aria-label="Live ticket form preview" aria-hidden="true">
+    <div class="preview-head">
+        <i class="bi bi-eye-fill text-primary"></i>
+        <span>Live Preview</span>
+        <span class="ph-type" id="previewHeadType">All types</span>
+        <div class="ph-actions">
+            <button type="button" class="ph-btn" id="previewReloadBtn" title="Reload preview">
+                <i class="bi bi-arrow-clockwise"></i>
+            </button>
+            <button type="button" class="ph-btn" id="previewOpenBtn" title="Open in new tab">
+                <i class="bi bi-box-arrow-up-right"></i>
+            </button>
+            <button type="button" class="ph-btn" id="previewCloseBtn" title="Close preview">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+    </div>
+    <iframe id="previewFrame" title="Portal ticket form preview" loading="lazy"
+            sandbox="allow-same-origin allow-scripts allow-forms allow-popups"></iframe>
+    <div class="preview-loading">
+        <div class="spinner-border spinner-border-sm text-primary"></div>
+        <span>Loading preview…</span>
+    </div>
+</aside>
+</div><!-- /.builder-wrap -->
 
 <!-- ── Field Properties Modal ── -->
 <div class="modal fade" id="fieldModal" tabindex="-1">
@@ -642,7 +750,7 @@ document.addEventListener('DOMContentLoaded', function () {
         handle:    '.drag-handle',
         animation: 150,
         filter:    '.custom-empty',
-        onEnd:     function () { saveOrder(); }
+        onEnd:     function () { saveOrder(); if (typeof loadPreview === 'function') loadPreview(); }
     });
 
     /* ─── Type filter: preview the form for any single ticket type ─── */
@@ -761,6 +869,79 @@ document.addEventListener('DOMContentLoaded', function () {
     /* ─── Bootstrap chip counts on first paint ─── */
     refreshChipCounts();
 
+    /* ─── Live preview pane ─── */
+    var previewPane    = document.getElementById('previewPane');
+    var previewFrame   = document.getElementById('previewFrame');
+    var previewToggle  = document.getElementById('togglePreviewBtn');
+    var previewHeadTy  = document.getElementById('previewHeadType');
+    var previewReload  = document.getElementById('previewReloadBtn');
+    var previewOpen    = document.getElementById('previewOpenBtn');
+    var previewClose   = document.getElementById('previewCloseBtn');
+
+    function buildPreviewUrl() {
+        var url = '/portal/tickets/create?embed=1';
+        if (currentFilterTypeId !== null) url += '&type_id=' + currentFilterTypeId;
+        // Cache-buster guarantees iframe reloads on each filter change AND on field-save
+        url += '&_t=' + Date.now();
+        return url;
+    }
+
+    function previewIsOpen() {
+        return previewPane.classList.contains('is-open');
+    }
+
+    function loadPreview() {
+        if (!previewIsOpen()) return;
+        previewPane.classList.add('is-loading');
+        previewFrame.src = buildPreviewUrl();
+        // Update the type chip in the preview header
+        if (currentFilterTypeId === null) {
+            previewHeadTy.textContent = 'All types';
+        } else {
+            for (var i = 0; i < ticketTypes.length; i++) {
+                if (parseInt(ticketTypes[i].id) === currentFilterTypeId) {
+                    previewHeadTy.textContent = ticketTypes[i].name;
+                    return;
+                }
+            }
+        }
+    }
+
+    previewFrame.addEventListener('load', function () {
+        previewPane.classList.remove('is-loading');
+    });
+
+    previewToggle.addEventListener('click', function () {
+        var willOpen = !previewIsOpen();
+        previewPane.classList.toggle('is-open', willOpen);
+        previewToggle.classList.toggle('is-active', willOpen);
+        previewToggle.setAttribute('aria-pressed', willOpen ? 'true' : 'false');
+        previewPane.setAttribute('aria-hidden', willOpen ? 'false' : 'true');
+        if (willOpen) loadPreview();
+    });
+
+    previewClose.addEventListener('click', function () {
+        previewPane.classList.remove('is-open');
+        previewToggle.classList.remove('is-active');
+        previewToggle.setAttribute('aria-pressed', 'false');
+        previewPane.setAttribute('aria-hidden', 'true');
+    });
+
+    previewReload.addEventListener('click', loadPreview);
+    previewOpen.addEventListener('click', function () {
+        // Open the live (non-embed) form in a new tab, with the active type pre-selected
+        var url = '/portal/tickets/create';
+        if (currentFilterTypeId !== null) url += '?type_id=' + currentFilterTypeId;
+        window.open(url, '_blank', 'noopener');
+    });
+
+    // Re-load the preview whenever the chip-strip filter changes
+    var origApplyTypeFilter = applyTypeFilter;
+    applyTypeFilter = function (typeId) {
+        origApplyTypeFilter(typeId);
+        loadPreview();
+    };
+
     /* ─── Add field from dropdown menu ─── */
     document.querySelectorAll('.add-field-btn').forEach(function (btn) {
         btn.addEventListener('click', function () {
@@ -794,6 +975,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (cb) cb.checked = true;
             }
             refreshChipCounts();
+            if (typeof loadPreview === 'function') loadPreview();
         });
     }
 
@@ -874,6 +1056,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 updateCount();
                 refreshChipCounts();
                 if (currentFilterTypeId !== null) applyTypeFilter(currentFilterTypeId);
+                if (typeof loadPreview === 'function') loadPreview();
             }
         });
     });

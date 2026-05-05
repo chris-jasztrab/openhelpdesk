@@ -11,6 +11,14 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.27.0 — 2026-05-05
+
+### Features
+- **Live preview pane on the ticket form builder.** The Ticket Form Builder now has a *Live Preview* toggle button next to *Add Custom Field*. When toggled on the layout splits into two columns — the existing builder card on the left and a sticky right-side pane that iframes the actual portal page at `/portal/tickets/create?embed=1[&type_id=N]`, so the preview is the real form (no parallel render path to drift). Clicking any chip in the *Preview as* strip swaps the iframe's `type_id` so the preview shows exactly the form a user filling in that ticket type would see — including dependent cascades, image fields, text blocks, and the dynamic show/hide of type-scoped fields driven by the existing portal JS. Reordering, adding, deleting, and saving fields all auto-reload the iframe (a `?_t=…` cache-buster is appended on every load), and the pane has its own *Reload* and *Open in new tab* buttons. Below 1200px the layout collapses to stack vertically so the iframe stays readable.
+- **`?embed=1` mode on `/portal/tickets/create`.** Adds a chrome-less rendering of the new-ticket form for use inside iframes. The layout in [templates/layouts/app.php](templates/layouts/app.php) now reads an `$embedMode` flag from the route data and, when set, adds a `body.embed-mode` class that hides the navbar, sidebar, breadcrumb, and the resume-tour overlay via CSS, plus zeroes out the sidebar margin and tightens padding on `.main-content`. The portal create handler in [src/routes/portal.php](src/routes/portal.php) reads `$_GET['embed']` and forwards the flag through `render()`. In the template itself the *Submit Request* button is rendered with `disabled` + a soft "submission disabled" tooltip and a one-line *Preview mode* alert appears at the top, plus a defensive JS submit-blocker handles keyboard submits. The *Cancel* link and template picker are suppressed in embed mode so nothing in the iframe navigates away. Read-only on purpose — embed mode never affects how portal users see the form.
+
+---
+
 ## 2.26.0 — 2026-05-05
 
 ### Features
