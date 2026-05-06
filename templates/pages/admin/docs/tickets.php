@@ -192,18 +192,120 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 </div>
 </div>
 
+<h3 id="form-builder" class="fw-bold mt-5 mb-3">The Ticket Form Builder</h3>
+
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-ui-checks-grid text-primary me-2"></i>Custom Form Fields (Workflows)</h5>
-<p class="text-muted mb-2">LocalDesk supports custom fields on the ticket creation and detail forms. Build and manage fields at <a href="/admin/workflows/ticket-fields"><strong>Admin → Settings → Custom Fields</strong></a>.</p>
-<p class="text-muted mb-2">Supported field types:</p>
-<ul class="text-muted mb-0">
-    <li><strong>Short Text</strong> — single-line text input.</li>
-    <li><strong>Long Text</strong> — multi-line textarea.</li>
-    <li><strong>Dropdown</strong> — single-select from a defined list of options.</li>
-    <li><strong>Multi-Select</strong> — choose multiple values from a list.</li>
-    <li><strong>Checkbox</strong> — a true/false toggle.</li>
+<h5 class="fw-semibold mb-3"><i class="bi bi-ui-checks-grid text-primary me-2"></i>What the Form Builder is for</h5>
+<p class="text-muted mb-2">The <strong>Ticket Form Builder</strong> at <a href="/admin/workflows/ticket-fields"><strong>Admin → Settings → Custom Fields</strong></a> controls everything that appears on the <em>New Ticket</em> form — both on the public portal and inside the admin/agent "Create Ticket" view. Anything you change here takes effect immediately for the next person who opens the form. There is no "publish" step.</p>
+<p class="text-muted mb-2">The page shows three kinds of rows in a single, drag-to-reorder list:</p>
+<ul class="text-muted mb-3">
+    <li><strong>Pinned Fields</strong> — <em>Subject</em> and <em>Description</em>. Always at the very top of the form. Their labels can be renamed (pencil icon), but they can't be moved or removed.</li>
+    <li><strong>System Fields</strong> — <em>Ticket Type</em>, <em>Location</em>, <em>Priority</em>, <em>Tags</em>, and <em>Attachments</em>. Built-in fields the application needs in order to function. You can rename them, toggle <em>required</em> on the ones that support it, and drag them up or down relative to the custom fields. They can't be deleted.</li>
+    <li><strong>Custom Fields</strong> — anything you add via the <strong>+ Add Custom Field</strong> dropdown. Twelve field types are supported (see the table below). Custom fields can be edited, deleted, reordered, marked required, hidden from portal users, and scoped to specific ticket types.</li>
 </ul>
+<div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
+    The order of rows on this page <em>is</em> the order users see on the form. Pinned fields are locked at the top; everything else flows in whatever order you arrange. There is no separate "form layout" screen.
+</div>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-list-ul text-primary me-2"></i>The 12 Custom Field Types</h5>
+<p class="text-muted mb-2">Pick the type that matches the data you want to collect. Each row in the form-builder list shows its field type as a small grey badge so you can scan the list at a glance.</p>
+<div class="table-responsive">
+<table class="table table-sm mb-0">
+    <thead class="table-light"><tr><th style="width:160px">Type</th><th>What it does</th></tr></thead>
+    <tbody class="text-muted">
+        <tr><td><strong>Text</strong></td><td>Single-line text input. Optional placeholder hint.</td></tr>
+        <tr><td><strong>Multi-line Text</strong></td><td>Tall textarea for longer free-form input — model numbers, error messages, paste-in logs.</td></tr>
+        <tr><td><strong>Checkbox</strong></td><td>One true/false toggle. The label <em>is</em> the question (<em>"Is the building unlocked?"</em>).</td></tr>
+        <tr><td><strong>Dropdown</strong></td><td>Single-select from a list you maintain inside the field's edit dialog. Options are kept as little pills you can add or remove.</td></tr>
+        <tr><td><strong>Date</strong></td><td>Single calendar picker.</td></tr>
+        <tr><td><strong>Date Range</strong></td><td>Two calendar pickers — <em>from</em> / <em>to</em>. Useful for "when can someone come?" and outage windows.</td></tr>
+        <tr><td><strong>Number</strong></td><td>Whole-number input — copy counts, port numbers, room numbers.</td></tr>
+        <tr><td><strong>Decimal</strong></td><td>Number input that accepts a decimal point (1.5 hours, $42.99, 0.25 GB).</td></tr>
+        <tr><td><strong>Dependent</strong></td><td>A 2- or 3-level cascading dropdown — pick a Region, then the Country dropdown re-populates, then the City dropdown does the same. The hierarchy is entered as an indented list (one tab per level) inside the edit dialog, with a "Preview hierarchy" button so you can sanity-check the tree before saving. Each level has its own label (<em>"Category"</em>, <em>"Subcategory"</em>, <em>"Item"</em>).</td></tr>
+        <tr><td><strong>Text Block</strong></td><td>A read-only paragraph rendered on the form itself — instructions, contact details, "please don't enter PII here" warnings. Doesn't accept input and doesn't store anything.</td></tr>
+        <tr><td><strong>Image</strong></td><td>A read-only image rendered on the form (logo, diagram, sign-here example). Upload a JPEG/PNG/GIF/WebP up to 5 MB; the image is stored under <code>public/uploads/field-images/</code> and shown to users without a download step.</td></tr>
+        <tr><td><strong>CC</strong></td><td>An "email me a copy" / "copy these people too" field. Adds the listed addresses to the requester acknowledgement and any future agent replies on the ticket.</td></tr>
+    </tbody>
+</table>
+</div>
+<p class="text-muted small mt-3 mb-0"><strong>About requirement and visibility:</strong> Most types let you mark them <em>Required</em> (red badge) and let you <em>Hide from portal users</em> (eye-slash icon). Hidden fields are still shown on the admin <em>Create Ticket</em> view — useful for admin-only metadata you don't want patrons filling in. <em>Text Block</em> and <em>Image</em> are display-only, so they don't have these toggles.</p>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-tag-fill text-primary me-2"></i>Field Scope: Global vs Specific to Ticket Type</h5>
+<p class="text-muted mb-2">Every custom field has a <strong>scope</strong> that decides which ticket types' forms it appears on. Scope is shown as a coloured pill in the field's row on the builder list:</p>
+<ul class="text-muted mb-3">
+    <li><span class="scope-pill scope-global" style="display:inline-flex;align-items:center;gap:.3rem;font-size:.7rem;padding:.2rem .55rem;border-radius:999px;background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;"><i class="bi bi-globe2"></i>Global</span> &nbsp; The field appears on the form regardless of which ticket type the user picks. Use this for things you always want to ask — <em>"Have you tried turning it off and on again?"</em>, <em>"Where can we reach you?"</em>.</li>
+    <li><span class="scope-pill scope-specific" style="display:inline-flex;align-items:center;gap:.3rem;font-size:.7rem;padding:.2rem .55rem;border-radius:999px;background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;"><i class="bi bi-tag-fill"></i>2 types</span> &nbsp; The field <em>only</em> appears when the user picks one of the listed ticket types. Hover the pill to see the names. Use this for type-specific data — a "printer model" field that only makes sense on <em>Printer Issue</em> tickets, an "outage start time" that only makes sense on <em>Outage Report</em>.</li>
+</ul>
+<p class="text-muted mb-2">Setting the scope happens inside the field's edit dialog (pencil icon). The first thing in the dialog is a segmented switch:</p>
+<div class="bg-light rounded p-3 mb-3">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;background:#f1f5f9;border-radius:.55rem;padding:.25rem;">
+        <div style="text-align:center;padding:.55rem .5rem;border-radius:.4rem;background:#fff;color:#4f46e5;font-size:.85rem;font-weight:500;box-shadow:0 1px 2px rgba(15,23,42,.06);"><i class="bi bi-globe2 me-1"></i>All ticket types</div>
+        <div style="text-align:center;padding:.55rem .5rem;border-radius:.4rem;color:#64748b;font-size:.85rem;font-weight:500;"><i class="bi bi-tag-fill me-1"></i>Only specific types</div>
+    </div>
+</div>
+<p class="text-muted mb-2">Pick <strong>All ticket types</strong> for a global field. Pick <strong>Only specific types</strong> to reveal a checkbox grid of every ticket type — tick the ones the field should appear on. The form refuses to save a "specific" field with zero boxes ticked, so you can't accidentally orphan a field by switching modes and not picking anything.</p>
+<p class="text-muted mb-0">Switching back from <em>Specific</em> to <em>All</em> automatically clears the checkbox state, so a stale list can never be saved by accident.</p>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-eye-fill text-primary me-2"></i>"Preview as" — Filter the List by Ticket Type</h5>
+<p class="text-muted mb-2">Once you start scoping fields to specific types, the field list quickly becomes hard to read at a glance — you can't easily answer <em>"what does the form actually look like for a Hardware ticket?"</em> just by scanning the rows. The <strong>Preview as</strong> chip strip at the top of the Form Fields card solves that.</p>
+<p class="text-muted mb-2">The strip is a horizontal scrolling row of chips — one for each ticket type, plus an <em>All types</em> chip on the left. Each chip carries a count of how many fields would land on that type's form (Pinned + System + every Global custom field + every Specific-to-this-type custom field).</p>
+<p class="text-muted mb-2">Click any chip and the field list filters in place to show <em>exactly</em> the fields a user filling in that ticket type would see, in the order they'd see them. Custom fields that don't apply to the chosen type are hidden. The visible custom rows pick up a subtle left-border accent so you can see scope at a glance:</p>
+<ul class="text-muted mb-3">
+    <li><strong>Grey accent</strong> — Global field (would appear on every type, including this one).</li>
+    <li><strong>Indigo accent</strong> — Specific to the currently-filtered type.</li>
+</ul>
+<p class="text-muted mb-2">An indigo banner appears at the top of the card while a filter is active, naming the ticket type and the visible field count. <strong>Drag-to-reorder is disabled while a filter is on</strong> — ordering is global, not per-type, and the banner spells that out: <em>"Reordering applies to all forms; switch to All types to reorder."</em> Click the <em>Clear</em> button on the banner (or the <em>All types</em> chip) to leave the filter view.</p>
+<div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
+    Quality-of-life: when a type filter is active and you click <strong>+ Add Custom Field</strong>, the new field's edit dialog opens pre-scoped to that type. So if you're previewing the <em>Hardware</em> form and add a "Printer model" field, it lands on the <em>Hardware</em> form by default — no need to remember to flip the scope after creating it.
+</div>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-display text-primary me-2"></i>Live Preview Pane</h5>
+<p class="text-muted mb-2">The chip strip filters the <em>builder list</em>, but the builder list is still a list of admin rows — labels, badges, edit buttons. To see what the form genuinely <em>looks like</em> to a user (with the actual input controls, dropdown options, dependent cascades, image fields, text blocks, all rendered for real), click the <strong>Live Preview</strong> button next to <em>+ Add Custom Field</em>.</p>
+<p class="text-muted mb-2">The page splits into two columns:</p>
+<ul class="text-muted mb-3">
+    <li><strong>Left column</strong> — the field-builder list as before. Filtering with the <em>Preview as</em> chip strip still works.</li>
+    <li><strong>Right column</strong> — a pinned preview pane that iframes the real <code>/portal/tickets/create</code> page in a chrome-less <em>preview mode</em> (no navbar, no sidebar, no tour overlays, the <em>Submit</em> button is disabled). The preview is the actual portal renderer — there is no parallel "preview engine" that could ever drift out of sync with what users see.</li>
+</ul>
+<p class="text-muted mb-2">Switching chips on the left swaps the preview's <code>type_id</code> deep-link, so the iframe always reflects the form for the currently-filtered ticket type — including dynamic show/hide of type-scoped fields, dependent cascades, image fields, and text blocks. Adding, editing, deleting, or reordering a field automatically reloads the iframe, and the pane has its own controls in its header:</p>
+<ul class="text-muted mb-3">
+    <li><strong>Reload</strong> (circular arrow) — manually refresh the preview, e.g. after editing something in another tab.</li>
+    <li><strong>Open in new tab</strong> (square-arrow icon) — opens the live (non-preview) form in a new tab with the type pre-selected, so you can submit a real test ticket if you want to.</li>
+    <li><strong>Close</strong> — collapses the preview pane back to a single-column builder.</li>
+</ul>
+<p class="text-muted small mb-0">On screens narrower than 1200&nbsp;px the preview drops below the field list rather than next to it, so the form remains readable on laptops and tablets.</p>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-link-45deg text-primary me-2"></i>Direct Links to a Specific Type's Form</h5>
+<p class="text-muted mb-2">Sometimes you want to send a patron straight to the right form rather than asking them to pick a ticket type from a dropdown — for example, a "Report a printer problem" link on the staff intranet. The portal supports two query parameters on <code>/portal/tickets/create</code> for exactly this:</p>
+<ul class="text-muted mb-3">
+    <li><code>?type_id=<em>N</em></code> — the numeric ID of the ticket type. <strong>Stable across renames</strong> and immune to typos. Less human-readable but the recommended form for shareable links.</li>
+    <li><code>?type=<em>name</em></code> — the human-readable name of the type, case-insensitive, with hyphens or underscores treated as spaces (so <code>?type=hardware-issue</code> resolves the same as <code>?type=Hardware%20Issue</code>). Nicer to look at, but the link will silently stop pre-selecting if the type is later renamed.</li>
+</ul>
+<p class="text-muted mb-2">The numeric form wins when both are supplied. Unknown values are ignored silently — a stale link still loads the form, just without the pre-selection.</p>
+<p class="text-muted mb-2">There's a built-in shortcut for grabbing the right URL: every row on <a href="/admin/types"><strong>Admin → Settings → Ticket Types</strong></a> now has a <strong>Direct Link</strong> column with a read-only path you can click to select, a <strong>copy</strong> button that puts the absolute URL on your clipboard, and an <strong>open in a new tab</strong> button. The copy button shows a green check briefly so you know it worked — paste it into your intranet, an email signature, a poster QR code, anywhere.</p>
+<div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
+    If the person clicking the link <strong>isn't signed in</strong>, they go through the login page first and are bounced straight to the right form afterwards. See <a href="/admin/docs/portal#direct-links"><strong>Portal → Direct Links</strong></a> for how that flow works end-to-end.
+</div>
 </div>
 </div>
 

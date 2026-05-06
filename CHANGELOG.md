@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.28.1 — 2026-05-06
+
+### Documentation
+- **In-app docs caught up to the form-builder and direct-link work shipped in 2.25–2.28.** None of yesterday's UX work was documented at [Admin → Docs](/admin/docs); only a thin five-line "Custom Form Fields" card existed in the *Tickets* page that listed five field types and missed the seven other supported types entirely. That card is replaced with a full *Ticket Form Builder* section in [templates/pages/admin/docs/tickets.php](templates/pages/admin/docs/tickets.php) covering: what the builder is for and the three row kinds it shows (Pinned / System / Custom), a table reference of all 12 supported field types with concrete usage examples for each (including the dependent cascade, date range, text block, image, and CC fields that weren't documented at all), the new *Global vs Specific to ticket type* scope model with an inline rendering of both pill colours and the segmented modal switch, the *Preview as* chip-strip filter (including how the row-border accent encodes Global vs Specific while filtered, and why drag-reorder is disabled in filtered mode), and the *Live Preview* iframe pane (chrome-less embed of `/portal/tickets/create?embed=1`, the three header controls, and the responsive collapse below 1200&nbsp;px). The form-builder section closes with a pointer to a new *Direct Links* heading in the Portal docs at [templates/pages/admin/docs/portal.php](templates/pages/admin/docs/portal.php#direct-links), which gets three new cards: how the `?type_id=N` and `?type=name` query parameters work and which one to pick for shareable links, where to grab a ready-made URL (the new *Direct Link* column at /admin/types with copy-to-clipboard and open-in-new-tab), and a step-by-step walk-through of the "remember where you were going" flow that runs when an anonymous visitor hits a direct link — including the survives-2FA behaviour, the explicit `/login?next=…` form for share-friendly direct-to-login URLs, and a callout explaining the open-redirect protection on both sides (relative path required, absolute / protocol-relative / backslash variants / the `/login` page itself / non-GET / >2&nbsp;000 chars all silently rejected). Twenty-five new entries are added to the docs hub search index in [templates/pages/admin/docs/index.php](templates/pages/admin/docs/index.php) so an admin typing "preview as", "scope", "direct link", "deep link", "type_id", "next", "open redirect", "live preview", "dependent", "CC field", or any of the other terms surfaces the right card.
+
+---
+
 ## 2.28.0 — 2026-05-05
 
 ### Features

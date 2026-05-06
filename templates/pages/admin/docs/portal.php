@@ -123,6 +123,68 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 </div>
 </div>
 
+<h3 id="direct-links" class="fw-bold mt-5 mb-3">Direct Links</h3>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-link-45deg text-primary me-2"></i>Linking Straight to a Specific Type's Form</h5>
+<p class="text-muted mb-2">Most users land on the portal, click <em>New Ticket</em>, and pick a ticket type from a dropdown. But there are plenty of situations where you want to skip the dropdown and send someone directly to the right form — a "Report a printer problem" link on the staff intranet, a QR code on a public-access PC, a button in a Teams channel, an email signature.</p>
+<p class="text-muted mb-2">The new-ticket page accepts two query parameters that pre-select the ticket type for the visitor:</p>
+<div class="table-responsive mb-3">
+<table class="table table-sm mb-0">
+    <thead class="table-light"><tr><th style="width:40%">URL pattern</th><th>Behaviour</th></tr></thead>
+    <tbody class="text-muted">
+        <tr>
+            <td><code>/portal/tickets/create?type_id=<em>N</em></code></td>
+            <td>Numeric ticket-type ID (you can find it in the URL when you edit a type). <strong>Stable across renames</strong> — the link keeps working even if you change the type's display name later. Recommended for shareable links.</td>
+        </tr>
+        <tr>
+            <td><code>/portal/tickets/create?type=<em>name</em></code></td>
+            <td>Human-readable name, case-insensitive. Hyphens and underscores are treated as spaces, so <code>?type=hardware-issue</code> resolves the same as <code>?type=Hardware%20Issue</code>. Nicer to read in a URL bar but <strong>breaks silently if the type is later renamed</strong>.</td>
+        </tr>
+    </tbody>
+</table>
+</div>
+<p class="text-muted mb-2">The numeric form wins if both are supplied. Unknown values are ignored — a stale link still loads the form, just without the pre-selection (the dropdown stays at "&mdash; Select type &mdash;"). And anything the user has typed before submitting (a half-finished POST that came back with an error) takes precedence over the URL parameter, so re-submitting after a validation failure won't lose their pick.</p>
+<p class="text-muted mb-0">Once the type is pre-selected, the form's existing JS automatically renders any custom fields scoped to that type — see <a href="/admin/docs/tickets#form-builder"><strong>Tickets → Form Builder</strong></a> for how field scope is configured.</p>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-clipboard-check text-primary me-2"></i>Where to Get a Direct Link</h5>
+<p class="text-muted mb-2">Rather than hand-crafting URLs, use the built-in column at <a href="/admin/types"><strong>Admin → Settings → Ticket Types</strong></a>. Each row carries a <strong>Direct Link</strong> column with three controls:</p>
+<ul class="text-muted mb-3">
+    <li><strong>Read-only path input</strong> — shows the relative path (<code>/portal/tickets/create?type_id=<em>N</em></code>). Click it once to select the whole thing, then <kbd>Ctrl</kbd>+<kbd>C</kbd> to copy. Hovering it shows a tooltip noting that anonymous visitors will be sent through login first.</li>
+    <li><strong>Copy button</strong> (clipboard icon) — copies the <em>absolute</em> URL (full <code>https://your-site/...</code>) to your clipboard, and briefly flashes a green check so you know it worked. Uses the modern <code>navigator.clipboard</code> API where available, with a fallback for older browsers and non-HTTPS contexts.</li>
+    <li><strong>Open in new tab</strong> (square-arrow icon) — opens the link in a new tab. Useful for sanity-checking that the right type pre-selects and that any type-scoped custom fields show up the way you expect.</li>
+</ul>
+<p class="text-muted mb-2">The link uses the <code>type_id</code> form deliberately — it's the durable choice. If you'd rather share a name-based URL (it reads more naturally on a printed poster or in an email), copy the path and swap <code>type_id=<em>N</em></code> for <code>type=<em>your-type-name</em></code> by hand.</p>
+<p class="text-muted mb-0">Direct-link URLs are always relative paths starting with a single forward slash. They are safe to embed anywhere on the same site (intranet pages, internal Slack/Teams messages, email signatures) and the absolute version on the clipboard is what you'd typically paste into a public-facing place.</p>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-shield-check text-primary me-2"></i>What Happens When the Visitor Isn't Signed In</h5>
+<p class="text-muted mb-2">Submitting a ticket requires a logged-in account. Direct links would be much less useful if every anonymous click dumped the visitor on a generic home page after login — they'd be left wondering what they were supposed to do next.</p>
+<p class="text-muted mb-2">LocalDesk handles this with a <strong>"remember where you were going"</strong> flow:</p>
+<ol class="text-muted mb-3">
+    <li>An anonymous visitor clicks the direct link (e.g. <code>/portal/tickets/create?type_id=5</code>).</li>
+    <li>The server sees they aren't signed in, <strong>stashes the requested URL in their session</strong>, and redirects them to the login page.</li>
+    <li>They sign in (and complete 2FA if their account has it enabled — the stashed URL survives the 2FA round-trip).</li>
+    <li>On final success, they're sent <strong>straight to the new-ticket form for the right type</strong>, with type-scoped custom fields already rendered.</li>
+</ol>
+<p class="text-muted mb-2">Self-registration works the same way: a visitor without an account can register from the login page, click the verification link in their welcome email, sign in, and land on the form they originally clicked. The session-stashed URL persists until either it's consumed on a successful login or the browser session ends.</p>
+<p class="text-muted mb-2">If you want to share a "log in first, then go to this form" link explicitly — for example, in an email where you want the recipient to see the login page even if they think they're already signed in elsewhere — you can also pass the destination as a <code>?next=</code> parameter on the login URL itself:</p>
+<div class="bg-light rounded px-3 py-2 font-monospace small mb-3">/login?next=%2Fportal%2Ftickets%2Fcreate%3Ftype_id%3D5</div>
+<p class="text-muted mb-2">The <code>next</code> value must be URL-encoded because it contains its own <code>?</code>. Once the user signs in, they're forwarded to the decoded path.</p>
+<div class="alert alert-warning small mb-0"><i class="bi bi-shield-lock me-2"></i>
+    <strong>Open-redirect protection.</strong> Both the auto-stash and the explicit <code>?next=</code> parameter only accept <strong>relative paths starting with a single forward slash</strong>. Absolute URLs (<code>http://&hellip;</code>), protocol-relative URLs (<code>//evil.example.com/&hellip;</code>), backslash-prefix variants that some browsers normalise (<code>/\evil.example.com</code>), the <code>/login</code> page itself, anything longer than 2&nbsp;000 characters, and non-GET requests are all silently rejected — visitors hitting a bad value just land on the home page after login. There is no way to weaponise this flow into bouncing a logged-in user off-site.
+</div>
+</div>
+</div>
+
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-paint-bucket text-primary me-2"></i>Customising the Portal</h5>
