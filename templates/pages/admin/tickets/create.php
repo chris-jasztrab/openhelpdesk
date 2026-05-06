@@ -197,7 +197,7 @@ $statusOptions = [
                         $cfKey = 'field_' . $cf['id'];
                         $cfOpts = $fieldOptions[$cf['id']] ?? [];
                     ?>
-                        <div class="col-12">
+                        <div class="col-12 custom-field-col" data-field-id="<?= (int) $cf['id'] ?>">
                             <?php include ROOT_DIR . '/templates/partials/custom-field-input.php'; ?>
                         </div>
                     <?php endif;
@@ -301,11 +301,11 @@ $statusOptions = [
 
     function filterFieldsByType() {
         var selectedType = parseInt(typeSelect.value) || 0;
-        document.querySelectorAll('.custom-field-wrap').forEach(function(wrap) {
-            var fieldId = wrap.dataset.fieldId;
+        document.querySelectorAll('.custom-field-col').forEach(function(col) {
+            var fieldId = col.dataset.fieldId;
             var types   = fieldTypeMap[fieldId] || [];
             var show    = selectedType > 0 && (types.length === 0 || types.indexOf(selectedType) !== -1);
-            wrap.style.display = show ? '' : 'none';
+            col.style.display = show ? '' : 'none';
         });
     }
 
