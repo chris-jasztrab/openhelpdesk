@@ -2775,6 +2775,301 @@ $router->post('/admin/ticket-templates/{id}/delete', function (array $p) {
 });
 
 /* ==================================================================
+ * ADMIN – Recurring / Preventive-Maintenance Ticket Schedules
+ * ================================================================== */
+
+/**
+ * Pull POST input into the schema's column shape, with the cadence
+ * fields normalised to the right types and the day/month anchors only
+ * carried through when the chosen frequency actually uses them.
+ */
+function _recurringPostToRow(): array
+{
+    $frequency = $_POST['frequency'] ?? 'monthly';
+    $allowed   = ['daily', 'weekly', 'monthly', 'yearly', 'custom'];
+    if (!in_array($frequency, $allowed, true)) {
+        $frequency = 'monthly';
+    }
+
+    $row = [
+        'name'                 => trim($_POST['name'] ?? ''),
+        'description_internal' => trim($_POST['description_internal'] ?? '') ?: null,
+        'subject'              => trim($_POST['subject'] ?? ''),
+        'body'                 => trim($_POST['body'] ?? ''),
+        'type_id'              => !empty($_POST['type_id'])     ? (int) $_POST['type_id']     : null,
+        'priority_id'          => !empty($_POST['priority_id']) ? (int) $_POST['priority_id'] : null,
+        'location_id'          => !empty($_POST['location_id']) ? (int) $_POST['location_id'] : null,
+        'assigned_to'          => !empty($_POST['assigned_to']) ? (int) $_POST['assigned_to'] : null,
+        'group_id'             => !empty($_POST['group_id'])    ? (int) $_POST['group_id']    : null,
+        'requester_id'         => !empty($_POST['requester_id']) ? (int) $_POST['requester_id'] : null,
+        'due_date_offset_days' => ($_POST['due_date_offset_days'] ?? '') !== '' ? max(0, (int) $_POST['due_date_offset_days']) : null,
+        'frequency'            => $frequency,
+        'interval_value'       => max(1, (int) ($_POST['interval_value'] ?? 1)),
+        'day_of_week'          => null,
+        'day_of_month'         => null,
+        'month_of_year'        => null,
+        'start_date'           => trim($_POST['start_date'] ?? '') ?: date('Y-m-d'),
+        'is_active'            => !empty($_POST['is_active']) ? 1 : 0,
+    ];
+
+    // Anchor fields only carry through when the chosen frequency uses them.
+    if ($frequency === 'weekly' && ($_POST['day_of_week'] ?? '') !== '') {
+        $row['day_of_week'] = max(0, min(6, (int) $_POST['day_of_week']));
+    }
+    if (in_array($frequency, ['monthly', 'yearly'], true) && ($_POST['day_of_month'] ?? '') !== '') {
+        $row['day_of_month'] = max(1, min(31, (int) $_POST['day_of_month']));
+    }
+    if ($frequency === 'yearly' && ($_POST['month_of_year'] ?? '') !== '') {
+        $row['month_of_year'] = max(1, min(12, (int) $_POST['month_of_year']));
+    }
+
+    return $row;
+}
+
+$router->get('/admin/recurring-tickets', function () {
+    Auth::requireRole('admin', 'agent', 'power_user');
+    $db = Database::connect();
+    $rows = $db->query(
+        "SELECT r.*,
+                tt.name  AS type_name,
+                pri.name AS priority_name,
+                loc.name AS location_name,
+                g.name   AS group_name,
+                CONCAT(req.first_name, ' ', req.last_name) AS requester_name,
+                CONCAT(asg.first_name, ' ', asg.last_name) AS assignee_name
+         FROM recurring_tickets r
+         LEFT JOIN ticket_types       tt  ON r.type_id     = tt.id
+         LEFT JOIN ticket_priorities  pri ON r.priority_id = pri.id
+         LEFT JOIN locations          loc ON r.location_id = loc.id
+         LEFT JOIN `groups`           g   ON r.group_id    = g.id
+         LEFT JOIN users              req ON r.requester_id = req.id
+         LEFT JOIN users              asg ON r.assigned_to  = asg.id
+         ORDER BY r.is_active DESC, r.next_run_at ASC, r.name ASC"
+    )->fetchAll();
+    render('admin/recurring-tickets/index', ['schedules' => $rows]);
+});
+
+$router->get('/admin/recurring-tickets/create', function () {
+    Auth::requireRole('admin', 'agent', 'power_user');
+    $db         = Database::connect();
+    $types      = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
+    $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
+    $locations  = $db->query('SELECT * FROM locations ORDER BY name')->fetchAll();
+    $groups     = $db->query('SELECT * FROM `groups` ORDER BY sort_order, name')->fetchAll();
+    $agents     = $db->query(
+        "SELECT id, first_name, last_name FROM users
+         WHERE role IN ('admin','agent','power_user') ORDER BY first_name, last_name"
+    )->fetchAll();
+    $allUsers   = $db->query(
+        "SELECT id, first_name, last_name, email FROM users ORDER BY first_name, last_name"
+    )->fetchAll();
+    render('admin/recurring-tickets/form', [
+        'types'      => $types,
+        'priorities' => $priorities,
+        'locations'  => $locations,
+        'groups'     => $groups,
+        'agents'     => $agents,
+        'allUsers'   => $allUsers,
+    ]);
+});
+
+$router->post('/admin/recurring-tickets/create', function () {
+    Auth::requireRole('admin', 'agent', 'power_user');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/recurring-tickets/create');
+    }
+
+    $row = _recurringPostToRow();
+    if ($row['name'] === '' || $row['subject'] === '' || $row['body'] === '') {
+        flash('error', 'Schedule name, ticket subject and ticket description are required.');
+        flashInput($_POST);
+        redirect('/admin/recurring-tickets/create');
+    }
+    if (!$row['requester_id']) {
+        $row['requester_id'] = Auth::id();
+    }
+
+    $now = new DateTimeImmutable('now');
+    $nextRun = RecurringTickets::computeNextRun($row, $now, false);
+
+    $db = Database::connect();
+    $db->prepare(
+        'INSERT INTO recurring_tickets
+            (name, description_internal, subject, body, type_id, priority_id, location_id,
+             assigned_to, group_id, requester_id, due_date_offset_days,
+             frequency, interval_value, day_of_week, day_of_month, month_of_year,
+             start_date, next_run_at, is_active, created_by, updated_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    )->execute([
+        $row['name'], $row['description_internal'], $row['subject'], $row['body'],
+        $row['type_id'], $row['priority_id'], $row['location_id'],
+        $row['assigned_to'], $row['group_id'], $row['requester_id'], $row['due_date_offset_days'],
+        $row['frequency'], $row['interval_value'], $row['day_of_week'], $row['day_of_month'], $row['month_of_year'],
+        $row['start_date'], $nextRun->format('Y-m-d H:i:s'), $row['is_active'],
+        Auth::id(), Auth::id(),
+    ]);
+
+    flash('success', 'Recurring schedule created. First ticket will fire on ' . $nextRun->format('M j, Y') . '.');
+    redirect('/admin/recurring-tickets');
+});
+
+$router->get('/admin/recurring-tickets/{id}/edit', function (array $p) {
+    Auth::requireRole('admin', 'agent', 'power_user');
+    $db = Database::connect();
+    $stmt = $db->prepare('SELECT * FROM recurring_tickets WHERE id = ?');
+    $stmt->execute([(int) $p['id']]);
+    $editing = $stmt->fetch();
+    if (!$editing) {
+        flash('error', 'Recurring schedule not found.');
+        redirect('/admin/recurring-tickets');
+    }
+    $types      = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
+    $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
+    $locations  = $db->query('SELECT * FROM locations ORDER BY name')->fetchAll();
+    $groups     = $db->query('SELECT * FROM `groups` ORDER BY sort_order, name')->fetchAll();
+    $agents     = $db->query(
+        "SELECT id, first_name, last_name FROM users
+         WHERE role IN ('admin','agent','power_user') ORDER BY first_name, last_name"
+    )->fetchAll();
+    $allUsers   = $db->query(
+        "SELECT id, first_name, last_name, email FROM users ORDER BY first_name, last_name"
+    )->fetchAll();
+    render('admin/recurring-tickets/form', [
+        'editing'    => $editing,
+        'types'      => $types,
+        'priorities' => $priorities,
+        'locations'  => $locations,
+        'groups'     => $groups,
+        'agents'     => $agents,
+        'allUsers'   => $allUsers,
+    ]);
+});
+
+$router->post('/admin/recurring-tickets/{id}/edit', function (array $p) {
+    Auth::requireRole('admin', 'agent', 'power_user');
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect("/admin/recurring-tickets/{$id}/edit");
+    }
+
+    $db   = Database::connect();
+    $stmt = $db->prepare('SELECT * FROM recurring_tickets WHERE id = ?');
+    $stmt->execute([$id]);
+    $existing = $stmt->fetch();
+    if (!$existing) {
+        flash('error', 'Recurring schedule not found.');
+        redirect('/admin/recurring-tickets');
+    }
+
+    $row = _recurringPostToRow();
+    if ($row['name'] === '' || $row['subject'] === '' || $row['body'] === '') {
+        flash('error', 'Schedule name, ticket subject and ticket description are required.');
+        flashInput($_POST);
+        redirect("/admin/recurring-tickets/{$id}/edit");
+    }
+    if (!$row['requester_id']) {
+        $row['requester_id'] = (int) ($existing['requester_id'] ?? Auth::id());
+    }
+
+    // Recompute next_run_at when cadence inputs changed — otherwise a
+    // user editing a schedule from monthly-15th to monthly-1st would
+    // keep firing on the 15th until it next fired.
+    $cadenceChanged =
+        $row['frequency']      !== (string) $existing['frequency']
+        || (int) $row['interval_value'] !== (int) $existing['interval_value']
+        || (string) ($row['day_of_week']   ?? '') !== (string) ($existing['day_of_week']   ?? '')
+        || (string) ($row['day_of_month']  ?? '') !== (string) ($existing['day_of_month']  ?? '')
+        || (string) ($row['month_of_year'] ?? '') !== (string) ($existing['month_of_year'] ?? '')
+        || $row['start_date']  !== (string) $existing['start_date'];
+
+    $nextRun = $cadenceChanged
+        ? RecurringTickets::computeNextRun($row, new DateTimeImmutable('now'), false)
+        : new DateTimeImmutable((string) $existing['next_run_at']);
+
+    $db->prepare(
+        'UPDATE recurring_tickets SET
+            name = ?, description_internal = ?, subject = ?, body = ?,
+            type_id = ?, priority_id = ?, location_id = ?, assigned_to = ?, group_id = ?,
+            requester_id = ?, due_date_offset_days = ?,
+            frequency = ?, interval_value = ?, day_of_week = ?, day_of_month = ?, month_of_year = ?,
+            start_date = ?, next_run_at = ?, is_active = ?, updated_by = ?
+         WHERE id = ?'
+    )->execute([
+        $row['name'], $row['description_internal'], $row['subject'], $row['body'],
+        $row['type_id'], $row['priority_id'], $row['location_id'], $row['assigned_to'], $row['group_id'],
+        $row['requester_id'], $row['due_date_offset_days'],
+        $row['frequency'], $row['interval_value'], $row['day_of_week'], $row['day_of_month'], $row['month_of_year'],
+        $row['start_date'], $nextRun->format('Y-m-d H:i:s'), $row['is_active'],
+        Auth::id(), $id,
+    ]);
+
+    flash('success', 'Recurring schedule updated.' . ($cadenceChanged ? ' Next run recalculated to ' . $nextRun->format('M j, Y') . '.' : ''));
+    redirect('/admin/recurring-tickets');
+});
+
+$router->post('/admin/recurring-tickets/{id}/toggle', function (array $p) {
+    Auth::requireRole('admin', 'agent', 'power_user');
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/recurring-tickets');
+    }
+    $db = Database::connect();
+    $db->prepare('UPDATE recurring_tickets SET is_active = 1 - is_active, updated_by = ? WHERE id = ?')
+        ->execute([Auth::id(), $id]);
+    flash('success', 'Schedule status updated.');
+    redirect('/admin/recurring-tickets');
+});
+
+$router->post('/admin/recurring-tickets/{id}/run-now', function (array $p) {
+    Auth::requireRole('admin', 'agent', 'power_user');
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/recurring-tickets');
+    }
+    $db = Database::connect();
+    $stmt = $db->prepare('SELECT * FROM recurring_tickets WHERE id = ?');
+    $stmt->execute([$id]);
+    $row = $stmt->fetch();
+    if (!$row) {
+        flash('error', 'Schedule not found.');
+        redirect('/admin/recurring-tickets');
+    }
+
+    $ticketId = RecurringTickets::mintTicket($db, $row);
+    if (!$ticketId) {
+        flash('error', 'Could not create ticket — schedule is missing a requester or required fields.');
+        redirect('/admin/recurring-tickets');
+    }
+
+    // "Run now" doesn't reset the cadence — the next scheduled run still
+    // fires on the configured cycle. We do bump last_run_at + run_count
+    // so the index list reflects reality.
+    $db->prepare(
+        'UPDATE recurring_tickets SET last_run_at = NOW(), last_ticket_id = ?, run_count = run_count + 1 WHERE id = ?'
+    )->execute([$ticketId, $id]);
+
+    flash('success', 'Ticket #' . $ticketId . ' created from schedule.');
+    redirect('/admin/recurring-tickets');
+});
+
+$router->post('/admin/recurring-tickets/{id}/delete', function (array $p) {
+    Auth::requireRole('admin', 'agent', 'power_user');
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/recurring-tickets');
+    }
+    $db = Database::connect();
+    $db->prepare('DELETE FROM recurring_tickets WHERE id = ?')->execute([$id]);
+    flash('success', 'Recurring schedule deleted.');
+    redirect('/admin/recurring-tickets');
+});
+
+/* ==================================================================
  * ADMIN – Ticket Viewing
  * ================================================================== */
 
