@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.29.1 — 2026-05-06
+
+### Fixes
+- **Tightened the Classification & Details grid on the staff Create Ticket page.** On wide screens the form sits in a `col-lg-8` shell (~880&nbsp;px) and the five system fields in [templates/pages/admin/tickets/create.php](templates/pages/admin/tickets/create.php) — Type, Status, Priority, Location, Due Date — were each `col-md-6`, so they laid out as Type|Status, Priority|*empty*, Location|Due Date with a half-row of dead space next to Priority and 420&nbsp;px-wide dropdowns holding single-word values like *Open* or *Medium*. Each field is now `col-md-6 col-lg-4` so on `lg+` screens they pack three-per-row (Type|Status|Priority, Location|Due Date|empty) — the leftover gap moves to the end of the section after Due Date where it doesn't break visual rhythm, dropdowns shrink to ~280&nbsp;px which suits the content, and the medium-screen layout is unchanged.
+
+---
+
 ## 2.29.0 — 2026-05-06
 
 ### Features

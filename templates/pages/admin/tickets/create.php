@@ -120,7 +120,7 @@ $statusOptions = [
                         if ($uf['kind'] === 'system'):
                     ?>
                         <?php if ($uf['key'] === 'ticket_type'): ?>
-                        <div class="col-md-6">
+                        <div class="col-md-6 col-lg-4">
                             <label for="type_id" class="form-label fw-semibold">Type</label>
                             <select class="form-select" id="type_id" name="type_id">
                                 <option value="">— Unclassified —</option>
@@ -132,7 +132,7 @@ $statusOptions = [
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-6 col-lg-4">
                             <label for="status" class="form-label fw-semibold">Status</label>
                             <select class="form-select" id="status" name="status">
                                 <?php foreach ($statusOptions as $val => $label): ?>
@@ -144,7 +144,7 @@ $statusOptions = [
                             </select>
                         </div>
                         <?php elseif ($uf['key'] === 'priority'): ?>
-                        <div class="col-md-6">
+                        <div class="col-md-6 col-lg-4">
                             <label for="priority_id" class="form-label fw-semibold">Priority</label>
                             <select class="form-select" id="priority_id" name="priority_id">
                                 <option value="">— None —</option>
@@ -157,7 +157,7 @@ $statusOptions = [
                             </select>
                         </div>
                         <?php elseif ($uf['key'] === 'location'): ?>
-                        <div class="col-md-6">
+                        <div class="col-md-6 col-lg-4">
                             <label for="location_id" class="form-label fw-semibold"><?= label('location.singular') ?></label>
                             <select class="form-select" id="location_id" name="location_id">
                                 <option value="">— None —</option>
@@ -169,7 +169,7 @@ $statusOptions = [
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-6 col-lg-4">
                             <label for="due_date" class="form-label fw-semibold">Due Date</label>
                             <input type="date" class="form-control" id="due_date" name="due_date"
                                    value="<?= e(old('due_date', '')) ?>">
