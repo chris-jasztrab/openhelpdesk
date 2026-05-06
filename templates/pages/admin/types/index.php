@@ -50,6 +50,9 @@ $breadcrumbs  = [
                             <?php if (!empty($t['is_confidential'])): ?>
                             <i class="bi bi-shield-lock text-warning ms-1" title="Confidential"></i>
                             <?php endif; ?>
+                            <?php if (!empty($t['ai_route_group'])): ?>
+                            <i class="bi bi-signpost-split text-info ms-1" title="AI routes to the best group (No Wrong Door)"></i>
+                            <?php endif; ?>
                         </td>
                         <td class="text-muted"><?= (int) $t['sort_order'] ?></td>
                         <td class="text-muted small"><?= date('M j, Y', strtotime($t['created_at'])) ?></td>

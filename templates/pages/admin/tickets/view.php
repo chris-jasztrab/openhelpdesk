@@ -415,6 +415,50 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
             </div>
         </div>
 
+        <!-- AI Group Routing ("No Wrong Door") audit card -->
+        <?php if (!empty($aiGroupClassification)):
+            $gc = $aiGroupClassification;
+            $gcConfPct  = (int) round(((float) $gc['confidence']) * 100);
+            $gcApplied  = !empty($gc['applied_group_id']);
+            $gcSuggName = $gc['suggested_group_name'] ?? null;
+            $gcApplName = $gc['applied_group_name']   ?? null;
+        ?>
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between">
+                <h5 class="mb-0 fw-semibold"><i class="bi bi-signpost-split me-2"></i>AI Group Routing</h5>
+                <span class="badge bg-info bg-opacity-10 text-info"><?= $gcConfPct ?>%</span>
+            </div>
+            <div class="card-body small">
+                <dl class="mb-0">
+                    <dt class="text-muted">Outcome</dt>
+                    <dd>
+                        <?php if ($gcApplied): ?>
+                            <span class="badge bg-success bg-opacity-10 text-success">
+                                <i class="bi bi-check-circle me-1"></i>Routed to <?= e($gcApplName ?? ('#' . (int) $gc['applied_group_id'])) ?>
+                            </span>
+                        <?php elseif ($gc['suggested_group_id'] === null): ?>
+                            <span class="badge bg-secondary bg-opacity-10 text-secondary">
+                                <i class="bi bi-question-circle me-1"></i>No confident match — left in current queue
+                            </span>
+                        <?php else: ?>
+                            <span class="badge bg-warning bg-opacity-10 text-warning">
+                                <i class="bi bi-dash-circle me-1"></i>Suggested <?= e($gcSuggName ?? ('#' . (int) $gc['suggested_group_id'])) ?> (below threshold)
+                            </span>
+                        <?php endif; ?>
+                    </dd>
+
+                    <?php if (!empty($gc['reasoning'])): ?>
+                    <dt class="text-muted mt-2">AI reasoning</dt>
+                    <dd class="text-muted fst-italic">"<?= e($gc['reasoning']) ?>"</dd>
+                    <?php endif; ?>
+
+                    <dt class="text-muted mt-2">Provider</dt>
+                    <dd class="text-muted small mb-0"><?= e($gc['provider']) ?> · <?= e($gc['model']) ?> · <?= (int) $gc['latency_ms'] ?>ms</dd>
+                </dl>
+            </div>
+        </div>
+        <?php endif; ?>
+
         <!-- AI Classification card -->
         <?php if (!empty($aiEnabled) || !empty($aiClassification)): ?>
         <?php

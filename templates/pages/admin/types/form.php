@@ -75,6 +75,19 @@ $action = $isEdit ? "/admin/types/{$editing['id']}/edit" : '/admin/types/create'
 
             <div class="mb-3">
                 <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="ai_route_group" name="ai_route_group" value="1"
+                           <?= (int) old('ai_route_group', (string) ($editing['ai_route_group'] ?? '0')) ? 'checked' : '' ?>>
+                    <label class="form-check-label fw-semibold" for="ai_route_group">
+                        <i class="bi bi-signpost-split me-1"></i>Let AI route this to the best group ("No Wrong Door")
+                    </label>
+                </div>
+                <div class="form-text">
+                    On submit, AI reads the ticket and picks the most appropriate group from all non-confidential groups, using each group's <em>description</em> to decide. If AI isn't confident, the ticket stays in the <strong>Default Group</strong> selected above (so make that your fallback queue — e.g. a "No Wrong Door" team that handles anything AI couldn't route). Requires AI to be enabled at <a href="/admin/settings/ai">Admin → Settings → AI Classification</a>; routing quality depends on each group having a clear description at <a href="/admin/groups">Admin → Groups</a>.
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <div class="form-check">
                     <input type="checkbox" class="form-check-input" id="show_to_location_visibility" name="show_to_location_visibility" value="1"
                            <?= (int) old('show_to_location_visibility', (string) ($editing['show_to_location_visibility'] ?? '1')) ? 'checked' : '' ?>>
                     <label class="form-check-label fw-semibold" for="show_to_location_visibility">
@@ -155,6 +168,19 @@ document.getElementById('name').addEventListener('input', function() {
         else { confCb.disabled = false; }
     }
     groupSel.addEventListener('change', toggle);
+    toggle();
+})();
+// AI group routing is incompatible with Confidential — bodies of confidential
+// tickets are never sent to a third-party provider.
+(function() {
+    var confCb = document.getElementById('is_confidential');
+    var aiCb   = document.getElementById('ai_route_group');
+    if (!confCb || !aiCb) return;
+    function toggle() {
+        if (confCb.checked) { aiCb.checked = false; aiCb.disabled = true; }
+        else { aiCb.disabled = false; }
+    }
+    confCb.addEventListener('change', toggle);
     toggle();
 })();
 </script>

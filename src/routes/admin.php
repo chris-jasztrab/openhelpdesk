@@ -1562,6 +1562,7 @@ $router->post('/admin/types/create', function () {
     $order   = (int) ($_POST['sort_order'] ?? 0);
     $groupId        = !empty($_POST['group_id']) ? (int) $_POST['group_id'] : null;
     $isConfidential = !empty($_POST['is_confidential']) && $groupId ? 1 : 0;
+    $aiRouteGroup   = !empty($_POST['ai_route_group']) && !$isConfidential ? 1 : 0;
     $showToLocVis   = !empty($_POST['show_to_location_visibility']) ? 1 : 0;
     $staleRaw       = trim((string) ($_POST['stale_threshold_hours'] ?? ''));
     $staleHours     = $staleRaw === '' ? null : max(0, (int) $staleRaw);
@@ -1572,8 +1573,8 @@ $router->post('/admin/types/create', function () {
         redirect('/admin/types/create');
     }
     $db = Database::connect();
-    $db->prepare('INSERT INTO ticket_types (name, color, group_id, is_confidential, show_to_location_visibility, sort_order, stale_threshold_hours) VALUES (?, ?, ?, ?, ?, ?, ?)')
-        ->execute([$name, $color, $groupId, $isConfidential, $showToLocVis, $order, $staleHours]);
+    $db->prepare('INSERT INTO ticket_types (name, color, group_id, is_confidential, ai_route_group, show_to_location_visibility, sort_order, stale_threshold_hours) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $showToLocVis, $order, $staleHours]);
     $typeId = (int) $db->lastInsertId();
     if ($skillIds) {
         $stmt = $db->prepare('INSERT IGNORE INTO ticket_type_skill_map (ticket_type_id, skill_id) VALUES (?, ?)');
@@ -1615,6 +1616,7 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
     $order   = (int) ($_POST['sort_order'] ?? 0);
     $groupId        = !empty($_POST['group_id']) ? (int) $_POST['group_id'] : null;
     $isConfidential = !empty($_POST['is_confidential']) && $groupId ? 1 : 0;
+    $aiRouteGroup   = !empty($_POST['ai_route_group']) && !$isConfidential ? 1 : 0;
     $showToLocVis   = !empty($_POST['show_to_location_visibility']) ? 1 : 0;
     $staleRaw       = trim((string) ($_POST['stale_threshold_hours'] ?? ''));
     $staleHours     = $staleRaw === '' ? null : max(0, (int) $staleRaw);
@@ -1644,6 +1646,7 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
                 'group_id'  => $groupId ? (string) $groupId : '',
                 'stale_threshold_hours' => $staleHours === null ? '' : (string) $staleHours,
                 'show_to_location_visibility' => $showToLocVis ? '1' : '',
+                'ai_route_group' => $aiRouteGroup ? '1' : '',
                 // is_confidential intentionally omitted (unchecked = removal)
             ];
             logAudit(
@@ -1680,8 +1683,8 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
         }
     }
 
-    $db->prepare('UPDATE ticket_types SET name=?, color=?, group_id=?, is_confidential=?, show_to_location_visibility=?, sort_order=?, stale_threshold_hours=? WHERE id=?')
-        ->execute([$name, $color, $groupId, $isConfidential, $showToLocVis, $order, $staleHours, $id]);
+    $db->prepare('UPDATE ticket_types SET name=?, color=?, group_id=?, is_confidential=?, ai_route_group=?, show_to_location_visibility=?, sort_order=?, stale_threshold_hours=? WHERE id=?')
+        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $showToLocVis, $order, $staleHours, $id]);
 
     // Required skills (used by Skill-Based group auto-assignment)
     $skillIds = array_filter(array_map('intval', (array) ($_POST['required_skills'] ?? [])));
@@ -4100,6 +4103,26 @@ $router->get('/admin/tickets/{id}', function (array $p) {
         }
     }
 
+    // AI group routing record (if any) — drives the "No Wrong Door"
+    // audit card in the sidebar. Joined to groups so the template can
+    // display human-readable names without another query.
+    $aiGroupClassification = null;
+    if (!empty($ticket['ai_group_classification_id'])) {
+        $gcStmt = $db->prepare(
+            "SELECT gc.id, gc.ticket_id, gc.provider, gc.model,
+                    gc.candidate_group_ids, gc.suggested_group_id, gc.applied_group_id,
+                    gc.confidence, gc.reasoning, gc.latency_ms, gc.created_at,
+                    sg.name AS suggested_group_name,
+                    ag.name AS applied_group_name
+             FROM ai_group_classifications gc
+             LEFT JOIN `groups` sg ON sg.id = gc.suggested_group_id
+             LEFT JOIN `groups` ag ON ag.id = gc.applied_group_id
+             WHERE gc.id = ?"
+        );
+        $gcStmt->execute([(int) $ticket['ai_group_classification_id']]);
+        $aiGroupClassification = $gcStmt->fetch() ?: null;
+    }
+
     render('admin/tickets/view', [
         'ticket' => $ticket, 'timeline' => $timeline, 'agents' => $agents,
         'priorities' => $priorities, 'ticketTypes' => $ticketTypes,
@@ -4107,6 +4130,7 @@ $router->get('/admin/tickets/{id}', function (array $p) {
         'customFields' => $customFields, 'fieldValues' => $fieldValues,
         'fieldOptions' => $fieldOptions, 'isWatching' => $isWatching,
         'aiClassification' => $aiClassification, 'aiSkillsForOverride' => $aiSkillsForOverride,
+        'aiGroupClassification' => $aiGroupClassification,
         'aiEnabled' => getSetting('ai_enabled', '0') === '1',
     ]);
 });

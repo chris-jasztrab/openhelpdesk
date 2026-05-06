@@ -41,6 +41,28 @@ interface AIClassifier
      */
     public function classify(string $subject, string $body, array $skills, int $maxTokens, int $timeoutSec): array;
 
+    /**
+     * Pick the best group (queue/team) for a ticket from a candidate list.
+     * Used by the "No Wrong Door" ticket type to route to the right team
+     * instead of pinning the ticket to a single default group.
+     *
+     * Returns the same shape as classify() except `group_id` (?int)
+     * replaces `skill_ids` and `sentiment` is omitted:
+     *
+     *   [
+     *     'group_id'    => 7|null,           // null when no confident match
+     *     'confidence'  => 0.0–1.0,
+     *     'reasoning'   => '<one sentence>',
+     *     'raw'         => [...],
+     *     'latency_ms'  => 842,
+     *     'prompt_tokens' => 412,
+     *     'output_tokens' => 47,
+     *   ]
+     *
+     * @param array $groups Each row: ['id', 'name', 'description'|null]
+     */
+    public function classifyGroup(string $subject, string $body, array $groups, int $maxTokens, int $timeoutSec): array;
+
     /** @return array{0:string,1:string}[] [[id, name], ...] from the provider catalogue */
     public function listModels(int $timeoutSec = 10): array;
 
@@ -153,6 +175,97 @@ TXT;
             'skill_ids'  => $skillIds,
             'confidence' => $confidence,
             'sentiment'  => $sentiment,
+            'reasoning'  => $reasoning,
+        ];
+    }
+
+    /**
+     * Group-routing system prompt. Different schema than skill
+     * classification — single group_id, no sentiment.
+     */
+    protected function groupSystemPrompt(): string
+    {
+        return <<<TXT
+You are a help-desk ticket router. Given a subject and body plus a list of available groups (teams/queues), pick the single group most likely to handle this ticket. Output one JSON object only — no markdown, no prose.
+
+Schema:
+{
+  "group_id": <int>|null,             // id of the chosen group, or null if no clear match
+  "confidence": <float 0.0–1.0>,      // your certainty about the chosen group
+  "reasoning": "<one sentence>"
+}
+
+Rules:
+- Pick a group ONLY when the subject or body clearly indicates one team handles this work. When unsure, return null with low confidence (<0.5) — do NOT guess.
+- Use the group descriptions to decide; don't assume domain knowledge from group names alone.
+- Confidence reflects routing certainty; return below the requester's threshold to leave the ticket in its current queue.
+- Output JSON only.
+TXT;
+    }
+
+    protected function groupUserPrompt(string $subject, string $body, array $groups): string
+    {
+        $catalogue = '';
+        foreach ($groups as $g) {
+            $line = '- id ' . (int) $g['id'] . ': ' . $g['name'];
+            if (!empty($g['description'])) {
+                $line .= ' — ' . str_replace(["\n", "\r"], ' ', (string) $g['description']);
+            }
+            $catalogue .= $line . "\n";
+        }
+        if ($catalogue === '') {
+            $catalogue = "(no groups available — return group_id: null)\n";
+        }
+
+        $subject = mb_substr(trim($subject), 0, 200);
+        $body    = mb_substr(trim(strip_tags($body)), 0, 4000);
+
+        return "Available groups:\n{$catalogue}\nTicket subject: {$subject}\n\nTicket body:\n{$body}\n\nRespond with JSON only.";
+    }
+
+    /**
+     * Parse a provider response for group routing. Mirrors parseVerdict()
+     * but for the group-id schema (single id or null + confidence + reasoning).
+     *
+     * @throws SoftAIException
+     */
+    protected function parseGroupVerdict(string $raw, array $candidateIds): array
+    {
+        $stripped = trim($raw);
+        if (preg_match('/```(?:json)?\s*([\s\S]*?)\s*```/i', $stripped, $m)) {
+            $stripped = trim($m[1]);
+        }
+        if (!str_starts_with($stripped, '{')) {
+            $start = strpos($stripped, '{');
+            $end   = strrpos($stripped, '}');
+            if ($start === false || $end === false || $end <= $start) {
+                throw new SoftAIException('AI response did not contain JSON: ' . mb_substr($raw, 0, 200));
+            }
+            $stripped = substr($stripped, $start, $end - $start + 1);
+        }
+
+        $decoded = json_decode($stripped, true);
+        if (!is_array($decoded)) {
+            throw new SoftAIException('AI JSON decode failed: ' . json_last_error_msg());
+        }
+
+        $groupId = null;
+        if (isset($decoded['group_id']) && $decoded['group_id'] !== null && $decoded['group_id'] !== '') {
+            $gid = (int) $decoded['group_id'];
+            if ($gid > 0 && in_array($gid, $candidateIds, true)) {
+                $groupId = $gid;
+            }
+        }
+
+        $confidence = isset($decoded['confidence']) ? (float) $decoded['confidence'] : 0.0;
+        if ($confidence < 0.0) { $confidence = 0.0; }
+        if ($confidence > 1.0) { $confidence = 1.0; }
+
+        $reasoning = isset($decoded['reasoning']) ? mb_substr((string) $decoded['reasoning'], 0, 500) : '';
+
+        return [
+            'group_id'   => $groupId,
+            'confidence' => $confidence,
             'reasoning'  => $reasoning,
         ];
     }
@@ -645,6 +758,47 @@ class AnthropicClassifier extends BaseAIClassifier
         return $verdict;
     }
 
+    public function classifyGroup(string $subject, string $body, array $groups, int $maxTokens, int $timeoutSec): array
+    {
+        $candidateIds = array_map(static fn($g) => (int) $g['id'], $groups);
+
+        $resp = $this->curlPostJson(
+            'https://api.anthropic.com/v1/messages',
+            [
+                'model'      => $this->model,
+                'max_tokens' => $maxTokens,
+                'system'     => $this->groupSystemPrompt(),
+                'messages'   => [
+                    ['role' => 'user', 'content' => $this->groupUserPrompt($subject, $body, $groups)],
+                ],
+            ],
+            [
+                'Content-Type: application/json',
+                'x-api-key: ' . $this->apiKey,
+                'anthropic-version: 2023-06-01',
+            ],
+            $timeoutSec
+        );
+
+        $decoded = $resp['decoded'];
+        $text = '';
+        foreach (($decoded['content'] ?? []) as $block) {
+            if (($block['type'] ?? '') === 'text') {
+                $text .= $block['text'] ?? '';
+            }
+        }
+        if ($text === '') {
+            throw new SoftAIException('Anthropic returned no text content');
+        }
+
+        $verdict = $this->parseGroupVerdict($text, $candidateIds);
+        $verdict['raw']           = $decoded;
+        $verdict['latency_ms']    = $resp['latency_ms'];
+        $verdict['prompt_tokens'] = (int) ($decoded['usage']['input_tokens']  ?? 0);
+        $verdict['output_tokens'] = (int) ($decoded['usage']['output_tokens'] ?? 0);
+        return $verdict;
+    }
+
     public function chat(string $systemPrompt, string $userPrompt, int $maxTokens, int $timeoutSec): string
     {
         $resp = $this->curlPostJson(
@@ -756,6 +910,43 @@ class OpenAIClassifier extends BaseAIClassifier
         }
 
         $verdict = $this->parseVerdict($text, $candidateIds);
+        $verdict['raw']           = $decoded;
+        $verdict['latency_ms']    = $resp['latency_ms'];
+        $verdict['prompt_tokens'] = (int) ($decoded['usage']['prompt_tokens']     ?? 0);
+        $verdict['output_tokens'] = (int) ($decoded['usage']['completion_tokens'] ?? 0);
+        return $verdict;
+    }
+
+    public function classifyGroup(string $subject, string $body, array $groups, int $maxTokens, int $timeoutSec): array
+    {
+        $candidateIds = array_map(static fn($g) => (int) $g['id'], $groups);
+
+        $resp = $this->curlPostJson(
+            'https://api.openai.com/v1/chat/completions',
+            [
+                'model' => $this->model,
+                'messages' => [
+                    ['role' => 'system', 'content' => $this->groupSystemPrompt()],
+                    ['role' => 'user',   'content' => $this->groupUserPrompt($subject, $body, $groups)],
+                ],
+                'max_tokens'      => $maxTokens,
+                'response_format' => ['type' => 'json_object'],
+                'temperature'     => 0.0,
+            ],
+            [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $this->apiKey,
+            ],
+            $timeoutSec
+        );
+
+        $decoded = $resp['decoded'];
+        $text = (string) ($decoded['choices'][0]['message']['content'] ?? '');
+        if ($text === '') {
+            throw new SoftAIException('OpenAI returned no message content');
+        }
+
+        $verdict = $this->parseGroupVerdict($text, $candidateIds);
         $verdict['raw']           = $decoded;
         $verdict['latency_ms']    = $resp['latency_ms'];
         $verdict['prompt_tokens'] = (int) ($decoded['usage']['prompt_tokens']     ?? 0);

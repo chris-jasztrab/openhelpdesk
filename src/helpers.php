@@ -1135,6 +1135,173 @@ function classifyTicketWithAI(int $ticketId): ?array
 }
 
 /**
+ * "No Wrong Door" group routing. Run for ticket types flagged with
+ * ai_route_group=1: ask the AI to pick the best group from every
+ * non-confidential group (using the description column to ground the
+ * pick) and move the ticket there if confidence clears the threshold.
+ *
+ * Always writes an `ai_group_classifications` row when AI is reached —
+ * even when AI declines or confidence is too low — so admins have a full
+ * audit trail of why each ticket did or didn't get routed.
+ *
+ * Soft-fail: returns null on any provider error; the ticket stays in its
+ * current group (the type's default — typically the "No Wrong Door"
+ * queue itself) so an agent can route it manually.
+ *
+ * Returns the applied group id on success, null on every other path
+ * (AI off, type not flagged, confidence too low, no candidate groups,
+ * provider error).
+ */
+function aiRouteTicketToGroup(int $ticketId): ?int
+{
+    $classifier = AIClassifierFactory::fromSettings();
+    if ($classifier === null) {
+        return null;
+    }
+
+    $db = Database::connect();
+    $stmt = $db->prepare(
+        "SELECT t.id, t.subject, t.description, t.group_id AS current_group_id,
+                tt.id AS type_id, tt.ai_route_group, tt.is_confidential AS type_is_confidential
+         FROM tickets t
+         LEFT JOIN ticket_types tt ON tt.id = t.type_id
+         WHERE t.id = ?"
+    );
+    $stmt->execute([$ticketId]);
+    $ticket = $stmt->fetch();
+    if (!$ticket) {
+        return null;
+    }
+    if ((int) ($ticket['ai_route_group'] ?? 0) !== 1) {
+        return null; // Type isn't flagged for AI routing
+    }
+    if ((int) ($ticket['type_is_confidential'] ?? 0) === 1) {
+        // Hard rule: never send confidential ticket bodies to a third party.
+        return null;
+    }
+
+    // Candidate groups: every non-confidential group with a usable
+    // description. We send the description to the AI as the routing
+    // signal — a group with an empty description gives the model
+    // nothing to work with, so skip it instead of polluting the prompt.
+    $groups = $db->query(
+        "SELECT id, name, description
+         FROM `groups`
+         WHERE COALESCE(is_confidential, 0) = 0
+           AND description IS NOT NULL
+           AND TRIM(description) <> ''
+         ORDER BY sort_order, name"
+    )->fetchAll();
+
+    if (empty($groups)) {
+        // Nothing to choose from — log a no-op classification so admins
+        // can see why routing didn't fire (likely: descriptions missing).
+        error_log('[AI route group] ticket #' . $ticketId . ': no candidate groups (none with description)');
+        return null;
+    }
+
+    $maxTokens  = (int) getSetting('ai_max_tokens', '500');
+    $timeoutSec = (int) getSetting('ai_timeout_seconds', '5');
+    $threshold  = (float) getSetting('ai_confidence_threshold', '0.7');
+
+    try {
+        $verdict = $classifier->classifyGroup(
+            (string) $ticket['subject'],
+            (string) $ticket['description'],
+            $groups,
+            $maxTokens,
+            $timeoutSec
+        );
+    } catch (\Throwable $e) {
+        error_log('[AI route group] ticket #' . $ticketId . ' failed: ' . $e->getMessage());
+        return null;
+    }
+
+    $providerKey = (string) getSetting('ai_provider', 'anthropic');
+    $modelKey    = $providerKey === 'anthropic'
+        ? (string) getSetting('ai_anthropic_model', 'claude-haiku-4-5')
+        : (string) getSetting('ai_openai_model',    'gpt-4o-mini');
+
+    $suggestedGroupId = $verdict['group_id'] !== null ? (int) $verdict['group_id'] : null;
+    $confidence       = (float) ($verdict['confidence'] ?? 0);
+    $shouldApply      = $suggestedGroupId !== null
+        && $confidence >= $threshold
+        && $suggestedGroupId !== (int) ($ticket['current_group_id'] ?? 0);
+    $appliedGroupId   = $shouldApply ? $suggestedGroupId : null;
+
+    $candidateIds = array_map(static fn($g) => (int) $g['id'], $groups);
+
+    $db->prepare(
+        'INSERT INTO ai_group_classifications
+            (ticket_id, provider, model, candidate_group_ids, suggested_group_id,
+             applied_group_id, confidence, reasoning, raw_output,
+             latency_ms, prompt_tokens, output_tokens)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    )->execute([
+        $ticketId,
+        $providerKey,
+        $modelKey,
+        json_encode($candidateIds, JSON_UNESCAPED_SLASHES),
+        $suggestedGroupId,
+        $appliedGroupId,
+        $confidence,
+        (string) ($verdict['reasoning'] ?? ''),
+        json_encode($verdict['raw'] ?? null, JSON_UNESCAPED_SLASHES),
+        (int) ($verdict['latency_ms']    ?? 0),
+        (int) ($verdict['prompt_tokens'] ?? 0),
+        (int) ($verdict['output_tokens'] ?? 0),
+    ]);
+    $classificationId = (int) $db->lastInsertId();
+
+    $db->prepare('UPDATE tickets SET ai_group_classification_id = ? WHERE id = ?')
+        ->execute([$classificationId, $ticketId]);
+
+    // Resolve names for the timeline message
+    $groupNameById = [];
+    foreach ($groups as $g) { $groupNameById[(int) $g['id']] = $g['name']; }
+    $confPct = (int) round($confidence * 100);
+
+    if ($shouldApply) {
+        $db->prepare('UPDATE tickets SET group_id = ? WHERE id = ?')
+            ->execute([$appliedGroupId, $ticketId]);
+
+        $details = 'AI (' . $providerKey . '/' . $modelKey . ') routed to group "'
+            . ($groupNameById[$appliedGroupId] ?? ('#' . $appliedGroupId)) . '"'
+            . ' — ' . $confPct . '% confidence. '
+            . ($verdict['reasoning'] !== '' ? '"' . $verdict['reasoning'] . '"' : '');
+        $db->prepare(
+            "INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal)
+             VALUES (?, NULL, 'ai_group_routed', ?, 1)"
+        )->execute([$ticketId, $details]);
+
+        return $appliedGroupId;
+    }
+
+    // No-op cases get a different timeline entry so admins can spot the
+    // pattern (low confidence vs. AI returned same group vs. AI declined).
+    if ($suggestedGroupId === null) {
+        $details = 'AI (' . $providerKey . '/' . $modelKey . ') could not confidently match a group'
+            . ' — ' . $confPct . '% confidence; ticket left in its current queue.'
+            . ($verdict['reasoning'] !== '' ? ' "' . $verdict['reasoning'] . '"' : '');
+    } elseif ($suggestedGroupId === (int) ($ticket['current_group_id'] ?? 0)) {
+        $details = 'AI (' . $providerKey . '/' . $modelKey . ') confirmed current group'
+            . ' (' . ($groupNameById[$suggestedGroupId] ?? ('#' . $suggestedGroupId)) . ')'
+            . ' — ' . $confPct . '% confidence.';
+    } else {
+        $details = 'AI (' . $providerKey . '/' . $modelKey . ') suggested "'
+            . ($groupNameById[$suggestedGroupId] ?? ('#' . $suggestedGroupId)) . '"'
+            . ' but ' . $confPct . '% confidence is below the ' . (int) round($threshold * 100) . '% threshold;'
+            . ' ticket left in its current queue.';
+    }
+    $db->prepare(
+        "INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal)
+         VALUES (?, NULL, 'ai_group_routing_skipped', ?, 1)"
+    )->execute([$ticketId, $details]);
+
+    return null;
+}
+
+/**
  * Bump a ticket's priority up one notch when AI flags angry/urgent
  * sentiment. Idempotent — never bumps past the highest-sort_order
  * priority, never re-bumps an already-handled ticket within the
