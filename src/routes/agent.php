@@ -1991,3 +1991,179 @@ $router->post('/agent/canned-responses/{id}/delete', function (array $p) {
     flash('success', 'Canned response deleted.');
     redirect('/agent/canned-responses');
 });
+
+/* ==================================================================
+ * AGENT – Status Banners (public status page / incident notices)
+ *
+ * Any agent can post, edit, or clear an incident banner — they're the
+ * folks who hear "Wi-Fi is down at Eastside" first and the whole point
+ * of the feature is that the next twelve duplicate tickets never get
+ * filed. Display logic (visibility scoping, dismiss-for-me, etc.)
+ * lives in templates/partials/status-banner.php and the helpers
+ * `getActiveBanners()` / `sanitizeBannerHtml()` in src/helpers.php.
+ * ================================================================== */
+
+function _agentValidateBannerInput(): array
+{
+    $title    = trim($_POST['title'] ?? '');
+    $body     = trim($_POST['body_html'] ?? '');
+    $severity = $_POST['severity'] ?? 'warning';
+    if (!in_array($severity, ['info', 'warning', 'critical'], true)) {
+        $severity = 'warning';
+    }
+    $locationId = $_POST['location_id'] ?? '';
+    $locationId = ($locationId === '' || $locationId === '0') ? null : (int) $locationId;
+
+    $startsRaw  = trim($_POST['starts_at']  ?? '');
+    $expiresRaw = trim($_POST['expires_at'] ?? '');
+
+    $toMysql = function (string $raw): ?string {
+        if ($raw === '') return null;
+        $ts = strtotime($raw);
+        return $ts ? date('Y-m-d H:i:s', $ts) : null;
+    };
+    $startsAt  = $toMysql($startsRaw);
+    $expiresAt = $toMysql($expiresRaw);
+
+    return [
+        'title'       => $title !== '' ? $title : null,
+        'body'        => $body,
+        'severity'    => $severity,
+        'location_id' => $locationId,
+        'starts_at'   => $startsAt,
+        'expires_at'  => $expiresAt,
+        'errors'      => $body === '' ? ['Banner body is required.'] : [],
+    ];
+}
+
+$router->get('/agent/banners', function () {
+    Auth::requireRole('agent', 'admin', 'power_user');
+    $db = Database::connect();
+    $banners = $db->query(
+        'SELECT b.*, l.name AS location_name,
+                CONCAT(u.first_name, " ", u.last_name) AS posted_by_name
+         FROM status_banners b
+         LEFT JOIN locations l ON b.location_id = l.id
+         LEFT JOIN users     u ON b.created_by  = u.id
+         ORDER BY b.is_active DESC,
+                  FIELD(b.severity, "critical", "warning", "info"),
+                  b.updated_at DESC'
+    )->fetchAll();
+    render('agent/banners/index', ['banners' => $banners]);
+});
+
+$router->get('/agent/banners/create', function () {
+    Auth::requireRole('agent', 'admin', 'power_user');
+    $locations = Database::connect()
+        ->query('SELECT id, name FROM locations ORDER BY name')
+        ->fetchAll();
+    render('agent/banners/form', ['editing' => null, 'locations' => $locations]);
+});
+
+$router->post('/agent/banners/create', function () {
+    Auth::requireRole('agent', 'admin', 'power_user');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/agent/banners/create');
+    }
+    $v = _agentValidateBannerInput();
+    if (!empty($v['errors'])) {
+        flashInput($_POST);
+        flash('error', $v['errors'][0]);
+        redirect('/agent/banners/create');
+    }
+    Database::connect()->prepare(
+        'INSERT INTO status_banners
+            (title, body_html, severity, location_id, starts_at, expires_at, created_by, updated_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    )->execute([
+        $v['title'], $v['body'], $v['severity'], $v['location_id'],
+        $v['starts_at'], $v['expires_at'], Auth::id(), Auth::id(),
+    ]);
+    flash('success', 'Status banner posted.');
+    redirect('/agent/banners');
+});
+
+$router->get('/agent/banners/{id}/edit', function (array $p) {
+    Auth::requireRole('agent', 'admin', 'power_user');
+    $db = Database::connect();
+    $stmt = $db->prepare('SELECT * FROM status_banners WHERE id = ?');
+    $stmt->execute([(int) $p['id']]);
+    $editing = $stmt->fetch();
+    if (!$editing) {
+        flash('error', 'Banner not found.');
+        redirect('/agent/banners');
+    }
+    $locations = $db->query('SELECT id, name FROM locations ORDER BY name')->fetchAll();
+    render('agent/banners/form', ['editing' => $editing, 'locations' => $locations]);
+});
+
+$router->post('/agent/banners/{id}/edit', function (array $p) {
+    Auth::requireRole('agent', 'admin', 'power_user');
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect("/agent/banners/{$id}/edit");
+    }
+    $v = _agentValidateBannerInput();
+    if (!empty($v['errors'])) {
+        flashInput($_POST);
+        flash('error', $v['errors'][0]);
+        redirect("/agent/banners/{$id}/edit");
+    }
+    $isActive = isset($_POST['is_active']) ? 1 : 0;
+    Database::connect()->prepare(
+        'UPDATE status_banners
+            SET title = ?, body_html = ?, severity = ?, location_id = ?,
+                starts_at = ?, expires_at = ?, is_active = ?, updated_by = ?
+          WHERE id = ?'
+    )->execute([
+        $v['title'], $v['body'], $v['severity'], $v['location_id'],
+        $v['starts_at'], $v['expires_at'], $isActive, Auth::id(), $id,
+    ]);
+    flash('success', 'Banner updated.');
+    redirect('/agent/banners');
+});
+
+$router->post('/agent/banners/{id}/clear', function (array $p) {
+    Auth::requireRole('agent', 'admin', 'power_user');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/agent/banners');
+    }
+    Database::connect()
+        ->prepare('UPDATE status_banners SET is_active = 0, updated_by = ? WHERE id = ?')
+        ->execute([Auth::id(), (int) $p['id']]);
+    flash('success', 'Banner cleared.');
+    $back = $_POST['_back'] ?? '/agent/banners';
+    if (!is_string($back) || $back === '' || $back[0] !== '/' || (isset($back[1]) && ($back[1] === '/' || $back[1] === '\\'))) {
+        $back = '/agent/banners';
+    }
+    redirect($back);
+});
+
+$router->post('/agent/banners/{id}/reactivate', function (array $p) {
+    Auth::requireRole('agent', 'admin', 'power_user');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/agent/banners');
+    }
+    Database::connect()
+        ->prepare('UPDATE status_banners SET is_active = 1, updated_by = ? WHERE id = ?')
+        ->execute([Auth::id(), (int) $p['id']]);
+    flash('success', 'Banner re-posted.');
+    redirect('/agent/banners');
+});
+
+$router->post('/agent/banners/{id}/delete', function (array $p) {
+    Auth::requireRole('agent', 'admin', 'power_user');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/agent/banners');
+    }
+    Database::connect()
+        ->prepare('DELETE FROM status_banners WHERE id = ?')
+        ->execute([(int) $p['id']]);
+    flash('success', 'Banner deleted.');
+    redirect('/agent/banners');
+});

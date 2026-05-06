@@ -838,12 +838,16 @@ function _autoAssignByAiSkill(PDO $db, array $members, int $ticketId): ?int
 /**
  * Run all post-create hooks on a freshly-created ticket. Order matters:
  *
- *   1. AI classification — writes suggested_skill_ids/sentiment so
+ *   1. AI group routing ("No Wrong Door") — for ticket types with
+ *      ai_route_group=1, AI picks the best group from all non-confidential
+ *      groups and updates ticket.group_id BEFORE skill classification, so
+ *      the skill candidate list is filtered against the chosen group.
+ *   2. AI skill classification — writes suggested_skill_ids/sentiment so
  *      ai_skill_based routing has data to work with.
- *   2. Automations (ticket_created) — may set group_id, type_id, etc.
+ *   3. Automations (ticket_created) — may set group_id, type_id, etc.
  *      based on subject/description rules.
- *   3. Auto-assign — needs group_id (set by step 2) and may consult
- *      the classification (set by step 1).
+ *   4. Auto-assign — needs group_id (set by steps 1/3) and may consult
+ *      the classification (set by step 2).
  *
  * Single chokepoint so every creation path (portal, admin, API,
  * email-to-ticket, agent split) gets identical behaviour.
@@ -856,6 +860,7 @@ function _autoAssignByAiSkill(PDO $db, array $members, int $ticketId): ?int
  */
 function runPostTicketCreateHooks(PDO $db, int $ticketId): ?int
 {
+    aiRouteTicketToGroup($ticketId);
     classifyTicketWithAI($ticketId);
     runAutomations($db, $ticketId, 'ticket_created');
     backfillTicketGroupFromDefault($db, $ticketId);
@@ -3634,6 +3639,7 @@ function adminSidebar(string $active = ''): array
     return array_map(fn($item) => array_merge($item, ['active' => $item['key'] === $active]), [
         ['icon' => 'bi-speedometer2',    'label' => label('nav.dashboard'),     'url' => '/admin',            'key' => 'dashboard'],
         ['icon' => 'bi-ticket-detailed', 'label' => label('nav.tickets'),       'url' => '/admin/tickets',    'key' => 'tickets'],
+        ['icon' => 'bi-arrow-clockwise', 'label' => 'Recurring Tickets',        'url' => '/admin/recurring-tickets', 'key' => 'recurring-tickets'],
         ['icon' => 'bi-people',          'label' => label('nav.users'),         'url' => '/admin/users',      'key' => 'users'],
         ['icon' => 'bi-book',            'label' => label('nav.knowledge_base'), 'url' => '/admin/kb/categories', 'key' => 'kb'],
         ['icon' => 'bi-diagram-3',       'label' => label('nav.workflows'),     'url' => '/admin/workflows/ticket-fields', 'key' => 'workflows'],
@@ -3660,6 +3666,7 @@ function agentSidebar(string $active = ''): array
         ['icon' => 'bi-ticket-detailed',  'label' => label('agent.nav.tickets'),        'url' => '/agent/tickets',          'key' => 'tickets'],
         ['icon' => 'bi-book',             'label' => label('agent.nav.knowledge_base'), 'url' => '/agent/kb',               'key' => 'kb'],
         ['icon' => 'bi-chat-square-text', 'label' => 'Canned Responses',                'url' => '/agent/canned-responses', 'key' => 'canned-responses'],
+        ['icon' => 'bi-megaphone',        'label' => 'Status Banners',                  'url' => '/agent/banners',          'key' => 'banners'],
         ['icon' => 'bi-question-circle',  'label' => 'Help',                            'url' => '/agent/help',             'key' => 'help'],
     ]);
 }
@@ -3671,6 +3678,7 @@ function powerUserSidebar(string $active = ''): array
         ['icon' => 'bi-ticket-detailed',  'label' => label('agent.nav.tickets'),        'url' => '/agent/tickets',          'key' => 'tickets'],
         ['icon' => 'bi-book',             'label' => label('agent.nav.knowledge_base'), 'url' => '/agent/kb',               'key' => 'kb'],
         ['icon' => 'bi-chat-square-text', 'label' => 'Canned Responses',                'url' => '/agent/canned-responses', 'key' => 'canned-responses'],
+        ['icon' => 'bi-megaphone',        'label' => 'Status Banners',                  'url' => '/agent/banners',          'key' => 'banners'],
         ['icon' => 'bi-bar-chart',        'label' => label('nav.reports'),              'url' => '/admin/reports',          'key' => 'reports'],
         ['icon' => 'bi-question-circle',  'label' => 'Help',                            'url' => '/agent/help',             'key' => 'help'],
     ]);
@@ -4522,4 +4530,82 @@ function notifyStaleTicketRequester(PDO $db, array $ticket, int $hoursSinceUpdat
         '',
         $ticketId
     );
+}
+
+/* ── Status Banners ───────────────────────────────────────────── */
+
+/**
+ * Fetch banners that should be shown to the current user right now.
+ *
+ * Visibility rules:
+ *   - is_active = 1
+ *   - within the optional starts_at / expires_at window (NULL bounds
+ *     mean "no bound on that side")
+ *   - location-scoped: portal users only see banners whose
+ *     location_id is NULL (global) or matches their users.location_id;
+ *     agents/admins/power_users see every active banner regardless of
+ *     branch so they always know what's posted.
+ *
+ * Returns rows ordered by severity (critical first) then most-recent
+ * first, with `posted_by_name` joined in for the byline.
+ */
+function getActiveBanners(): array
+{
+    if (!Auth::check()) {
+        return [];
+    }
+    $db   = Database::connect();
+    $role = Auth::role();
+
+    $where  = ['b.is_active = 1'];
+    $where[] = '(b.starts_at IS NULL OR b.starts_at <= NOW())';
+    $where[] = '(b.expires_at IS NULL OR b.expires_at > NOW())';
+    $params = [];
+
+    // Portal users only see global banners or ones at their location.
+    if (!in_array($role, ['agent', 'admin', 'power_user'], true)) {
+        $userLoc = (int) ($_SESSION['user']['location_id'] ?? 0);
+        if (!$userLoc) {
+            // Hydrate location_id lazily — older sessions may not have it.
+            $stmt = $db->prepare('SELECT location_id FROM users WHERE id = ?');
+            $stmt->execute([Auth::id()]);
+            $userLoc = (int) ($stmt->fetchColumn() ?: 0);
+            $_SESSION['user']['location_id'] = $userLoc;
+        }
+        if ($userLoc > 0) {
+            $where[]  = '(b.location_id IS NULL OR b.location_id = ?)';
+            $params[] = $userLoc;
+        } else {
+            $where[] = 'b.location_id IS NULL';
+        }
+    }
+
+    $sql = 'SELECT b.*, l.name AS location_name,
+                   CONCAT(u.first_name, " ", u.last_name) AS posted_by_name
+            FROM status_banners b
+            LEFT JOIN locations l ON b.location_id = l.id
+            LEFT JOIN users     u ON b.created_by  = u.id
+            WHERE ' . implode(' AND ', $where) . '
+            ORDER BY FIELD(b.severity, "critical", "warning", "info"),
+                     b.updated_at DESC';
+
+    $stmt = $db->prepare($sql);
+    $stmt->execute($params);
+    return $stmt->fetchAll();
+}
+
+/**
+ * Strip the obvious script-injection vectors from CKEditor output before
+ * we render it back to portal users. CKEditor itself never produces
+ * <script> or on*= attributes, but the route accepts raw POST so this
+ * is the defence-in-depth line.
+ */
+function sanitizeBannerHtml(string $html): string
+{
+    $html = preg_replace('#<script\b[^>]*>.*?</script\s*>#is', '', $html) ?? '';
+    $html = preg_replace('#<style\b[^>]*>.*?</style\s*>#is', '', $html) ?? '';
+    $html = preg_replace('#\son[a-z]+\s*=\s*"[^"]*"#i', '', $html) ?? '';
+    $html = preg_replace("#\son[a-z]+\s*=\s*'[^']*'#i", '', $html) ?? '';
+    $html = preg_replace('#javascript:#i', '', $html) ?? '';
+    return $html;
 }

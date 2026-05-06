@@ -376,6 +376,7 @@
         <?php endif; ?>
 
         <?php require ROOT_DIR . '/templates/partials/flash.php'; ?>
+        <?php if (Auth::check() && empty($embedMode)) require ROOT_DIR . '/templates/partials/status-banner.php'; ?>
         <?php if (Auth::check() && Auth::role() === 'admin') require ROOT_DIR . '/templates/partials/secret-expiry-modal.php'; ?>
         <?= $content ?>
     </main>
