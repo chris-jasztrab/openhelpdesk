@@ -238,11 +238,12 @@ $statusOptions = [
                             </select>
                         </div>
 
-                        <?php if (!$isAgent): ?>
                         <div class="col-12">
-                            <label class="form-label fw-semibold">On Behalf Of</label>
+                            <label class="form-label fw-semibold">
+                                <i class="bi bi-telephone me-1"></i>On Behalf Of
+                            </label>
                             <div class="form-text mb-1">
-                                Leave blank to submit as yourself. Search for a portal user to create this ticket for them.
+                                Leave blank to submit as yourself. To file a ticket for someone who phoned in, search for them by name or email — the requester will receive the confirmation email and own the ticket; you'll be recorded as the submitter for audit.
                             </div>
                             <div class="position-relative">
                                 <input type="text" class="form-control" id="onBehalfSearch"
@@ -259,7 +260,6 @@ $statusOptions = [
                                         id="onBehalfClear">Clear</button>
                             </div>
                         </div>
-                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -440,7 +440,6 @@ tagInput.addEventListener('keydown', e => {
 });
 <?php endif; ?>
 
-<?php if (!$isAgent): ?>
 // ── "On behalf of" live search ─────────────────────────────────
 const obSearch   = document.getElementById('onBehalfSearch');
 const obResults  = document.getElementById('onBehalfResults');
@@ -496,7 +495,7 @@ document.addEventListener('click', e => {
         obResults.style.display = 'none';
     }
 });
-<?php endif; ?>
+
 // ── CC autocomplete ─────────────────────────────────────────────
 (function() {
     var ccInput   = document.getElementById('ccSearchInput');

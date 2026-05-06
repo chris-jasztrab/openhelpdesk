@@ -811,6 +811,7 @@ $router->get('/agent/tickets/{id}', function (array $p) {
                 c.first_name AS creator_first_name, c.last_name AS creator_last_name,
                 CONCAT(c.first_name, ' ', c.last_name) AS creator_name, c.email AS creator_email,
                 CONCAT(a.first_name, ' ', a.last_name) AS agent_name,
+                CONCAT(s.first_name, ' ', s.last_name) AS submitter_name, s.email AS submitter_email,
                 g.name AS group_name
          FROM tickets t
          LEFT JOIN ticket_priorities tp ON t.priority_id = tp.id
@@ -818,6 +819,7 @@ $router->get('/agent/tickets/{id}', function (array $p) {
          LEFT JOIN locations l         ON t.location_id  = l.id
          LEFT JOIN users c             ON t.created_by   = c.id
          LEFT JOIN users a             ON t.assigned_to  = a.id
+         LEFT JOIN users s             ON t.submitted_by = s.id
          LEFT JOIN groups g            ON t.group_id     = g.id
          WHERE t.id = ?"
     );

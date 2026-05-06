@@ -511,6 +511,14 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
                         <?php if (!empty($ticket['creator_email'])): ?>
                         <br><small class="text-muted"><?= e($ticket['creator_email']) ?></small>
                         <?php endif; ?>
+                        <?php if (!empty($ticket['submitted_by']) && !empty($ticket['submitter_name'])): ?>
+                        <br>
+                        <small class="text-muted d-inline-flex align-items-center gap-1 mt-1"
+                               title="Filed via the helpdesk on the requester's behalf — the requester still owns the ticket and receives notifications.">
+                            <i class="bi bi-telephone-forward"></i>
+                            Filed by <?= e($ticket['submitter_name']) ?> on their behalf
+                        </small>
+                        <?php endif; ?>
                     </dd>
 
                     <dt class="text-muted small"><?= label('location.singular') ?></dt>

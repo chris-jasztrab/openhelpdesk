@@ -74,11 +74,63 @@ class TicketsTest extends TestCase
         $this->assertSee('New Ticket', $r);
     }
 
-    public function test_agent_create_form_does_not_show_on_behalf_of(): void
+    public function test_agent_create_form_shows_on_behalf_of(): void
     {
-        // Agents create tickets as themselves — no "on behalf of" picker
+        // Library staff phone the helpdesk — agents need to file tickets for
+        // the caller. The picker is shown on agent create just like admin.
         $r = $this->get($this->agentClient(), '/agent/tickets/create');
-        $this->assertNotSee('On Behalf Of', $r);
+        $this->assertSee('On Behalf Of', $r);
+    }
+
+    public function test_agent_on_behalf_of_post_records_submitter_and_requester(): void
+    {
+        $db = \Database::connect();
+
+        // Pick a portal user that exists; use the seeded portal user if any,
+        // otherwise create a throw-away one.
+        $row = $db->query("SELECT id FROM users WHERE role = 'user' LIMIT 1")->fetch();
+        $cleanupUser = false;
+        if ($row) {
+            $portalUserId = (int) $row['id'];
+        } else {
+            $db->prepare(
+                "INSERT INTO users (first_name, last_name, email, password, role)
+                 VALUES ('Onbehalf', 'Caller', 'onbehalf-caller@test.local', '!', 'user')"
+            )->execute();
+            $portalUserId = (int) $db->lastInsertId();
+            $cleanupUser  = true;
+        }
+
+        $r = $this->post($this->agentClient(), '/admin/tickets/create', [
+            'subject'         => '[TEST] Phoned-in ticket',
+            'description'     => 'Filed by agent over the phone.',
+            'status'          => 'open',
+            'on_behalf_of_id' => $portalUserId,
+        ]);
+        $this->assertTrue(in_array($r->getStatusCode(), [200, 302]));
+
+        $sel = $db->prepare(
+            "SELECT created_by, submitted_by FROM tickets
+             WHERE subject = '[TEST] Phoned-in ticket' LIMIT 1"
+        );
+        $sel->execute();
+        $t = $sel->fetch();
+
+        $this->assertNotEmpty($t, 'Ticket row was not created.');
+        $this->assertSame($portalUserId, (int) $t['created_by'], 'created_by must be the requester.');
+        $this->assertGreaterThan(0, (int) $t['submitted_by'], 'submitted_by must record the agent.');
+        $this->assertNotSame($portalUserId, (int) $t['submitted_by'], 'submitted_by must differ from requester.');
+
+        // Cleanup
+        $tid = $db->prepare("SELECT id FROM tickets WHERE subject = '[TEST] Phoned-in ticket' LIMIT 1");
+        $tid->execute();
+        if ($r2 = $tid->fetch()) {
+            $db->prepare('DELETE FROM ticket_timeline WHERE ticket_id = ?')->execute([$r2['id']]);
+            $db->prepare('DELETE FROM tickets WHERE id = ?')->execute([$r2['id']]);
+        }
+        if ($cleanupUser) {
+            $db->prepare('DELETE FROM users WHERE id = ?')->execute([$portalUserId]);
+        }
     }
 
     public function test_create_form_shows_template_picker(): void

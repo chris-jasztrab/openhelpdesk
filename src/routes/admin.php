@@ -3338,9 +3338,20 @@ $router->post('/admin/tickets/create', function () {
     $status     = $_POST['status'] ?? 'open';
     $dueDate    = trim($_POST['due_date'] ?? '') ?: null;
     $tagNames   = $_POST['tags'] ?? [];
-    // Admin can create on behalf of another user
-    $onBehalf   = !empty($_POST['on_behalf_of_id']) ? (int) $_POST['on_behalf_of_id'] : null;
-    $createdBy  = (Auth::role() === 'admin' && $onBehalf) ? $onBehalf : Auth::id();
+    // Agents/admins/power-users can file a ticket on behalf of another user
+    // (e.g. someone phones the helpdesk). When set, `created_by` becomes the
+    // requester and `submitted_by` records who actually clicked submit so the
+    // audit trail isn't lost. Self-submission keeps `submitted_by` NULL.
+    $onBehalf    = !empty($_POST['on_behalf_of_id']) ? (int) $_POST['on_behalf_of_id'] : null;
+    $canDelegate = in_array(Auth::role(), ['admin', 'agent', 'power_user'], true);
+    if ($onBehalf && $canDelegate && $onBehalf !== Auth::id()) {
+        $createdBy   = $onBehalf;
+        $submittedBy = Auth::id();
+    } else {
+        $createdBy   = Auth::id();
+        $submittedBy = null;
+        $onBehalf    = null; // discard if self or not permitted
+    }
 
     $validStatuses = ['open','in_progress','pending','waiting_on_customer','waiting_on_third_party','resolved','closed'];
     if (!in_array($status, $validStatuses, true)) {
@@ -3357,9 +3368,9 @@ $router->post('/admin/tickets/create', function () {
     $db = Database::connect();
     $groupId = resolveTicketGroup($db, $groupId, $typeId);
     $db->prepare(
-        'INSERT INTO tickets (subject, description, created_by, type_id, location_id, status, priority_id, assigned_to, group_id, due_date)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-    )->execute([$subject, $desc, $createdBy, $typeId, $locationId, $status, $priId, $assignedTo, $groupId, $dueDate]);
+        'INSERT INTO tickets (subject, description, created_by, submitted_by, type_id, location_id, status, priority_id, assigned_to, group_id, due_date)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    )->execute([$subject, $desc, $createdBy, $submittedBy, $typeId, $locationId, $status, $priId, $assignedTo, $groupId, $dueDate]);
     $ticketId = (int) $db->lastInsertId();
 
     // Always run post-create hooks: AI classification (if enabled & non-confidential)
@@ -3426,10 +3437,21 @@ $router->post('/admin/tickets/create', function () {
         }
     }
 
-    // Timeline
+    // Timeline — record who actually clicked submit, and (when delegating)
+    // who the ticket was filed for so the on-behalf-of relationship is
+    // legible in the audit trail.
+    if ($submittedBy) {
+        $rs = $db->prepare("SELECT CONCAT(first_name, ' ', last_name) FROM users WHERE id = ?");
+        $rs->execute([$createdBy]);
+        $requesterName = (string) ($rs->fetchColumn() ?: 'requester');
+        $timelineDetails = 'Ticket filed by ' . Auth::fullName()
+                         . ' on behalf of ' . $requesterName . '.';
+    } else {
+        $timelineDetails = 'Ticket created by ' . Auth::fullName() . '.';
+    }
     $db->prepare(
         'INSERT INTO ticket_timeline (ticket_id, user_id, action, details) VALUES (?, ?, ?, ?)'
-    )->execute([$ticketId, Auth::id(), 'created', 'Ticket created by ' . Auth::fullName() . '.']);
+    )->execute([$ticketId, Auth::id(), 'created', $timelineDetails]);
 
     // Initialize SLA timers if priority is set
     if ($priId) {
@@ -3622,6 +3644,7 @@ $router->get('/admin/tickets/{id}', function (array $p) {
                 c.first_name AS creator_first_name, c.last_name AS creator_last_name,
                 CONCAT(c.first_name, ' ', c.last_name) AS creator_name, c.email AS creator_email,
                 CONCAT(a.first_name, ' ', a.last_name) AS agent_name,
+                CONCAT(s.first_name, ' ', s.last_name) AS submitter_name, s.email AS submitter_email,
                 g.name AS group_name
          FROM tickets t
          LEFT JOIN ticket_priorities tp ON t.priority_id = tp.id
@@ -3629,6 +3652,7 @@ $router->get('/admin/tickets/{id}', function (array $p) {
          LEFT JOIN locations l         ON t.location_id  = l.id
          LEFT JOIN users c             ON t.created_by   = c.id
          LEFT JOIN users a             ON t.assigned_to  = a.id
+         LEFT JOIN users s             ON t.submitted_by = s.id
          LEFT JOIN `groups` g          ON t.group_id     = g.id
          WHERE t.id = ?"
     );

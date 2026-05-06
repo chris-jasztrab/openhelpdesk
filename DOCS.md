@@ -199,6 +199,25 @@ The ticket detail view at `/agent/tickets/{id}` has three columns.
 
 When you post the first public reply on a ticket you did not create, the system records the first response timestamp for SLA compliance reporting.
 
+### Filing a Ticket On Behalf Of Someone Else
+
+Library staff routinely phone the helpdesk. Rather than file the ticket as yourself and have the wrong person own it, the **On Behalf Of** picker on the staff *Create Ticket* page (`/admin/tickets/create` and `/agent/tickets/create`) lets you record who the ticket is really for.
+
+To use it:
+
+1. Open the *Create Ticket* page.
+2. In the *Assignment* card, find the **On Behalf Of** field and type at least two characters of the caller's name or email.
+3. Click their entry in the dropdown — the picker is replaced by a coloured pill showing the requester. Use **Clear** to undo.
+4. Fill the rest of the form and submit.
+
+What this changes:
+
+- The picked person becomes the ticket's **requester** (`created_by`). The ticket appears in their portal, the confirmation email goes to *their* inbox, CSAT is sent to *them*, and they can reply or close it like any self-submitted ticket.
+- The staff member who clicked *Create* is recorded in a separate **submitter** column (`submitted_by`) so the audit trail isn't lost. The ticket-detail sidebar shows a small *"Filed by [staff] on their behalf"* hint under *Created By*, and the timeline's first *Created* entry reads *"Ticket filed by [staff] on behalf of [requester]."*
+- Leaving the picker blank — or picking yourself — files the ticket as you would any other. There is no audit trail when you and the requester are the same person.
+
+The requester must already have an account. If the caller is new, create their account first at `/admin/users/create`, then come back to file the ticket. The submitter hint and timeline phrasing are only visible to agents and admins; end users in the portal see the ticket as theirs.
+
 ---
 
 ## Admin Area

@@ -11,16 +11,46 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <h2 class="fw-bold mb-1">Tickets</h2>
 <p class="text-muted mb-4">Everything you need to know about creating, managing and resolving tickets.</p>
 
-<div class="card border-0 shadow-sm mb-4">
+<div class="card border-0 shadow-sm mb-4" id="creating-tickets">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-plus-circle text-primary me-2"></i>Creating Tickets</h5>
 <p class="text-muted mb-2">Tickets can be created in two ways:</p>
 <ul class="text-muted mb-3">
     <li><strong>Portal:</strong> End users submit tickets through the public portal at <code>/portal</code>. They provide a subject, description, location (if enabled) and optionally attach files.</li>
-    <li><strong>Admin / Agent:</strong> Staff can create tickets on behalf of users from <a href="/admin/tickets/create"><strong>Admin → Tickets → Create Ticket</strong></a>. You must select or create a requester, choose a subject, priority, and optionally assign it immediately.</li>
+    <li><strong>Admin / Agent:</strong> Staff can create tickets from <a href="/admin/tickets/create"><strong>Admin → Tickets → Create Ticket</strong></a> or <a href="/agent/tickets/create"><strong>Agent → Tickets → Create Ticket</strong></a>. Provide a subject, description and (optionally) a ticket type, priority, location, group, assignee, due date and tags.</li>
 </ul>
 <div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
     When a ticket is created, a confirmation email is sent to the requester (if SMTP is configured) and, if assigned, a notification is sent to the agent.
+</div>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4" id="on-behalf-of">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-telephone-forward text-primary me-2"></i>Filing a Ticket On Behalf Of Someone Else</h5>
+<p class="text-muted mb-2">When a staff member phones the helpdesk — or stops you in the hall — you can file the ticket <em>for them</em> from the staff <em>Create Ticket</em> page so the right person owns it from the start. The picker is shown to admins, agents and power users on both <a href="/admin/tickets/create"><strong>Admin → Tickets → Create Ticket</strong></a> and <a href="/agent/tickets/create"><strong>Agent → Tickets → Create Ticket</strong></a>.</p>
+
+<p class="text-muted mb-2"><strong>How to use it</strong></p>
+<ol class="text-muted mb-3">
+    <li>Open the <em>Create Ticket</em> page.</li>
+    <li>Scroll to the <em>Assignment</em> card and find the <strong>On Behalf Of</strong> field.</li>
+    <li>Type at least two characters of the caller's name or email — matching staff appear in a dropdown. Click to pick.</li>
+    <li>The picker swaps for a coloured pill showing the chosen requester. Use <strong>Clear</strong> to undo.</li>
+    <li>Fill the rest of the form as normal and submit.</li>
+</ol>
+
+<p class="text-muted mb-2"><strong>What happens behind the scenes</strong></p>
+<ul class="text-muted mb-3">
+    <li>The picked person becomes the ticket's <strong>requester</strong> (<code>created_by</code>). They own it: it shows up in <em>their</em> portal, the confirmation email goes to <em>their</em> inbox, CSAT is sent to <em>them</em>, and they can reply or close it like any self-submitted ticket.</li>
+    <li>The staff member who clicked <em>Create</em> is recorded in a separate <strong>submitter</strong> column (<code>submitted_by</code>) so the audit trail isn't lost. The ticket-detail sidebar shows a small <em>"Filed by [staff] on their behalf"</em> hint under <em>Created By</em>, and the timeline's first <em>Created</em> entry reads <em>"Ticket filed by [staff] on behalf of [requester]."</em></li>
+    <li>If you leave the picker blank, the ticket is created as you would any other — you are both the submitter and the requester, exactly like before.</li>
+    <li>Picking yourself is treated the same as leaving the picker blank — no spurious "filed on behalf" hint.</li>
+</ul>
+
+<p class="text-muted mb-2"><strong>The requester must already have a user account.</strong> If the caller is new, create their account first at <a href="/admin/users/create"><strong>Admin → Users → Add User</strong></a>, then come back to file the ticket.</p>
+
+<div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
+    The submitter pill is only visible to agents and admins. End users in the portal see the ticket as theirs, with no reference to who filed it for them.
 </div>
 </div>
 </div>
