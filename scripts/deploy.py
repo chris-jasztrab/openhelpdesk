@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Deploy: pull on helpdeskvm, fix ownership, run migrations."""
+"""Deploy: pull on helpdeskvm, fix ownership, run migrations.
+
+Uses --ff-only: aborts (exit 128) if the remote was force-pushed
+or the prod working tree has diverged. Resolve manually via SSH
+before re-running.
+"""
 import os, sys
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
