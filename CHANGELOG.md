@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.33.1 — 2026-05-07
+
+### Documentation
+- **In-app docs catch up to the "No Wrong Door" AI group routing shipped in 2.33.0.** A new *No Wrong Door — Let AI Pick the Group* card is added to [Admin → Docs → AI Classification](/admin/docs/ai#no-wrong-door) ([templates/pages/admin/docs/ai.php](templates/pages/admin/docs/ai.php)) covering when to use it, the five-step setup walk-through (tick the type flag, set the Default Group as fallback queue, sharpen group descriptions, confidence threshold behaviour, downstream skill classifier), the audit trail badges shown on the ticket detail page (*Routed to X* / *No confident match* / *Suggested X (below threshold)*), and a tuning playbook for reading the audit to fix vague or overlapping group descriptions. Seven new search-index entries are added to [templates/pages/admin/docs/index.php](templates/pages/admin/docs/index.php) so admins typing "no wrong door", "ai group routing", "don't know who handles this", "ai_route_group", "ai group routing card", "group description ai signal", or "fallback queue default group" surface the new card. [DOCS.md](DOCS.md) gets a new *Let AI route this to the best group ("No Wrong Door")* row in the *Ticket Types* field reference, plus updated copy on the *Default Group* and *Confidential* rows explaining how each interacts with the new flag (Default Group doubles as fallback queue; Confidential is mutually exclusive because confidential bodies must never reach a third-party provider).
+
+---
+
 ## 2.33.0 — 2026-05-06
 
 ### Features

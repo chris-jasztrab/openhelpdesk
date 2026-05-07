@@ -25,6 +25,41 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 </div>
 </div>
 
+<div class="card border-0 shadow-sm mb-4" id="no-wrong-door">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-signpost-split text-info me-2"></i>"No Wrong Door" — Let AI Pick the Group</h5>
+<p class="text-muted mb-3">Some patron requests don't fit a clear category — the patron knows they need help but doesn't know which team handles it. The skill classifier above picks <em>which agent</em> handles a ticket within a group it's already in; the <strong>No Wrong Door</strong> flag adds a layer above that, picking <em>which group</em> handles the ticket in the first place.</p>
+
+<h6 class="fw-semibold mt-3 mb-2">When to use it</h6>
+<ul class="text-muted mb-3">
+    <li>You have a generic portal entry like <em>"I'm not sure who handles this"</em> or <em>"Help — anything"</em> and want patrons to use it without picking a category.</li>
+    <li>You want a single inbox for ambiguous requests but don't want a human triager to read each one — AI fans them out to the right team automatically.</li>
+    <li>Your library has departments with clearly distinct domains (Branch IT, Cataloguing, Facilities, HR, Programming, etc.) and the body of a ticket usually makes the right group obvious.</li>
+</ul>
+
+<h6 class="fw-semibold mt-3 mb-2">How it works</h6>
+<ol class="text-muted mb-3">
+    <li>Edit a ticket type at <a href="/admin/types"><strong>Admin → Settings → Ticket Types</strong></a> and tick <strong><i class="bi bi-signpost-split me-1"></i>Let AI route this to the best group ("No Wrong Door")</strong>. The flag is mutually exclusive with <strong>Confidential</strong> — confidential bodies are never sent to a third-party provider.</li>
+    <li>Set the type's <strong>Default Group</strong> to your <em>fallback queue</em> — the team whose members handle anything AI couldn't route. This doubles as the "No Wrong Door" team. Make sure it has agents in it.</li>
+    <li>At <a href="/admin/groups"><strong>Admin → Groups</strong></a>, give every group that should be a routing candidate a <strong>clear, specific description</strong>. <em>This is the only signal AI uses to pick.</em> Groups with an empty description are excluded from the candidate pool.</li>
+    <li>When a patron submits a ticket of that type, AI receives the subject + body plus every non-confidential group's name &amp; description and returns one of: a chosen <code>group_id</code>, or <code>null</code> if it can't decide. The ticket is moved to the chosen group <strong>only if</strong> the model's confidence clears the same threshold the skill classifier uses (default 0.7). Below that — or if AI returns null — the ticket stays in the <strong>Default Group</strong> queue.</li>
+    <li>Once the group is settled, the existing skill classifier runs against <em>that</em> group's skills, and auto-assignment proceeds normally. So a ticket can be routed to "Branch IT" by AI, then assigned to the on-shift Branch IT agent who holds the matching skill.</li>
+</ol>
+
+<h6 class="fw-semibold mt-3 mb-2">Audit trail</h6>
+<p class="text-muted mb-2">Every routing decision — apply or skip — is recorded in <code>ai_group_classifications</code> and surfaced as an <strong>AI Group Routing</strong> card on the ticket detail page (above the existing AI Classification card). The card shows:</p>
+<ul class="text-muted mb-3">
+    <li><span class="badge bg-success bg-opacity-10 text-success"><i class="bi bi-check-circle me-1"></i>Routed to <em>Group</em></span> — AI picked confidently and the ticket was moved.</li>
+    <li><span class="badge bg-secondary bg-opacity-10 text-secondary"><i class="bi bi-question-circle me-1"></i>No confident match</span> — AI returned <code>null</code>; ticket stayed in the Default Group.</li>
+    <li><span class="badge bg-warning bg-opacity-10 text-warning"><i class="bi bi-dash-circle me-1"></i>Suggested <em>Group</em> (below threshold)</span> — AI picked a group but its confidence was below the threshold, so the ticket stayed in the Default Group.</li>
+</ul>
+<p class="text-muted mb-0">The card also shows the AI's one-sentence reasoning, the provider/model, and call latency. Use the audit trail to tune your group descriptions: if you keep seeing "Suggested X (below threshold)" pointing at the right group, your description for X is too vague to satisfy the threshold — sharpen it. If you see confident routes to the wrong group, the descriptions are misleading or overlapping.</p>
+
+<h6 class="fw-semibold mt-3 mb-2">Spotting AI-routed types in the list</h6>
+<p class="text-muted mb-0">The <a href="/admin/types">Ticket Types</a> list shows a small <i class="bi bi-signpost-split text-info"></i> icon beside every type with <strong>No Wrong Door</strong> on, alongside the existing <i class="bi bi-shield-lock text-warning"></i> for confidential types. Hover for a tooltip.</p>
+</div>
+</div>
+
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-shield-lock text-success me-2"></i>Privacy &amp; Confidential Tickets</h5>
