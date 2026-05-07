@@ -43,16 +43,21 @@ const STATIC_CACHE  = 'ld-static-' + VERSION;
 const RUNTIME_CACHE = 'ld-runtime-' + VERSION;
 const OFFLINE_URL   = '/offline';
 
-// Pre-cache the bare minimum so the offline shell loads even on a
-// brand-new install where nothing has been navigated to yet.
+// Pre-cache the bare minimum (same-origin only) so the offline shell
+// loads even on a brand-new install where nothing has been navigated
+// to yet. Cross-origin URLs (CDN bootstrap etc.) are NOT precached:
+// SW-initiated cross-origin fetches go through the page CSP's
+// connect-src directive, which on this app is 'self' + ckeditor only —
+// jsdelivr would be blocked, the precache fetch would fail, and the
+// browser would receive a stylesheet response with no body and render
+// every page unstyled. Letting the browser load CDN assets natively
+// (via <link rel="stylesheet"> which uses style-src, not connect-src)
+// is the only path that actually works under our CSP.
 const PRECACHE_URLS = [
     '/offline',
     '/manifest.webmanifest',
     '/pwa/icon-192.png',
     '/pwa/icon-512.png',
-    'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css',
-    'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css',
-    'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js',
 ];
 
 self.addEventListener('install', (event) => {
@@ -107,6 +112,15 @@ self.addEventListener('fetch', (event) => {
     if (req.method !== 'GET') return;
 
     const url = new URL(req.url);
+
+    // CRITICAL: do not intercept cross-origin requests. SW fetch() to
+    // cross-origin hosts is governed by connect-src on this app's CSP
+    // (which is 'self' + ckeditor only); CDN stylesheets, scripts, and
+    // fonts must reach the browser through their native loaders (where
+    // style-src / script-src / font-src apply). Intercepting them was
+    // the cause of the unstyled-pages outage in 2.34.0–2.35.0.
+    if (url.origin !== self.location.origin) return;
+
     if (isUncacheable(url)) return;
 
     // Navigations: network-first, fall back to last cached HTML, then
@@ -130,14 +144,12 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // Static assets: stale-while-revalidate. Serve cache instantly,
-    // refresh in the background. Covers CDN bootstrap + own-origin CSS,
-    // JS, fonts, and PWA icons.
+    // Same-origin static assets: stale-while-revalidate. Covers
+    // /pwa/icons and any future own-origin CSS/JS/fonts. Cross-origin
+    // CDN assets bypass the SW entirely (see early-return above).
     const dest = req.destination;
     if (
         dest === 'style' || dest === 'script' || dest === 'font' || dest === 'image' ||
-        url.hostname === 'cdn.jsdelivr.net' ||
-        url.hostname === 'cdn.ckeditor.com' ||
         url.pathname.startsWith('/pwa/')
     ) {
         event.respondWith((async () => {

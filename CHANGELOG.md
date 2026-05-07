@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.35.1 — 2026-05-07
+
+### Bug fixes
+- **Service worker no longer breaks page styling.** Shipping 2.34.0 caused every page (login, admin dashboard, agent UI) to render as unstyled raw HTML on browsers that had registered the new service worker — Bootstrap and Bootstrap-Icons were loading from `cdn.jsdelivr.net` but the SW was intercepting those cross-origin requests, calling `fetch()` from inside the worker, which is governed by the page's `connect-src` CSP directive (currently `'self' https://cdn.ckeditor.com` only — no jsdelivr). The cross-origin fetches inside the SW were therefore blocked, the worker returned an empty response, and the browser applied the empty stylesheet. Native `<link rel="stylesheet">` requests are governed by `style-src` (which DOES allow jsdelivr) and worked fine before the SW started intercepting. **Fix:** the SW now early-returns on any cross-origin request — those go to the browser's native loader, where the correct CSP directive applies. Cross-origin URLs were also dropped from the SW precache list. Same-origin caching (`/offline` shell, `/pwa/icons`, future own-origin CSS/JS) is unchanged. The fix self-deploys: the new sw.js content rotates the cache version, install + activate auto-skipWaiting + clients.claim, and the existing `controllerchange` listener reloads the page so users on a broken cached state recover on next page load. Affected versions were 2.34.0 (where the bug was introduced) and 2.35.0 (which inherited it). Anyone still seeing unstyled pages after 2.35.1 deploys should hard-reload (Ctrl+Shift+R) once to pick up the new worker; subsequent pages render normally.
+
+---
+
 ## 2.35.0 — 2026-05-07
 
 ### Features
