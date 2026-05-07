@@ -12,9 +12,16 @@ declare(strict_types=1);
  * card grid with 44pt+ targets, large type, and a single-screen
  * quick-create flow that captures a photo straight from the camera.
  *
- *   GET  /agent/floor                  Tablet queue for staff
- *   POST /agent/floor/quick-create     Bottom-sheet quick ticket (JSON)
- *   GET  /portal/floor                 Patron-side "my tickets" cards
+ *   GET  /agent/floor                       Tablet queue for staff
+ *   POST /agent/floor/quick-create          Bottom-sheet quick ticket (JSON)
+ *   GET  /agent/floor/tickets/{id}          Tablet ticket detail (3-tap actions)
+ *   POST /agent/floor/tickets/{id}/action   Status/claim/note from floor detail
+ *   GET  /portal/floor                      Patron-side "my tickets" cards
+ *
+ * The agent detail view links back to the dense /agent/tickets/{id}
+ * page with ?from=floor — that flag asks the layout to drop the
+ * sidebar/navbar (embedMode) and the template to overlay an ✕ that
+ * returns to /agent/floor/tickets/{id}.
  * ================================================================== */
 
 $router->get('/agent/floor', function () {
@@ -188,6 +195,174 @@ $router->post('/agent/floor/quick-create', function () {
         'redirect_url' => '/agent/tickets/' . $ticketId,
     ]);
     exit;
+});
+
+$router->get('/agent/floor/tickets/{id}', function (array $p) {
+    Auth::requireRole('agent', 'admin', 'power_user');
+    $db = Database::connect();
+    $id = (int) $p['id'];
+
+    $stmt = $db->prepare(
+        "SELECT t.*,
+                tp.name AS priority_name, tp.color AS priority_color,
+                tt.name AS type_name, tt.color AS type_color,
+                l.name  AS location_name,
+                g.name  AS group_name,
+                CONCAT(c.first_name, ' ', c.last_name) AS creator_name,
+                c.email AS creator_email,
+                CONCAT(a.first_name, ' ', a.last_name) AS agent_name
+         FROM tickets t
+         LEFT JOIN ticket_priorities tp ON t.priority_id = tp.id
+         LEFT JOIN ticket_types     tt ON t.type_id     = tt.id
+         LEFT JOIN locations        l  ON t.location_id = l.id
+         LEFT JOIN `groups`         g  ON t.group_id    = g.id
+         LEFT JOIN users c             ON t.created_by  = c.id
+         LEFT JOIN users a             ON t.assigned_to = a.id
+         WHERE t.id = ?"
+    );
+    $stmt->execute([$id]);
+    $ticket = $stmt->fetch();
+    if (!$ticket) {
+        flash('error', 'Ticket not found.');
+        redirect('/agent/floor');
+    }
+
+    _agentRequireTicketAccess($db, $ticket);
+
+    // Recent timeline (last 8). Internal notes included — floor staff often
+    // need the agent-side context (who's already looked at this).
+    $tl = $db->prepare(
+        "SELECT tl.id, tl.action, tl.details, tl.is_internal, tl.created_at,
+                CONCAT(u.first_name, ' ', u.last_name) AS user_name
+         FROM ticket_timeline tl
+         LEFT JOIN users u ON tl.user_id = u.id
+         WHERE tl.ticket_id = ?
+         ORDER BY tl.created_at DESC
+         LIMIT 8"
+    );
+    $tl->execute([$id]);
+    $timeline = $tl->fetchAll();
+
+    render('agent/floor-ticket', [
+        'pageTitle'    => '#' . $id . ' · ' . $ticket['subject'],
+        'layout'       => 'app',
+        'sidebarItems' => Auth::role() === 'power_user' ? powerUserSidebar('floor') : agentSidebar('floor'),
+        'ticket'       => $ticket,
+        'timeline'     => $timeline,
+        'isMine'       => (int) ($ticket['assigned_to'] ?? 0) === (int) Auth::id(),
+    ]);
+});
+
+$router->post('/agent/floor/tickets/{id}/action', function (array $p) {
+    Auth::requireRole('agent', 'admin', 'power_user');
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect("/agent/floor/tickets/{$id}");
+    }
+
+    $db = Database::connect();
+    $stmt = $db->prepare('SELECT * FROM tickets WHERE id = ?');
+    $stmt->execute([$id]);
+    $ticket = $stmt->fetch();
+    if (!$ticket) {
+        flash('error', 'Ticket not found.');
+        redirect('/agent/floor');
+    }
+    _agentRequireTicketAccess($db, $ticket);
+
+    $action = $_POST['action'] ?? '';
+    $userId = (int) Auth::id();
+
+    if ($action === 'claim' || $action === 'unclaim') {
+        $newAssigned = $action === 'claim' ? $userId : null;
+        $oldAssigned = $ticket['assigned_to'] ? (int) $ticket['assigned_to'] : null;
+        if ($newAssigned !== $oldAssigned) {
+            $db->prepare('UPDATE tickets SET assigned_to = ? WHERE id = ?')->execute([$newAssigned, $id]);
+            $agentName = $newAssigned ? Auth::fullName() : 'Unassigned';
+            $db->prepare(
+                'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
+            )->execute([$id, $userId, 'assigned', "Assigned to {$agentName} (floor)"]);
+            if ($newAssigned) { notifyAssignedAgent($db, $id, $newAssigned); }
+            runAutomations($db, $id, 'ticket_updated');
+            flash('success', $newAssigned ? 'Claimed by you.' : 'Released.');
+        }
+    } elseif ($action === 'status') {
+        $newStatus = $_POST['status'] ?? '';
+        $valid = ['open', 'in_progress', 'pending', 'resolved', 'closed'];
+        if (in_array($newStatus, $valid, true) && $newStatus !== $ticket['status']) {
+            $oldStatus = $ticket['status'];
+            $db->prepare('UPDATE tickets SET status = ? WHERE id = ?')->execute([$newStatus, $id]);
+            $db->prepare(
+                'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
+            )->execute([$id, $userId, 'status_changed', "Status changed from {$oldStatus} to {$newStatus} (floor)"]);
+
+            $pausing = ['pending', 'waiting_on_customer', 'waiting_on_third_party'];
+            if (in_array($newStatus, $pausing, true)) {
+                Sla::pause($db, $id);
+            } elseif (in_array($oldStatus, $pausing, true)) {
+                Sla::resume($db, $id);
+            }
+            if (in_array($newStatus, ['resolved', 'closed'], true)) {
+                notifyRequesterStatusChanged($db, $id, $newStatus);
+            }
+            $csatTrigger = getSetting('csat_trigger_status', 'resolved');
+            if ($newStatus === $csatTrigger) {
+                sendCsatSurvey($db, $id);
+            }
+            runAutomations($db, $id, 'ticket_updated');
+            flash('success', 'Status updated.');
+        }
+    } elseif ($action === 'comment') {
+        $message    = trim($_POST['message'] ?? '');
+        $isInternal = !empty($_POST['is_internal']) ? 1 : 0;
+        if ($message === '') {
+            flash('error', 'Note cannot be empty.');
+            redirect("/agent/floor/tickets/{$id}");
+        }
+        $db->prepare(
+            'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, ?)'
+        )->execute([$id, $userId, 'comment', $message, $isInternal]);
+        $timelineId = (int) $db->lastInsertId();
+
+        processAtMentions($db, $message, $id, $timelineId, $userId);
+
+        $attachments = !empty($_FILES['attachments']['name'][0] ?? null) ? handleAttachmentUploads('attachments') : [];
+        if ($attachments) saveAttachments($db, $id, $timelineId, $userId, $attachments);
+
+        if (!$isInternal) {
+            notifyTicketCreator($db, $id, $message, Auth::fullName());
+            notifyCcUsers($db, $id, $message, Auth::fullName());
+            notifyWatchers($db, $id, $message, Auth::fullName());
+
+            // First-response SLA mark — same rule as the regular comment endpoint.
+            $r = $db->prepare('SELECT created_by, first_responded_at FROM tickets WHERE id = ?');
+            $r->execute([$id]);
+            $row = $r->fetch();
+            if ($row && $row['first_responded_at'] === null && (int) $row['created_by'] !== $userId) {
+                $db->prepare('UPDATE tickets SET first_responded_at = NOW() WHERE id = ?')->execute([$id]);
+                $db->prepare(
+                    'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, ?, ?, 1)'
+                )->execute([$id, 'sla_set', 'First response recorded']);
+            }
+        } else {
+            notifyAgentNoteAdded($db, $id, $message);
+        }
+
+        // Auto-claim on public reply (matches /agent/tickets/{id}/comment behaviour).
+        if (!$isInternal && $ticket['assigned_to'] === null) {
+            $db->prepare('UPDATE tickets SET assigned_to = ? WHERE id = ?')->execute([$userId, $id]);
+            $db->prepare(
+                'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
+            )->execute([$id, $userId, 'assigned', 'Ticket auto-assigned to ' . Auth::fullName() . ' upon reply']);
+        }
+
+        flash('success', $isInternal ? 'Internal note added.' : 'Reply posted.');
+    } else {
+        flash('error', 'Unknown action.');
+    }
+
+    redirect("/agent/floor/tickets/{$id}");
 });
 
 $router->get('/portal/floor', function () {

@@ -279,7 +279,7 @@
 
             $rail = $t['priority_color'] ?: '#94a3b8';
         ?>
-            <a class="floor-card" href="/agent/tickets/<?= (int) $t['id'] ?>" style="border-left-color:<?= e($rail) ?>;">
+            <a class="floor-card" href="/agent/floor/tickets/<?= (int) $t['id'] ?>" style="border-left-color:<?= e($rail) ?>;">
                 <div class="top-row">
                     <span class="ticket-id">#<?= (int) $t['id'] ?>
                         <?php if (!empty($t['priority_name'])): ?>

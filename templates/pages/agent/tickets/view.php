@@ -2,7 +2,7 @@
 $layout       = 'app';
 $pageTitle    = 'Ticket #' . $ticket['id'];
 $sidebarItems = agentSidebar('tickets');
-$breadcrumbs  = [
+$breadcrumbs  = !empty($fromFloor) ? [] : [
     ['label' => 'Agent', 'url' => '/agent'],
     ['label' => 'Tickets', 'url' => '/agent/tickets'],
     ['label' => '#' . $ticket['id']],
@@ -40,6 +40,34 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
 [data-bs-theme="dark"] .ck.ck-balloon-panel { background: #2b3035 !important; border-color: #495057 !important; }
 [data-bs-theme="dark"] .ck.ck-color-grid__tile:hover { border-color: #fff !important; }
 </style>
+<?php if (!empty($fromFloor)): ?>
+<style>
+/* Floor-mode entry: chrome already stripped by embedMode in the layout —
+   this just adds a close pill and tightens the top padding so the ✕
+   sits within thumb reach on a tablet. */
+.main-content { padding-top: 1rem !important; }
+#floor-close {
+    position: fixed;
+    top: max(.85rem, env(safe-area-inset-top, .85rem));
+    right: max(.85rem, env(safe-area-inset-right, .85rem));
+    z-index: 1050;
+    width: 48px; height: 48px; border-radius: 50%;
+    background: #fff; color: #1e293b;
+    border: 1px solid #cbd5e1;
+    box-shadow: 0 4px 12px rgba(15,23,42,.18);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 1.4rem; text-decoration: none;
+}
+#floor-close:hover { background: #f1f5f9; color: #1e293b; }
+[data-bs-theme="dark"] #floor-close { background: #212529; color: #f8f9fa; border-color: #495057; }
+[data-bs-theme="dark"] #floor-close:hover { background: #2b3035; color: #fff; }
+</style>
+<a id="floor-close" href="/agent/floor/tickets/<?= (int) $ticket['id'] ?>"
+   aria-label="Close detailed view and return to floor mode" title="Back to floor view">
+    <i class="bi bi-x-lg" aria-hidden="true"></i>
+</a>
+<?php endif; ?>
+
 <?php if ($ticket['merged_into_ticket_id']): ?>
 <div class="alert alert-warning d-flex align-items-center gap-2 mb-4" role="alert">
     <i class="bi bi-arrow-right-circle-fill fs-5"></i>

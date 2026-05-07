@@ -11,6 +11,14 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.36.0 — 2026-05-07
+
+### New features
+- **Floor mode now has its own ticket detail view.** Tapping a card in [/agent/floor](src/routes/floor.php) used to drop the user into the dense desktop ticket page ([templates/pages/agent/tickets/view.php](templates/pages/agent/tickets/view.php)) — sidebar, full edit form, dozens of small targets — which broke the touch-first design promise of the queue. **Fix:** new route `GET /agent/floor/tickets/{id}` rendering [templates/pages/agent/floor-ticket.php](templates/pages/agent/floor-ticket.php), a single-column card layout sized for thumbs: large subject + status/priority/type/location pills, two who-cards (Reported by, Assigned to), an auto-collapsing description, a Quick Actions grid (Claim/Release plus contextual In Progress / Pending / Resolve / Reopen — each a one-click form to `POST /agent/floor/tickets/{id}/action`), the most recent 8 timeline entries, and an Add-a-note form with camera-capture photo input and an "Internal only" toggle. The action endpoint reuses the existing helpers (`Sla::pause/resume`, `notifyAssignedAgent`, `notifyTicketCreator`, `notifyCcUsers`, `notifyWatchers`, `notifyAgentNoteAdded`, `notifyRequesterStatusChanged`, `processAtMentions`, `runAutomations`, `sendCsatSurvey`) so SLA timers, CSAT survey triggers, first-response marking, @-mention notifications, and auto-claim-on-reply all behave identically to the regular detail page. Floor cards in [templates/pages/agent/floor.php](templates/pages/agent/floor.php) now link here instead of `/agent/tickets/{id}`.
+- **"Full ticket details" escape hatch with chrome-stripped, ✕-to-close return path.** The floor detail page links to `/agent/tickets/{id}?from=floor` for cases that need fields/merge/escalate the simple view doesn't expose. The route handler ([src/routes/agent.php](src/routes/agent.php) at `GET /agent/tickets/{id}`) detects `?from=floor` and passes `embedMode=true` plus `fromFloor=true` to `render()` — the layout's existing `embed-mode` body class hides navbar, sidebar, breadcrumbs, status banner, and PWA install prompt, and [templates/pages/agent/tickets/view.php](templates/pages/agent/tickets/view.php) overlays a fixed top-right ✕ pill that returns to `/agent/floor/tickets/{id}`. Breadcrumbs are also nulled in floor-entry mode (they were already CSS-hidden, but emptying the array is cleaner). Net effect: a staffer can drop into the dense view for one specific edit and bounce straight back to the simple view without ever seeing the desktop chrome.
+
+---
+
 ## 2.35.4 — 2026-05-07
 
 ### Bug fixes
