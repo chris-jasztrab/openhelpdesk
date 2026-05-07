@@ -12,16 +12,18 @@ declare(strict_types=1);
  * card grid with 44pt+ targets, large type, and a single-screen
  * quick-create flow that captures a photo straight from the camera.
  *
- *   GET  /agent/floor                       Tablet queue for staff
- *   POST /agent/floor/quick-create          Bottom-sheet quick ticket (JSON)
- *   GET  /agent/floor/tickets/{id}          Tablet ticket detail (3-tap actions)
- *   POST /agent/floor/tickets/{id}/action   Status/claim/note from floor detail
- *   GET  /portal/floor                      Patron-side "my tickets" cards
+ *   GET  /agent/floor                        Tablet queue for staff
+ *   POST /agent/floor/quick-create           Bottom-sheet quick ticket (JSON)
+ *   GET  /agent/floor/tickets/{id}           Tablet ticket detail (3-tap actions)
+ *   POST /agent/floor/tickets/{id}/action    Status/claim/note from floor detail
+ *   GET  /portal/floor                       Patron-side "my tickets" cards
+ *   GET  /portal/floor/tickets/{id}          Patron-side simple detail view
+ *   POST /portal/floor/tickets/{id}/action   Patron comment / close from floor
  *
- * The agent detail view links back to the dense /agent/tickets/{id}
- * page with ?from=floor — that flag asks the layout to drop the
+ * The detail views link back to the dense /agent|portal/tickets/{id}
+ * pages with ?from=floor — that flag asks the layout to drop the
  * sidebar/navbar (embedMode) and the template to overlay an ✕ that
- * returns to /agent/floor/tickets/{id}.
+ * returns to the simple floor detail.
  * ================================================================== */
 
 $router->get('/agent/floor', function () {
@@ -393,4 +395,167 @@ $router->get('/portal/floor', function () {
         'sidebarItems' => portalSidebar('floor'),
         'tickets'      => $tickets,
     ]);
+});
+
+/* ------------------------------------------------------------------
+ * Patron-side floor detail. Same access rules as /portal/tickets/{id}
+ * (own ticket, merged master, or location-visible non-confidential).
+ * ------------------------------------------------------------------ */
+$router->get('/portal/floor/tickets/{id}', function (array $p) {
+    Auth::requireAuth();
+    $db  = Database::connect();
+    $uid = (int) Auth::id();
+    $tid = (int) $p['id'];
+
+    // Mirror the merged-redirect from /portal/tickets/{id}.
+    $merged = $db->prepare('SELECT merged_into_ticket_id FROM tickets WHERE id = ? AND created_by = ?');
+    $merged->execute([$tid, $uid]);
+    $mRow = $merged->fetch();
+    if ($mRow && $mRow['merged_into_ticket_id']) {
+        redirect('/portal/floor/tickets/' . (int) $mRow['merged_into_ticket_id']);
+    }
+
+    $permStmt = $db->prepare('SELECT can_view_location_tickets, location_id FROM users WHERE id = ?');
+    $permStmt->execute([$uid]);
+    $userPerms = $permStmt->fetch();
+
+    $accessCond   = '(t.created_by = ? OR t.id IN (SELECT DISTINCT merged_into_ticket_id FROM tickets WHERE created_by = ? AND merged_into_ticket_id IS NOT NULL))';
+    $accessParams = [$tid, $uid, $uid];
+    if ($userPerms['can_view_location_tickets'] && $userPerms['location_id']) {
+        $accessCond     = '(' . $accessCond . ' OR (t.location_id = ? AND NOT EXISTS (
+                                SELECT 1 FROM ticket_types ct
+                                WHERE ct.id = t.type_id
+                                  AND (ct.is_confidential = 1 OR ct.show_to_location_visibility = 0)
+                            )))';
+        $accessParams[] = (int) $userPerms['location_id'];
+    }
+
+    $stmt = $db->prepare(
+        "SELECT t.*,
+                tp.name AS priority_name, tp.color AS priority_color,
+                tt.name AS type_name, tt.color AS type_color,
+                l.name  AS location_name,
+                CONCAT(a.first_name, ' ', a.last_name) AS agent_name
+         FROM tickets t
+         LEFT JOIN ticket_priorities tp ON t.priority_id = tp.id
+         LEFT JOIN ticket_types     tt ON t.type_id     = tt.id
+         LEFT JOIN locations        l  ON t.location_id = l.id
+         LEFT JOIN users a             ON t.assigned_to = a.id
+         WHERE t.id = ? AND {$accessCond}"
+    );
+    $stmt->execute($accessParams);
+    $ticket = $stmt->fetch();
+    if (!$ticket) {
+        flash('error', 'Request not found.');
+        redirect('/portal/floor');
+    }
+
+    // Public timeline only — patrons never see internal agent notes.
+    $tl = $db->prepare(
+        "SELECT tl.id, tl.action, tl.details, tl.created_at,
+                CONCAT(u.first_name, ' ', u.last_name) AS user_name
+         FROM ticket_timeline tl
+         LEFT JOIN users u ON tl.user_id = u.id
+         WHERE tl.ticket_id = ? AND tl.is_internal = 0
+         ORDER BY tl.created_at DESC
+         LIMIT 8"
+    );
+    $tl->execute([$tid]);
+    $timeline = $tl->fetchAll();
+
+    $isOwner = (int) $ticket['created_by'] === $uid;
+
+    render('portal/floor-ticket', [
+        'pageTitle'    => '#' . $tid . ' · ' . $ticket['subject'],
+        'layout'       => 'app',
+        'sidebarItems' => portalSidebar('floor'),
+        'ticket'       => $ticket,
+        'timeline'     => $timeline,
+        'isOwner'      => $isOwner,
+    ]);
+});
+
+$router->post('/portal/floor/tickets/{id}/action', function (array $p) {
+    Auth::requireAuth();
+    $id  = (int) $p['id'];
+    $uid = (int) Auth::id();
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect("/portal/floor/tickets/{$id}");
+    }
+
+    $db = Database::connect();
+
+    // Same access check as /portal/tickets/{id}/comment — own ticket, merged
+    // master, or location-visible non-confidential type.
+    $permStmt = $db->prepare('SELECT can_view_location_tickets, location_id FROM users WHERE id = ?');
+    $permStmt->execute([$uid]);
+    $userPerms = $permStmt->fetch();
+
+    $accessCond   = '(tickets.created_by = ? OR tickets.id IN (SELECT DISTINCT merged_into_ticket_id FROM tickets t2 WHERE t2.created_by = ? AND t2.merged_into_ticket_id IS NOT NULL))';
+    $accessParams = [$id, $uid, $uid];
+    if ($userPerms['can_view_location_tickets'] && $userPerms['location_id']) {
+        $accessCond     = '(' . $accessCond . ' OR (tickets.location_id = ? AND NOT EXISTS (
+                                SELECT 1 FROM ticket_types ct
+                                WHERE ct.id = tickets.type_id
+                                  AND (ct.is_confidential = 1 OR ct.show_to_location_visibility = 0)
+                            )))';
+        $accessParams[] = (int) $userPerms['location_id'];
+    }
+    $check = $db->prepare("SELECT created_by, status FROM tickets WHERE tickets.id = ? AND {$accessCond}");
+    $check->execute($accessParams);
+    $ticket = $check->fetch();
+    if (!$ticket) {
+        flash('error', 'Request not found.');
+        redirect('/portal/floor');
+    }
+
+    $action = $_POST['action'] ?? '';
+
+    if ($action === 'comment') {
+        $message = trim($_POST['message'] ?? '');
+        if ($message === '') {
+            flash('error', 'Message cannot be empty.');
+            redirect("/portal/floor/tickets/{$id}");
+        }
+
+        $db->prepare(
+            'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
+        )->execute([$id, $uid, 'comment', $message]);
+        $timelineId = (int) $db->lastInsertId();
+
+        $attachments = !empty($_FILES['attachments']['name'][0] ?? null) ? handleAttachmentUploads('attachments') : [];
+        if ($attachments) saveAttachments($db, $id, $timelineId, $uid, $attachments);
+
+        notifyCcUsers($db, $id, $message, Auth::fullName());
+        notifyAgentRequesterReplied($db, $id, $message);
+
+        $msg = 'Comment added.';
+        if (!empty($attachments)) {
+            $msg = 'Comment added with ' . count($attachments) . ' file(s).';
+        }
+        flash('success', $msg);
+    } elseif ($action === 'close') {
+        // Only the creator can close their own ticket — same rule as
+        // /portal/tickets/{id}/close.
+        if ((int) $ticket['created_by'] !== $uid) {
+            flash('error', 'Only the requester can close this request.');
+            redirect("/portal/floor/tickets/{$id}");
+        }
+        if ($ticket['status'] === 'closed') {
+            flash('info', 'Request is already closed.');
+            redirect("/portal/floor/tickets/{$id}");
+        }
+        $oldStatus = $ticket['status'];
+        $db->prepare('UPDATE tickets SET status = ?, updated_at = NOW() WHERE id = ?')
+           ->execute(['closed', $id]);
+        $db->prepare(
+            'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 1)'
+        )->execute([$id, $uid, 'status_changed', "Requester closed ticket (was: {$oldStatus})"]);
+        flash('success', 'Your request has been closed.');
+    } else {
+        flash('error', 'Unknown action.');
+    }
+
+    redirect("/portal/floor/tickets/{$id}");
 });

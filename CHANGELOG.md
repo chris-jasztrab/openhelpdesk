@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.36.1 — 2026-05-07
+
+### New features
+- **Patron-side floor mode now has its own ticket detail view too.** 2.36.0 only built the simple detail view for the agent floor queue; the matching `/portal/floor` page (regular users tapping cards from a phone in the stacks) was still routing to the dense `/portal/tickets/{id}` page. **Fix:** new route `GET /portal/floor/tickets/{id}` rendering [templates/pages/portal/floor-ticket.php](templates/pages/portal/floor-ticket.php), with the same single-column layout as the agent version but tuned for patrons — patron-friendly status labels ("Submitted" / "We're working on it" / "Done"), a "Helping you" who-card showing the assigned agent, an Updates timeline that strips internal notes (patrons never see those), a Reply form with camera-capture photo input, and a Close-this-request button shown only when the user owns the ticket and it's not already closed/resolved. Companion `POST /portal/floor/tickets/{id}/action` handles `comment` (reuses `notifyCcUsers` + `notifyAgentRequesterReplied`) and `close` (writes the same internal audit-trail entry as the dense `/portal/tickets/{id}/close`). Access checks mirror the dense view exactly: own ticket OR merged-master OR location-visible non-confidential type. Cards in [templates/pages/portal/floor.php](templates/pages/portal/floor.php) now link here. The "Full request details" escape hatch goes to `/portal/tickets/{id}?from=floor` — the route handler ([src/routes/portal.php](src/routes/portal.php)) detects the flag and passes `embedMode=true` + `fromFloor=true`, so [templates/pages/portal/tickets/view.php](templates/pages/portal/tickets/view.php) drops the breadcrumbs (the layout already drops navbar/sidebar/banner) and overlays a fixed top-right ✕ pill that returns to `/portal/floor/tickets/{id}`. Same UX as the agent path, same chrome-stripping primitive.
+
+---
+
 ## 2.36.0 — 2026-05-07
 
 ### New features

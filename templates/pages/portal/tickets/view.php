@@ -2,7 +2,7 @@
 $layout       = 'app';
 $pageTitle    = 'Request #' . $ticket['id'];
 $sidebarItems = portalSidebar('tickets');
-$breadcrumbs  = [
+$breadcrumbs  = !empty($fromFloor) ? [] : [
     ['label' => label('portal.nav.help', 'Help'), 'url' => '/portal'],
     ['label' => label('portal.request.my_plural', 'My Requests'), 'url' => '/portal/tickets'],
     ['label' => '#' . $ticket['id']],
@@ -20,6 +20,30 @@ $statusLabels = [
 $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-person-check text-primary', 'status_changed' => 'bi-arrow-repeat text-warning', 'priority_changed' => 'bi-flag text-danger', 'comment' => 'bi-chat-dots text-info', 'edited' => 'bi-pencil text-secondary', 'escalated' => 'bi-arrow-up-circle text-danger'];
 ?>
 <link rel="stylesheet" href="https://cdn.ckeditor.com/ckeditor5/43.3.1/ckeditor5.css">
+<?php if (!empty($fromFloor)): ?>
+<style>
+.main-content { padding-top: 1rem !important; }
+#floor-close {
+    position: fixed;
+    top: max(.85rem, env(safe-area-inset-top, .85rem));
+    right: max(.85rem, env(safe-area-inset-right, .85rem));
+    z-index: 1050;
+    width: 48px; height: 48px; border-radius: 50%;
+    background: #fff; color: #1e293b;
+    border: 1px solid #cbd5e1;
+    box-shadow: 0 4px 12px rgba(15,23,42,.18);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 1.4rem; text-decoration: none;
+}
+#floor-close:hover { background: #f1f5f9; color: #1e293b; }
+[data-bs-theme="dark"] #floor-close { background: #212529; color: #f8f9fa; border-color: #495057; }
+[data-bs-theme="dark"] #floor-close:hover { background: #2b3035; color: #fff; }
+</style>
+<a id="floor-close" href="/portal/floor/tickets/<?= (int) $ticket['id'] ?>"
+   aria-label="Close detailed view and return to floor mode" title="Back to floor view">
+    <i class="bi bi-x-lg" aria-hidden="true"></i>
+</a>
+<?php endif; ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h2 class="fw-bold mb-1"><?= e($ticket['subject']) ?></h2>

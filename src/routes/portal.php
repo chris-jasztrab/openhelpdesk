@@ -589,6 +589,10 @@ $router->get('/portal/tickets/{id}', function (array $p) {
         }
     }
 
+    // Floor-mode entry: hide app chrome and overlay an ✕ that returns
+    // to /portal/floor/tickets/{id}. Picked up by portal/tickets/view.php.
+    $fromFloor = ($_GET['from'] ?? '') === 'floor';
+
     render('portal/tickets/view', [
         'ticket'             => $ticket,
         'timeline'           => $timeline,
@@ -600,6 +604,8 @@ $router->get('/portal/tickets/{id}', function (array $p) {
         'isOwner'            => $isOwner,
         'hasEscalationPath'  => $hasEscalationPath,
         'nextEscalationStep' => $nextEscalationStep,
+        'fromFloor'          => $fromFloor,
+        'embedMode'          => $fromFloor,
     ]);
 });
 

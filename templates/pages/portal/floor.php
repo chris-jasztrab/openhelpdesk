@@ -120,7 +120,7 @@
 
             $rail = $t['priority_color'] ?: '#94a3b8';
         ?>
-            <a class="floor-portal-card" href="/portal/tickets/<?= (int) $t['id'] ?>" style="border-left-color:<?= e($rail) ?>;">
+            <a class="floor-portal-card" href="/portal/floor/tickets/<?= (int) $t['id'] ?>" style="border-left-color:<?= e($rail) ?>;">
                 <div class="top-row">
                     <span>#<?= (int) $t['id'] ?></span>
                     <span><?= e($age) ?></span>
