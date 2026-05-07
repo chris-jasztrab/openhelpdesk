@@ -236,20 +236,33 @@ function handleInstall(): void
             [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
         );
 
-        // 3. Run schema
-        $schema = file_get_contents(INSTALL_ROOT . '/database/schema.sql');
-        if ($schema === false) {
-            throw new RuntimeException('Could not read database/schema.sql.');
+        // 3. Run all migrations: migration 001 applies the baseline schema.sql,
+        //    every subsequent file adds incremental tables/columns. Each
+        //    migration is recorded in `schema_migrations` so the same
+        //    migrate.php runner can pick up future upgrades after install.
+        if (!defined('ROOT_DIR')) {
+            define('ROOT_DIR', INSTALL_ROOT);   // migration files use ROOT_DIR
         }
-        // Split and execute each statement
+        $pdo->exec(
+            "CREATE TABLE IF NOT EXISTS `schema_migrations` (
+                `id`         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                `migration`  VARCHAR(255) NOT NULL UNIQUE,
+                `applied_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+        $migrationFiles = glob(INSTALL_ROOT . '/database/migrations/*.php') ?: [];
+        sort($migrationFiles);
         $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
-        foreach (array_filter(array_map('trim', explode(';', $schema))) as $stmt) {
-            if ($stmt !== '') {
-                $pdo->exec($stmt);
-            }
+        $insertMigration = $pdo->prepare(
+            "INSERT IGNORE INTO schema_migrations (migration) VALUES (?)"
+        );
+        foreach ($migrationFiles as $file) {
+            $up = require $file;
+            $up($pdo);
+            $insertMigration->execute([basename($file)]);
         }
         $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
-        $messages[] = ['ok', 'Database tables created successfully.'];
+        $messages[] = ['ok', 'Database schema created (' . count($migrationFiles) . ' migrations applied).'];
 
         // 4. Seed default priorities
         $pdo->exec("INSERT IGNORE INTO ticket_priorities (name, color, sort_order) VALUES
@@ -295,8 +308,10 @@ function handleInstall(): void
         // Flag to trigger the first-login onboarding tour
         $settingStmt->execute(['show_onboarding', '1']);
 
-        // 7. Create storage directories
-        @mkdir(INSTALL_ROOT . '/storage/attachments/', 0755, true);
+        // 7. Create storage directories the app writes to at runtime
+        foreach (['attachments', 'logs', 'imports', 'backups', 'pwa'] as $dir) {
+            @mkdir(INSTALL_ROOT . '/storage/' . $dir, 0755, true);
+        }
         $messages[] = ['ok', 'Storage directories verified.'];
 
         // 8. Write lockfile
@@ -1087,7 +1102,10 @@ function renderResultPage(array $messages, ?string $fatalError, string $appUrl):
                 <div>*/5 * * * * php <?= htmlspecialchars(INSTALL_ROOT, ENT_QUOTES, 'UTF-8') ?>/public/sla-cron.php</div>
                 <div>*/5 * * * * php <?= htmlspecialchars(INSTALL_ROOT, ENT_QUOTES, 'UTF-8') ?>/scripts/process-replies.php</div>
                 <div>*/15 * * * * php <?= htmlspecialchars(INSTALL_ROOT, ENT_QUOTES, 'UTF-8') ?>/scripts/process-escalations.php</div>
+                <div>*/15 * * * * php <?= htmlspecialchars(INSTALL_ROOT, ENT_QUOTES, 'UTF-8') ?>/scripts/process-recurring-tickets.php</div>
                 <div>*/30 * * * * php <?= htmlspecialchars(INSTALL_ROOT, ENT_QUOTES, 'UTF-8') ?>/scripts/process-scheduled-reports.php</div>
+                <div>0 * * * * php <?= htmlspecialchars(INSTALL_ROOT, ENT_QUOTES, 'UTF-8') ?>/scripts/process-stale-tickets.php</div>
+                <div>0 8 * * * php <?= htmlspecialchars(INSTALL_ROOT, ENT_QUOTES, 'UTF-8') ?>/scripts/process-secret-reminders.php</div>
             </div>
             <p class="text-muted small mb-3">View full cron job details at <strong>Admin → Settings → Cron Jobs</strong> after logging in.</p>
 

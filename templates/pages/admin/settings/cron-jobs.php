@@ -54,6 +54,17 @@ $cronJobs = [
         'note'             => 'Only required if you have scheduled reports configured in Admin → Reports → Scheduled Reports.',
     ],
     [
+        'title'            => 'Recurring / Preventive-Maintenance Tickets',
+        'icon'             => 'bi-arrow-repeat',
+        'description'      => 'Mints tickets from active recurring schedules whose <code>next_run_at</code> has passed (e.g. monthly toner audit, quarterly HVAC, annual fire inspection), then advances each schedule to its next firing slot.',
+        'frequency'        => 'Every 15 minutes',
+        'interval_seconds' => 900,
+        'command'          => '*/15 * * * * php ' . ROOT_DIR . '/scripts/process-recurring-tickets.php >> ' . ROOT_DIR . '/storage/logs/recurring-tickets.log 2>&1',
+        'log'              => ROOT_DIR . '/storage/logs/recurring-tickets.log',
+        'required'         => false,
+        'note'             => 'Only required if you have recurring schedules configured in Admin → Recurring Tickets. Missed-tick safe — does not back-fill if cron pauses.',
+    ],
+    [
         'title'            => 'Stale Ticket Notifications',
         'icon'             => 'bi-hourglass-split',
         'description'      => 'Finds active tickets that have had no activity for longer than the configured stale threshold and emails both the assigned agent and the requester. Skips resolved, closed, and waiting-on-customer/third-party statuses.',

@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.35.3 — 2026-05-07
+
+### Bug fixes
+- **Web installer no longer produces a broken database on a fresh `/install/` run.** [public/install/index.php](public/install/index.php) used to read [database/schema.sql](database/schema.sql) and execute it directly, but `schema.sql` represents only the migration-001 baseline — every table added since (api_tokens, escalation_paths, login_attempts, ai_classifications, user_presence, status_banners, recurring_tickets, ai_group_classifications) plus a long list of column additions from migrations 011–035 lived in [database/migrations/](database/migrations/) and never made it into the fresh-install path. So a brand-new install booted with a half-built schema and would crash on first use of any of those features. **Fix:** the installer now runs the same migration loop as [database/migrate.php](database/migrate.php) — creates `schema_migrations`, walks every file in `database/migrations/` in order, executes each, and records it as applied. Migration 001 still applies the `schema.sql` baseline; migrations 002–035 are all idempotent (each guarded by an `information_schema` lookup) so they layer cleanly on top, and post-install runs of `migrate.php` correctly skip everything that's already recorded. **Cron list filled in:** the post-install "Next Steps" panel listed only 4 cron jobs, but the app's own [Admin → Settings → Cron Jobs](templates/pages/admin/settings/cron-jobs.php) page lists 6, plus `process-recurring-tickets.php` (added by migration 034) was missing from both. The installer panel now lists all 7 with their correct schedules, and the admin page also gained the recurring-tickets entry. **Storage dirs:** the installer only created `storage/attachments/`, but the app also writes to `storage/logs/`, `storage/imports/`, `storage/backups/`, and `storage/pwa/` — first-run permission errors on each of those would fail silently or surface as flash errors deep in admin flows. All five are now created at install time. **`.env.example` synced:** it was missing `APP_TIMEZONE`, `UPLOAD_MAX_SIZE`, and `UPLOAD_ALLOWED_TYPES` (which the installer already writes to `.env`); manual-setup users now get the same complete file.
+
+---
+
 ## 2.35.2 — 2026-05-07
 
 ### Bug fixes
