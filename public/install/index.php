@@ -236,13 +236,21 @@ function handleInstall(): void
             [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
         );
 
-        // 3. Run all migrations: migration 001 applies the baseline schema.sql,
-        //    every subsequent file adds incremental tables/columns. Each
-        //    migration is recorded in `schema_migrations` so the same
-        //    migrate.php runner can pick up future upgrades after install.
-        if (!defined('ROOT_DIR')) {
-            define('ROOT_DIR', INSTALL_ROOT);   // migration files use ROOT_DIR
+        // 3. Apply schema.sql -- this is the canonical "fresh install"
+        //    snapshot; it already includes every table and column added by
+        //    every committed migration. Wrapped internally in
+        //    SET FOREIGN_KEY_CHECKS = 0/1 so order doesn't matter.
+        $schema = file_get_contents(INSTALL_ROOT . '/database/schema.sql');
+        if ($schema === false) {
+            throw new RuntimeException('Could not read database/schema.sql.');
         }
+        $pdo->exec($schema);
+
+        // 4. Mark every committed migration as already applied. schema.sql
+        //    is the snapshot; we don't re-run the migrations on top of it
+        //    (some, e.g. 006, are deliberately destructive and would crash
+        //    against the post-snapshot state). Future migrations added
+        //    after install will run normally via `php database/migrate.php`.
         $pdo->exec(
             "CREATE TABLE IF NOT EXISTS `schema_migrations` (
                 `id`         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -252,17 +260,13 @@ function handleInstall(): void
         );
         $migrationFiles = glob(INSTALL_ROOT . '/database/migrations/*.php') ?: [];
         sort($migrationFiles);
-        $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
         $insertMigration = $pdo->prepare(
             "INSERT IGNORE INTO schema_migrations (migration) VALUES (?)"
         );
         foreach ($migrationFiles as $file) {
-            $up = require $file;
-            $up($pdo);
             $insertMigration->execute([basename($file)]);
         }
-        $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
-        $messages[] = ['ok', 'Database schema created (' . count($migrationFiles) . ' migrations applied).'];
+        $messages[] = ['ok', 'Database schema applied (' . count($migrationFiles) . ' migrations recorded as baseline).'];
 
         // 4. Seed default priorities
         $pdo->exec("INSERT IGNORE INTO ticket_priorities (name, color, sort_order) VALUES

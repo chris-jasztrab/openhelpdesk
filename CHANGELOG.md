@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.35.4 — 2026-05-07
+
+### Bug fixes
+- **Regenerated [database/schema.sql](database/schema.sql) from the live database and switched the installer to a snapshot-based install instead of a migration replay.** 2.35.3 had the installer walk every file in `database/migrations/` after applying `schema.sql`, which exposed a latent problem: migration 006 isn't idempotent — it intentionally adds `api_tokens.token_hash`, backfills it from `api_tokens.token`, then DROPs `token`. Replaying it against a database where `token` was never present (because the regenerated `schema.sql` reflects the *post*-006 shape) crashes with `Unknown column 'token'`. **Fix:** `schema.sql` is now the canonical fresh-install snapshot — dumped from the live DB, comments stripped, every CREATE wrapped in `IF NOT EXISTS`, and the file wraps itself in `SET FOREIGN_KEY_CHECKS = 0/1`. The installer applies it in a single `PDO::exec()` (PDO+MySQL handles the multi-statement payload natively, which matters because one `COMMENT 'NULL = global; non-null = personal to that agent'` contains an embedded semicolon that broke the old naive splitter). Then it marks every committed migration as already-applied in `schema_migrations` *without* running them, so [database/migrate.php](database/migrate.php) on later upgrades correctly skips everything in the snapshot and only runs migrations added after the snapshot was cut. **Verified end-to-end** against a freshly created MySQL database: 48 tables, 399 columns, 88 FK constraints — exact match with the canonical DB; `migrate.php` immediately after install re-runs zero migrations.
+
+---
+
 ## 2.35.3 — 2026-05-07
 
 ### Bug fixes
