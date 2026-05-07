@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="<?= e(csrfToken()) ?>">
     <title><?= e($pageTitle) ?> &ndash; <?= e(getSetting('branding_app_name', 'LocalDesk')) ?></title>
+    <?php require ROOT_DIR . '/templates/partials/pwa-head.php'; ?>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <?php if (Auth::check() && in_array(Auth::role(), ['agent', 'power_user', 'user'], true)): ?>
@@ -383,6 +384,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function(el){new bootstrap.Tooltip(el)});</script>
+    <?php if (empty($embedMode)) require ROOT_DIR . '/templates/partials/pwa-install.php'; ?>
     <?php if (Auth::check() && in_array(Auth::role(), ['agent', 'power_user'], true)): ?>
     <script src="https://cdn.jsdelivr.net/npm/driver.js@1.3.4/dist/driver.js.iife.js"></script>
     <?php require ROOT_DIR . '/templates/partials/agent-tour.php'; ?>

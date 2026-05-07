@@ -12,6 +12,11 @@ $router->get('/health', function () {
 });
 
 /* ------------------------------------------------------------------
+ * Progressive Web App (manifest, service worker, icons, offline page)
+ * ------------------------------------------------------------------ */
+require ROOT_DIR . '/src/routes/pwa.php';
+
+/* ------------------------------------------------------------------
  * Shared: enforce ticket-level access for JSON API endpoints.
  * Mirrors _agentRequireTicketAccess() but returns JSON 403 instead of redirect.
  * ------------------------------------------------------------------ */
