@@ -90,12 +90,15 @@ $router->get('/agent/floor', function () {
     $types     = $db->query('SELECT * FROM ticket_types WHERE is_confidential = 0 ORDER BY sort_order, name')->fetchAll();
     $locations = $db->query('SELECT * FROM locations ORDER BY name')->fetchAll();
 
+    // Note: must NOT pass a key named 'view' — render() uses its own
+    // $view parameter internally for the template path, and extract()
+    // would clobber it. Use 'activeView' here and in the template.
     render('agent/floor', [
         'pageTitle'    => 'Floor mode',
         'layout'       => 'app',
         'sidebarItems' => Auth::role() === 'power_user' ? powerUserSidebar('floor') : agentSidebar('floor'),
         'tickets'      => $tickets,
-        'view'         => $view,
+        'activeView'   => $view,
         'counts'       => ['all' => $cAll, 'mine' => $cMine, 'unassigned' => $cUnass],
         'types'        => $types,
         'locations'    => $locations,

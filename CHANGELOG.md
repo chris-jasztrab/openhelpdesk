@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.35.2 — 2026-05-07
+
+### Bug fixes
+- **Fix 500 on /agent/floor caused by `extract($data)` clobbering the template path.** The floor route was passing `'view' => $view` (the All / Mine / Unassigned filter) to `render()`, but `render()` itself uses a `$view` parameter internally for the *template name* — `extract($data)` overwrote it, so PHP tried to `require .../templates/pages/all.php` (or `mine` / `unassigned`) which doesn't exist, and the request fataled before any output. Renamed the data key to `activeView` in [src/routes/floor.php](src/routes/floor.php) and the matching reads in [templates/pages/agent/floor.php](templates/pages/agent/floor.php). Added a comment at the call site warning that `view` is a reserved key for `render()` so future routes don't repeat the mistake. Affected only the agent-side floor route; portal floor never had a `view` filter and was always fine.
+
+---
+
 ## 2.35.1 — 2026-05-07
 
 ### Bug fixes

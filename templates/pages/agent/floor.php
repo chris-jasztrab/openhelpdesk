@@ -1,6 +1,6 @@
 <?php
 /** @var array $tickets */
-/** @var string $view */
+/** @var string $activeView */
 /** @var array $counts */
 /** @var array $types */
 /** @var array $locations */
@@ -255,9 +255,9 @@
     </div>
 
     <nav class="floor-tabs" aria-label="Filter">
-        <a class="floor-tab <?= $view === 'all'        ? 'active' : '' ?>" href="/agent/floor?view=all">All open <span class="count"><?= (int) $counts['all'] ?></span></a>
-        <a class="floor-tab <?= $view === 'mine'       ? 'active' : '' ?>" href="/agent/floor?view=mine">Mine <span class="count"><?= (int) $counts['mine'] ?></span></a>
-        <a class="floor-tab <?= $view === 'unassigned' ? 'active' : '' ?>" href="/agent/floor?view=unassigned">Unassigned <span class="count"><?= (int) $counts['unassigned'] ?></span></a>
+        <a class="floor-tab <?= $activeView === 'all'        ? 'active' : '' ?>" href="/agent/floor?view=all">All open <span class="count"><?= (int) $counts['all'] ?></span></a>
+        <a class="floor-tab <?= $activeView === 'mine'       ? 'active' : '' ?>" href="/agent/floor?view=mine">Mine <span class="count"><?= (int) $counts['mine'] ?></span></a>
+        <a class="floor-tab <?= $activeView === 'unassigned' ? 'active' : '' ?>" href="/agent/floor?view=unassigned">Unassigned <span class="count"><?= (int) $counts['unassigned'] ?></span></a>
     </nav>
 
     <?php if (empty($tickets)): ?>
