@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.37.0 — 2026-05-07
+
+### New features
+- **Floor mode now has help docs &mdash; agent side and a brand-new patron help section.** 2.36.x shipped the floor ticket detail views without any documentation; nothing in `/agent/help` or anywhere on the patron side mentioned floor mode existed. **Agent doc:** new page at `/agent/help/floor` ([templates/pages/agent/docs/floor.php](templates/pages/agent/docs/floor.php)) covering the queue + tabs (All open / Mine / Unassigned), the quick-create bottom sheet (subject + voice dictate, type, location, photo, barcode scan including the BarcodeDetector / Chrome-on-Android caveat), the floor ticket detail view (subject card, who-cards, collapsible description, Quick Actions, recent activity, add-a-note with photo + Internal toggle), the `?from=floor` full-detail escape hatch, permissions/visibility, and PWA-install tips. Wired into [src/routes/agent.php](src/routes/agent.php) by adding `floor` to `$validHelpPages` + the titles map; into [templates/partials/agent-help-nav.php](templates/partials/agent-help-nav.php) (sticky sidebar) and [templates/pages/agent/docs/index.php](templates/pages/agent/docs/index.php) (an extra card and four entries in the in-page search index). **Patron docs:** the portal had no docs section at all, so this stands one up: new routes `GET /portal/help` and `GET /portal/help/{page}` in [src/routes/portal.php](src/routes/portal.php), a `bi-question-circle` Help icon added to `portalSidebar()` in [src/helpers.php](src/helpers.php), and three new templates &mdash; [templates/partials/portal-help-nav.php](templates/partials/portal-help-nav.php) (sticky sidebar matching the agent partial), [templates/pages/portal/docs/index.php](templates/pages/portal/docs/index.php) (overview cards), and [templates/pages/portal/docs/floor.php](templates/pages/portal/docs/floor.php) (patron-friendly walkthrough: status pill labels, Helping you, What you reported, Updates, Reply, Close-this-request gating, and the Full request details escape hatch). Tone is patron-facing throughout &mdash; "request" not "ticket", plain-English status labels.
+
+---
+
 ## 2.36.1 — 2026-05-07
 
 ### New features

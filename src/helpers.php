@@ -3824,6 +3824,7 @@ function portalSidebar(string $active = ''): array
         ['icon' => 'bi-ticket-detailed', 'label' => label('portal.nav.my_tickets'),    'url' => '/portal/tickets', 'key' => 'tickets'],
         ['icon' => 'bi-grid-1x2',        'label' => 'Floor mode',                      'url' => '/portal/floor',   'key' => 'floor'],
         ['icon' => 'bi-book',            'label' => label('portal.nav.knowledge_base'), 'url' => '/portal/kb',     'key' => 'kb'],
+        ['icon' => 'bi-question-circle', 'label' => 'Help',                            'url' => '/portal/help',    'key' => 'help'],
     ]);
 }
 

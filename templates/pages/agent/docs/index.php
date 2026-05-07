@@ -30,6 +30,9 @@ $breadcrumbs  = [['label' => 'Help']];
         ['url' => '/agent/help/working-tickets',    'icon' => 'bi-ticket-detailed',  'color' => '#16a34a', 'bg' => '#f0fdf4',
          'title' => 'Working on Tickets',
          'desc'  => 'Replying, adding notes, updating fields, attaching files, merging, splitting, and more.'],
+        ['url' => '/agent/help/floor',              'icon' => 'bi-grid-1x2',         'color' => '#7c3aed', 'bg' => '#f5f3ff',
+         'title' => 'Floor Mode',
+         'desc'  => 'Tablet-friendly queue and ticket view for working from the floor: photos, voice dictation, claim & resolve in one tap.'],
         ['url' => '/agent/help/canned-responses',   'icon' => 'bi-chat-square-text', 'color' => '#ca8a04', 'bg' => '#fefce8',
          'title' => 'Canned Responses',
          'desc'  => 'Create and manage reusable reply templates with dynamic tokens.'],
@@ -78,6 +81,10 @@ $breadcrumbs  = [['label' => 'Help']];
         ["Timeline audit trail history replies notes system events attachments inline", "/agent/help/working-tickets", "Working on Tickets"],
         ["Canned responses create edit delete personal global", "/agent/help/canned-responses", "Canned Responses"],
         ["Tokens dynamic placeholders canned response customer name ticket", "/agent/help/canned-responses", "Canned Responses"],
+        ["Floor mode tablet phone touch queue cards", "/agent/help/floor", "Floor Mode"],
+        ["Quick create photo camera voice dictate barcode scan asset", "/agent/help/floor", "Floor Mode"],
+        ["Floor ticket detail claim release status resolve in progress pending reopen", "/agent/help/floor", "Floor Mode"],
+        ["Full ticket details floor close X return", "/agent/help/floor", "Floor Mode"],
     ];
     var input = document.getElementById("helpSearch");
     var box = document.getElementById("helpSearchResults");

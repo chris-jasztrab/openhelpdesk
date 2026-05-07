@@ -801,6 +801,43 @@ $router->post('/portal/tickets/{id}/edit', function (array $p) {
 });
 
 /* ==================================================================
+ * PORTAL – Help / Documentation
+ *
+ * Patron-facing docs. Same structure as the agent help section
+ * (overview index + per-page templates) but written for non-staff.
+ * ================================================================== */
+
+$validPortalHelpPages = ['floor'];
+
+$router->get('/portal/help', function () {
+    Auth::requireAuth();
+    render('portal/docs/index', [
+        'sidebarItems' => portalSidebar('help'),
+        'layout'       => 'app',
+        'pageTitle'    => 'Help',
+        'breadcrumbs'  => [['label' => 'Help']],
+    ]);
+});
+
+$router->get('/portal/help/{page}', function (array $p) use ($validPortalHelpPages) {
+    Auth::requireAuth();
+    $page = $p['page'] ?? '';
+    if (!in_array($page, $validPortalHelpPages, true)) {
+        redirect('/portal/help');
+    }
+    $titles = ['floor' => 'Floor Mode'];
+    render('portal/docs/' . $page, [
+        'sidebarItems' => portalSidebar('help'),
+        'layout'       => 'app',
+        'pageTitle'    => 'Help: ' . ($titles[$page] ?? $page),
+        'breadcrumbs'  => [
+            ['label' => 'Help', 'url' => '/portal/help'],
+            ['label' => $titles[$page] ?? $page],
+        ],
+    ]);
+});
+
+/* ==================================================================
  * PORTAL – Knowledge Base
  * ================================================================== */
 
