@@ -3822,6 +3822,7 @@ function portalSidebar(string $active = ''): array
     return array_map(fn($item) => array_merge($item, ['active' => $item['key'] === $active]), [
         ['icon' => 'bi-speedometer2',    'label' => label('portal.nav.dashboard'),     'url' => '/portal',         'key' => 'dashboard'],
         ['icon' => 'bi-ticket-detailed', 'label' => label('portal.nav.my_tickets'),    'url' => '/portal/tickets', 'key' => 'tickets'],
+        ['icon' => 'bi-grid-1x2',        'label' => 'Floor mode',                      'url' => '/portal/floor',   'key' => 'floor'],
         ['icon' => 'bi-book',            'label' => label('portal.nav.knowledge_base'), 'url' => '/portal/kb',     'key' => 'kb'],
     ]);
 }
@@ -3831,6 +3832,7 @@ function agentSidebar(string $active = ''): array
     return array_map(fn($item) => array_merge($item, ['active' => $item['key'] === $active]), [
         ['icon' => 'bi-speedometer2',     'label' => label('agent.nav.dashboard'),      'url' => '/agent',                  'key' => 'dashboard'],
         ['icon' => 'bi-ticket-detailed',  'label' => label('agent.nav.tickets'),        'url' => '/agent/tickets',          'key' => 'tickets'],
+        ['icon' => 'bi-grid-1x2',         'label' => 'Floor mode',                      'url' => '/agent/floor',            'key' => 'floor'],
         ['icon' => 'bi-book',             'label' => label('agent.nav.knowledge_base'), 'url' => '/agent/kb',               'key' => 'kb'],
         ['icon' => 'bi-chat-square-text', 'label' => 'Canned Responses',                'url' => '/agent/canned-responses', 'key' => 'canned-responses'],
         ['icon' => 'bi-megaphone',        'label' => 'Status Banners',                  'url' => '/agent/banners',          'key' => 'banners'],
@@ -3843,6 +3845,7 @@ function powerUserSidebar(string $active = ''): array
     return array_map(fn($item) => array_merge($item, ['active' => $item['key'] === $active]), [
         ['icon' => 'bi-speedometer2',     'label' => label('agent.nav.dashboard'),      'url' => '/agent',                  'key' => 'dashboard'],
         ['icon' => 'bi-ticket-detailed',  'label' => label('agent.nav.tickets'),        'url' => '/agent/tickets',          'key' => 'tickets'],
+        ['icon' => 'bi-grid-1x2',         'label' => 'Floor mode',                      'url' => '/agent/floor',            'key' => 'floor'],
         ['icon' => 'bi-book',             'label' => label('agent.nav.knowledge_base'), 'url' => '/agent/kb',               'key' => 'kb'],
         ['icon' => 'bi-chat-square-text', 'label' => 'Canned Responses',                'url' => '/agent/canned-responses', 'key' => 'canned-responses'],
         ['icon' => 'bi-megaphone',        'label' => 'Status Banners',                  'url' => '/agent/banners',          'key' => 'banners'],

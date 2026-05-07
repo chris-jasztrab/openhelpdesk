@@ -17,6 +17,11 @@ $router->get('/health', function () {
 require ROOT_DIR . '/src/routes/pwa.php';
 
 /* ------------------------------------------------------------------
+ * Floor mode (tablet-friendly card view + bottom-sheet quick-create)
+ * ------------------------------------------------------------------ */
+require ROOT_DIR . '/src/routes/floor.php';
+
+/* ------------------------------------------------------------------
  * Shared: enforce ticket-level access for JSON API endpoints.
  * Mirrors _agentRequireTicketAccess() but returns JSON 403 instead of redirect.
  * ------------------------------------------------------------------ */
