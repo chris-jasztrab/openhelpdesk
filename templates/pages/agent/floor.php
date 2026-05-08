@@ -374,6 +374,11 @@
         </div>
     </form>
 </div>
+<?php
+$dupPreviewEndpoint = '/agent/tickets/dup-preview';
+$dupViewBase        = '/agent/tickets';
+include ROOT_DIR . '/templates/partials/dup-preview-modal.php';
+?>
 
 <script>
 (function () {
@@ -509,23 +514,29 @@
     function escH(s) { var d = document.createElement('div'); d.textContent = (s == null ? '' : String(s)); return d.innerHTML; }
 
     function renderDupMatches(matches) {
+        var allIds = matches.map(function (m) { return m.ticket_id; });
+        var headline = matches.length === 1
+            ? 'Oops! Someone may have already submitted a ticket for this issue.'
+            : 'Oops! There are ' + matches.length + ' open tickets at this branch that look similar.';
+
         var items = matches.map(function (m) {
             var conf = Math.round((m.confidence || 0) * 100);
             var when = m.created_at ? new Date(m.created_at.replace(' ', 'T')).toLocaleString() : '';
-            var who  = m.requester ? ' &middot; opened by ' + escH(m.requester) : '';
+            var who  = m.requester ? ' &middot; Reported by ' + escH(m.requester) : '';
             var reason = m.reasoning ? '<div class="small text-muted mt-1">' + escH(m.reasoning) + '</div>' : '';
             return '<div class="border rounded p-2 mb-2 bg-white">'
                  +   '<div class="d-flex justify-content-between align-items-start gap-2">'
                  +     '<div>'
-                 +       '<div class="fw-semibold">'
-                 +         '<a href="/agent/tickets/' + m.ticket_id + '" target="_blank" class="text-decoration-none">'
-                 +           '#' + m.ticket_id + ' &mdash; ' + escH(m.subject)
-                 +         '</a>'
-                 +       '</div>'
-                 +       '<div class="small text-muted">' + escH(m.status) + (when ? ' &middot; ' + escH(when) : '') + who + '</div>'
+                 +       '<div class="fw-semibold">#' + m.ticket_id + ' &mdash; ' + escH(m.subject) + '</div>'
+                 +       '<div class="small text-muted">Status: ' + escH(m.status) + (when ? ' &middot; Opened ' + escH(when) : '') + who + '</div>'
                  +       reason
                  +     '</div>'
                  +     '<span class="badge bg-warning text-dark align-self-start">' + conf + '% match</span>'
+                 +   '</div>'
+                 +   '<div class="mt-2 d-flex gap-2 flex-wrap">'
+                 +     '<button type="button" class="btn btn-sm btn-primary fq-dup-view-details" data-ticket-id="' + m.ticket_id + '">'
+                 +       '<i class="bi bi-eye me-1"></i>Click here to see this ticket'
+                 +     '</button>'
                  +   '</div>'
                  + '</div>';
         }).join('');
@@ -533,18 +544,28 @@
             '<div class="alert alert-warning border-warning mb-0">'
           +   '<div class="d-flex align-items-center gap-2 mb-2">'
           +     '<i class="bi bi-exclamation-triangle-fill"></i>'
-          +     '<strong>Possible duplicate</strong>'
+          +     '<strong>' + escH(headline) + '</strong>'
           +   '</div>'
+          +   '<p class="small mb-2">Please take a moment to review the existing ticket before you create a new one.</p>'
           +   items
-          +   '<button type="button" id="fq-dup-anyway" class="btn btn-sm btn-outline-secondary mt-1">Create anyway</button>'
+          +   '<button type="button" id="fq-dup-anyway" class="btn btn-sm btn-warning mt-1">Create anyway &mdash; This is a Different Issue</button>'
           + '</div>';
         dupBox.style.display = '';
         dupBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
+        dupBox.querySelectorAll('.fq-dup-view-details').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var tid = parseInt(btn.dataset.ticketId, 10) || 0;
+                if (tid && typeof window.openDupPreviewModal === 'function') {
+                    window.openDupPreviewModal(tid, allIds);
+                }
+            });
+        });
+
         document.getElementById('fq-dup-anyway').addEventListener('click', function () {
             form.dataset.dupOverride = '1';
             var idsField = document.getElementById('fq-dup-matched-ids');
-            if (idsField) idsField.value = matches.map(function (m) { return m.ticket_id; }).join(',');
+            if (idsField) idsField.value = allIds.join(',');
             dupBox.style.display = 'none';
             if (typeof form.requestSubmit === 'function') form.requestSubmit();
             else form.submit();

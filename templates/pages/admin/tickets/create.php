@@ -106,6 +106,11 @@ $statusOptions = [
                         <div id="admin-ticket-editor-error" class="text-danger small mt-1" style="display:none;">Description is required.</div>
                     </div>
                     <div id="dup-warning" class="mt-3" style="display:none;"></div>
+                    <?php
+                    $dupPreviewEndpoint = '/agent/tickets/dup-preview';
+                    $dupViewBase        = '/agent/tickets';
+                    include ROOT_DIR . '/templates/partials/dup-preview-modal.php';
+                    ?>
                 </div>
             </div>
 
@@ -679,23 +684,29 @@ ClassicEditor.create(document.querySelector('#admin-ticket-editor'), {
     function escH(s) { const d = document.createElement('div'); d.textContent = (s == null ? '' : String(s)); return d.innerHTML; }
 
     function renderDupMatches(matches) {
+        const allIds = matches.map(m => m.ticket_id);
+        const headline = matches.length === 1
+            ? 'Oops! Someone may have already submitted a ticket for this issue.'
+            : 'Oops! There are ' + matches.length + ' open tickets at this branch that look similar to the one you are creating.';
+
         const items = matches.map(m => {
             const conf = Math.round((m.confidence || 0) * 100);
             const when = m.created_at ? new Date(m.created_at.replace(' ', 'T')).toLocaleString() : '';
-            const who  = m.requester ? ' &middot; opened by ' + escH(m.requester) : '';
+            const who  = m.requester ? ' &middot; Reported by ' + escH(m.requester) : '';
             const reason = m.reasoning ? '<div class="small text-muted mt-1">' + escH(m.reasoning) + '</div>' : '';
             return '<div class="border rounded p-2 mb-2 bg-white">'
                  +   '<div class="d-flex justify-content-between align-items-start gap-2">'
                  +     '<div>'
-                 +       '<div class="fw-semibold">'
-                 +         '<a href="/agent/tickets/' + m.ticket_id + '" target="_blank" class="text-decoration-none">'
-                 +           '#' + m.ticket_id + ' &mdash; ' + escH(m.subject)
-                 +         '</a>'
-                 +       '</div>'
-                 +       '<div class="small text-muted">' + escH(m.status) + (when ? ' &middot; ' + escH(when) : '') + who + '</div>'
+                 +       '<div class="fw-semibold">#' + m.ticket_id + ' &mdash; ' + escH(m.subject) + '</div>'
+                 +       '<div class="small text-muted">Status: ' + escH(m.status) + (when ? ' &middot; Opened ' + escH(when) : '') + who + '</div>'
                  +       reason
                  +     '</div>'
                  +     '<span class="badge bg-warning text-dark align-self-start">' + conf + '% match</span>'
+                 +   '</div>'
+                 +   '<div class="mt-2 d-flex gap-2 flex-wrap">'
+                 +     '<button type="button" class="btn btn-sm btn-primary dup-view-details" data-ticket-id="' + m.ticket_id + '">'
+                 +       '<i class="bi bi-eye me-1"></i>Click here to see this ticket'
+                 +     '</button>'
                  +   '</div>'
                  + '</div>';
         }).join('');
@@ -704,21 +715,31 @@ ClassicEditor.create(document.querySelector('#admin-ticket-editor'), {
             '<div class="alert alert-warning border-warning">'
           +   '<div class="d-flex align-items-center gap-2 mb-2">'
           +     '<i class="bi bi-exclamation-triangle-fill"></i>'
-          +     '<strong>Possible duplicate of ' + matches.length + ' open ticket' + (matches.length === 1 ? '' : 's') + ' at this branch</strong>'
+          +     '<strong>' + escH(headline) + '</strong>'
           +   '</div>'
+          +   '<p class="small mb-2">Please take a moment to review the existing ticket before you create a new one. If it covers the same issue, you can let the assigned team continue with that ticket.</p>'
           +   items
           +   '<div class="d-flex gap-2 flex-wrap mt-2">'
-          +     '<button type="button" id="dup-submit-anyway" class="btn btn-sm btn-outline-secondary">Create anyway &mdash; this is different</button>'
-          +     '<button type="button" id="dup-edit" class="btn btn-sm btn-link">Edit ticket</button>'
+          +     '<button type="button" id="dup-submit-anyway" class="btn btn-sm btn-warning">Create anyway &mdash; This is a Different Issue</button>'
+          +     '<button type="button" id="dup-edit" class="btn btn-sm btn-link">Let me edit this ticket first.</button>'
           +   '</div>'
           + '</div>';
         dupBox.style.display = '';
         dupBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
+        dupBox.querySelectorAll('.dup-view-details').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tid = parseInt(btn.dataset.ticketId, 10) || 0;
+                if (tid && typeof window.openDupPreviewModal === 'function') {
+                    window.openDupPreviewModal(tid, allIds);
+                }
+            });
+        });
+
         document.getElementById('dup-submit-anyway').addEventListener('click', () => {
             form.dataset.dupOverride = '1';
             const idsField = document.getElementById('dup_matched_ids');
-            if (idsField) idsField.value = matches.map(m => m.ticket_id).join(',');
+            if (idsField) idsField.value = allIds.join(',');
             dupBox.style.display = 'none';
             form.submit();
         });

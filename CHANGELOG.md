@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.38.2 &mdash; 2026-05-08
+
+### New features
+- **Friendlier dup-check warning + modal preview of the matched ticket.** The dup-check banner copy was reading like an internal error message ("Looks like someone may have already reported this") and the per-match action ("View this existing request") opened a new tab, pulling the requester out of their flow. **Fix:** new patron-friendly opening line &mdash; "Oops! It looks like someone else might have already submitted a ticket for this issue." &mdash; and every match now has a "Click here to see this ticket" button that opens a Bootstrap modal showing the existing ticket's subject, status, when it was opened, who reported it, the description, and the reply count, all without leaving the create form. The override button now reads "Create anyway &mdash; This is a Different Issue" everywhere (portal, agent, floor) and is rendered as a warning-coloured action so it doesn't look like the default. **Privacy:** new `getDupPreviewTicket()` helper in [src/helpers.php](src/helpers.php) re-validates each preview request server-side &mdash; non-confidential type, not merged-out, not closed, and (for portal users) at the user's branch &mdash; so the modal never leaks tickets the user wouldn't have been a candidate for, and portal users see only first name + last initial. **Backbone:** new shared partial [templates/partials/dup-preview-modal.php](templates/partials/dup-preview-modal.php) renders the modal once per page; the create form templates ([portal](templates/pages/portal/tickets/create.php), [agent/admin](templates/pages/admin/tickets/create.php), [floor](templates/pages/agent/floor.php)) include it with the right endpoint + view base. JSON endpoints `GET /portal/tickets/dup-preview` and `GET /agent/tickets/dup-preview` ([src/routes/portal.php](src/routes/portal.php), [src/routes/agent.php](src/routes/agent.php)) hand back the preview data. Floor mode's bottom sheet uses z-index 1070, so the partial pushes the modal + its backdrop to 1090/1085 on `shown.bs.modal` to render above the sheet. All user-facing copy is full sentences throughout the warning banner and modal.
+
+---
+
 ## 2.38.1 &mdash; 2026-05-08
 
 ### New features

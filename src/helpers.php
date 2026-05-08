@@ -1313,6 +1313,86 @@ function checkTicketDuplicates(int $userId, int $typeId, ?int $locationId, strin
 }
 
 /**
+ * Fetch a small, presentation-safe view of a candidate-duplicate ticket
+ * for the modal preview shown on the create form. Returns null when the
+ * ticket should NOT be visible to the requesting user under the same
+ * rules used by the dup-check candidate query (non-confidential type,
+ * not-merged, recent, same branch for portal users).
+ *
+ * Result shape:
+ *   [
+ *     'id'              => int,
+ *     'subject'         => string,
+ *     'status'          => string,
+ *     'created_at'      => string,
+ *     'type_name'       => string,
+ *     'requester'       => string,        // first + last initial (portal) or full (agent)
+ *     'description_html'=> string,        // capped at 4 KB
+ *     'comment_count'   => int,
+ *   ]
+ */
+function getDupPreviewTicket(int $userId, int $ticketId, bool $agentScope): ?array
+{
+    if ($ticketId <= 0) { return null; }
+
+    $db = Database::connect();
+
+    $stmt = $db->prepare(
+        "SELECT t.id, t.subject, t.description, t.status, t.created_at,
+                t.location_id, t.merged_into_ticket_id,
+                tt.name AS type_name, COALESCE(tt.is_confidential, 0) AS type_is_confidential,
+                u.first_name, u.last_name
+         FROM tickets t
+         LEFT JOIN ticket_types tt ON tt.id = t.type_id
+         LEFT JOIN users u         ON u.id  = t.created_by
+         WHERE t.id = ?"
+    );
+    $stmt->execute([$ticketId]);
+    $row = $stmt->fetch();
+    if (!$row)                                                  { return null; }
+    if ((int) $row['type_is_confidential'] === 1)               { return null; }
+    if ($row['merged_into_ticket_id'] !== null)                 { return null; }
+    if (in_array($row['status'], ['resolved', 'closed'], true)) { return null; }
+
+    if (!$agentScope) {
+        // Portal users: only show tickets at the user's own branch.
+        $userStmt = $db->prepare('SELECT location_id FROM users WHERE id = ?');
+        $userStmt->execute([$userId]);
+        $userLocationId = $userStmt->fetchColumn();
+        $userLocationId = $userLocationId ? (int) $userLocationId : null;
+        if ($userLocationId === null) { return null; }
+        if ((int) ($row['location_id'] ?? 0) !== $userLocationId) { return null; }
+    }
+
+    $first = trim((string) ($row['first_name'] ?? ''));
+    $last  = trim((string) ($row['last_name']  ?? ''));
+    if ($agentScope) {
+        $requester = trim($first . ' ' . $last);
+    } else {
+        $requester = $first;
+        if ($last !== '') { $requester .= ' ' . mb_substr($last, 0, 1) . '.'; }
+        $requester = trim($requester);
+    }
+
+    $cnt = $db->prepare(
+        "SELECT COUNT(*) FROM ticket_timeline WHERE ticket_id = ? AND action = 'comment' AND is_internal = 0"
+    );
+    $cnt->execute([$ticketId]);
+    $commentCount = (int) $cnt->fetchColumn();
+
+    return [
+        'id'               => (int) $row['id'],
+        'subject'          => (string) $row['subject'],
+        'status'           => (string) $row['status'],
+        'created_at'       => (string) $row['created_at'],
+        'type_name'        => (string) ($row['type_name'] ?? ''),
+        'requester'        => $requester,
+        'description_html' => mb_substr((string) ($row['description'] ?? ''), 0, 4000),
+        'comment_count'    => $commentCount,
+    ];
+}
+
+/**
  * Record that the requester saw AI duplicate-warning suggestions for this
  * ticket and chose to file it anyway. Writes a single internal timeline
  * entry on the new ticket so admins can audit overrides, and links the

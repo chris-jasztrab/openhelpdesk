@@ -611,6 +611,20 @@ $router->get('/agent/tickets/search', function () {
     exit;
 });
 
+$router->get('/agent/tickets/dup-preview', function () {
+    Auth::requireRole('agent', 'admin', 'power_user');
+    header('Content-Type: application/json');
+    $tid = (int) ($_GET['id'] ?? 0);
+    $row = getDupPreviewTicket((int) Auth::id(), $tid, true);
+    if (!$row) {
+        http_response_code(404);
+        echo json_encode(['ok' => false]);
+        exit;
+    }
+    echo json_encode(['ok' => true, 'ticket' => $row]);
+    exit;
+});
+
 $router->post('/agent/tickets/check-duplicates', function () {
     Auth::requireRole('agent', 'admin', 'power_user');
     header('Content-Type: application/json');

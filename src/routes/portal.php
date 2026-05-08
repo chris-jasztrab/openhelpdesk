@@ -860,6 +860,20 @@ $router->get('/portal/kb', function () {
     render('portal/kb/index', ['categories' => $categories]);
 });
 
+$router->get('/portal/tickets/dup-preview', function () {
+    Auth::requireAuth();
+    header('Content-Type: application/json');
+    $tid = (int) ($_GET['id'] ?? 0);
+    $row = getDupPreviewTicket((int) Auth::id(), $tid, false);
+    if (!$row) {
+        http_response_code(404);
+        echo json_encode(['ok' => false]);
+        exit;
+    }
+    echo json_encode(['ok' => true, 'ticket' => $row]);
+    exit;
+});
+
 $router->post('/portal/tickets/check-duplicates', function () {
     Auth::requireAuth();
     header('Content-Type: application/json');
