@@ -110,6 +110,7 @@ $statusOptions = [
                     $dupPreviewEndpoint = '/agent/tickets/dup-preview';
                     $dupViewBase        = '/agent/tickets';
                     include ROOT_DIR . '/templates/partials/dup-preview-modal.php';
+                    include ROOT_DIR . '/templates/partials/ticket-submit-progress.php';
                     ?>
                 </div>
             </div>
@@ -741,6 +742,8 @@ ClassicEditor.create(document.querySelector('#admin-ticket-editor'), {
             const idsField = document.getElementById('dup_matched_ids');
             if (idsField) idsField.value = allIds.join(',');
             dupBox.style.display = 'none';
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) window.startTicketSubmitProgress(submitBtn);
             form.submit();
         });
         document.getElementById('dup-edit').addEventListener('click', () => {
@@ -772,12 +775,7 @@ ClassicEditor.create(document.querySelector('#admin-ticket-editor'), {
 
         e.preventDefault();
         const submitBtn = form.querySelector('button[type="submit"]');
-        let origLabel = '';
-        if (submitBtn) {
-            origLabel = submitBtn.innerHTML;
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Checking for duplicates&hellip;';
-        }
+        const progress  = submitBtn ? window.startTicketSubmitProgress(submitBtn) : { stop: function () {} };
 
         let proceed = true;
         try {
@@ -796,19 +794,17 @@ ClassicEditor.create(document.querySelector('#admin-ticket-editor'), {
             });
             const json = await res.json();
             if (json && json.ok && Array.isArray(json.matches) && json.matches.length) {
+                progress.stop();
                 renderDupMatches(json.matches);
                 proceed = false;
             }
         } catch (err) {
             // Non-blocking — let the create go through.
-        } finally {
-            if (submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = origLabel;
-            }
         }
 
         if (proceed) {
+            // Cycling keeps running through the synchronous form post; the
+            // page navigates away and the JS dies naturally with it.
             form.dataset.dupOverride = '1';
             form.submit();
         }

@@ -148,6 +148,10 @@ function _initDupPreviewModal() {
         if (idsField && ids) idsField.value = ids;
         form.dataset.dupOverride = '1';
         modal.hide();
+        const submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn && typeof window.startTicketSubmitProgress === 'function') {
+            window.startTicketSubmitProgress(submitBtn);
+        }
         if (typeof form.requestSubmit === 'function') form.requestSubmit();
         else form.submit();
     });

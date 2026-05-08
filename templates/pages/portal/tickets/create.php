@@ -109,6 +109,7 @@ endif; ?>
             $dupPreviewEndpoint = '/portal/tickets/dup-preview';
             $dupViewBase        = '/portal/tickets';
             include ROOT_DIR . '/templates/partials/dup-preview-modal.php';
+            include ROOT_DIR . '/templates/partials/ticket-submit-progress.php';
             ?>
 
             <?php
@@ -728,6 +729,8 @@ ClassicEditor.create(document.querySelector('#portal-ticket-editor'), {
             const idsField = document.getElementById('dup_matched_ids');
             if (idsField) idsField.value = allIds.join(',');
             dupBox.style.display = 'none';
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) window.startTicketSubmitProgress(submitBtn);
             form.submit();
         });
         document.getElementById('dup-edit').addEventListener('click', () => {
@@ -760,12 +763,7 @@ ClassicEditor.create(document.querySelector('#portal-ticket-editor'), {
 
         e.preventDefault();
         const submitBtn = form.querySelector('button[type="submit"]');
-        let origLabel = '';
-        if (submitBtn) {
-            origLabel = submitBtn.innerHTML;
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Checking for duplicates&hellip;';
-        }
+        const progress  = submitBtn ? window.startTicketSubmitProgress(submitBtn) : { stop: function () {} };
 
         let proceed = true;
         try {
@@ -784,19 +782,19 @@ ClassicEditor.create(document.querySelector('#portal-ticket-editor'), {
             });
             const json = await res.json();
             if (json && json.ok && Array.isArray(json.matches) && json.matches.length) {
+                progress.stop();
                 renderDupMatches(json.matches);
                 proceed = false;
             }
         } catch (err) {
             // Non-blocking: if the dup check fails, let the user submit anyway.
-        } finally {
-            if (submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = origLabel;
-            }
         }
 
         if (proceed) {
+            // Keep the cycling running while the synchronous form post happens
+            // — the page will navigate away and naturally clear it. Don't
+            // call progress.stop() here or the user sees the original label
+            // for a flash before navigation.
             form.dataset.dupOverride = '1';
             form.submit();
         }

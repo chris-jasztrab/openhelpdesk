@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.39.0 &mdash; 2026-05-08
+
+### New features
+- **Submit button now cycles playful "we are working on it" phrases while the AI and server do their thing.** Before, the only feedback while a ticket was being processed was a single "Checking for duplicates&hellip;" string &mdash; if the dup check + post-create AI tasks (skill classification, group routing, SLA setup) ran for more than a couple of seconds, the user had no idea anything was still happening. **Fix:** new shared partial [templates/partials/ticket-submit-progress.php](templates/partials/ticket-submit-progress.php) defines `window.startTicketSubmitProgress(btn)` which swaps the submit button for a spinner + rotating message every 1.8&nbsp;s, starting with "Checking for duplicates&hellip;" so the first frame still tells the truth, then shuffling through 13 phrases including "Phoning a friend&hellip;", "Flashing the bat signal&hellip;", "Putting your ticket in the paper shredder&hellip;", "Waking the help desk gnomes&hellip;", "Bribing the printer with cookies&hellip;", "Consulting the magic 8-ball&hellip;", "Sharpening every pencil in the building&hellip;", "Untangling the cables&hellip;", "Decoding ancient library scrolls&hellip;", "Polishing the crystal ball&hellip;", "Negotiating with the wifi router&hellip;", "Re-inking the stamp pad&hellip;", and "Looking under the rug&hellip;". **Wired in** all three create flows: [templates/pages/portal/tickets/create.php](templates/pages/portal/tickets/create.php), [templates/pages/admin/tickets/create.php](templates/pages/admin/tickets/create.php), [templates/pages/agent/floor.php](templates/pages/agent/floor.php), and the dup-preview modal's "Create anyway" button in [templates/partials/dup-preview-modal.php](templates/partials/dup-preview-modal.php). The helper returns a `stop()` so synchronous form-post flows let the cycling die naturally on navigation (no flicker), while async flows (floor mode dup-check &rarr; create chain, dup-warning re-render) explicitly stop the cycling the moment the server responds &mdash; so we never waste the user's time animating after the work is done.
+
+---
+
 ## 2.38.3 &mdash; 2026-05-08
 
 ### Bug fixes

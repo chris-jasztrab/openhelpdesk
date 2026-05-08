@@ -378,6 +378,7 @@
 $dupPreviewEndpoint = '/agent/tickets/dup-preview';
 $dupViewBase        = '/agent/tickets';
 include ROOT_DIR . '/templates/partials/dup-preview-modal.php';
+include ROOT_DIR . '/templates/partials/ticket-submit-progress.php';
 ?>
 
 <script>
@@ -580,10 +581,10 @@ include ROOT_DIR . '/templates/partials/dup-preview-modal.php';
         var typeId  = parseInt(document.getElementById('fq-type').value, 10) || 0;
         var locVal  = document.getElementById('fq-location').value;
 
+        var progress = window.startTicketSubmitProgress(submitBtn);
+
         // Dup-check first, unless the user has already chosen to proceed.
         if (form.dataset.dupOverride !== '1' && typeId && subject.length >= 3) {
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Checking…';
             try {
                 var fdc = new FormData();
                 fdc.append('subject', subject);
@@ -598,8 +599,7 @@ include ROOT_DIR . '/templates/partials/dup-preview-modal.php';
                 });
                 var ddata = await dres.json();
                 if (ddata && ddata.ok && Array.isArray(ddata.matches) && ddata.matches.length) {
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = 'Create ticket';
+                    progress.stop();
                     renderDupMatches(ddata.matches);
                     return;
                 }
@@ -608,10 +608,9 @@ include ROOT_DIR . '/templates/partials/dup-preview-modal.php';
             }
         }
 
-        // No matches (or override) — actually create.
+        // No matches (or override) — actually create. Keep cycling running
+        // through the create fetch so the user gets continuous feedback.
         dupBox.style.display = 'none';
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Creating…';
         try {
             var fd = new FormData(form);
             var res = await fetch('/agent/floor/quick-create', {
@@ -625,12 +624,11 @@ include ROOT_DIR . '/templates/partials/dup-preview-modal.php';
                 window.location.href = data.redirect_url;
                 return;
             }
+            progress.stop();
             alert((data && data.error) || 'Something went wrong creating the ticket.');
         } catch (err) {
+            progress.stop();
             alert('Network error: ' + (err && err.message ? err.message : 'unknown'));
-        } finally {
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Create ticket';
         }
     });
 })();
