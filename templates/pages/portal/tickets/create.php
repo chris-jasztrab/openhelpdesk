@@ -103,6 +103,9 @@ endif; ?>
                 <div id="portal-ticket-editor-error" class="text-danger small mt-1" style="display:none;">Description is required.</div>
             </div>
 
+            <!-- Duplicate-ticket warning (filled by JS when AI finds matches) -->
+            <div id="dup-warning" class="mb-3" style="display:none;"></div>
+
             <?php
             $portalMode = true;
             $priorityRequired = getSetting('sys_field_required_priority', '0') === '1';
@@ -655,7 +658,67 @@ ClassicEditor.create(document.querySelector('#portal-ticket-editor'), {
 }).then(editor => {
     window._portalTicketEditor = editor;
 
-    document.getElementById('portal-ticket-form').addEventListener('submit', function (e) {
+    const form     = document.getElementById('portal-ticket-form');
+    const dupBox   = document.getElementById('dup-warning');
+    const csrfTok  = '<?= e(csrfToken()) ?>';
+
+    function escH(s) { const d = document.createElement('div'); d.textContent = (s == null ? '' : String(s)); return d.innerHTML; }
+
+    function renderDupMatches(matches) {
+        const items = matches.map(m => {
+            const conf = Math.round((m.confidence || 0) * 100);
+            const when = m.created_at ? new Date(m.created_at.replace(' ', 'T')).toLocaleString() : '';
+            const who  = m.requester ? ' &middot; opened by ' + escH(m.requester) : '';
+            const reason = m.reasoning ? '<div class="small text-muted mt-1">' + escH(m.reasoning) + '</div>' : '';
+            return '<div class="border rounded p-2 mb-2 bg-white">'
+                 +   '<div class="d-flex justify-content-between align-items-start gap-2">'
+                 +     '<div>'
+                 +       '<div class="fw-semibold">'
+                 +         '<a href="/portal/tickets/' + m.ticket_id + '" target="_blank" class="text-decoration-none">'
+                 +           '#' + m.ticket_id + ' &mdash; ' + escH(m.subject)
+                 +         '</a>'
+                 +       '</div>'
+                 +       '<div class="small text-muted">' + escH(m.status) + (when ? ' &middot; ' + escH(when) : '') + who + '</div>'
+                 +       reason
+                 +     '</div>'
+                 +     '<span class="badge bg-warning text-dark align-self-start">' + conf + '% match</span>'
+                 +   '</div>'
+                 +   '<div class="mt-2 d-flex gap-2 flex-wrap">'
+                 +     '<a href="/portal/tickets/' + m.ticket_id + '" class="btn btn-sm btn-primary">'
+                 +       '<i class="bi bi-eye me-1"></i>View this existing request'
+                 +     '</a>'
+                 +   '</div>'
+                 + '</div>';
+        }).join('');
+
+        dupBox.innerHTML =
+            '<div class="alert alert-warning border-warning">'
+          +   '<div class="d-flex align-items-center gap-2 mb-2">'
+          +     '<i class="bi bi-exclamation-triangle-fill"></i>'
+          +     '<strong>Looks like someone may have already reported this</strong>'
+          +   '</div>'
+          +   '<p class="small mb-2">We found ' + matches.length + ' open request' + (matches.length === 1 ? '' : 's') + ' at your branch that may already cover this. Please check before submitting a new one.</p>'
+          +   items
+          +   '<div class="d-flex gap-2 flex-wrap mt-2">'
+          +     '<button type="button" id="dup-submit-anyway" class="btn btn-sm btn-outline-secondary">Submit anyway &mdash; this is different</button>'
+          +     '<button type="button" id="dup-edit" class="btn btn-sm btn-link">Edit my request</button>'
+          +   '</div>'
+          + '</div>';
+        dupBox.style.display = '';
+        dupBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+        document.getElementById('dup-submit-anyway').addEventListener('click', () => {
+            form.dataset.dupOverride = '1';
+            dupBox.style.display = 'none';
+            form.submit();
+        });
+        document.getElementById('dup-edit').addEventListener('click', () => {
+            dupBox.style.display = 'none';
+            document.getElementById('subject').focus();
+        });
+    }
+
+    form.addEventListener('submit', async function (e) {
         const data  = editor.getData();
         const text  = data.replace(/<[^>]*>/g, '').trim();
         const errEl = document.getElementById('portal-ticket-editor-error');
@@ -669,6 +732,56 @@ ClassicEditor.create(document.querySelector('#portal-ticket-editor'), {
 
         errEl.style.display = 'none';
         document.getElementById('description').value = data;
+
+        // User already chose "submit anyway" — let it through.
+        if (form.dataset.dupOverride === '1') return;
+
+        const typeSel = document.getElementById('type_id');
+        const typeId  = typeSel ? parseInt(typeSel.value, 10) : 0;
+        if (!typeId) return; // type is required by the form anyway
+
+        e.preventDefault();
+        const submitBtn = form.querySelector('button[type="submit"]');
+        let origLabel = '';
+        if (submitBtn) {
+            origLabel = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Checking for duplicates&hellip;';
+        }
+
+        let proceed = true;
+        try {
+            const fd = new FormData();
+            fd.append('subject',     document.getElementById('subject').value);
+            fd.append('description', data);
+            fd.append('type_id',     String(typeId));
+            const locSel = document.getElementById('location_id');
+            if (locSel && locSel.value) fd.append('location_id', locSel.value);
+
+            const res = await fetch('/portal/tickets/check-duplicates', {
+                method: 'POST',
+                body: fd,
+                credentials: 'same-origin',
+                headers: { 'X-CSRF-TOKEN': csrfTok },
+            });
+            const json = await res.json();
+            if (json && json.ok && Array.isArray(json.matches) && json.matches.length) {
+                renderDupMatches(json.matches);
+                proceed = false;
+            }
+        } catch (err) {
+            // Non-blocking: if the dup check fails, let the user submit anyway.
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = origLabel;
+            }
+        }
+
+        if (proceed) {
+            form.dataset.dupOverride = '1';
+            form.submit();
+        }
     });
 }).catch(console.error);
 </script>

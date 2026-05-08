@@ -88,6 +88,35 @@ $action = $isEdit ? "/admin/types/{$editing['id']}/edit" : '/admin/types/create'
 
             <div class="mb-3">
                 <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="ai_dup_check_enabled" name="ai_dup_check_enabled" value="1"
+                           <?= (int) old('ai_dup_check_enabled', (string) ($editing['ai_dup_check_enabled'] ?? '0')) ? 'checked' : '' ?>>
+                    <label class="form-check-label fw-semibold" for="ai_dup_check_enabled">
+                        <i class="bi bi-files me-1"></i>Check for duplicates on submit
+                    </label>
+                </div>
+                <div class="form-text">
+                    When the requester clicks Submit, AI scans recent open non-confidential tickets at the same branch and warns if any look like the same issue. Common at multi-shift branches where staff don't see what's already in the queue.
+                    Confidential ticket types are NEVER scanned and never appear as candidates. Requires AI to be enabled at <a href="/admin/settings/ai">Admin → Settings → AI Classification</a>.
+                </div>
+                <div class="mt-2 row g-2 align-items-center" id="dup_threshold_row" style="<?= (int) old('ai_dup_check_enabled', (string) ($editing['ai_dup_check_enabled'] ?? '0')) ? '' : 'display:none;' ?>">
+                    <div class="col-auto">
+                        <label for="ai_dup_threshold" class="form-label fw-semibold mb-0 small">
+                            Match confidence threshold
+                        </label>
+                    </div>
+                    <div class="col-auto">
+                        <input type="number" min="0.50" max="0.99" step="0.05" class="form-control form-control-sm"
+                               id="ai_dup_threshold" name="ai_dup_threshold" style="width:90px;"
+                               value="<?= e(old('ai_dup_threshold', (string) ($editing['ai_dup_threshold'] ?? '0.75'))) ?>">
+                    </div>
+                    <div class="col">
+                        <small class="text-muted">0.50 = looser (more matches, more false positives) · 0.95 = strict.</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <div class="form-check">
                     <input type="checkbox" class="form-check-input" id="show_to_location_visibility" name="show_to_location_visibility" value="1"
                            <?= (int) old('show_to_location_visibility', (string) ($editing['show_to_location_visibility'] ?? '1')) ? 'checked' : '' ?>>
                     <label class="form-check-label fw-semibold" for="show_to_location_visibility">
@@ -181,6 +210,22 @@ document.getElementById('name').addEventListener('input', function() {
         else { aiCb.disabled = false; }
     }
     confCb.addEventListener('change', toggle);
+    toggle();
+})();
+// AI dup-check is also incompatible with Confidential, and the threshold
+// row only makes sense when the toggle is on.
+(function() {
+    var confCb  = document.getElementById('is_confidential');
+    var dupCb   = document.getElementById('ai_dup_check_enabled');
+    var dupRow  = document.getElementById('dup_threshold_row');
+    if (!dupCb || !dupRow) return;
+    function toggle() {
+        if (confCb && confCb.checked) { dupCb.checked = false; dupCb.disabled = true; }
+        else if (dupCb.disabled) { dupCb.disabled = false; }
+        dupRow.style.display = dupCb.checked ? '' : 'none';
+    }
+    dupCb.addEventListener('change', toggle);
+    if (confCb) confCb.addEventListener('change', toggle);
     toggle();
 })();
 </script>

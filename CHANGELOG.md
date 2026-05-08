@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.38.0 &mdash; 2026-05-08
+
+### New features
+- **AI duplicate-ticket detection on submit.** Branches with multiple shifts kept filing the same ticket twice because staff don't routinely scan every open ticket before opening their own. **Fix:** new opt-in feature on `ticket_types`. When enabled, every Submit click runs the new ticket through AI against open non-confidential tickets at the same branch (last 14 days, capped at 30) and shows a warning card listing any matches above the type's confidence threshold; the user can click through to the existing ticket or click _Submit anyway_ to override. **Hard rule:** confidential ticket types are NEVER scanned and never appear as candidates &mdash; their bodies are not sent to a third-party provider, full stop. **Per-type config** lives in [templates/pages/admin/types/form.php](templates/pages/admin/types/form.php) (toggle + 0.50&ndash;0.99 threshold spinbox), persisted via the create/edit handlers in [src/routes/admin.php](src/routes/admin.php). **Wired into all three create flows:** portal ([templates/pages/portal/tickets/create.php](templates/pages/portal/tickets/create.php) + endpoint in [src/routes/portal.php](src/routes/portal.php)), agent/admin ticket form ([templates/pages/admin/tickets/create.php](templates/pages/admin/tickets/create.php) + endpoint in [src/routes/agent.php](src/routes/agent.php)), and floor mode quick-create ([templates/pages/agent/floor.php](templates/pages/agent/floor.php) reuses the same `/agent/tickets/check-duplicates` endpoint). All three soft-fail: provider timeout/error silently lets the ticket through, never blocking creation. **Backbone:** new `findDuplicates()` method on `AIClassifier` + Anthropic + OpenAI implementations in [src/AI.php](src/AI.php), and a shared `checkTicketDuplicates()` helper in [src/helpers.php](src/helpers.php) that gathers candidates, calls AI, filters by threshold, and audits to a new `ai_duplicate_classifications` table for tuning. **Migration 036** ([database/migrations/036_ai_duplicate_detection.php](database/migrations/036_ai_duplicate_detection.php)) adds `ai_dup_check_enabled` (default 0) + `ai_dup_threshold` (default 0.75) on `ticket_types` and creates the audit table. Admin form blocks the dup-check toggle when Confidential is checked.
+
+---
+
 ## 2.37.0 — 2026-05-07
 
 ### New features

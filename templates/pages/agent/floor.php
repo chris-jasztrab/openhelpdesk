@@ -365,6 +365,8 @@
         <div class="photo-thumbs" id="fq-photo-thumbs"></div>
         <div class="scan-result" id="fq-scan-result"></div>
 
+        <div id="fq-dup-warning" style="display:none;margin-top:1rem;"></div>
+
         <div class="submit-row">
             <button type="button" class="cancel" id="fq-cancel">Cancel</button>
             <button type="submit" class="submit" id="fq-submit">Create ticket</button>
@@ -501,9 +503,89 @@
     });
 
     /* ── Submit ─────────────────────────────────────────────────── */
+    var dupBox = document.getElementById('fq-dup-warning');
+
+    function escH(s) { var d = document.createElement('div'); d.textContent = (s == null ? '' : String(s)); return d.innerHTML; }
+
+    function renderDupMatches(matches) {
+        var items = matches.map(function (m) {
+            var conf = Math.round((m.confidence || 0) * 100);
+            var when = m.created_at ? new Date(m.created_at.replace(' ', 'T')).toLocaleString() : '';
+            var who  = m.requester ? ' &middot; opened by ' + escH(m.requester) : '';
+            var reason = m.reasoning ? '<div class="small text-muted mt-1">' + escH(m.reasoning) + '</div>' : '';
+            return '<div class="border rounded p-2 mb-2 bg-white">'
+                 +   '<div class="d-flex justify-content-between align-items-start gap-2">'
+                 +     '<div>'
+                 +       '<div class="fw-semibold">'
+                 +         '<a href="/agent/tickets/' + m.ticket_id + '" target="_blank" class="text-decoration-none">'
+                 +           '#' + m.ticket_id + ' &mdash; ' + escH(m.subject)
+                 +         '</a>'
+                 +       '</div>'
+                 +       '<div class="small text-muted">' + escH(m.status) + (when ? ' &middot; ' + escH(when) : '') + who + '</div>'
+                 +       reason
+                 +     '</div>'
+                 +     '<span class="badge bg-warning text-dark align-self-start">' + conf + '% match</span>'
+                 +   '</div>'
+                 + '</div>';
+        }).join('');
+        dupBox.innerHTML =
+            '<div class="alert alert-warning border-warning mb-0">'
+          +   '<div class="d-flex align-items-center gap-2 mb-2">'
+          +     '<i class="bi bi-exclamation-triangle-fill"></i>'
+          +     '<strong>Possible duplicate</strong>'
+          +   '</div>'
+          +   items
+          +   '<button type="button" id="fq-dup-anyway" class="btn btn-sm btn-outline-secondary mt-1">Create anyway</button>'
+          + '</div>';
+        dupBox.style.display = '';
+        dupBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+        document.getElementById('fq-dup-anyway').addEventListener('click', function () {
+            form.dataset.dupOverride = '1';
+            dupBox.style.display = 'none';
+            if (typeof form.requestSubmit === 'function') form.requestSubmit();
+            else form.submit();
+        });
+    }
+
     form.addEventListener('submit', async function (e) {
         e.preventDefault();
         if (!form.reportValidity()) return;
+
+        var subject = (subjectEl.value || '').trim();
+        var typeId  = parseInt(document.getElementById('fq-type').value, 10) || 0;
+        var locVal  = document.getElementById('fq-location').value;
+
+        // Dup-check first, unless the user has already chosen to proceed.
+        if (form.dataset.dupOverride !== '1' && typeId && subject.length >= 3) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Checking…';
+            try {
+                var fdc = new FormData();
+                fdc.append('subject', subject);
+                fdc.append('description', subject); // floor capture often only knows the headline
+                fdc.append('type_id', String(typeId));
+                if (locVal) fdc.append('location_id', locVal);
+                var dres = await fetch('/agent/tickets/check-duplicates', {
+                    method: 'POST',
+                    body: fdc,
+                    credentials: 'same-origin',
+                    headers: { 'X-CSRF-TOKEN': '<?= e(csrfToken()) ?>' },
+                });
+                var ddata = await dres.json();
+                if (ddata && ddata.ok && Array.isArray(ddata.matches) && ddata.matches.length) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Create ticket';
+                    renderDupMatches(ddata.matches);
+                    return;
+                }
+            } catch (err) {
+                // Soft-fail: fall through to the actual create.
+            }
+        }
+
+        // No matches (or override) — actually create.
+        dupBox.style.display = 'none';
         submitBtn.disabled = true;
         submitBtn.textContent = 'Creating…';
         try {

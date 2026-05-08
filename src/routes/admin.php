@@ -1563,6 +1563,10 @@ $router->post('/admin/types/create', function () {
     $groupId        = !empty($_POST['group_id']) ? (int) $_POST['group_id'] : null;
     $isConfidential = !empty($_POST['is_confidential']) && $groupId ? 1 : 0;
     $aiRouteGroup   = !empty($_POST['ai_route_group']) && !$isConfidential ? 1 : 0;
+    $aiDupCheck     = !empty($_POST['ai_dup_check_enabled']) && !$isConfidential ? 1 : 0;
+    $aiDupThreshold = isset($_POST['ai_dup_threshold']) ? (float) $_POST['ai_dup_threshold'] : 0.75;
+    if ($aiDupThreshold < 0.50) { $aiDupThreshold = 0.50; }
+    if ($aiDupThreshold > 0.99) { $aiDupThreshold = 0.99; }
     $showToLocVis   = !empty($_POST['show_to_location_visibility']) ? 1 : 0;
     $staleRaw       = trim((string) ($_POST['stale_threshold_hours'] ?? ''));
     $staleHours     = $staleRaw === '' ? null : max(0, (int) $staleRaw);
@@ -1573,8 +1577,8 @@ $router->post('/admin/types/create', function () {
         redirect('/admin/types/create');
     }
     $db = Database::connect();
-    $db->prepare('INSERT INTO ticket_types (name, color, group_id, is_confidential, ai_route_group, show_to_location_visibility, sort_order, stale_threshold_hours) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $showToLocVis, $order, $staleHours]);
+    $db->prepare('INSERT INTO ticket_types (name, color, group_id, is_confidential, ai_route_group, ai_dup_check_enabled, ai_dup_threshold, show_to_location_visibility, sort_order, stale_threshold_hours) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $showToLocVis, $order, $staleHours]);
     $typeId = (int) $db->lastInsertId();
     if ($skillIds) {
         $stmt = $db->prepare('INSERT IGNORE INTO ticket_type_skill_map (ticket_type_id, skill_id) VALUES (?, ?)');
@@ -1617,6 +1621,10 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
     $groupId        = !empty($_POST['group_id']) ? (int) $_POST['group_id'] : null;
     $isConfidential = !empty($_POST['is_confidential']) && $groupId ? 1 : 0;
     $aiRouteGroup   = !empty($_POST['ai_route_group']) && !$isConfidential ? 1 : 0;
+    $aiDupCheck     = !empty($_POST['ai_dup_check_enabled']) && !$isConfidential ? 1 : 0;
+    $aiDupThreshold = isset($_POST['ai_dup_threshold']) ? (float) $_POST['ai_dup_threshold'] : 0.75;
+    if ($aiDupThreshold < 0.50) { $aiDupThreshold = 0.50; }
+    if ($aiDupThreshold > 0.99) { $aiDupThreshold = 0.99; }
     $showToLocVis   = !empty($_POST['show_to_location_visibility']) ? 1 : 0;
     $staleRaw       = trim((string) ($_POST['stale_threshold_hours'] ?? ''));
     $staleHours     = $staleRaw === '' ? null : max(0, (int) $staleRaw);
@@ -1647,6 +1655,8 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
                 'stale_threshold_hours' => $staleHours === null ? '' : (string) $staleHours,
                 'show_to_location_visibility' => $showToLocVis ? '1' : '',
                 'ai_route_group' => $aiRouteGroup ? '1' : '',
+                'ai_dup_check_enabled' => $aiDupCheck ? '1' : '',
+                'ai_dup_threshold' => (string) $aiDupThreshold,
                 // is_confidential intentionally omitted (unchecked = removal)
             ];
             logAudit(
@@ -1683,8 +1693,8 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
         }
     }
 
-    $db->prepare('UPDATE ticket_types SET name=?, color=?, group_id=?, is_confidential=?, ai_route_group=?, show_to_location_visibility=?, sort_order=?, stale_threshold_hours=? WHERE id=?')
-        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $showToLocVis, $order, $staleHours, $id]);
+    $db->prepare('UPDATE ticket_types SET name=?, color=?, group_id=?, is_confidential=?, ai_route_group=?, ai_dup_check_enabled=?, ai_dup_threshold=?, show_to_location_visibility=?, sort_order=?, stale_threshold_hours=? WHERE id=?')
+        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $showToLocVis, $order, $staleHours, $id]);
 
     // Required skills (used by Skill-Based group auto-assignment)
     $skillIds = array_filter(array_map('intval', (array) ($_POST['required_skills'] ?? [])));

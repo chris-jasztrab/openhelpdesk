@@ -853,6 +853,38 @@ $router->get('/portal/kb', function () {
     render('portal/kb/index', ['categories' => $categories]);
 });
 
+$router->post('/portal/tickets/check-duplicates', function () {
+    Auth::requireAuth();
+    header('Content-Type: application/json');
+
+    if (!verifyCsrf($_SERVER['HTTP_X_CSRF_TOKEN'] ?? ($_POST['_token'] ?? ''))) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'matches' => []]);
+        exit;
+    }
+
+    $subject    = (string) ($_POST['subject']     ?? '');
+    $body       = (string) ($_POST['description'] ?? '');
+    $typeId     = (int)    ($_POST['type_id']     ?? 0);
+    $locationId = !empty($_POST['location_id']) ? (int) $_POST['location_id'] : null;
+
+    if ($locationId === null) {
+        $db   = Database::connect();
+        $stmt = $db->prepare('SELECT location_id FROM users WHERE id = ?');
+        $stmt->execute([Auth::id()]);
+        $locationId = $stmt->fetchColumn() ?: null;
+        $locationId = $locationId ? (int) $locationId : null;
+    }
+
+    $result = checkTicketDuplicates(Auth::id(), $typeId, $locationId, $subject, $body);
+    echo json_encode([
+        'ok'        => true,
+        'matches'   => $result['matches'],
+        'threshold' => $result['threshold'],
+    ]);
+    exit;
+});
+
 $router->get('/portal/kb/search', function () {
     Auth::requireAuth();
     $q = trim($_GET['q'] ?? '');

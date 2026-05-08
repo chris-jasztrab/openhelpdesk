@@ -1135,6 +1135,184 @@ function classifyTicketWithAI(int $ticketId): ?array
 }
 
 /**
+ * Check whether a not-yet-saved ticket looks like a duplicate of an
+ * existing OPEN ticket at the same branch. Used by portal, agent, and
+ * floor-quick-create flows so people don't open the same ticket twice
+ * (different staff, different shifts, didn't scroll the open queue).
+ *
+ * Hard rules:
+ *   - Confidential ticket types are NEVER scanned and NEVER appear as
+ *     candidates — regardless of the new ticket's type. We don't send
+ *     those bodies to a third-party AI under any circumstance.
+ *   - Returns [] if the feature is off for this type, AI is disabled,
+ *     no candidates exist, or the provider errors. Never throws.
+ *
+ * Result shape:
+ *   [
+ *     'matches' => [
+ *       [
+ *         'ticket_id'   => int,
+ *         'subject'     => string,
+ *         'status'      => string,
+ *         'created_at'  => string,
+ *         'requester'   => string,   // first name + last initial (privacy)
+ *         'type_name'   => string,
+ *         'confidence'  => float,
+ *         'reasoning'   => string,
+ *       ],
+ *       ...
+ *     ],
+ *     'threshold' => float,
+ *   ]
+ *
+ * @param int    $userId     Auth::id() of the user about to file
+ * @param int    $typeId     Selected ticket type
+ * @param ?int   $locationId Selected branch (NULL = scan all branches)
+ * @param string $subject    Subject the user typed
+ * @param string $body       Description the user typed
+ */
+function checkTicketDuplicates(int $userId, int $typeId, ?int $locationId, string $subject, string $body): array
+{
+    $empty = ['matches' => [], 'threshold' => 0.0];
+    if ($subject === '' || mb_strlen(trim($subject)) < 3) { return $empty; }
+    if ($typeId <= 0) { return $empty; }
+
+    $db = Database::connect();
+
+    $tStmt = $db->prepare(
+        'SELECT id, name, ai_dup_check_enabled, ai_dup_threshold, is_confidential
+         FROM ticket_types WHERE id = ?'
+    );
+    $tStmt->execute([$typeId]);
+    $type = $tStmt->fetch();
+    if (!$type)                                            { return $empty; }
+    if ((int) $type['is_confidential'] === 1)              { return $empty; } // safety belt
+    if ((int) $type['ai_dup_check_enabled'] !== 1)         { return $empty; }
+
+    $threshold = (float) ($type['ai_dup_threshold'] ?? 0.75);
+    if ($threshold < 0.0) { $threshold = 0.0; }
+    if ($threshold > 1.0) { $threshold = 1.0; }
+
+    $classifier = AIClassifierFactory::fromSettings();
+    if (!$classifier instanceof AIClassifier) { return ['matches' => [], 'threshold' => $threshold]; }
+
+    // Candidates: open tickets at the same branch, NOT a confidential type,
+    // opened in the last 14 days, capped at 30. Same branch = same location_id;
+    // when the user has no location set we fall back to "any branch" so we
+    // still catch duplicates rather than silently skipping the check.
+    $params = [];
+    $where  = [
+        "t.status NOT IN ('resolved', 'closed')",
+        "t.merged_into_ticket_id IS NULL",
+        "COALESCE(tt.is_confidential, 0) = 0",
+        "t.created_at >= NOW() - INTERVAL 14 DAY",
+    ];
+    if ($locationId !== null) {
+        $where[]  = 't.location_id = ?';
+        $params[] = $locationId;
+    }
+    $whereSql = implode(' AND ', $where);
+
+    $cStmt = $db->prepare(
+        "SELECT t.id, t.subject, t.description, t.status, t.created_at,
+                tt.name AS type_name,
+                u.first_name, u.last_name
+         FROM tickets t
+         LEFT JOIN ticket_types tt ON tt.id = t.type_id
+         LEFT JOIN users u         ON u.id  = t.created_by
+         WHERE {$whereSql}
+         ORDER BY t.created_at DESC
+         LIMIT 30"
+    );
+    $cStmt->execute($params);
+    $candidates = $cStmt->fetchAll();
+    if (empty($candidates)) { return ['matches' => [], 'threshold' => $threshold]; }
+
+    $maxTokens  = max(600, (int) getSetting('ai_max_tokens', '500'));
+    $timeoutSec = (int) getSetting('ai_timeout_seconds', '5');
+
+    try {
+        $verdict = $classifier->findDuplicates(
+            $subject,
+            $body,
+            array_map(static fn($c) => [
+                'id'          => (int) $c['id'],
+                'subject'     => (string) $c['subject'],
+                'description' => (string) ($c['description'] ?? ''),
+                'created_at'  => (string) ($c['created_at'] ?? ''),
+            ], $candidates),
+            $maxTokens,
+            $timeoutSec
+        );
+    } catch (\Throwable $e) {
+        error_log('[AI dup-check] type ' . $typeId . ' user ' . $userId . ' failed: ' . $e->getMessage());
+        return ['matches' => [], 'threshold' => $threshold];
+    }
+
+    $byId = [];
+    foreach ($candidates as $c) {
+        $byId[(int) $c['id']] = $c;
+    }
+
+    $hits = [];
+    foreach (($verdict['matches'] ?? []) as $m) {
+        if ($m['confidence'] < $threshold)        { continue; }
+        if (!isset($byId[$m['ticket_id']]))       { continue; }
+        $row = $byId[$m['ticket_id']];
+        $first = trim((string) ($row['first_name'] ?? ''));
+        $last  = trim((string) ($row['last_name']  ?? ''));
+        $requester = $first;
+        if ($last !== '') { $requester .= ' ' . mb_substr($last, 0, 1) . '.'; }
+        $hits[] = [
+            'ticket_id'  => (int) $m['ticket_id'],
+            'subject'    => (string) $row['subject'],
+            'status'     => (string) $row['status'],
+            'created_at' => (string) $row['created_at'],
+            'requester'  => trim($requester),
+            'type_name'  => (string) ($row['type_name'] ?? ''),
+            'confidence' => (float) $m['confidence'],
+            'reasoning'  => (string) ($m['reasoning'] ?? ''),
+        ];
+    }
+
+    // Audit log — even no-match calls go in the table for tuning.
+    $providerKey = (string) getSetting('ai_provider', 'anthropic');
+    $modelKey    = $providerKey === 'anthropic'
+        ? (string) getSetting('ai_anthropic_model', 'claude-haiku-4-5')
+        : (string) getSetting('ai_openai_model',    'gpt-4o-mini');
+    $candidateIds = array_map(static fn($c) => (int) $c['id'], $candidates);
+
+    try {
+        $db->prepare(
+            'INSERT INTO ai_duplicate_classifications
+                (user_id, type_id, location_id, provider, model, subject,
+                 candidate_ticket_ids, matches, threshold, decision,
+                 raw_output, latency_ms, prompt_tokens, output_tokens)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        )->execute([
+            $userId,
+            $typeId,
+            $locationId,
+            $providerKey,
+            $modelKey,
+            mb_substr($subject, 0, 255),
+            json_encode($candidateIds, JSON_UNESCAPED_SLASHES),
+            json_encode($hits, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            $threshold,
+            empty($hits) ? 'no_match' : 'suggested',
+            json_encode($verdict['raw'] ?? null, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            (int) ($verdict['latency_ms']    ?? 0),
+            (int) ($verdict['prompt_tokens'] ?? 0),
+            (int) ($verdict['output_tokens'] ?? 0),
+        ]);
+    } catch (\Throwable $e) {
+        error_log('[AI dup-check] audit insert failed: ' . $e->getMessage());
+    }
+
+    return ['matches' => $hits, 'threshold' => $threshold];
+}
+
+/**
  * "No Wrong Door" group routing. Run for ticket types flagged with
  * ai_route_group=1: ask the AI to pick the best group from every
  * non-confidential group (using the description column to ground the

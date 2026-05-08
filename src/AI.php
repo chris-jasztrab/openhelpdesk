@@ -63,6 +63,27 @@ interface AIClassifier
      */
     public function classifyGroup(string $subject, string $body, array $groups, int $maxTokens, int $timeoutSec): array;
 
+    /**
+     * Look at a new (not-yet-saved) ticket and decide which, if any, of the
+     * supplied candidate open tickets it duplicates. Confidential ticket
+     * bodies are NEVER passed in by callers — see checkTicketDuplicates().
+     *
+     * Returns:
+     *   [
+     *     'matches' => [
+     *       ['ticket_id' => int, 'confidence' => float 0..1, 'reasoning' => string],
+     *       ...
+     *     ],
+     *     'raw'           => [...],
+     *     'latency_ms'    => int,
+     *     'prompt_tokens' => int,
+     *     'output_tokens' => int,
+     *   ]
+     *
+     * @param array $candidates Each row: ['id', 'subject', 'description'|null, 'created_at'|null]
+     */
+    public function findDuplicates(string $subject, string $body, array $candidates, int $maxTokens, int $timeoutSec): array;
+
     /** @return array{0:string,1:string}[] [[id, name], ...] from the provider catalogue */
     public function listModels(int $timeoutSec = 10): array;
 
@@ -268,6 +289,121 @@ TXT;
             'confidence' => $confidence,
             'reasoning'  => $reasoning,
         ];
+    }
+
+    /**
+     * Duplicate-detection system prompt. Output schema is a list of
+     * {ticket_id, confidence, reasoning} — empty list means no match.
+     */
+    protected function dupSystemPrompt(): string
+    {
+        return <<<TXT
+You are a help-desk duplicate-ticket detector. A user is about to file a NEW ticket. Given the new ticket's subject + body and a list of OPEN candidate tickets at the same branch, decide which (if any) of the candidates describe the SAME underlying issue. Output one JSON object only — no markdown, no prose.
+
+Schema:
+{
+  "matches": [
+    {
+      "ticket_id":  <int>,                  // must be one of the provided ids
+      "confidence": <float 0.0-1.0>,        // your certainty THIS is the same issue
+      "reasoning":  "<one short sentence>"  // why you think it matches
+    },
+    ...
+  ]
+}
+
+Rules:
+- Match ONLY when the candidate clearly describes the same underlying problem (same equipment, same symptom, same workflow) — NOT just the same general topic. "Printer is jamming" and "Printer is out of toner" are NOT duplicates even though both are about a printer.
+- Generic/vague new tickets ("computer not working", "need help") match nothing — return [].
+- Order matches by confidence, highest first. List at most 3.
+- Confidence reflects CERTAINTY of being the same issue, not topical similarity.
+- If unsure, leave the candidate OUT — false positives waste people's time.
+- Output JSON only.
+TXT;
+    }
+
+    protected function dupUserPrompt(string $subject, string $body, array $candidates): string
+    {
+        // Cap inputs aggressively — 30 candidate snippets at 200 chars + 4K body
+        // gives a generous budget without inflating the prompt.
+        $subject = mb_substr(trim($subject), 0, 200);
+        $body    = mb_substr(trim(strip_tags($body)), 0, 4000);
+
+        $list = '';
+        foreach ($candidates as $c) {
+            $cid     = (int) ($c['id'] ?? 0);
+            if ($cid <= 0) { continue; }
+            $cSubj   = mb_substr(trim((string) ($c['subject'] ?? '')), 0, 200);
+            $cBody   = mb_substr(trim(strip_tags((string) ($c['description'] ?? ''))), 0, 400);
+            $cAge    = trim((string) ($c['created_at'] ?? ''));
+            $list   .= '- id ' . $cid;
+            if ($cAge !== '') { $list .= ' (opened ' . $cAge . ')'; }
+            $list   .= ': ' . $cSubj;
+            if ($cBody !== '') { $list .= ' — ' . str_replace(["\n", "\r"], ' ', $cBody); }
+            $list   .= "\n";
+        }
+        if ($list === '') {
+            $list = "(no candidates)\n";
+        }
+
+        return "Open candidate tickets at the same branch:\n{$list}\nNEW ticket subject: {$subject}\n\nNEW ticket body:\n{$body}\n\nRespond with JSON only.";
+    }
+
+    /**
+     * Parse a provider response for duplicate detection. Returns a list of
+     * {ticket_id, confidence, reasoning} verdicts, filtered to the supplied
+     * candidate IDs.
+     *
+     * @throws SoftAIException
+     */
+    protected function parseDupVerdict(string $raw, array $candidateIds): array
+    {
+        $stripped = trim($raw);
+        if (preg_match('/```(?:json)?\s*([\s\S]*?)\s*```/i', $stripped, $m)) {
+            $stripped = trim($m[1]);
+        }
+        if (!str_starts_with($stripped, '{') && !str_starts_with($stripped, '[')) {
+            $start = strpos($stripped, '{');
+            $end   = strrpos($stripped, '}');
+            if ($start === false || $end === false || $end <= $start) {
+                throw new SoftAIException('AI response did not contain JSON: ' . mb_substr($raw, 0, 200));
+            }
+            $stripped = substr($stripped, $start, $end - $start + 1);
+        }
+
+        $decoded = json_decode($stripped, true);
+        if (!is_array($decoded)) {
+            throw new SoftAIException('AI JSON decode failed: ' . json_last_error_msg());
+        }
+
+        $list = [];
+        if (isset($decoded['matches']) && is_array($decoded['matches'])) {
+            $list = $decoded['matches'];
+        } elseif (array_is_list($decoded)) {
+            $list = $decoded;
+        }
+
+        $matches = [];
+        $seen    = [];
+        foreach ($list as $row) {
+            if (!is_array($row)) { continue; }
+            $tid = (int) ($row['ticket_id'] ?? $row['id'] ?? 0);
+            if ($tid <= 0 || !in_array($tid, $candidateIds, true) || isset($seen[$tid])) {
+                continue;
+            }
+            $seen[$tid] = true;
+
+            $conf = isset($row['confidence']) ? (float) $row['confidence'] : 0.0;
+            if ($conf < 0.0) { $conf = 0.0; }
+            if ($conf > 1.0) { $conf = 1.0; }
+
+            $reason = isset($row['reasoning']) ? mb_substr((string) $row['reasoning'], 0, 300) : '';
+
+            $matches[] = ['ticket_id' => $tid, 'confidence' => $conf, 'reasoning' => $reason];
+        }
+
+        usort($matches, static fn($a, $b) => $b['confidence'] <=> $a['confidence']);
+        return array_slice($matches, 0, 3);
     }
 
     /**
@@ -799,6 +935,49 @@ class AnthropicClassifier extends BaseAIClassifier
         return $verdict;
     }
 
+    public function findDuplicates(string $subject, string $body, array $candidates, int $maxTokens, int $timeoutSec): array
+    {
+        $candidateIds = array_map(static fn($c) => (int) $c['id'], $candidates);
+
+        $resp = $this->curlPostJson(
+            'https://api.anthropic.com/v1/messages',
+            [
+                'model'      => $this->model,
+                'max_tokens' => $maxTokens,
+                'system'     => $this->dupSystemPrompt(),
+                'messages'   => [
+                    ['role' => 'user', 'content' => $this->dupUserPrompt($subject, $body, $candidates)],
+                ],
+            ],
+            [
+                'Content-Type: application/json',
+                'x-api-key: ' . $this->apiKey,
+                'anthropic-version: 2023-06-01',
+            ],
+            $timeoutSec
+        );
+
+        $decoded = $resp['decoded'];
+        $text = '';
+        foreach (($decoded['content'] ?? []) as $block) {
+            if (($block['type'] ?? '') === 'text') {
+                $text .= $block['text'] ?? '';
+            }
+        }
+        if ($text === '') {
+            throw new SoftAIException('Anthropic returned no text content');
+        }
+
+        $matches = $this->parseDupVerdict($text, $candidateIds);
+        return [
+            'matches'       => $matches,
+            'raw'           => $decoded,
+            'latency_ms'    => $resp['latency_ms'],
+            'prompt_tokens' => (int) ($decoded['usage']['input_tokens']  ?? 0),
+            'output_tokens' => (int) ($decoded['usage']['output_tokens'] ?? 0),
+        ];
+    }
+
     public function chat(string $systemPrompt, string $userPrompt, int $maxTokens, int $timeoutSec): string
     {
         $resp = $this->curlPostJson(
@@ -952,6 +1131,45 @@ class OpenAIClassifier extends BaseAIClassifier
         $verdict['prompt_tokens'] = (int) ($decoded['usage']['prompt_tokens']     ?? 0);
         $verdict['output_tokens'] = (int) ($decoded['usage']['completion_tokens'] ?? 0);
         return $verdict;
+    }
+
+    public function findDuplicates(string $subject, string $body, array $candidates, int $maxTokens, int $timeoutSec): array
+    {
+        $candidateIds = array_map(static fn($c) => (int) $c['id'], $candidates);
+
+        $resp = $this->curlPostJson(
+            'https://api.openai.com/v1/chat/completions',
+            [
+                'model' => $this->model,
+                'messages' => [
+                    ['role' => 'system', 'content' => $this->dupSystemPrompt()],
+                    ['role' => 'user',   'content' => $this->dupUserPrompt($subject, $body, $candidates)],
+                ],
+                'max_tokens'      => $maxTokens,
+                'response_format' => ['type' => 'json_object'],
+                'temperature'     => 0.0,
+            ],
+            [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $this->apiKey,
+            ],
+            $timeoutSec
+        );
+
+        $decoded = $resp['decoded'];
+        $text = (string) ($decoded['choices'][0]['message']['content'] ?? '');
+        if ($text === '') {
+            throw new SoftAIException('OpenAI returned no message content');
+        }
+
+        $matches = $this->parseDupVerdict($text, $candidateIds);
+        return [
+            'matches'       => $matches,
+            'raw'           => $decoded,
+            'latency_ms'    => $resp['latency_ms'],
+            'prompt_tokens' => (int) ($decoded['usage']['prompt_tokens']     ?? 0),
+            'output_tokens' => (int) ($decoded['usage']['completion_tokens'] ?? 0),
+        ];
     }
 
     public function chat(string $systemPrompt, string $userPrompt, int $maxTokens, int $timeoutSec): string
