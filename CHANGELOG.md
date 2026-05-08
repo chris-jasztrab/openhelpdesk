@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.38.3 &mdash; 2026-05-08
+
+### Bug fixes
+- **Dup-check modal now actually opens.** The "Click here to see this ticket" button was a silent no-op because the modal partial's inline script ran at parse time &mdash; before [templates/layouts/app.php](templates/layouts/app.php) loaded the Bootstrap bundle in the footer &mdash; so `typeof bootstrap === 'undefined'` and the IIFE returned without registering `window.openDupPreviewModal`. **Fix:** [templates/partials/dup-preview-modal.php](templates/partials/dup-preview-modal.php) now defers init to `DOMContentLoaded` (Bootstrap's parser-blocking script tag finishes by then) and falls back to a 50 ms retry if the script somehow runs even later. The button now opens the modal as designed.
+
+---
+
 ## 2.38.2 &mdash; 2026-05-08
 
 ### New features

@@ -53,9 +53,14 @@ $dupViewBase        = $dupViewBase        ?? '/portal/tickets';
     </div>
 </div>
 <script>
-(function () {
+function _initDupPreviewModal() {
     const modalEl   = document.getElementById('dupPreviewModal');
-    if (!modalEl || typeof bootstrap === 'undefined') return;
+    if (!modalEl) return;
+    if (typeof bootstrap === 'undefined') {
+        // Bootstrap hasn't loaded yet — try again on the next tick.
+        setTimeout(_initDupPreviewModal, 50);
+        return;
+    }
     const modal     = new bootstrap.Modal(modalEl);
     const loadEl    = document.getElementById('dup-preview-loading');
     const errEl     = document.getElementById('dup-preview-error');
@@ -146,5 +151,10 @@ $dupViewBase        = $dupViewBase        ?? '/portal/tickets';
         if (typeof form.requestSubmit === 'function') form.requestSubmit();
         else form.submit();
     });
-})();
+}
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _initDupPreviewModal);
+} else {
+    _initDupPreviewModal();
+}
 </script>
