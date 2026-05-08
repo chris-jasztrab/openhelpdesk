@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.40.0 &mdash; 2026-05-08
+
+### New features
+- **Unresolved Tickets report now paginates and supports drill-down filtering.** Before, [templates/pages/admin/reports/unresolved.php](templates/pages/admin/reports/unresolved.php) dumped *every* unresolved ticket onto a single page with no way to narrow the view &mdash; an instance with a few hundred unresolved tickets meant a slow render and an unusable wall of rows. The "By Status" and "By Age" tiles were also static read-outs, not navigation. **Fix:** the route at [src/routes/admin.php](src/routes/admin.php) (`/admin/reports/unresolved`) now (1) accepts `status`, `age` (0&ndash;4), `page`, and `per_page` (10/25/50/100, default 25) query params; (2) computes summary cards + tile counts from a single `SUM(CASE WHEN ...)` aggregate plus a `GROUP BY status` query against `tickets` (unfiltered &mdash; tiles are the navigation source, not filtered); (3) runs a separate `LIMIT/OFFSET`-paginated query against the same table for just the on-screen page; and (4) when called with `?ajax=1` returns only the new partial [templates/pages/admin/reports/_unresolved-table.php](templates/pages/admin/reports/_unresolved-table.php) instead of the full layout. The page template wraps the table card in `#unresolvedDrillRegion`; the inline JS intercepts tile clicks, the per-page `<select>`, and pagination links, fetches the partial, and swaps the region's innerHTML &mdash; with `history.pushState` so URLs stay bookmarkable and Back/Forward work via `popstate`. Status + age filters are combinable (e.g. `?status=open&age=4` for "open tickets older than 14 days"); clicking an already-active tile (or its `&times;` chip in the table header) toggles it off; "Clear all" wipes both at once. Tiles paint an active border + funnel icon when applied, and the region dims briefly during fetch so the swap doesn't feel ghosty. Aging buckets are computed in SQL with `TIMESTAMPDIFF(HOUR, created_at, NOW())` against fixed hour cutoffs (24 / 72 / 168 / 336) which matches the existing `< 1d / 1&ndash;3d / 3&ndash;7d / 7&ndash;14d / > 14d` labels exactly.
+
+---
+
 ## 2.39.0 &mdash; 2026-05-08
 
 ### New features

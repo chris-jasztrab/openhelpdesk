@@ -8668,58 +8668,113 @@ $router->get('/admin/reports/unresolved', function () {
     Auth::requireRole('admin', 'power_user');
     $db = Database::connect();
 
-    // No date filter for unresolved — it's current state
+    // ── Inputs (drilldown filters + pagination) ────────────────────
+    $allowedPerPage = [10, 25, 50, 100];
+    $perPage = (isset($_GET['per_page']) && in_array((int) $_GET['per_page'], $allowedPerPage, true))
+        ? (int) $_GET['per_page'] : 25;
+    $statusFilter = isset($_GET['status']) ? trim((string) $_GET['status']) : '';
+    if ($statusFilter === 'resolved' || $statusFilter === 'closed') $statusFilter = '';
+    $ageFilter = (isset($_GET['age']) && $_GET['age'] !== '' && in_array((int) $_GET['age'], [0, 1, 2, 3, 4], true))
+        ? (int) $_GET['age'] : null;
+    $isAjax = !empty($_GET['ajax']);
+
+    // ── Filter WHERE for the table query ───────────────────────────
+    $where  = "t.status NOT IN ('resolved','closed')";
+    $params = [];
+    if ($statusFilter !== '') {
+        $where .= " AND t.status = ?";
+        $params[] = $statusFilter;
+    }
+    if ($ageFilter !== null) {
+        $bounds = [
+            0 => [0, 24],     // < 1 day
+            1 => [24, 72],    // 1–3 days
+            2 => [72, 168],   // 3–7 days
+            3 => [168, 336],  // 7–14 days
+            4 => [336, null], // > 14 days
+        ];
+        [$minH, $maxH] = $bounds[$ageFilter];
+        $where .= " AND TIMESTAMPDIFF(HOUR, t.created_at, NOW()) >= ?";
+        $params[] = $minH;
+        if ($maxH !== null) {
+            $where .= " AND TIMESTAMPDIFF(HOUR, t.created_at, NOW()) < ?";
+            $params[] = $maxH;
+        }
+    }
+
+    // ── Paginated, filtered ticket page ────────────────────────────
+    $countStmt = $db->prepare("SELECT COUNT(*) FROM tickets t WHERE $where");
+    $countStmt->execute($params);
+    $totalFiltered = (int) $countStmt->fetchColumn();
+    $totalPages    = max(1, (int) ceil($totalFiltered / $perPage));
+    $page          = max(1, min($totalPages, (int) ($_GET['page'] ?? 1)));
+    $offset        = ($page - 1) * $perPage;
+
     $stmt = $db->prepare(
         "SELECT t.*, tp.name AS priority_name, tp.color AS priority_color,
                 CONCAT(a.first_name, ' ', a.last_name) AS agent_name
          FROM tickets t
          LEFT JOIN ticket_priorities tp ON t.priority_id = tp.id
          LEFT JOIN users a ON t.assigned_to = a.id
-         WHERE t.status NOT IN ('resolved','closed')
-         ORDER BY t.created_at ASC"
+         WHERE $where
+         ORDER BY t.created_at ASC
+         LIMIT $perPage OFFSET $offset"
     );
-    $stmt->execute();
+    $stmt->execute($params);
     $tickets = $stmt->fetchAll();
-
-    $totalUnresolved = count($tickets);
-    $unassigned = 0;
-    $breachedCount = 0;
-    $totalAgeMin = 0;
-    $agingBuckets = [0, 0, 0, 0, 0]; // <1d, 1-3d, 3-7d, 7-14d, >14d
-    $byStatus = [];
 
     $now = new DateTime();
     foreach ($tickets as &$t) {
-        if (empty($t['assigned_to'])) $unassigned++;
-        if ($t['sla_state'] === 'breached') $breachedCount++;
-
         $created = new DateTime($t['created_at']);
         $diffMin = ($now->getTimestamp() - $created->getTimestamp()) / 60;
-        $totalAgeMin += $diffMin;
         $t['age_display'] = formatMinutes($diffMin);
-
-        $days = $diffMin / 1440;
-        if ($days < 1) $agingBuckets[0]++;
-        elseif ($days < 3) $agingBuckets[1]++;
-        elseif ($days < 7) $agingBuckets[2]++;
-        elseif ($days < 14) $agingBuckets[3]++;
-        else $agingBuckets[4]++;
-
-        $byStatus[$t['status']] = ($byStatus[$t['status']] ?? 0) + 1;
     }
     unset($t);
 
-    $avgAge = $totalUnresolved > 0 ? formatMinutes($totalAgeMin / $totalUnresolved) : '—';
-
-    $byStatusArr = [];
-    foreach ($byStatus as $status => $count) {
-        $byStatusArr[] = ['status' => $status, 'count' => $count];
+    // ── AJAX: emit just the partial and exit ───────────────────────
+    if ($isAjax) {
+        require ROOT_DIR . '/templates/pages/admin/reports/_unresolved-table.php';
+        exit;
     }
-    $byStatus = $byStatusArr;
+
+    // ── Aggregate stats for summary cards + drilldown tiles ────────
+    // (UNFILTERED — these are the navigation source.)
+    $agg = $db->query(
+        "SELECT
+            COUNT(*) AS total_unresolved,
+            SUM(CASE WHEN assigned_to IS NULL THEN 1 ELSE 0 END) AS unassigned,
+            SUM(CASE WHEN sla_state = 'breached' THEN 1 ELSE 0 END) AS breached,
+            AVG(TIMESTAMPDIFF(MINUTE, created_at, NOW())) AS avg_age_min,
+            SUM(CASE WHEN TIMESTAMPDIFF(HOUR, created_at, NOW()) < 24 THEN 1 ELSE 0 END) AS age_0,
+            SUM(CASE WHEN TIMESTAMPDIFF(HOUR, created_at, NOW()) >= 24  AND TIMESTAMPDIFF(HOUR, created_at, NOW()) < 72  THEN 1 ELSE 0 END) AS age_1,
+            SUM(CASE WHEN TIMESTAMPDIFF(HOUR, created_at, NOW()) >= 72  AND TIMESTAMPDIFF(HOUR, created_at, NOW()) < 168 THEN 1 ELSE 0 END) AS age_2,
+            SUM(CASE WHEN TIMESTAMPDIFF(HOUR, created_at, NOW()) >= 168 AND TIMESTAMPDIFF(HOUR, created_at, NOW()) < 336 THEN 1 ELSE 0 END) AS age_3,
+            SUM(CASE WHEN TIMESTAMPDIFF(HOUR, created_at, NOW()) >= 336 THEN 1 ELSE 0 END) AS age_4
+         FROM tickets
+         WHERE status NOT IN ('resolved','closed')"
+    )->fetch();
+
+    $totalUnresolved = (int) $agg['total_unresolved'];
+    $unassigned      = (int) $agg['unassigned'];
+    $breachedCount   = (int) $agg['breached'];
+    $avgAge          = $totalUnresolved > 0 ? formatMinutes((float) $agg['avg_age_min']) : '—';
+    $agingBuckets    = [
+        (int) $agg['age_0'], (int) $agg['age_1'], (int) $agg['age_2'],
+        (int) $agg['age_3'], (int) $agg['age_4'],
+    ];
+
+    $byStatus = $db->query(
+        "SELECT status, COUNT(*) AS count
+         FROM tickets
+         WHERE status NOT IN ('resolved','closed')
+         GROUP BY status
+         ORDER BY count DESC"
+    )->fetchAll();
 
     render('admin/reports/unresolved', compact(
         'tickets', 'totalUnresolved', 'unassigned', 'breachedCount', 'avgAge',
-        'agingBuckets', 'byStatus'
+        'agingBuckets', 'byStatus', 'page', 'perPage', 'totalPages',
+        'totalFiltered', 'statusFilter', 'ageFilter'
     ));
 });
 
