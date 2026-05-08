@@ -1313,6 +1313,59 @@ function checkTicketDuplicates(int $userId, int $typeId, ?int $locationId, strin
 }
 
 /**
+ * Record that the requester saw AI duplicate-warning suggestions for this
+ * ticket and chose to file it anyway. Writes a single internal timeline
+ * entry on the new ticket so admins can audit overrides, and links the
+ * matching `ai_duplicate_classifications` row (if found) to the new
+ * ticket id with decision='suppressed'.
+ *
+ * Safe to call with an empty / malformed CSV — does nothing in that case.
+ */
+function recordDupOverrideOnNewTicket(PDO $db, int $newTicketId, int $userId, string $matchedIdsCsv): void
+{
+    $ids = array_values(array_unique(array_filter(array_map(
+        static fn($s) => (int) trim($s),
+        explode(',', $matchedIdsCsv)
+    ), static fn($i) => $i > 0)));
+    if (empty($ids)) { return; }
+
+    // Resolve to subjects so the timeline entry is human-readable, not
+    // just bare numbers. Skip any IDs that don't exist (stale form submit).
+    $place = implode(',', array_fill(0, count($ids), '?'));
+    $sStmt = $db->prepare("SELECT id, subject FROM tickets WHERE id IN ({$place})");
+    $sStmt->execute($ids);
+    $rows = $sStmt->fetchAll();
+    if (empty($rows)) { return; }
+
+    $links = array_map(
+        static fn($r) => '#' . (int) $r['id'] . ' "' . mb_substr((string) $r['subject'], 0, 80) . '"',
+        $rows
+    );
+    $details = 'AI flagged this as a possible duplicate of ' . implode(', ', $links)
+             . ' &mdash; submitter chose to file anyway.';
+
+    $db->prepare(
+        "INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal)
+         VALUES (?, NULL, 'ai_duplicate_warned', ?, 1)"
+    )->execute([$newTicketId, $details]);
+
+    // Link the audit row (most recent 'suggested' for this user, last 5 min)
+    // to the new ticket so admins can correlate the AI verdict with the
+    // ticket that ultimately got created.
+    try {
+        $db->prepare(
+            "UPDATE ai_duplicate_classifications
+             SET chosen_ticket_id = ?, decision = 'suppressed'
+             WHERE user_id = ? AND decision = 'suggested'
+               AND created_at >= NOW() - INTERVAL 5 MINUTE
+             ORDER BY id DESC LIMIT 1"
+        )->execute([$newTicketId, $userId]);
+    } catch (\Throwable $e) {
+        error_log('[AI dup-check] audit link failed: ' . $e->getMessage());
+    }
+}
+
+/**
  * "No Wrong Door" group routing. Run for ticket types flagged with
  * ai_route_group=1: ask the AI to pick the best group from every
  * non-confidential group (using the description column to ground the

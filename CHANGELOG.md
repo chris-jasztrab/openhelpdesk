@@ -11,6 +11,14 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.38.1 &mdash; 2026-05-08
+
+### New features
+- **AI classification notes are now visible to admins in the ticket timeline.** AI-generated timeline entries (`ai_classified` skill verdicts, `ai_group_routed` "No Wrong Door" decisions, the new `ai_duplicate_warned` audit, plus any other system-generated internal entries) were always being written to `ticket_timeline` but the agent ticket view was filtering out everything `is_internal=1` with no `user_name` &mdash; meaning admins couldn't actually see the AI's reasoning, confidence, or sentiment. **Fix:** [templates/pages/agent/tickets/view.php](templates/pages/agent/tickets/view.php) now lets system entries through when `Auth::role() === 'admin'`, renders them with the existing `ld-timeline-system` blue stripe, and tags them with an "AI &middot; Admin only" badge so admins know what they're looking at and that requesters/agents don't see it. Action label + icon maps gained `ai_classified`, `ai_group_routed`, `ai_group_routing_skipped`, `ai_duplicate_warned` so each renders with a robot/signpost/files icon and a human-readable label instead of the generic "Ai Classified" fallback. Same label/icon map updates added to [templates/pages/admin/tickets/view.php](templates/pages/admin/tickets/view.php) which already renders system entries.
+- **Dup-check overrides are now audited on the new ticket.** When the requester sees the AI duplicate warning and clicks _Submit anyway_, all three create flows ([src/routes/portal.php](src/routes/portal.php), [src/routes/admin.php](src/routes/admin.php), [src/routes/floor.php](src/routes/floor.php)) now write an `ai_duplicate_warned` timeline entry on the new ticket linking the matched ticket numbers + subjects, so admins can see overrides happened. Hidden field `_dup_matched_ids` is populated by JS on the override click; new `recordDupOverrideOnNewTicket()` helper in [src/helpers.php](src/helpers.php) writes the timeline entry and links the original `ai_duplicate_classifications` audit row to the new ticket id with `decision='suppressed'`.
+
+---
+
 ## 2.38.0 &mdash; 2026-05-08
 
 ### New features

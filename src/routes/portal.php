@@ -376,6 +376,13 @@ $router->post('/portal/tickets/create', function () {
         'INSERT INTO ticket_timeline (ticket_id, user_id, action, details) VALUES (?, ?, ?, ?)'
     )->execute([$ticketId, Auth::id(), 'created', 'Ticket created.']);
 
+    // If the AI dup-check warned the user and they overrode it, record that
+    // on the new ticket so admins can see the override happened.
+    $dupOverrideCsv = (string) ($_POST['_dup_matched_ids'] ?? '');
+    if ($dupOverrideCsv !== '') {
+        recordDupOverrideOnNewTicket($db, $ticketId, (int) Auth::id(), $dupOverrideCsv);
+    }
+
     // Save custom field values
     if (!empty($visibleCustomFields)) {
         $cfSaveStmt = $db->prepare(

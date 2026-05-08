@@ -212,6 +212,7 @@ endif; ?>
             <!-- Hidden fields for browser/OS auto-detection -->
             <input type="hidden" id="browser_info" name="browser_info" value="">
             <input type="hidden" id="os_info" name="os_info" value="">
+            <input type="hidden" id="dup_matched_ids" name="_dup_matched_ids" value="">
 
             <hr class="my-4">
 
@@ -709,6 +710,8 @@ ClassicEditor.create(document.querySelector('#portal-ticket-editor'), {
 
         document.getElementById('dup-submit-anyway').addEventListener('click', () => {
             form.dataset.dupOverride = '1';
+            const idsField = document.getElementById('dup_matched_ids');
+            if (idsField) idsField.value = matches.map(m => m.ticket_id).join(',');
             dupBox.style.display = 'none';
             form.submit();
         });

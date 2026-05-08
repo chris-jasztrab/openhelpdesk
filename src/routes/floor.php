@@ -175,6 +175,11 @@ $router->post('/agent/floor/quick-create', function () {
     $db->prepare('INSERT INTO ticket_timeline (ticket_id, user_id, action, details) VALUES (?, ?, ?, ?)')
         ->execute([$ticketId, Auth::id(), 'created', 'Ticket created from floor mode quick-capture.']);
 
+    $dupOverrideCsv = (string) ($_POST['_dup_matched_ids'] ?? '');
+    if ($dupOverrideCsv !== '') {
+        recordDupOverrideOnNewTicket($db, $ticketId, (int) Auth::id(), $dupOverrideCsv);
+    }
+
     // Photo / file attachments captured by the camera input.
     if (!empty($_FILES['attachments']['name'][0] ?? null)) {
         $attachments = handleAttachmentUploads('attachments');

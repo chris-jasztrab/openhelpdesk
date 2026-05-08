@@ -3761,6 +3761,12 @@ $router->post('/admin/tickets/create', function () {
         'INSERT INTO ticket_timeline (ticket_id, user_id, action, details) VALUES (?, ?, ?, ?)'
     )->execute([$ticketId, Auth::id(), 'created', $timelineDetails]);
 
+    // If the AI dup-check warned the agent and they overrode it, audit that.
+    $dupOverrideCsv = (string) ($_POST['_dup_matched_ids'] ?? '');
+    if ($dupOverrideCsv !== '') {
+        recordDupOverrideOnNewTicket($db, $ticketId, (int) Auth::id(), $dupOverrideCsv);
+    }
+
     // Initialize SLA timers if priority is set
     if ($priId) {
         Sla::initializeForTicket($db, $ticketId, $priId, $typeId);

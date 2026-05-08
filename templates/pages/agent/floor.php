@@ -319,6 +319,7 @@
     <h3 id="floor-sheet-title">Quick ticket</h3>
     <form id="floor-quick-form" enctype="multipart/form-data" novalidate>
         <input type="hidden" name="_token" value="<?= e(csrfToken()) ?>">
+        <input type="hidden" id="fq-dup-matched-ids" name="_dup_matched_ids" value="">
 
         <label for="fq-subject">What happened?</label>
         <div class="input-with-mic">
@@ -542,6 +543,8 @@
 
         document.getElementById('fq-dup-anyway').addEventListener('click', function () {
             form.dataset.dupOverride = '1';
+            var idsField = document.getElementById('fq-dup-matched-ids');
+            if (idsField) idsField.value = matches.map(function (m) { return m.ticket_id; }).join(',');
             dupBox.style.display = 'none';
             if (typeof form.requestSubmit === 'function') form.requestSubmit();
             else form.submit();

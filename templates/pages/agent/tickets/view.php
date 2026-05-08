@@ -9,8 +9,8 @@ $breadcrumbs  = !empty($fromFloor) ? [] : [
 ];
 $statusColors = ['open' => 'primary', 'in_progress' => 'warning', 'pending' => 'info', 'waiting_on_customer' => 'warning', 'waiting_on_third_party' => 'dark', 'resolved' => 'success', 'closed' => 'secondary'];
 $statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 'Pending', 'waiting_on_customer' => 'Waiting on Customer', 'waiting_on_third_party' => 'Waiting on Third Party', 'resolved' => 'Resolved', 'closed' => 'Closed'];
-$actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-person-check text-primary', 'status_changed' => 'bi-arrow-repeat text-warning', 'priority_changed' => 'bi-flag text-danger', 'comment' => 'bi-chat-dots text-info', 'internal_note' => 'bi-lock text-secondary', 'sla_set' => 'bi-stopwatch text-primary', 'sla_paused' => 'bi-pause-circle text-warning', 'sla_resumed' => 'bi-play-circle text-success', 'merged' => 'bi-arrow-right-circle text-secondary', 'split' => 'bi-scissors text-warning', 'edited' => 'bi-pencil text-secondary', 'escalated' => 'bi-arrow-up-circle text-danger', 'stale_notification_sent' => 'bi-hourglass-split text-warning'];
-$actionLabels = ['created' => 'Created', 'assigned' => 'Assigned', 'status_changed' => 'Status Changed', 'priority_changed' => 'Priority Changed', 'comment' => 'Comment', 'internal_note' => 'Internal Note', 'sla_set' => 'SLA Set', 'sla_paused' => 'SLA Paused', 'sla_resumed' => 'SLA Resumed', 'merged' => 'Merged', 'split' => 'Split', 'edited' => 'Edited by Requester', 'escalated' => 'Escalated', 'stale_notification_sent' => 'Stale Reminder Sent'];
+$actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-person-check text-primary', 'status_changed' => 'bi-arrow-repeat text-warning', 'priority_changed' => 'bi-flag text-danger', 'comment' => 'bi-chat-dots text-info', 'internal_note' => 'bi-lock text-secondary', 'sla_set' => 'bi-stopwatch text-primary', 'sla_paused' => 'bi-pause-circle text-warning', 'sla_resumed' => 'bi-play-circle text-success', 'merged' => 'bi-arrow-right-circle text-secondary', 'split' => 'bi-scissors text-warning', 'edited' => 'bi-pencil text-secondary', 'escalated' => 'bi-arrow-up-circle text-danger', 'stale_notification_sent' => 'bi-hourglass-split text-warning', 'ai_classified' => 'bi-robot text-info', 'ai_group_routed' => 'bi-signpost-split text-info', 'ai_group_routing_skipped' => 'bi-signpost text-muted', 'ai_duplicate_warned' => 'bi-files text-warning'];
+$actionLabels = ['created' => 'Created', 'assigned' => 'Assigned', 'status_changed' => 'Status Changed', 'priority_changed' => 'Priority Changed', 'comment' => 'Comment', 'internal_note' => 'Internal Note', 'sla_set' => 'SLA Set', 'sla_paused' => 'SLA Paused', 'sla_resumed' => 'SLA Resumed', 'merged' => 'Merged', 'split' => 'Split', 'edited' => 'Edited by Requester', 'escalated' => 'Escalated', 'stale_notification_sent' => 'Stale Reminder Sent', 'ai_classified' => 'AI Classified', 'ai_group_routed' => 'AI Routed', 'ai_group_routing_skipped' => 'AI Routing Skipped', 'ai_duplicate_warned' => 'AI Duplicate Warning'];
 $slaStateColors = ['on_track' => 'success', 'warning' => 'warning', 'breached' => 'danger'];
 $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' => 'Breached'];
 ?>
@@ -224,10 +224,12 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
                 <div class="list-group list-group-flush">
                     <?php foreach ($timeline as $tlIdx => $entry):
                         $isSystem = $entry['is_internal'] && !$entry['user_name'];
-                        if ($isSystem) continue;
+                        $isAi     = $isSystem && str_starts_with((string) $entry['action'], 'ai_');
+                        // Admins see AI/system notes; non-admins still don't.
+                        if ($isSystem && Auth::role() !== 'admin') continue;
                         $isOlder  = $tlIdx >= 10;
                         $isNote   = $entry['is_internal'] && $entry['user_name'];
-                        $tlClass  = $isNote ? 'ld-timeline-note' : '';
+                        $tlClass  = $isNote ? 'ld-timeline-note' : ($isSystem ? 'ld-timeline-system' : '');
                     ?>
                     <div class="list-group-item px-4 py-3 <?= $tlClass ?><?= $isOlder ? ' timeline-older-item' : '' ?>"
                          <?= $isOlder ? 'style="display:none;"' : '' ?>>
@@ -246,6 +248,8 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
                                         <span class="text-muted ms-1"><?= e($actionLabels[$entry['action']] ?? ucwords(str_replace('_', ' ', $entry['action']))) ?></span>
                                         <?php if ($isNote): ?>
                                         <span class="badge ms-1" style="background:var(--ld-timeline-note-accent); color:#fff;">Internal</span>
+                                        <?php elseif ($isAi): ?>
+                                        <span class="badge ms-1 bg-info text-dark" title="Visible to admins only"><i class="bi bi-robot me-1"></i>AI &middot; Admin only</span>
                                         <?php endif; ?>
                                     </div>
                                     <small class="text-muted"><?= date('M j, Y g:i A', strtotime($entry['created_at'])) ?></small>
