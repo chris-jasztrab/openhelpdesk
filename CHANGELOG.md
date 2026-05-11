@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.40.1 &mdash; 2026-05-11
+
+### Bug fixes
+- **Header search placeholder is now legible.** The "Search&hellip; ( / )" placeholder in the global search input was rendered at 45% white opacity against the dark indigo navbar gradient, which made it look washed out and easy to miss. **Fix:** bumped the placeholder colour in [templates/layouts/app.php](templates/layouts/app.php) from `rgba(255,255,255,.45)` to `rgba(255,255,255,.75)`. Typed text was already pure white via Bootstrap's `text-white` class on the input, so only the placeholder needed the boost.
+
+---
+
 ## 2.40.0 &mdash; 2026-05-08
 
 ### New features

@@ -123,7 +123,7 @@
         .ld-bell-active .bi-bell { color: #fbbf24 !important; animation: ld-bell-glow 2s ease-in-out infinite; }
 
         /* Global Search */
-        #ld-search-input::placeholder { color: rgba(255,255,255,.45); }
+        #ld-search-input::placeholder { color: rgba(255,255,255,.75); }
         #ld-search-input:focus { background: rgba(255,255,255,.18) !important; }
         .ld-search-tab {
             font-size: .75rem; color: #64748b; border-radius: .375rem .375rem 0 0;
