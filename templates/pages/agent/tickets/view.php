@@ -109,15 +109,12 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
             </button>
         </form>
         <?php if (!$ticket['merged_into_ticket_id']): ?>
+        <?php if ($hasEscalationPath): ?>
         <?php
             $canEscalate = !in_array($ticket['status'], ['resolved', 'closed'], true);
             $escTitle = 'Escalate this ticket to the next person in the path';
             if (!$canEscalate) {
                 $escTitle = 'Closed tickets cannot be escalated.';
-            } elseif (!$ticket['type_id']) {
-                $escTitle = 'Set a ticket type first — escalation paths are defined per type.';
-            } elseif (!$hasEscalationPath) {
-                $escTitle = 'No escalation path is configured for this ticket type.';
             } elseif (!$nextEscalationStep) {
                 $escTitle = 'No further escalation step is available — you are at the top of the chain (or the next step is you).';
             } else {
@@ -134,6 +131,7 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
                 data-bs-target="#escalateModal">
             <i class="bi bi-arrow-up-circle me-1"></i>Escalate
         </button>
+        <?php endif; ?>
         <a href="/agent/tickets/<?= (int) $ticket['id'] ?>/split" id="tour-split-btn" class="btn btn-outline-warning">
             <i class="bi bi-scissors me-1"></i>Split
         </a>

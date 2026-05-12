@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.40.2 &mdash; 2026-05-12
+
+### Bug fixes
+- **Escalate button is now hidden on tickets whose type has no escalation path configured.** Before, [templates/pages/agent/tickets/view.php](templates/pages/agent/tickets/view.php) and [templates/pages/portal/tickets/view.php](templates/pages/portal/tickets/view.php) always rendered the **Escalate** button and merely disabled it with a tooltip when no path was wired up &mdash; which still drew the eye, invited hover-discovery, and suggested an action the user could never take. **Fix:** both views now gate the button on `$hasEscalationPath` (computed in [src/routes/agent.php](src/routes/agent.php) and [src/routes/portal.php](src/routes/portal.php) as `COUNT(*) > 0` against `ticket_escalation_steps` for the ticket's `type_id`), so the button is omitted entirely when the type has no steps &mdash; or when no type is set yet, since `$hasEscalationPath` is initialised to `false` in that case too. The "at the top of the chain" and "closed ticket" disabled states are preserved (path exists, but no `$nextEscalationStep` is reachable), since those are meaningful "you have an escalation lane, you just can't take it right now" signals rather than configuration gaps. The escalate modal is unchanged &mdash; it was already gated on `$nextEscalationStep`.
+
+---
+
 ## 2.40.1 &mdash; 2026-05-11
 
 ### Bug fixes

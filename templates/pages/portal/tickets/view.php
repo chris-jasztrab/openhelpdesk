@@ -70,14 +70,11 @@ $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-p
         <a href="/portal/tickets/<?= $ticket['id'] ?>/edit" class="btn btn-outline-primary btn-sm">
             <i class="bi bi-pencil me-1"></i>Edit
         </a>
+        <?php if ($hasEscalationPath): ?>
         <?php
             $escCanEscalate = !in_array($ticket['status'], ['resolved', 'closed'], true) && empty($ticket['merged_into_ticket_id']);
             if (!$escCanEscalate) {
                 $escTitle = 'Closed tickets cannot be escalated.';
-            } elseif (!$ticket['type_id']) {
-                $escTitle = 'A ticket type must be set before this ticket can be escalated.';
-            } elseif (!$hasEscalationPath) {
-                $escTitle = 'No escalation path is configured for this ticket type yet.';
             } elseif (!$nextEscalationStep) {
                 $escTitle = 'This ticket is already at the top of its escalation chain.';
             } else {
@@ -94,6 +91,7 @@ $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-p
                 data-bs-target="#escalateModal">
             <i class="bi bi-arrow-up-circle me-1"></i>Escalate
         </button>
+        <?php endif; ?>
         <button type="button" class="btn btn-outline-secondary btn-sm"
                 data-bs-toggle="modal" data-bs-target="#closeTicketModal">
             <i class="bi bi-x-circle me-1"></i><?= e(label('portal.action.close', 'Close this request')) ?>
