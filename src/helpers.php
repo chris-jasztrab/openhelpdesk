@@ -183,76 +183,145 @@ function isActive(string $path): bool
     return $current === $path || str_starts_with($current, $path . '/');
 }
 
-/* ── Custom form fields by ticket type ────────────────────────── */
+/* ── Form builder: per-ticket-type layout ──────────────────────── */
 
 /**
- * Return custom fields that should appear for a given ticket type.
- * Fields with no rows in ticket_form_field_type_map are "global" (show for all types).
+ * Stable list of system-field keys (in default order). The form layout
+ * table allows admins to reorder them per ticket type, but these are the
+ * only known keys — anything else is treated as a custom field id.
  */
-function getCustomFieldsForType(PDO $db, int $typeId, bool $visibleOnly = false): array
+const SYSTEM_FIELD_KEYS = ['subject','description','ticket_type','location','priority','tags','attachments'];
+
+/**
+ * Default presentation for a system field — the seed an admin gets the
+ * first time they look at a new ticket type's form.
+ */
+function systemFieldDefaults(): array
 {
-    $visibleClause = $visibleOnly ? 'AND f.is_visible = 1' : '';
+    return [
+        'subject'     => ['sort_order' => 0,   'visibility' => 'required', 'lockedVisibility' => true,  'lockedOrder' => true],
+        'description' => ['sort_order' => 50,  'visibility' => 'required', 'lockedVisibility' => true,  'lockedOrder' => true],
+        'ticket_type' => ['sort_order' => 100, 'visibility' => 'required', 'lockedVisibility' => true,  'lockedOrder' => false],
+        'location'    => ['sort_order' => 200, 'visibility' => 'optional', 'lockedVisibility' => false, 'lockedOrder' => false],
+        'priority'    => ['sort_order' => 300, 'visibility' => 'optional', 'lockedVisibility' => false, 'lockedOrder' => false],
+        'tags'        => ['sort_order' => 400, 'visibility' => 'optional', 'lockedVisibility' => false, 'lockedOrder' => false],
+        'attachments' => ['sort_order' => 900, 'visibility' => 'optional', 'lockedVisibility' => false, 'lockedOrder' => false],
+    ];
+}
+
+/**
+ * Seed default layout rows for a newly-created ticket type. Idempotent —
+ * skips any row that already exists.
+ */
+function seedDefaultLayoutForType(PDO $db, int $typeId): void
+{
+    $insert = $db->prepare(
+        'INSERT IGNORE INTO ticket_type_form_layout
+            (type_id, field_kind, field_key, sort_order, visibility, label_override)
+         VALUES (?, ?, ?, ?, ?, NULL)'
+    );
+    foreach (systemFieldDefaults() as $key => $cfg) {
+        $insert->execute([$typeId, 'system', $key, $cfg['sort_order'], $cfg['visibility']]);
+    }
+}
+
+/**
+ * Return the full form layout for a single ticket type, in display order.
+ *
+ * Each row: [
+ *   'kind'           => 'system'|'custom',
+ *   'key'            => string                  (e.g. 'priority' or '42'),
+ *   'sort_order'     => int,
+ *   'visibility'     => 'required'|'optional'|'hidden',
+ *   'label_override' => ?string,
+ *   'label'          => string                  (resolved — override OR default),
+ *   'field'          => ?array                  (ticket_form_fields row for custom; null for system),
+ * ]
+ *
+ * If $visibleOnly is true, rows with visibility = 'hidden' are dropped — use
+ * this when rendering the actual ticket-create form. Pass false for the
+ * builder UI.
+ */
+function getFormLayoutForType(PDO $db, ?int $typeId, bool $visibleOnly = false): array
+{
+    if (!$typeId) {
+        return [];
+    }
     $stmt = $db->prepare(
-        "SELECT f.*
-         FROM ticket_form_fields f
-         LEFT JOIN ticket_form_field_type_map m ON f.id = m.field_id
-         WHERE f.deleted_at IS NULL {$visibleClause}
-         GROUP BY f.id
-         HAVING COUNT(m.type_id) = 0 OR SUM(m.type_id = ?) > 0
-         ORDER BY f.sort_order"
+        'SELECT l.type_id, l.field_kind, l.field_key, l.sort_order, l.visibility, l.label_override,
+                f.id AS field_id, f.field_type, f.label AS field_label, f.placeholder, f.config
+         FROM ticket_type_form_layout l
+         LEFT JOIN ticket_form_fields f
+            ON l.field_kind = "custom" AND f.id = CAST(l.field_key AS UNSIGNED) AND f.deleted_at IS NULL
+         WHERE l.type_id = ?
+            AND (l.field_kind = "system" OR f.id IS NOT NULL)
+         ORDER BY l.sort_order, l.field_kind'
     );
     $stmt->execute([$typeId]);
-    return $stmt->fetchAll();
-}
+    $rows = $stmt->fetchAll();
 
-/**
- * Return the full field→type mapping as [field_id => [type_id, …]].
- * Fields with no mapping (global) will not have an entry.
- */
-function getFieldTypeMap(PDO $db): array
-{
-    $rows = $db->query('SELECT field_id, type_id FROM ticket_form_field_type_map')->fetchAll();
-    $map = [];
+    $out = [];
     foreach ($rows as $r) {
-        $map[(int) $r['field_id']][] = (int) $r['type_id'];
+        if ($visibleOnly && $r['visibility'] === 'hidden') continue;
+        $kind = $r['field_kind'];
+        $key  = $r['field_key'];
+
+        if ($kind === 'system') {
+            $defaultLabel = (string) getSetting('sys_field_label_' . $key, ucfirst(str_replace('_', ' ', $key)));
+        } else {
+            $defaultLabel = (string) $r['field_label'];
+        }
+
+        $field = null;
+        if ($kind === 'custom' && $r['field_id'] !== null) {
+            $field = [
+                'id'          => (int) $r['field_id'],
+                'field_type'  => $r['field_type'],
+                'label'       => $r['field_label'],
+                'placeholder' => $r['placeholder'],
+                'config'      => $r['config'],
+            ];
+        }
+
+        $out[] = [
+            'kind'           => $kind,
+            'key'            => $key,
+            'sort_order'     => (int) $r['sort_order'],
+            'visibility'     => $r['visibility'],
+            'label_override' => $r['label_override'],
+            'label'          => $r['label_override'] ?: $defaultLabel,
+            'field'          => $field,
+        ];
     }
-    return $map;
+    return $out;
 }
 
 /**
- * Resolve the effective priority-field visibility for a given ticket type.
- *
- * Each ticket type stores one of: 'inherit', 'required', 'optional', 'hidden'.
- * 'inherit' (or an unknown / null type) falls back to the global
- *  `sys_field_required_priority` setting:
- *   - '1' → 'required'
- *   - anything else → 'optional'
- *
- * Returns one of: 'required', 'optional', 'hidden'.
+ * Resolve the visibility of a single field on a single ticket type's form.
+ * Returns 'required' | 'optional' | 'hidden'. If no layout row exists for
+ * this type/field, returns 'hidden' (defensive — caller should generally
+ * see the layout it just rendered).
  */
-function resolvePriorityVisibility(PDO $db, ?int $typeId): string
+function resolveFieldVisibility(PDO $db, ?int $typeId, string $kind, string $key): string
 {
-    $globalRequired = getSetting('sys_field_required_priority', '0') === '1';
-    $fallback = $globalRequired ? 'required' : 'optional';
-    if (!$typeId) {
-        return $fallback;
-    }
+    if (!$typeId) return 'hidden';
     static $cache = [];
-    if (!array_key_exists($typeId, $cache)) {
-        $stmt = $db->prepare('SELECT priority_visibility FROM ticket_types WHERE id = ?');
-        $stmt->execute([$typeId]);
-        $cache[$typeId] = $stmt->fetchColumn() ?: 'inherit';
+    $ck = "{$typeId}|{$kind}|{$key}";
+    if (!array_key_exists($ck, $cache)) {
+        $stmt = $db->prepare(
+            'SELECT visibility FROM ticket_type_form_layout
+             WHERE type_id = ? AND field_kind = ? AND field_key = ?'
+        );
+        $stmt->execute([$typeId, $kind, $key]);
+        $cache[$ck] = $stmt->fetchColumn() ?: 'hidden';
     }
-    $v = $cache[$typeId];
-    if (in_array($v, ['required', 'optional', 'hidden'], true)) {
-        return $v;
-    }
-    return $fallback;
+    return $cache[$ck];
 }
 
 /**
  * Look up the system "default" priority — the priority with the lowest
- * sort_order (tiebroken by id). Returns null only if no priorities exist.
+ * sort_order (tiebroken by id). Used to backfill when priority is hidden
+ * for the chosen ticket type. Returns null only if no priorities exist.
  */
 function getDefaultPriorityId(PDO $db): ?int
 {
@@ -265,113 +334,53 @@ function getDefaultPriorityId(PDO $db): ?int
 }
 
 /**
- * Build a map of type_id → effective priority visibility for client-side
- * use (so the form can toggle the field as the user changes type).
- * The 0 key carries the global fallback for "no type selected yet".
+ * Custom field ids that appear on each ticket type — used to filter
+ * options/etc. queries. Returns [type_id => [field_id, ...]].
  */
-function getPriorityVisibilityMap(PDO $db): array
+function getCustomFieldIdsByType(PDO $db): array
 {
-    $globalRequired = getSetting('sys_field_required_priority', '0') === '1';
-    $fallback = $globalRequired ? 'required' : 'optional';
-    $rows = $db->query('SELECT id, priority_visibility FROM ticket_types')->fetchAll();
-    $map = [0 => $fallback];
+    $rows = $db->query(
+        'SELECT type_id, field_key FROM ticket_type_form_layout
+         WHERE field_kind = "custom" AND visibility != "hidden"'
+    )->fetchAll();
+    $map = [];
     foreach ($rows as $r) {
-        $v = $r['priority_visibility'] ?? 'inherit';
-        $map[(int) $r['id']] = in_array($v, ['required', 'optional', 'hidden'], true) ? $v : $fallback;
+        $map[(int) $r['type_id']][] = (int) $r['field_key'];
     }
     return $map;
 }
 
-/* ── Unified field list (system + custom, sorted) ────────────── */
-
 /**
- * Default sort_order values for orderable system fields.
- * Subject and Description are always pinned first and are NOT included.
+ * For every ticket type, the list of custom-field ids whose visibility is
+ * 'required' for that type. Used server-side to know which custom fields
+ * must be present in a submitted payload.
  */
-function systemFieldSortDefaults(): array
+function getRequiredCustomFieldIdsForType(PDO $db, int $typeId): array
 {
-    return [
-        'ticket_type' => 100,
-        'location'    => 200,
-        'priority'    => 300,
-        'tags'        => 400,
-        'attachments' => 900,
-    ];
+    $stmt = $db->prepare(
+        'SELECT field_key FROM ticket_type_form_layout
+         WHERE type_id = ? AND field_kind = "custom" AND visibility = "required"'
+    );
+    $stmt->execute([$typeId]);
+    return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
 }
 
 /**
- * Build a unified, sorted list of system fields and custom fields.
- * Subject and Description are excluded — they are always pinned at the top.
- *
- * Each entry: ['kind' => 'system'|'custom', 'key' => string, 'sort_order' => int, 'field' => array|null]
+ * Map of [field_id => [type_id, ...]] — used by the ticket-create page JS
+ * to show/hide custom fields as the user changes ticket type. Mirrors the
+ * old getFieldTypeMap() shape so callers can drop in without changes.
  */
-function getUnifiedFieldList(PDO $db, bool $visibleOnly = false): array
+function getCustomFieldTypeMap(PDO $db): array
 {
-    $defaults = systemFieldSortDefaults();
-    $unified  = [];
-
-    foreach ($defaults as $key => $defaultOrder) {
-        if ($key === 'tags' && getSetting('tags_enabled', '1') !== '1') {
-            continue;
-        }
-        $unified[] = [
-            'kind'       => 'system',
-            'key'        => $key,
-            'sort_order' => (int) getSetting("sys_field_sort_order_{$key}", (string) $defaultOrder),
-            'field'      => null,
-        ];
-    }
-
-    $visibleClause = $visibleOnly ? 'AND f.is_visible = 1' : '';
     $rows = $db->query(
-        "SELECT f.*
-         FROM ticket_form_fields f
-         WHERE f.deleted_at IS NULL {$visibleClause}
-         ORDER BY f.sort_order"
+        'SELECT type_id, field_key FROM ticket_type_form_layout
+         WHERE field_kind = "custom" AND visibility != "hidden"'
     )->fetchAll();
-
-    foreach ($rows as $cf) {
-        $unified[] = [
-            'kind'       => 'custom',
-            'key'        => 'field_' . $cf['id'],
-            'sort_order' => (int) $cf['sort_order'],
-            'field'      => $cf,
-        ];
+    $map = [];
+    foreach ($rows as $r) {
+        $map[(int) $r['field_key']][] = (int) $r['type_id'];
     }
-
-    usort($unified, function ($a, $b) {
-        $cmp = $a['sort_order'] <=> $b['sort_order'];
-        return $cmp !== 0 ? $cmp : ($a['kind'] === 'system' ? 0 : 1) <=> ($b['kind'] === 'system' ? 0 : 1);
-    });
-
-    return $unified;
-}
-
-/**
- * One-time migration: when sys_field_sort_order_ticket_type has never been set,
- * renumber all custom field sort_orders to fit into the unified numbering scheme.
- * Custom fields get placed between tags (400) and attachments (900).
- */
-function normalizeFieldSortOrders(PDO $db): void
-{
-    if (getSetting('sys_field_sort_order_ticket_type', '') !== '') {
-        return; // Already initialized
-    }
-
-    // Set system field defaults
-    foreach (systemFieldSortDefaults() as $key => $val) {
-        setSetting("sys_field_sort_order_{$key}", (string) $val);
-    }
-
-    // Renumber custom fields starting at 410 (between tags=400 and attachments=900)
-    $fields = $db->query(
-        'SELECT id FROM ticket_form_fields WHERE deleted_at IS NULL ORDER BY sort_order'
-    )->fetchAll();
-    $stmt = $db->prepare('UPDATE ticket_form_fields SET sort_order = ? WHERE id = ?');
-    $start = 410;
-    foreach ($fields as $i => $f) {
-        $stmt->execute([$start + $i, (int) $f['id']]);
-    }
+    return $map;
 }
 
 /* ── Flash messages ───────────────────────────────────────────── */

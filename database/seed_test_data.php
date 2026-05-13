@@ -135,15 +135,17 @@ echo "[OK] SLA, holidays, settings seeded.\n";
 
 // ── Custom Ticket Fields ───────────────────────────────────────────
 // id: 1=text  2=dropdown  3=checkbox  4=date  5=number  6=decimal  7=textarea  8=dependent
-$pdo->exec("INSERT INTO ticket_form_fields (field_type,label,placeholder,is_required,is_visible,sort_order) VALUES
- ('text',     'Library Card Number',        'e.g. 29141001234567', 0,1,1),
- ('dropdown', 'IT Category',                NULL,                  0,1,2),
- ('checkbox', 'Patron-Facing Issue',         NULL,                  0,1,3),
- ('date',     'Target Resolution Date',      NULL,                  0,1,4),
- ('number',   'Affected Users Count',        'e.g. 5',              0,1,5),
- ('decimal',  'Estimated Cost (\$)',          'e.g. 150.00',         0,0,6),
- ('textarea', 'Vendor / Supplier Notes',     '',                    0,0,7),
- ('dependent','Location > Area > Workstation',NULL,                 0,1,8)");
+// (per-type visibility + sort order lives in ticket_type_form_layout, seeded
+//  for each existing ticket type when the migration runs at the end of this file)
+$pdo->exec("INSERT INTO ticket_form_fields (field_type,label,placeholder) VALUES
+ ('text',     'Library Card Number',         'e.g. 29141001234567'),
+ ('dropdown', 'IT Category',                 NULL),
+ ('checkbox', 'Patron-Facing Issue',         NULL),
+ ('date',     'Target Resolution Date',      NULL),
+ ('number',   'Affected Users Count',        'e.g. 5'),
+ ('decimal',  'Estimated Cost (\$)',         'e.g. 150.00'),
+ ('textarea', 'Vendor / Supplier Notes',     ''),
+ ('dependent','Location > Area > Workstation',NULL)");
 // Dropdown options (field 2) → ids 1–6
 $pdo->exec("INSERT INTO ticket_form_field_options (field_id,label,sort_order) VALUES
  (2,'Hardware',1),(2,'Software',2),(2,'Network',3),(2,'Account Management',4),(2,'Printing',5),(2,'Other',6)");
@@ -711,6 +713,13 @@ $pdo->exec("INSERT INTO audit_log (user_id,action,target_type,target_id,detail,i
  (1,'create_field',  'field', 8,'Added custom field: Location > Area > Workstation','192.168.1.10','2025-12-15 09:30:00')");
 
 echo "[OK] Scheduled reports and audit log seeded.\n";
+
+// Run pending migrations to bring this fresh schema up to current.
+// schema.sql captures only an older snapshot; migrations 037+ etc still need to apply.
+echo "[..] Running migrations...\n";
+require ROOT_DIR . '/database/migrate.php';
+echo "[OK] Migrations applied.\n";
+
 echo "\n✓ All test data seeded successfully!\n";
 echo "  Tickets:        62 (60 regular + 2 splits)\n";
 echo "  Users:          14 (1 admin, 3 agents, 10 patrons)\n";

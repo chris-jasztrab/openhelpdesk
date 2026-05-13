@@ -115,19 +115,14 @@ $statusOptions = [
                 </div>
             </div>
 
-            <!-- Classification & Custom Fields (unified order) -->
+            <!-- Classification & Custom Fields -->
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-transparent fw-semibold">
                     <i class="bi bi-tags me-1"></i>Classification & Details
                 </div>
                 <div class="card-body">
                     <div class="row g-3">
-                    <?php
-                    $portalMode = false;
-                    foreach ($unifiedFields as $uf):
-                        if ($uf['kind'] === 'system'):
-                    ?>
-                        <?php if ($uf['key'] === 'ticket_type'): ?>
+                        <!-- Type picker (always shown, drives the layout below) -->
                         <div class="col-md-6 col-lg-4">
                             <label for="type_id" class="form-label fw-semibold">Type</label>
                             <select class="form-select" id="type_id" name="type_id">
@@ -140,6 +135,7 @@ $statusOptions = [
                                 <?php endforeach; ?>
                             </select>
                         </div>
+                        <!-- Status (admin-only, not in layout) -->
                         <div class="col-md-6 col-lg-4">
                             <label for="status" class="form-label fw-semibold">Status</label>
                             <select class="form-select" id="status" name="status">
@@ -151,22 +147,43 @@ $statusOptions = [
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <?php elseif ($uf['key'] === 'priority'): ?>
-                        <div class="col-md-6 col-lg-4" id="priorityFieldWrap">
-                            <label for="priority_id" class="form-label fw-semibold">Priority</label>
-                            <select class="form-select" id="priority_id" name="priority_id">
-                                <option value="">— None —</option>
-                                <?php foreach ($priorities as $pri): ?>
-                                    <option value="<?= $pri['id'] ?>"
-                                        <?= old('priority_id', '') == $pri['id'] ? 'selected' : '' ?>>
-                                        <?= e($pri['name']) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <?php elseif ($uf['key'] === 'location'): ?>
+                        <!-- Due date (admin-only, not in layout) -->
                         <div class="col-md-6 col-lg-4">
-                            <label for="location_id" class="form-label fw-semibold"><?= label('location.singular') ?></label>
+                            <label for="due_date" class="form-label fw-semibold">Due Date</label>
+                            <input type="date" class="form-control" id="due_date" name="due_date"
+                                   value="<?= e(old('due_date', '')) ?>">
+                        </div>
+                    </div>
+
+                    <?php
+                    $portalMode = false;
+                    $initialTypeId = (int) (old('type_id', '0'));
+                    $initialLayout = $formLayouts[$initialTypeId] ?? [];
+                    $initialVis = [];
+                    foreach ($initialLayout as $r) {
+                        $initialVis[$r['kind'] . '|' . $r['key']] = $r['visibility'];
+                    }
+                    $visOf = function(string $kind, string $key) use ($initialVis, $initialTypeId): string {
+                        if (!$initialTypeId) return 'optional';
+                        return $initialVis[$kind . '|' . $key] ?? 'absent';
+                    };
+                    ?>
+
+                    <div id="dynamic-fields" class="row g-3 mt-0">
+                        <?php
+                        $dynamicSystemOrder = ['location', 'priority', 'tags', 'attachments'];
+                        foreach ($dynamicSystemOrder as $sysKey):
+                            $v = $visOf('system', $sysKey);
+                            $isAbsent = $v === 'absent' || $v === 'hidden';
+                            $wrapStyle = $isAbsent ? 'style="display:none;"' : '';
+                        ?>
+                        <?php if ($sysKey === 'location'): ?>
+                        <div class="col-md-6 col-lg-4 dynamic-field-wrap"
+                             data-field-kind="system" data-field-key="location" <?= $wrapStyle ?>>
+                            <label for="location_id" class="form-label fw-semibold">
+                                <?= label('location.singular') ?>
+                                <span class="text-danger field-required-star" <?= $v === 'required' ? '' : 'style="display:none;"' ?>>*</span>
+                            </label>
                             <select class="form-select" id="location_id" name="location_id">
                                 <option value="">— None —</option>
                                 <?php foreach ($locations as $loc): ?>
@@ -177,15 +194,31 @@ $statusOptions = [
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-md-6 col-lg-4">
-                            <label for="due_date" class="form-label fw-semibold">Due Date</label>
-                            <input type="date" class="form-control" id="due_date" name="due_date"
-                                   value="<?= e(old('due_date', '')) ?>">
+                        <?php elseif ($sysKey === 'priority'): ?>
+                        <div class="col-md-6 col-lg-4 dynamic-field-wrap"
+                             data-field-kind="system" data-field-key="priority" <?= $wrapStyle ?>>
+                            <label for="priority_id" class="form-label fw-semibold">
+                                Priority
+                                <span class="text-danger field-required-star" <?= $v === 'required' ? '' : 'style="display:none;"' ?>>*</span>
+                            </label>
+                            <select class="form-select" id="priority_id" name="priority_id">
+                                <option value="">— None —</option>
+                                <?php foreach ($priorities as $pri): ?>
+                                    <option value="<?= $pri['id'] ?>"
+                                        <?= old('priority_id', '') == $pri['id'] ? 'selected' : '' ?>>
+                                        <?= e($pri['name']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
-                        <?php elseif ($uf['key'] === 'tags'): ?>
+                        <?php elseif ($sysKey === 'tags'): ?>
                         <?php if (getSetting('tags_enabled', '1') === '1'): ?>
-                        <div class="col-12">
-                            <label class="form-label fw-semibold">Tags</label>
+                        <div class="col-12 dynamic-field-wrap"
+                             data-field-kind="system" data-field-key="tags" <?= $wrapStyle ?>>
+                            <label class="form-label fw-semibold">
+                                Tags
+                                <span class="text-danger field-required-star" <?= $v === 'required' ? '' : 'style="display:none;"' ?>>*</span>
+                            </label>
                             <div class="d-flex flex-wrap gap-2 mb-2" id="tagBadges"></div>
                             <div class="input-group" style="max-width:320px;">
                                 <span class="input-group-text text-muted">#</span>
@@ -197,19 +230,31 @@ $statusOptions = [
                             <div class="form-text mt-1">Press Enter or comma to add a tag.</div>
                         </div>
                         <?php endif; ?>
-                        <?php elseif ($uf['key'] === 'attachments'): ?>
-                        <!-- Attachments not shown on admin create form -->
+                        <?php elseif ($sysKey === 'attachments'): ?>
+                        <!-- attachments aren't part of the staff create form today -->
                         <?php endif; ?>
-                    <?php else:
-                        $cf    = $uf['field'];
-                        $cfKey = 'field_' . $cf['id'];
-                        $cfOpts = $fieldOptions[$cf['id']] ?? [];
-                    ?>
-                        <div class="col-12 custom-field-col" data-field-id="<?= (int) $cf['id'] ?>">
+                        <?php endforeach; ?>
+
+                        <?php
+                        $renderedCustomIds = [];
+                        foreach ($customFields as $cf) {
+                            $renderedCustomIds[(int) $cf['id']] = $cf;
+                        }
+                        foreach ($renderedCustomIds as $cf):
+                            $cfKey  = 'field_' . $cf['id'];
+                            $cfOpts = $fieldOptions[$cf['id']] ?? [];
+                            $v = $visOf('custom', (string) $cf['id']);
+                            $isAbsent = $v === 'absent' || $v === 'hidden';
+                            $cfRequired = $v === 'required';
+                        ?>
+                        <div class="col-12 dynamic-field-wrap custom-field-col"
+                             data-field-kind="custom"
+                             data-field-key="<?= (int) $cf['id'] ?>"
+                             data-field-id="<?= (int) $cf['id'] ?>"
+                             <?= $isAbsent ? 'style="display:none;"' : '' ?>>
                             <?php include ROOT_DIR . '/templates/partials/custom-field-input.php'; ?>
                         </div>
-                    <?php endif;
-                    endforeach; ?>
+                        <?php endforeach; ?>
                     </div>
                 </div>
             </div>
@@ -301,48 +346,61 @@ $statusOptions = [
 </div>
 
 <script>
-// ── Custom field type filtering ────────────────────────────────
-<?php if (!empty($customFields)): ?>
+// ── Per-type form layout: reorder + show/hide + required toggling ──
 (function() {
-    var fieldTypeMap = <?= json_encode($fieldTypeMap ?: new stdClass()) ?>;
-    var typeSelect   = document.getElementById('type_id');
+    var formLayouts = <?= json_encode($formLayouts ?? new stdClass()) ?>;
+    var typeSelect  = document.getElementById('type_id');
+    var dynRoot     = document.getElementById('dynamic-fields');
+    if (!typeSelect || !dynRoot) return;
 
-    function filterFieldsByType() {
-        var selectedType = parseInt(typeSelect.value) || 0;
-        document.querySelectorAll('.custom-field-col').forEach(function(col) {
-            var fieldId = col.dataset.fieldId;
-            var types   = fieldTypeMap[fieldId] || [];
-            var show    = selectedType > 0 && (types.length === 0 || types.indexOf(selectedType) !== -1);
-            col.style.display = show ? '' : 'none';
+    function setRequired(wrap, required) {
+        wrap.querySelectorAll('.field-required-star').forEach(function(el) {
+            el.style.display = required ? '' : 'none';
+        });
+        wrap.querySelectorAll('input, select, textarea').forEach(function(inp) {
+            if (inp.type === 'hidden' || inp.type === 'file') return;
+            if (required) inp.setAttribute('required', '');
+            else          inp.removeAttribute('required');
         });
     }
 
-    typeSelect.addEventListener('change', filterFieldsByType);
-    filterFieldsByType();
-})();
-<?php endif; ?>
-
-// ── Priority field per-type visibility ─────────────────────────
-(function() {
-    var priorityVisibilityMap = <?= json_encode($priorityVisibilityMap ?? new stdClass()) ?>;
-    var typeSelect = document.getElementById('type_id');
-    var wrap       = document.getElementById('priorityFieldWrap');
-    if (!typeSelect || !wrap) return;
-    var priInput   = document.getElementById('priority_id');
-
-    function applyPriorityVisibility() {
+    function applyLayout() {
         var selectedType = parseInt(typeSelect.value) || 0;
-        var v = priorityVisibilityMap[selectedType] || priorityVisibilityMap[0] || 'optional';
-        if (v === 'hidden') {
-            wrap.style.display = 'none';
-            if (priInput) priInput.value = '';
-        } else {
+        var layout = formLayouts[selectedType] || [];
+        var visByKey = {};
+        layout.forEach(function(row) { visByKey[row.kind + '|' + row.key] = row.visibility; });
+
+        dynRoot.querySelectorAll('.dynamic-field-wrap').forEach(function(wrap) {
+            var kind = wrap.dataset.fieldKind;
+            var key  = wrap.dataset.fieldKey;
+            var v    = visByKey[kind + '|' + key];
+            if (!selectedType) {
+                wrap.style.display = '';
+                setRequired(wrap, false);
+                return;
+            }
+            if (v === undefined || v === 'hidden') {
+                wrap.style.display = 'none';
+                setRequired(wrap, false);
+                return;
+            }
             wrap.style.display = '';
-        }
+            setRequired(wrap, v === 'required');
+        });
+
+        if (!selectedType) return;
+        layout
+            .slice()
+            .sort(function(a, b) { return a.sort_order - b.sort_order; })
+            .forEach(function(row) {
+                var sel = '.dynamic-field-wrap[data-field-kind="' + row.kind + '"][data-field-key="' + row.key + '"]';
+                var el = dynRoot.querySelector(sel);
+                if (el) dynRoot.appendChild(el);
+            });
     }
 
-    typeSelect.addEventListener('change', applyPriorityVisibility);
-    applyPriorityVisibility();
+    typeSelect.addEventListener('change', applyLayout);
+    applyLayout();
 })();
 
 <?php if (!empty($customFields)): ?>

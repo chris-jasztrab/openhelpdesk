@@ -624,9 +624,6 @@ $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' 
                 ?>
                 <dt class="col-5 text-muted fw-medium">
                     <?= e($cf['label']) ?>
-                    <?php if (!$cf['is_visible']): ?>
-                    <span class="badge bg-secondary ms-1" style="font-size:.6rem;">Hidden</span>
-                    <?php endif; ?>
                 </dt>
                 <dd class="col-7 mb-2">
                     <?php if ($cf['field_type'] === 'checkbox'): ?>

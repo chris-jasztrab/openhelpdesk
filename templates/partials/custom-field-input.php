@@ -3,12 +3,16 @@
  * Shared custom field rendering partial.
  *
  * Expected variables in scope:
- *   $cf      — the ticket_form_fields row
- *   $cfKey   — 'field_<id>'
- *   $cfOpts  — options array (for dropdown/dependent)
+ *   $cf         — the ticket_form_fields row (definition only — no per-type flags)
+ *   $cfKey      — 'field_<id>'
+ *   $cfOpts     — options array (for dropdown/dependent)
+ *   $cfRequired — bool: required *for the currently selected ticket type*
+ *                 (the form-create page sets this from the layout table)
  *   $portalMode — (optional) bool, true if rendering on the portal form
  */
 $portalMode = $portalMode ?? false;
+$cfRequired = $cfRequired ?? false;
+$requiredAttr = ($portalMode && $cfRequired) ? 'required' : '';
 ?>
 <?php if ($cf['field_type'] === 'text_block'):
     $tbCfg = $cf['config'] ? (is_string($cf['config']) ? json_decode($cf['config'], true) : $cf['config']) : [];
@@ -35,19 +39,17 @@ $portalMode = $portalMode ?? false;
 <div class="mb-3 custom-field-wrap" data-field-id="<?= (int) $cf['id'] ?>">
     <label class="form-label fw-semibold">
         <?= e($cf['label']) ?>
-        <?php if ($cf['is_required']): ?><span class="text-danger ms-1">*</span><?php endif; ?>
+        <span class="text-danger ms-1 field-required-star" <?= $cfRequired ? '' : 'style="display:none;"' ?>>*</span>
     </label>
 
     <?php if ($cf['field_type'] === 'text'): ?>
     <input type="text" class="form-control" name="<?= e($cfKey) ?>"
            placeholder="<?= e($cf['placeholder'] ?? '') ?>"
-           value="<?= e(old($cfKey)) ?>"
-           <?= ($portalMode && $cf['is_required']) ? 'required' : '' ?>>
+           value="<?= e(old($cfKey)) ?>" <?= $requiredAttr ?>>
 
     <?php elseif ($cf['field_type'] === 'textarea'): ?>
     <textarea class="form-control" name="<?= e($cfKey) ?>" rows="3"
-              placeholder="<?= e($cf['placeholder'] ?? '') ?>"
-              <?= ($portalMode && $cf['is_required']) ? 'required' : '' ?>><?= e(old($cfKey)) ?></textarea>
+              placeholder="<?= e($cf['placeholder'] ?? '') ?>" <?= $requiredAttr ?>><?= e(old($cfKey)) ?></textarea>
 
     <?php elseif ($cf['field_type'] === 'checkbox'): ?>
     <div class="form-check">
@@ -57,8 +59,7 @@ $portalMode = $portalMode ?? false;
     </div>
 
     <?php elseif ($cf['field_type'] === 'dropdown'): ?>
-    <select class="form-select" name="<?= e($cfKey) ?>"
-            <?= ($portalMode && $cf['is_required']) ? 'required' : '' ?>>
+    <select class="form-select" name="<?= e($cfKey) ?>" <?= $requiredAttr ?>>
         <option value="">— Select —</option>
         <?php foreach ($cfOpts as $opt): ?>
         <option value="<?= (int) $opt['id'] ?>"
@@ -70,36 +71,31 @@ $portalMode = $portalMode ?? false;
 
     <?php elseif ($cf['field_type'] === 'date'): ?>
     <input type="date" class="form-control" name="<?= e($cfKey) ?>"
-           value="<?= e(old($cfKey)) ?>"
-           <?= ($portalMode && $cf['is_required']) ? 'required' : '' ?>>
+           value="<?= e(old($cfKey)) ?>" <?= $requiredAttr ?>>
 
     <?php elseif ($cf['field_type'] === 'date_range'): ?>
     <div class="row g-2">
         <div class="col">
             <label class="form-label small">From</label>
             <input type="date" class="form-control" name="<?= e($cfKey) ?>_from"
-                   value="<?= e(old($cfKey . '_from')) ?>"
-                   <?= ($portalMode && $cf['is_required']) ? 'required' : '' ?>>
+                   value="<?= e(old($cfKey . '_from')) ?>" <?= $requiredAttr ?>>
         </div>
         <div class="col">
             <label class="form-label small">To</label>
             <input type="date" class="form-control" name="<?= e($cfKey) ?>_to"
-                   value="<?= e(old($cfKey . '_to')) ?>"
-                   <?= ($portalMode && $cf['is_required']) ? 'required' : '' ?>>
+                   value="<?= e(old($cfKey . '_to')) ?>" <?= $requiredAttr ?>>
         </div>
     </div>
 
     <?php elseif ($cf['field_type'] === 'number'): ?>
     <input type="number" step="1" class="form-control" name="<?= e($cfKey) ?>"
            placeholder="<?= e($cf['placeholder'] ?? '') ?>"
-           value="<?= e(old($cfKey)) ?>"
-           <?= ($portalMode && $cf['is_required']) ? 'required' : '' ?>>
+           value="<?= e(old($cfKey)) ?>" <?= $requiredAttr ?>>
 
     <?php elseif ($cf['field_type'] === 'decimal'): ?>
     <input type="number" step="0.01" class="form-control" name="<?= e($cfKey) ?>"
            placeholder="<?= e($cf['placeholder'] ?? '') ?>"
-           value="<?= e(old($cfKey)) ?>"
-           <?= ($portalMode && $cf['is_required']) ? 'required' : '' ?>>
+           value="<?= e(old($cfKey)) ?>" <?= $requiredAttr ?>>
 
     <?php elseif ($cf['field_type'] === 'cc'): ?>
     <div id="cc_badges_<?= (int) $cf['id'] ?>" class="d-flex flex-wrap gap-2 mb-2"></div>
@@ -109,7 +105,7 @@ $portalMode = $portalMode ?? false;
                id="cc_input_<?= (int) $cf['id'] ?>"
                data-field-id="<?= (int) $cf['id'] ?>"
                placeholder="Search by name or email…" autocomplete="off"
-               <?= $cf['is_required'] ? 'data-required="1"' : '' ?>>
+               <?= $cfRequired ? 'data-required="1"' : '' ?>>
         <div id="cc_drop_<?= (int) $cf['id'] ?>" class="mention-dropdown" style="display:none;position:absolute;top:100%;left:0;z-index:1050;width:100%;"></div>
     </div>
 
@@ -126,8 +122,7 @@ $portalMode = $portalMode ?? false;
             <label class="form-label small"><?= e($l1Label) ?></label>
             <select class="form-select form-select-sm dep-l1"
                     name="<?= e($cfKey) ?>_l1"
-                    data-field="<?= (int) $cf['id'] ?>"
-                    <?= ($portalMode && $cf['is_required']) ? 'required' : '' ?>>
+                    data-field="<?= (int) $cf['id'] ?>" <?= $requiredAttr ?>>
                 <option value="">— Select —</option>
                 <?php foreach ($l1Opts as $opt): ?>
                 <option value="<?= (int) $opt['id'] ?>"><?= e($opt['label']) ?></option>

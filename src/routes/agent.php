@@ -670,10 +670,29 @@ $router->get('/agent/tickets/create', function () {
     )->fetchAll();
     $templates  = $db->query('SELECT * FROM ticket_templates ORDER BY name')->fetchAll();
 
-    // Unified field list (system + custom) for rendering
-    $unifiedFields = getUnifiedFieldList($db, false);
-    $customFields  = array_map(fn($u) => $u['field'], array_filter($unifiedFields, fn($u) => $u['kind'] === 'custom'));
-    $fieldOptions  = [];
+    $formLayouts  = [];
+    $customFields = [];
+    $seenCustomIds = [];
+    foreach ($types as $t) {
+        $layout = getFormLayoutForType($db, (int) $t['id'], false);
+        $slim = [];
+        foreach ($layout as $row) {
+            $slim[] = [
+                'kind'       => $row['kind'],
+                'key'        => $row['key'],
+                'sort_order' => $row['sort_order'],
+                'visibility' => $row['visibility'],
+                'label'      => $row['label'],
+            ];
+            if ($row['kind'] === 'custom' && $row['field'] && !isset($seenCustomIds[$row['field']['id']])) {
+                $seenCustomIds[$row['field']['id']] = true;
+                $customFields[] = $row['field'];
+            }
+        }
+        $formLayouts[(int) $t['id']] = $slim;
+    }
+
+    $fieldOptions = [];
     foreach ($customFields as $f) {
         if (in_array($f['field_type'], ['dropdown', 'dependent'], true)) {
             $s = $db->prepare(
@@ -683,8 +702,6 @@ $router->get('/agent/tickets/create', function () {
             $fieldOptions[$f['id']] = $s->fetchAll();
         }
     }
-    $fieldTypeMap = getFieldTypeMap($db);
-    $priorityVisibilityMap = getPriorityVisibilityMap($db);
 
     render('admin/tickets/create', [
         'types'         => $types,
@@ -697,9 +714,7 @@ $router->get('/agent/tickets/create', function () {
         'formAction'    => '/admin/tickets/create',
         'customFields'  => $customFields,
         'fieldOptions'  => $fieldOptions,
-        'fieldTypeMap'  => $fieldTypeMap,
-        'priorityVisibilityMap' => $priorityVisibilityMap,
-        'unifiedFields' => $unifiedFields,
+        'formLayouts'   => $formLayouts,
     ]);
 });
 
@@ -962,7 +977,7 @@ $router->get('/agent/tickets/{id}', function (array $p) {
     $groups = $db->query('SELECT id, name FROM groups ORDER BY name')->fetchAll();
 
     // Custom form fields + stored values
-    $customFields = $db->query('SELECT * FROM ticket_form_fields WHERE deleted_at IS NULL ORDER BY sort_order')->fetchAll();
+    $customFields = $db->query('SELECT * FROM ticket_form_fields WHERE deleted_at IS NULL ORDER BY id')->fetchAll();
     $fieldValues  = [];
     $fieldOptions = [];
     if ($customFields) {
@@ -1381,7 +1396,7 @@ $router->post('/agent/tickets/{id}/fields', function (array $p) {
     }
     _agentRequireTicketAccess($db, $fieldsTicket);
 
-    $fields   = $db->query('SELECT * FROM ticket_form_fields WHERE deleted_at IS NULL ORDER BY sort_order')->fetchAll();
+    $fields   = $db->query('SELECT * FROM ticket_form_fields WHERE deleted_at IS NULL ORDER BY id')->fetchAll();
     $saveStmt = $db->prepare(
         'INSERT INTO ticket_field_values (ticket_id, field_id, value) VALUES (?, ?, ?)
          ON DUPLICATE KEY UPDATE value = VALUES(value)'

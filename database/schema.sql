@@ -529,28 +529,30 @@ CREATE TABLE IF NOT EXISTS `ticket_form_field_options` (
   CONSTRAINT `ticket_form_field_options_ibfk_1` FOREIGN KEY (`field_id`) REFERENCES `ticket_form_fields` (`id`) ON DELETE CASCADE,
   CONSTRAINT `ticket_form_field_options_ibfk_2` FOREIGN KEY (`parent_option_id`) REFERENCES `ticket_form_field_options` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=48 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-CREATE TABLE IF NOT EXISTS `ticket_form_field_type_map` (
-  `field_id` int(10) unsigned NOT NULL,
-  `type_id` int(10) unsigned NOT NULL,
-  PRIMARY KEY (`field_id`,`type_id`),
-  KEY `type_id` (`type_id`),
-  CONSTRAINT `ticket_form_field_type_map_ibfk_1` FOREIGN KEY (`field_id`) REFERENCES `ticket_form_fields` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `ticket_form_field_type_map_ibfk_2` FOREIGN KEY (`type_id`) REFERENCES `ticket_types` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE IF NOT EXISTS `ticket_form_fields` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `field_type` enum('text','textarea','checkbox','dropdown','date','number','decimal','dependent','text_block','image','cc','date_range') NOT NULL,
   `label` varchar(255) NOT NULL,
   `placeholder` varchar(255) DEFAULT NULL,
   `config` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`config`)),
-  `is_required` tinyint(1) NOT NULL DEFAULT 0,
-  `is_visible` tinyint(1) NOT NULL DEFAULT 1,
-  `sort_order` int(10) unsigned NOT NULL DEFAULT 0,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `deleted_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=25 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS `ticket_type_form_layout` (
+  `type_id` int(10) unsigned NOT NULL,
+  `field_kind` enum('system','custom') NOT NULL,
+  `field_key` varchar(64) NOT NULL,
+  `sort_order` int(11) NOT NULL DEFAULT 0,
+  `visibility` enum('required','optional','hidden') NOT NULL DEFAULT 'optional',
+  `label_override` varchar(255) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`type_id`,`field_kind`,`field_key`),
+  KEY `idx_type_sort` (`type_id`,`sort_order`),
+  CONSTRAINT `fk_layout_type` FOREIGN KEY (`type_id`) REFERENCES `ticket_types` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE IF NOT EXISTS `ticket_presence` (
   `ticket_id` int(10) unsigned NOT NULL,
   `user_id` int(10) unsigned NOT NULL,

@@ -1570,8 +1570,6 @@ $router->post('/admin/types/create', function () {
     $showToLocVis   = !empty($_POST['show_to_location_visibility']) ? 1 : 0;
     $staleRaw       = trim((string) ($_POST['stale_threshold_hours'] ?? ''));
     $staleHours     = $staleRaw === '' ? null : max(0, (int) $staleRaw);
-    $priVisRaw      = (string) ($_POST['priority_visibility'] ?? 'inherit');
-    $priVis         = in_array($priVisRaw, ['inherit','required','optional','hidden'], true) ? $priVisRaw : 'inherit';
     $skillIds       = array_filter(array_map('intval', (array) ($_POST['required_skills'] ?? [])));
     if ($name === '') {
         flashInput($_POST);
@@ -1579,8 +1577,8 @@ $router->post('/admin/types/create', function () {
         redirect('/admin/types/create');
     }
     $db = Database::connect();
-    $db->prepare('INSERT INTO ticket_types (name, color, group_id, is_confidential, ai_route_group, ai_dup_check_enabled, ai_dup_threshold, show_to_location_visibility, sort_order, stale_threshold_hours, priority_visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $showToLocVis, $order, $staleHours, $priVis]);
+    $db->prepare('INSERT INTO ticket_types (name, color, group_id, is_confidential, ai_route_group, ai_dup_check_enabled, ai_dup_threshold, show_to_location_visibility, sort_order, stale_threshold_hours) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $showToLocVis, $order, $staleHours]);
     $typeId = (int) $db->lastInsertId();
     if ($skillIds) {
         $stmt = $db->prepare('INSERT IGNORE INTO ticket_type_skill_map (ticket_type_id, skill_id) VALUES (?, ?)');
@@ -1588,8 +1586,11 @@ $router->post('/admin/types/create', function () {
             $stmt->execute([$typeId, $sid]);
         }
     }
+    // Seed the form-builder layout so this new type has the standard set of
+    // fields out of the box — admin can edit them in the form builder.
+    seedDefaultLayoutForType($db, $typeId);
     flash('success', 'Ticket type created.');
-    redirect('/admin/types');
+    redirect('/admin/types/' . $typeId . '/edit');
 });
 
 $router->get('/admin/types/{id}/edit', function (array $p) {
@@ -1630,8 +1631,6 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
     $showToLocVis   = !empty($_POST['show_to_location_visibility']) ? 1 : 0;
     $staleRaw       = trim((string) ($_POST['stale_threshold_hours'] ?? ''));
     $staleHours     = $staleRaw === '' ? null : max(0, (int) $staleRaw);
-    $priVisRaw      = (string) ($_POST['priority_visibility'] ?? 'inherit');
-    $priVis         = in_array($priVisRaw, ['inherit','required','optional','hidden'], true) ? $priVisRaw : 'inherit';
     if ($name === '') {
         flashInput($_POST);
         flash('error', 'Type name is required.');
@@ -1661,7 +1660,6 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
                 'ai_route_group' => $aiRouteGroup ? '1' : '',
                 'ai_dup_check_enabled' => $aiDupCheck ? '1' : '',
                 'ai_dup_threshold' => (string) $aiDupThreshold,
-                'priority_visibility' => $priVis,
                 // is_confidential intentionally omitted (unchecked = removal)
             ];
             logAudit(
@@ -1698,8 +1696,8 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
         }
     }
 
-    $db->prepare('UPDATE ticket_types SET name=?, color=?, group_id=?, is_confidential=?, ai_route_group=?, ai_dup_check_enabled=?, ai_dup_threshold=?, show_to_location_visibility=?, sort_order=?, stale_threshold_hours=?, priority_visibility=? WHERE id=?')
-        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $showToLocVis, $order, $staleHours, $priVis, $id]);
+    $db->prepare('UPDATE ticket_types SET name=?, color=?, group_id=?, is_confidential=?, ai_route_group=?, ai_dup_check_enabled=?, ai_dup_threshold=?, show_to_location_visibility=?, sort_order=?, stale_threshold_hours=? WHERE id=?')
+        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $showToLocVis, $order, $staleHours, $id]);
 
     // Required skills (used by Skill-Based group auto-assignment)
     $skillIds = array_filter(array_map('intval', (array) ($_POST['required_skills'] ?? [])));
@@ -3604,10 +3602,30 @@ $router->get('/admin/tickets/create', function () {
         'SELECT * FROM ticket_templates ORDER BY name'
     )->fetchAll();
 
-    // Unified field list (system + custom) for rendering
-    $unifiedFields = getUnifiedFieldList($db, false);
-    $customFields  = array_map(fn($u) => $u['field'], array_filter($unifiedFields, fn($u) => $u['kind'] === 'custom'));
-    $fieldOptions  = [];
+    // Per-type form layouts — same approach as the portal create page.
+    $formLayouts  = [];
+    $customFields = [];
+    $seenCustomIds = [];
+    foreach ($types as $t) {
+        $layout = getFormLayoutForType($db, (int) $t['id'], false);
+        $slim = [];
+        foreach ($layout as $row) {
+            $slim[] = [
+                'kind'       => $row['kind'],
+                'key'        => $row['key'],
+                'sort_order' => $row['sort_order'],
+                'visibility' => $row['visibility'],
+                'label'      => $row['label'],
+            ];
+            if ($row['kind'] === 'custom' && $row['field'] && !isset($seenCustomIds[$row['field']['id']])) {
+                $seenCustomIds[$row['field']['id']] = true;
+                $customFields[] = $row['field'];
+            }
+        }
+        $formLayouts[(int) $t['id']] = $slim;
+    }
+
+    $fieldOptions = [];
     foreach ($customFields as $f) {
         if (in_array($f['field_type'], ['dropdown', 'dependent'], true)) {
             $s = $db->prepare(
@@ -3617,8 +3635,6 @@ $router->get('/admin/tickets/create', function () {
             $fieldOptions[$f['id']] = $s->fetchAll();
         }
     }
-    $fieldTypeMap = getFieldTypeMap($db);
-    $priorityVisibilityMap = getPriorityVisibilityMap($db);
 
     render('admin/tickets/create', [
         'types'         => $types,
@@ -3630,9 +3646,7 @@ $router->get('/admin/tickets/create', function () {
         'isAgent'       => false,
         'customFields'  => $customFields,
         'fieldOptions'  => $fieldOptions,
-        'fieldTypeMap'  => $fieldTypeMap,
-        'priorityVisibilityMap' => $priorityVisibilityMap,
-        'unifiedFields' => $unifiedFields,
+        'formLayouts'   => $formLayouts,
     ]);
 });
 
@@ -3685,7 +3699,7 @@ $router->post('/admin/tickets/create', function () {
     // If the priority picker is hidden for this type, the staff form will not
     // have rendered it — fall back to the system default so the ticket has a
     // priority on creation.
-    if (resolvePriorityVisibility($db, $typeId) === 'hidden') {
+    if ($typeId && resolveFieldVisibility($db, $typeId, 'system', 'priority') === 'hidden') {
         $priId = getDefaultPriorityId($db);
     }
     $db->prepare(
@@ -3727,8 +3741,13 @@ $router->post('/admin/tickets/create', function () {
             }
         }
     }
-    // Save custom field values (filtered by selected ticket type)
-    $adminCustomFields = getCustomFieldsForType($db, $typeId ?? 0);
+    // Save custom field values (filtered by this ticket type's layout —
+    // hidden fields are skipped so a stale value can't leak through).
+    $adminLayout = $typeId ? getFormLayoutForType($db, $typeId, true) : [];
+    $adminCustomFields = array_values(array_map(
+        fn($r) => $r['field'],
+        array_filter($adminLayout, fn($r) => $r['kind'] === 'custom' && $r['field'] !== null)
+    ));
     if (!empty($adminCustomFields)) {
         $cfSaveStmt = $db->prepare(
             'INSERT INTO ticket_field_values (ticket_id, field_id, value) VALUES (?, ?, ?)
@@ -4070,8 +4089,9 @@ $router->get('/admin/tickets/{id}', function (array $p) {
     // Ticket types for update dropdown
     $ticketTypes = $db->query('SELECT id, name FROM ticket_types ORDER BY sort_order, name')->fetchAll();
 
-    // Custom form fields + stored values
-    $customFields = $db->query('SELECT * FROM ticket_form_fields WHERE deleted_at IS NULL ORDER BY sort_order')->fetchAll();
+    // Custom form fields + stored values (ordering is per-type now, so just
+    // pull definitions in id order — the view template joins to stored values)
+    $customFields = $db->query('SELECT * FROM ticket_form_fields WHERE deleted_at IS NULL ORDER BY id')->fetchAll();
     $fieldValues  = [];
     $fieldOptions = [];
     if ($customFields) {
@@ -4526,7 +4546,7 @@ $router->post('/admin/tickets/{id}/fields', function (array $p) {
         redirect('/admin/tickets');
     }
 
-    $fields = $db->query('SELECT * FROM ticket_form_fields WHERE deleted_at IS NULL ORDER BY sort_order')->fetchAll();
+    $fields = $db->query('SELECT * FROM ticket_form_fields WHERE deleted_at IS NULL ORDER BY id')->fetchAll();
     $saveStmt = $db->prepare(
         'INSERT INTO ticket_field_values (ticket_id, field_id, value) VALUES (?, ?, ?)
          ON DUPLICATE KEY UPDATE value = VALUES(value)'
@@ -9700,287 +9720,351 @@ $router->post('/admin/settings/scheduled-reports/{id}/toggle', function (array $
 });
 
 /* ==================================================================
- * ADMIN – Workflows: Ticket Fields Builder
+ * ADMIN – Form Builder (per ticket type)
  * ================================================================== */
 
-// Builder page
+// Builder page — pick a ticket type from the left rail, edit its form.
 $router->get('/admin/workflows/ticket-fields', function () {
     Auth::requireRole('admin');
     $db = Database::connect();
 
-    // One-time migration to unified sort order numbering
-    normalizeFieldSortOrders($db);
+    $ticketTypes = $db->query('SELECT id, name, color FROM ticket_types ORDER BY sort_order, name')->fetchAll();
+    if (!$ticketTypes) {
+        render('admin/workflows/ticket-fields', [
+            'layout'       => 'app',
+            'pageTitle'    => 'Form Builder',
+            'ticketTypes'  => [],
+            'selectedType' => null,
+            'layout_'      => [],
+            'unusedFields' => [],
+            'fieldOptions' => [],
+        ]);
+        return;
+    }
 
-    $fields = $db->query('SELECT * FROM ticket_form_fields WHERE deleted_at IS NULL ORDER BY sort_order')->fetchAll();
+    // Resolve selected type from ?type=N, default to first
+    $selectedTypeId = isset($_GET['type']) && ctype_digit((string) $_GET['type']) ? (int) $_GET['type'] : 0;
+    $validIds = array_map(fn($t) => (int) $t['id'], $ticketTypes);
+    if (!in_array($selectedTypeId, $validIds, true)) {
+        $selectedTypeId = (int) $ticketTypes[0]['id'];
+    }
+    $selectedType = null;
+    foreach ($ticketTypes as $t) {
+        if ((int) $t['id'] === $selectedTypeId) { $selectedType = $t; break; }
+    }
 
-    // Load options for each field that needs them
+    // Seed defaults for this type if no layout rows exist yet
+    $hasRows = (int) $db->prepare('SELECT COUNT(*) FROM ticket_type_form_layout WHERE type_id = ?')
+                        ->execute([$selectedTypeId]);
+    $countStmt = $db->prepare('SELECT COUNT(*) FROM ticket_type_form_layout WHERE type_id = ?');
+    $countStmt->execute([$selectedTypeId]);
+    if ((int) $countStmt->fetchColumn() === 0) {
+        seedDefaultLayoutForType($db, $selectedTypeId);
+    }
+
+    $layout_ = getFormLayoutForType($db, $selectedTypeId, false);
+
+    // Custom fields not currently in this type's layout — for the "add existing" picker
+    $usedFieldIds = array_map(
+        fn($r) => (int) $r['key'],
+        array_filter($layout_, fn($r) => $r['kind'] === 'custom')
+    );
+    if ($usedFieldIds) {
+        $placeholders = implode(',', array_fill(0, count($usedFieldIds), '?'));
+        $unusedStmt = $db->prepare(
+            "SELECT * FROM ticket_form_fields
+             WHERE deleted_at IS NULL AND id NOT IN ($placeholders)
+             ORDER BY label"
+        );
+        $unusedStmt->execute($usedFieldIds);
+    } else {
+        $unusedStmt = $db->query(
+            'SELECT * FROM ticket_form_fields WHERE deleted_at IS NULL ORDER BY label'
+        );
+    }
+    $unusedFields = $unusedStmt->fetchAll();
+
+    // Options for any dropdown/dependent fields in the layout (used by the edit modal)
     $fieldOptions = [];
-    foreach ($fields as $f) {
-        if (in_array($f['field_type'], ['dropdown', 'dependent'], true)) {
-            $stmt = $db->prepare(
+    foreach ($layout_ as $row) {
+        if ($row['kind'] === 'custom' && $row['field']
+            && in_array($row['field']['field_type'], ['dropdown', 'dependent'], true)) {
+            $optStmt = $db->prepare(
                 'SELECT * FROM ticket_form_field_options WHERE field_id = ? ORDER BY parent_option_id, sort_order'
             );
-            $stmt->execute([$f['id']]);
-            $fieldOptions[$f['id']] = $stmt->fetchAll();
+            $optStmt->execute([$row['field']['id']]);
+            $fieldOptions[$row['field']['id']] = $optStmt->fetchAll();
         }
     }
 
-    $sysFs = [
-        'label_subject'     => getSetting('sys_field_label_subject',     'Subject'),
-        'label_description' => getSetting('sys_field_label_description', 'Description'),
-        'label_ticket_type' => getSetting('sys_field_label_ticket_type', 'Ticket Type'),
-        'label_priority'    => getSetting('sys_field_label_priority',    'Priority'),
-        'label_tags'        => getSetting('sys_field_label_tags',        'Tags'),
-        'label_attachments' => getSetting('sys_field_label_attachments', 'Attachments'),
-        'required_priority' => getSetting('sys_field_required_priority', '0'),
-        'required_tags'     => getSetting('sys_field_required_tags',     '0'),
-    ];
-
-    // Ticket types + field-type map for the type-association UI
-    $ticketTypes  = $db->query('SELECT id, name FROM ticket_types ORDER BY sort_order, name')->fetchAll();
-    $fieldTypeMap = getFieldTypeMap($db);
-
     render('admin/workflows/ticket-fields', [
-        'layout'       => 'app',
-        'pageTitle'    => 'Ticket Fields',
-        'fields'       => $fields,
-        'fieldOptions' => $fieldOptions,
-        'sysFs'        => $sysFs,
-        'ticketTypes'  => $ticketTypes,
-        'fieldTypeMap' => $fieldTypeMap,
+        'layout'        => 'app',
+        'pageTitle'     => 'Form Builder',
+        'ticketTypes'   => $ticketTypes,
+        'selectedType'  => $selectedType,
+        'layout_'       => $layout_,
+        'unusedFields'  => $unusedFields,
+        'fieldOptions'  => $fieldOptions,
     ]);
 });
 
-// Save system field label / required settings (AJAX)
-$router->post('/admin/workflows/ticket-fields/system', function () {
+/* ─── Per-type layout: reorder + visibility + label ─── */
+
+// Reorder all rows for one type. Body: { order: [{kind, key}, ...] }
+$router->post('/admin/forms/{typeId}/layout/save', function (array $p) {
     Auth::requireRole('admin');
     header('Content-Type: application/json');
+    $typeId = (int) $p['typeId'];
+    $body   = json_decode(file_get_contents('php://input'), true);
+    $order  = $body['order'] ?? [];
+    if (!is_array($order)) { echo json_encode(['success' => false, 'error' => 'Bad input']); exit; }
 
-    $raw     = file_get_contents('php://input');
-    $payload = json_decode($raw, true);
-    if (!is_array($payload)) {
-        echo json_encode(['success' => false, 'error' => 'Bad request.']);
-        exit;
+    $db = Database::connect();
+    $stmt = $db->prepare(
+        'UPDATE ticket_type_form_layout SET sort_order = ?
+         WHERE type_id = ? AND field_kind = ? AND field_key = ?'
+    );
+    foreach ($order as $i => $item) {
+        $kind = $item['kind'] ?? '';
+        $key  = (string) ($item['key'] ?? '');
+        if (!in_array($kind, ['system', 'custom'], true)) continue;
+        $stmt->execute([$i * 10, $typeId, $kind, $key]);
     }
-
-    $allowedKeys = ['subject', 'description', 'ticket_type', 'priority', 'tags', 'attachments'];
-    $fieldKey    = $payload['field'] ?? '';
-    if (!in_array($fieldKey, $allowedKeys, true)) {
-        echo json_encode(['success' => false, 'error' => 'Invalid field.']);
-        exit;
-    }
-
-    $label = trim($payload['label'] ?? '');
-    if ($label === '') {
-        echo json_encode(['success' => false, 'error' => 'Label cannot be empty.']);
-        exit;
-    }
-    if (mb_strlen($label) > 80) {
-        echo json_encode(['success' => false, 'error' => 'Label too long (max 80 characters).']);
-        exit;
-    }
-
-    setSetting("sys_field_label_{$fieldKey}", $label);
-
-    if (in_array($fieldKey, ['priority', 'tags'], true)) {
-        setSetting("sys_field_required_{$fieldKey}", !empty($payload['required']) ? '1' : '0');
-    }
-
     echo json_encode(['success' => true]);
     exit;
 });
 
-// Add a new field (AJAX)
-$router->post('/admin/workflows/ticket-fields/add', function () {
+// Toggle visibility for a single row. Body: { kind, key, visibility }
+$router->post('/admin/forms/{typeId}/layout/visibility', function (array $p) {
     Auth::requireRole('admin');
     header('Content-Type: application/json');
+    $typeId = (int) $p['typeId'];
+    $body   = json_decode(file_get_contents('php://input'), true);
+    $kind   = $body['kind'] ?? '';
+    $key    = (string) ($body['key'] ?? '');
+    $vis    = $body['visibility'] ?? '';
 
-    $allowed = ['text','textarea','checkbox','dropdown','date','number','decimal','dependent','text_block','image','cc','date_range'];
-    $type    = $_POST['field_type'] ?? '';
-    if (!in_array($type, $allowed, true)) {
-        echo json_encode(['success' => false, 'error' => 'Invalid field type.']);
-        exit;
+    if (!in_array($kind, ['system', 'custom'], true)
+        || !in_array($vis, ['required', 'optional', 'hidden'], true)) {
+        echo json_encode(['success' => false, 'error' => 'Bad input']); exit;
     }
-
+    // Locked system fields can't be hidden or made non-required
+    $sysDefaults = systemFieldDefaults();
+    if ($kind === 'system' && isset($sysDefaults[$key]) && $sysDefaults[$key]['lockedVisibility'] && $vis !== 'required') {
+        echo json_encode(['success' => false, 'error' => 'This field can\'t be made optional or hidden.']); exit;
+    }
     $db = Database::connect();
-    $maxOrder = (int) $db->query('SELECT COALESCE(MAX(sort_order),0) FROM ticket_form_fields WHERE deleted_at IS NULL')->fetchColumn();
-
-    $labelMap = [
-        'text'       => 'Text Field',
-        'textarea'   => 'Multi-line Text',
-        'checkbox'   => 'Checkbox',
-        'dropdown'   => 'Dropdown',
-        'date'       => 'Date',
-        'number'     => 'Number',
-        'decimal'    => 'Decimal',
-        'dependent'  => 'Dependent Field',
-        'text_block' => 'Text Block',
-        'image'      => 'Image',
-        'cc'         => 'CC',
-        'date_range' => 'Date Range',
-    ];
-
-    $stmt = $db->prepare(
-        'INSERT INTO ticket_form_fields (field_type, label, sort_order) VALUES (?, ?, ?)'
-    );
-    $stmt->execute([$type, $labelMap[$type], $maxOrder + 1]);
-    $newId = (int) $db->lastInsertId();
-
-    $field = $db->prepare('SELECT * FROM ticket_form_fields WHERE id = ?');
-    $field->execute([$newId]);
-
-    echo json_encode(['success' => true, 'field' => $field->fetch()]);
+    $db->prepare(
+        'UPDATE ticket_type_form_layout SET visibility = ?
+         WHERE type_id = ? AND field_kind = ? AND field_key = ?'
+    )->execute([$vis, $typeId, $kind, $key]);
+    echo json_encode(['success' => true]);
     exit;
 });
 
-// Reorder fields (AJAX) — unified system + custom
-$router->post('/admin/workflows/ticket-fields/reorder', function () {
+// Update label override for a single row. Body: { kind, key, label_override }
+// Empty string clears the override (falls back to the field's default label).
+$router->post('/admin/forms/{typeId}/layout/label', function (array $p) {
     Auth::requireRole('admin');
     header('Content-Type: application/json');
+    $typeId = (int) $p['typeId'];
+    $body   = json_decode(file_get_contents('php://input'), true);
+    $kind   = $body['kind'] ?? '';
+    $key    = (string) ($body['key'] ?? '');
+    $label  = trim((string) ($body['label_override'] ?? ''));
+    if (!in_array($kind, ['system', 'custom'], true)) {
+        echo json_encode(['success' => false, 'error' => 'Bad input']); exit;
+    }
+    if (mb_strlen($label) > 255) {
+        echo json_encode(['success' => false, 'error' => 'Label too long (max 255).']); exit;
+    }
+    $db = Database::connect();
+    $db->prepare(
+        'UPDATE ticket_type_form_layout SET label_override = ?
+         WHERE type_id = ? AND field_kind = ? AND field_key = ?'
+    )->execute([$label === '' ? null : $label, $typeId, $kind, $key]);
+    echo json_encode(['success' => true]);
+    exit;
+});
 
-    $body  = json_decode(file_get_contents('php://input'), true);
-    $order = $body['order'] ?? [];
+// Add an existing custom field to this type's form. Body: { field_id }
+$router->post('/admin/forms/{typeId}/layout/add-existing', function (array $p) {
+    Auth::requireRole('admin');
+    header('Content-Type: application/json');
+    $typeId  = (int) $p['typeId'];
+    $body    = json_decode(file_get_contents('php://input'), true);
+    $fieldId = (int) ($body['field_id'] ?? 0);
+    if (!$fieldId) { echo json_encode(['success' => false, 'error' => 'Bad input']); exit; }
 
-    if (!is_array($order)) {
-        echo json_encode(['success' => false]);
-        exit;
+    $db = Database::connect();
+    $exists = $db->prepare('SELECT 1 FROM ticket_form_fields WHERE id = ? AND deleted_at IS NULL');
+    $exists->execute([$fieldId]);
+    if (!$exists->fetchColumn()) { echo json_encode(['success' => false, 'error' => 'Field not found']); exit; }
+
+    $maxOrder = (int) $db->prepare(
+        'SELECT COALESCE(MAX(sort_order), 0) FROM ticket_type_form_layout WHERE type_id = ?'
+    )->execute([$typeId]);
+    // PDOStatement::execute returns bool; use fetchColumn separately
+    $maxStmt = $db->prepare('SELECT COALESCE(MAX(sort_order), 0) FROM ticket_type_form_layout WHERE type_id = ?');
+    $maxStmt->execute([$typeId]);
+    $maxOrder = (int) $maxStmt->fetchColumn();
+
+    $db->prepare(
+        'INSERT IGNORE INTO ticket_type_form_layout
+            (type_id, field_kind, field_key, sort_order, visibility)
+         VALUES (?, "custom", ?, ?, "optional")'
+    )->execute([$typeId, (string) $fieldId, $maxOrder + 10]);
+    echo json_encode(['success' => true]);
+    exit;
+});
+
+// Remove a row from a type's layout (does NOT delete the field definition).
+// Body: { kind, key }
+$router->post('/admin/forms/{typeId}/layout/remove', function (array $p) {
+    Auth::requireRole('admin');
+    header('Content-Type: application/json');
+    $typeId = (int) $p['typeId'];
+    $body   = json_decode(file_get_contents('php://input'), true);
+    $kind   = $body['kind'] ?? '';
+    $key    = (string) ($body['key'] ?? '');
+    if (!in_array($kind, ['system', 'custom'], true)) {
+        echo json_encode(['success' => false, 'error' => 'Bad input']); exit;
+    }
+    // Locked system fields can't be removed
+    $sysDefaults = systemFieldDefaults();
+    if ($kind === 'system' && isset($sysDefaults[$key]) && $sysDefaults[$key]['lockedVisibility']) {
+        echo json_encode(['success' => false, 'error' => 'This field can\'t be removed.']); exit;
+    }
+    $db = Database::connect();
+    $db->prepare(
+        'DELETE FROM ticket_type_form_layout
+         WHERE type_id = ? AND field_kind = ? AND field_key = ?'
+    )->execute([$typeId, $kind, $key]);
+    echo json_encode(['success' => true]);
+    exit;
+});
+
+/* ─── Custom field definitions (global, used by any type) ─── */
+
+// Create a new custom field AND add it to this type's layout.
+// Body: { field_type, label, share_with_types?: [int, ...] }
+$router->post('/admin/forms/{typeId}/field/create', function (array $p) {
+    Auth::requireRole('admin');
+    header('Content-Type: application/json');
+    $typeId = (int) $p['typeId'];
+    $body   = json_decode(file_get_contents('php://input'), true);
+
+    $allowed = ['text','textarea','checkbox','dropdown','date','number','decimal','dependent','text_block','image','cc','date_range'];
+    $fieldType = $body['field_type'] ?? '';
+    $label     = trim((string) ($body['label'] ?? ''));
+    if (!in_array($fieldType, $allowed, true)) {
+        echo json_encode(['success' => false, 'error' => 'Invalid field type']); exit;
+    }
+    if ($label === '') {
+        $labelMap = [
+            'text' => 'Text Field', 'textarea' => 'Multi-line Text', 'checkbox' => 'Checkbox',
+            'dropdown' => 'Dropdown', 'date' => 'Date', 'number' => 'Number', 'decimal' => 'Decimal',
+            'dependent' => 'Dependent Field', 'text_block' => 'Text Block', 'image' => 'Image',
+            'cc' => 'CC', 'date_range' => 'Date Range',
+        ];
+        $label = $labelMap[$fieldType];
     }
 
-    $systemKeys = ['ticket_type', 'location', 'priority', 'tags', 'attachments'];
-    $db   = Database::connect();
-    $cfStmt = $db->prepare('UPDATE ticket_form_fields SET sort_order = ? WHERE id = ?');
+    $db = Database::connect();
+    $db->prepare(
+        'INSERT INTO ticket_form_fields (field_type, label) VALUES (?, ?)'
+    )->execute([$fieldType, $label]);
+    $newId = (int) $db->lastInsertId();
 
-    foreach ($order as $i => $item) {
-        if (in_array($item, $systemKeys, true)) {
-            setSetting("sys_field_sort_order_{$item}", (string) $i);
-        } else {
-            $cfStmt->execute([$i, (int) $item]);
+    // Add to this type's layout
+    $maxStmt = $db->prepare('SELECT COALESCE(MAX(sort_order), 0) FROM ticket_type_form_layout WHERE type_id = ?');
+    $maxStmt->execute([$typeId]);
+    $maxOrder = (int) $maxStmt->fetchColumn();
+    $db->prepare(
+        'INSERT INTO ticket_type_form_layout
+            (type_id, field_kind, field_key, sort_order, visibility)
+         VALUES (?, "custom", ?, ?, "optional")'
+    )->execute([$typeId, (string) $newId, $maxOrder + 10]);
+
+    // Optionally also add to other types
+    $shareWith = array_unique(array_map('intval', (array) ($body['share_with_types'] ?? [])));
+    if ($shareWith) {
+        $insertOther = $db->prepare(
+            'INSERT IGNORE INTO ticket_type_form_layout
+                (type_id, field_kind, field_key, sort_order, visibility)
+             VALUES (?, "custom", ?, ?, "optional")'
+        );
+        $maxOther = $db->prepare(
+            'SELECT COALESCE(MAX(sort_order), 0) FROM ticket_type_form_layout WHERE type_id = ?'
+        );
+        foreach ($shareWith as $otherId) {
+            if ($otherId === $typeId || $otherId <= 0) continue;
+            $maxOther->execute([$otherId]);
+            $maxOO = (int) $maxOther->fetchColumn();
+            $insertOther->execute([$otherId, (string) $newId, $maxOO + 10]);
         }
     }
 
-    echo json_encode(['success' => true]);
+    $row = $db->prepare('SELECT * FROM ticket_form_fields WHERE id = ?');
+    $row->execute([$newId]);
+    echo json_encode(['success' => true, 'field' => $row->fetch()]);
     exit;
 });
 
-// Get config for a field (AJAX, used by text_block / image edit modal)
-$router->get('/admin/workflows/ticket-fields/{id}/config', function (array $p) {
+// Update field definition + options + share-with-types.
+// Body: { label, placeholder?, config?, options?, share_with_types?: [int, ...] }
+$router->post('/admin/forms/field/{id}/update', function (array $p) {
     Auth::requireRole('admin');
     header('Content-Type: application/json');
-
-    $id  = (int) $p['id'];
-    $db  = Database::connect();
-    $row = $db->prepare('SELECT config FROM ticket_form_fields WHERE id = ? AND deleted_at IS NULL');
-    $row->execute([$id]);
-    $cfg = $row->fetchColumn();
-    echo json_encode(['config' => $cfg ? json_decode($cfg, true) : null]);
-    exit;
-});
-
-// Get options for a field (AJAX, used to pre-load modal on edit)
-$router->get('/admin/workflows/ticket-fields/{id}/options', function (array $p) {
-    Auth::requireRole('admin');
-    header('Content-Type: application/json');
-
-    $id   = (int) $p['id'];
-    $db   = Database::connect();
-    $stmt = $db->prepare(
-        'SELECT * FROM ticket_form_field_options WHERE field_id = ? ORDER BY parent_option_id, sort_order'
-    );
-    $stmt->execute([$id]);
-    echo json_encode($stmt->fetchAll());
-    exit;
-});
-
-// Update field properties + options (AJAX)
-$router->post('/admin/workflows/ticket-fields/{id}/update', function (array $p) {
-    Auth::requireRole('admin');
-    header('Content-Type: application/json');
-
     $id   = (int) $p['id'];
     $body = json_decode(file_get_contents('php://input'), true);
-    if (!$body) {
-        echo json_encode(['success' => false, 'error' => 'Invalid JSON.']);
-        exit;
-    }
+    if (!is_array($body)) { echo json_encode(['success' => false, 'error' => 'Bad input']); exit; }
 
-    $label       = trim($body['label']       ?? '');
-    $placeholder = trim($body['placeholder'] ?? '');
-    $isRequired  = !empty($body['is_required']) ? 1 : 0;
-    $isVisible   = !empty($body['is_visible'])  ? 1 : 0;
-    $config      = isset($body['config'])  ? json_encode($body['config'])  : null;
-
-    if ($label === '') {
-        echo json_encode(['success' => false, 'error' => 'Label is required.']);
-        exit;
-    }
+    $label       = trim((string) ($body['label'] ?? ''));
+    $placeholder = trim((string) ($body['placeholder'] ?? ''));
+    if ($label === '') { echo json_encode(['success' => false, 'error' => 'Label is required']); exit; }
 
     $db = Database::connect();
-
-    // Verify field exists and is not deleted
     $check = $db->prepare('SELECT field_type FROM ticket_form_fields WHERE id = ? AND deleted_at IS NULL');
     $check->execute([$id]);
     $fieldType = $check->fetchColumn();
-    if (!$fieldType) {
-        echo json_encode(['success' => false, 'error' => 'Field not found.']);
-        exit;
-    }
+    if (!$fieldType) { echo json_encode(['success' => false, 'error' => 'Field not found']); exit; }
 
-    // For image fields, never overwrite config from this endpoint — the image path
-    // is managed exclusively by the upload-image endpoint.
     if ($fieldType === 'image' && !isset($body['config'])) {
         $db->prepare(
-            'UPDATE ticket_form_fields SET label=?, placeholder=?, is_required=?, is_visible=?, updated_at=NOW() WHERE id=?'
-        )->execute([$label, $placeholder ?: null, $isRequired, $isVisible, $id]);
+            'UPDATE ticket_form_fields SET label = ?, placeholder = ?, updated_at = NOW() WHERE id = ?'
+        )->execute([$label, $placeholder ?: null, $id]);
     } else {
+        $config = isset($body['config']) ? json_encode($body['config']) : null;
         $db->prepare(
-            'UPDATE ticket_form_fields SET label=?, placeholder=?, is_required=?, is_visible=?, config=?, updated_at=NOW() WHERE id=?'
-        )->execute([$label, $placeholder ?: null, $isRequired, $isVisible, $config, $id]);
-    }
-
-    // Sync ticket-type associations
-    if (array_key_exists('type_ids', $body)) {
-        $db->prepare('DELETE FROM ticket_form_field_type_map WHERE field_id = ?')->execute([$id]);
-        $typeIds = array_unique(array_map('intval', (array) $body['type_ids']));
-        $mapInsert = $db->prepare('INSERT INTO ticket_form_field_type_map (field_id, type_id) VALUES (?, ?)');
-        foreach ($typeIds as $tid) {
-            if ($tid > 0) {
-                $mapInsert->execute([$id, $tid]);
-            }
-        }
+            'UPDATE ticket_form_fields SET label = ?, placeholder = ?, config = ?, updated_at = NOW() WHERE id = ?'
+        )->execute([$label, $placeholder ?: null, $config, $id]);
     }
 
     // Replace options for dropdown / dependent fields
     if (in_array($fieldType, ['dropdown', 'dependent'], true) && isset($body['options'])) {
         $db->prepare('DELETE FROM ticket_form_field_options WHERE field_id = ?')->execute([$id]);
-
         $insertOpt = $db->prepare(
             'INSERT INTO ticket_form_field_options (field_id, parent_option_id, label, sort_order) VALUES (?, ?, ?, ?)'
         );
-
         if ($fieldType === 'dropdown') {
-            // Flat array of {label}
             foreach ($body['options'] as $i => $opt) {
                 $optLabel = trim($opt['label'] ?? '');
-                if ($optLabel !== '') {
-                    $insertOpt->execute([$id, null, $optLabel, $i]);
-                }
+                if ($optLabel !== '') $insertOpt->execute([$id, null, $optLabel, $i]);
             }
         } else {
-            // Nested tree for dependent: [{label, children:[{label, children:[{label}]}]}]
             $sort1 = 0;
             foreach ($body['options'] as $l1) {
                 $l1Label = trim($l1['label'] ?? '');
                 if ($l1Label === '') continue;
                 $insertOpt->execute([$id, null, $l1Label, $sort1++]);
                 $l1Id = (int) $db->lastInsertId();
-
                 $sort2 = 0;
                 foreach ($l1['children'] ?? [] as $l2) {
                     $l2Label = trim($l2['label'] ?? '');
                     if ($l2Label === '') continue;
                     $insertOpt->execute([$id, $l1Id, $l2Label, $sort2++]);
                     $l2Id = (int) $db->lastInsertId();
-
                     $sort3 = 0;
                     foreach ($l2['children'] ?? [] as $l3) {
                         $l3Label = trim($l3['label'] ?? '');
@@ -9992,28 +10076,101 @@ $router->post('/admin/workflows/ticket-fields/{id}/update', function (array $p) 
         }
     }
 
+    // Share/unshare with ticket types: sets the field's layout rows to exactly
+    // the supplied set. Sort order is preserved for types it already appeared on.
+    if (array_key_exists('share_with_types', $body)) {
+        $newTypeIds = array_unique(array_map('intval', (array) $body['share_with_types']));
+
+        $curStmt = $db->prepare(
+            'SELECT type_id FROM ticket_type_form_layout WHERE field_kind = "custom" AND field_key = ?'
+        );
+        $curStmt->execute([(string) $id]);
+        $curTypeIds = array_map('intval', $curStmt->fetchAll(PDO::FETCH_COLUMN));
+
+        $toAdd    = array_diff($newTypeIds, $curTypeIds);
+        $toRemove = array_diff($curTypeIds, $newTypeIds);
+
+        if ($toRemove) {
+            $ph = implode(',', array_fill(0, count($toRemove), '?'));
+            $args = array_merge([(string) $id], array_values($toRemove));
+            $db->prepare(
+                "DELETE FROM ticket_type_form_layout
+                 WHERE field_kind = 'custom' AND field_key = ? AND type_id IN ($ph)"
+            )->execute($args);
+        }
+        if ($toAdd) {
+            $maxStmt = $db->prepare(
+                'SELECT COALESCE(MAX(sort_order), 0) FROM ticket_type_form_layout WHERE type_id = ?'
+            );
+            $insertNew = $db->prepare(
+                'INSERT IGNORE INTO ticket_type_form_layout
+                    (type_id, field_kind, field_key, sort_order, visibility)
+                 VALUES (?, "custom", ?, ?, "optional")'
+            );
+            foreach ($toAdd as $tid) {
+                $maxStmt->execute([$tid]);
+                $insertNew->execute([$tid, (string) $id, ((int) $maxStmt->fetchColumn()) + 10]);
+            }
+        }
+    }
+
     echo json_encode(['success' => true]);
     exit;
 });
 
-// Delete a field (AJAX)
-$router->post('/admin/workflows/ticket-fields/{id}/delete', function (array $p) {
+// Soft-delete a custom field (FK CASCADE removes its layout rows everywhere).
+$router->post('/admin/forms/field/{id}/delete', function (array $p) {
     Auth::requireRole('admin');
     header('Content-Type: application/json');
-
     $id = (int) $p['id'];
     $db = Database::connect();
-    $db->prepare('UPDATE ticket_form_fields SET deleted_at = NOW() WHERE id = ? AND deleted_at IS NULL')->execute([$id]);
-
+    $db->prepare(
+        'UPDATE ticket_form_fields SET deleted_at = NOW() WHERE id = ? AND deleted_at IS NULL'
+    )->execute([$id]);
+    // Layout rows reference field_key as VARCHAR — no FK CASCADE — clean up by hand
+    $db->prepare(
+        'DELETE FROM ticket_type_form_layout WHERE field_kind = "custom" AND field_key = ?'
+    )->execute([(string) $id]);
     echo json_encode(['success' => true]);
     exit;
 });
 
-// Upload image for an image-type field (AJAX, multipart)
-$router->post('/admin/workflows/ticket-fields/{id}/upload-image', function (array $p) {
+// Get the full config + option tree for a custom field (used by the edit modal).
+$router->get('/admin/forms/field/{id}/details', function (array $p) {
     Auth::requireRole('admin');
     header('Content-Type: application/json');
+    $id = (int) $p['id'];
+    $db = Database::connect();
 
+    $fStmt = $db->prepare('SELECT * FROM ticket_form_fields WHERE id = ? AND deleted_at IS NULL');
+    $fStmt->execute([$id]);
+    $field = $fStmt->fetch();
+    if (!$field) { echo json_encode(['error' => 'Not found']); exit; }
+
+    $oStmt = $db->prepare(
+        'SELECT * FROM ticket_form_field_options WHERE field_id = ? ORDER BY parent_option_id, sort_order'
+    );
+    $oStmt->execute([$id]);
+    $options = $oStmt->fetchAll();
+
+    $tStmt = $db->prepare(
+        'SELECT type_id FROM ticket_type_form_layout WHERE field_kind = "custom" AND field_key = ?'
+    );
+    $tStmt->execute([(string) $id]);
+    $typeIds = array_map('intval', $tStmt->fetchAll(PDO::FETCH_COLUMN));
+
+    echo json_encode([
+        'field'    => $field,
+        'options'  => $options,
+        'type_ids' => $typeIds,
+    ]);
+    exit;
+});
+
+// Image upload (unchanged structure, new URL)
+$router->post('/admin/forms/field/{id}/upload-image', function (array $p) {
+    Auth::requireRole('admin');
+    header('Content-Type: application/json');
     $id = (int) $p['id'];
     $db = Database::connect();
 
@@ -10021,58 +10178,61 @@ $router->post('/admin/workflows/ticket-fields/{id}/upload-image', function (arra
     $check->execute([$id]);
     $fieldType = $check->fetchColumn();
     if ($fieldType !== 'image') {
-        echo json_encode(['success' => false, 'error' => 'Field is not an image type.']);
-        exit;
+        echo json_encode(['success' => false, 'error' => 'Field is not an image type.']); exit;
     }
-
     $file = $_FILES['image'] ?? null;
     if (!$file || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
-        echo json_encode(['success' => false, 'error' => 'No file uploaded.']);
-        exit;
+        echo json_encode(['success' => false, 'error' => 'No file uploaded.']); exit;
     }
-
     $allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    $mime    = mime_content_type($file['tmp_name']);
+    $mime = mime_content_type($file['tmp_name']);
     if (!in_array($mime, $allowed, true)) {
-        echo json_encode(['success' => false, 'error' => 'Only JPEG, PNG, GIF, and WebP images are allowed.']);
-        exit;
+        echo json_encode(['success' => false, 'error' => 'Only JPEG, PNG, GIF, and WebP images are allowed.']); exit;
     }
-
     if ($file['size'] > 5 * 1024 * 1024) {
-        echo json_encode(['success' => false, 'error' => 'Image must be under 5 MB.']);
-        exit;
+        echo json_encode(['success' => false, 'error' => 'Image must be under 5 MB.']); exit;
     }
-
     $uploadDir = ROOT_DIR . '/public/uploads/field-images/';
-    if (!is_dir($uploadDir)) {
-        mkdir($uploadDir, 0755, true);
-    }
+    if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
 
-    $ext      = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif', 'image/webp' => 'webp'][$mime];
+    $ext = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif', 'image/webp' => 'webp'][$mime];
     $filename = 'field_' . $id . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
-    $dest     = $uploadDir . $filename;
+    $dest = $uploadDir . $filename;
 
-    // Delete old image if present
     $cfgRow = $db->prepare('SELECT config FROM ticket_form_fields WHERE id = ?');
     $cfgRow->execute([$id]);
     $oldCfg = json_decode($cfgRow->fetchColumn() ?? '{}', true);
     if (!empty($oldCfg['image_path'])) {
         $oldFile = ROOT_DIR . '/public/uploads/field-images/' . basename($oldCfg['image_path']);
-        if (file_exists($oldFile)) {
-            unlink($oldFile);
-        }
+        if (file_exists($oldFile)) unlink($oldFile);
     }
-
     if (!move_uploaded_file($file['tmp_name'], $dest)) {
-        echo json_encode(['success' => false, 'error' => 'Failed to save image.']);
-        exit;
+        echo json_encode(['success' => false, 'error' => 'Failed to save image.']); exit;
     }
-
     $newCfg = array_merge($oldCfg ?? [], ['image_path' => $filename]);
     $db->prepare('UPDATE ticket_form_fields SET config = ?, updated_at = NOW() WHERE id = ?')
        ->execute([json_encode($newCfg), $id]);
-
     echo json_encode(['success' => true, 'image_path' => $filename]);
+    exit;
+});
+
+// Update a system-field default label (the sys_field_label_* setting).
+// Body: { field, label }
+$router->post('/admin/forms/system-label', function () {
+    Auth::requireRole('admin');
+    header('Content-Type: application/json');
+    $body  = json_decode(file_get_contents('php://input'), true);
+    $field = (string) ($body['field'] ?? '');
+    $label = trim((string) ($body['label'] ?? ''));
+    $allowed = ['subject', 'description', 'ticket_type', 'location', 'priority', 'tags', 'attachments'];
+    if (!in_array($field, $allowed, true)) {
+        echo json_encode(['success' => false, 'error' => 'Invalid field']); exit;
+    }
+    if ($label === '' || mb_strlen($label) > 80) {
+        echo json_encode(['success' => false, 'error' => 'Label is required (max 80 chars)']); exit;
+    }
+    setSetting("sys_field_label_{$field}", $label);
+    echo json_encode(['success' => true]);
     exit;
 });
 

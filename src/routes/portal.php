@@ -186,10 +186,32 @@ $router->get('/portal/tickets/create', function () {
         }
     }
 
-    // Unified field list (system + custom) for rendering
-    $unifiedFields = getUnifiedFieldList($db, true);
-    $customFields  = array_map(fn($u) => $u['field'], array_filter($unifiedFields, fn($u) => $u['kind'] === 'custom'));
-    $fieldOptions  = [];
+    // Build the per-type form layouts. The portal page renders every field
+    // that appears on any ticket type once, then JS reorders + toggles
+    // required/hidden as the user picks a type.
+    $formLayouts  = [];   // typeId => [['kind','key','sort_order','visibility','label'], ...]
+    $customFields = [];   // unique custom-field definitions for rendering
+    $seenCustomIds = [];
+    foreach ($types as $t) {
+        $layout = getFormLayoutForType($db, (int) $t['id'], false);
+        $slim = [];
+        foreach ($layout as $row) {
+            $slim[] = [
+                'kind'       => $row['kind'],
+                'key'        => $row['key'],
+                'sort_order' => $row['sort_order'],
+                'visibility' => $row['visibility'],
+                'label'      => $row['label'],
+            ];
+            if ($row['kind'] === 'custom' && $row['field'] && !isset($seenCustomIds[$row['field']['id']])) {
+                $seenCustomIds[$row['field']['id']] = true;
+                $customFields[] = $row['field'];
+            }
+        }
+        $formLayouts[(int) $t['id']] = $slim;
+    }
+
+    $fieldOptions = [];
     foreach ($customFields as $f) {
         if (in_array($f['field_type'], ['dropdown', 'dependent'], true)) {
             $s = $db->prepare(
@@ -209,9 +231,6 @@ $router->get('/portal/tickets/create', function () {
          WHERE t.is_shared = 1
          ORDER BY t.name'
     )->fetchAll();
-
-    $fieldTypeMap = getFieldTypeMap($db);
-    $priorityVisibilityMap = getPriorityVisibilityMap($db);
 
     // Embed mode: chrome-less, submit-disabled rendering for the admin form-builder
     // live-preview iframe. Read-only on purpose — never affects the real form behaviour
@@ -248,9 +267,7 @@ $router->get('/portal/tickets/create', function () {
         'customFields'      => $customFields,
         'fieldOptions'      => $fieldOptions,
         'sharedTemplates'   => $sharedTemplates,
-        'fieldTypeMap'      => $fieldTypeMap,
-        'priorityVisibilityMap' => $priorityVisibilityMap,
-        'unifiedFields'     => $unifiedFields,
+        'formLayouts'       => $formLayouts,
         'preselectedTypeId' => $preselectedTypeId,
         'embedMode'         => $embedMode,
     ]);
@@ -303,10 +320,15 @@ $router->post('/portal/tickets/create', function () {
         redirect('/portal/tickets/create');
     }
 
-    $priorityVis = resolvePriorityVisibility($db, $typeId);
+    // Resolve this ticket type's form layout server-side and validate
+    // against it, ignoring whatever the client did or didn't render.
+    $typeLayout = $typeId ? getFormLayoutForType($db, $typeId, false) : [];
+    $visByKey = [];
+    foreach ($typeLayout as $r) {
+        $visByKey[$r['kind'] . '|' . $r['key']] = $r['visibility'];
+    }
+    $priorityVis = $visByKey['system|priority'] ?? 'optional';
     if ($priorityVis === 'hidden') {
-        // Form did not show the picker — ignore anything the user might have posted
-        // and fall back to the system default priority.
         $priorityId = getDefaultPriorityId($db);
     } elseif ($priorityVis === 'required' && $priorityId === null) {
         flashInput($_POST);
@@ -314,18 +336,21 @@ $router->post('/portal/tickets/create', function () {
         redirect('/portal/tickets/create');
     }
 
-    if (getSetting('sys_field_required_tags', '0') === '1' && getSetting('tags_enabled', '1') === '1') {
-        if (empty($tagNames)) {
-            flashInput($_POST);
-            flash('error', getSetting('sys_field_label_tags', 'Tags') . ' is required.');
-            redirect('/portal/tickets/create');
-        }
+    $tagsVis = $visByKey['system|tags'] ?? 'optional';
+    if ($tagsVis === 'required' && empty($tagNames)) {
+        flashInput($_POST);
+        flash('error', getSetting('sys_field_label_tags', 'Tags') . ' is required.');
+        redirect('/portal/tickets/create');
+    }
+    if ($tagsVis === 'hidden') {
+        $tagNames = [];
     }
 
-    // Validate required custom fields (filtered by the selected ticket type)
-    $visibleCustomFields = getCustomFieldsForType($db, $typeId ?? 0, true);
-    foreach ($visibleCustomFields as $cf) {
-        if (!$cf['is_required']) continue;
+    // Validate custom fields per this type's layout
+    $customRowsForType = array_values(array_filter($typeLayout, fn($r) => $r['kind'] === 'custom' && $r['field'] !== null));
+    foreach ($customRowsForType as $row) {
+        $cf = $row['field'];
+        if ($row['visibility'] !== 'required') continue;
         if (in_array($cf['field_type'], ['text_block', 'image'], true)) continue; // display-only, no value
         $key = 'field_' . $cf['id'];
         if ($cf['field_type'] === 'cc') {
@@ -560,9 +585,11 @@ $router->get('/portal/tickets/{id}', function (array $p) {
     $ccStmt->execute([$ticket['id']]);
     $ccUsers = $ccStmt->fetchAll();
 
-    // Custom field values (visible fields only)
+    // Custom field values — show every field that has a stored value, so a
+    // request shows the data the requester originally submitted even if the
+    // field's visibility has since been changed for the type's form.
     $customFields = $db->query(
-        'SELECT * FROM ticket_form_fields WHERE is_visible = 1 AND deleted_at IS NULL ORDER BY sort_order'
+        'SELECT * FROM ticket_form_fields WHERE deleted_at IS NULL ORDER BY id'
     )->fetchAll();
     $fieldValues  = [];
     $fieldOptions = [];
