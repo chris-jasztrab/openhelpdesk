@@ -475,7 +475,7 @@ $sysDefaults = systemFieldDefaults();
         <?php if ($selectedType): ?>
         <iframe id="previewFrame"
                 title="Form preview"
-                data-src="/portal/tickets/create?embed=1&amp;type_id=<?= (int) $selectedType['id'] ?>"
+                src="/portal/tickets/create?embed=1&amp;type_id=<?= (int) $selectedType['id'] ?>"
                 sandbox="allow-same-origin allow-scripts allow-forms allow-popups"></iframe>
         <?php else: ?>
         <div class="canvas-empty p-3"><small>No type selected.</small></div>
@@ -612,6 +612,38 @@ $sysDefaults = systemFieldDefaults();
 
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 <script>
+// ── Preview toggle: bound first, outside the main IIFE, so it works even if
+//    the builder IIFE bails on a later error (Sortable load, etc.). ──
+(function() {
+    var shell      = document.getElementById('builderShell');
+    var previewBtn = document.getElementById('togglePreviewBtn');
+    var iframe     = document.getElementById('previewFrame');
+    if (!shell || !previewBtn) return;
+
+    function setOpen(open) {
+        shell.classList.toggle('preview-open', open);
+        previewBtn.classList.toggle('active', open);
+        previewBtn.setAttribute('aria-pressed', open ? 'true' : 'false');
+        try { localStorage.setItem('formBuilder_previewOpen', open ? '1' : '0'); } catch (e) {}
+    }
+    function reload() {
+        if (!iframe) return;
+        var s = iframe.getAttribute('src');
+        if (s) iframe.setAttribute('src', s); // force reload
+    }
+    var savedOpen = false;
+    try { savedOpen = localStorage.getItem('formBuilder_previewOpen') === '1'; } catch (e) {}
+    if (savedOpen) setOpen(true);
+    previewBtn.addEventListener('click', function() {
+        setOpen(!shell.classList.contains('preview-open'));
+    });
+    var rBtn = document.getElementById('previewReloadBtn');
+    if (rBtn) rBtn.addEventListener('click', reload);
+    var cBtn = document.getElementById('previewCloseBtn');
+    if (cBtn) cBtn.addEventListener('click', function() { setOpen(false); });
+    window.__formBuilderReloadPreview = reload;
+})();
+
 (function() {
     var typeId = <?= $selectedType ? (int) $selectedType['id'] : 'null' ?>;
     if (!typeId) return;
@@ -953,49 +985,20 @@ $sysDefaults = systemFieldDefaults();
             });
     });
 
-    /* Live preview toggle. The iframe is rendered with `data-src` (not `src`)
-       so the browser doesn't try to load it until we open the pane — avoids
-       the Chrome quirk where loading=lazy iframes inside display:none never
-       fire, and saves bandwidth when the user never opens the preview. */
-    var shell = document.getElementById('builderShell');
-    var previewBtn = document.getElementById('togglePreviewBtn');
-    var iframe = document.getElementById('previewFrame');
-    function ensureIframeLoaded() {
-        if (!iframe) return;
-        var ds = iframe.getAttribute('data-src');
-        if (ds && !iframe.getAttribute('src')) {
-            iframe.setAttribute('src', ds);
-        }
+    /* Live preview toggle is wired in a separate IIFE above so it works even
+       if anything in this main IIFE throws. Here we only wire the "open in
+       new tab" button and expose a no-op reloadPreview() used by other
+       handlers below. */
+    var openBtn = document.getElementById('previewOpenBtn');
+    if (openBtn) {
+        openBtn.addEventListener('click', function() {
+            window.open('/portal/tickets/create?type_id=' + typeId, '_blank');
+        });
     }
-    function openPane() {
-        shell.classList.add('preview-open');
-        previewBtn.classList.add('active');
-        previewBtn.setAttribute('aria-pressed', 'true');
-        ensureIframeLoaded();
-        localStorage.setItem('formBuilder_previewOpen', '1');
-    }
-    function closePane() {
-        shell.classList.remove('preview-open');
-        previewBtn.classList.remove('active');
-        previewBtn.setAttribute('aria-pressed', 'false');
-        localStorage.setItem('formBuilder_previewOpen', '0');
-    }
-    if (localStorage.getItem('formBuilder_previewOpen') === '1') openPane();
-
-    previewBtn.addEventListener('click', function() {
-        if (shell.classList.contains('preview-open')) closePane(); else openPane();
-    });
-    document.getElementById('previewReloadBtn').addEventListener('click', reloadPreview);
-    document.getElementById('previewCloseBtn').addEventListener('click', closePane);
-    document.getElementById('previewOpenBtn').addEventListener('click', function() {
-        window.open('/portal/tickets/create?type_id=' + typeId, '_blank');
-    });
     function reloadPreview() {
-        if (!shell.classList.contains('preview-open') || !iframe) return;
-        ensureIframeLoaded();
-        // If src is already set, force a reload by reassigning to itself.
-        var cur = iframe.getAttribute('src');
-        if (cur) iframe.setAttribute('src', cur);
+        if (typeof window.__formBuilderReloadPreview === 'function') {
+            window.__formBuilderReloadPreview();
+        }
     }
 })();
 </script>

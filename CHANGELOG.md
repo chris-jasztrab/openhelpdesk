@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.42.3 &mdash; 2026-05-13
+
+### Bug fixes
+- **Form Builder live preview still not opening (2.42.2 follow-up).** The previous attempt switched the iframe to `data-src` and copied it into `src` on toggle open, but that depended on the main builder IIFE running through to where the preview-toggle handler was bound &mdash; if anything earlier in the IIFE threw (e.g. a transient `Sortable` load issue or a missing modal element), the click handler was never wired and clicking "Live Preview" did nothing visible. **Fix:** the preview toggle now lives in its own separate IIFE before the main builder code, so it binds regardless of what happens later, and the iframe is rendered with a plain `src=` again (browsers will load it on page paint, even with the pane initially `display:none` &mdash; only rendering is suppressed). Every `getElementById` in the toggle is null-guarded; `localStorage` reads/writes are wrapped in `try/catch` for private-window safety. The main IIFE retains a `reloadPreview()` shim that delegates to the toggle's reload, so visibility-pill clicks and drag-reorders still refresh the preview when changes save.
+
+---
+
 ## 2.42.2 &mdash; 2026-05-13
 
 ### Bug fixes
