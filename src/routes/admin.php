@@ -9765,10 +9765,10 @@ $router->get('/admin/workflows/ticket-fields', function () {
     $layout_ = getFormLayoutForType($db, $selectedTypeId, false);
 
     // Custom fields not currently in this type's layout — for the "add existing" picker
-    $usedFieldIds = array_map(
+    $usedFieldIds = array_values(array_map(
         fn($r) => (int) $r['key'],
         array_filter($layout_, fn($r) => $r['kind'] === 'custom')
-    );
+    ));
     if ($usedFieldIds) {
         $placeholders = implode(',', array_fill(0, count($usedFieldIds), '?'));
         $unusedStmt = $db->prepare(

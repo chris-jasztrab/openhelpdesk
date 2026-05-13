@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.42.1 &mdash; 2026-05-13
+
+### Bug fixes
+- **Form Builder page errored with "Invalid parameter number" instead of rendering.** The new builder route at [src/routes/admin.php](src/routes/admin.php) (`/admin/workflows/ticket-fields`) computed the "fields not on this type's form" list by passing `array_map(..., array_filter(...))` straight into `PDOStatement::execute()` for a `NOT IN (?, ?, ...)` query. `array_filter()` preserves the original (non-sequential) array keys, and `array_map()` carries them through, so the resulting positional-parameter array looked like `{"1": 40}` instead of `{"0": 40}` &mdash; which PDO rejects with `SQLSTATE[HY093]: Invalid parameter number: parameter was not defined`. **Fix:** wrap the chain in `array_values()` so the params are zero-indexed. The matching cleanup query on the field-update endpoint already used `array_values()` correctly. Confirmed via a probe script against prod's PHP runtime before re-deploying.
+
+---
+
 ## 2.42.0 &mdash; 2026-05-13
 
 ### New features
