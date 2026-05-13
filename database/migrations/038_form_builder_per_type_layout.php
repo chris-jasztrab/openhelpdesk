@@ -76,13 +76,13 @@ return static function (PDO $pdo): void {
 
     // ── 2 + 3. Seed layout rows for every ticket type ─────────────────
     $globalReqPriority = $pdo->query(
-        "SELECT value FROM settings WHERE name = 'sys_field_required_priority' LIMIT 1"
+        "SELECT setting_value FROM settings WHERE setting_key = 'sys_field_required_priority' LIMIT 1"
     )->fetchColumn();
     $globalReqTags = $pdo->query(
-        "SELECT value FROM settings WHERE name = 'sys_field_required_tags' LIMIT 1"
+        "SELECT setting_value FROM settings WHERE setting_key = 'sys_field_required_tags' LIMIT 1"
     )->fetchColumn();
     $tagsEnabledRaw = $pdo->query(
-        "SELECT value FROM settings WHERE name = 'tags_enabled' LIMIT 1"
+        "SELECT setting_value FROM settings WHERE setting_key = 'tags_enabled' LIMIT 1"
     )->fetchColumn();
     $tagsEnabled = $tagsEnabledRaw === false ? true : ((string) $tagsEnabledRaw === '1');
 
@@ -204,7 +204,7 @@ return static function (PDO $pdo): void {
     // ── 7. Delete redundant settings rows ─────────────────────────────
     $pdo->exec(
         "DELETE FROM settings
-         WHERE name IN ('sys_field_required_priority', 'sys_field_required_tags')
-            OR name LIKE 'sys_field_sort_order_%'"
+         WHERE setting_key IN ('sys_field_required_priority', 'sys_field_required_tags')
+            OR setting_key LIKE 'sys_field_sort_order_%'"
     );
 };
