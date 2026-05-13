@@ -130,6 +130,27 @@ $action = $isEdit ? "/admin/types/{$editing['id']}/edit" : '/admin/types/create'
                 </div>
             </div>
 
+            <?php
+            $globalReq    = getSetting('sys_field_required_priority', '0') === '1';
+            $inheritLabel = $globalReq ? 'Required' : 'Optional';
+            $priVis       = $editing['priority_visibility'] ?? 'inherit';
+            $priVis       = old('priority_visibility', $priVis);
+            ?>
+            <div class="mb-3">
+                <label for="priority_visibility" class="form-label fw-semibold">
+                    <i class="bi bi-flag me-1"></i>Priority Field
+                </label>
+                <select class="form-select" id="priority_visibility" name="priority_visibility">
+                    <option value="inherit"  <?= $priVis === 'inherit'  ? 'selected' : '' ?>>Use global setting (<?= e($inheritLabel) ?>)</option>
+                    <option value="required" <?= $priVis === 'required' ? 'selected' : '' ?>>Required &mdash; user must pick a priority</option>
+                    <option value="optional" <?= $priVis === 'optional' ? 'selected' : '' ?>>Optional &mdash; user may leave blank</option>
+                    <option value="hidden"   <?= $priVis === 'hidden'   ? 'selected' : '' ?>>Hidden &mdash; don't show the field</option>
+                </select>
+                <div class="form-text">
+                    Controls whether the priority picker appears on the New Ticket form for this type. When <strong>Hidden</strong>, new tickets are created with the system default priority (the priority with the lowest sort order at <a href="/admin/priorities">Admin &rarr; Priorities</a>); agents can still change it after creation. The global default lives at <a href="/admin/workflows/ticket-fields">Admin &rarr; Form Builder</a>.
+                </div>
+            </div>
+
             <div class="mb-3">
                 <label for="stale_threshold_hours" class="form-label fw-semibold">
                     <i class="bi bi-hourglass-split me-1"></i>Stale Threshold (hours)

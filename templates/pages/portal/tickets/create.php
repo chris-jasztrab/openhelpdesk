@@ -114,8 +114,17 @@ endif; ?>
 
             <?php
             $portalMode = true;
-            $priorityRequired = getSetting('sys_field_required_priority', '0') === '1';
-            $tagsRequired     = getSetting('sys_field_required_tags', '0') === '1';
+            // Initial state mirrors the *currently selected* type (if any). The
+            // form's JS swaps it as the user changes type via the priorityVisibilityMap.
+            $initialTypeIdRaw = old('type_id');
+            if ($initialTypeIdRaw === '' && !empty($preselectedTypeId)) {
+                $initialTypeIdRaw = (string) $preselectedTypeId;
+            }
+            $initialTypeId        = ctype_digit((string) $initialTypeIdRaw) ? (int) $initialTypeIdRaw : 0;
+            $initialPriorityVis   = $priorityVisibilityMap[$initialTypeId] ?? $priorityVisibilityMap[0];
+            $priorityRequired     = $initialPriorityVis === 'required';
+            $priorityHidden       = $initialPriorityVis === 'hidden';
+            $tagsRequired         = getSetting('sys_field_required_tags', '0') === '1';
             foreach ($unifiedFields as $uf):
                 if ($uf['kind'] === 'system'):
             ?>
@@ -164,11 +173,11 @@ endif; ?>
                 </div>
             </div>
                 <?php elseif ($uf['key'] === 'priority'): ?>
-            <div class="row g-3 mb-3">
+            <div class="row g-3 mb-3" id="priorityFieldWrap" <?= $priorityHidden ? 'style="display:none;"' : '' ?>>
                 <div class="col-md-6">
                     <label for="priority_id" class="form-label fw-semibold">
                         <?= e(label('portal.field.priority_label', 'How urgent is this?')) ?>
-                        <?php if ($priorityRequired): ?><span class="text-danger">*</span><?php endif; ?>
+                        <span class="text-danger priority-required-star" <?= $priorityRequired ? '' : 'style="display:none;"' ?>>*</span>
                     </label>
                     <select class="form-select" id="priority_id" name="priority_id"
                             <?= $priorityRequired ? 'required' : '' ?>>
@@ -179,9 +188,9 @@ endif; ?>
                         </option>
                         <?php endforeach; ?>
                     </select>
-                    <?php if (!$priorityRequired): ?>
-                    <div class="form-text"><?= e(label('portal.field.priority_help', 'Pick a level if you know — otherwise leave blank and our team will set it.')) ?></div>
-                    <?php endif; ?>
+                    <div class="form-text priority-help-text" <?= $priorityRequired ? 'style="display:none;"' : '' ?>>
+                        <?= e(label('portal.field.priority_help', 'Pick a level if you know — otherwise leave blank and our team will set it.')) ?>
+                    </div>
                 </div>
             </div>
                 <?php elseif ($uf['key'] === 'tags'): ?>
@@ -267,6 +276,41 @@ endif; ?>
 
     typeSelect.addEventListener('change', filterFieldsByType);
     filterFieldsByType();
+})();
+
+// ── Priority field per-type visibility ─────────────────────────
+(function() {
+    var priorityVisibilityMap = <?= json_encode($priorityVisibilityMap) ?>;
+    var typeSelect = document.getElementById('type_id');
+    var wrap       = document.getElementById('priorityFieldWrap');
+    if (!typeSelect || !wrap) return;
+    var priInput   = document.getElementById('priority_id');
+    var star       = wrap.querySelector('.priority-required-star');
+    var help       = wrap.querySelector('.priority-help-text');
+
+    function applyPriorityVisibility() {
+        var selectedType = parseInt(typeSelect.value) || 0;
+        var v = priorityVisibilityMap[selectedType] || priorityVisibilityMap[0] || 'optional';
+        if (v === 'hidden') {
+            wrap.style.display = 'none';
+            // Clear value + drop required so it never blocks submit
+            if (priInput) { priInput.value = ''; priInput.removeAttribute('required'); }
+            return;
+        }
+        wrap.style.display = '';
+        if (v === 'required') {
+            if (priInput) priInput.setAttribute('required', '');
+            if (star) star.style.display = '';
+            if (help) help.style.display = 'none';
+        } else {
+            if (priInput) priInput.removeAttribute('required');
+            if (star) star.style.display = 'none';
+            if (help) help.style.display = '';
+        }
+    }
+
+    typeSelect.addEventListener('change', applyPriorityVisibility);
+    applyPriorityVisibility();
 })();
 
 <?php if (!empty($sharedTemplates)): ?>

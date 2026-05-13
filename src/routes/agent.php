@@ -684,6 +684,7 @@ $router->get('/agent/tickets/create', function () {
         }
     }
     $fieldTypeMap = getFieldTypeMap($db);
+    $priorityVisibilityMap = getPriorityVisibilityMap($db);
 
     render('admin/tickets/create', [
         'types'         => $types,
@@ -697,6 +698,7 @@ $router->get('/agent/tickets/create', function () {
         'customFields'  => $customFields,
         'fieldOptions'  => $fieldOptions,
         'fieldTypeMap'  => $fieldTypeMap,
+        'priorityVisibilityMap' => $priorityVisibilityMap,
         'unifiedFields' => $unifiedFields,
     ]);
 });

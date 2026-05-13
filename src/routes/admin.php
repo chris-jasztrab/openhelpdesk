@@ -1570,6 +1570,8 @@ $router->post('/admin/types/create', function () {
     $showToLocVis   = !empty($_POST['show_to_location_visibility']) ? 1 : 0;
     $staleRaw       = trim((string) ($_POST['stale_threshold_hours'] ?? ''));
     $staleHours     = $staleRaw === '' ? null : max(0, (int) $staleRaw);
+    $priVisRaw      = (string) ($_POST['priority_visibility'] ?? 'inherit');
+    $priVis         = in_array($priVisRaw, ['inherit','required','optional','hidden'], true) ? $priVisRaw : 'inherit';
     $skillIds       = array_filter(array_map('intval', (array) ($_POST['required_skills'] ?? [])));
     if ($name === '') {
         flashInput($_POST);
@@ -1577,8 +1579,8 @@ $router->post('/admin/types/create', function () {
         redirect('/admin/types/create');
     }
     $db = Database::connect();
-    $db->prepare('INSERT INTO ticket_types (name, color, group_id, is_confidential, ai_route_group, ai_dup_check_enabled, ai_dup_threshold, show_to_location_visibility, sort_order, stale_threshold_hours) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $showToLocVis, $order, $staleHours]);
+    $db->prepare('INSERT INTO ticket_types (name, color, group_id, is_confidential, ai_route_group, ai_dup_check_enabled, ai_dup_threshold, show_to_location_visibility, sort_order, stale_threshold_hours, priority_visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $showToLocVis, $order, $staleHours, $priVis]);
     $typeId = (int) $db->lastInsertId();
     if ($skillIds) {
         $stmt = $db->prepare('INSERT IGNORE INTO ticket_type_skill_map (ticket_type_id, skill_id) VALUES (?, ?)');
@@ -1628,6 +1630,8 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
     $showToLocVis   = !empty($_POST['show_to_location_visibility']) ? 1 : 0;
     $staleRaw       = trim((string) ($_POST['stale_threshold_hours'] ?? ''));
     $staleHours     = $staleRaw === '' ? null : max(0, (int) $staleRaw);
+    $priVisRaw      = (string) ($_POST['priority_visibility'] ?? 'inherit');
+    $priVis         = in_array($priVisRaw, ['inherit','required','optional','hidden'], true) ? $priVisRaw : 'inherit';
     if ($name === '') {
         flashInput($_POST);
         flash('error', 'Type name is required.');
@@ -1657,6 +1661,7 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
                 'ai_route_group' => $aiRouteGroup ? '1' : '',
                 'ai_dup_check_enabled' => $aiDupCheck ? '1' : '',
                 'ai_dup_threshold' => (string) $aiDupThreshold,
+                'priority_visibility' => $priVis,
                 // is_confidential intentionally omitted (unchecked = removal)
             ];
             logAudit(
@@ -1693,8 +1698,8 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
         }
     }
 
-    $db->prepare('UPDATE ticket_types SET name=?, color=?, group_id=?, is_confidential=?, ai_route_group=?, ai_dup_check_enabled=?, ai_dup_threshold=?, show_to_location_visibility=?, sort_order=?, stale_threshold_hours=? WHERE id=?')
-        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $showToLocVis, $order, $staleHours, $id]);
+    $db->prepare('UPDATE ticket_types SET name=?, color=?, group_id=?, is_confidential=?, ai_route_group=?, ai_dup_check_enabled=?, ai_dup_threshold=?, show_to_location_visibility=?, sort_order=?, stale_threshold_hours=?, priority_visibility=? WHERE id=?')
+        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $showToLocVis, $order, $staleHours, $priVis, $id]);
 
     // Required skills (used by Skill-Based group auto-assignment)
     $skillIds = array_filter(array_map('intval', (array) ($_POST['required_skills'] ?? [])));
@@ -3613,6 +3618,7 @@ $router->get('/admin/tickets/create', function () {
         }
     }
     $fieldTypeMap = getFieldTypeMap($db);
+    $priorityVisibilityMap = getPriorityVisibilityMap($db);
 
     render('admin/tickets/create', [
         'types'         => $types,
@@ -3625,6 +3631,7 @@ $router->get('/admin/tickets/create', function () {
         'customFields'  => $customFields,
         'fieldOptions'  => $fieldOptions,
         'fieldTypeMap'  => $fieldTypeMap,
+        'priorityVisibilityMap' => $priorityVisibilityMap,
         'unifiedFields' => $unifiedFields,
     ]);
 });
@@ -3675,6 +3682,12 @@ $router->post('/admin/tickets/create', function () {
 
     $db = Database::connect();
     $groupId = resolveTicketGroup($db, $groupId, $typeId);
+    // If the priority picker is hidden for this type, the staff form will not
+    // have rendered it — fall back to the system default so the ticket has a
+    // priority on creation.
+    if (resolvePriorityVisibility($db, $typeId) === 'hidden') {
+        $priId = getDefaultPriorityId($db);
+    }
     $db->prepare(
         'INSERT INTO tickets (subject, description, created_by, submitted_by, type_id, location_id, status, priority_id, assigned_to, group_id, due_date)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'

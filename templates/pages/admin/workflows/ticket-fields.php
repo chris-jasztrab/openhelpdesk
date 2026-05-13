@@ -696,6 +696,10 @@ usort($unifiedBuilderList, fn($a, $b) => $a['sort_order'] <=> $b['sort_order']);
                         <label class="form-check-label" for="sysFieldRequired">Required field</label>
                     </div>
                     <div class="form-text">When enabled, users must fill this in before submitting.</div>
+                    <div id="sysFieldPriorityPerTypeNote" class="alert alert-info py-2 mt-3 mb-0 small" style="display:none;">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Need this <strong>required, optional, or hidden</strong> on only some ticket types? Override it per type at <a href="/admin/types">Admin &rarr; Ticket Types</a> &rarr; (edit) &rarr; <em>Priority Field</em>. This Required toggle is the global default that types inherit unless overridden.
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -1428,12 +1432,16 @@ document.addEventListener('DOMContentLoaded', function () {
     var sysFieldReqWrap = document.getElementById('sysFieldRequiredWrap');
     var sysFieldReq    = document.getElementById('sysFieldRequired');
 
+    var sysFieldPriNote = document.getElementById('sysFieldPriorityPerTypeNote');
     document.querySelectorAll('.edit-sys-field-btn').forEach(function (btn) {
         btn.addEventListener('click', function () {
             sysFieldKey.value       = btn.dataset.key;
             sysFieldLabel.value     = btn.dataset.label;
             sysFieldReq.checked     = btn.dataset.required === '1';
             sysFieldReqWrap.style.display = btn.dataset.hasRequired === '1' ? '' : 'none';
+            if (sysFieldPriNote) {
+                sysFieldPriNote.style.display = btn.dataset.key === 'priority' ? '' : 'none';
+            }
             sysModal.show();
         });
     });

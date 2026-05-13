@@ -152,7 +152,7 @@ $statusOptions = [
                             </select>
                         </div>
                         <?php elseif ($uf['key'] === 'priority'): ?>
-                        <div class="col-md-6 col-lg-4">
+                        <div class="col-md-6 col-lg-4" id="priorityFieldWrap">
                             <label for="priority_id" class="form-label fw-semibold">Priority</label>
                             <select class="form-select" id="priority_id" name="priority_id">
                                 <option value="">— None —</option>
@@ -320,6 +320,32 @@ $statusOptions = [
     typeSelect.addEventListener('change', filterFieldsByType);
     filterFieldsByType();
 })();
+<?php endif; ?>
+
+// ── Priority field per-type visibility ─────────────────────────
+(function() {
+    var priorityVisibilityMap = <?= json_encode($priorityVisibilityMap ?? new stdClass()) ?>;
+    var typeSelect = document.getElementById('type_id');
+    var wrap       = document.getElementById('priorityFieldWrap');
+    if (!typeSelect || !wrap) return;
+    var priInput   = document.getElementById('priority_id');
+
+    function applyPriorityVisibility() {
+        var selectedType = parseInt(typeSelect.value) || 0;
+        var v = priorityVisibilityMap[selectedType] || priorityVisibilityMap[0] || 'optional';
+        if (v === 'hidden') {
+            wrap.style.display = 'none';
+            if (priInput) priInput.value = '';
+        } else {
+            wrap.style.display = '';
+        }
+    }
+
+    typeSelect.addEventListener('change', applyPriorityVisibility);
+    applyPriorityVisibility();
+})();
+
+<?php if (!empty($customFields)): ?>
 
 // ── Dependent field cascading dropdowns ────────────────────────
 <?php

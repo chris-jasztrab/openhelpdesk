@@ -219,6 +219,69 @@ function getFieldTypeMap(PDO $db): array
     return $map;
 }
 
+/**
+ * Resolve the effective priority-field visibility for a given ticket type.
+ *
+ * Each ticket type stores one of: 'inherit', 'required', 'optional', 'hidden'.
+ * 'inherit' (or an unknown / null type) falls back to the global
+ *  `sys_field_required_priority` setting:
+ *   - '1' → 'required'
+ *   - anything else → 'optional'
+ *
+ * Returns one of: 'required', 'optional', 'hidden'.
+ */
+function resolvePriorityVisibility(PDO $db, ?int $typeId): string
+{
+    $globalRequired = getSetting('sys_field_required_priority', '0') === '1';
+    $fallback = $globalRequired ? 'required' : 'optional';
+    if (!$typeId) {
+        return $fallback;
+    }
+    static $cache = [];
+    if (!array_key_exists($typeId, $cache)) {
+        $stmt = $db->prepare('SELECT priority_visibility FROM ticket_types WHERE id = ?');
+        $stmt->execute([$typeId]);
+        $cache[$typeId] = $stmt->fetchColumn() ?: 'inherit';
+    }
+    $v = $cache[$typeId];
+    if (in_array($v, ['required', 'optional', 'hidden'], true)) {
+        return $v;
+    }
+    return $fallback;
+}
+
+/**
+ * Look up the system "default" priority — the priority with the lowest
+ * sort_order (tiebroken by id). Returns null only if no priorities exist.
+ */
+function getDefaultPriorityId(PDO $db): ?int
+{
+    static $cached = null;
+    if ($cached === null) {
+        $id = $db->query('SELECT id FROM ticket_priorities ORDER BY sort_order, id LIMIT 1')->fetchColumn();
+        $cached = $id ? (int) $id : 0;
+    }
+    return $cached ?: null;
+}
+
+/**
+ * Build a map of type_id → effective priority visibility for client-side
+ * use (so the form can toggle the field as the user changes type).
+ * The 0 key carries the global fallback for "no type selected yet".
+ */
+function getPriorityVisibilityMap(PDO $db): array
+{
+    $globalRequired = getSetting('sys_field_required_priority', '0') === '1';
+    $fallback = $globalRequired ? 'required' : 'optional';
+    $rows = $db->query('SELECT id, priority_visibility FROM ticket_types')->fetchAll();
+    $map = [0 => $fallback];
+    foreach ($rows as $r) {
+        $v = $r['priority_visibility'] ?? 'inherit';
+        $map[(int) $r['id']] = in_array($v, ['required', 'optional', 'hidden'], true) ? $v : $fallback;
+    }
+    return $map;
+}
+
 /* ── Unified field list (system + custom, sorted) ────────────── */
 
 /**

@@ -211,6 +211,7 @@ $router->get('/portal/tickets/create', function () {
     )->fetchAll();
 
     $fieldTypeMap = getFieldTypeMap($db);
+    $priorityVisibilityMap = getPriorityVisibilityMap($db);
 
     // Embed mode: chrome-less, submit-disabled rendering for the admin form-builder
     // live-preview iframe. Read-only on purpose — never affects the real form behaviour
@@ -248,6 +249,7 @@ $router->get('/portal/tickets/create', function () {
         'fieldOptions'      => $fieldOptions,
         'sharedTemplates'   => $sharedTemplates,
         'fieldTypeMap'      => $fieldTypeMap,
+        'priorityVisibilityMap' => $priorityVisibilityMap,
         'unifiedFields'     => $unifiedFields,
         'preselectedTypeId' => $preselectedTypeId,
         'embedMode'         => $embedMode,
@@ -301,7 +303,12 @@ $router->post('/portal/tickets/create', function () {
         redirect('/portal/tickets/create');
     }
 
-    if (getSetting('sys_field_required_priority', '0') === '1' && $priorityId === null) {
+    $priorityVis = resolvePriorityVisibility($db, $typeId);
+    if ($priorityVis === 'hidden') {
+        // Form did not show the picker — ignore anything the user might have posted
+        // and fall back to the system default priority.
+        $priorityId = getDefaultPriorityId($db);
+    } elseif ($priorityVis === 'required' && $priorityId === null) {
         flashInput($_POST);
         flash('error', getSetting('sys_field_label_priority', 'Priority') . ' is required.');
         redirect('/portal/tickets/create');
