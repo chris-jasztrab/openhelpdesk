@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.42.2 &mdash; 2026-05-13
+
+### Bug fixes
+- **Form Builder's live preview never loaded.** The `<iframe id="previewFrame">` in [templates/pages/admin/workflows/ticket-fields.php](templates/pages/admin/workflows/ticket-fields.php) was rendered with both `src=` and `loading="lazy"`, while its parent pane started with `display: none` until the user clicked **Live Preview**. Chrome (and a few other browsers) decline to start loading a lazy iframe whose parent is `display: none`, and once the parent becomes visible the deferred load never fires for that DOM node &mdash; so the user clicked the toggle, saw the pane open, and got a blank rectangle. **Fix:** the iframe is now rendered with `data-src=` instead of `src=`, and the toggle's open path copies `data-src` into `src` on the first open (subsequent opens are no-ops; the reload button reassigns the existing src to force a refresh). Verified end-to-end against prod by forging a session, curling the builder page to confirm the iframe markup, then curling the embed URL itself to confirm headers + body were healthy &mdash; the page was rendering fine; the iframe just wasn't being asked to load. While here, encoded the `&` in the iframe URL as `&amp;` for HTML-attribute correctness.
+
+---
+
 ## 2.42.1 &mdash; 2026-05-13
 
 ### Bug fixes
