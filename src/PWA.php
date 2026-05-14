@@ -70,7 +70,7 @@ final class PWA
     /** First grapheme of the app name, uppercased. */
     public static function appInitial(): string
     {
-        $name = trim(getSetting('branding_app_name', 'LocalDesk'));
+        $name = trim(getSetting('branding_app_name', 'OpenHelpDesk'));
         if ($name === '') {
             return 'L';
         }
@@ -261,8 +261,8 @@ final class PWA
      */
     public static function manifestData(): array
     {
-        $appName     = getSetting('branding_app_name', 'LocalDesk');
-        $shortName   = mb_substr($appName, 0, 12, 'UTF-8') ?: 'LocalDesk';
+        $appName     = getSetting('branding_app_name', 'OpenHelpDesk');
+        $shortName   = mb_substr($appName, 0, 12, 'UTF-8') ?: 'OpenHelpDesk';
         $themeColor  = getSetting('branding_navbar_start', '#1e1b4b');
         $brandColor  = getSetting('branding_primary_color', '#4f46e5');
         $bgColor     = '#f1f5f9';

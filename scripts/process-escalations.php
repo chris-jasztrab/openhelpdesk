@@ -1,7 +1,7 @@
 <?php
 
 /**
- * LocalDesk — Escalation Rules Processor
+ * OpenHelpDesk — Escalation Rules Processor
  *
  * Evaluates all enabled escalation rules against active tickets.
  * Designed to run via cron every 15 minutes:

@@ -20,7 +20,7 @@ $breadcrumbs  = [
     </div>
     <div class="card-body p-4">
         <p class="text-muted mb-4">
-            Tell <?= e(getSetting('branding_app_name', 'LocalDesk')) ?> what kind of organization you are.
+            Tell <?= e(getSetting('branding_app_name', 'OpenHelpDesk')) ?> what kind of organization you are.
             This helps tailor terminology, default ticket types, and AI suggestions to your sector.
         </p>
 

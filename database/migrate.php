@@ -1,6 +1,6 @@
 <?php
 /**
- * LocalDesk — Database Migration Runner
+ * OpenHelpDesk — Database Migration Runner
  *
  * Applies any pending migrations from database/migrations/ in order.
  * Each migration is recorded in `schema_migrations` so it only ever runs once.

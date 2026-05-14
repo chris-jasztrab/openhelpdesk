@@ -22,7 +22,7 @@ $breadcrumbs  = [
     </div>
     <div class="card-body p-4">
         <p class="text-muted mb-4">
-            Match each LocalDesk field to the corresponding column from your CSV file.
+            Match each OpenHelpDesk field to the corresponding column from your CSV file.
             Fields marked <span class="text-danger fw-semibold">*</span> are required.
             Columns with a likely match have been pre-selected — review them and adjust as needed.
         </p>
@@ -34,7 +34,7 @@ $breadcrumbs  = [
                 <table class="table table-bordered align-middle mb-0">
                     <thead class="table-light">
                         <tr>
-                            <th style="width:220px;">LocalDesk Field</th>
+                            <th style="width:220px;">OpenHelpDesk Field</th>
                             <th>CSV Column</th>
                             <th style="width:280px;">Sample Values</th>
                         </tr>

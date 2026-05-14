@@ -28,7 +28,7 @@ $redirectUri = rtrim(env('APP_URL', ''), '/') . '/auth/microsoft/callback';
     <div class="card-body">
         <ul class="mb-0">
             <li>You must be a <strong>Global Administrator</strong> or <strong>Application Administrator</strong> in your Microsoft 365 tenant.</li>
-            <li>Your LocalDesk install must be accessible over HTTPS. Microsoft does not allow plain HTTP redirect URIs in production.</li>
+            <li>Your OpenHelpDesk install must be accessible over HTTPS. Microsoft does not allow plain HTTP redirect URIs in production.</li>
             <li>The redirect URI for your install is: <br>
                 <div class="input-group mt-2" style="max-width:560px;">
                     <input type="text" class="form-control form-control-sm font-monospace bg-light" readonly
@@ -69,7 +69,7 @@ $redirectUri = rtrim(env('APP_URL', ''), '/') . '/auth/microsoft/callback';
             <li>Click <strong>+ New registration</strong> at the top.</li>
             <li>Fill in the form:
                 <ul class="mt-2">
-                    <li><strong>Name:</strong> Enter a recognisable name, e.g. <em>LocalDesk SSO</em>.</li>
+                    <li><strong>Name:</strong> Enter a recognisable name, e.g. <em>OpenHelpDesk SSO</em>.</li>
                     <li><strong>Supported account types:</strong> Choose <em>"Accounts in this organizational directory only (Single tenant)"</em> — this restricts login to your organisation's accounts only.</li>
                     <li><strong>Redirect URI:</strong> Select <em>Web</em> from the platform dropdown and paste your redirect URI:
                         <div class="input-group mt-1" style="max-width:560px;">
@@ -97,10 +97,10 @@ $redirectUri = rtrim(env('APP_URL', ''), '/') . '/auth/microsoft/callback';
     <div class="card-body">
         <ol class="mb-2">
             <li>After registering, you are taken to the app's <strong>Overview</strong> page.</li>
-            <li>Copy the following values — you will paste them into LocalDesk:
+            <li>Copy the following values — you will paste them into OpenHelpDesk:
                 <table class="table table-sm table-bordered mt-2 mb-0">
                     <thead class="table-light">
-                        <tr><th>Azure Field</th><th>LocalDesk Field</th></tr>
+                        <tr><th>Azure Field</th><th>OpenHelpDesk Field</th></tr>
                     </thead>
                     <tbody>
                         <tr><td><strong>Application (client) ID</strong></td><td>Application (Client) ID</td></tr>
@@ -126,8 +126,8 @@ $redirectUri = rtrim(env('APP_URL', ''), '/') . '/auth/microsoft/callback';
         <ol class="mb-2">
             <li>In the left sidebar of your app, click <strong>Certificates &amp; secrets</strong>.</li>
             <li>Under the <strong>Client secrets</strong> tab, click <strong>+ New client secret</strong>.</li>
-            <li>Enter a description (e.g. <em>LocalDesk</em>) and choose an expiry period. Click <strong>Add</strong>.</li>
-            <li>The secret is displayed <strong>once only</strong>. Copy the <strong>Value</strong> (not the Secret ID) immediately and paste it into the <em>Client Secret</em> field in LocalDesk.</li>
+            <li>Enter a description (e.g. <em>OpenHelpDesk</em>) and choose an expiry period. Click <strong>Add</strong>.</li>
+            <li>The secret is displayed <strong>once only</strong>. Copy the <strong>Value</strong> (not the Secret ID) immediately and paste it into the <em>Client Secret</em> field in OpenHelpDesk.</li>
         </ol>
         <div class="alert alert-danger small py-2 mb-0">
             <i class="bi bi-shield-exclamation me-1"></i>
@@ -160,7 +160,7 @@ $redirectUri = rtrim(env('APP_URL', ''), '/') . '/auth/microsoft/callback';
         </ol>
         <div class="alert alert-info small py-2 mb-0">
             <i class="bi bi-info-circle me-1"></i>
-            <code>User.Read</code> allows LocalDesk to read the signed-in user's name and email address from Microsoft Graph. No other data is accessed.
+            <code>User.Read</code> allows OpenHelpDesk to read the signed-in user's name and email address from Microsoft Graph. No other data is accessed.
         </div>
     </div>
 </div>
@@ -169,7 +169,7 @@ $redirectUri = rtrim(env('APP_URL', ''), '/') . '/auth/microsoft/callback';
 <div class="card border-0 shadow-sm mb-4">
     <div class="card-header bg-transparent">
         <span class="badge text-white me-2" style="background:var(--ld-primary);">Step 6</span>
-        <span class="fw-semibold">Enter Credentials in LocalDesk and Enable SSO</span>
+        <span class="fw-semibold">Enter Credentials in OpenHelpDesk and Enable SSO</span>
     </div>
     <div class="card-body">
         <ol class="mb-0">
@@ -195,7 +195,7 @@ $redirectUri = rtrim(env('APP_URL', ''), '/') . '/auth/microsoft/callback';
             <tbody>
                 <tr>
                     <td>AADSTS50011: Redirect URI mismatch</td>
-                    <td>The Redirect URI in Azure does not exactly match the one shown in LocalDesk. Check for trailing slashes, HTTP vs HTTPS, or wrong domain.</td>
+                    <td>The Redirect URI in Azure does not exactly match the one shown in OpenHelpDesk. Check for trailing slashes, HTTP vs HTTPS, or wrong domain.</td>
                 </tr>
                 <tr>
                     <td>AADSTS700016: Application not found</td>
@@ -207,7 +207,7 @@ $redirectUri = rtrim(env('APP_URL', ''), '/') . '/auth/microsoft/callback';
                 </tr>
                 <tr>
                     <td>Authentication error on callback</td>
-                    <td>The Client Secret may have expired. Create a new secret in Azure and update it in LocalDesk SSO settings.</td>
+                    <td>The Client Secret may have expired. Create a new secret in Azure and update it in OpenHelpDesk SSO settings.</td>
                 </tr>
                 <tr>
                     <td>"SSO is not enabled" on login page</td>

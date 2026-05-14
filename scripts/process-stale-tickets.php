@@ -1,7 +1,7 @@
 <?php
 
 /**
- * LocalDesk — Stale Ticket Notifier
+ * OpenHelpDesk — Stale Ticket Notifier
  *
  * Finds active tickets that have had no update for longer than the
  * configured stale threshold and emails the assigned agent (or group)

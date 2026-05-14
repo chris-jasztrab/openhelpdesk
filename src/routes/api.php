@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * LocalDesk Mobile REST API — /api/v1/
+ * OpenHelpDesk Mobile REST API — /api/v1/
  *
  * Authentication: Bearer token obtained via POST /api/v1/auth/login.
  * All endpoints accept JSON bodies and return JSON responses.

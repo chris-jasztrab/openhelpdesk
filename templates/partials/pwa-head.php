@@ -10,7 +10,7 @@ $_pwaThemeColor = getSetting('branding_navbar_start', '#1e1b4b');
 <meta name="theme-color" content="<?= e($_pwaThemeColor) ?>">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="<?= e(getSetting('branding_app_name', 'LocalDesk')) ?>">
+<meta name="apple-mobile-web-app-title" content="<?= e(getSetting('branding_app_name', 'OpenHelpDesk')) ?>">
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="apple-touch-icon" href="/pwa/apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="/pwa/icon-192.png">

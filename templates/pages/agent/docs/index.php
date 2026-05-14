@@ -6,7 +6,7 @@ $breadcrumbs  = [['label' => 'Help']];
 ?>
 <div class="mb-4">
     <h2 class="fw-bold mb-1">Agent Help</h2>
-    <p class="text-muted mb-0">Guides for everything you can do as an agent in LocalDesk.</p>
+    <p class="text-muted mb-0">Guides for everything you can do as an agent in OpenHelpDesk.</p>
 </div>
 
 <div class="mb-4">

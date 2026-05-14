@@ -16,7 +16,7 @@
                                  style="width:72px;height:72px;background:var(--ld-primary);font-size:2rem;color:#fff;">
                                 <i class="bi bi-rocket-takeoff-fill"></i>
                             </div>
-                            <h4 class="fw-bold mb-2">Welcome to LocalDesk!</h4>
+                            <h4 class="fw-bold mb-2">Welcome to OpenHelpDesk!</h4>
                             <p class="text-muted mb-0">
                                 Your help desk is installed and ready. This short tour covers the
                                 <strong>essential setup steps</strong> to get your system fully operational.
@@ -124,7 +124,7 @@
                                 <h5 class="fw-bold mb-0">Step 4 — Configure Email</h5>
                             </div>
                             <p class="text-muted mb-3">
-                                LocalDesk sends email notifications to agents and users when tickets are created,
+                                OpenHelpDesk sends email notifications to agents and users when tickets are created,
                                 updated, or resolved. <strong>Without SMTP configured, no emails will be sent.</strong>
                             </p>
                             <ul class="text-muted small mb-3" style="line-height:1.9;">

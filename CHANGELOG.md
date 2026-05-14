@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to LocalDesk will be documented in this file.
+All notable changes to OpenHelpDesk will be documented in this file.
 
 Follows [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`
 - **MAJOR** — breaking changes
@@ -8,6 +8,13 @@ Follows [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`
 - **PATCH** — backwards-compatible bug fixes
 
 To release a new version: update `config/version.php`, add a dated entry below under `## Unreleased`, then move it to a new versioned section.
+
+---
+
+## 2.42.11 &mdash; 2026-05-14
+
+### Changed
+- **Renamed the project from LocalDesk to OpenHelpDesk.** The GitHub repository is now `openhelpdesk`, and the brand name has been updated everywhere it was hardcoded: README, docs pages, the web installer, email templates, PWA manifest, page titles, and the default `app_name` / `branding_app_name` fallback strings throughout the codebase. The configurable branding setting is unaffected — existing installs keep their chosen name. The `localdesk` MySQL database name is unchanged. Every historical entry in this changelog has also been updated to read OpenHelpDesk.
 
 ---
 
@@ -57,7 +64,7 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ### Licensing
 - **Released under the MIT License.** Added a top-level `LICENSE` file (MIT, &copy; 2026 Chris Jasztrab, Waterloo Public Library). The `README.md` licence section now states the project is open source and free to the world, and `openapi.json` / `composer.json` declare `MIT` instead of `Proprietary`.
-- **Added credits & donation note.** `README.md` now records that LocalDesk was vibe coded by Chris Jasztrab at the Waterloo Public Library, with a link to donate at <https://www.wpl.ca/your-library/donate/>.
+- **Added credits & donation note.** `README.md` now records that OpenHelpDesk was vibe coded by Chris Jasztrab at the Waterloo Public Library, with a link to donate at <https://www.wpl.ca/your-library/donate/>.
 
 ---
 
@@ -1033,7 +1040,7 @@ Managers can: assign existing skills (their group's + global) to their members, 
 
 ### User Import from CSV
 - Bulk import user accounts from a CSV file at Admin → Settings → Import Users
-- Flexible column-mapping step to match CSV headers to LocalDesk fields
+- Flexible column-mapping step to match CSV headers to OpenHelpDesk fields
 - Dry-run preview shows row count, role breakdown, and detected duplicates before committing
 - Skipped rows downloadable as a CSV after import
 - Sample CSV available for download from the import page

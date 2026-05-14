@@ -23,7 +23,7 @@ $breadcrumbs  = [
             </div>
             <div class="card-body">
                 <p class="text-muted mb-3">
-                    Upload a <strong>.json</strong> file previously exported from LocalDesk.
+                    Upload a <strong>.json</strong> file previously exported from OpenHelpDesk.
                     The import will recreate all categories, folders, and articles. Where a category
                     or folder name already exists on this server, new content will be merged into it.
                 </p>
@@ -31,7 +31,7 @@ $breadcrumbs  = [
                 <div class="alert alert-info small mb-4">
                     <i class="bi bi-info-circle me-1"></i>
                     To create an export file, go to <strong>KB Articles</strong> and click <strong>Export JSON</strong>.
-                    You can then import that file on any LocalDesk installation.
+                    You can then import that file on any OpenHelpDesk installation.
                 </div>
 
                 <form method="POST" action="/admin/kb/import/preview" enctype="multipart/form-data">

@@ -10,7 +10,7 @@ $pageTitle = 'Setup — Create Admin Account';
              style="width:56px;height:56px;background:#4f46e5;">
             <i class="bi bi-stars text-white" style="font-size:1.6rem;"></i>
         </div>
-        <h1 class="text-white fw-bold fs-4 mb-1">Welcome to LocalDesk</h1>
+        <h1 class="text-white fw-bold fs-4 mb-1">Welcome to OpenHelpDesk</h1>
         <p class="text-white-50 mb-0">Let's get your helpdesk set up. Create your admin account to get started.</p>
     </div>
 
@@ -35,7 +35,7 @@ $pageTitle = 'Setup — Create Admin Account';
                 <div class="mb-3">
                     <label for="app_name" class="form-label fw-semibold">Helpdesk Name</label>
                     <input type="text" class="form-control" id="app_name" name="app_name"
-                           value="<?= e($formData['appName'] ?? 'LocalDesk') ?>"
+                           value="<?= e($formData['appName'] ?? 'OpenHelpDesk') ?>"
                            placeholder="e.g. My IT Helpdesk" required>
                     <div class="form-text">This is shown in emails and the browser title.</div>
                 </div>

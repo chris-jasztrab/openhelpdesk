@@ -16,7 +16,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <h5 class="fw-semibold mb-3"><i class="bi bi-diagram-3 text-primary me-2"></i>How It Works</h5>
 <ol class="text-muted mb-0">
     <li>A new ticket arrives (portal, admin, API, or inbound email).</li>
-    <li>If AI is enabled and the ticket type is <strong>not</strong> confidential, LocalDesk sends the subject + body plus the candidate skill list (global skills + the destination group's skills) to the configured provider.</li>
+    <li>If AI is enabled and the ticket type is <strong>not</strong> confidential, OpenHelpDesk sends the subject + body plus the candidate skill list (global skills + the destination group's skills) to the configured provider.</li>
     <li>The provider returns JSON: <code>skill_ids</code>, a confidence score, and a sentiment label.</li>
     <li>Result is stored in <code>ai_classifications</code> and pointed at by <code>tickets.ai_classification_id</code>. The ticket also gets a denormalised <code>ai_sentiment</code> for fast filtering.</li>
     <li>If the group's auto-assign strategy is <strong>AI Skill-Based</strong> AND confidence ≥ threshold, the routing engine picks the least-loaded group member who holds <em>all</em> the suggested skills. Otherwise it falls through to the group's configured fallback (load-based, round-robin, or leave unassigned).</li>
@@ -173,7 +173,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <table class="table table-sm mb-0">
     <thead class="table-light"><tr><th>Status</th><th>Message</th><th>Root cause</th></tr></thead>
     <tbody class="text-muted">
-        <tr><td>200</td><td>—</td><td>Working. If LocalDesk's classifier still fails, the issue is in the LocalDesk side — check error logs.</td></tr>
+        <tr><td>200</td><td>—</td><td>Working. If OpenHelpDesk's classifier still fails, the issue is in the OpenHelpDesk side — check error logs.</td></tr>
         <tr><td>401</td><td>Unauthorized</td><td>Wrong key, revoked key, or whitespace in the pasted value. Generate a new one.</td></tr>
         <tr><td>403</td><td>Forbidden</td><td>Workspace permission issue or region block.</td></tr>
         <tr><td>400</td><td>"credit balance is too low"</td><td>Workspace spend cap is $0 even though the org has credits. See the next card for the fix.</td></tr>
@@ -194,7 +194,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <p class="text-muted mb-2">If <strong>Models list</strong> works on the debug page but <strong>Message</strong> returns the credit error, this is almost certainly the cause. Two ways to fix it:</p>
 <ol class="text-muted mb-0">
     <li><strong>Raise the workspace's spend limit.</strong> In <a href="https://console.anthropic.com/" target="_blank" rel="noopener">Anthropic Console</a> → <strong>Workspaces</strong> → click your workspace → <strong>Limits</strong> tab → set a monthly cap (or leave blank to inherit the org limit).</li>
-    <li><strong>Generate a new key in the Default workspace.</strong> Click <strong>API keys</strong> in the Console → <strong>Create Key</strong> → make sure the workspace selector says Default → paste the new key into <a href="/admin/settings/ai">LocalDesk's AI settings page</a>.</li>
+    <li><strong>Generate a new key in the Default workspace.</strong> Click <strong>API keys</strong> in the Console → <strong>Create Key</strong> → make sure the workspace selector says Default → paste the new key into <a href="/admin/settings/ai">OpenHelpDesk's AI settings page</a>.</li>
 </ol>
 </div>
 </div>
@@ -214,7 +214,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-emoji-frown text-warning me-2"></i>Sentiment-Driven Priority Bump</h5>
-<p class="text-muted mb-2">When the AI flags sentiment as <strong>angry</strong> or <strong>urgent</strong>, LocalDesk can automatically bump priority up one level (e.g. Medium → High). Toggle this on the AI settings page.</p>
+<p class="text-muted mb-2">When the AI flags sentiment as <strong>angry</strong> or <strong>urgent</strong>, OpenHelpDesk can automatically bump priority up one level (e.g. Medium → High). Toggle this on the AI settings page.</p>
 <ul class="text-muted mb-0">
     <li>Bump fires on the AI verdict, regardless of group strategy — useful even when the destination group uses Round Robin or Manual.</li>
     <li>Each ticket is bumped at most once (timeline entry <code>ai_priority_bumped</code> is the dedup marker).</li>

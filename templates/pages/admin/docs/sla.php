@@ -44,7 +44,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-link text-primary me-2"></i>Linking SLAs to Priorities</h5>
 <p class="text-muted mb-2">SLA policies are applied based on a ticket's priority. Link a policy to a priority at <a href="/admin/priorities"><strong>Admin → Priorities</strong></a> by editing any priority and selecting the desired SLA policy.</p>
-<p class="text-muted mb-0">When a ticket is created or its priority changes, LocalDesk automatically assigns the matching SLA policy and (re)calculates the deadlines.</p>
+<p class="text-muted mb-0">When a ticket is created or its priority changes, OpenHelpDesk automatically assigns the matching SLA policy and (re)calculates the deadlines.</p>
 </div>
 </div>
 

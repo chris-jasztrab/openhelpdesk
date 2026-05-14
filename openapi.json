@@ -1,8 +1,8 @@
 {
     "openapi": "3.0.3",
     "info": {
-        "title": "LocalDesk Mobile API",
-        "description": "REST API for the LocalDesk helpdesk system. Designed for Android and iOS clients.\n\n## Authentication\nAll endpoints (except `POST /auth/login`) require a Bearer token in the\n`Authorization` header:\n```\nAuthorization: Bearer <token>\n```\nObtain a token by calling `POST /auth/login`. Revoke it with `POST /auth/logout`.\n\n## Roles\n| Role    | Access                                          |\n|---------|--------------------------------------------------|\n| `admin` | Full access to all endpoints                    |\n| `agent` | All agent endpoints; sees tickets per group membership |\n| `user`  | Own tickets only; no internal notes or agent data |\n\n## Pagination\nList endpoints return a consistent envelope:\n```json\n{ \"data\": [...], \"total\": 100, \"page\": 1, \"per_page\": 25, \"last_page\": 4 }\n```\n",
+        "title": "OpenHelpDesk Mobile API",
+        "description": "REST API for the OpenHelpDesk helpdesk system. Designed for Android and iOS clients.\n\n## Authentication\nAll endpoints (except `POST /auth/login`) require a Bearer token in the\n`Authorization` header:\n```\nAuthorization: Bearer <token>\n```\nObtain a token by calling `POST /auth/login`. Revoke it with `POST /auth/logout`.\n\n## Roles\n| Role    | Access                                          |\n|---------|--------------------------------------------------|\n| `admin` | Full access to all endpoints                    |\n| `agent` | All agent endpoints; sees tickets per group membership |\n| `user`  | Own tickets only; no internal notes or agent data |\n\n## Pagination\nList endpoints return a consistent envelope:\n```json\n{ \"data\": [...], \"total\": 100, \"page\": 1, \"per_page\": 25, \"last_page\": 4 }\n```\n",
         "version": "1.0.0",
         "contact": {
             "name": "Example Library — IT"

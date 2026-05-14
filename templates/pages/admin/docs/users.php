@@ -14,7 +14,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-person-badge text-primary me-2"></i>Roles Overview</h5>
-<p class="text-muted mb-2">Every account in LocalDesk has one of three roles:</p>
+<p class="text-muted mb-2">Every account in OpenHelpDesk has one of three roles:</p>
 <div class="table-responsive">
 <table class="table table-sm mb-0">
     <thead class="table-light"><tr><th>Role</th><th>Access</th></tr></thead>
@@ -369,7 +369,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-person-x text-primary me-2"></i>Deleting Users</h5>
-<p class="text-muted mb-2">When an admin deletes a user who has associated tickets or KB articles, LocalDesk shows a warning listing those records. The ticket count and article count are clickable links that open the filtered list in a new tab so you can review them before deciding.</p>
+<p class="text-muted mb-2">When an admin deletes a user who has associated tickets or KB articles, OpenHelpDesk shows a warning listing those records. The ticket count and article count are clickable links that open the filtered list in a new tab so you can review them before deciding.</p>
 <p class="text-muted mb-2">You must choose one of two options before the deletion can proceed:</p>
 <ul class="text-muted mb-3">
     <li><strong>Transfer records</strong> — search for another user and move all associated tickets and articles to them.</li>

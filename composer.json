@@ -1,5 +1,5 @@
 {
-    "description": "LocalDesk — a self-hosted IT helpdesk and ticketing system.",
+    "description": "OpenHelpDesk — a self-hosted IT helpdesk and ticketing system.",
     "license": "MIT",
     "require": {
         "league/commonmark": "^2",

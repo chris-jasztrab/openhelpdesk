@@ -1,4 +1,4 @@
-# LocalDesk Documentation
+# OpenHelpDesk Documentation
 
 Complete guide for end users, agents, and administrators.
 

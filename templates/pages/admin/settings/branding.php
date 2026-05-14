@@ -323,7 +323,7 @@ $breadcrumbs  = [
     // App name live preview
     var appNameInput = document.getElementById('appName');
     appNameInput.addEventListener('input', function () {
-        document.getElementById('previewAppName').textContent = appNameInput.value || 'LocalDesk';
+        document.getElementById('previewAppName').textContent = appNameInput.value || 'OpenHelpDesk';
     });
 
     // Navbar icon live preview
@@ -434,8 +434,8 @@ $breadcrumbs  = [
             document.getElementById(key).value = defaults[key];
             document.getElementById(key + 'Picker').value = defaults[key];
         }
-        document.getElementById('appName').value = 'LocalDesk';
-        document.getElementById('previewAppName').textContent = 'LocalDesk';
+        document.getElementById('appName').value = 'OpenHelpDesk';
+        document.getElementById('previewAppName').textContent = 'OpenHelpDesk';
         updatePreview();
     });
 

@@ -1,7 +1,7 @@
 <?php
 
 /**
- * LocalDesk — App Secret Expiry Reminder
+ * OpenHelpDesk — App Secret Expiry Reminder
  *
  * Sends email reminders to all admin users when the Microsoft Graph
  * app secret is approaching its expiry date.
@@ -67,7 +67,7 @@ if (empty($admins)) {
 
 logLine('Admin recipients: ' . implode(', ', array_column($admins, 'email')));
 
-$appName    = getSetting('branding_app_name', 'LocalDesk');
+$appName    = getSetting('branding_app_name', 'OpenHelpDesk');
 $appUrl     = getSetting('app_url', '');
 $settingsUrl = rtrim($appUrl, '/') . '/admin/settings#graph-secret';
 

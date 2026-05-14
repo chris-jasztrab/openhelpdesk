@@ -11,7 +11,7 @@ $breadcrumbs  = [
     <div>
         <h2 class="fw-bold mb-1">Recurring Tickets</h2>
         <div class="text-muted small">
-            Schedule preventive-maintenance work — monthly toner audits, quarterly HVAC, annual fire inspection — and let LocalDesk file the ticket on cadence.
+            Schedule preventive-maintenance work — monthly toner audits, quarterly HVAC, annual fire inspection — and let OpenHelpDesk file the ticket on cadence.
         </div>
     </div>
     <div class="d-flex gap-2">

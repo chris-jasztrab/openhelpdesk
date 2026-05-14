@@ -9,7 +9,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="col-lg-9">
 
 <h2 class="fw-bold mb-1">Email &amp; SMTP</h2>
-<p class="text-muted mb-4">Configure outgoing email so LocalDesk can notify users and agents about ticket activity.</p>
+<p class="text-muted mb-4">Configure outgoing email so OpenHelpDesk can notify users and agents about ticket activity.</p>
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
@@ -36,7 +36,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-envelope-arrow-down text-primary me-2"></i>Inbound Email (Email Reply Integration)</h5>
-<p class="text-muted mb-2">LocalDesk can process replies sent directly to your support email address and automatically add them as ticket comments — so agents and requesters can reply from their inbox without logging in.</p>
+<p class="text-muted mb-2">OpenHelpDesk can process replies sent directly to your support email address and automatically add them as ticket comments — so agents and requesters can reply from their inbox without logging in.</p>
 
 <h6 class="fw-semibold mt-3 mb-2">Option 1 — Microsoft Graph API (Microsoft 365 / Exchange Online)</h6>
 <p class="text-muted mb-2">Configure at <a href="/admin/settings"><strong>Admin → Settings → Email → Graph API</strong></a>. You will need a registered Azure AD application with <code>Mail.Read</code> permissions.</p>
@@ -165,7 +165,7 @@ I've confirmed the fix is deployed and the user has verified it works.
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-send-check text-primary me-2"></i>When Emails Are Sent</h5>
-<p class="text-muted mb-2">LocalDesk sends emails automatically for the following events:</p>
+<p class="text-muted mb-2">OpenHelpDesk sends emails automatically for the following events:</p>
 <ul class="text-muted mb-0">
     <li><strong>New ticket submitted</strong> — confirmation sent to the requester.</li>
     <li><strong>Agent reply</strong> — notification sent to the requester with the reply content.</li>

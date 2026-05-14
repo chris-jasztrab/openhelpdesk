@@ -9,12 +9,12 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="col-lg-9">
 
 <h2 class="fw-bold mb-1">Getting Started</h2>
-<p class="text-muted mb-4">Follow these steps to configure LocalDesk after a fresh installation.</p>
+<p class="text-muted mb-4">Follow these steps to configure OpenHelpDesk after a fresh installation.</p>
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-1-circle-fill text-primary me-2"></i>Configure Email (SMTP)</h5>
-<p class="text-muted mb-2">LocalDesk sends notifications when tickets are created, updated or merged. Without SMTP configured, no emails will be sent.</p>
+<p class="text-muted mb-2">OpenHelpDesk sends notifications when tickets are created, updated or merged. Without SMTP configured, no emails will be sent.</p>
 <ol class="text-muted mb-3">
     <li>Go to <a href="/admin/settings"><strong>Admin → Settings → Email / SMTP</strong></a>.</li>
     <li>Enter your SMTP host, port, encryption (TLS recommended), username and password.</li>

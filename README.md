@@ -1,10 +1,10 @@
-# LocalDesk
+# OpenHelpDesk
 
-**LocalDesk** is a self-hosted IT helpdesk and ticketing system built for libraries and small IT teams who want a capable support platform without SaaS fees or vendor lock-in. It runs on a plain LAMP stack — pure PHP 8 with a lightweight custom router, PDO, MySQL, and Bootstrap 5 — so it installs anywhere from XAMPP on Windows to a standard Apache box, via either a six-step web installer or a one-command seed script. Despite the modest footprint, it covers the full ticket lifecycle: assignment, prioritization, SLA tracking with business-hours and per-location timezone awareness, internal notes, attachments, tags, merging and splitting, bulk actions, custom form fields, and a drag-and-drop form builder.
+**OpenHelpDesk** is a self-hosted IT helpdesk and ticketing system built for libraries and small IT teams who want a capable support platform without SaaS fees or vendor lock-in. It runs on a plain LAMP stack — pure PHP 8 with a lightweight custom router, PDO, MySQL, and Bootstrap 5 — so it installs anywhere from XAMPP on Windows to a standard Apache box, via either a six-step web installer or a one-command seed script. Despite the modest footprint, it covers the full ticket lifecycle: assignment, prioritization, SLA tracking with business-hours and per-location timezone awareness, internal notes, attachments, tags, merging and splitting, bulk actions, custom form fields, and a drag-and-drop form builder.
 
-Beyond core ticketing, LocalDesk includes a three-tier knowledge base with a public help center and version history, twelve built-in reports plus a custom report builder and scheduled emailed reports, CSAT surveys, a rule-based automation and escalation engine, and full inbound email integration over IMAP or the Microsoft Graph API (including email-to-ticket and hashtag commands). It ships with Microsoft 365 SSO, optional TOTP two-factor auth, role-based access for admins/power users/agents/users, an end-user portal, an iPad-friendly "floor mode" for roaming staff, customizable branding and email templates, one-click backups, and a Bearer-token REST API with an OpenAPI spec. Security is built in throughout — CSRF protection, prepared statements, bcrypt hashing, output escaping, upload validation, and per-route role checks.
+Beyond core ticketing, OpenHelpDesk includes a three-tier knowledge base with a public help center and version history, twelve built-in reports plus a custom report builder and scheduled emailed reports, CSAT surveys, a rule-based automation and escalation engine, and full inbound email integration over IMAP or the Microsoft Graph API (including email-to-ticket and hashtag commands). It ships with Microsoft 365 SSO, optional TOTP two-factor auth, role-based access for admins/power users/agents/users, an end-user portal, an iPad-friendly "floor mode" for roaming staff, customizable branding and email templates, one-click backups, and a Bearer-token REST API with an OpenAPI spec. Security is built in throughout — CSRF protection, prepared statements, bcrypt hashing, output escaping, upload validation, and per-route role checks.
 
-LocalDesk also has optional AI-assisted triage, powered by your choice of Anthropic Claude or OpenAI (just paste an API key — no extra services to run). On arrival, a large language model reads each new ticket and suggests the agent skills it needs, scores its own confidence, and gauges sentiment; from there it can auto-route the ticket to the best-matching agent, hand an ambiguous "No Wrong Door" request off to the right team, bump priority when a requester sounds angry or urgent, and flag likely duplicate tickets before they're filed. The AI layer is built to fail safe — confidential ticket types are never sent to a provider, every call has a hard timeout with graceful fallback to manual routing, hallucinated skill IDs are stripped, and every verdict is audit-logged with provider, model, latency, and token counts. Released under the MIT License.
+OpenHelpDesk also has optional AI-assisted triage, powered by your choice of Anthropic Claude or OpenAI (just paste an API key — no extra services to run). On arrival, a large language model reads each new ticket and suggests the agent skills it needs, scores its own confidence, and gauges sentiment; from there it can auto-route the ticket to the best-matching agent, hand an ambiguous "No Wrong Door" request off to the right team, bump priority when a requester sounds angry or urgent, and flag likely duplicate tickets before they're filed. The AI layer is built to fail safe — confidential ticket types are never sent to a provider, every call has a hard timeout with graceful fallback to manual routing, hallucinated skill IDs are stripped, and every verdict is audit-logged with provider, model, latency, and token counts. Released under the MIT License.
 
 ## Screenshots
 
@@ -275,7 +275,7 @@ sudo nano /etc/apache2/sites-available/localdesk.conf
 
 ```apache
 <VirtualHost *:80>
-    ServerName localdesk.example.com
+    ServerName openhelpdesk.example.com
     DocumentRoot /var/www/localdesk/public
 
     <Directory /var/www/localdesk/public>
@@ -290,7 +290,7 @@ sudo a2ensite localdesk.conf
 sudo systemctl reload apache2
 ```
 
-Set `APP_URL=http://localdesk.example.com` in your `.env` file.
+Set `APP_URL=http://openhelpdesk.example.com` in your `.env` file.
 
 ### Windows IIS
 
@@ -305,7 +305,7 @@ Set `APP_URL=http://localdesk.example.com` in your `.env` file.
      <system.webServer>
        <rewrite>
          <rules>
-           <rule name="LocalDesk Front Controller" stopProcessing="true">
+           <rule name="OpenHelpDesk Front Controller" stopProcessing="true">
              <match url="^(.*)$" />
              <conditions>
                <add input="{REQUEST_FILENAME}" matchType="IsFile" negate="true" />
@@ -334,7 +334,7 @@ Set `APP_URL=http://localdesk.example.com` in your `.env` file.
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `APP_NAME` | Application display name | `LocalDesk` |
+| `APP_NAME` | Application display name | `OpenHelpDesk` |
 | `APP_URL` | Base URL for email links | `http://localhost:8000` |
 | `APP_DEBUG` | Show detailed errors | `true` |
 | `APP_TIMEZONE` | PHP timezone | `UTC` |
@@ -506,6 +506,6 @@ Open source and free to the world under the [MIT License](LICENSE) — use it, m
 
 ## Credits & Donations
 
-LocalDesk was vibe coded by Chris Jasztrab at the Waterloo Public Library.
+OpenHelpDesk was vibe coded by Chris Jasztrab at the Waterloo Public Library.
 
 If this software helped you out, please consider making a donation to the Waterloo Public Library: <https://www.wpl.ca/your-library/donate/>

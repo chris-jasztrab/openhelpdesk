@@ -9,7 +9,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="col-lg-9">
 
 <h2 class="fw-bold mb-1">Branding</h2>
-<p class="text-muted mb-4">Customise the look and feel of LocalDesk to match your organisation's identity.</p>
+<p class="text-muted mb-4">Customise the look and feel of OpenHelpDesk to match your organisation's identity.</p>
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">

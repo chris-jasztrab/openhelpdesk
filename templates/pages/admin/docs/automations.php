@@ -9,7 +9,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="col-lg-9">
 
 <h2 class="fw-bold mb-1">Automations &amp; Escalations</h2>
-<p class="text-muted mb-4">Reduce manual work by letting LocalDesk act on tickets for you. This page covers four related-but-distinct systems:</p>
+<p class="text-muted mb-4">Reduce manual work by letting OpenHelpDesk act on tickets for you. This page covers four related-but-distinct systems:</p>
 <ul class="text-muted mb-4">
     <li><a href="#automation-rules"><strong>Automation Rules</strong></a> — event-based "when X happens, do Y" rules.</li>
     <li><a href="#group-auto-assign"><strong>Group Auto-Assignment</strong></a> — which member of a group picks up a new ticket.</li>
@@ -121,7 +121,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-person-fill-gear text-primary me-2"></i>How It Works</h5>
-<p class="text-muted mb-2">When a new ticket arrives with a <strong>Group</strong> set but no assignee, LocalDesk can pick a member of that group automatically. Each group chooses its own strategy at <a href="/admin/groups"><strong>Admin → Settings → Groups → Edit</strong></a>.</p>
+<p class="text-muted mb-2">When a new ticket arrives with a <strong>Group</strong> set but no assignee, OpenHelpDesk can pick a member of that group automatically. Each group chooses its own strategy at <a href="/admin/groups"><strong>Admin → Settings → Groups → Edit</strong></a>.</p>
 <p class="text-muted mb-0">Auto-assignment runs on portal submissions, the public REST API, email-to-ticket, and the admin "Split Ticket" flow whenever the assignee is left blank but a group is set. Direct manual assignment is never overridden.</p>
 <div class="alert alert-info small mt-3 mb-0"><i class="bi bi-diagram-3 me-2"></i>
 For step-by-step diagrams of every strategy, the master flow that runs on every new ticket, and the default-group safety net that prevents tickets getting stuck in the no-group queue, see <a href="/admin/docs/flows" class="alert-link"><strong>Docs → Assignment Flows</strong></a>.
@@ -332,7 +332,7 @@ For step-by-step diagrams of every strategy, the master flow that runs on every 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-hourglass-split text-warning me-2"></i>What It Does</h5>
-<p class="text-muted mb-2">When a ticket has had <em>no</em> activity for longer than the configured threshold and is in a status that's still waiting on your team, LocalDesk emails the assigned agent (or all group members if unassigned) and reassures the requester that they haven't been forgotten.</p>
+<p class="text-muted mb-2">When a ticket has had <em>no</em> activity for longer than the configured threshold and is in a status that's still waiting on your team, OpenHelpDesk emails the assigned agent (or all group members if unassigned) and reassures the requester that they haven't been forgotten.</p>
 <p class="text-muted mb-0">Tickets in <strong>Waiting on Customer</strong>, <strong>Waiting on Third Party</strong>, <strong>Resolved</strong>, or <strong>Closed</strong> are intentionally ignored — the clock only runs when the ball is in your court.</p>
 </div>
 </div>

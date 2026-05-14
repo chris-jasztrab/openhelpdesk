@@ -134,7 +134,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-lightbulb text-primary me-2"></i>Article Suggestions When Creating a Ticket</h5>
-<p class="text-muted mb-2">When a portal user is writing the subject of a new ticket, LocalDesk automatically searches the Knowledge Base and displays matching published articles as suggestions below the subject field.</p>
+<p class="text-muted mb-2">When a portal user is writing the subject of a new ticket, OpenHelpDesk automatically searches the Knowledge Base and displays matching published articles as suggestions below the subject field.</p>
 <p class="text-muted mb-2">This gives users a chance to self-serve before submitting — if a relevant article answers their question, they can read it without creating a ticket at all.</p>
 <ul class="text-muted mb-0">
     <li>Suggestions appear after a short pause while the user types.</li>

@@ -52,7 +52,7 @@ $_agentTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
     var dashboardSteps = [
         {
             popover: {
-                title:       '👋 Welcome to LocalDesk!',
+                title:       '👋 Welcome to OpenHelpDesk!',
                 description: 'This quick tour shows you the key parts of your agent interface — it takes about 2 minutes.<br><br>' +
                              '<strong>Tip:</strong> You can restart this tour anytime by clicking your name in the top-right corner and choosing <strong>Restart Tour</strong>.'
             }

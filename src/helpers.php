@@ -107,7 +107,7 @@ function render(string $view, array $data = []): never
 {
     // Defaults
     $layout       = 'base';
-    $pageTitle    = 'LocalDesk';
+    $pageTitle    = 'OpenHelpDesk';
     $breadcrumbs  = [];
     $sidebarItems = [];
     $error        = '';
@@ -2014,7 +2014,7 @@ function sendMail(string $toEmail, string $toName, string $subject, string $html
     $username   = getSetting('smtp_username');
     $password   = getSetting('smtp_password');
     $fromAddr   = getSetting('mail_from_address');
-    $fromName   = getSetting('mail_from_name', 'LocalDesk');
+    $fromName   = getSetting('mail_from_name', 'OpenHelpDesk');
 
     if ($fromAddr === '') {
         return false;
@@ -2101,7 +2101,7 @@ function sendMail(string $toEmail, string $toName, string $subject, string $html
     } catch (\PHPMailer\PHPMailer\Exception $e) {
         $err = '[' . date('H:i:s') . '] ERROR ' . $mail->ErrorInfo . "\n";
         file_put_contents($smtpLogFile, $err, FILE_APPEND | LOCK_EX);
-        error_log('LocalDesk mail error: ' . $mail->ErrorInfo);
+        error_log('OpenHelpDesk mail error: ' . $mail->ErrorInfo);
         return false;
     }
 }
@@ -2234,7 +2234,7 @@ function getEmailTpl(string $name, array $rawTokens): array
     $subjectTpl = getSetting("email_subject_{$key}") ?: $d['subject'];
     $introTpl   = getSetting("email_intro_{$key}")   ?: $d['intro'];
     $button     = getSetting("email_button_{$key}")  ?: $d['button'];
-    $footer     = getSetting('email_footer_text')    ?: 'This is an automated message from LocalDesk. Please do not reply directly to this email.';
+    $footer     = getSetting('email_footer_text')    ?: 'This is an automated message from OpenHelpDesk. Please do not reply directly to this email.';
 
     // Add common token aliases so custom templates using alternative names still work
     $aliases = [
@@ -3354,7 +3354,7 @@ function runEscalationRule(\PDO $db, array $rule, array $ticket): void
     $systemUserId = null;
 
     $appUrl     = env('APP_URL', 'http://localhost:8000');
-    $appName    = getSetting('app_name', 'LocalDesk');
+    $appName    = getSetting('app_name', 'OpenHelpDesk');
     $brandColor = getSetting('branding_primary_color', '#4f46e5');
 
     // Add a parent timeline entry marking the escalation fired
@@ -3613,7 +3613,7 @@ function sendCsatSurvey(\PDO $db, int $ticketId): void
     $surveyUrl  = $appUrl . '/survey/' . $token;
     $reopenUrl  = $appUrl . '/survey/' . $token . '/reopen';
     $brandColor = getSetting('branding_primary_color', '#4f46e5');
-    $appName    = getSetting('app_name', 'LocalDesk');
+    $appName    = getSetting('app_name', 'OpenHelpDesk');
 
     $tpl = getEmailTpl('csat_survey', [
         'ticket_id'  => $ticketId,
@@ -3733,7 +3733,7 @@ function totpVerify(string $secret, string $code, int $window = 1): bool
  */
 function totpGetUri(string $secret, string $email): string
 {
-    $appName = rawurlencode(getSetting('branding_app_name', 'LocalDesk'));
+    $appName = rawurlencode(getSetting('branding_app_name', 'OpenHelpDesk'));
     $email   = rawurlencode($email);
     return "otpauth://totp/{$appName}:{$email}?secret={$secret}&issuer={$appName}&algorithm=SHA1&digits=6&period=30";
 }

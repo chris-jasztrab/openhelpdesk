@@ -1,6 +1,6 @@
 <nav class="navbar navbar-expand-lg navbar-dark sticky-top" style="height:var(--ld-navbar-height,56px);" aria-label="Primary">
     <div class="container-fluid">
-        <?php $brandLogo = getSetting('branding_logo', ''); $brandName = getSetting('branding_app_name', 'LocalDesk'); $brandIcon = getSetting('branding_navbar_icon', 'bi-headset'); ?>
+        <?php $brandLogo = getSetting('branding_logo', ''); $brandName = getSetting('branding_app_name', 'OpenHelpDesk'); $brandIcon = getSetting('branding_navbar_icon', 'bi-headset'); ?>
         <a class="navbar-brand d-flex align-items-center gap-2" href="/">
             <?php if ($brandLogo && file_exists(ROOT_DIR . '/public/uploads/branding/' . $brandLogo)): ?>
                 <img src="/uploads/branding/<?= e($brandLogo) ?>" alt="" style="height:32px;">

@@ -1,6 +1,6 @@
 <?php
 /**
- * LocalDesk — Account Rescue Script
+ * OpenHelpDesk — Account Rescue Script
  *
  * Canonical location: scripts/admin/rescue.php (NOT web-accessible).
  *
@@ -141,7 +141,7 @@ $roleBadgeClass = ['admin' => 'danger', 'agent' => 'primary', 'user' => 'seconda
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>LocalDesk — Account Rescue</title>
+<title>OpenHelpDesk — Account Rescue</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
 </head>
 <body class="bg-light">
@@ -149,7 +149,7 @@ $roleBadgeClass = ['admin' => 'danger', 'agent' => 'primary', 'user' => 'seconda
 
     <div class="card border-danger shadow-sm">
         <div class="card-header bg-danger text-white fw-semibold">
-            &#128274; LocalDesk — Account Rescue
+            &#128274; OpenHelpDesk — Account Rescue
         </div>
         <div class="card-body">
 

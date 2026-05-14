@@ -141,7 +141,7 @@ $defaults = [
     ],
 ];
 
-$defaultFooter = 'This is an automated message from LocalDesk. Please do not reply directly to this email.';
+$defaultFooter = 'This is an automated message from OpenHelpDesk. Please do not reply directly to this email.';
 
 $tabs = [
     'ticket_created'        => ['label' => 'Ticket Created',      'icon' => 'bi-ticket-perforated'],

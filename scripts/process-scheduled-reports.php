@@ -1,7 +1,7 @@
 <?php
 
 /**
- * LocalDesk — Scheduled Reports Processor
+ * OpenHelpDesk — Scheduled Reports Processor
  *
  * Checks for due scheduled reports and emails summaries to configured recipients.
  * Designed to run via cron every 30 minutes:
@@ -357,7 +357,7 @@ foreach ($reports as $report) {
     }
 
     // ── Build email ───────────────────────────────────────────────────
-    $appName    = getSetting('app_name', 'LocalDesk');
+    $appName    = getSetting('app_name', 'OpenHelpDesk');
     $appUrl     = env('APP_URL', 'http://localhost');
     $brandColor = getSetting('branding_primary_color', '#4f46e5');
     $footerText = "Sent by {$appName} · Scheduled Reports";

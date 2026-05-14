@@ -11,7 +11,7 @@
         <td style="background:linear-gradient(135deg,#7f1d1d,#b91c1c); padding:20px 32px;">
             <h1 style="margin:0; color:#ffffff; font-size:20px; font-weight:700;">
                 <span style="display:inline-block; vertical-align:middle; background:#ffffff; color:#b91c1c; border-radius:4px; padding:2px 8px; font-size:12px; font-weight:700; letter-spacing:.05em; margin-right:8px;">ESCALATED</span>
-                LocalDesk
+                OpenHelpDesk
             </h1>
         </td>
     </tr>
@@ -101,7 +101,7 @@
     <tr>
         <td style="padding:16px 32px; background:#f8fafc; border-top:1px solid #e2e8f0;">
             <p style="margin:0; font-size:12px; color:#94a3b8; text-align:center;">
-                <?= $footerText ?? 'This is an automated message from LocalDesk. Please do not reply directly to this email.' ?>
+                <?= $footerText ?? 'This is an automated message from OpenHelpDesk. Please do not reply directly to this email.' ?>
             </p>
         </td>
     </tr>

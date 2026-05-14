@@ -77,7 +77,7 @@ $breadcrumbs  = [
                     <label for="mail_from_name" class="form-label fw-semibold">From Name</label>
                     <input type="text" class="form-control" id="mail_from_name" name="mail_from_name"
                            value="<?= e($settings['mail_from_name']) ?>"
-                           placeholder="e.g. LocalDesk">
+                           placeholder="e.g. OpenHelpDesk">
                 </div>
             </div>
 

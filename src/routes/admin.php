@@ -5484,7 +5484,7 @@ $router->post('/admin/kb/import/preview', function () {
 
     $data = json_decode($raw, true);
     if (!is_array($data) || !isset($data['categories']) || !is_array($data['categories'])) {
-        flash('error', 'Invalid format. Please upload a JSON file exported from LocalDesk.');
+        flash('error', 'Invalid format. Please upload a JSON file exported from OpenHelpDesk.');
         redirect('/admin/kb/import');
         return;
     }
@@ -5909,13 +5909,13 @@ $router->post('/admin/settings/test-email', function () {
     }
 
     $user     = Auth::user();
-    $htmlBody = '<h2>It works!</h2><p>This is a test email from <strong>LocalDesk</strong>. Your SMTP configuration is correct.</p>';
+    $htmlBody = '<h2>It works!</h2><p>This is a test email from <strong>OpenHelpDesk</strong>. Your SMTP configuration is correct.</p>';
     $result   = sendMail(
         $toEmail,
         $toEmail,
-        'LocalDesk - Test Email',
+        'OpenHelpDesk - Test Email',
         $htmlBody,
-        "It works!\n\nThis is a test email from LocalDesk. Your SMTP configuration is correct."
+        "It works!\n\nThis is a test email from OpenHelpDesk. Your SMTP configuration is correct."
     );
 
     if ($result !== false) {
@@ -7525,7 +7525,7 @@ $router->post('/admin/settings/import-kb/confirm', function () {
 $router->get('/admin/settings/branding', function () {
     Auth::requireRole('admin');
     render('admin/settings/branding', [
-        'appName'             => getSetting('branding_app_name', 'LocalDesk'),
+        'appName'             => getSetting('branding_app_name', 'OpenHelpDesk'),
         'primaryColor'        => getSetting('branding_primary_color', '#4f46e5'),
         'primaryHover'        => getSetting('branding_primary_hover', '#4338ca'),
         'navbarStart'         => getSetting('branding_navbar_start', '#1e1b4b'),
@@ -7543,7 +7543,7 @@ $router->post('/admin/settings/branding', function () {
     Auth::requireRole('admin');
     verifyCsrf($_POST['_token'] ?? '');
 
-    $appName              = trim($_POST['app_name'] ?? 'LocalDesk');
+    $appName              = trim($_POST['app_name'] ?? 'OpenHelpDesk');
     $navbarIconRaw        = trim($_POST['navbar_icon'] ?? 'bi-person-raised-hand');
     // Normalise: ensure it starts with bi- and only contains safe chars
     if (!str_starts_with($navbarIconRaw, 'bi-')) {
@@ -9262,7 +9262,7 @@ $router->post('/admin/settings/csat/test', function () {
     $surveyUrl  = $appUrl . '/survey/' . $token;
     $reopenUrl  = $appUrl . '/survey/' . $token . '/reopen';
     $brandColor = getSetting('branding_primary_color', '#4f46e5');
-    $appName    = getSetting('app_name', 'LocalDesk');
+    $appName    = getSetting('app_name', 'OpenHelpDesk');
 
     $tpl = getEmailTpl('csat_survey', [
         'ticket_id'  => $ticket['id'],
@@ -10291,7 +10291,7 @@ $router->post('/admin/settings/backup/create', function () {
 
         // --- SQL dump ---
         $tables = $db->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
-        $sql  = "-- LocalDesk Database Backup\n";
+        $sql  = "-- OpenHelpDesk Database Backup\n";
         $sql .= "-- Generated: " . date('Y-m-d H:i:s') . "\n";
         $sql .= "-- Tables: " . count($tables) . "\n";
         $sql .= "-- ------------------------------------------------\n\n";

@@ -18,7 +18,7 @@ $breadcrumbs  = [
 <div class="alert alert-info mb-4">
     <i class="bi bi-info-circle me-2"></i>
     This guide walks you through registering an application in <strong>Microsoft Entra ID (Azure AD)</strong>
-    so LocalDesk can read your Microsoft 365 mailbox without requiring an App Password or interactive login.
+    so OpenHelpDesk can read your Microsoft 365 mailbox without requiring an App Password or interactive login.
     This uses the <strong>OAuth 2.0 Client Credentials</strong> flow — app-only access with no user sign-in.
 </div>
 
@@ -54,14 +54,14 @@ $breadcrumbs  = [
             <li class="mb-2">Click <strong>+ New registration</strong>.</li>
             <li class="mb-2">Fill in the form:
                 <ul class="mt-2">
-                    <li><strong>Name:</strong> <code>LocalDesk Mail Reader</code> (or any name you prefer)</li>
+                    <li><strong>Name:</strong> <code>OpenHelpDesk Mail Reader</code> (or any name you prefer)</li>
                     <li><strong>Supported account types:</strong> <em>Accounts in this organizational directory only (Single tenant)</em></li>
                     <li><strong>Redirect URI:</strong> Leave blank</li>
                 </ul>
             </li>
             <li class="mb-2">Click <strong>Register</strong>.</li>
             <li>
-                On the Overview page that appears, copy these two values — you will need them in LocalDesk:
+                On the Overview page that appears, copy these two values — you will need them in OpenHelpDesk:
                 <div class="row g-3 mt-1">
                     <div class="col-md-6">
                         <div class="bg-light border rounded p-3">
@@ -133,11 +133,11 @@ $breadcrumbs  = [
         <ol class="mb-0">
             <li class="mb-2">In the left sidebar, click <strong>Certificates &amp; secrets</strong>.</li>
             <li class="mb-2">Under the <strong>Client secrets</strong> tab, click <strong>+ New client secret</strong>.</li>
-            <li class="mb-2">Enter a description (e.g. <code>LocalDesk</code>) and choose an expiry duration.</li>
+            <li class="mb-2">Enter a description (e.g. <code>OpenHelpDesk</code>) and choose an expiry duration.</li>
             <li class="mb-2">Click <strong>Add</strong>.</li>
             <li>
                 <strong class="text-danger">Copy the secret value immediately</strong> — it is only shown once.
-                Paste it into the <strong>Client Secret</strong> field in LocalDesk Settings.
+                Paste it into the <strong>Client Secret</strong> field in OpenHelpDesk Settings.
                 <div class="alert alert-warning mt-2 mb-0 py-2" style="font-size:.875rem;">
                     <i class="bi bi-exclamation-triangle me-1"></i>
                     Copy the <strong>Value</strong> column, not the "Secret ID". If you navigate away before copying, you will need to create a new secret.
@@ -152,7 +152,7 @@ $breadcrumbs  = [
     <div class="card-header bg-white py-3">
         <h5 class="mb-0 fw-semibold">
             <span class="badge rounded-pill text-white me-2" style="background:var(--ld-primary);">5</span>
-            Enter Credentials in LocalDesk
+            Enter Credentials in OpenHelpDesk
         </h5>
     </div>
     <div class="card-body p-4">
@@ -224,7 +224,7 @@ $breadcrumbs  = [
             <dd class="mb-3">The mailbox address doesn't match a valid Microsoft 365 user or shared mailbox. Verify the address in your Microsoft 365 Admin Center.</dd>
 
             <dt class="mb-1">Sender not a registered user</dt>
-            <dd class="mb-3">Only users with accounts in LocalDesk can post replies via email. The email address in LocalDesk must match the From address of the reply exactly.</dd>
+            <dd class="mb-3">Only users with accounts in OpenHelpDesk can post replies via email. The email address in OpenHelpDesk must match the From address of the reply exactly.</dd>
 
             <dt class="mb-1">Reply body is empty after stripping quoted text</dt>
             <dd class="mb-0">The reply processor strips the quoted original email from the reply body. Make sure the user is replying <em>above</em> the quoted text, not below or replacing it.</dd>

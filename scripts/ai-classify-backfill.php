@@ -1,7 +1,7 @@
 <?php
 
 /**
- * LocalDesk — AI classification backfill
+ * OpenHelpDesk — AI classification backfill
  *
  * Walks open tickets that haven't been classified yet (or were
  * classified before the current feature was enabled) and runs them

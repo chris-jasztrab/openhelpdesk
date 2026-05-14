@@ -168,7 +168,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-shield-check text-primary me-2"></i>What Happens When the Visitor Isn't Signed In</h5>
 <p class="text-muted mb-2">Submitting a ticket requires a logged-in account. Direct links would be much less useful if every anonymous click dumped the visitor on a generic home page after login — they'd be left wondering what they were supposed to do next.</p>
-<p class="text-muted mb-2">LocalDesk handles this with a <strong>"remember where you were going"</strong> flow:</p>
+<p class="text-muted mb-2">OpenHelpDesk handles this with a <strong>"remember where you were going"</strong> flow:</p>
 <ol class="text-muted mb-3">
     <li>An anonymous visitor clicks the direct link (e.g. <code>/portal/tickets/create?type_id=5</code>).</li>
     <li>The server sees they aren't signed in, <strong>stashes the requested URL in their session</strong>, and redirects them to the login page.</li>

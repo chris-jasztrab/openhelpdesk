@@ -4,7 +4,7 @@ $pageTitle = 'Two-Factor Authentication';
 ?>
 <div style="max-width:420px;width:100%;">
     <div class="text-center mb-4">
-        <h1 class="text-white fw-bold"><i class="bi <?= e(getSetting('branding_navbar_icon', 'bi-headset')) ?>"></i> <?= e(getSetting('branding_app_name', 'LocalDesk')) ?></h1>
+        <h1 class="text-white fw-bold"><i class="bi <?= e(getSetting('branding_navbar_icon', 'bi-headset')) ?>"></i> <?= e(getSetting('branding_app_name', 'OpenHelpDesk')) ?></h1>
         <p class="text-white-50">Two-Factor Authentication</p>
     </div>
 
@@ -57,6 +57,6 @@ $pageTitle = 'Two-Factor Authentication';
     </p>
 
     <p class="text-center text-white-50 mt-2 small">
-        <?= e(getSetting('branding_app_name', 'LocalDesk')) ?> &copy; <?= date('Y') ?>
+        <?= e(getSetting('branding_app_name', 'OpenHelpDesk')) ?> &copy; <?= date('Y') ?>
     </p>
 </div>

@@ -1,7 +1,7 @@
 <?php
 
 /**
- * LocalDesk — Recurring / Preventive-Maintenance Ticket Processor
+ * OpenHelpDesk — Recurring / Preventive-Maintenance Ticket Processor
  *
  * Walks every active row in `recurring_tickets` whose `next_run_at` has
  * passed and mints a real ticket from it, then advances `next_run_at`

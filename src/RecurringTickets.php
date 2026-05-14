@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * LocalDesk — Recurring / preventive-maintenance ticket schedules.
+ * OpenHelpDesk — Recurring / preventive-maintenance ticket schedules.
  *
  * Two responsibilities:
  *   1. Cadence math: given a schedule row, work out the next firing

@@ -1,6 +1,6 @@
 <?php
 /**
- * LocalDesk — Inbound Email Reply Processor (Microsoft Graph API)
+ * OpenHelpDesk — Inbound Email Reply Processor (Microsoft Graph API)
  *
  * Polls a Microsoft 365 mailbox via the Graph API using OAuth 2.0
  * Client Credentials flow. Finds unread ticket reply emails, strips

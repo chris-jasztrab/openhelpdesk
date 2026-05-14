@@ -38,7 +38,7 @@ $breadcrumbs  = [
     <div class="card-body p-4">
         <p class="text-muted mb-3">
             Upload a CSV export from your previous ticketing system. Any CSV format is supported — you will be able to
-            map your file's columns to the correct LocalDesk fields before the import runs.
+            map your file's columns to the correct OpenHelpDesk fields before the import runs.
         </p>
 
         <div class="alert alert-info d-flex align-items-start" role="alert">

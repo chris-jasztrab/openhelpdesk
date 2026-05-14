@@ -9,19 +9,19 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="col-lg-9">
 
 <h2 class="fw-bold mb-1">Ticket Import</h2>
-<p class="text-muted mb-4">Migrate existing tickets from another system into LocalDesk using a CSV file.</p>
+<p class="text-muted mb-4">Migrate existing tickets from another system into OpenHelpDesk using a CSV file.</p>
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-filetype-csv text-primary me-2"></i>Supported Format</h5>
-<p class="text-muted mb-2">LocalDesk accepts any CSV file with a header row. The column names do not need to match exactly — you will map your columns to the correct LocalDesk fields in the next step.</p>
+<p class="text-muted mb-2">OpenHelpDesk accepts any CSV file with a header row. The column names do not need to match exactly — you will map your columns to the correct OpenHelpDesk fields in the next step.</p>
 <p class="text-muted mb-0">The importer supports common exports from Zendesk and generic CSV formats. Files must be UTF-8 encoded.</p>
 </div>
 </div>
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-list-columns text-primary me-2"></i>LocalDesk Fields</h5>
+<h5 class="fw-semibold mb-3"><i class="bi bi-list-columns text-primary me-2"></i>OpenHelpDesk Fields</h5>
 <p class="text-muted mb-2">The following fields can be mapped from your CSV:</p>
 <div class="table-responsive mb-0">
 <table class="table table-sm mb-0">
@@ -46,7 +46,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <h5 class="fw-semibold mb-3"><i class="bi bi-card-checklist text-primary me-2"></i>Import Process</h5>
 <ol class="text-muted mb-0">
     <li class="mb-2"><strong>Upload CSV</strong> — go to <a href="/admin/settings/import"><strong>Admin → Settings → Import Tickets</strong></a> and upload your CSV file.</li>
-    <li class="mb-2"><strong>Map Columns</strong> — the importer shows all columns found in your CSV. Select which LocalDesk field each column should map to. Auto-detection will pre-select likely matches based on common column name patterns. Set any column to "— skip —" to ignore it.</li>
+    <li class="mb-2"><strong>Map Columns</strong> — the importer shows all columns found in your CSV. Select which OpenHelpDesk field each column should map to. Auto-detection will pre-select likely matches based on common column name patterns. Set any column to "— skip —" to ignore it.</li>
     <li class="mb-2"><strong>Preview</strong> — review a table of how your data will be imported. Any rows with problems (missing required fields, unmatched values) are highlighted.</li>
     <li><strong>Confirm Import</strong> — click <strong>Import Tickets</strong> to run the import. Results show how many tickets were created and how many were skipped.</li>
 </ol>

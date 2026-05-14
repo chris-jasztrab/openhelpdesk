@@ -32,7 +32,7 @@ $router->get('/sw.js', function () {
     header('Service-Worker-Allowed: /');
 
     $version = PWA::swCacheVersion();
-    $appName = json_encode(getSetting('branding_app_name', 'LocalDesk'), JSON_UNESCAPED_SLASHES);
+    $appName = json_encode(getSetting('branding_app_name', 'OpenHelpDesk'), JSON_UNESCAPED_SLASHES);
 
     // The service worker is plain JS — no PHP except for the version
     // and app-name strings injected via heredoc.
@@ -192,7 +192,7 @@ $router->get('/pwa/apple-touch-icon.png', function () {
 $router->get('/offline', function () {
     // Light-weight offline shell — no DB calls, no auth, no flash.
     header('Cache-Control: public, max-age=86400');
-    $appName    = getSetting('branding_app_name', 'LocalDesk');
+    $appName    = getSetting('branding_app_name', 'OpenHelpDesk');
     $primary    = getSetting('branding_primary_color', '#4f46e5');
     $startGrad  = getSetting('branding_navbar_start', '#1e1b4b');
     $endGrad    = getSetting('branding_navbar_end', '#312e81');

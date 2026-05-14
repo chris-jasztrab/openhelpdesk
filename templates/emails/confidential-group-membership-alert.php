@@ -9,7 +9,7 @@
     <!-- Header — amber/warning colour for security notice -->
     <tr>
         <td style="background:linear-gradient(135deg,#92400e,#b45309); padding:20px 32px;">
-            <h1 style="margin:0; color:#ffffff; font-size:20px; font-weight:700;">LocalDesk — Security Notice</h1>
+            <h1 style="margin:0; color:#ffffff; font-size:20px; font-weight:700;">OpenHelpDesk — Security Notice</h1>
         </td>
     </tr>
 
@@ -90,7 +90,7 @@
     <tr>
         <td style="padding:16px 32px; background:#f8fafc; border-top:1px solid #e2e8f0;">
             <p style="margin:0; font-size:12px; color:#94a3b8; text-align:center;">
-                <?= $footerText ?: 'This is an automated message from LocalDesk. Please do not reply directly to this email.' ?>
+                <?= $footerText ?: 'This is an automated message from OpenHelpDesk. Please do not reply directly to this email.' ?>
             </p>
         </td>
     </tr>

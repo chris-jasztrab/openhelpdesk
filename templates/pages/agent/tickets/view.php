@@ -1356,7 +1356,7 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
         'ticket_subject'      => $ticket['subject']            ?? '',
         'agent_first_name'    => Auth::user()['first_name']    ?? '',
         'agent_full_name'     => Auth::fullName(),
-        'org_name'            => getSetting('app_name', 'LocalDesk'),
+        'org_name'            => getSetting('app_name', 'OpenHelpDesk'),
     ]) ?>;
 
     function resolveTokens(body) {

@@ -1,6 +1,6 @@
 <?php
 /**
- * LocalDesk — Web Installer
+ * OpenHelpDesk — Web Installer
  *
  * Access this file at /install/ before the application is configured.
  * Delete (or restrict access to) this directory after installation is complete.
@@ -106,7 +106,7 @@ function handleStep2(): void
 
 function handleStep3(): void
 {
-    $appName  = trim($_POST['app_name']  ?? 'LocalDesk');
+    $appName  = trim($_POST['app_name']  ?? 'OpenHelpDesk');
     $appUrl   = rtrim(trim($_POST['app_url'] ?? ''), '/');
     $timezone = trim($_POST['timezone']  ?? 'UTC');
     $debug    = isset($_POST['app_debug']) ? 'true' : 'false';
@@ -307,7 +307,7 @@ function handleInstall(): void
         }
 
         // Seed app name from installer into branding settings
-        $settingStmt->execute(['branding_app_name', $data['app_name'] ?? 'LocalDesk']);
+        $settingStmt->execute(['branding_app_name', $data['app_name'] ?? 'OpenHelpDesk']);
 
         // Flag to trigger the first-login onboarding tour
         $settingStmt->execute(['show_onboarding', '1']);
@@ -359,7 +359,7 @@ function checkRequirements(): array
 
 function buildEnvContent(array $data): string
 {
-    $appName  = $data['app_name']  ?? 'LocalDesk';
+    $appName  = $data['app_name']  ?? 'OpenHelpDesk';
     $appUrl   = $data['app_url']   ?? 'http://localhost';
     $debug    = $data['app_debug'] ?? 'false';
     $timezone = $data['timezone']  ?? 'UTC';
@@ -482,7 +482,7 @@ $stepTitles = ['Requirements', 'Database', 'Application', 'Admin Account', 'Mail
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Installer — LocalDesk</title>
+    <title>Installer — OpenHelpDesk</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <style>
@@ -581,7 +581,7 @@ $stepTitles = ['Requirements', 'Database', 'Application', 'Admin Account', 'Mail
     <!-- Brand -->
     <div class="installer-brand">
         <div class="brand-icon"><i class="bi bi-headset"></i></div>
-        <h1>LocalDesk Installer</h1>
+        <h1>OpenHelpDesk Installer</h1>
         <p>Follow the steps below to configure your help desk.</p>
     </div>
 
@@ -728,7 +728,7 @@ $stepTitles = ['Requirements', 'Database', 'Application', 'Admin Account', 'Mail
                     <div class="col-12">
                         <label class="form-label fw-medium">Application Name <span class="text-danger">*</span></label>
                         <input type="text" class="form-control" name="app_name"
-                               value="<?= h($formData['app_name'] ?? $data['app_name'] ?? 'LocalDesk') ?>" required>
+                               value="<?= h($formData['app_name'] ?? $data['app_name'] ?? 'OpenHelpDesk') ?>" required>
                         <div class="form-text">Shown in the browser title bar and emails.</div>
                     </div>
                     <div class="col-12">
@@ -972,7 +972,7 @@ $stepTitles = ['Requirements', 'Database', 'Application', 'Admin Account', 'Mail
     </div><!-- /card -->
 
     <p class="text-center text-muted small mt-4">
-        LocalDesk &bull; Web Installer &bull; <?= h(PHP_VERSION) ?>
+        OpenHelpDesk &bull; Web Installer &bull; <?= h(PHP_VERSION) ?>
     </p>
 </div>
 
@@ -1005,7 +1005,7 @@ function renderAlreadyInstalled(string $lockFile): void
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Already Installed — LocalDesk</title>
+    <title>Already Installed — OpenHelpDesk</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <style>
@@ -1020,7 +1020,7 @@ function renderAlreadyInstalled(string $lockFile): void
             <span style="font-size:3rem; color:var(--ld-primary);"><i class="bi bi-shield-lock-fill"></i></span>
         </div>
         <h4 class="fw-bold mb-2">Already Installed</h4>
-        <p class="text-muted mb-1">LocalDesk is already installed and configured.</p>
+        <p class="text-muted mb-1">OpenHelpDesk is already installed and configured.</p>
         <?php if ($installedAt): ?>
         <p class="text-muted small mb-3">Installed: <?= htmlspecialchars($installedAt, ENT_QUOTES, 'UTF-8') ?></p>
         <?php endif; ?>
@@ -1029,7 +1029,7 @@ function renderAlreadyInstalled(string $lockFile): void
             For security, delete or restrict access to the <code>/install/</code> directory.
         </div>
         <a href="/" class="btn text-white" style="background:var(--ld-primary);">
-            <i class="bi bi-house me-1"></i>Go to LocalDesk
+            <i class="bi bi-house me-1"></i>Go to OpenHelpDesk
         </a>
     </div>
 </body>
@@ -1046,7 +1046,7 @@ function renderResultPage(array $messages, ?string $fatalError, string $appUrl):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= $success ? 'Installation Complete' : 'Installation Failed' ?> — LocalDesk</title>
+    <title><?= $success ? 'Installation Complete' : 'Installation Failed' ?> — OpenHelpDesk</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <style>
@@ -1064,7 +1064,7 @@ function renderResultPage(array $messages, ?string $fatalError, string $appUrl):
         <?php if ($success): ?>
         <div style="font-size:4rem; color:#22c55e;"><i class="bi bi-check-circle-fill"></i></div>
         <h2 class="fw-bold mt-2">Installation Complete!</h2>
-        <p class="text-muted">LocalDesk has been successfully installed.</p>
+        <p class="text-muted">OpenHelpDesk has been successfully installed.</p>
         <?php else: ?>
         <div style="font-size:4rem; color:#ef4444;"><i class="bi bi-x-circle-fill"></i></div>
         <h2 class="fw-bold mt-2">Installation Failed</h2>
@@ -1098,10 +1098,10 @@ function renderResultPage(array $messages, ?string $fatalError, string $appUrl):
             <i class="bi bi-list-check me-1"></i>Next Steps
         </div>
         <div class="card-body">
-            <p class="text-muted small mb-3">After logging in, complete these steps to get LocalDesk fully operational:</p>
+            <p class="text-muted small mb-3">After logging in, complete these steps to get OpenHelpDesk fully operational:</p>
 
             <h6 class="fw-semibold mb-2"><i class="bi bi-clock-history me-1 text-primary"></i>Set Up Background Tasks (Cron Jobs)</h6>
-            <p class="text-muted small mb-2">LocalDesk requires several background scripts for SLA tracking, email replies, escalations, and scheduled reports. Add these to your server's crontab:</p>
+            <p class="text-muted small mb-2">OpenHelpDesk requires several background scripts for SLA tracking, email replies, escalations, and scheduled reports. Add these to your server's crontab:</p>
             <div class="bg-light rounded p-2 mb-2" style="font-family:monospace; font-size:.8rem; word-break:break-all;">
                 <div>*/5 * * * * php <?= htmlspecialchars(INSTALL_ROOT, ENT_QUOTES, 'UTF-8') ?>/public/sla-cron.php</div>
                 <div>*/5 * * * * php <?= htmlspecialchars(INSTALL_ROOT, ENT_QUOTES, 'UTF-8') ?>/scripts/process-replies.php</div>

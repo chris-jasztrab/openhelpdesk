@@ -1286,7 +1286,7 @@ $router->post('/setup', function () {
     $email     = trim($_POST['email']      ?? '');
     $password  = $_POST['password']        ?? '';
     $confirm   = $_POST['password_confirm'] ?? '';
-    $appName   = trim($_POST['app_name']   ?? 'LocalDesk');
+    $appName   = trim($_POST['app_name']   ?? 'OpenHelpDesk');
 
     $errors = [];
     if ($firstName === '') $errors[] = 'First name is required.';
@@ -1295,7 +1295,7 @@ $router->post('/setup', function () {
     elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = 'Please enter a valid email address.';
     if (strlen($password) < 8) $errors[] = 'Password must be at least 8 characters.';
     if ($password !== $confirm) $errors[] = 'Passwords do not match.';
-    if ($appName   === '') $appName = 'LocalDesk';
+    if ($appName   === '') $appName = 'OpenHelpDesk';
 
     if (!empty($errors)) {
         $_SESSION['setup_errors'] = $errors;
@@ -1657,7 +1657,7 @@ $router->get('/survey/{token}', function (array $p) {
         'survey'      => $survey,
         'preselect'   => $preselect,
         'alreadyDone' => $survey['responded_at'] !== null,
-        'appName'     => getSetting('app_name', 'LocalDesk'),
+        'appName'     => getSetting('app_name', 'OpenHelpDesk'),
         'brandColor'  => getSetting('branding_primary_color', '#4f46e5'),
         'error'       => $_GET['error'] ?? '',
     ]);
@@ -1719,7 +1719,7 @@ $router->get('/survey/{token}/thanks', function (array $p) {
 
     render('survey/thanks', [
         'survey'     => $survey,
-        'appName'    => getSetting('app_name', 'LocalDesk'),
+        'appName'    => getSetting('app_name', 'OpenHelpDesk'),
         'brandColor' => getSetting('branding_primary_color', '#4f46e5'),
     ]);
 });
@@ -1771,7 +1771,7 @@ $router->get('/survey/{token}/reopen', function (array $p) {
 
     render('survey/reopened', [
         'ticketId' => (int) $survey['ticket_id'],
-        'appName'  => getSetting('app_name', 'LocalDesk'),
+        'appName'  => getSetting('app_name', 'OpenHelpDesk'),
     ]);
 });
 

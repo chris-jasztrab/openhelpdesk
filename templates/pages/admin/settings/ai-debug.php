@@ -165,7 +165,7 @@ $pretty = static function (string $body): string {
     <div class="card-body p-4 small">
         <h6 class="fw-semibold mb-3"><i class="bi bi-lightbulb me-2"></i>Reading the result</h6>
         <ul class="text-muted mb-0">
-            <li><strong>200</strong> on both calls — provider is reachable, key is valid, billing is fine. If LocalDesk's classifier still fails, the issue is in the classification flow specifically (open <a href="/admin/settings/ai">AI settings</a> and click Test Connection there).</li>
+            <li><strong>200</strong> on both calls — provider is reachable, key is valid, billing is fine. If OpenHelpDesk's classifier still fails, the issue is in the classification flow specifically (open <a href="/admin/settings/ai">AI settings</a> and click Test Connection there).</li>
             <li><strong>401 Unauthorized</strong> — wrong / revoked key, or you copied with whitespace. Generate a new one.</li>
             <li><strong>403 Forbidden</strong> — key is valid but lacks permission for that endpoint (workspace restrictions, region blocks).</li>
             <li><strong>400 with "credit balance is too low"</strong> — workspace spend limit is $0 or org credits aren't visible to this workspace. Check <strong>Workspaces → [your workspace] → Limits</strong> in Anthropic Console.</li>

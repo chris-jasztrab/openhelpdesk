@@ -6,7 +6,7 @@ $breadcrumbs  = [['label' => 'Admin', 'url' => '/admin'], ['label' => 'Docs']];
 ?>
 <div class="mb-4">
     <h2 class="fw-bold mb-1">Documentation</h2>
-    <p class="text-muted mb-0">Everything you need to know about configuring and using LocalDesk.</p>
+    <p class="text-muted mb-0">Everything you need to know about configuring and using OpenHelpDesk.</p>
 </div>
 
 <div class="mb-4">

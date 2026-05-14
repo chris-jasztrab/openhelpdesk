@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * LocalDesk — AI ticket classification
+ * OpenHelpDesk — AI ticket classification
  *
  * Provider abstraction. Each provider takes a ticket subject + body
  * plus the candidate skills (filtered to the ticket's destination

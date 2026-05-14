@@ -1,8 +1,8 @@
 -- ============================================================
--- LocalDesk -- Full Database Schema
+-- OpenHelpDesk -- Full Database Schema
 -- ============================================================
 --
--- This file is the authoritative shape of the LocalDesk database.
+-- This file is the authoritative shape of the OpenHelpDesk database.
 -- It is applied verbatim by `database/migrations/001_create_all_tables.php`
 -- (and by the web installer at `public/install/index.php`), wrapped in
 -- `SET FOREIGN_KEY_CHECKS = 0/1` so table-creation order does not matter.
