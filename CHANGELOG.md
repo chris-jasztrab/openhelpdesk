@@ -11,6 +11,16 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.42.6 &mdash; 2026-05-14
+
+### Bug fixes
+- **Manual setup (`php database/seed.php`) crashed on first page load.** The seeder applied `schema.sql` (the full table snapshot) but never recorded the migrations as applied, so the auto-migrator in `src/bootstrap.php` replayed all 38 migrations against the already-complete schema on first request &mdash; some are deliberately destructive and would crash. `seed.php` and `seed_test_data.php` now stamp every committed migration into `schema_migrations` as a baseline immediately after applying the schema, matching what the web installer already does.
+
+### Documentation
+- **Corrected README inaccuracies.** `schema.sql` table count (35 &rarr; 49); `scripts/` listing now reflects the real layout (`scripts/admin/rescue.php` plus the five `process-*` cron scripts); `database/` listing now includes `migrate.php` and `seed_test_data.php`; `APP_TIMEZONE` default corrected to `UTC` to match `.env.example`; the PHP-extensions requirement list now matches what the installer checks; and the old single-job "SLA Cron Job" section is now a "Cron Jobs" section listing all seven background scripts.
+
+---
+
 ## 2.42.5 &mdash; 2026-05-14
 
 ### Licensing

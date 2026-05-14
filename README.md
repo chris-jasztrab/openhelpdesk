@@ -164,7 +164,7 @@ Twelve built-in report types accessible from the Reports Overview:
 - PHP 8.0 or higher
 - MySQL 5.7 or higher
 - Composer
-- PHP extensions: `pdo_mysql`, `mbstring`, `fileinfo`, `zip` (for backup)
+- PHP extensions: `pdo_mysql`, `mbstring`, `json`, `openssl`, `fileinfo`, `zip`
 
 ## Installation
 
@@ -198,7 +198,7 @@ composer install
 cp .env.example .env
 # Edit .env with your database credentials and app URL
 
-# 3. Seed the database (creates DB, applies schema, inserts sample data)
+# 3. Seed the database (creates DB, applies schema, stamps migrations, inserts sample data)
 php database/seed.php
 
 # 4. Configure your web server (see platform instructions below)
@@ -310,7 +310,7 @@ Set `APP_URL=http://localdesk.example.com` in your `.env` file.
 | `APP_NAME` | Application display name | `LocalDesk` |
 | `APP_URL` | Base URL for email links | `http://localhost:8000` |
 | `APP_DEBUG` | Show detailed errors | `true` |
-| `APP_TIMEZONE` | PHP timezone | `America/Toronto` |
+| `APP_TIMEZONE` | PHP timezone | `UTC` |
 | `DB_HOST` | MySQL host | `127.0.0.1` |
 | `DB_PORT` | MySQL port | `3306` |
 | `DB_NAME` | Database name | `localdesk` |
@@ -381,8 +381,10 @@ localdesk/
 │   └── version.php             # APP_VERSION constant (Semantic Versioning)
 ├── database/
 │   ├── migrations/             # Numbered migration files (auto-applied on startup)
-│   ├── schema.sql              # Full database schema (35 tables)
-│   └── seed.php                # Drop, recreate, and seed all tables
+│   ├── migrate.php             # Migration runner (invoked by src/bootstrap.php each request)
+│   ├── schema.sql              # Full database schema snapshot (49 tables)
+│   ├── seed.php                # Drop, recreate, and seed demo data (dev only)
+│   └── seed_test_data.php      # Drop, recreate, and seed two months of test data (dev only)
 ├── public/
 │   ├── index.php               # Front controller
 │   ├── install/                # Web installer (delete after setup)
@@ -391,8 +393,13 @@ localdesk/
 │   ├── sla-cron.php            # Standalone SLA recalculation script
 │   └── uploads/                # Branding assets and user avatars
 ├── scripts/
-│   ├── process-replies.php     # Inbound email processor (IMAP or Microsoft Graph API)
-│   └── rescue.php              # CLI admin password reset / role change script
+│   ├── admin/rescue.php             # CLI admin password reset / role change script
+│   ├── process-replies.php          # Inbound email processor (IMAP or Microsoft Graph API)
+│   ├── process-escalations.php      # Time-based escalation rule runner
+│   ├── process-recurring-tickets.php  # Recurring ticket generator
+│   ├── process-scheduled-reports.php  # Scheduled report mailer
+│   ├── process-stale-tickets.php    # Stale-ticket notifications
+│   └── process-secret-reminders.php   # Microsoft Graph secret-expiry reminders
 ├── src/
 │   ├── Auth.php                # Session-based authentication
 │   ├── Database.php            # PDO singleton connection
@@ -433,21 +440,29 @@ localdesk/
 └── README.md
 ```
 
-## SLA Cron Job
+## Cron Jobs
 
-SLA states are recalculated periodically to detect warning and breached conditions. Set up a cron job to run every 5 minutes:
+Several background scripts keep SLA states, escalations, recurring tickets, scheduled reports, and email processing up to date. Add all of them to your server's crontab (the post-install page also lists these):
 
 ```bash
-*/5 * * * * php /path/to/localdesk/public/sla-cron.php
+*/5  * * * * php /path/to/localdesk/public/sla-cron.php
+*/5  * * * * php /path/to/localdesk/scripts/process-replies.php
+*/15 * * * * php /path/to/localdesk/scripts/process-escalations.php
+*/15 * * * * php /path/to/localdesk/scripts/process-recurring-tickets.php
+*/30 * * * * php /path/to/localdesk/scripts/process-scheduled-reports.php
+0    * * * * php /path/to/localdesk/scripts/process-stale-tickets.php
+0    8 * * * php /path/to/localdesk/scripts/process-secret-reminders.php
 ```
 
-Or trigger via HTTP with a secret token (set `SLA_CRON_TOKEN` in `.env`):
+Full cron details are also shown in **Admin → Settings → Cron Jobs**.
+
+The SLA recalculation can alternatively be triggered via HTTP with a secret token (set `SLA_CRON_TOKEN` in `.env`):
 
 ```
 GET https://yoursite.com/sla-cron.php?token=YOUR_SLA_CRON_TOKEN
 ```
 
-Admins can also manually recalculate from **Settings → SLA Policies → Recalculate All**.
+Admins can also manually recalculate SLA states from **Settings → SLA Policies → Recalculate All**.
 
 ## Inbound Email (Reply-to-Ticket)
 

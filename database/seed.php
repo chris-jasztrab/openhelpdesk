@@ -49,6 +49,26 @@ try {
     $pdo->exec($schema);
     echo "[OK] Schema applied.\n";
 
+    // Stamp every committed migration as already applied. schema.sql is the
+    // canonical snapshot — it already includes every column/table the
+    // migrations add. Without this, the auto-migrator in src/bootstrap.php
+    // would replay all migrations against the snapshot on first page load
+    // and crash (some, e.g. 006, are deliberately destructive).
+    $pdo->exec(
+        "CREATE TABLE IF NOT EXISTS `schema_migrations` (
+            `id`         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `migration`  VARCHAR(255) NOT NULL UNIQUE,
+            `applied_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
+    $migrationFiles = glob(ROOT_DIR . '/database/migrations/*.php') ?: [];
+    sort($migrationFiles);
+    $stampStmt = $pdo->prepare("INSERT IGNORE INTO schema_migrations (migration) VALUES (?)");
+    foreach ($migrationFiles as $file) {
+        $stampStmt->execute([basename($file)]);
+    }
+    echo "[OK] " . count($migrationFiles) . " migrations stamped as baseline.\n";
+
     // ── Locations ────────────────────────────────────────────────
     $locStmt = $pdo->prepare('INSERT INTO locations (name, address, description) VALUES (?, ?, ?)');
     $locations = [

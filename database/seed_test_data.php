@@ -45,7 +45,24 @@ $pdo->exec(file_get_contents(ROOT_DIR . '/database/schema.sql'));
 $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
 echo "[OK] Schema applied.\n";
 
-// ── Locations (1=Main, 2=East, 3=McCormick) ───────────────────────
+// Stamp every committed migration as already applied. schema.sql is the
+// canonical snapshot; without this, the auto-migrator in src/bootstrap.php
+// would replay all migrations against the snapshot on first page load and
+// crash (some, e.g. 006, are deliberately destructive).
+$pdo->exec(
+    "CREATE TABLE IF NOT EXISTS `schema_migrations` (
+        `id`         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        `migration`  VARCHAR(255) NOT NULL UNIQUE,
+        `applied_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+);
+$migrationFiles = glob(ROOT_DIR . '/database/migrations/*.php') ?: [];
+sort($migrationFiles);
+$stampStmt = $pdo->prepare("INSERT IGNORE INTO schema_migrations (migration) VALUES (?)");
+foreach ($migrationFiles as $file) { $stampStmt->execute([basename($file)]); }
+echo "[OK] " . count($migrationFiles) . " migrations stamped as baseline.\n";
+
+// ── Locations (1=Main, 2=East, 3=West) ────────────────────────────
 $pdo->exec("INSERT INTO locations (name,address,description) VALUES
  ('Main Library','100 Main St, Anytown','Central branch and administrative offices.'),
  ('East Branch','200 East Ave, Anytown','Eastside community branch.'),
