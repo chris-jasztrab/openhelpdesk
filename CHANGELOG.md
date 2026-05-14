@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.42.9 &mdash; 2026-05-14
+
+### Documentation
+- **Replaced the one-line README intro with a three-paragraph project description** suitable for a GitHub release: core ticketing and lifecycle features, the broader feature set (KB, reports, email integration, SSO, REST API, security), and the optional AI-assisted triage layer (Anthropic/OpenAI skill routing, "No Wrong Door" group routing, sentiment-driven priority bumps, duplicate detection, and its fail-safe design).
+
+---
+
 ## 2.42.8 &mdash; 2026-05-14
 
 ### Documentation
