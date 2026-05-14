@@ -33,6 +33,10 @@
         }
         body { background-color: #f1f5f9; overflow-x: hidden; }
         .navbar { background: linear-gradient(135deg, <?= e(getSetting('branding_navbar_start', '#1e1b4b')) ?> 0%, <?= e(getSetting('branding_navbar_end', '#312e81')) ?> 100%) !important; }
+        /* Header sits above all page-level sticky content (Bootstrap .sticky-top = 1020,
+           #ld-tour-resume = 1039) so its account dropdown is never covered. Stays below
+           modals/offcanvas (1050+). */
+        .navbar.sticky-top { z-index: 1040; }
         .navbar-brand { font-weight: 700; letter-spacing: -0.5px; }
 
         /* Sidebar – icon-only */

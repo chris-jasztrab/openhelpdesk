@@ -13,6 +13,9 @@
         body { background-color: #f1f5f9; }
         .navbar { background: linear-gradient(135deg, <?= e(getSetting('branding_navbar_start', '#1e1b4b')) ?> 0%, <?= e(getSetting('branding_navbar_end', '#312e81')) ?> 100%) !important; }
         .navbar-brand { font-weight: 700; letter-spacing: -0.5px; }
+        /* Header sits above all page-level sticky content (Bootstrap .sticky-top = 1020)
+           so its account dropdown is never covered. Stays below modals/offcanvas (1050+). */
+        .navbar.sticky-top { z-index: 1040; }
         .stat-card {
             border: none; border-radius: .75rem;
             box-shadow: 0 1px 3px rgba(0,0,0,.08);

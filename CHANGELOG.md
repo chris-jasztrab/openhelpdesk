@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.42.10 &mdash; 2026-05-14
+
+### Fixed
+- **The header account dropdown is no longer covered by page content.** The navbar and Bootstrap's `.sticky-top` page elements (e.g. the Branding page's Live Preview card) shared the same stacking level (`z-index: 1020`), so later-rendered content painted over the header's dropdown menu. The sticky navbar now sits at `z-index: 1040` — above all page-level sticky content and the tour-resume pill, still below modals/offcanvas. Applied in both the `app` and `base` layouts.
+
+---
+
 ## 2.42.9 &mdash; 2026-05-14
 
 ### Documentation
