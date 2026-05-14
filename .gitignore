@@ -27,3 +27,7 @@ test-results*.txt
 .claude/*
 
 .claude/settings.json
+
+# Internal deploy script — contains production host/path details.
+# Keep this out of the public repo.
+/scripts/deploy.py

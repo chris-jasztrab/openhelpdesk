@@ -2,6 +2,15 @@
 /**
  * Database seeder — drops existing tables, applies schema, and seeds all data.
  *
+ * ┌─────────────────────────────────────────────────────────────────────┐
+ * │  DEV / DEMO SEEDER — LOCAL USE ONLY.                                │
+ * │  This script DROPS every table and inserts demo data with           │
+ * │  well-known credentials (e.g. admin@localdesk.user / Password123!). │
+ * │  NEVER run it against a production database.                        │
+ * │  The real administrator account is created by the web installer    │
+ * │  (public/install/), not by this file.                              │
+ * └─────────────────────────────────────────────────────────────────────┘
+ *
  * Usage:  php database/seed.php
  */
 
@@ -43,9 +52,9 @@ try {
     // ── Locations ────────────────────────────────────────────────
     $locStmt = $pdo->prepare('INSERT INTO locations (name, address, description) VALUES (?, ?, ?)');
     $locations = [
-        ['Main Library',    '35 Albert St, Waterloo, ON N2L 5E2',   'Central branch and administrative offices.'],
-        ['East Branch',     '500 Parkside Dr, Waterloo, ON N2L 5R4', 'Eastside community branch.'],
-        ['McCormick Branch','500 Parkside Dr, Waterloo, ON N2L 5Z4', 'McCormick neighbourhood branch.'],
+        ['Main Library', '100 Main St, Anytown',  'Central branch and administrative offices.'],
+        ['East Branch',  '200 East Ave, Anytown', 'Eastside community branch.'],
+        ['West Branch',  '300 West Rd, Anytown',  'Westside community branch.'],
     ];
     foreach ($locations as $loc) {
         $locStmt->execute($loc);

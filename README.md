@@ -1,6 +1,6 @@
 # LocalDesk
 
-A self-hosted IT helpdesk and ticketing system built for the Waterloo Public Library. Pure PHP on a LAMP stack (PHP 8.0+, MySQL, Apache) with a lightweight custom router, PDO, and Bootstrap 5.
+A self-hosted IT helpdesk and ticketing system for libraries and small IT teams. Pure PHP on a LAMP stack (PHP 8.0+, MySQL, Apache) with a lightweight custom router, PDO, and Bootstrap 5.
 
 ## Features
 
@@ -460,4 +460,4 @@ Agents and admins can also control tickets via hashtag commands in email replies
 
 ## License
 
-Internal project — Waterloo Public Library.
+Proprietary — all rights reserved. Add an explicit open-source license before public distribution.

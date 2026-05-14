@@ -146,15 +146,15 @@ assert_eq('status=null',    null,   $r['status']);
 // ─── 15. Command followed by typical email signature ─────────────────────────
 echo "\n15. Command followed by email signature (Outlook style)\n";
 $r = parseEmailCommands(
-    "This issue is resolved.\n\n#close\n\nThanks,\nJohn Smith\nIT Support\nWaterloo Public Library"
+    "This issue is resolved.\n\n#close\n\nThanks,\nJohn Smith\nIT Support\nExample Library"
 );
 assert_eq('status=closed with sig',  'closed',                    $r['status']);
 // The blank before AND after #close both remain; the signature is preserved in body
-assert_eq('body has message+sig',    "This issue is resolved.\n\n\nThanks,\nJohn Smith\nIT Support\nWaterloo Public Library", $r['body']);
+assert_eq('body has message+sig',    "This issue is resolved.\n\n\nThanks,\nJohn Smith\nIT Support\nExample Library", $r['body']);
 
 // ─── 16. Command followed by longer corporate signature (6 lines) ─────────────
 echo "\n16. Command followed by 6-line corporate signature\n";
-$sig = "Kind regards,\nJohn Smith\nSenior IT Technician\nWaterloo Public Library\n(519) 886-1310\njsmith@wpl.ca";
+$sig = "Kind regards,\nJohn Smith\nSenior IT Technician\nExample Library\n(555) 010-1234\njsmith@example.com";
 $r   = parseEmailCommands("Please close.\n\n#resolve #high\n\n{$sig}");
 assert_eq('status=resolved with long sig', 'resolved', $r['status']);
 assert_eq('priority=high with long sig',   'high',     $r['priority_slug']);

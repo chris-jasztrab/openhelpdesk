@@ -11,6 +11,15 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.42.4 &mdash; 2026-05-14
+
+### Housekeeping (open-source prep)
+- **Removed internal infrastructure from the tracked tree.** `scripts/deploy.py` hard-coded the production host IP, SSH user, and webroot path; it is now git-ignored and untracked (the working copy stays for local use). `.claude/settings.local.json` (a personal editor config) was likewise untracked &mdash; `.claude/*` was already ignored, it had just been committed before that rule existed.
+- **Scrubbed organisation-identifying details from sample data.** All example/seed email addresses in `openapi.json`, `database/seed_test_data.php`, and `scripts/test-email-commands.php` now use `example.com`. The email-signature test fixtures, seed branch names and addresses, seed branding/footer strings, KB article titles, the OpenAPI contact name, and the `README.md` description/licence line no longer reference a specific organisation &mdash; they use generic placeholders (`Example Library`, `Anytown` addresses, `(555) 010-1234`). The backup-restore help page's example path is now `/var/www/localdesk` to match the product name.
+- **Marked the demo seeders as dev-only.** `database/seed.php` and `database/seed_test_data.php` carry a prominent header warning that they drop all tables and insert well-known demo credentials, and must never be run against production &mdash; the real administrator account is created by the web installer (`public/install/`).
+
+---
+
 ## 2.42.3 &mdash; 2026-05-13
 
 ### Bug fixes

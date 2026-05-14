@@ -122,9 +122,9 @@ $breadcrumbs  = [
                     <li>Import <code>database.sql</code> into your MySQL database:<br>
                         <code class="d-block mt-1 p-1 bg-light rounded">mysql -u user -p dbname &lt; database.sql</code>
                     </li>
-                    <li>Copy the contents of <code>website/</code> to your site directory (e.g. <code>/var/www/freshwpl/</code>).</li>
+                    <li>Copy the contents of <code>website/</code> to your site directory (e.g. <code>/var/www/localdesk/</code>).</li>
                     <li>Restore file ownership so the web server can read/write uploads:<br>
-                        <code class="d-block mt-1 p-1 bg-light rounded">chown -R www-data:www-data /var/www/freshwpl</code>
+                        <code class="d-block mt-1 p-1 bg-light rounded">chown -R www-data:www-data /var/www/localdesk</code>
                     </li>
                     <li>Confirm <code>.env</code> still matches the target environment (DB credentials, mail, URL).</li>
                 </ol>

@@ -1,6 +1,16 @@
 <?php
 /**
  * Comprehensive test data seeder — replaces all data with two months of test tickets.
+ *
+ * ┌─────────────────────────────────────────────────────────────────────┐
+ * │  DEV / DEMO SEEDER — LOCAL USE ONLY.                                │
+ * │  This script DROPS every table and inserts demo data with           │
+ * │  well-known credentials (e.g. admin@localdesk.user / Password123!). │
+ * │  NEVER run it against a production database.                        │
+ * │  The real administrator account is created by the web installer    │
+ * │  (public/install/), not by this file.                              │
+ * └─────────────────────────────────────────────────────────────────────┘
+ *
  * Usage: php database/seed_test_data.php
  */
 declare(strict_types=1);
@@ -37,9 +47,9 @@ echo "[OK] Schema applied.\n";
 
 // ── Locations (1=Main, 2=East, 3=McCormick) ───────────────────────
 $pdo->exec("INSERT INTO locations (name,address,description) VALUES
- ('Main Library','35 Albert St, Waterloo, ON N2L 5E2','Central branch and administrative offices.'),
- ('East Branch','500 Parkside Dr, Waterloo, ON N2L 5R4','Eastside community branch.'),
- ('McCormick Branch','550 Parkside Dr, Waterloo, ON N2L 5Z4','McCormick neighbourhood branch.')");
+ ('Main Library','100 Main St, Anytown','Central branch and administrative offices.'),
+ ('East Branch','200 East Ave, Anytown','Eastside community branch.'),
+ ('West Branch','300 West Rd, Anytown','Westside community branch.')");
 
 // ── Users ─────────────────────────────────────────────────────────
 // 1=Admin  2=AgentUser  3=EndUser  4=Sarah(agent)  5=Mike(agent)  6=Emma(agent)
@@ -50,9 +60,9 @@ foreach ([
     ['Admin',    'User',      'admin@localdesk.user',  $pw,'admin','519-555-0001',1],
     ['Agent',    'User',      'agent@localdesk.user',  $pw,'agent','519-555-0002',1],
     ['End',      'User',      'user@localdesk.user',   $pw,'user', null,          2],
-    ['Sarah',    'Chen',      'sarah.chen@wpl.ca',     $pw,'agent','519-555-0010',1],
-    ['Mike',     'Rodriguez', 'mike.rodriguez@wpl.ca', $pw,'agent','519-555-0011',2],
-    ['Emma',     'Wilson',    'emma.wilson@wpl.ca',    $pw,'agent','519-555-0012',3],
+    ['Sarah',    'Chen',      'sarah.chen@example.com',     $pw,'agent','519-555-0010',1],
+    ['Mike',     'Rodriguez', 'mike.rodriguez@example.com', $pw,'agent','519-555-0011',2],
+    ['Emma',     'Wilson',    'emma.wilson@example.com',    $pw,'agent','519-555-0012',3],
     ['John',     'Smith',     'john.smith@patron.ca',  $pw,'user', null,          1],
     ['Jane',     'Doe',       'jane.doe@patron.ca',    $pw,'user', null,          2],
     ['Robert',   'Johnson',   'robert.j@patron.ca',    $pw,'user', null,          3],
@@ -108,8 +118,8 @@ $bh = json_encode([
 ]);
 $si = $pdo->prepare('INSERT INTO settings (setting_key,setting_value) VALUES (?,?)');
 foreach ([
-    ['app_name',               'Waterloo Public Library Help Desk'],
-    ['branding_app_name',      'WPL Help Desk'],
+    ['app_name',               'Example Library Help Desk'],
+    ['branding_app_name',      'Example Help Desk'],
     ['branding_primary_color', '#005a9c'],
     ['branding_primary_hover', '#004a7c'],
     ['branding_navbar_start',  '#003d6b'],
@@ -120,7 +130,7 @@ foreach ([
     ['csat_enabled',           '1'],
     ['csat_trigger_status',    'resolved'],
     ['show_onboarding',        '0'],
-    ['email_footer_text',      'This message was sent by the Waterloo Public Library Help Desk.'],
+    ['email_footer_text',      'This message was sent by the Example Library Help Desk.'],
     ['email_subject_ticket_created',  '[#{{ticket_id}}] Request received – {{ticket_subject}}'],
     ['email_intro_ticket_created',    'Hi {{customer_first_name}}, we received your request and will be in touch shortly.'],
     ['email_button_ticket_created',   'View Your Ticket'],
@@ -227,7 +237,7 @@ echo "[OK] Canned responses, templates, escalations, automations seeded.\n";
 $pdo->exec("INSERT INTO kb_categories (name,slug,description,is_public,sort_order) VALUES
  ('IT Self-Help','it-self-help','Common IT issues you can resolve yourself.',1,1),
  ('Library Services','library-services','Information about library services and policies.',1,2),
- ('Staff Resources','staff-resources','Internal guides for WPL staff only.',0,3)");
+ ('Staff Resources','staff-resources','Internal guides for library staff only.',0,3)");
 $pdo->exec("INSERT INTO kb_folders (category_id,name,slug,sort_order) VALUES
  (1,'Account & Password','account-password',1),(1,'Network & WiFi','network-wifi',2),
  (2,'Borrowing & Holds','borrowing-holds',1),(2,'Digital Resources','digital-resources',2),
@@ -237,7 +247,7 @@ $art = $pdo->prepare('INSERT INTO kb_articles (folder_id,title,slug,body_markdow
 foreach ([
     [1,'How to Reset Your Password',      'reset-password',         $lbody,'published','2025-11-01 09:00:00',1,1],
     [1,'Setting Up Multi-Factor Auth',    'setup-mfa',              $lbody,'published','2025-11-15 10:00:00',1,2],
-    [2,'Connecting to WPL WiFi',          'connect-wpl-wifi',       $lbody,'published','2025-12-01 09:00:00',4,1],
+    [2,'Connecting to Library WiFi',      'connect-library-wifi',   $lbody,'published','2025-12-01 09:00:00',4,1],
     [3,'How to Place a Hold',             'place-a-hold',           $lbody,'published','2025-10-15 09:00:00',1,1],
     [4,'Accessing OverDrive / Libby',     'access-overdrive',       $lbody,'published','2025-10-20 10:00:00',1,1],
     [5,'New Workstation Setup Checklist', 'workstation-setup',      $lbody,'published','2025-09-01 09:00:00',1,1],
@@ -690,7 +700,7 @@ echo "[OK] Custom field values seeded.\n";
 // ════════════════════════════════════════════════════════════════════
 $pdo->exec("INSERT INTO scheduled_reports (name,report_type,recipients,frequency,send_day,date_range_days,is_enabled) VALUES
  ('Weekly IT Overview',  'overview',          '[\"admin@localdesk.user\"]',          'weekly',  1,7, 1),
- ('Monthly SLA Report',  'sla',               '[\"admin@localdesk.user\",\"sarah.chen@wpl.ca\"]','monthly',1,30,1),
+ ('Monthly SLA Report',  'sla',               '[\"admin@localdesk.user\",\"sarah.chen@example.com\"]','monthly',1,30,1),
  ('Weekly CSAT Summary', 'csat',              '[\"admin@localdesk.user\"]',          'weekly',  1,7, 1),
  ('Daily Open Tickets',  'unresolved',        '[\"admin@localdesk.user\"]',          'daily',   null,1,1)");
 
