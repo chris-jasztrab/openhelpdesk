@@ -2,6 +2,21 @@
 
 A self-hosted IT helpdesk and ticketing system for libraries and small IT teams. Pure PHP on a LAMP stack (PHP 8.0+, MySQL, Apache) with a lightweight custom router, PDO, and Bootstrap 5.
 
+## Screenshots
+
+| | |
+|---|---|
+| **Admin dashboard** | **All tickets** |
+| ![Admin dashboard](docs/screenshots/admin-dashboard.png) | ![All tickets](docs/screenshots/tickets-list.png) |
+| **Ticket detail** — timeline, SLA, custom fields | **Reports & analytics** |
+| ![Ticket detail](docs/screenshots/ticket-detail.png) | ![Reports and analytics](docs/screenshots/reports-overview.png) |
+| **Drag-and-drop form builder** | **Knowledge base** |
+| ![Form builder](docs/screenshots/form-builder.png) | ![Knowledge base](docs/screenshots/knowledge-base.png) |
+| **End-user portal** | **Sign in** |
+| ![End-user portal](docs/screenshots/portal.png) | ![Sign in](docs/screenshots/login.png) |
+
+*Screenshots show the bundled demo data (`php database/seed_test_data.php`).*
+
 ## Features
 
 ### Ticket Management
@@ -345,7 +360,7 @@ SMTP settings are configured through the admin UI at **Settings → Email / SMTP
 | `/admin/ticket-templates` | Ticket template management |
 | `/admin/users` | User management |
 | `/admin/groups` | Group management |
-| `/admin/kb` | Knowledge base management |
+| `/admin/kb/articles` | Knowledge base management (articles, folders, categories) |
 | `/admin/reports` | Reports & Analytics overview |
 | `/admin/audit-log` | Admin audit log |
 | `/admin/workflows/ticket-fields` | Custom ticket form field builder |

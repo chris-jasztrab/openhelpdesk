@@ -11,6 +11,17 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.42.7 &mdash; 2026-05-14
+
+### Bug fixes
+- **`schema.sql` carried `AUTO_INCREMENT=N` counters on 28 of 49 tables**, leftovers from a database dump (e.g. `AUTO_INCREMENT=10214`). Fresh installs would start those tables' IDs at the dumped values instead of 1, breaking the seeders' hard-coded foreign-key references (locations 1/2/3, etc.) with FK constraint violations. Stripped every `AUTO_INCREMENT=N` table-option clause; column-level `AUTO_INCREMENT` definitions are untouched. This was the second half of the broken-manual-setup story alongside the migration-stamping fix in 2.42.6.
+
+### Documentation
+- **Added a Screenshots section to the README.** Eight screenshots of the running app (admin dashboard, ticket list, ticket detail, reports, form builder, knowledge base, end-user portal, sign-in) captured against the bundled demo data and stored in `docs/screenshots/`.
+- Corrected the `/admin/kb` key-endpoint reference to `/admin/kb/articles` (the bare path 404s).
+
+---
+
 ## 2.42.6 &mdash; 2026-05-14
 
 ### Bug fixes
