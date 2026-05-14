@@ -14,6 +14,14 @@ A self-hosted IT helpdesk and ticketing system for libraries and small IT teams.
 | ![Form builder](docs/screenshots/form-builder.png) | ![Knowledge base](docs/screenshots/knowledge-base.png) |
 | **End-user portal** | **Sign in** |
 | ![End-user portal](docs/screenshots/portal.png) | ![Sign in](docs/screenshots/login.png) |
+| **Public Help Center** — branded, searchable | **Knowledge base article** — with helpfulness voting |
+| ![Public help center](docs/screenshots/kb-public.png) | ![Knowledge base article](docs/screenshots/kb-article.png) |
+| **Rich-text editing everywhere** — KB article editor | **Email templates** — rich-text with dynamic tokens |
+| ![Knowledge base editor](docs/screenshots/kb-editor.png) | ![Email template editor](docs/screenshots/email-templates.png) |
+| **Fully configurable branding** — logo, colors, live preview | **iPad "floor mode"** — touch-friendly card queue for roaming staff |
+| ![Branding settings](docs/screenshots/branding.png) | ![Floor mode queue](docs/screenshots/floor-mode.png) |
+| **Floor mode** — streamlined ticket detail with quick actions | |
+| ![Floor mode ticket detail](docs/screenshots/floor-ticket.png) | |
 
 *Screenshots show the bundled demo data (`php database/seed_test_data.php`).*
 

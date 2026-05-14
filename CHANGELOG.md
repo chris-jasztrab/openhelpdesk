@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.42.8 &mdash; 2026-05-14
+
+### Documentation
+- **Expanded the README Screenshots section with seven more screenshots.** Public Help Center, a rendered KB article (with helpfulness voting), the KB article editor and email template editor (showing rich-text editing throughout), the Branding settings page (logo, colors, live preview), and the iPad "floor mode" card queue plus its streamlined ticket detail. Captured against the bundled demo data and stored in `docs/screenshots/`.
+
+---
+
 ## 2.42.7 &mdash; 2026-05-14
 
 ### Bug fixes
