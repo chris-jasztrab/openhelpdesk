@@ -1,4 +1,6 @@
 {
+    "description": "LocalDesk — a self-hosted IT helpdesk and ticketing system.",
+    "license": "MIT",
     "require": {
         "league/commonmark": "^2",
         "phpmailer/phpmailer": "^6"

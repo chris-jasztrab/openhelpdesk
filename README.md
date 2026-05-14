@@ -460,4 +460,10 @@ Agents and admins can also control tickets via hashtag commands in email replies
 
 ## License
 
-Proprietary — all rights reserved. Add an explicit open-source license before public distribution.
+Open source and free to the world under the [MIT License](LICENSE) — use it, modify it, ship it, no strings attached.
+
+## Credits & Donations
+
+LocalDesk was vibe coded by Chris Jasztrab at the Waterloo Public Library.
+
+If this software helped you out, please consider making a donation to the Waterloo Public Library: <https://www.wpl.ca/your-library/donate/>

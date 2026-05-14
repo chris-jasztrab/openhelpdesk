@@ -11,6 +11,14 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.42.5 &mdash; 2026-05-14
+
+### Licensing
+- **Released under the MIT License.** Added a top-level `LICENSE` file (MIT, &copy; 2026 Chris Jasztrab, Waterloo Public Library). The `README.md` licence section now states the project is open source and free to the world, and `openapi.json` / `composer.json` declare `MIT` instead of `Proprietary`.
+- **Added credits & donation note.** `README.md` now records that LocalDesk was vibe coded by Chris Jasztrab at the Waterloo Public Library, with a link to donate at <https://www.wpl.ca/your-library/donate/>.
+
+---
+
 ## 2.42.4 &mdash; 2026-05-14
 
 ### Housekeeping (open-source prep)
