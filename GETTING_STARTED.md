@@ -49,23 +49,24 @@ If you only want to spin up an evaluation copy on your laptop, jump to [Installa
     - 13.3 [Stale ticket notifications](#133-stale-ticket-notifications)
 14. [AI ticket triage (optional)](#14-ai-ticket-triage-optional)
 15. [CSAT surveys](#15-csat-surveys)
-16. [Custom ticket fields (form builder)](#16-custom-ticket-fields-form-builder)
-17. [Ticket templates](#17-ticket-templates)
-18. [Knowledge base](#18-knowledge-base)
-19. [Email templates](#19-email-templates)
-20. [Scheduled reports](#20-scheduled-reports)
-21. [Notifications & user preferences](#21-notifications--user-preferences)
-22. [Authentication — 2FA & Microsoft 365 SSO](#22-authentication--2fa--microsoft-365-sso)
-23. [Portal & floor mode](#23-portal--floor-mode)
-24. [REST API & mobile tokens](#24-rest-api--mobile-tokens)
-25. [Backups](#25-backups)
-26. [Importing existing data](#26-importing-existing-data)
-27. [Maintenance & troubleshooting](#27-maintenance--troubleshooting)
-28. [Danger zone — full reset](#28-danger-zone--full-reset)
-29. [Appendix A — Cron job reference](#appendix-a--cron-job-reference)
-30. [Appendix B — Key URL endpoints](#appendix-b--key-url-endpoints)
-31. [Appendix C — Environment variables](#appendix-c--environment-variables)
-32. [Appendix D — Further reading](#appendix-d--further-reading)
+16. [Marking a comment as the solution](#16-marking-a-comment-as-the-solution)
+17. [Custom ticket fields (form builder)](#17-custom-ticket-fields-form-builder)
+18. [Ticket templates](#18-ticket-templates)
+19. [Knowledge base](#19-knowledge-base)
+20. [Email templates](#20-email-templates)
+21. [Scheduled reports](#21-scheduled-reports)
+22. [Notifications & user preferences](#22-notifications--user-preferences)
+23. [Authentication — 2FA & Microsoft 365 SSO](#23-authentication--2fa--microsoft-365-sso)
+24. [Portal & floor mode](#24-portal--floor-mode)
+25. [REST API & mobile tokens](#25-rest-api--mobile-tokens)
+26. [Backups](#26-backups)
+27. [Importing existing data](#27-importing-existing-data)
+28. [Maintenance & troubleshooting](#28-maintenance--troubleshooting)
+29. [Danger zone — full reset](#29-danger-zone--full-reset)
+30. [Appendix A — Cron job reference](#appendix-a--cron-job-reference)
+31. [Appendix B — Key URL endpoints](#appendix-b--key-url-endpoints)
+32. [Appendix C — Environment variables](#appendix-c--environment-variables)
+33. [Appendix D — Further reading](#appendix-d--further-reading)
 
 ---
 
@@ -1281,7 +1282,58 @@ If the email went out (`csat_surveys.sent_at` is set) but no row ever gets `resp
 
 ---
 
-## 16. Custom ticket fields (form builder)
+## 16. Marking a comment as the solution
+
+On a long-running ticket, the answer often ends up buried halfway down the timeline — six "we're looking into it" replies, an internal note or two, then the actual fix. Anyone who lands on the ticket later (a watcher, a CC, the requester returning to check, an agent picking up a re-opened ticket) has to scroll the whole conversation to find it.
+
+This feature lets agents and admins flag a single timeline reply as the **ticket's solution**, and renders a green **Go to solution** jump-link near the top of the ticket detail page that anchors-and-scrolls to that comment.
+
+### Marking and unmarking
+
+On the agent and admin ticket detail pages, every customer-visible reply in the timeline shows a small **Mark as solution** button next to the timestamp. Click it; the page reloads with that comment flagged. The button on the marked comment toggles to **Unmark solution** so you can clear or reassign the flag at any time.
+
+A ticket has at most one marked solution. Marking a different comment replaces the previous one — there's no separate "clear" step needed when you're picking a better answer.
+
+The flag does *not* change ticket status. If you want the ticket moved to **Resolved** at the same time, do that separately from the status dropdown — keeping the two actions independent means you can flag the answer on a ticket that's still in **Waiting on Customer** (e.g. "here's what to try, let us know if it works") without prematurely closing the SLA clock.
+
+### What changes when a comment is marked
+
+- **Top of the page:** a green **Go to solution** alert appears below the ticket header, showing who posted the answer and when. Clicking it scrolls to the marked comment.
+- **The marked comment:** picks up a green left border, a green **Solution** badge in the header line, and a brief highlight pulse when you land on it via the link.
+- **Older-updates collapser:** the timeline collapses anything older than the most recent ten entries behind a **Show N older updates** button. The marked solution is **always force-shown** even if it would otherwise sit inside the collapsed range — otherwise the anchor would land on a `display:none` element and silently fail.
+
+### Why internal notes can't be marked
+
+Internal notes (`Add Note` rather than `Reply`) are visible only to agents and admins — the portal timeline filters them out entirely so the requester never sees them. If we let you mark one as the solution, two things would break:
+
+1. The green **Go to solution** alert would render on the requester's portal view but the anchor would point at a comment that doesn't exist in their HTML, so the link would jump to nothing.
+2. The very existence of the note would leak via the URL fragment (`#timeline-entry-12345`) even though the note's contents stay hidden.
+
+So the **Mark as solution** button is intentionally absent on internal-note rows. Agent and admin views display a small muted hint in the slot the button would occupy — *"internal — can't be the solution"* — so it's clear the absence is by design rather than a missing feature. Reply publicly first if you want the note's content to be the answer of record.
+
+The button is also absent on system events (Created, Status Changed, Assigned, AI Classified, etc.) — only `comment` rows authored by a person can be flagged.
+
+### What the requester sees
+
+On `/portal/tickets/{id}`, when a solution is marked the requester sees the same green alert at the top of the page — labelled **Answer available** rather than **Solution available** by default — and the marked reply gets the same green border and **Answer** badge in the timeline. There is no Mark / Unmark button on the portal; the requester is read-only on this flag.
+
+The labels (`portal.solution.available`, `portal.solution.go`, `portal.solution.badge`) all run through the application label system, so if your team prefers **Solution** over **Answer** (or **Resolution**, or your own term) you can rename them at **Admin → Settings → Application name & labels**.
+
+### A useful workflow pattern
+
+For long support threads with multiple people CC'd, the typical flow is:
+
+1. Agent replies publicly with the working fix.
+2. Agent clicks **Mark as solution** on that reply.
+3. Agent moves status to **Resolved** (or leaves it for the requester to confirm and close).
+4. CSAT survey fires automatically (if §15 is enabled).
+5. The requester returns to the ticket via the email link, sees the green **Go to answer** at the top, jumps straight to the fix without rereading the back-and-forth, and either marks the ticket closed or replies if they need more help.
+
+The flag is purely informational and surface-level — there's no report on solutions, no count, no "% of tickets with a marked solution" metric. It's a navigation aid, not a workflow stage.
+
+---
+
+## 17. Custom ticket fields (form builder)
 
 **Admin → Workflows → Ticket Fields** (`/admin/workflows/ticket-fields`).
 
@@ -1315,7 +1367,7 @@ Custom field values appear in a dedicated sidebar column on the ticket detail vi
 
 ---
 
-## 17. Ticket templates
+## 18. Ticket templates
 
 **Admin → Ticket Templates** (`/admin/ticket-templates`).
 
@@ -1329,7 +1381,7 @@ A ticket template is a reusable pre-fill — subject, body, type, priority, opti
 
 ---
 
-## 18. Knowledge base
+## 19. Knowledge base
 
 **Admin → KB → Articles** (`/admin/kb/articles`).
 
@@ -1377,7 +1429,7 @@ Add categories as patterns emerge from your real tickets. Every time you find yo
 
 ---
 
-## 19. Email templates
+## 20. Email templates
 
 **Admin → Settings → Email Templates.**
 
@@ -1405,7 +1457,7 @@ A **Send Test** button on each template fires the rendered email to your address
 
 ---
 
-## 20. Scheduled reports
+## 21. Scheduled reports
 
 **Admin → Reports → Scheduled Reports** (or **Settings → Scheduled Reports**).
 
@@ -1421,7 +1473,7 @@ Each report page also has a **Schedule** button at the top right that pre-fills 
 
 ---
 
-## 21. Notifications & user preferences
+## 22. Notifications & user preferences
 
 ### In-app notifications
 
@@ -1458,7 +1510,7 @@ This is distinct from the global online-presence list at **Admin → Users → W
 
 ---
 
-## 22. Authentication — 2FA & Microsoft 365 SSO
+## 23. Authentication — 2FA & Microsoft 365 SSO
 
 ### 22.1 Two-factor authentication (TOTP)
 
@@ -1508,7 +1560,7 @@ There's a live tail of the log directly on the SSO settings page when debug is o
 
 ---
 
-## 23. Portal & floor mode
+## 24. Portal & floor mode
 
 ### The end-user portal
 
@@ -1540,7 +1592,7 @@ Floor mode uses the same auth as the agent panel; whichever agent is logged in s
 
 ---
 
-## 24. REST API & mobile tokens
+## 25. REST API & mobile tokens
 
 OpenHelpDesk ships a Bearer-token REST API that mirrors most of the UI. Use it for mobile apps, integrations, scripts, dashboards, anything.
 
@@ -1576,7 +1628,7 @@ Rate limit: requests per token are tracked in the `api_request_log` table and a 
 
 ---
 
-## 25. Backups
+## 26. Backups
 
 **Admin → Settings → Backup.**
 
@@ -1614,7 +1666,7 @@ For production, copy the `.zip`s offsite. A cron line like:
 
 ---
 
-## 26. Importing existing data
+## 27. Importing existing data
 
 If you're migrating from another helpdesk (Spiceworks, OSTicket, Zendesk, Freshdesk, SharePoint lists, a spreadsheet, etc.), three CSV importers cover most cases.
 
@@ -1642,7 +1694,7 @@ Upload a CSV with category / folder / title / body / tags / published columns. B
 
 ---
 
-## 27. Maintenance & troubleshooting
+## 28. Maintenance & troubleshooting
 
 ### Audit log
 
@@ -1705,7 +1757,7 @@ The script connects via the same `.env` credentials the app uses; no separate DB
 
 ---
 
-## 28. Danger zone — full reset
+## 29. Danger zone — full reset
 
 **Admin → Settings → Danger Zone.**
 

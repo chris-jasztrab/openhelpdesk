@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.44.2 &mdash; 2026-05-15
+
+### Documentation
+- **GETTING_STARTED.md gains a new top-level §16 "Marking a comment as the solution"** covering the 2.44.0 / 2.44.1 feature end-to-end: where the **Mark as solution** button lives on agent + admin views (next to the timestamp on every customer-visible reply, absent on system events and on internal notes), how to unmark or reassign the flag (single solution per ticket; marking a different one replaces the previous), what changes visually when a comment is marked (green top-of-page alert with poster + timestamp, green left border on the marked row, **Solution** badge, brief :target highlight pulse, and force-show out of the "Show N older updates" collapser so the anchor never lands on a `display:none` element), the privacy reasoning behind excluding internal notes (the portal timeline filters out is_internal=1 rows, so allowing one would point the anchor at HTML the requester can't see *and* leak the existence of the note via the URL fragment) and the corresponding muted "internal — can't be the solution" hint that explains the absence in place, the requester-side experience on `/portal/tickets/{id}` (same green alert and badge, no Mark/Unmark control, default labels are **Answer** rather than **Solution** but renameable via the application label system at Settings → Application name & labels), the explicit non-coupling to ticket status (marking a solution does not auto-resolve — agents change status separately, which lets you flag a candidate fix on a ticket that's still **Waiting on Customer** without prematurely closing the SLA clock), and the recommended public-reply → mark → resolve → CSAT workflow. Subsequent sections renumbered 17–29 (was 16–28); appendix entries in the TOC bumped to 30–33; appendix labels A/B/C/D unchanged. No body cross-references used numbered anchors so no other internal link updates were needed.
+
+---
+
 ## 2.44.1 &mdash; 2026-05-15
 
 ### Fixed
