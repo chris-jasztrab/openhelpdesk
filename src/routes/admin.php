@@ -5747,7 +5747,7 @@ $router->get('/admin/settings', function () {
     ]);
 });
 
-$router->post('/admin/settings', function () {
+$router->post('/admin/settings/email', function () {
     Auth::requireRole('admin');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');

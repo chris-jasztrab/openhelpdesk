@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.43.4 &mdash; 2026-05-15
+
+### Fixed
+- **SMTP card no longer wipes itself when another Settings sub-form is posted to the wrong URL.** The SMTP form was the only card on `/admin/settings` whose POST handler lived at the bare page URL (`POST /admin/settings`) — every other card (ticket routing, email-to-ticket, Graph, test-email, run-reply-processor) already had its own scoped route. That meant any form on the page that submitted to `/admin/settings` instead of its intended sub-route would trip the SMTP handler, and because that handler reads every SMTP field with `$_POST['smtp_host'] ?? ''`, missing fields silently overwrote the saved values with empty strings — host, port, encryption, username, from-address, from-name all zeroed in one POST. Moved the SMTP card to its own `POST /admin/settings/email` route so the page is now consistent: each card owns its own URL, and a mis-targeted submit produces a 404 instead of corrupting unrelated settings.
+
+---
+
 ## 2.43.3 &mdash; 2026-05-15
 
 ### Documentation

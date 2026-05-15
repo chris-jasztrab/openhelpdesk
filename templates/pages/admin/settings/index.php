@@ -19,7 +19,7 @@ $breadcrumbs  = [
         <h5 class="mb-0 fw-semibold"><i class="bi bi-envelope me-2"></i>Email / SMTP Configuration</h5>
     </div>
     <div class="card-body p-4">
-        <form method="POST" action="/admin/settings">
+        <form method="POST" action="/admin/settings/email">
             <?= csrfField() ?>
 
             <div class="row g-3 mb-3">
