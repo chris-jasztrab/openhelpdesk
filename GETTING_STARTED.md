@@ -20,6 +20,7 @@ If you only want to spin up an evaluation copy on your laptop, jump to [Installa
 5. [First login & onboarding tour](#5-first-login--onboarding-tour)
 6. [Cron jobs — critical post-install step](#6-cron-jobs--critical-post-install-step)
 7. [Initial configuration walkthrough](#7-initial-configuration-walkthrough)
+   - 7.0 [Organization type](#70-organization-type)
    - 7.1 [Email / SMTP](#71-email--smtp)
    - 7.2 [Application name & label customisation](#72-application-name--label-customisation)
    - 7.3 [Branding](#73-branding)
@@ -113,13 +114,22 @@ If any of those are missing — install anyway. SMTP, inbound email, SSO and AI 
 
 ### 3.1 Choosing an install path
 
-There are two ways to install OpenHelpDesk; both end up at the same place.
+There are three ways to install OpenHelpDesk; all end up at the same place.
 
 **Option A — Web installer (recommended).** A six-step wizard that lives at `/install/` until you complete it. Verifies your PHP setup, creates the database (or uses an existing one), captures admin credentials and SMTP settings, applies the schema, and writes `.env` for you. After it runs successfully it writes `storage/installed.lock` and the installer refuses to run again.
 
-**Option B — Manual.** Useful when you're scripting a deploy, when the web installer's session isn't reachable behind a corporate proxy, or when you simply prefer the shell. Clone the repo, copy `.env.example` to `.env`, fill it in, and run `php database/seed.php`. This drops and recreates the database with bundled demo content; for a *bare* install run `database/seed.php --no-data` (or apply `database/schema.sql` against an empty database yourself).
+**Option B — Quick evaluation with PHP's built-in server (no Apache/IIS required).** Good for kicking the tyres on a laptop. Clone the repo, `composer install`, then start the dev server and open the installer:
 
-Both paths assume you have already pointed your web server's document root at the project's **`public/`** directory and enabled URL rewriting. That part is covered next.
+```bash
+php -S 127.0.0.1:8000 -t public public/index.php
+# now open http://127.0.0.1:8000/install/ in a browser
+```
+
+You still need MySQL or MariaDB running (default `127.0.0.1:3306`). PHP's built-in server is single-threaded and not production-ready — switch to Apache or IIS for anything beyond evaluation.
+
+**Option C — Manual.** Useful when you're scripting a deploy, when the web installer's session isn't reachable behind a corporate proxy, or when you simply prefer the shell. Clone the repo, copy `.env.example` to `.env`, fill it in, and run `php database/seed.php`. This drops and recreates the database with bundled demo content; for a *bare* install run `database/seed.php --no-data` (or apply `database/schema.sql` against an empty database yourself).
+
+Options A and C assume you have already pointed your web server's document root at the project's **`public/`** directory and enabled URL rewriting. That part is covered next.
 
 ### 3.2 Web server configuration
 
@@ -129,7 +139,7 @@ The **`DocumentRoot`** must point to the project's `public/` subdirectory, not t
 
 A handy local-eval setup.
 
-1. Clone the repository somewhere XAMPP can read it, e.g. `C:\xampp\htdocs\openhelpdesk`, then run `composer install` in that directory.
+1. Clone the repository somewhere XAMPP can read it, e.g. `C:\xampp\htdocs\openhelpdesk`, then run `composer install` in that directory. If composer aborts with `Could not delete vendor/composer/tmp-<hash>.zip … antivirus or Windows Search Indexer`, simply re-run `composer install` — the second attempt almost always succeeds once the AV scanner has released the file.
 
 2. Open `C:\xampp\apache\conf\extra\httpd-vhosts.conf` and add:
 
@@ -145,9 +155,11 @@ A handy local-eval setup.
    </VirtualHost>
    ```
 
-3. Add `127.0.0.1 openhelpdesk.test` to `C:\Windows\System32\drivers\etc\hosts` (you'll need to edit this file as an administrator).
+   While you're there, confirm `C:\xampp\apache\conf\httpd.conf` has the line `Include conf/extra/httpd-vhosts.conf` uncommented — on some XAMPP builds it's commented out by default and your vhost is silently ignored.
 
-4. In `C:\xampp\apache\conf\httpd.conf`, ensure `LoadModule rewrite_module modules/mod_rewrite.so` is **not** commented out.
+3. Add `127.0.0.1 openhelpdesk.test` to `C:\Windows\System32\drivers\etc\hosts`. **You must run your text editor as Administrator** to save changes to this file — Notepad will silently fail and offer to "Save As" elsewhere if you don't.
+
+4. In `C:\xampp\apache\conf\httpd.conf`, ensure `LoadModule rewrite_module modules/mod_rewrite.so` is **not** commented out. The bundled rewrite rules at `public/.htaccess` will then take effect automatically — there's nothing to write yourself.
 
 5. Restart Apache from the XAMPP Control Panel.
 
@@ -166,7 +178,7 @@ sudo apt install -y apache2 php php-mysql php-mbstring php-xml php-zip php-curl 
 # 2. Code
 sudo mkdir -p /var/www/openhelpdesk
 sudo chown -R $USER:www-data /var/www/openhelpdesk
-git clone https://github.com/yourorg/openhelpdesk.git /var/www/openhelpdesk
+git clone https://github.com/REPLACE-WITH-YOUR-FORK/openhelpdesk.git /var/www/openhelpdesk
 cd /var/www/openhelpdesk
 composer install --no-dev --optimize-autoloader
 
@@ -174,6 +186,8 @@ composer install --no-dev --optimize-autoloader
 sudo a2enmod rewrite
 sudo systemctl restart apache2
 ```
+
+The bundled `public/.htaccess` already contains the front-controller rewrite rules — once `mod_rewrite` is enabled and `AllowOverride All` is set in the vhost, no further rewrite config is needed.
 
 Create `/etc/apache2/sites-available/openhelpdesk.conf`:
 
@@ -271,7 +285,7 @@ Visit `http://your-server/install/` in a browser. You'll be walked through six s
 A green check-list of nine items:
 
 - PHP ≥ 8.0
-- `pdo`, `pdo_mysql`, `mbstring`, `json`, `openssl` extensions
+- `pdo`, `pdo_mysql`, `mbstring`, `json`, `openssl`, `fileinfo`, and `zip` extensions
 - Composer autoloader (`vendor/autoload.php`) present
 - Project root writable (so `.env` can be created)
 - `storage/` writable
@@ -411,7 +425,15 @@ If you see **Stale** or **Not configured** on the SLA job, fix that first — it
 
 ### Windows alternative
 
-Use **Task Scheduler** to run each script at the corresponding cadence. The Cron Jobs page shows the absolute Windows path you need; copy the `php` executable from your XAMPP (`C:\xampp\php\php.exe`) or system PHP install.
+The Cron Jobs page automatically detects Windows and emits **`schtasks /Create`** commands instead of crontab lines. Each card shows a ready-to-paste command like:
+
+```powershell
+schtasks /Create /TN "OpenHelpDesk SLA Recalculation" /TR "'C:\xampp\php\php.exe' 'C:\xampp\htdocs\openhelpdesk\public\sla-cron.php'" /SC MINUTE /MO 5 /F
+```
+
+Run each one in an **elevated** PowerShell or Command Prompt (Run as Administrator) — non-admin shells get "Access is denied." The `/F` flag overwrites an existing task with the same name, so re-pasting an updated command is safe.
+
+To verify tasks are registered: `schtasks /Query /TN "OpenHelpDesk SLA Recalculation"` (replace name as appropriate), or open **Task Scheduler** (`taskschd.msc`) and look under the root library.
 
 ### HTTP-only fallback for the SLA recaler
 
@@ -429,16 +451,23 @@ This is **only** appropriate for the SLA job; the others write to local logs and
 
 You can configure everything in any order, but the path of least friction is roughly:
 
-1. SMTP first (so test emails and welcome emails work).
-2. Application name + label vocabulary (because changing them later means re-explaining things to your team).
-3. Branding (instant gratification).
-4. Business hours + holidays (because SLA depends on them).
-5. Your organisational structure — locations → types → priorities → tags → groups → users.
-6. SLA policies (which use priorities and types).
-7. Ticket routing defaults (which use groups).
-8. The optional stuff: inbound email, automations, escalations, AI, CSAT, custom fields, KB, etc.
+1. Organization type (so vocabulary and example data match your sector).
+2. SMTP (so test emails and welcome emails work).
+3. Application name + label vocabulary (because changing them later means re-explaining things to your team).
+4. Branding (instant gratification).
+5. Business hours + holidays (because SLA depends on them).
+6. Your organisational structure — locations → types → priorities → tags → groups → users.
+7. SLA policies (which use priorities and types).
+8. Ticket routing defaults (which use groups).
+9. The optional stuff: inbound email, automations, escalations, AI, CSAT, custom fields, KB, etc.
 
 The rest of this guide follows that order.
+
+### 7.0 Organization type
+
+**Admin → Settings → Organization Type.** A single drop-down that tells the app what sector you're in — `K-12 School`, `Public Library`, `Higher Education`, `Government — Municipal`, `Hospital`, `Corporation`, `Non-Profit`, and ~20 others. The selection influences sample data, default ticket-type names, label vocabulary defaults, and which built-in KB starter articles get suggested. None of it is binding — every field can still be renamed later via **Settings → Labels** — but picking the right one up front saves a round of renaming.
+
+If your scenario doesn't have a perfect match, pick the closest fit. A K-12 school district covering multiple buildings, for example, would pick `K-12 School` and rely on **Locations** (Section 8.1) to model the individual schools.
 
 ### 7.1 Email / SMTP
 
@@ -523,7 +552,12 @@ Save and the SLA engine immediately starts using these hours for future calculat
 
 #### Per-location overrides
 
-If you have branches in different timezones (e.g. a Toronto headquarters and a Vancouver branch), edit the relevant location at **Admin → Locations** and set the location-specific timezone. Tickets created at that location will use the local timezone for SLA calculations.
+If you have branches in different timezones (e.g. a Toronto headquarters and a Vancouver branch):
+
+1. Go to **Admin → Locations** and switch the radio button at the top from "All my Locations are in the same timezone" to **"Each Location has its own timezone"**, then save.
+2. *Now* edit each location — a timezone select appears that wasn't there before. (The shared-timezone mode hides it deliberately to keep the form tidy for single-timezone installs.)
+
+Tickets created at that location will use the local timezone for SLA calculations.
 
 ### 7.5 Holidays & closed days
 
@@ -568,7 +602,7 @@ Configure them in roughly that order. Each one references the ones before it.
 A location can be a branch, a department, a building, a remote office — anything you want to group tickets and users by. Optional but recommended once you have more than one physical site, because:
 
 - Users can be assigned to a location; their submitted tickets inherit it.
-- Locations have a per-location timezone, used for SLA calculation when set.
+- Locations can have a per-location timezone used for SLA calculation — but the timezone field is only visible after you switch the toggle at the top of the Locations page from "All my Locations are in the same timezone" to **"Each Location has its own timezone"**. See [Section 7.4](#74-business-hours--timezone).
 - The ticket list can be filtered by location.
 - Reports can be sliced by location ("By Location" report).
 - The label "Location" itself can be renamed via the Labels page (so "Branch", "Site", "Department" all work).
@@ -588,10 +622,13 @@ A ticket type is the top-level "what kind of request is this" category. Common e
 |---|---|
 | **Name** | Display label. |
 | **Colour** | Used on the ticket list and the SLA-policies-per-type tab. |
+| **Sort order** | Numeric — controls the order types appear in dropdowns and lists. Lower numbers float to the top. |
 | **Default group** | The group new tickets of this type get routed to (unless the creator picks a different group). Set this if you want type-based auto-routing. |
 | **Required skills** | Zero or more skills from the global catalogue (see [Agent skills](#86-agent-skills)). Used by the Skill-Based auto-assignment strategy: only group members holding all required skills are eligible. |
-| **Confidential** | When on, tickets of this type are hidden from agents outside the type's group, redacted in admin lists for admins outside the group, and require password re-authentication for admins to view. **Confidential tickets are never sent to AI providers.** See [Confidential groups & types](#85-groups) below. |
-| **No Wrong Door** | When on, the AI router (if enabled) reads the ticket body and picks the best-matching group from your configured groups' descriptions. Mutually exclusive with Confidential. See [AI](#14-ai-ticket-triage-optional). |
+| **Confidential** | When on, tickets of this type are hidden from agents outside the type's group, redacted in admin lists for admins outside the group, and require password re-authentication for admins to view. **Confidential tickets are never sent to AI providers.** See [Confidential groups & types](#85-groups) below. **The Confidential checkbox is disabled until a Default Group is selected** — a confidential type without a group has no meaningful "inside vs outside the group" scope. |
+| **No Wrong Door** | (Internal field name: `ai_route_group`.) When on, the AI router (if enabled) reads the ticket body and picks the best-matching group from your configured groups' descriptions. Mutually exclusive with Confidential. See [AI](#14-ai-ticket-triage-optional). |
+| **AI duplicate check** | When on, the AI scans recent open non-confidential tickets at the same branch when a requester clicks Submit and warns if any look like the same issue. Useful at multi-shift sites where staff don't see what's already in the queue. Has a separate **threshold** slider for match-confidence floor. Requires AI to be enabled. |
+| **Show to "Location Ticket Visibility" users** | When on, a non-agent user with the *Location Ticket Visibility* flag can see tickets of this type at their location. Off means even location-visible users don't see this type. Useful for sensitive categories. |
 | **Stale-ticket override** | Override the global stale-ticket threshold for this type (e.g. give "Facilities" a 7-day threshold instead of the global 3-day). |
 | **Escalation path** | Per-type ordered chain of agents the manual **Escalate** button rotates through. See [Manual escalation paths](#132-manual-escalation-paths). |
 
@@ -605,6 +642,8 @@ Create your first three or four types now. You can always add more later.
 *Priorities — the four seeded tiers, each with a colour and sort order. Drag rows to reorder.*
 
 Four priorities are seeded by the installer: Low, Medium, High, Critical, each with a colour. You can edit, reorder, or add more (e.g. an "Emergency" tier above Critical). Each priority can be linked to an SLA policy — that's how the SLA policy applies to a given ticket.
+
+> Internally these are stored in the `ticket_priorities` table — relevant only if you're writing custom reports or poking the database directly.
 
 If you want fewer than four tiers, delete or rename the ones you don't want — but do it *before* tickets pile up against those priorities.
 
@@ -693,7 +732,10 @@ Four roles, in increasing power:
 | **Power User** | Everything an agent can do plus access to reports & analytics. Cannot manage settings or other users. |
 | **Admin** | Everything. |
 
-Per user you can set: name, email, role, location, group memberships, skills, password (or send a reset link), 2FA reset, **Location Ticket Visibility** (let a non-agent see all tickets at their location), and **Active / Inactive** to disable a login without deleting history.
+The fields you can set per user are split across two forms:
+
+- **Add User** form (create only) — name, email, role, location, optional avatar and work phone, password, and **Location Ticket Visibility** (let a non-agent see all tickets at their location).
+- **Edit User** form (after the user exists) — everything above plus **group memberships**, **agent skills**, **2FA reset**, **password reset** (send reset link), and the **Active / Inactive** toggle to disable a login without deleting history.
 
 When you create a user, a temporary password is set and a welcome email is sent (if SMTP is configured) with login instructions.
 
@@ -1662,6 +1704,7 @@ The authoritative version of this list is at **Admin → Settings → Cron Jobs*
 | `/admin/audit-log` | Admin audit log. |
 | `/admin/workflows/ticket-fields` | Custom form-field builder. |
 | `/admin/settings` | All settings (start here). |
+| `/admin/settings/organization` | Organization type (sector / industry). |
 | `/admin/settings/ai` | AI Classification. |
 | `/admin/settings/ai/debug` | Raw HTTP debug for AI providers. |
 | `/admin/settings/branding` | Branding (logo, colours). |

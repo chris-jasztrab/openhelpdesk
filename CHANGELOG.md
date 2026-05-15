@@ -11,6 +11,19 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.43.1 &mdash; 2026-05-15
+
+### Fixed
+- **Fresh installs can now create or edit ticket types again.** `database/schema.sql` was missing two columns (`ai_dup_check_enabled`, `ai_dup_threshold` on `ticket_types`) and the entire `ai_duplicate_classifications` audit table added by migration 036 — but the installer stamps all migrations as already-applied immediately after loading the schema, so the gap was never filled in. The result: any fresh install hit a fatal `Column 'ai_dup_check_enabled' not found` PDOException the moment an admin tried to add a ticket type. Schema.sql now matches the post-migration-038 canonical shape verified column-for-column against a long-lived production database.
+- **Cron Jobs page emits real Windows Task Scheduler commands on Windows servers** instead of malformed Linux `*/5 * * * * php C:\xampp\…/script.php` lines that were neither valid cron syntax nor valid Windows command lines. The page detects the platform server-side and switches to ready-to-paste `schtasks /Create /TN "OpenHelpDesk …" /TR "'C:\xampp\php\php.exe' 'C:\…\script.php'" /SC … /F` commands, plus a one-shot combined block. Intro/help text, the per-card field label, and the combined-block heading all switch accordingly.
+- **Group create/update form correctly treats `is_confidential=0` as off.** Previously the controller checked `isset($_POST['is_confidential'])` — fine for browser checkboxes (which simply omit unchecked fields), but any API client, CSV importer, or test harness that posts `is_confidential=0` explicitly was silently flipping the group into confidential mode, triggering all the membership-alert plumbing in Section 8.5. Switched to `!empty()` to match the ticket-types route's existing pattern.
+
+### Documentation
+- **GETTING_STARTED.md &mdash; rev pass after a brand-new-user install test on Windows/XAMPP.** Added a Section 7.0 covering the previously-undocumented **Organization Type** setting with its `k12_school`, `public_library`, `higher_education`, `government_*`, `hospital`, `corporation`, and `non_profit` options. Added an Option B `php -S` evaluation install path for laptop tyre-kicking (no Apache/IIS required). Documented the "switch the mode toggle first" prerequisite for per-location timezones (Section 7.4 and 8.1). Expanded the ticket types field reference (Section 8.2) to cover **AI duplicate check**, **Show to Location-Visibility users**, and **Sort order**; clarified that **Confidential** is locked until a Default Group is picked, and that **No Wrong Door** is stored as `ai_route_group` internally. Split the user-fields list (Section 8.7) into create-form fields vs edit-form fields. Reconciled the PHP-extension list between Sections 2 and 4 (both now include `fileinfo` and `zip`). Added a `ticket_priorities` table-name parenthetical to Section 8.3. Added XAMPP-on-Windows hints to Section 3.2: how to handle the antivirus-locked `composer install` retry, that `Include conf/extra/httpd-vhosts.conf` may need uncommenting, that editing `hosts` requires Administrator elevation, and that the bundled `public/.htaccess` covers the rewrite rules automatically. Same `.htaccess` note added to the LAMP path. Replaced the dead `https://github.com/yourorg/openhelpdesk.git` placeholder with a more obvious `REPLACE-WITH-YOUR-FORK` token. Rewrote Section 6's Windows alternative to match the new schtasks output and added a `schtasks /Query` verification recipe.
+- **Renamed `claude.md` → `CLAUDE.md`** for the canonical capitalization. On a case-sensitive filesystem, fresh clones were silently shipping a lowercase `claude.md` that no other project documentation referenced.
+
+---
+
 ## 2.43.0 &mdash; 2026-05-15
 
 ### Added

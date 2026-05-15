@@ -8,6 +8,37 @@ $breadcrumbs  = [
     ['label' => 'Cron Jobs'],
 ];
 
+// Platform detection — Linux/macOS users get crontab lines; Windows users
+// get Task Scheduler (schtasks) commands. Mixing slashes from a Linux-style
+// cron line with a Windows ROOT_DIR produces a path that's invalid on either.
+$isWindows = stripos(PHP_OS, 'WIN') === 0;
+$phpBin    = $isWindows ? str_replace('/', '\\', PHP_BINARY) : 'php';
+$rootPath  = $isWindows ? str_replace('/', '\\', ROOT_DIR) : rtrim(ROOT_DIR, '/');
+$sep       = $isWindows ? '\\' : '/';
+
+// Build the platform-appropriate scheduler command for a job.
+// $cronSchedule is the Linux cron expression (kept as canonical because it's
+// terse and unambiguous); $schtasksArgs is the Windows /SC … /MO … pair.
+$buildCommand = static function (string $cronSchedule, string $schtasksArgs, string $scriptRel, string $logRel, string $taskName)
+    use ($isWindows, $phpBin, $rootPath, $sep): string {
+    if ($isWindows) {
+        $script = $rootPath . $sep . str_replace('/', $sep, $scriptRel);
+        // schtasks /TR wraps program+args in one double-quoted string and
+        // accepts single quotes around inner paths — cleaner than the
+        // backslash-escape form, and works in both cmd.exe and PowerShell.
+        return sprintf(
+            "schtasks /Create /TN \"%s\" /TR \"'%s' '%s'\" %s /F",
+            $taskName,
+            $phpBin,
+            $script,
+            $schtasksArgs
+        );
+    }
+    $script = $rootPath . '/' . $scriptRel;
+    $log    = $rootPath . '/' . $logRel;
+    return $cronSchedule . ' ' . $phpBin . ' ' . $script . ' >> ' . $log . ' 2>&1';
+};
+
 $cronJobs = [
     [
         'title'            => 'SLA Recalculation',
@@ -15,8 +46,8 @@ $cronJobs = [
         'description'      => 'Recalculates SLA status (breached / at-risk) for all active tickets. Should run frequently so SLA breaches are detected promptly.',
         'frequency'        => 'Every 5 minutes',
         'interval_seconds' => 300,
-        'command'          => '*/5 * * * * php ' . ROOT_DIR . '/public/sla-cron.php >> ' . ROOT_DIR . '/storage/logs/sla-cron.log 2>&1',
-        'log'              => ROOT_DIR . '/storage/logs/sla-cron.log',
+        'command'          => $buildCommand('*/5 * * * *', '/SC MINUTE /MO 5', 'public/sla-cron.php', 'storage/logs/sla-cron.log', 'OpenHelpDesk SLA Recalculation'),
+        'log'              => $rootPath . $sep . 'storage' . $sep . 'logs' . $sep . 'sla-cron.log',
         'required'         => true,
         'note'             => 'Can also be triggered via HTTP: <code>GET /sla-cron.php?token=YOUR_SECRET_TOKEN</code>. Set <code>SLA_CRON_TOKEN</code> in your <code>.env</code> file when using HTTP mode.',
     ],
@@ -26,8 +57,8 @@ $cronJobs = [
         'description'      => 'Polls the configured Microsoft 365 mailbox via the Graph API for new replies and appends them to the matching ticket timeline.',
         'frequency'        => 'Every 5 minutes',
         'interval_seconds' => 300,
-        'command'          => '*/5 * * * * php ' . ROOT_DIR . '/scripts/process-replies.php >> ' . ROOT_DIR . '/storage/logs/graph-mail.log 2>&1',
-        'log'              => ROOT_DIR . '/storage/logs/graph-mail.log',
+        'command'          => $buildCommand('*/5 * * * *', '/SC MINUTE /MO 5', 'scripts/process-replies.php', 'storage/logs/graph-mail.log', 'OpenHelpDesk Inbound Email'),
+        'log'              => $rootPath . $sep . 'storage' . $sep . 'logs' . $sep . 'graph-mail.log',
         'required'         => false,
         'note'             => 'Only required if you have Microsoft Graph / inbound email configured in Admin → Settings → Email / SMTP.',
     ],
@@ -37,8 +68,8 @@ $cronJobs = [
         'description'      => 'Evaluates all enabled escalation rules against open tickets and fires any configured actions (reassign, notify, change priority, etc.).',
         'frequency'        => 'Every 15 minutes',
         'interval_seconds' => 900,
-        'command'          => '*/15 * * * * php ' . ROOT_DIR . '/scripts/process-escalations.php >> ' . ROOT_DIR . '/storage/logs/escalations.log 2>&1',
-        'log'              => ROOT_DIR . '/storage/logs/escalations.log',
+        'command'          => $buildCommand('*/15 * * * *', '/SC MINUTE /MO 15', 'scripts/process-escalations.php', 'storage/logs/escalations.log', 'OpenHelpDesk Escalations'),
+        'log'              => $rootPath . $sep . 'storage' . $sep . 'logs' . $sep . 'escalations.log',
         'required'         => false,
         'note'             => 'Only required if you have escalation rules configured in Admin → Settings → Escalations.',
     ],
@@ -48,8 +79,8 @@ $cronJobs = [
         'description'      => 'Checks for any scheduled reports that are due and emails summaries to the configured recipients.',
         'frequency'        => 'Every 30 minutes',
         'interval_seconds' => 1800,
-        'command'          => '*/30 * * * * php ' . ROOT_DIR . '/scripts/process-scheduled-reports.php >> ' . ROOT_DIR . '/storage/logs/scheduled-reports.log 2>&1',
-        'log'              => ROOT_DIR . '/storage/logs/scheduled-reports.log',
+        'command'          => $buildCommand('*/30 * * * *', '/SC MINUTE /MO 30', 'scripts/process-scheduled-reports.php', 'storage/logs/scheduled-reports.log', 'OpenHelpDesk Scheduled Reports'),
+        'log'              => $rootPath . $sep . 'storage' . $sep . 'logs' . $sep . 'scheduled-reports.log',
         'required'         => false,
         'note'             => 'Only required if you have scheduled reports configured in Admin → Reports → Scheduled Reports.',
     ],
@@ -59,8 +90,8 @@ $cronJobs = [
         'description'      => 'Mints tickets from active recurring schedules whose <code>next_run_at</code> has passed (e.g. monthly toner audit, quarterly HVAC, annual fire inspection), then advances each schedule to its next firing slot.',
         'frequency'        => 'Every 15 minutes',
         'interval_seconds' => 900,
-        'command'          => '*/15 * * * * php ' . ROOT_DIR . '/scripts/process-recurring-tickets.php >> ' . ROOT_DIR . '/storage/logs/recurring-tickets.log 2>&1',
-        'log'              => ROOT_DIR . '/storage/logs/recurring-tickets.log',
+        'command'          => $buildCommand('*/15 * * * *', '/SC MINUTE /MO 15', 'scripts/process-recurring-tickets.php', 'storage/logs/recurring-tickets.log', 'OpenHelpDesk Recurring Tickets'),
+        'log'              => $rootPath . $sep . 'storage' . $sep . 'logs' . $sep . 'recurring-tickets.log',
         'required'         => false,
         'note'             => 'Only required if you have recurring schedules configured in Admin → Recurring Tickets. Missed-tick safe — does not back-fill if cron pauses.',
     ],
@@ -70,8 +101,8 @@ $cronJobs = [
         'description'      => 'Finds active tickets that have had no activity for longer than the configured stale threshold and emails both the assigned agent and the requester. Skips resolved, closed, and waiting-on-customer/third-party statuses.',
         'frequency'        => 'Every hour',
         'interval_seconds' => 3600,
-        'command'          => '0 * * * * php ' . ROOT_DIR . '/scripts/process-stale-tickets.php >> ' . ROOT_DIR . '/storage/logs/stale-tickets.log 2>&1',
-        'log'              => ROOT_DIR . '/storage/logs/stale-tickets.log',
+        'command'          => $buildCommand('0 * * * *', '/SC HOURLY', 'scripts/process-stale-tickets.php', 'storage/logs/stale-tickets.log', 'OpenHelpDesk Stale Tickets'),
+        'log'              => $rootPath . $sep . 'storage' . $sep . 'logs' . $sep . 'stale-tickets.log',
         'required'         => false,
         'note'             => 'Configure the threshold and per-type overrides in Admin → Settings → Stale Tickets.',
     ],
@@ -81,8 +112,8 @@ $cronJobs = [
         'description'      => 'Sends email reminders to all administrators when the Microsoft Graph app secret is approaching its expiry date. Reminds at 30 days, 7 days, and on the day of expiry.',
         'frequency'        => 'Once daily',
         'interval_seconds' => 86400,
-        'command'          => '0 8 * * * php ' . ROOT_DIR . '/scripts/process-secret-reminders.php >> ' . ROOT_DIR . '/storage/logs/secret-reminders.log 2>&1',
-        'log'              => ROOT_DIR . '/storage/logs/secret-reminders.log',
+        'command'          => $buildCommand('0 8 * * *', '/SC DAILY /ST 08:00', 'scripts/process-secret-reminders.php', 'storage/logs/secret-reminders.log', 'OpenHelpDesk Secret Reminders'),
+        'log'              => $rootPath . $sep . 'storage' . $sep . 'logs' . $sep . 'secret-reminders.log',
         'required'         => false,
         'note'             => 'Only required if you have a Microsoft Graph app secret expiry date configured in Admin → Settings → Email / SMTP.',
     ],
@@ -126,7 +157,12 @@ $cronStatus = static function (array $job): array {
     <h5 class="fw-semibold mb-1"><i class="bi bi-clock me-2"></i>Cron Jobs</h5>
     <p class="text-muted mb-0" style="font-size:.875rem;">
         These background scripts must be scheduled on your server for certain features to function automatically.
+        <?php if ($isWindows): ?>
+        Run each <code>schtasks</code> command below in an <strong>elevated</strong> PowerShell or Command Prompt
+        (Run as Administrator) to register it with Windows Task Scheduler.
+        <?php else: ?>
         Add them to your server's crontab using <code>crontab -e</code>.
+        <?php endif; ?>
     </p>
 </div>
 
@@ -184,9 +220,15 @@ foreach ($cronJobs as $j) {
 <div class="alert alert-info d-flex gap-3 align-items-start mb-4">
     <i class="bi bi-info-circle-fill fs-5 mt-1 flex-shrink-0"></i>
     <div class="small">
+        <?php if ($isWindows): ?>
+        <strong>How to register a task:</strong> Open an <strong>elevated</strong> PowerShell or Command Prompt,
+        paste the <code>schtasks /Create …</code> command, and press Enter. Replace existing entries with <code>/F</code>
+        already included. Click any command to copy it to the clipboard.
+        <?php else: ?>
         <strong>How to edit your crontab:</strong> Run <code>crontab -e</code> on your server, paste the desired
         cron lines, save, and exit. All paths below are absolute paths for your installation.
         Click any command to copy it to the clipboard.
+        <?php endif; ?>
         <br>
         <strong>Status detection:</strong> Each job is checked by the modified time of its log file.
         A job shows <span class="badge bg-success">Running</span> if its log was written within 2× its expected interval,
@@ -235,7 +277,7 @@ foreach ($cronJobs as $j) {
     <div class="card-body p-4">
         <p class="text-muted small mb-3"><?= e($job['description']) ?></p>
 
-        <label class="form-label small fw-semibold text-muted text-uppercase" style="font-size:.7rem;letter-spacing:.05em;">Crontab entry</label>
+        <label class="form-label small fw-semibold text-muted text-uppercase" style="font-size:.7rem;letter-spacing:.05em;"><?= $isWindows ? 'Task Scheduler command' : 'Crontab entry' ?></label>
         <div class="position-relative">
             <code class="d-block bg-light border rounded p-3 small user-select-all pe-5 cron-command"
                   style="word-break:break-all;"><?= e($job['command']) ?></code>
@@ -262,13 +304,17 @@ foreach ($cronJobs as $j) {
 </div>
 <?php endforeach; ?>
 
-<!-- Combined crontab block -->
+<!-- Combined block -->
 <div class="card border-0 shadow-sm">
     <div class="card-header bg-white py-3">
-        <h6 class="mb-0 fw-semibold"><i class="bi bi-terminal me-2"></i>Combined Crontab Block</h6>
+        <h6 class="mb-0 fw-semibold"><i class="bi bi-terminal me-2"></i><?= $isWindows ? 'Combined Task Scheduler Commands' : 'Combined Crontab Block' ?></h6>
     </div>
     <div class="card-body p-4">
-        <p class="text-muted small mb-3">Copy all entries at once and paste into your crontab:</p>
+        <p class="text-muted small mb-3">
+            <?= $isWindows
+                ? 'Run all of these in an <strong>elevated</strong> PowerShell or Command Prompt:'
+                : 'Copy all entries at once and paste into your crontab:' ?>
+        </p>
         <div class="position-relative">
             <pre class="bg-light border rounded p-3 small mb-0 user-select-all pe-5" id="combinedBlock" style="white-space:pre-wrap;word-break:break-all;"><?php
 $lines = array_map(fn($j) => $j['command'], $cronJobs);

@@ -2001,8 +2001,12 @@ $router->post('/admin/groups/create', function () {
         redirect('/admin/groups/create');
     }
 
-    $notifyNew      = isset($_POST['notify_new_ticket']) ? 1 : 0;
-    $isConfidential = isset($_POST['is_confidential']) ? 1 : 0;
+    // Treat a checkbox sent with an explicit value of "0"/"" as off, not on.
+    // Browsers omit unchecked boxes (so `isset` works for them), but API
+    // clients and CSV-driven scripts pass `is_confidential=0` literally —
+    // `!empty` is the only form that handles both.
+    $notifyNew      = !empty($_POST['notify_new_ticket']) ? 1 : 0;
+    $isConfidential = !empty($_POST['is_confidential']) ? 1 : 0;
 
     $allowedStrategies = ['manual','round_robin','load_based','skill_based','first_available'];
     $assignStrategy = in_array($_POST['assign_strategy'] ?? '', $allowedStrategies, true) ? $_POST['assign_strategy'] : 'manual';
@@ -2087,8 +2091,8 @@ $router->post('/admin/groups/{id}/edit', function (array $p) {
     $desc  = trim($_POST['description'] ?? '');
     $order = (int) ($_POST['sort_order'] ?? 0);
 
-    $notifyNew      = isset($_POST['notify_new_ticket']) ? 1 : 0;
-    $isConfidential = isset($_POST['is_confidential']) ? 1 : 0;
+    $notifyNew      = !empty($_POST['notify_new_ticket']) ? 1 : 0;
+    $isConfidential = !empty($_POST['is_confidential']) ? 1 : 0;
     $userIds        = isset($_POST['members']) && is_array($_POST['members']) ? array_map('intval', $_POST['members']) : [];
     $managerSet     = isset($_POST['managers']) && is_array($_POST['managers']) ? array_flip(array_map('intval', $_POST['managers'])) : [];
 
