@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.43.3 &mdash; 2026-05-15
+
+### Documentation
+- **GETTING_STARTED.md &mdash; three gaps closed after a brand-new-user end-to-end test on a fresh DB.** Added a "Verifying a response was saved" subsection to §15 explaining that responses land in `csat_surveys.responded_at` and surface at **Reports → Satisfaction**, with the common-failure note that a mismatched `APP_URL` is what produces "the email went out but no one ever replied" (the survey link points at an unroutable URL). Documented the **per-ticket co-presence indicator** in §21 — the previously-undocumented "Marcus Lee is also viewing this ticket" banner, separate from the global online-presence list, polled from `/api/tickets/{id}/presence` every 15s, with 45-second pruning and portal-user exclusion. Added a "Required-field gotcha" callout to §16 explaining that custom fields marked Required are enforced on every creation path (portal, agent, REST, email-to-ticket, CSV import), aren't retroactive against pre-existing tickets, and that the **Staff-only** flag is the correct way to keep a field "required for agents but invisible on the portal" — overused Required fields are the most common cause of "Submit just reloads the page" complaints on the portal form.
+
+---
+
 ## 2.43.2 &mdash; 2026-05-15
 
 ### Documentation

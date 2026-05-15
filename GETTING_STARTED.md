@@ -1270,6 +1270,15 @@ Use the **Send a Test Survey** card below to preview the email design and rating
 
 The email template can be customised at **Settings → Email Templates → CSAT Survey** (rich-text intro, button label).
 
+### Verifying a response was saved
+
+The survey email contains a public link of the form `https://your-helpdesk/survey/<64-hex-token>` — no login required. When the requester clicks a star and submits, the server writes the rating + optional comment back to the `csat_surveys` row and sets `responded_at = NOW()`. To confirm a specific response landed:
+
+- Check **Admin → Reports → Satisfaction** — every ticket with a saved rating appears here with stars and a comment column. The page shows totals per agent, per group, and an overall average.
+- Or query the database directly: `SELECT ticket_id, rating, comment, responded_at FROM csat_surveys ORDER BY responded_at DESC;`
+
+If the email went out (`csat_surveys.sent_at` is set) but no row ever gets `responded_at` after the requester says they replied, the cause is almost always that the `APP_URL` in `.env` doesn't match the URL the requester actually has to reach the helpdesk on — the survey link in the email was baked from `APP_URL` and points somewhere unroutable.
+
 ---
 
 ## 16. Custom ticket fields (form builder)
@@ -1301,6 +1310,8 @@ Per-field options:
 - **Appears on type(s)** — restrict the field to specific ticket types (so an "Asset tag" field doesn't appear on Facilities tickets).
 
 Custom field values appear in a dedicated sidebar column on the ticket detail view, are searchable from the global search box, and are included in CSV exports.
+
+> **Required-field gotcha.** A custom field marked Required is enforced server-side on every creation path — portal form, agent / admin create form, REST API, email-to-ticket, and CSV import alike. If you mark a field Required *after* tickets already exist, the existing tickets keep their NULL value and are not retroactively rejected, but every *new* ticket of that type must supply the field or submission fails with `<Field name> is required.`. Mark fields Required only when you genuinely cannot work the ticket without the answer (e.g. an "Asset Tag" field on IT tickets); over-strict required fields are the single most common cause of portal-form "Submit does nothing" complaints. Marking the field **Staff-only** instead bypasses the requirement on the portal form (since the field isn't shown there at all) while keeping agents accountable for filling it in once they pick up the ticket.
 
 ---
 
@@ -1438,6 +1449,12 @@ Each group can optionally email all of its members when a new ticket is assigned
 ### Microsoft Graph app-secret expiry reminders
 
 If you use the Microsoft Graph inbound mail integration, the daily cron `0 8 * * * scripts/process-secret-reminders.php` sends email reminders to all administrators when the Graph app secret is approaching expiry — 30 days, 7 days, and on the day. Set the expiry date accurately at **Settings → Inbound Mail → App Secret Expiry Date** so the reminders fire on the right day.
+
+### Per-ticket co-presence — "someone else is viewing this ticket"
+
+A separate presence system runs **per ticket**, so two agents don't accidentally reply to the same customer at the same time or step on each other's notes. While an agent or admin has a ticket open, their browser POSTs to `/api/tickets/{id}/presence` every 15 seconds; the ticket detail page polls `/api/tickets/{id}/presence` for *other* current viewers and renders a dismissible banner that names them ("**Marcus Lee is also viewing this ticket**"). Records older than 45 seconds are pruned automatically, so closing the tab quietly clears the banner for everyone else within the next poll cycle.
+
+This is distinct from the global online-presence list at **Admin → Users → Who's Online** (covered in [Section 8.7](#87-users)) — the latter shows who's logged in *anywhere* in the app, the former shows who is on *this specific ticket* right now. Portal users (User-role accounts) never trigger the per-ticket banner; only Admin, Agent and Power User sessions are counted.
 
 ---
 
