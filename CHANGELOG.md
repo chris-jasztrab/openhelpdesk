@@ -11,6 +11,14 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.43.0 &mdash; 2026-05-15
+
+### Added
+- **`GETTING_STARTED.md` &mdash; a comprehensive cradle-to-grave setup guide** covering prerequisites, server install on XAMPP / LAMP / IIS, the six-step web installer wizard, the cron job dashboard, every settings page (SMTP, branding, labels, business hours, holidays, locations, types, priorities, tags, groups, agent skills, users, SLA policies, ticket routing, inbound email via Microsoft Graph and IMAP, automations, time-based and manual escalations, stale-ticket notifications, AI triage with No-Wrong-Door routing, CSAT, custom form fields, ticket templates, the knowledge base, email templates, scheduled reports, notifications, 2FA, Microsoft 365 SSO, the portal, floor mode, the REST API, backups, importing data, maintenance, the danger zone), plus four appendices (cron reference, URL reference, environment variables, further reading). 1,700+ lines.
+- **24 new screenshots** in `docs/screenshots/` captured against the bundled demo data: settings index, business hours, holidays, SLA policies, AI Classification, CSAT, escalation rules, cron jobs dashboard, label customisation, users, groups, ticket types, priorities, automations, locations, agent skills, the Microsoft Graph email-reply setup guide, SSO, danger zone, stale tickets, scheduled reports, email templates list, custom ticket fields builder, audit log. The guide embeds all of them inline.
+
+---
+
 ## 2.42.11 &mdash; 2026-05-14
 
 ### Changed
