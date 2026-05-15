@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.43.2 &mdash; 2026-05-15
+
+### Documentation
+- **GETTING_STARTED.md §6 now has full Windows Task Scheduler instructions** in place of the previous one-paragraph "Windows alternative" stub. Three paths are documented: (A) the `schtasks /Create` one-liner from the admin page, (B) wrapper `.bat` files that redirect output to `storage/logs/` so the Cron Jobs status dashboard actually turns green, and (C) a click-through `taskschd.msc` walkthrough using **Create Task** with the right knobs (Run whether logged on or not, Run with highest privileges, sub-daily repeat with a typed "5 minutes" interval, **Start in** set so relative `.env`/`vendor` lookups work, **Do not start a new instance** so 5-minute jobs can't pile up). Also calls out the silent gotcha that the bare `schtasks` form leaves the dashboard sitting at "Not configured" forever because it doesn't redirect output, and gives `schtasks /Query` and **History** tab pointers for verification.
+
+---
+
 ## 2.43.1 &mdash; 2026-05-15
 
 ### Fixed

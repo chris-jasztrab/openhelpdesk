@@ -423,17 +423,75 @@ After a few minutes return to **Settings → Cron Jobs**. Each card shows one of
 
 If you see **Stale** or **Not configured** on the SLA job, fix that first — it's the only job marked **Required** and the only one that breaks user-visible behaviour silently.
 
-### Windows alternative
+### Windows — Task Scheduler
 
-The Cron Jobs page automatically detects Windows and emits **`schtasks /Create`** commands instead of crontab lines. Each card shows a ready-to-paste command like:
+On Windows there is no `cron`; the equivalent is **Task Scheduler**. The Cron Jobs page detects Windows server-side and emits ready-to-paste `schtasks /Create` commands, but you can also build the tasks by hand in the Task Scheduler GUI. Both paths are covered below.
+
+> **Important — logging gotcha.** The `schtasks` command emitted by the admin page runs `php.exe script.php` directly and does **not** redirect output to a log file the way the Linux `>> log 2>&1` form does. The scripts still run correctly, but **the Cron Jobs status dashboard reads log-file mtimes to decide if a job is "Running"** — so without redirection every card will sit at "Not configured" forever. The fix is the wrapper `.bat` files in **Option B** below.
+
+#### Option A — `schtasks` command line (fast)
+
+Open an **elevated** PowerShell or Command Prompt (Run as Administrator — non-admin shells get "Access is denied.") and paste each command from **Admin → Settings → Cron Jobs**. Example for the SLA recalculation on a default XAMPP install:
 
 ```powershell
 schtasks /Create /TN "OpenHelpDesk SLA Recalculation" /TR "'C:\xampp\php\php.exe' 'C:\xampp\htdocs\openhelpdesk\public\sla-cron.php'" /SC MINUTE /MO 5 /F
 ```
 
-Run each one in an **elevated** PowerShell or Command Prompt (Run as Administrator) — non-admin shells get "Access is denied." The `/F` flag overwrites an existing task with the same name, so re-pasting an updated command is safe.
+The `/F` flag overwrites an existing task with the same name, so re-pasting an updated command is safe. Repeat for each job listed on the Cron Jobs page (SLA, Inbound Email, Escalations, Recurring Tickets, Scheduled Reports, Stale Ticket Notifications, Secret Reminders).
 
-To verify tasks are registered: `schtasks /Query /TN "OpenHelpDesk SLA Recalculation"` (replace name as appropriate), or open **Task Scheduler** (`taskschd.msc`) and look under the root library.
+#### Option B — wrapper `.bat` files (recommended; makes the status dashboard work)
+
+Create one `.bat` file per job in `C:\xampp\htdocs\openhelpdesk\scripts\windows\` (create the folder if it doesn't exist — any folder is fine, this just keeps them together):
+
+```bat
+@echo off
+"C:\xampp\php\php.exe" "C:\xampp\htdocs\openhelpdesk\public\sla-cron.php" >> "C:\xampp\htdocs\openhelpdesk\storage\logs\sla-cron.log" 2>&1
+```
+
+Then point Task Scheduler at the `.bat` instead of `php.exe`:
+
+```powershell
+schtasks /Create /TN "OpenHelpDesk SLA Recalculation" /TR "C:\xampp\htdocs\openhelpdesk\scripts\windows\sla-cron.bat" /SC MINUTE /MO 5 /F
+```
+
+Now each run appends to the log, the dashboard shows **Running · Ns ago**, and you have a real audit trail you can `Get-Content -Tail 50 storage\logs\sla-cron.log` if something misbehaves. Repeat with one `.bat` + one `schtasks` line per job, mirroring the script paths and intervals shown on the Cron Jobs page.
+
+#### Option C — Task Scheduler GUI walkthrough
+
+If you'd rather click through it, this is the canonical way to register the SLA recalculation job. Use **Create Task** (not **Create Basic Task** — Basic Task can't repeat sub-daily without workarounds and exposes fewer reliability knobs).
+
+1. **Win + R → `taskschd.msc` → Enter.** In the right-hand Actions pane click **Create Task…**.
+2. **General tab:**
+   - **Name:** `OpenHelpDesk SLA Recalculation`
+   - **Description (optional):** `Recalculates SLA states every 5 minutes.`
+   - Select **Run whether user is logged on or not** (so the task fires when no one is signed in).
+   - Tick **Run with highest privileges**.
+   - **Configure for:** `Windows 10` (also fine for Windows 11 / Server 2019+).
+3. **Triggers tab → New…**
+   - **Begin the task:** `On a schedule`
+   - **Settings:** `Daily`, recur every `1` day, with a start date/time of today.
+   - Under **Advanced settings**, tick **Repeat task every:** `5 minutes` (type the value in — the dropdown only shows 5 / 10 / 15 / 30 minutes / 1 hour) **for a duration of:** `Indefinitely`.
+   - Leave **Enabled** ticked. **OK**.
+4. **Actions tab → New…**
+   - **Action:** `Start a program`
+   - **Program/script:** `C:\xampp\htdocs\openhelpdesk\scripts\windows\sla-cron.bat` (the wrapper from Option B). If you skipped the wrapper, use `C:\xampp\php\php.exe` and put `C:\xampp\htdocs\openhelpdesk\public\sla-cron.php` in **Add arguments**.
+   - **Start in:** `C:\xampp\htdocs\openhelpdesk` (important — without this, relative `.env` and `vendor/autoload.php` lookups fail).
+5. **Conditions tab:**
+   - Untick **Start the task only if the computer is on AC power** (otherwise jobs silently pause on a laptop).
+6. **Settings tab:**
+   - Tick **Allow task to be run on demand** (lets you right-click → **Run** for an instant test).
+   - **If the task is already running, then the following rule applies:** `Do not start a new instance` (prevents pile-ups if a run ever overruns its 5-minute window).
+   - **Stop the task if it runs longer than:** `1 hour` (safety net).
+7. **OK** → Windows prompts for the password of the account the task runs under. Use a service account or a local admin whose password doesn't expire — if the password ever changes the task silently stops firing until you re-enter it.
+
+Repeat steps 1–7 for each remaining job, swapping in the script path, task name, and repetition interval from **Admin → Settings → Cron Jobs**. Use the table in [Appendix A](#appendix-a--cron-job-reference) as the master list.
+
+#### Verifying on Windows
+
+- **`schtasks /Query /FO LIST /V /TN "OpenHelpDesk SLA Recalculation"`** shows last-run time, next-run time, and last result (`0x0` = success). Drop `/TN` to list every scheduled task on the box.
+- In **Task Scheduler**, select the task and open the **History** tab — every fire is logged with timestamps and exit codes. If History is empty, click **Enable All Tasks History** in the right-hand Actions pane (it's off by default on some Windows builds).
+- Back in OpenHelpDesk, **Admin → Settings → Cron Jobs** should flip to green within 2× the schedule interval — but **only if you used Option B** (wrapper `.bat`). With Option A the cards stay grey even though the jobs are firing fine, because no log file is being written for the dashboard to read.
+- To force an immediate run for testing: `schtasks /Run /TN "OpenHelpDesk SLA Recalculation"`, or right-click → **Run** in the GUI.
 
 ### HTTP-only fallback for the SLA recaler
 
