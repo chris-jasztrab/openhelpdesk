@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.44.1 &mdash; 2026-05-15
+
+### Fixed
+- **Explain why the "Mark as solution" button is missing on internal notes.** A ticket with only internal notes (or only system events — no public reply yet) showed no Mark button anywhere, which read as "the feature isn't deployed" when in fact the privacy gate from 2.44.0 was working correctly: internal notes are filtered out of the portal timeline, so flagging one would create a `Go to solution` anchor that lands on nothing for the requester. The agent and admin timelines now render a small muted hint in the slot the button would occupy on internal-note rows — `internal — can't be the solution` with a tooltip explaining that the requester can't see internal notes and a public reply is needed first. Portal view unchanged (it never sees internal notes). No change to the route gate or schema.
+
+---
+
 ## 2.44.0 &mdash; 2026-05-15
 
 ### Added

@@ -308,6 +308,11 @@ if ($solutionTimelineId > 0) {
                                                 <i class="bi bi-check-circle me-1"></i><?= $isSolution ? 'Unmark solution' : 'Mark as solution' ?>
                                             </button>
                                         </form>
+                                        <?php elseif ($entry['action'] === 'comment' && $isNote): ?>
+                                        <small class="text-muted fst-italic"
+                                               title="The requester can't see internal notes, so we can't anchor a 'Go to solution' link at one. Reply publicly to mark a solution.">
+                                            <i class="bi bi-info-circle me-1"></i>internal &mdash; can't be the solution
+                                        </small>
                                         <?php endif; ?>
                                         <small class="text-muted"><?= date('M j, Y g:i A', strtotime($entry['created_at'])) ?></small>
                                     </div>
