@@ -31,3 +31,4 @@ test-results*.txt
 # Internal deploy script — contains production host/path details.
 # Keep this out of the public repo.
 /scripts/deploy.py
+scripts/generate_schema_diagram.py
