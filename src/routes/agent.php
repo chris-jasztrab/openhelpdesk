@@ -1128,6 +1128,69 @@ $router->post('/agent/tickets/{id}/watch', function (array $p) {
 });
 
 /* ==================================================================
+ * AGENT – Mark / Unmark a Comment as the Solution
+ *
+ * Pass timeline_id in the form body to mark; pass it empty (or omit)
+ * to clear. Internal notes are intentionally rejected — the portal
+ * timeline filters out is_internal=1 rows, so marking one would create
+ * a "Go to solution" link that anchors to nothing on the requester's
+ * view, and would leak the existence of the internal note via the URL
+ * fragment.
+ * ================================================================== */
+
+$router->post('/agent/tickets/{id}/solution', function (array $p) {
+    Auth::requireRole('agent', 'admin', 'power_user');
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect("/agent/tickets/{$id}");
+    }
+
+    $db = Database::connect();
+    $tStmt = $db->prepare('SELECT id, group_id FROM tickets WHERE id = ?');
+    $tStmt->execute([$id]);
+    $solTicket = $tStmt->fetch();
+    if (!$solTicket) {
+        flash('error', 'Ticket not found.');
+        redirect('/agent/tickets');
+    }
+    _agentRequireTicketAccess($db, $solTicket);
+
+    $rawTl = trim((string) ($_POST['timeline_id'] ?? ''));
+
+    if ($rawTl === '' || $rawTl === '0') {
+        $db->prepare('UPDATE tickets SET solution_timeline_id = NULL WHERE id = ?')
+           ->execute([$id]);
+        flash('success', 'Solution unmarked.');
+        redirect("/agent/tickets/{$id}");
+    }
+
+    $tlId = (int) $rawTl;
+    $check = $db->prepare(
+        'SELECT id, action, is_internal FROM ticket_timeline WHERE id = ? AND ticket_id = ?'
+    );
+    $check->execute([$tlId, $id]);
+    $row = $check->fetch();
+    if (!$row) {
+        flash('error', 'That comment is not on this ticket.');
+        redirect("/agent/tickets/{$id}");
+    }
+    if (!in_array($row['action'], ['comment'], true)) {
+        flash('error', 'Only customer-visible replies can be marked as the solution.');
+        redirect("/agent/tickets/{$id}");
+    }
+    if ((int) $row['is_internal'] === 1) {
+        flash('error', 'Internal notes cannot be marked as the solution — the requester would not be able to see it.');
+        redirect("/agent/tickets/{$id}");
+    }
+
+    $db->prepare('UPDATE tickets SET solution_timeline_id = ? WHERE id = ?')
+       ->execute([$tlId, $id]);
+    flash('success', 'Marked as the solution.');
+    redirect("/agent/tickets/{$id}#timeline-entry-{$tlId}");
+});
+
+/* ==================================================================
  * AGENT – Merge Ticket into Another
  * ================================================================== */
 

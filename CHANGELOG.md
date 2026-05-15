@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.44.0 &mdash; 2026-05-15
+
+### Added
+- **Mark a comment as the ticket's solution + green "Go to solution" jump-link near the top of every ticket view.** Long-running tickets often end with the answer buried halfway down the timeline; now agents and admins see a small **Mark as solution** button on every customer-visible reply in the timeline, and once one is marked the ticket detail page (agent, admin, and the portal `/portal/tickets/{id}` requester view) renders a green alert at the top with a **Go to solution** button that anchors-and-scrolls to the marked comment, which itself gets a green left-border, "Solution" badge, and a brief :target highlight pulse so it's obvious where you landed. The marked comment is force-shown even when it would otherwise be hidden inside the "show N older updates" collapser, so the anchor never points at a `display:none` row. Internal notes are explicitly rejected by `POST /agent/tickets/{id}/solution` and `POST /admin/tickets/{id}/solution` — the portal timeline filters out `is_internal=1`, so allowing one would create a "Go to solution" link that anchors to nothing on the requester's view *and* leak the existence of the internal note via the URL fragment. Agents are still gated by the same group/confidential checks as every other ticket-action route (`_agentRequireTicketAccess`). Database side: migration 039 adds `tickets.solution_timeline_id INT UNSIGNED NULL` with `ON DELETE SET NULL` to `ticket_timeline.id`, so deleting the comment automatically clears the flag rather than leaving a dangling reference. Portal labels are wired through the `label()` helper (`portal.solution.available` / `portal.solution.go` / `portal.solution.badge`) so admins can rename "Answer" → "Solution" → "Resolution" to match their team's vocabulary.
+
+---
+
 ## 2.43.4 &mdash; 2026-05-15
 
 ### Fixed

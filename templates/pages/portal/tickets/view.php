@@ -18,7 +18,27 @@ $statusLabels = [
     'closed'                 => label('portal.status.closed', 'Closed'),
 ];
 $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-person-check text-primary', 'status_changed' => 'bi-arrow-repeat text-warning', 'priority_changed' => 'bi-flag text-danger', 'comment' => 'bi-chat-dots text-info', 'edited' => 'bi-pencil text-secondary', 'escalated' => 'bi-arrow-up-circle text-danger'];
+
+// Resolve the marked-solution timeline row (if any). The portal $timeline
+// already excludes is_internal rows, so this lookup will simply not find
+// the entry if the marked comment was somehow flipped internal — and the
+// "Go to solution" link is suppressed.
+$solutionTimelineId = (int) ($ticket['solution_timeline_id'] ?? 0);
+$solutionEntry      = null;
+if ($solutionTimelineId > 0) {
+    foreach ($timeline as $__solRow) {
+        if ((int) $__solRow['id'] === $solutionTimelineId) {
+            $solutionEntry = $__solRow;
+            break;
+        }
+    }
+}
 ?>
+<style>
+.ld-timeline-solution { border-left: 4px solid #198754 !important; background: rgba(25,135,84,.06); }
+[data-bs-theme="dark"] .ld-timeline-solution { background: rgba(25,135,84,.16); }
+.ld-timeline-solution:target { box-shadow: inset 0 0 0 9999px rgba(25,135,84,.12); transition: box-shadow .8s ease; }
+</style>
 <link rel="stylesheet" href="https://cdn.ckeditor.com/ckeditor5/43.3.1/ckeditor5.css">
 <?php if (!empty($fromFloor)): ?>
 <style>
@@ -182,6 +202,25 @@ $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-p
     <?php endif; ?>
 </div>
 
+<?php if ($solutionEntry): ?>
+<a href="#timeline-entry-<?= (int) $solutionEntry['id'] ?>"
+   class="alert alert-success d-flex align-items-center gap-2 mb-4 text-decoration-none"
+   role="note"
+   style="border-left:4px solid #198754;">
+    <i class="bi bi-check-circle-fill fs-5"></i>
+    <div class="flex-grow-1">
+        <strong><?= e(label('portal.solution.available', 'Answer available')) ?></strong> &middot;
+        <?= e(label('portal.solution.posted_by', 'posted by')) ?>
+        <?= e($solutionEntry['user_name'] ?: label('portal.solution.staff', 'our team')) ?>
+        <?= e(label('portal.solution.on', 'on')) ?>
+        <?= date('M j, Y g:i A', strtotime($solutionEntry['created_at'])) ?>
+    </div>
+    <span class="btn btn-sm btn-success">
+        <i class="bi bi-arrow-down-circle me-1"></i><?= e(label('portal.solution.go', 'Go to answer')) ?>
+    </span>
+</a>
+<?php endif; ?>
+
 <?php if ($isOwner && $ticket['status'] === 'open'): ?>
 <div class="alert border-0 shadow-sm mb-4" role="note"
      style="background:#eef2ff;border-left:4px solid var(--ld-primary) !important;">
@@ -317,19 +356,32 @@ $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-p
                 ?>
                 <div class="list-group list-group-flush">
                     <?php foreach ($timeline as $tlIdx => $entry):
-                        $isOlder = $tlIdx >= 10;
+                        $isSolution = $solutionTimelineId > 0 && (int) $entry['id'] === $solutionTimelineId;
+                        // Never let the marked solution be hidden inside the
+                        // older-updates collapser — the requester needs to be
+                        // able to land directly on it via the green link above.
+                        $isOlder    = !$isSolution && $tlIdx >= 10;
+                        $tlClass    = $isSolution ? 'ld-timeline-solution' : '';
                     ?>
-                    <div class="list-group-item px-4 py-3<?= $isOlder ? ' timeline-older-item' : '' ?>"
+                    <div class="list-group-item px-4 py-3 <?= $tlClass ?><?= $isOlder ? ' timeline-older-item' : '' ?>"
+                         id="timeline-entry-<?= (int) $entry['id'] ?>"
                          <?= $isOlder ? 'style="display:none;"' : '' ?>>
                         <div class="d-flex gap-3">
                             <div class="pt-1">
+                                <?php if ($isSolution): ?>
+                                <i class="bi bi-check-circle-fill fs-5 text-success"></i>
+                                <?php else: ?>
                                 <i class="bi <?= $actionIcons[$entry['action']] ?? 'bi-circle text-muted' ?> fs-5"></i>
+                                <?php endif; ?>
                             </div>
                             <div class="flex-grow-1">
                                 <div class="d-flex justify-content-between">
                                     <div>
                                         <span class="fw-semibold"><?= e($entry['user_name'] ?: 'System') ?></span>
                                         <span class="text-muted ms-1"><?= e(str_replace('_', ' ', ucfirst($entry['action']))) ?></span>
+                                        <?php if ($isSolution): ?>
+                                        <span class="badge ms-1 bg-success"><i class="bi bi-check-circle me-1"></i><?= e(label('portal.solution.badge', 'Answer')) ?></span>
+                                        <?php endif; ?>
                                     </div>
                                     <small class="text-muted"><?= date('M j, Y g:i A', strtotime($entry['created_at'])) ?></small>
                                 </div>

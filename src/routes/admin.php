@@ -4266,6 +4266,63 @@ $router->post('/admin/tickets/{id}/watch', function (array $p) {
 });
 
 /* ==================================================================
+ * ADMIN – Mark / Unmark a Comment as the Solution
+ *
+ * Mirror of the agent route — see src/routes/agent.php for the
+ * privacy rationale around rejecting internal notes.
+ * ================================================================== */
+
+$router->post('/admin/tickets/{id}/solution', function (array $p) {
+    Auth::requireRole('admin');
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect("/admin/tickets/{$id}");
+    }
+
+    $db = Database::connect();
+    $tStmt = $db->prepare('SELECT id FROM tickets WHERE id = ?');
+    $tStmt->execute([$id]);
+    if (!$tStmt->fetch()) {
+        flash('error', 'Ticket not found.');
+        redirect('/admin/tickets');
+    }
+
+    $rawTl = trim((string) ($_POST['timeline_id'] ?? ''));
+
+    if ($rawTl === '' || $rawTl === '0') {
+        $db->prepare('UPDATE tickets SET solution_timeline_id = NULL WHERE id = ?')
+           ->execute([$id]);
+        flash('success', 'Solution unmarked.');
+        redirect("/admin/tickets/{$id}");
+    }
+
+    $tlId = (int) $rawTl;
+    $check = $db->prepare(
+        'SELECT id, action, is_internal FROM ticket_timeline WHERE id = ? AND ticket_id = ?'
+    );
+    $check->execute([$tlId, $id]);
+    $row = $check->fetch();
+    if (!$row) {
+        flash('error', 'That comment is not on this ticket.');
+        redirect("/admin/tickets/{$id}");
+    }
+    if (!in_array($row['action'], ['comment'], true)) {
+        flash('error', 'Only customer-visible replies can be marked as the solution.');
+        redirect("/admin/tickets/{$id}");
+    }
+    if ((int) $row['is_internal'] === 1) {
+        flash('error', 'Internal notes cannot be marked as the solution — the requester would not be able to see it.');
+        redirect("/admin/tickets/{$id}");
+    }
+
+    $db->prepare('UPDATE tickets SET solution_timeline_id = ? WHERE id = ?')
+       ->execute([$tlId, $id]);
+    flash('success', 'Marked as the solution.');
+    redirect("/admin/tickets/{$id}#timeline-entry-{$tlId}");
+});
+
+/* ==================================================================
  * ADMIN – Merge Ticket into Another
  * ================================================================== */
 
