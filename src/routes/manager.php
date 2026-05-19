@@ -220,7 +220,7 @@ $router->post('/manager/groups/{id}/team', function (array $p) {
             $detail = "Group #{$groupId}, user #{$uid}.";
             if (!empty($toAdd))    { $detail .= ' Added: '   . implode(',', $toAdd)    . '.'; }
             if (!empty($toRemove)) { $detail .= ' Removed: ' . implode(',', $toRemove) . '.'; }
-            logAudit('manager_skill_assignments_changed', $uid, 'user', $detail);
+            logAudit('manager.skill_assignments_changed', $uid, 'user', $detail);
         }
 
         // Suppress "unused" linter warning for the var still in scope
@@ -320,7 +320,7 @@ $router->post('/manager/groups/{id}/skills/create', function (array $p) {
         redirect("/manager/groups/{$groupId}/skills/create");
     }
     $skillId = (int) $db->lastInsertId();
-    logAudit('manager_skill_created', $skillId, 'agent_skill', "Group #{$groupId} created skill \"{$name}\"");
+    logAudit('manager.skill_created', $skillId, 'agent_skill', "Group #{$groupId} created skill \"{$name}\"");
     flash('success', 'Skill created.');
     redirect("/manager/groups/{$groupId}/skills");
 });
@@ -387,7 +387,7 @@ $router->post('/manager/groups/{id}/skills/{skillId}/edit', function (array $p) 
         flashInput($_POST);
         redirect("/manager/groups/{$groupId}/skills/{$skillId}/edit");
     }
-    logAudit('manager_skill_updated', $skillId, 'agent_skill', "Group #{$groupId} updated skill \"{$name}\"");
+    logAudit('manager.skill_updated', $skillId, 'agent_skill', "Group #{$groupId} updated skill \"{$name}\"");
     flash('success', 'Skill updated.');
     redirect("/manager/groups/{$groupId}/skills");
 });
@@ -409,7 +409,7 @@ $router->post('/manager/groups/{id}/skills/{skillId}/delete', function (array $p
         redirect("/manager/groups/{$groupId}/skills");
     }
     Database::connect()->prepare('DELETE FROM agent_skills WHERE id = ? AND group_id = ?')->execute([$skillId, $groupId]);
-    logAudit('manager_skill_deleted', $skillId, 'agent_skill', "Group #{$groupId} deleted skill #{$skillId}");
+    logAudit('manager.skill_deleted', $skillId, 'agent_skill', "Group #{$groupId} deleted skill #{$skillId}");
     flash('success', 'Skill deleted.');
     redirect("/manager/groups/{$groupId}/skills");
 });

@@ -11,6 +11,17 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.48.0 &mdash; 2026-05-19
+
+### Changed
+- **Audit log action names standardized on `<area>.<verb>` convention (Phase 4) with single-source-of-truth back-compat aliases so existing rows still filter correctly.** Seventeen legacy action names from before the Phase-1/2/3 work — `login`, `logout`, `2fa.enable`, `2fa.disable`, `2fa.admin_reset`, `ticket_escalated`, `confidential_ticket_viewed`, `group_managers_changed`, `ai_settings_saved`, `ai_classification_override`, `ai_backfill_run`, `manager_skill_assignments_changed` / `_created` / `_updated` / `_deleted`, `default_group_changed`, `escalation_path_saved` — are now written under their canonical equivalents (`auth.login`, `auth.logout`, `auth.2fa_enabled`, `auth.2fa_disabled`, `user.2fa_reset_by_admin`, `ticket.escalated`, `ticket.confidential_viewed`, `group.managers_changed`, `ai.settings_changed`, `ai.classification_override`, `ai.backfill_run`, `manager.skill_assignments_changed` / `_created` / `_updated` / `_deleted`, `settings.default_group_changed`, `escalation_path.saved`).
+- **Single alias-map source of truth** in [`auditAliases()`](src/helpers.php) feeds three places at once: `logAudit()` rewrites legacy → canonical at write time (so even an un-renamed third-party callsite emitting an old name lands canonically in the table); the audit-log viewer route canonicalizes each fetched row before render so legacy entries display under their new name and badge color; and the action-filter dropdown deduplicates legacy + canonical into one entry while the WHERE clause expands the user's selection back out to `action IN (canonical, ...legacy)` so old rows still match. Result: rolling out the rename was a one-table change, no DB migration, no broken filter on historical data.
+- **`auditCanonicalAction()`** and **`auditLegacyAliasesFor()`** helpers exposed for any future caller (e.g. analytics scripts, scheduled-report jobs) that needs to bridge the two namespaces.
+- **The confidential_\* family** of action names (`confidential_flag_removed`, `confidential_delete_attempted`, `confidential_entity_deleted`, etc.) was intentionally **not** renamed — those names form a cohesive feature namespace with consistent semantics across the seven entries, and renaming a coherent set would have been churn for churn's sake. They stay as-is.
+- **Audit-log viewer badge-color map** was rekeyed to canonical names only, with entries added for every new action introduced in Phases 1–3 (`auth.api_login`, `api_token.rotated`, `backup.deleted`, `audit_log.pruned`, etc.) so the colored chips on the results page reflect actual severity instead of falling through to the default `info` color.
+
+---
+
 ## 2.47.0 &mdash; 2026-05-19
 
 ### Added

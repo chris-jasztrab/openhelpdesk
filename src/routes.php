@@ -365,7 +365,7 @@ $router->post('/api/tickets/{id}/escalate', function (array $p) {
         exit;
     }
 
-    logAudit('ticket_escalated', $ticketId, 'ticket', 'Level ' . $stepOrder . ' → ' . $next['user_name']
+    logAudit('ticket.escalated', $ticketId, 'ticket', 'Level ' . $stepOrder . ' → ' . $next['user_name']
         . ($reason !== '' ? ' | Reason: ' . $reason : ''));
 
     notifyEscalation($db, $ticketId, $toUserId, $actorId, $stepOrder, $next['label'], $reason !== '' ? $reason : null, $fromUserId);
@@ -947,7 +947,7 @@ $router->post('/login', function () {
             // Keep $_SESSION['intended_url'] set — consumed after 2FA succeeds.
             redirect('/2fa');
         }
-        logAudit('login');
+        logAudit('auth.login');
         redirect(consumeIntendedUrl());
     }
 
@@ -964,7 +964,7 @@ $router->post('/login', function () {
 });
 
 $router->get('/logout', function () {
-    logAudit('logout');
+    logAudit('auth.logout');
     Auth::logout();
     redirect('/login');
 });
@@ -1203,7 +1203,7 @@ $router->get('/auth/microsoft/callback', function () {
     // 7. Log in
     session_regenerate_id(true);
     ssoSetSessionUser($user);
-    logAudit('login');
+    logAudit('auth.login');
     ssoDebugLog("Login successful: user_id={$user['id']} | email={$user['email']} | brand_new=" . ($isBrandNew ? 'yes' : 'no'));
 
     // 8. Redirect to location picker when needed
@@ -1387,7 +1387,7 @@ $router->post('/2fa', function () {
             'role'       => $u['role'],
             'avatar'     => $u['avatar'],
         ];
-        logAudit('login');
+        logAudit('auth.login');
         redirect(consumeIntendedUrl());
     }
 
@@ -1610,7 +1610,7 @@ $router->post('/profile/2fa/setup', function () {
        ->execute([$secret, Auth::id()]);
 
     unset($_SESSION['totp_pending_secret']);
-    logAudit('2fa.enable');
+    logAudit('auth.2fa_enabled');
     flash('success', 'Two-factor authentication has been enabled.');
     redirect('/profile');
 });
@@ -1639,7 +1639,7 @@ $router->post('/profile/2fa/disable', function () {
     $db->prepare('UPDATE users SET totp_secret = NULL, totp_enabled = 0 WHERE id = ?')
        ->execute([Auth::id()]);
 
-    logAudit('2fa.disable');
+    logAudit('auth.2fa_disabled');
     flash('success', 'Two-factor authentication has been disabled.');
     redirect('/profile');
 });

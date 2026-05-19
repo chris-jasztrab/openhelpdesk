@@ -202,7 +202,7 @@ $router->post('/admin/settings/ai', function () {
     if ($anthropicKey !== '') { setSetting('ai_anthropic_api_key', $anthropicKey); }
     if ($openaiKey    !== '') { setSetting('ai_openai_api_key',    $openaiKey); }
 
-    logAudit('ai_settings_saved', null, 'settings', 'AI provider=' . $provider . ' enabled=' . $enabled);
+    logAudit('ai.settings_changed', null, 'settings', 'AI provider=' . $provider . ' enabled=' . $enabled);
     flash('success', 'AI classification settings saved.');
     redirect('/admin/settings/ai');
 });
@@ -348,7 +348,7 @@ $router->post('/admin/tickets/{id}/classification/override', function (array $p)
          VALUES (?, ?, 'ai_override', ?, 1)"
     )->execute([$ticketId, Auth::id(), $detail]);
 
-    logAudit('ai_classification_override', $classificationId, 'ai_classification', "Ticket #{$ticketId}: " . $detail);
+    logAudit('ai.classification_override', $classificationId, 'ai_classification', "Ticket #{$ticketId}: " . $detail);
     flash('success', 'AI suggestion overridden.');
     redirect('/admin/tickets/' . $ticketId);
 });
@@ -393,7 +393,7 @@ $router->post('/admin/settings/ai/backfill', function () {
         }
         usleep(250000);
     }
-    logAudit('ai_backfill_run', null, 'settings', "Backfill processed {$ok} ok / {$fail} failed (limit {$limit})");
+    logAudit('ai.backfill_run', null, 'settings', "Backfill processed {$ok} ok / {$fail} failed (limit {$limit})");
     flash('success', "Backfill complete — classified {$ok} ticket(s), {$fail} skipped/failed.");
     redirect('/admin/settings/ai');
 });
@@ -1122,7 +1122,7 @@ $router->post('/admin/users/{id}/reset-2fa', function (array $p) {
     $stmt->execute([$id]);
     $name = $stmt->fetchColumn() ?: "id={$id}";
     $db->prepare('UPDATE users SET totp_secret = NULL, totp_enabled = 0 WHERE id = ?')->execute([$id]);
-    logAudit('2fa.admin_reset', $id, 'user', $name);
+    logAudit('user.2fa_reset_by_admin', $id, 'user', $name);
     flash('success', '2FA has been reset for this user.');
     redirect("/admin/users/{$id}");
 });
@@ -2424,7 +2424,7 @@ $router->post('/admin/groups/{id}/edit', function (array $p) {
         $detail = 'Group "' . $name . '" (ID: ' . $id . ') manager set changed.';
         if (!empty($managersAdded))   { $detail .= ' Added: ' . implode(',', $managersAdded) . '.'; }
         if (!empty($managersRemoved)) { $detail .= ' Removed: ' . implode(',', $managersRemoved) . '.'; }
-        logAudit('group_managers_changed', $id, 'group', $detail);
+        logAudit('group.managers_changed', $id, 'group', $detail);
     }
 
     // Confidential alert: if the group is now confidential, had at least one
@@ -4514,7 +4514,7 @@ $router->post('/admin/tickets/{id}/confidential-auth', function (array $p) {
     $_SESSION["confidential_access_{$ticketId}"] = time();
 
     logAudit(
-        'confidential_ticket_viewed',
+        'ticket.confidential_viewed',
         $ticketId,
         'ticket',
         'Admin ' . Auth::fullName() . ' (ID: ' . Auth::id() . ') accessed confidential ticket #' . $ticketId
@@ -6303,7 +6303,7 @@ $router->post('/admin/settings/ticket-routing', function () {
         }
     }
     setSetting('default_group_id', $value);
-    logAudit('default_group_changed', null, null, $value === '' ? 'cleared' : "id={$value}");
+    logAudit('settings.default_group_changed', null, null, $value === '' ? 'cleared' : "id={$value}");
     flash('success', 'Default group saved.');
     redirect('/admin/settings');
 });
@@ -11183,7 +11183,15 @@ $router->get('/admin/audit-log', function () {
     if ($includeAudit) {
         $w = [];
         if ($filterUser)         { $w[] = 'user_id = ?';     $params[] = $filterUser; }
-        if ($filterAction !== ''){ $w[] = 'action = ?';      $params[] = $filterAction; }
+        if ($filterAction !== ''){
+            // Expand the canonical action to include any legacy aliases so old
+            // rows written before the Phase-4 rename still match the filter.
+            $legacy = auditLegacyAliasesFor($filterAction);
+            $names  = array_merge([$filterAction], $legacy);
+            $ph     = implode(',', array_fill(0, count($names), '?'));
+            $w[]    = "action IN ({$ph})";
+            foreach ($names as $n) { $params[] = $n; }
+        }
         if ($filterFrom !== '')  { $w[] = 'created_at >= ?'; $params[] = $filterFrom . ' 00:00:00'; }
         if ($filterTo   !== '')  { $w[] = 'created_at <= ?'; $params[] = $filterTo   . ' 23:59:59'; }
         $wsql    = $w ? ('WHERE ' . implode(' AND ', $w)) : '';
@@ -11257,10 +11265,13 @@ $router->get('/admin/audit-log', function () {
 
     // Action list — audit_log actions verbatim, plus the curated timeline
     // actions with a `ticket.` prefix so the dropdown round-trips into the
-    // source-routing logic above.
-    $auditActions = $db->query(
-        'SELECT DISTINCT action FROM audit_log ORDER BY action'
-    )->fetchAll(\PDO::FETCH_COLUMN);
+    // source-routing logic above. Legacy names are canonicalized so the
+    // dropdown shows one entry per logical action even when the DB still
+    // contains a mix of pre- and post-rename rows.
+    $auditActions = array_map(
+        'auditCanonicalAction',
+        $db->query('SELECT DISTINCT action FROM audit_log')->fetchAll(\PDO::FETCH_COLUMN)
+    );
     $historyActions = $db->query(
         "SELECT DISTINCT CONCAT('ticket.', action) AS action
          FROM ticket_timeline
@@ -11269,6 +11280,14 @@ $router->get('/admin/audit-log', function () {
     )->fetchAll(\PDO::FETCH_COLUMN);
     $actionList = array_values(array_unique(array_merge($auditActions, $historyActions)));
     sort($actionList);
+
+    // Canonicalize each row's action so legacy entries display under the
+    // same name as freshly-written ones (so badge colors and filter chips
+    // line up regardless of when the row was written).
+    foreach ($entries as &$e) {
+        $e['action'] = auditCanonicalAction((string) $e['action']);
+    }
+    unset($e);
 
     // Oldest entry timestamp drives the date-picker minimum on the prune form
     // so admins can't pick a cutoff that would delete zero rows. (Prune still
@@ -11490,7 +11509,7 @@ $router->post('/admin/settings/escalation-paths/{typeId}', function (array $p) {
         redirect('/admin/settings/escalation-paths/' . $typeId);
     }
 
-    logAudit('escalation_path_saved', $typeId, 'ticket_type', 'Steps: ' . count($steps));
+    logAudit('escalation_path.saved', $typeId, 'ticket_type', 'Steps: ' . count($steps));
     flash('success', 'Escalation path saved (' . count($steps) . ' step' . (count($steps) === 1 ? '' : 's') . ').');
     redirect('/admin/settings/escalation-paths/' . $typeId);
 });

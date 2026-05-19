@@ -1092,7 +1092,7 @@ $router->post('/agent/tickets/{id}/confidential-auth', function (array $p) {
 
     // Audit log
     logAudit(
-        'confidential_ticket_viewed',
+        'ticket.confidential_viewed',
         $ticketId,
         'ticket',
         'Admin ' . Auth::fullName() . ' (ID: ' . Auth::id() . ') accessed confidential ticket #' . $ticketId

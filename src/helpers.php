@@ -3749,15 +3749,72 @@ function totpGetQrUrl(string $uri): string
 /* ── Audit log ────────────────────────────────────────────────── */
 
 /**
+ * Map of legacy audit-log action names to their canonical, dotted, area-first
+ * replacements. Lives in one place so both the write path (which canonicalizes
+ * new rows) and the viewer (which canonicalizes display + expands filters to
+ * also match the legacy names on old rows) read from the same table.
+ *
+ * Adding a new entry here is enough to roll out a rename — old rows continue
+ * to filter correctly because the legacy name is still recognized as an alias
+ * of the canonical one; new rows are stored under the canonical name from
+ * here on out so eventually no legacy values remain in the table.
+ */
+function auditAliases(): array
+{
+    return [
+        'login'                              => 'auth.login',
+        'logout'                             => 'auth.logout',
+        '2fa.enable'                         => 'auth.2fa_enabled',
+        '2fa.disable'                        => 'auth.2fa_disabled',
+        '2fa.admin_reset'                    => 'user.2fa_reset_by_admin',
+        'ticket_escalated'                   => 'ticket.escalated',
+        'confidential_ticket_viewed'         => 'ticket.confidential_viewed',
+        'group_managers_changed'             => 'group.managers_changed',
+        'ai_settings_saved'                  => 'ai.settings_changed',
+        'ai_classification_override'         => 'ai.classification_override',
+        'ai_backfill_run'                    => 'ai.backfill_run',
+        'manager_skill_assignments_changed'  => 'manager.skill_assignments_changed',
+        'manager_skill_created'              => 'manager.skill_created',
+        'manager_skill_updated'              => 'manager.skill_updated',
+        'manager_skill_deleted'              => 'manager.skill_deleted',
+        'default_group_changed'              => 'settings.default_group_changed',
+        'escalation_path_saved'              => 'escalation_path.saved',
+    ];
+}
+
+/** Resolve a possibly-legacy action name to its canonical form. */
+function auditCanonicalAction(string $action): string
+{
+    return auditAliases()[$action] ?? $action;
+}
+
+/** Reverse lookup: legacy names that map to a given canonical action. */
+function auditLegacyAliasesFor(string $canonical): array
+{
+    $legacy = [];
+    foreach (auditAliases() as $old => $new) {
+        if ($new === $canonical) {
+            $legacy[] = $old;
+        }
+    }
+    return $legacy;
+}
+
+/**
  * Record an admin audit event. Silently swallows all errors so that
  * a logging failure never breaks the main request.
  *
  * $userIdOverride lets unauthenticated paths (API login, etc.) record the
  * acting user explicitly; when omitted the row uses Auth::id() (which may
  * be null for failed-login attempts, and that is intentional).
+ *
+ * Legacy action names are rewritten to their canonical equivalents on the
+ * way in, so the table converges on the new naming convention even when an
+ * older callsite is still emitting the old name.
  */
 function logAudit(string $action, ?int $targetId = null, ?string $targetType = null, ?string $detail = null, ?int $userIdOverride = null): void
 {
+    $action = auditCanonicalAction($action);
     try {
         $db = Database::connect();
         $db->prepare(
