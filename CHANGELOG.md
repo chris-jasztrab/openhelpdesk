@@ -11,6 +11,19 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.47.0 &mdash; 2026-05-19
+
+### Added
+- **Audit log viewer — Phase 3: cross-references `ticket_timeline` so the admin gets a single pane of glass for "who did what" without forcing a double-write.** Per-ticket state-machine events (status, priority, assignment, group, type, merge, escalated, created) were already captured in `ticket_timeline` and shown on the per-ticket page; previously they were invisible at `/admin/audit-log` and any attempt to mirror them into `audit_log` would have doubled-up the write path for every ticket mutation. Now the viewer's `SELECT` builds a UNION-ALL subquery that pulls from `audit_log` *and* from a curated allowlist of `ticket_timeline` actions (the eight listed above; comments, notes, and automation-generated rows are excluded so routine reply traffic doesn't drown out actual admin events). Counts, pagination, ordering, actor list, and action list all run against the unified set; `ip_address` is `NULL` for timeline rows because the original write path doesn't capture it.
+- **"Source" filter dropdown** at `/admin/audit-log` — `All sources` / `Audit log only` / `Ticket history only`. The viewer also auto-routes when the action filter is set: picking a `ticket.*` action implicitly hides `audit_log`, picking a non-prefixed action implicitly hides `ticket_history`, so the existing action dropdown still narrows correctly without the user needing to also touch the source filter. The action dropdown now lists both audit-log actions and `ticket.<verb>` actions in one sorted list, deduplicated across the union. A `Source` column on the results table renders each row with a colored badge (gray "Audit" for `audit_log`, blue "Timeline" for `ticket_timeline`) so it's never ambiguous which write path a row came from. Ticket targets are linkified — `ticket #N` in the Detail column is now a clickable badge that opens the ticket detail page in admin.
+- **Pagination preserves the source filter** across page navigation (the prior commit's `from`/`to`/`user_id`/`action` round-tripping is now joined by `source`).
+
+### Notes
+- **No new writes added.** Per the Phase-1 design decision documented in the plan, ticket-scoped state changes continue to live in `ticket_timeline` exclusively; the audit log just quotes them at read time. This keeps each event in exactly one place and avoids the per-mutation write amplification that mirroring would have caused.
+- **Audit-log prune still only touches `audit_log`** — `ticket_timeline` has its own retention story (it's tied to ticket lifetime via `ON DELETE CASCADE`).
+
+---
+
 ## 2.46.0 &mdash; 2026-05-19
 
 ### Added

@@ -11118,6 +11118,33 @@ $router->post('/admin/settings/backup/delete', function () {
  * Audit Log
  * ================================================================== */
 
+/*
+ * GET /admin/audit-log
+ *
+ * The viewer unifies two data sources so admins have one place to ask "who did
+ * what":
+ *   1. `audit_log` — every callsite that calls `logAudit()` (auth events,
+ *      settings changes, admin config CRUD, etc.)
+ *   2. `ticket_timeline` — the existing per-ticket history, filtered to a
+ *      curated allowlist of state-machine events and prefixed with `ticket.`
+ *      in the unified action column. Comments, notes, and bot/automation rows
+ *      are excluded so the audit log doesn't drown in routine reply traffic.
+ *
+ * The two sources are not mirrored at write-time (no double-writes); they're
+ * UNION-merged at read-time so each ticket-scoped event lives in exactly one
+ * place and the audit-log viewer simply quotes both.
+ */
+const _AUDIT_LOG_TIMELINE_ALLOWLIST = [
+    'created',
+    'status_changed',
+    'priority_changed',
+    'assigned',
+    'group_changed',
+    'type_changed',
+    'merged',
+    'escalated',
+];
+
 $router->get('/admin/audit-log', function () {
     Auth::requireRole('admin');
     $db = Database::connect();
@@ -11127,68 +11154,125 @@ $router->get('/admin/audit-log', function () {
     $filterAction = trim($_GET['action']     ?? '');
     $filterFrom   = trim($_GET['from']       ?? '');
     $filterTo     = trim($_GET['to']         ?? '');
+    $filterSource = in_array($_GET['source'] ?? '', ['audit', 'history'], true) ? $_GET['source'] : '';
     $page         = max(1, (int) ($_GET['page'] ?? 1));
     $perPage      = 50;
     $offset       = ($page - 1) * $perPage;
 
-    // Build WHERE clause
-    $where  = [];
-    $params = [];
+    // Decide which sources to include based on the explicit source filter AND
+    // (when an action filter is set) whether the action name belongs to that
+    // source. Action names from ticket_timeline are surfaced with a `ticket.`
+    // prefix so we can route the filter without ambiguity.
+    $includeAudit   = $filterSource !== 'history';
+    $includeHistory = $filterSource !== 'audit';
 
-    if ($filterUser) {
-        $where[]  = 'al.user_id = ?';
-        $params[] = $filterUser;
-    }
     if ($filterAction !== '') {
-        $where[]  = 'al.action = ?';
-        $params[] = $filterAction;
-    }
-    if ($filterFrom !== '') {
-        $where[]  = 'al.created_at >= ?';
-        $params[] = $filterFrom . ' 00:00:00';
-    }
-    if ($filterTo !== '') {
-        $where[]  = 'al.created_at <= ?';
-        $params[] = $filterTo . ' 23:59:59';
+        if (strpos($filterAction, 'ticket.') === 0) {
+            $includeAudit = false;
+        } else {
+            $includeHistory = false;
+        }
     }
 
-    $whereSQL = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
+    // Build a sub-query for each source we're including. Each yields the same
+    // column shape so they can be UNIONed and paged as one stream.
+    $parts        = [];
+    $params       = [];
+    $allowlistSQL = "'" . implode("','", _AUDIT_LOG_TIMELINE_ALLOWLIST) . "'";
 
-    // Total count
-    $countStmt = $db->prepare("SELECT COUNT(*) FROM audit_log al {$whereSQL}");
-    $countStmt->execute($params);
-    $total     = (int) $countStmt->fetchColumn();
-    $totalPages = (int) ceil($total / $perPage);
+    if ($includeAudit) {
+        $w = [];
+        if ($filterUser)         { $w[] = 'user_id = ?';     $params[] = $filterUser; }
+        if ($filterAction !== ''){ $w[] = 'action = ?';      $params[] = $filterAction; }
+        if ($filterFrom !== '')  { $w[] = 'created_at >= ?'; $params[] = $filterFrom . ' 00:00:00'; }
+        if ($filterTo   !== '')  { $w[] = 'created_at <= ?'; $params[] = $filterTo   . ' 23:59:59'; }
+        $wsql    = $w ? ('WHERE ' . implode(' AND ', $w)) : '';
+        $parts[] = "SELECT created_at, user_id, action, target_type, target_id, detail, ip_address,
+                           'audit' AS source
+                    FROM audit_log {$wsql}";
+    }
 
-    // Rows
-    $rowsStmt = $db->prepare(
-        "SELECT al.*,
-                CONCAT(u.first_name, ' ', u.last_name) AS actor_name
-         FROM audit_log al
-         LEFT JOIN users u ON al.user_id = u.id
-         {$whereSQL}
-         ORDER BY al.created_at DESC
-         LIMIT {$perPage} OFFSET {$offset}"
-    );
-    $rowsStmt->execute($params);
-    $entries = $rowsStmt->fetchAll();
+    if ($includeHistory) {
+        // Allowlist + is_internal=0 keep comments/notes/automation chatter out
+        // of the audit viewer; the per-ticket page still shows everything.
+        $w = ['is_internal = 0', "action IN ({$allowlistSQL})"];
+        if ($filterUser)         { $w[] = 'user_id = ?';     $params[] = $filterUser; }
+        if ($filterAction !== '' && strpos($filterAction, 'ticket.') === 0) {
+            $w[] = 'action = ?';
+            $params[] = substr($filterAction, 7);
+        }
+        if ($filterFrom !== '')  { $w[] = 'created_at >= ?'; $params[] = $filterFrom . ' 00:00:00'; }
+        if ($filterTo   !== '')  { $w[] = 'created_at <= ?'; $params[] = $filterTo   . ' 23:59:59'; }
+        $wsql    = 'WHERE ' . implode(' AND ', $w);
+        $parts[] = "SELECT created_at, user_id, CONCAT('ticket.', action) AS action,
+                           'ticket' AS target_type, ticket_id AS target_id,
+                           details AS detail, NULL AS ip_address,
+                           'ticket_history' AS source
+                    FROM ticket_timeline {$wsql}";
+    }
 
-    // List of users for filter dropdown (those who have audit entries)
+    // No source selected (filter contradicts itself, e.g. action=user.create
+    // with source=history) — short-circuit to an empty result rather than
+    // trying to render a syntactically invalid UNION.
+    if (empty($parts)) {
+        $total      = 0;
+        $totalPages = 0;
+        $entries    = [];
+    } else {
+        $unionSQL = '(' . implode(') UNION ALL (', $parts) . ')';
+
+        $countStmt = $db->prepare("SELECT COUNT(*) FROM ({$unionSQL}) AS combined");
+        $countStmt->execute($params);
+        $total      = (int) $countStmt->fetchColumn();
+        $totalPages = (int) ceil($total / $perPage);
+
+        $rowsStmt = $db->prepare(
+            "SELECT combined.*,
+                    CONCAT(u.first_name, ' ', u.last_name) AS actor_name
+             FROM ({$unionSQL}) AS combined
+             LEFT JOIN users u ON combined.user_id = u.id
+             ORDER BY combined.created_at DESC, combined.source DESC
+             LIMIT {$perPage} OFFSET {$offset}"
+        );
+        $rowsStmt->execute($params);
+        $entries = $rowsStmt->fetchAll();
+    }
+
+    // Actor list — union both sources so an agent who only ever writes to
+    // ticket_timeline still appears in the filter dropdown.
     $actorList = $db->query(
-        "SELECT DISTINCT al.user_id,
-                CONCAT(u.first_name, ' ', u.last_name) AS name
-         FROM audit_log al
-         JOIN users u ON al.user_id = u.id
-         ORDER BY name"
+        "SELECT DISTINCT user_id, name FROM (
+            SELECT al.user_id AS user_id,
+                   CONCAT(u.first_name, ' ', u.last_name) AS name
+            FROM audit_log al JOIN users u ON al.user_id = u.id
+            UNION
+            SELECT tt.user_id AS user_id,
+                   CONCAT(u.first_name, ' ', u.last_name) AS name
+            FROM ticket_timeline tt JOIN users u ON tt.user_id = u.id
+            WHERE tt.user_id IS NOT NULL AND tt.is_internal = 0
+              AND tt.action IN ({$allowlistSQL})
+        ) AS combined_actors
+        ORDER BY name"
     )->fetchAll();
 
-    // Distinct action types for filter dropdown
-    $actionList = $db->query(
-        "SELECT DISTINCT action FROM audit_log ORDER BY action"
+    // Action list — audit_log actions verbatim, plus the curated timeline
+    // actions with a `ticket.` prefix so the dropdown round-trips into the
+    // source-routing logic above.
+    $auditActions = $db->query(
+        'SELECT DISTINCT action FROM audit_log ORDER BY action'
     )->fetchAll(\PDO::FETCH_COLUMN);
+    $historyActions = $db->query(
+        "SELECT DISTINCT CONCAT('ticket.', action) AS action
+         FROM ticket_timeline
+         WHERE is_internal = 0 AND action IN ({$allowlistSQL})
+         ORDER BY action"
+    )->fetchAll(\PDO::FETCH_COLUMN);
+    $actionList = array_values(array_unique(array_merge($auditActions, $historyActions)));
+    sort($actionList);
 
     // Oldest entry timestamp drives the date-picker minimum on the prune form
-    // so admins can't pick a cutoff that would delete zero rows.
+    // so admins can't pick a cutoff that would delete zero rows. (Prune still
+    // only touches audit_log — ticket_timeline owns its own retention.)
     $oldest = $db->query('SELECT MIN(created_at) FROM audit_log')->fetchColumn() ?: null;
 
     render('admin/audit-log/index', [
@@ -11199,6 +11283,7 @@ $router->get('/admin/audit-log', function () {
         'filterAction' => $filterAction,
         'filterFrom'   => $filterFrom,
         'filterTo'     => $filterTo,
+        'filterSource' => $filterSource,
         'total'        => $total,
         'page'         => $page,
         'totalPages'   => $totalPages,

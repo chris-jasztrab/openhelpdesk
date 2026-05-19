@@ -31,6 +31,14 @@ $actionColors = [
     'backup.created'        => 'primary',
     'backup.deleted'        => 'danger',
     'audit_log.pruned'      => 'danger',
+    'ticket.created'          => 'success',
+    'ticket.status_changed'   => 'warning',
+    'ticket.priority_changed' => 'warning',
+    'ticket.assigned'         => 'primary',
+    'ticket.group_changed'    => 'warning',
+    'ticket.type_changed'     => 'warning',
+    'ticket.merged'           => 'info',
+    'ticket.escalated'        => 'danger',
 ];
 
 function auditBadge(string $action, array $colors): string {
@@ -115,6 +123,14 @@ function auditBadge(string $action, array $colors): string {
                 </select>
             </div>
             <div class="col-md-2">
+                <label class="form-label small fw-semibold mb-1">Source</label>
+                <select name="source" class="form-select form-select-sm">
+                    <option value=""        <?= $filterSource === ''        ? 'selected' : '' ?>>All sources</option>
+                    <option value="audit"   <?= $filterSource === 'audit'   ? 'selected' : '' ?>>Audit log only</option>
+                    <option value="history" <?= $filterSource === 'history' ? 'selected' : '' ?>>Ticket history only</option>
+                </select>
+            </div>
+            <div class="col-md-2">
                 <label class="form-label small fw-semibold mb-1">Action</label>
                 <select name="action" class="form-select form-select-sm">
                     <option value="">All actions</option>
@@ -135,13 +151,13 @@ function auditBadge(string $action, array $colors): string {
                 <input type="date" name="to" class="form-control form-control-sm"
                        value="<?= e($filterTo) ?>">
             </div>
-            <div class="col-md-3 d-flex gap-2">
+            <div class="col-md-1 d-flex gap-2">
                 <button type="submit" class="btn btn-sm text-white" style="background:var(--ld-primary);">
-                    <i class="bi bi-funnel me-1"></i>Filter
+                    <i class="bi bi-funnel"></i>
                 </button>
-                <?php if ($filterUser || $filterAction !== '' || $filterFrom !== '' || $filterTo !== ''): ?>
+                <?php if ($filterUser || $filterAction !== '' || $filterFrom !== '' || $filterTo !== '' || $filterSource !== ''): ?>
                     <a href="/admin/audit-log" class="btn btn-sm btn-outline-secondary">
-                        <i class="bi bi-x-lg me-1"></i>Clear
+                        <i class="bi bi-x-lg"></i>
                     </a>
                 <?php endif; ?>
             </div>
@@ -156,8 +172,9 @@ function auditBadge(string $action, array $colors): string {
             <thead class="table-light">
                 <tr>
                     <th style="width:170px">When</th>
+                    <th style="width:90px">Source</th>
                     <th style="width:180px">Actor</th>
-                    <th style="width:140px">Action</th>
+                    <th style="width:160px">Action</th>
                     <th>Detail</th>
                     <th style="width:140px">IP Address</th>
                 </tr>
@@ -165,16 +182,30 @@ function auditBadge(string $action, array $colors): string {
             <tbody>
                 <?php if (empty($entries)): ?>
                 <tr>
-                    <td colspan="5" class="text-center py-4 text-muted">No audit entries found.</td>
+                    <td colspan="6" class="text-center py-4 text-muted">No audit entries found.</td>
                 </tr>
                 <?php else: ?>
-                    <?php foreach ($entries as $entry): ?>
+                    <?php foreach ($entries as $entry):
+                        $isTimeline   = ($entry['source'] ?? 'audit') === 'ticket_history';
+                        $isTicketRef  = $entry['target_type'] === 'ticket' && $entry['target_id'];
+                    ?>
                     <tr>
                         <td class="text-muted text-nowrap">
                             <?= date('M j, Y', strtotime($entry['created_at'])) ?>
                             <span class="d-block text-muted" style="font-size:.75rem;">
                                 <?= date('g:i:s A', strtotime($entry['created_at'])) ?>
                             </span>
+                        </td>
+                        <td class="text-nowrap">
+                            <?php if ($isTimeline): ?>
+                                <span class="badge bg-info-subtle text-info border border-info-subtle" title="Sourced from ticket_timeline">
+                                    <i class="bi bi-clock-history me-1"></i>Timeline
+                                </span>
+                            <?php else: ?>
+                                <span class="badge bg-secondary-subtle text-secondary border" title="Sourced from audit_log">
+                                    <i class="bi bi-shield-check me-1"></i>Audit
+                                </span>
+                            <?php endif; ?>
                         </td>
                         <td>
                             <?php if ($entry['user_id']): ?>
@@ -187,7 +218,13 @@ function auditBadge(string $action, array $colors): string {
                         </td>
                         <td><?= auditBadge($entry['action'], $actionColors) ?></td>
                         <td class="text-muted">
-                            <?php if ($entry['target_type'] && $entry['target_id']): ?>
+                            <?php if ($isTicketRef): ?>
+                                <a href="/admin/tickets/<?= (int) $entry['target_id'] ?>"
+                                   class="badge bg-light text-dark border me-1 text-decoration-none"
+                                   title="Open ticket #<?= (int) $entry['target_id'] ?>">
+                                    ticket #<?= (int) $entry['target_id'] ?>
+                                </a>
+                            <?php elseif ($entry['target_type'] && $entry['target_id']): ?>
                                 <span class="badge bg-light text-dark border me-1">
                                     <?= e($entry['target_type']) ?> #<?= $entry['target_id'] ?>
                                 </span>
@@ -212,6 +249,7 @@ function auditBadge(string $action, array $colors): string {
                     'action'  => $filterAction ?: null,
                     'from'    => $filterFrom ?: null,
                     'to'      => $filterTo ?: null,
+                    'source'  => $filterSource ?: null,
                 ]));
                 $qsSep = $qs ? '&' : '';
                 ?>
