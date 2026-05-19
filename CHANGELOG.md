@@ -11,6 +11,18 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.49.1 &mdash; 2026-05-19
+
+### Fixed
+- **`power_user` accounts no longer hit a 403 "You do not have permission to access this page" after login.** The home redirector at [src/routes.php](src/routes.php) sent power_users to `/agent`, but `Auth::requireRole()` on `/agent` (and `POST /agent/tour/dismiss`) only allowed `agent` and `admin` — so every power_user landing on the dashboard was bounced into the 403 page. Most visible after Microsoft 365 SSO, since the SSO callback always lands on `/` and can't fall through `intended_url` like a password login sometimes can. Both routes now accept `power_user` alongside `agent`/`admin`, restoring the agent dashboard for the role.
+- **`/agent` dashboard now applies group-based ticket visibility to power_users**, mirroring how `/agent/tickets` already treats them: counts and the recent-tickets list are restricted to the user's groups instead of showing every ticket in the system. The auto-show agent tour also fires for power_users now, so the tour-dismiss button (which they can hit) corresponds to a tour they can see.
+- **`/notifications` renders the correct sidebar and area prefix for power_users** (`powerUserSidebar` + `/agent`) instead of falling through to the portal sidebar / `/portal` prefix.
+- **Three `/admin/kb/articles/{id}/...` routes (edit GET, edit POST, preview) now accept `power_user`.** Previously agents could edit/preview KB articles but power_users — who otherwise have full agent-plus-reports access — were 403'd on the same screens.
+- **Ticket-creation redirect after `POST /admin/tickets/create` now sends power_users to `/agent/tickets/{id}`** instead of `/admin/tickets/{id}` (which is admin-only and would 403). The `ticket-templates/index` and `ticket-templates/form` views similarly route the "Back to Tickets" link and sidebar/breadcrumbs through the agent area for power_users.
+- **SQL filters that build "agents" lists were missing `power_user`** in eight places, so power_user accounts were invisible to features that select agents/admins: the assignee autocomplete on `/api/users/agents-search`, the agent dropdowns on `/agent/tickets` / `/agent/tickets/create` / `/agent/tickets/{id}/split`, the `@mention` parser, the watcher-notification fan-out and escalation-watcher seeding helpers, the admin-dashboard "total agents" stat, the agent-performance report on `/admin/reports/agent-performance`, and the `agent_performance` + `workload` scheduled-report builders. All now include `power_user` alongside `agent`/`admin`.
+
+---
+
 ## 2.49.0 &mdash; 2026-05-19
 
 ### Added

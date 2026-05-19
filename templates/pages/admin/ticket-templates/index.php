@@ -1,9 +1,12 @@
 <?php
-$isAgentView  = Auth::role() === 'agent';
+$role         = Auth::role();
+$isAgentView  = in_array($role, ['agent', 'power_user'], true);
 $ticketsUrl   = $isAgentView ? '/agent/tickets' : '/admin/tickets';
 $layout       = 'app';
 $pageTitle    = 'Ticket Templates';
-$sidebarItems = $isAgentView ? agentSidebar('tickets') : adminSidebar('tickets');
+$sidebarItems = $role === 'power_user'
+    ? powerUserSidebar('tickets')
+    : ($isAgentView ? agentSidebar('tickets') : adminSidebar('tickets'));
 $breadcrumbs  = $isAgentView ? [
     ['label' => 'Agent',     'url' => '/agent'],
     ['label' => 'Tickets',   'url' => '/agent/tickets'],

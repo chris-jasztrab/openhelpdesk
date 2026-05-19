@@ -327,7 +327,7 @@ $router->get('/agent/tickets', function () {
     $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
     $types      = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
     $locations  = $db->query('SELECT * FROM locations ORDER BY name')->fetchAll();
-    $agents     = $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin') ORDER BY first_name")->fetchAll();
+    $agents     = $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin','power_user') ORDER BY first_name")->fetchAll();
 
     // Build group → agents map for quick-assign dropdowns
     $gaRows = $db->query(
@@ -666,7 +666,7 @@ $router->get('/agent/tickets/create', function () {
     $groups     = $db->query('SELECT * FROM `groups` ORDER BY sort_order, name')->fetchAll();
     $agents     = $db->query(
         "SELECT id, first_name, last_name, email FROM users
-         WHERE role IN ('admin','agent') ORDER BY first_name, last_name"
+         WHERE role IN ('admin','agent','power_user') ORDER BY first_name, last_name"
     )->fetchAll();
     $templates  = $db->query('SELECT * FROM ticket_templates ORDER BY name')->fetchAll();
 
@@ -1343,7 +1343,7 @@ $router->get('/agent/tickets/{id}/split', function (array $p) {
     $commentsStmt->execute([$ticket['id']]);
     $comments = $commentsStmt->fetchAll();
 
-    $agents     = $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin') ORDER BY first_name")->fetchAll();
+    $agents     = $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin','power_user') ORDER BY first_name")->fetchAll();
     $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
     $types      = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
     $groups     = $db->query('SELECT * FROM `groups` ORDER BY sort_order, name')->fetchAll();

@@ -4095,7 +4095,7 @@ $router->post('/admin/tickets/create', function () {
     }
 
     flash('success', 'Ticket #' . $ticketId . ' created.');
-    $redirectBase = Auth::role() === 'agent' ? '/agent' : '/admin';
+    $redirectBase = in_array(Auth::role(), ['agent', 'power_user'], true) ? '/agent' : '/admin';
     redirect("{$redirectBase}/tickets/{$ticketId}");
 });
 
@@ -5595,7 +5595,7 @@ $router->post('/admin/kb/articles/create', function () {
 });
 
 $router->get('/admin/kb/articles/{id}/edit', function (array $p) {
-    Auth::requireRole('admin', 'agent');
+    Auth::requireRole('admin', 'agent', 'power_user');
     $db   = Database::connect();
     $stmt = $db->prepare('SELECT * FROM kb_articles WHERE id = ?');
     $stmt->execute([(int) $p['id']]);
@@ -5614,7 +5614,7 @@ $router->get('/admin/kb/articles/{id}/edit', function (array $p) {
 });
 
 $router->post('/admin/kb/articles/{id}/edit', function (array $p) {
-    Auth::requireRole('admin', 'agent');
+    Auth::requireRole('admin', 'agent', 'power_user');
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -5699,7 +5699,7 @@ $router->post('/admin/kb/articles/{id}/delete', function (array $p) {
 });
 
 $router->get('/admin/kb/articles/{id}/preview', function (array $p) {
-    Auth::requireRole('admin', 'agent');
+    Auth::requireRole('admin', 'agent', 'power_user');
     $db   = Database::connect();
     $stmt = $db->prepare(
         'SELECT a.*, f.name AS folder_name, f.slug AS folder_slug,
@@ -9128,7 +9128,7 @@ $router->get('/admin/reports/agent-performance', function () {
             SUM(CASE WHEN t.sla_state = 'breached' THEN 1 ELSE 0 END) AS sla_breached
          FROM users u
          LEFT JOIN tickets t ON t.assigned_to = u.id AND t.created_at BETWEEN ? AND ?
-         WHERE u.role IN ('admin','agent')
+         WHERE u.role IN ('admin','agent','power_user')
          GROUP BY u.id, u.first_name, u.last_name
          ORDER BY resolved DESC"
     );

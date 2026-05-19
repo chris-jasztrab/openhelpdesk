@@ -431,7 +431,7 @@ function notificationCount(): int
  */
 function processAtMentions(PDO $db, string $message, int $ticketId, int $timelineId, int $mentionedBy): void
 {
-    $agents = $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin')")->fetchAll();
+    $agents = $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin','power_user')")->fetchAll();
     foreach ($agents as $agent) {
         $fullName = $agent['first_name'] . ' ' . $agent['last_name'];
         if (stripos($message, '@' . $fullName) !== false && (int) $agent['id'] !== $mentionedBy) {
@@ -2605,7 +2605,7 @@ function notifyWatchers(PDO $db, int $ticketId, string $message, string $authorN
         "SELECT u.id, u.first_name, u.last_name, u.email, u.role
          FROM ticket_watchers tw
          JOIN users u ON tw.user_id = u.id
-         WHERE tw.ticket_id = ? AND u.role IN ('agent','admin')"
+         WHERE tw.ticket_id = ? AND u.role IN ('agent','admin','power_user')"
     );
     $stmt->execute([$ticketId]);
 
@@ -3453,7 +3453,7 @@ function runEscalationRule(\PDO $db, array $rule, array $ticket): void
 
                 // Ensure the recipient can actually open the ticket from the email link,
                 // even if they're outside the ticket's group. Mirrors manual-escalation behaviour.
-                if (in_array($targetUser['role'], ['admin', 'agent'], true)) {
+                if (in_array($targetUser['role'], ['admin', 'agent', 'power_user'], true)) {
                     $db->prepare('INSERT IGNORE INTO ticket_watchers (ticket_id, user_id) VALUES (?, ?)')
                        ->execute([$ticketId, $targetUserId]);
                 }

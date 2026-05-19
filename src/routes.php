@@ -649,7 +649,7 @@ $router->get('/api/mention-search', function () {
     $stmt = $db->prepare(
         "SELECT id, first_name, last_name, role
          FROM users
-         WHERE role IN ('agent','admin')
+         WHERE role IN ('agent','admin','power_user')
            AND (first_name LIKE ? OR last_name LIKE ? OR CONCAT(first_name, ' ', last_name) LIKE ?)
          ORDER BY first_name
          LIMIT 8"
@@ -2309,6 +2309,9 @@ $router->get('/notifications', function () {
     } elseif ($role === 'agent') {
         $sidebarFn = 'agentSidebar';
         $areaPrefix = '/agent';
+    } elseif ($role === 'power_user') {
+        $sidebarFn = 'powerUserSidebar';
+        $areaPrefix = '/agent';
     } else {
         $sidebarFn = 'portalSidebar';
         $areaPrefix = '/portal';
@@ -2357,7 +2360,7 @@ $router->post('/notifications/read-all', function () {
  * Agent area
  * ------------------------------------------------------------------ */
 $router->post('/agent/tour/dismiss', function () {
-    Auth::requireRole('agent', 'admin');
+    Auth::requireRole('agent', 'admin', 'power_user');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         http_response_code(403);
         header('Content-Type: application/json');
@@ -2372,14 +2375,14 @@ $router->post('/agent/tour/dismiss', function () {
 });
 
 $router->get('/agent', function () {
-    Auth::requireRole('agent', 'admin');
+    Auth::requireRole('agent', 'admin', 'power_user');
     $db      = Database::connect();
     $agentId = Auth::id();
 
     // Group-based visibility: agents in groups only see those groups' tickets.
     $groupRestriction = '';
     $groupParams      = [];
-    if (Auth::role() === 'agent') {
+    if (in_array(Auth::role(), ['agent', 'power_user'], true)) {
         $gStmt = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
         $gStmt->execute([$agentId]);
         $agentGroupIds = array_map('intval', $gStmt->fetchAll(PDO::FETCH_COLUMN));
@@ -2462,7 +2465,7 @@ $router->get('/agent', function () {
 
     // Determine whether to auto-show the agent tour
     $autoShowTour = false;
-    if (Auth::role() === 'agent') {
+    if (in_array(Auth::role(), ['agent', 'power_user'], true)) {
         $tourStmt = $db->prepare('SELECT show_agent_tour FROM users WHERE id = ?');
         $tourStmt->execute([$agentId]);
         $autoShowTour = (bool) $tourStmt->fetchColumn() || isset($_GET['tour']);
@@ -2498,7 +2501,7 @@ $router->get('/admin', function () {
     $totalTickets = (int) $db->query("SELECT COUNT(*) FROM tickets")->fetchColumn();
     $openTickets = (int) $db->query("SELECT COUNT(*) FROM tickets WHERE status IN ('open','in_progress','pending')")->fetchColumn();
     $totalUsers = (int) $db->query("SELECT COUNT(*) FROM users")->fetchColumn();
-    $totalAgents = (int) $db->query("SELECT COUNT(*) FROM users WHERE role IN ('agent','admin')")->fetchColumn();
+    $totalAgents = (int) $db->query("SELECT COUNT(*) FROM users WHERE role IN ('agent','admin','power_user')")->fetchColumn();
 
     // Recent activity (last 10 timeline entries)
     $recentActivity = $db->query(
