@@ -42,16 +42,46 @@ $router->post('/admin/settings/sso', function () {
 
     $debug = isset($_POST['sso_debug']) ? '1' : '0';
 
+    $before = [
+        'sso_enabled'         => getSetting('sso_enabled',         '0'),
+        'sso_tenant_id'       => getSetting('sso_tenant_id',       ''),
+        'sso_client_id'       => getSetting('sso_client_id',       ''),
+        'sso_location_prompt' => getSetting('sso_location_prompt', 'sso_only'),
+        'sso_debug'           => getSetting('sso_debug',           '0'),
+        // Use a stable placeholder so the diff fires only when the secret
+        // is actually rotated (i.e. when $clientSecret is non-empty below).
+        'sso_client_secret'   => '(unchanged)',
+    ];
+
     setSetting('sso_enabled',        $enabled);
     setSetting('sso_tenant_id',      $tenantId);
     setSetting('sso_client_id',      $clientId);
     setSetting('sso_location_prompt', $locationPrompt);
     setSetting('sso_debug',          $debug);
 
+    $after = [
+        'sso_enabled'         => $enabled,
+        'sso_tenant_id'       => $tenantId,
+        'sso_client_id'       => $clientId,
+        'sso_location_prompt' => $locationPrompt,
+        'sso_debug'           => $debug,
+        'sso_client_secret'   => '(unchanged)',
+    ];
+
     // Only overwrite the secret if a new value was provided
     if ($clientSecret !== '') {
         setSetting('sso_client_secret', $clientSecret);
+        $after['sso_client_secret'] = '(rotated)';
     }
+
+    logAuditChange(
+        'sso.settings_changed',
+        null,
+        null,
+        $before,
+        $after,
+        ['sso_client_secret']
+    );
 
     flash('success', 'SSO settings saved successfully.');
     redirect('/admin/settings/sso');
@@ -3877,6 +3907,12 @@ $router->post('/admin/tickets/bulk', function () {
         case 'close':
             $db->prepare("UPDATE tickets SET status = 'closed' WHERE id IN ({$placeholders})")
                ->execute($ticketIds);
+            logAudit(
+                'ticket.bulk_closed',
+                null,
+                'ticket',
+                'count=' . count($ticketIds) . '; ids=' . implode(',', $ticketIds)
+            );
             flash('success', count($ticketIds) . ' ticket(s) closed.');
             break;
 
@@ -3885,6 +3921,12 @@ $router->post('/admin/tickets/bulk', function () {
             $db->prepare("UPDATE tickets SET assigned_to = ? WHERE id IN ({$placeholders})")
                ->execute(array_merge([$assignTo], $ticketIds));
             $label = $assignTo ? 'reassigned' : 'unassigned';
+            logAudit(
+                'ticket.bulk_assigned',
+                $assignTo,
+                'user',
+                'count=' . count($ticketIds) . '; assign_to=' . ($assignTo ?? 'none') . '; ids=' . implode(',', $ticketIds)
+            );
             flash('success', count($ticketIds) . ' ticket(s) ' . $label . '.');
             break;
 
@@ -3960,6 +4002,12 @@ $router->post('/admin/tickets/bulk', function () {
                        ->execute([$targetId, Auth::id(), 'priority_changed', "Priority escalated to {$priorityLabel} during merge by {$actor}"]);
                 }
             }
+            logAudit(
+                'ticket.bulk_merged',
+                $targetId,
+                'ticket',
+                'count=' . $merged . '; primary=' . $targetId . '; sources=' . implode(',', $ticketIds)
+            );
             flash('success', "{$merged} ticket(s) merged into #{$targetId}.");
             redirect("/admin/tickets/{$targetId}");
 
@@ -3972,6 +4020,12 @@ $router->post('/admin/tickets/bulk', function () {
                 if (file_exists($path)) unlink($path);
             }
             $db->prepare("DELETE FROM tickets WHERE id IN ({$placeholders})")->execute($ticketIds);
+            logAudit(
+                'ticket.bulk_deleted',
+                null,
+                'ticket',
+                'count=' . count($ticketIds) . '; ids=' . implode(',', $ticketIds)
+            );
             flash('success', count($ticketIds) . ' ticket(s) deleted.');
             break;
 
@@ -4945,6 +4999,8 @@ $router->post('/admin/tickets/delete-all', function () {
 
     // Delete all tickets (cascades to timeline, attachments, notifications)
     $count = $db->exec('DELETE FROM tickets');
+
+    logAudit('ticket.delete_all', null, 'ticket', 'count=' . (int) $count);
 
     flash('success', "Deleted {$count} ticket(s) and all associated data.");
     redirect('/admin/settings/danger-zone');
@@ -10410,6 +10466,12 @@ $router->post('/admin/settings/backup/create', function () {
         }
 
         $zip->close();
+        logAudit(
+            'backup.created',
+            null,
+            'backup',
+            'file=' . $filename . '; size=' . (file_exists($zipPath) ? filesize($zipPath) : 0)
+        );
         flash('success', "Backup created: $filename");
     } catch (Exception $e) {
         @unlink($zipPath);
@@ -10456,6 +10518,7 @@ $router->post('/admin/settings/backup/delete', function () {
     $path = ROOT_DIR . '/storage/backups/' . $filename;
     if (file_exists($path)) {
         unlink($path);
+        logAudit('backup.deleted', null, 'backup', 'file=' . $filename);
         flash('success', 'Backup deleted.');
     }
     redirect('/admin/settings/backup');
@@ -10534,6 +10597,10 @@ $router->get('/admin/audit-log', function () {
         "SELECT DISTINCT action FROM audit_log ORDER BY action"
     )->fetchAll(\PDO::FETCH_COLUMN);
 
+    // Oldest entry timestamp drives the date-picker minimum on the prune form
+    // so admins can't pick a cutoff that would delete zero rows.
+    $oldest = $db->query('SELECT MIN(created_at) FROM audit_log')->fetchColumn() ?: null;
+
     render('admin/audit-log/index', [
         'entries'      => $entries,
         'actorList'    => $actorList,
@@ -10546,7 +10613,49 @@ $router->get('/admin/audit-log', function () {
         'page'         => $page,
         'totalPages'   => $totalPages,
         'perPage'      => $perPage,
+        'oldestEntry'  => $oldest,
     ]);
+});
+
+/*
+ * POST /admin/audit-log/prune
+ *
+ * Bulk-delete audit_log rows whose created_at is strictly less than the supplied
+ * YYYY-MM-DD cutoff (i.e. anything from before that date is removed; the cutoff
+ * day itself is preserved). Records its own prune as a new audit_log row so the
+ * action of pruning is itself permanently visible.
+ */
+$router->post('/admin/audit-log/prune', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/audit-log');
+    }
+
+    $cutoff = trim($_POST['before_date'] ?? '');
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $cutoff)) {
+        flash('error', 'Please pick a valid cutoff date (YYYY-MM-DD).');
+        redirect('/admin/audit-log');
+    }
+
+    $db    = Database::connect();
+    $stmt  = $db->prepare('DELETE FROM audit_log WHERE created_at < ?');
+    $stmt->execute([$cutoff . ' 00:00:00']);
+    $count = $stmt->rowCount();
+
+    logAudit(
+        'audit_log.pruned',
+        null,
+        'audit_log',
+        'cutoff=' . $cutoff . '; deleted=' . $count
+    );
+
+    if ($count === 0) {
+        flash('info', 'No audit entries were older than ' . $cutoff . '.');
+    } else {
+        flash('success', 'Pruned ' . number_format($count) . ' audit entr' . ($count === 1 ? 'y' : 'ies') . ' older than ' . $cutoff . '.');
+    }
+    redirect('/admin/audit-log');
 });
 
 /* ==================================================================

@@ -9,11 +9,28 @@ $breadcrumbs  = [
 
 // Action badge colours
 $actionColors = [
-    'login'       => 'success',
-    'logout'      => 'secondary',
-    'user.create' => 'primary',
-    'user.update' => 'warning',
-    'user.delete' => 'danger',
+    'login'                 => 'success',
+    'logout'                => 'secondary',
+    'user.create'           => 'primary',
+    'user.update'           => 'warning',
+    'user.delete'           => 'danger',
+    'auth.login_failed'     => 'danger',
+    'auth.api_login'        => 'success',
+    'auth.api_login_failed' => 'danger',
+    'auth.api_logout'       => 'secondary',
+    'auth.password_changed' => 'warning',
+    'api_token.created'     => 'primary',
+    'api_token.rotated'     => 'warning',
+    'user.profile_updated'  => 'warning',
+    'sso.settings_changed'  => 'warning',
+    'ticket.bulk_closed'    => 'secondary',
+    'ticket.bulk_assigned'  => 'warning',
+    'ticket.bulk_merged'    => 'warning',
+    'ticket.bulk_deleted'   => 'danger',
+    'ticket.delete_all'     => 'danger',
+    'backup.created'        => 'primary',
+    'backup.deleted'        => 'danger',
+    'audit_log.pruned'      => 'danger',
 ];
 
 function auditBadge(string $action, array $colors): string {
@@ -23,7 +40,62 @@ function auditBadge(string $action, array $colors): string {
 ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="fw-bold mb-0">Audit Log</h2>
-    <span class="text-muted small"><?= number_format($total) ?> record<?= $total === 1 ? '' : 's' ?></span>
+    <div class="d-flex align-items-center gap-3">
+        <span class="text-muted small"><?= number_format($total) ?> record<?= $total === 1 ? '' : 's' ?></span>
+        <button type="button"
+                class="btn btn-sm btn-outline-danger"
+                data-bs-toggle="collapse"
+                data-bs-target="#auditPruneCard"
+                aria-expanded="false"
+                aria-controls="auditPruneCard">
+            <i class="bi bi-eraser me-1"></i>Prune older entries
+        </button>
+    </div>
+</div>
+
+<!-- Prune card (hidden by default, expanded via the header button) -->
+<div class="collapse mb-4" id="auditPruneCard">
+    <div class="card border-danger shadow-sm">
+        <div class="card-body p-3">
+            <h5 class="card-title text-danger mb-2">
+                <i class="bi bi-exclamation-triangle me-1"></i>Prune audit log
+            </h5>
+            <p class="text-muted small mb-3">
+                Permanently delete every audit entry created <strong>before</strong> the date you pick.
+                Entries from the chosen day onward are kept. The prune action itself is logged so the
+                record of pruning survives in the audit trail.
+            </p>
+            <form method="POST" action="/admin/audit-log/prune" class="row g-2 align-items-end"
+                  onsubmit="return confirm('Permanently delete all audit entries before ' + this.before_date.value + '?\n\nThis cannot be undone.');">
+                <input type="hidden" name="_token" value="<?= e(csrfToken()) ?>">
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold mb-1" for="auditPruneCutoff">
+                        Delete entries before
+                    </label>
+                    <input type="date" id="auditPruneCutoff" name="before_date" required
+                           class="form-control form-control-sm"
+                           <?php if (!empty($oldestEntry)): ?>min="<?= e(substr($oldestEntry, 0, 10)) ?>"<?php endif; ?>
+                           max="<?= e(date('Y-m-d')) ?>">
+                </div>
+                <div class="col-md-4 text-muted small">
+                    <?php if (!empty($oldestEntry)): ?>
+                        Oldest entry: <?= e(date('M j, Y', strtotime($oldestEntry))) ?>
+                    <?php else: ?>
+                        No entries to prune.
+                    <?php endif; ?>
+                </div>
+                <div class="col-md-5 d-flex gap-2 justify-content-end">
+                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                            data-bs-toggle="collapse" data-bs-target="#auditPruneCard">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn btn-sm btn-danger">
+                        <i class="bi bi-trash me-1"></i>Prune
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 
 <!-- Filters -->

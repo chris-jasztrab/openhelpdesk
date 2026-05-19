@@ -301,6 +301,15 @@ $router->post('/api/v1/auth/login', function () {
 
     if (!$user || !password_verify($password, $user['password'])) {
         _apiLoginRecordAttempt($db, $email, $ip, false);
+        // Tie the failed attempt to the targeted account when one exists,
+        // so the audit log can surface stuffing patterns against real users.
+        logAudit(
+            'auth.api_login_failed',
+            null,
+            null,
+            'email=' . $email . '; device=' . $device,
+            $user ? (int) $user['id'] : null
+        );
         _apiJson(['error' => 'Invalid credentials'], 401);
     }
 
@@ -312,6 +321,10 @@ $router->post('/api/v1/auth/login', function () {
     $db->prepare(
         'INSERT INTO api_tokens (user_id, token_hash, device_name, expires_at) VALUES (?, ?, ?, ?)'
     )->execute([$user['id'], $tokenHash, $device, $expiresAt]);
+    $tokenId = (int) $db->lastInsertId();
+
+    logAudit('auth.api_login',    null,     null,          'device=' . $device, (int) $user['id']);
+    logAudit('api_token.created', $tokenId, 'api_token',   'device=' . $device, (int) $user['id']);
 
     _apiJson([
         'token' => $token,
@@ -336,9 +349,22 @@ $router->post('/api/v1/auth/logout', function () {
     $header = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
     if (preg_match('/^Bearer\s+(.+)$/i', $header, $m)) {
         $hash = hash('sha256', trim($m[1]));
-        Database::connect()
-            ->prepare('DELETE FROM api_tokens WHERE token_hash = ?')
+        $db   = Database::connect();
+        // Look up the owner before deleting so we can attribute the audit row.
+        $owner = $db->prepare('SELECT user_id, device_name FROM api_tokens WHERE token_hash = ?');
+        $owner->execute([$hash]);
+        $row = $owner->fetch(\PDO::FETCH_ASSOC) ?: null;
+        $db->prepare('DELETE FROM api_tokens WHERE token_hash = ?')
             ->execute([$hash]);
+        if ($row) {
+            logAudit(
+                'auth.api_logout',
+                null,
+                null,
+                'device=' . ($row['device_name'] ?? ''),
+                (int) $row['user_id']
+            );
+        }
     }
     _apiJson(['message' => 'Logged out']);
 });
@@ -380,6 +406,8 @@ $router->post('/api/v1/auth/rotate', function () {
         'UPDATE api_tokens SET token_hash = ?, expires_at = ?, last_used_at = NOW()
           WHERE id = ?'
     )->execute([$newHash, $expiresAt, $row['id']]);
+
+    logAudit('api_token.rotated', (int) $row['id'], 'api_token', null, (int) $row['user_id']);
 
     _apiJson(['token' => $newToken, 'expires_at' => $expiresAt]);
 });

@@ -770,6 +770,12 @@ $router->post('/agent/tickets/bulk', function () {
         case 'close':
             $db->prepare("UPDATE tickets SET status = 'closed' WHERE id IN ({$placeholders})")
                ->execute($ticketIds);
+            logAudit(
+                'ticket.bulk_closed',
+                null,
+                'ticket',
+                'count=' . count($ticketIds) . '; ids=' . implode(',', $ticketIds)
+            );
             flash('success', count($ticketIds) . ' ticket(s) closed.');
             break;
 
@@ -778,6 +784,12 @@ $router->post('/agent/tickets/bulk', function () {
             $db->prepare("UPDATE tickets SET assigned_to = ? WHERE id IN ({$placeholders})")
                ->execute(array_merge([$assignTo], $ticketIds));
             $label = $assignTo ? 'reassigned' : 'unassigned';
+            logAudit(
+                'ticket.bulk_assigned',
+                $assignTo,
+                'user',
+                'count=' . count($ticketIds) . '; assign_to=' . ($assignTo ?? 'none') . '; ids=' . implode(',', $ticketIds)
+            );
             flash('success', count($ticketIds) . ' ticket(s) ' . $label . '.');
             break;
 
@@ -853,6 +865,12 @@ $router->post('/agent/tickets/bulk', function () {
                        ->execute([$targetId, Auth::id(), 'priority_changed', "Priority escalated to {$priorityLabel} during merge by {$actor}"]);
                 }
             }
+            logAudit(
+                'ticket.bulk_merged',
+                $targetId,
+                'ticket',
+                'count=' . $merged . '; primary=' . $targetId . '; sources=' . implode(',', $ticketIds)
+            );
             flash('success', "{$merged} ticket(s) merged into #{$targetId}.");
             redirect("/agent/tickets/{$targetId}");
 

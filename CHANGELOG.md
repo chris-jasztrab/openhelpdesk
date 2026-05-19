@@ -11,6 +11,20 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.45.0 &mdash; 2026-05-19
+
+### Added
+- **Audit log coverage — Phase 1: security & high-blast-radius gaps.** A wide swath of mutating actions that previously left no audit trail are now logged, with the granularity scaled to the actor's privilege (admin/power_user actions log everything; agents log ticket mutations; portal users log only auth + self-service changes). New entries:
+  - **Authentication.** Web `auth.login_failed` (resolves the attempted email to a user_id when one exists so credential-stuffing patterns against real accounts are visible in the log); web `auth.password_changed` on `/profile/password`; web `user.profile_updated` on `/profile` with a per-field old→new diff via the new `logAuditChange()` helper.
+  - **API authentication & tokens.** `auth.api_login` / `auth.api_login_failed` / `auth.api_logout` for `POST /api/v1/auth/login` and `POST /api/v1/auth/logout`, plus `api_token.created` (issuance) and `api_token.rotated` (rotate endpoint). Because these flows run before/without a session, `logAudit()` gained an optional `$userIdOverride` parameter so the row is attributed to the right user even when `Auth::id()` is `null`.
+  - **SSO settings.** `POST /admin/settings/sso` now records `sso.settings_changed` with a per-field diff — the client secret is treated as sensitive and rendered as `(rotated)` / `(unchanged)` rather than logging the value.
+  - **Bulk ticket operations.** `POST /admin/tickets/bulk` and `POST /agent/tickets/bulk` emit one summary audit row per action: `ticket.bulk_closed`, `ticket.bulk_assigned`, `ticket.bulk_merged`, `ticket.bulk_deleted` — each with the operation count and the affected ticket IDs in the detail field. Individual per-ticket state changes continue to live in `ticket_timeline` (no double-write).
+  - **Mass-destructive admin operations.** `POST /admin/tickets/delete-all` writes `ticket.delete_all`; `POST /admin/settings/backup/create` and `POST /admin/settings/backup/delete` write `backup.created` / `backup.deleted` with the backup filename and (for create) the archive size.
+- **`logAuditChange()` helper.** New `logAuditChange($action, $targetId, $targetType, array $before, array $after, array $sensitiveFields = [])` in [`src/helpers.php`](src/helpers.php). Diffs two snapshots and writes a single audit_log row with a `field: old→new; field2: old→new` summary; long values are truncated at 60 chars to keep the detail column readable, fields listed in `$sensitiveFields` render as `field: (changed)` so secrets and passwords never land in the log as plaintext, and the function returns silently (no row written) when nothing actually changed. Used today by the SSO settings handler and the profile update handler; will be the default change-recording mechanism for the Phase 2 config-CRUD pass.
+- **Admin audit-log prune UI** at `/admin/audit-log`. The audit log retains entries forever by default, but admins can now permanently delete every entry older than a chosen date via a new red "Prune older entries" button in the page header which expands a confirmation card; submitting it `POST`s to `/admin/audit-log/prune` with a `before_date` (validated against `YYYY-MM-DD`) and clears `audit_log` rows whose `created_at < <date> 00:00:00`. The date picker's `min` is pinned to the oldest existing entry so it's impossible to pick a cutoff that would delete zero rows, the form requires a JS `confirm()` echoing the chosen date, and the prune action itself is logged as `audit_log.pruned` with the cutoff and the deleted-row count — so the record of pruning survives even after the rows it pruned are gone. CSRF-gated and admin-only like the rest of the audit log surface.
+
+---
+
 ## 2.44.2 &mdash; 2026-05-15
 
 ### Documentation

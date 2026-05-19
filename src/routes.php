@@ -951,6 +951,15 @@ $router->post('/login', function () {
         redirect(consumeIntendedUrl());
     }
 
+    // Resolve the email to a user_id so the failed attempt is tied to the
+    // targeted account when one exists — important for spotting credential-
+    // stuffing patterns from the audit log.
+    $db = Database::connect();
+    $uidStmt = $db->prepare('SELECT id FROM users WHERE email = ?');
+    $uidStmt->execute([$email]);
+    $targetUid = $uidStmt->fetchColumn() ?: null;
+    logAudit('auth.login_failed', null, null, 'email=' . $email, $targetUid ? (int) $targetUid : null);
+
     render('login', ['error' => 'Invalid email or password.', 'email' => $email]);
 });
 
@@ -1426,9 +1435,22 @@ $router->post('/profile', function () {
     $db     = Database::connect();
     $userId = Auth::id();
 
+    // Snapshot the fields we care about for the audit log before updating
+    $beforeStmt = $db->prepare('SELECT first_name, last_name FROM users WHERE id = ?');
+    $beforeStmt->execute([$userId]);
+    $beforeProfile = $beforeStmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+
     // Update name (password handled by /profile/password)
     $db->prepare('UPDATE users SET first_name = ?, last_name = ? WHERE id = ?')
        ->execute([$fn, $ln, $userId]);
+
+    logAuditChange(
+        'user.profile_updated',
+        $userId,
+        'user',
+        $beforeProfile,
+        ['first_name' => $fn, 'last_name' => $ln]
+    );
 
     // Save theme preference
     $theme = in_array($_POST['theme'] ?? '', ['light', 'dark'], true) ? $_POST['theme'] : 'light';
@@ -1523,6 +1545,8 @@ $router->post('/profile/password', function () {
 
     $db->prepare('UPDATE users SET password = ? WHERE id = ?')
        ->execute([password_hash($newPassword, PASSWORD_DEFAULT), $userId]);
+
+    logAudit('auth.password_changed', $userId, 'user');
 
     flash('success', 'Password updated successfully.');
     redirect('/profile');

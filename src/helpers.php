@@ -3751,8 +3751,12 @@ function totpGetQrUrl(string $uri): string
 /**
  * Record an admin audit event. Silently swallows all errors so that
  * a logging failure never breaks the main request.
+ *
+ * $userIdOverride lets unauthenticated paths (API login, etc.) record the
+ * acting user explicitly; when omitted the row uses Auth::id() (which may
+ * be null for failed-login attempts, and that is intentional).
  */
-function logAudit(string $action, ?int $targetId = null, ?string $targetType = null, ?string $detail = null): void
+function logAudit(string $action, ?int $targetId = null, ?string $targetType = null, ?string $detail = null, ?int $userIdOverride = null): void
 {
     try {
         $db = Database::connect();
@@ -3760,7 +3764,7 @@ function logAudit(string $action, ?int $targetId = null, ?string $targetType = n
             'INSERT INTO audit_log (user_id, action, target_type, target_id, detail, ip_address)
              VALUES (?, ?, ?, ?, ?, ?)'
         )->execute([
-            Auth::id(),
+            $userIdOverride ?? Auth::id(),
             $action,
             $targetType,
             $targetId,
@@ -3770,6 +3774,46 @@ function logAudit(string $action, ?int $targetId = null, ?string $targetType = n
     } catch (\Throwable $e) {
         // Never let audit logging break the application
     }
+}
+
+/**
+ * Diff two associative arrays and write an audit_log entry summarizing the
+ * fields that changed, in the form "field: old→new; field2: old→new".
+ *
+ * Fields listed in $sensitiveFields are rendered as "field: (changed)" so
+ * passwords, secrets, and tokens never land in the audit log as plaintext.
+ * Returns silently (no log row) when nothing actually changed.
+ */
+function logAuditChange(
+    string $action,
+    ?int $targetId,
+    ?string $targetType,
+    array $before,
+    array $after,
+    array $sensitiveFields = []
+): void {
+    $parts = [];
+    $sensitive = array_flip($sensitiveFields);
+    foreach ($after as $field => $newVal) {
+        $oldVal = $before[$field] ?? null;
+        if ((string) $oldVal === (string) $newVal) {
+            continue;
+        }
+        if (isset($sensitive[$field])) {
+            $parts[] = "{$field}: (changed)";
+            continue;
+        }
+        $oldStr = $oldVal === null ? '(null)' : (string) $oldVal;
+        $newStr = $newVal === null ? '(null)' : (string) $newVal;
+        // Truncate noisy values so the detail column stays readable
+        if (strlen($oldStr) > 60) $oldStr = substr($oldStr, 0, 57) . '...';
+        if (strlen($newStr) > 60) $newStr = substr($newStr, 0, 57) . '...';
+        $parts[] = "{$field}: {$oldStr}→{$newStr}";
+    }
+    if (empty($parts)) {
+        return;
+    }
+    logAudit($action, $targetId, $targetType, implode('; ', $parts));
 }
 
 /**
