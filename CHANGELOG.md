@@ -11,6 +11,24 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.46.0 &mdash; 2026-05-19
+
+### Added
+- **Audit log coverage — Phase 2: admin config CRUD pass.** Every create/update/delete on the admin settings surfaces that previously left no audit trail now emits one entry, with `logAuditChange()` used on update handlers so the detail field carries a `field: old→new` diff rather than just the row id. Areas instrumented in this pass:
+  - **Catalog entities** — locations (`location.created`/`location.updated`/`location.deleted` + `location.timezone_settings_changed`), priorities, ticket types (full-row diff incl. `is_confidential`, `ai_route_group`, `ai_dup_check_enabled`, `ai_dup_threshold`, `show_to_location_visibility`, `stale_threshold_hours`; non-confidential deletes get a standard `ticket_type.deleted` row, confidential deletes continue to use the existing dedicated entry), canned responses, groups (full-row diff incl. `assign_strategy` / `assign_fallback` / `is_confidential`; non-confidential delete gets `group.deleted`), agent skills, ticket templates, recurring tickets (CRUD + `recurring_ticket.toggled` + `recurring_ticket.run_now`), KB categories/folders/articles, and the KB import-confirm step (`kb.import_confirmed` with article count + `publish_all` flag).
+  - **Business-hours & SLA** — `business_hours.updated` and `sla.policies_saved` / `sla.recalculated`. Holidays now emit `holiday.created` / `holiday.deleted` / `holiday.toggled` / `holiday.auto_populated` (with country + year + added/skipped counts).
+  - **Automations** — full CRUD (`automation.created` / `.updated` / `.deleted`) plus `automation.toggled` and `automation.run_now` (with `tickets_affected` count).
+  - **Escalation rules** — full CRUD plus `escalation_rule.toggled` and a top-level `escalation.run_now` from the manual processor button.
+  - **Scheduled reports** — CRUD plus `scheduled_report.toggled`.
+  - **Form builder** — `form_field.created` (with shared-with type count), `form_field.updated`, `form_field.deleted`.
+  - **Tenant settings** — SMTP (`smtp.settings_changed` with `smtp_password` redacted to `(rotated)`/`(unchanged)`), Microsoft Graph (`graph.settings_changed` with `graph_client_secret` redacted the same way), email-to-ticket, email templates (per-tab save + per-template reset + footer reset), email notifications, branding (full colour-palette + logo state diff), label upload/reset, tags, organization, CSAT, stale-tickets settings.
+  - **Bulk imports** — `ticket.import_confirmed` and `user.import_confirmed` join the existing `kb.import_confirmed`, each carrying the imported and skipped row counts so admins can reconstruct any CSV-driven mass mutation from the audit log.
+  - **Danger zone** — `system.factory_reset` is written immediately before `/admin/settings/danger-zone/reset` truncates every table (the row itself is wiped along with the rest, but the running request's record gives the trail one final entry in any external sink); `tables_truncated=<count>` is included for the same reason.
+
+This is a wide, mechanical pass — no new infrastructure, just call-sites. Phase 3 (cross-referencing `ticket_history` for ticket-scoped actions in the audit-log viewer) and Phase 4 (naming standardization with back-compat aliases) are still pending.
+
+---
+
 ## 2.45.0 &mdash; 2026-05-19
 
 ### Added

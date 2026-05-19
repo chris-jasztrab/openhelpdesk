@@ -1323,12 +1323,21 @@ $router->post('/admin/locations/timezone-settings', function () {
         flash('error', 'Invalid request.');
         redirect('/admin/locations');
     }
+    $beforeMode = getSetting('location_timezone_mode', 'shared');
+    $beforeTz   = getSetting('location_timezone_shared', 'UTC');
     $mode = ($_POST['location_timezone_mode'] ?? '') === 'per_location' ? 'per_location' : 'shared';
     $sharedTz = trim($_POST['location_timezone_shared'] ?? '');
     setSetting('location_timezone_mode', $mode);
     if ($sharedTz !== '') {
         setSetting('location_timezone_shared', $sharedTz);
     }
+    logAuditChange(
+        'location.timezone_settings_changed',
+        null,
+        null,
+        ['mode' => $beforeMode, 'shared_timezone' => $beforeTz],
+        ['mode' => $mode,       'shared_timezone' => $sharedTz !== '' ? $sharedTz : $beforeTz]
+    );
     flash('success', 'Timezone settings saved.');
     redirect('/admin/locations');
 });
@@ -1358,8 +1367,11 @@ $router->post('/admin/locations/create', function () {
         flash('error', 'Location name is required.');
         redirect('/admin/locations/create');
     }
-    Database::connect()->prepare('INSERT INTO locations (name, address, description, timezone) VALUES (?, ?, ?, ?)')
+    $db = Database::connect();
+    $db->prepare('INSERT INTO locations (name, address, description, timezone) VALUES (?, ?, ?, ?)')
         ->execute([$name, $addr, $desc, $tz]);
+    $newId = (int) $db->lastInsertId();
+    logAudit('location.created', $newId, 'location', 'name=' . $name);
     flash('success', 'Location created.');
     redirect('/admin/locations');
 });
@@ -1397,8 +1409,19 @@ $router->post('/admin/locations/{id}/edit', function (array $p) {
         flash('error', 'Location name is required.');
         redirect("/admin/locations/{$id}/edit");
     }
-    Database::connect()->prepare('UPDATE locations SET name=?, address=?, description=?, timezone=? WHERE id=?')
+    $db = Database::connect();
+    $beforeStmt = $db->prepare('SELECT name, address, description, timezone FROM locations WHERE id = ?');
+    $beforeStmt->execute([$id]);
+    $before = $beforeStmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+    $db->prepare('UPDATE locations SET name=?, address=?, description=?, timezone=? WHERE id=?')
         ->execute([$name, $addr, $desc, $tz, $id]);
+    logAuditChange(
+        'location.updated',
+        $id,
+        'location',
+        $before,
+        ['name' => $name, 'address' => $addr, 'description' => $desc, 'timezone' => $tz]
+    );
     flash('success', 'Location updated.');
     redirect('/admin/locations');
 });
@@ -1480,6 +1503,13 @@ $router->post('/admin/locations/{id}/delete', function (array $p) {
     }
 
     $db->prepare('DELETE FROM locations WHERE id = ?')->execute([$id]);
+    logAudit(
+        'location.deleted',
+        $id,
+        'location',
+        'name=' . $locName . '; tickets_affected=' . $ticketCount
+            . ($action !== '' ? '; reassign_action=' . $action : '')
+    );
     flash('success', "Location \"{$locName}\" deleted.");
     redirect('/admin/locations');
 });
@@ -1513,8 +1543,11 @@ $router->post('/admin/priorities/create', function () {
         flash('error', 'Priority name is required.');
         redirect('/admin/priorities/create');
     }
-    Database::connect()->prepare('INSERT INTO ticket_priorities (name, color, sort_order) VALUES (?, ?, ?)')
+    $db = Database::connect();
+    $db->prepare('INSERT INTO ticket_priorities (name, color, sort_order) VALUES (?, ?, ?)')
         ->execute([$name, $color, $order]);
+    $newId = (int) $db->lastInsertId();
+    logAudit('priority.created', $newId, 'priority', 'name=' . $name . '; color=' . $color);
     flash('success', 'Priority created.');
     redirect('/admin/priorities');
 });
@@ -1546,8 +1579,19 @@ $router->post('/admin/priorities/{id}/edit', function (array $p) {
         flash('error', 'Priority name is required.');
         redirect("/admin/priorities/{$id}/edit");
     }
-    Database::connect()->prepare('UPDATE ticket_priorities SET name=?, color=?, sort_order=? WHERE id=?')
+    $db = Database::connect();
+    $beforeStmt = $db->prepare('SELECT name, color, sort_order FROM ticket_priorities WHERE id = ?');
+    $beforeStmt->execute([$id]);
+    $before = $beforeStmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+    $db->prepare('UPDATE ticket_priorities SET name=?, color=?, sort_order=? WHERE id=?')
         ->execute([$name, $color, $order, $id]);
+    logAuditChange(
+        'priority.updated',
+        $id,
+        'priority',
+        $before,
+        ['name' => $name, 'color' => $color, 'sort_order' => $order]
+    );
     flash('success', 'Priority updated.');
     redirect('/admin/priorities');
 });
@@ -1558,7 +1602,13 @@ $router->post('/admin/priorities/{id}/delete', function (array $p) {
         flash('error', 'Invalid request.');
         redirect('/admin/priorities');
     }
-    Database::connect()->prepare('DELETE FROM ticket_priorities WHERE id = ?')->execute([(int) $p['id']]);
+    $id   = (int) $p['id'];
+    $db   = Database::connect();
+    $name = $db->prepare('SELECT name FROM ticket_priorities WHERE id = ?');
+    $name->execute([$id]);
+    $pname = (string) ($name->fetchColumn() ?: '');
+    $db->prepare('DELETE FROM ticket_priorities WHERE id = ?')->execute([$id]);
+    logAudit('priority.deleted', $id, 'priority', 'name=' . $pname);
     flash('success', 'Priority deleted.');
     redirect('/admin/priorities');
 });
@@ -1616,6 +1666,15 @@ $router->post('/admin/types/create', function () {
             $stmt->execute([$typeId, $sid]);
         }
     }
+    logAudit(
+        'ticket_type.created',
+        $typeId,
+        'ticket_type',
+        'name=' . $name
+            . '; group_id=' . ($groupId ?? 'null')
+            . '; is_confidential=' . $isConfidential
+            . '; required_skills=' . count($skillIds)
+    );
     // Seed the form-builder layout so this new type has the standard set of
     // fields out of the box — admin can edit them in the form builder.
     seedDefaultLayoutForType($db, $typeId);
@@ -1726,6 +1785,16 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
         }
     }
 
+    // Capture the full prior row so the diff covers all editable fields,
+    // not just the confidential flag we already snapshotted above.
+    $fullPriorStmt = $db->prepare(
+        'SELECT name, color, group_id, is_confidential, ai_route_group, ai_dup_check_enabled,
+                ai_dup_threshold, show_to_location_visibility, sort_order, stale_threshold_hours
+         FROM ticket_types WHERE id = ?'
+    );
+    $fullPriorStmt->execute([$id]);
+    $fullPrior = $fullPriorStmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+
     $db->prepare('UPDATE ticket_types SET name=?, color=?, group_id=?, is_confidential=?, ai_route_group=?, ai_dup_check_enabled=?, ai_dup_threshold=?, show_to_location_visibility=?, sort_order=?, stale_threshold_hours=? WHERE id=?')
         ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $showToLocVis, $order, $staleHours, $id]);
 
@@ -1738,6 +1807,25 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
             $sStmt->execute([$id, $sid]);
         }
     }
+
+    logAuditChange(
+        'ticket_type.updated',
+        $id,
+        'ticket_type',
+        $fullPrior,
+        [
+            'name'                        => $name,
+            'color'                       => $color,
+            'group_id'                    => $groupId,
+            'is_confidential'             => $isConfidential,
+            'ai_route_group'              => $aiRouteGroup,
+            'ai_dup_check_enabled'        => $aiDupCheck,
+            'ai_dup_threshold'            => $aiDupThreshold,
+            'show_to_location_visibility' => $showToLocVis,
+            'sort_order'                  => $order,
+            'stale_threshold_hours'       => $staleHours,
+        ]
+    );
 
     // Confidential flag removal: audit log + notify all group members
     if ($wasConfidential && !$isConfidential && $priorGroupId) {
@@ -1897,6 +1985,16 @@ $router->post('/admin/types/{id}/delete', function (array $p) {
             Auth::fullName() . ' (ID: ' . Auth::id() . ') deleted confidential ticket type "' . $typeName . '" (ID: ' . $id . ') after re-authentication'
         );
         notifyConfidentialEntityDeleted($db, 'ticket type', $typeName, $members);
+    } else {
+        // Non-confidential deletes don't get the dedicated confidential alert,
+        // so add the standard CRUD entry here.
+        logAudit(
+            'ticket_type.deleted',
+            $id,
+            'ticket_type',
+            'name=' . $typeName . '; tickets_affected=' . $ticketCount
+                . ($action !== '' ? '; ticket_action=' . $action : '')
+        );
     }
 
     flash('success', "Ticket type \"{$typeName}\" deleted.");
@@ -1935,9 +2033,12 @@ $router->post('/admin/settings/canned-responses/create', function () {
         flash('error', 'Title and body are required.');
         redirect('/admin/settings/canned-responses/create');
     }
-    Database::connect()->prepare(
+    $db = Database::connect();
+    $db->prepare(
         'INSERT INTO canned_responses (user_id, title, body, sort_order) VALUES (NULL, ?, ?, ?)'
     )->execute([$title, $body, $order]);
+    $newId = (int) $db->lastInsertId();
+    logAudit('canned_response.created', $newId, 'canned_response', 'title=' . $title);
     flash('success', 'Canned response created.');
     redirect('/admin/settings/canned-responses');
 });
@@ -1970,9 +2071,20 @@ $router->post('/admin/settings/canned-responses/{id}/edit', function (array $p) 
         flash('error', 'Title and body are required.');
         redirect("/admin/settings/canned-responses/{$id}/edit");
     }
-    Database::connect()->prepare(
+    $db = Database::connect();
+    $beforeStmt = $db->prepare('SELECT title, sort_order FROM canned_responses WHERE id = ? AND user_id IS NULL');
+    $beforeStmt->execute([$id]);
+    $before = $beforeStmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+    $db->prepare(
         'UPDATE canned_responses SET title = ?, body = ?, sort_order = ? WHERE id = ? AND user_id IS NULL'
     )->execute([$title, $body, $order, $id]);
+    logAuditChange(
+        'canned_response.updated',
+        $id,
+        'canned_response',
+        $before,
+        ['title' => $title, 'sort_order' => $order]
+    );
     flash('success', 'Canned response updated.');
     redirect('/admin/settings/canned-responses');
 });
@@ -1983,9 +2095,15 @@ $router->post('/admin/settings/canned-responses/{id}/delete', function (array $p
         flash('error', 'Invalid request.');
         redirect('/admin/settings/canned-responses');
     }
-    Database::connect()->prepare(
+    $id    = (int) $p['id'];
+    $db    = Database::connect();
+    $titleStmt = $db->prepare('SELECT title FROM canned_responses WHERE id = ? AND user_id IS NULL');
+    $titleStmt->execute([$id]);
+    $title = (string) ($titleStmt->fetchColumn() ?: '');
+    $db->prepare(
         'DELETE FROM canned_responses WHERE id = ? AND user_id IS NULL'
-    )->execute([(int) $p['id']]);
+    )->execute([$id]);
+    logAudit('canned_response.deleted', $id, 'canned_response', 'title=' . $title);
     flash('success', 'Canned response deleted.');
     redirect('/admin/settings/canned-responses');
 });
@@ -2060,6 +2178,17 @@ $router->post('/admin/groups/create', function () {
 
     // No notification on create — there are no prior members to alert.
     // Per spec, alerts only fire after the first person is in the group.
+
+    logAudit(
+        'group.created',
+        $groupId,
+        'group',
+        'name=' . $name
+            . '; is_confidential=' . $isConfidential
+            . '; assign_strategy=' . $assignStrategy
+            . '; members=' . count($userIds)
+            . '; managers=' . count($managerSet)
+    );
 
     flash('success', 'Group created.');
     redirect('/admin/groups');
@@ -2242,8 +2371,35 @@ $router->post('/admin/groups/{id}/edit', function (array $p) {
     $allowedFallbacks = ['round_robin','load_based','none'];
     $assignFallback = in_array($_POST['assign_fallback'] ?? '', $allowedFallbacks, true) ? $_POST['assign_fallback'] : 'load_based';
 
+    // Capture the full editable set on the group row before update so the
+    // diff covers everything (name, strategy, fallback, etc.) on top of the
+    // dedicated confidential-flag log entry.
+    $fullGroupPriorStmt = $db->prepare(
+        'SELECT name, description, sort_order, notify_new_ticket, is_confidential,
+                assign_strategy, assign_fallback
+         FROM `groups` WHERE id = ?'
+    );
+    $fullGroupPriorStmt->execute([$id]);
+    $fullGroupPrior = $fullGroupPriorStmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+
     $db->prepare('UPDATE `groups` SET name=?, description=?, sort_order=?, notify_new_ticket=?, is_confidential=?, assign_strategy=?, assign_fallback=? WHERE id=?')
         ->execute([$name, $desc, $order, $notifyNew, $isConfidential, $assignStrategy, $assignFallback, $id]);
+
+    logAuditChange(
+        'group.updated',
+        $id,
+        'group',
+        $fullGroupPrior,
+        [
+            'name'              => $name,
+            'description'       => $desc,
+            'sort_order'        => $order,
+            'notify_new_ticket' => $notifyNew,
+            'is_confidential'   => $isConfidential,
+            'assign_strategy'   => $assignStrategy,
+            'assign_fallback'   => $assignFallback,
+        ]
+    );
 
     // Snapshot the prior manager set before we overwrite the membership rows,
     // so we can audit-log what changed.
@@ -2372,6 +2528,7 @@ $router->post('/admin/groups/{id}/delete', function (array $p) {
     }
 
     $db->prepare('DELETE FROM `groups` WHERE id = ?')->execute([$id]);
+    logAudit('group.deleted', $id, 'group', 'name=' . $group['name']);
     flash('success', 'Group deleted.');
     redirect('/admin/groups');
 });
@@ -2467,6 +2624,12 @@ $router->post('/admin/skills/create', function () {
             $stmt->execute([$uid, $skillId]);
         }
     }
+    logAudit(
+        'skill.created',
+        $skillId,
+        'skill',
+        'name=' . $name . '; group_id=' . ($groupId ?? 'null') . '; members=' . count($userIds)
+    );
     flash('success', 'Skill created.');
     redirect('/admin/skills');
 });
@@ -2509,6 +2672,9 @@ $router->post('/admin/skills/{id}/edit', function (array $p) {
         redirect("/admin/skills/{$id}/edit");
     }
     $db = Database::connect();
+    $beforeStmt = $db->prepare('SELECT name, description, sort_order, group_id FROM agent_skills WHERE id = ?');
+    $beforeStmt->execute([$id]);
+    $before = $beforeStmt->fetch(\PDO::FETCH_ASSOC) ?: [];
     try {
         $db->prepare('UPDATE agent_skills SET name = ?, description = ?, sort_order = ?, group_id = ? WHERE id = ?')
            ->execute([$name, $desc !== '' ? $desc : null, $order, $groupId, $id]);
@@ -2525,6 +2691,13 @@ $router->post('/admin/skills/{id}/edit', function (array $p) {
             $stmt->execute([$uid, $id]);
         }
     }
+    logAuditChange(
+        'skill.updated',
+        $id,
+        'skill',
+        $before,
+        ['name' => $name, 'description' => $desc !== '' ? $desc : null, 'sort_order' => $order, 'group_id' => $groupId]
+    );
     flash('success', 'Skill updated.');
     redirect('/admin/skills');
 });
@@ -2535,8 +2708,13 @@ $router->post('/admin/skills/{id}/delete', function (array $p) {
         flash('error', 'Invalid request.');
         redirect('/admin/skills');
     }
-    $id = (int) $p['id'];
-    Database::connect()->prepare('DELETE FROM agent_skills WHERE id = ?')->execute([$id]);
+    $id   = (int) $p['id'];
+    $db   = Database::connect();
+    $name = $db->prepare('SELECT name FROM agent_skills WHERE id = ?');
+    $name->execute([$id]);
+    $sname = (string) ($name->fetchColumn() ?: '');
+    $db->prepare('DELETE FROM agent_skills WHERE id = ?')->execute([$id]);
+    logAudit('skill.deleted', $id, 'skill', 'name=' . $sname);
     flash('success', 'Skill deleted.');
     redirect('/admin/skills');
 });
@@ -2743,6 +2921,13 @@ $router->post('/admin/ticket-templates/create', function () {
         'INSERT INTO ticket_templates (name, description, subject, body, type_id, priority_id, is_shared, created_by)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
     )->execute([$name, $desc ?: null, $subject, $body, $typeId, $priId, $isShared, Auth::id()]);
+    $newId = (int) $db->lastInsertId();
+    logAudit(
+        'ticket_template.created',
+        $newId,
+        'ticket_template',
+        'name=' . $name . '; shared=' . $isShared
+    );
 
     flash('success', 'Template created.');
     redirect('/admin/ticket-templates');
@@ -2800,6 +2985,14 @@ $router->post('/admin/ticket-templates/{id}/edit', function (array $p) {
         'UPDATE ticket_templates SET name=?, description=?, subject=?, body=?, type_id=?, priority_id=?, is_shared=? WHERE id=?'
     )->execute([$name, $desc ?: null, $subject, $body, $typeId, $priId, $isShared, $id]);
 
+    logAuditChange(
+        'ticket_template.updated',
+        $id,
+        'ticket_template',
+        ['name' => $existing['name'], 'is_shared' => $existing['is_shared'], 'type_id' => $existing['type_id'], 'priority_id' => $existing['priority_id']],
+        ['name' => $name,            'is_shared' => $isShared,             'type_id' => $typeId,             'priority_id' => $priId]
+    );
+
     flash('success', 'Template updated.');
     redirect('/admin/ticket-templates');
 });
@@ -2812,7 +3005,7 @@ $router->post('/admin/ticket-templates/{id}/delete', function (array $p) {
         redirect('/admin/ticket-templates');
     }
     $db  = Database::connect();
-    $tpl = $db->prepare('SELECT created_by FROM ticket_templates WHERE id = ?');
+    $tpl = $db->prepare('SELECT created_by, name FROM ticket_templates WHERE id = ?');
     $tpl->execute([$id]);
     $existing = $tpl->fetch();
     if (!$existing || (Auth::role() !== 'admin' && $existing['created_by'] !== Auth::id())) {
@@ -2820,6 +3013,7 @@ $router->post('/admin/ticket-templates/{id}/delete', function (array $p) {
         redirect('/admin/ticket-templates');
     }
     $db->prepare('DELETE FROM ticket_templates WHERE id = ?')->execute([$id]);
+    logAudit('ticket_template.deleted', $id, 'ticket_template', 'name=' . $existing['name']);
     flash('success', 'Template deleted.');
     redirect('/admin/ticket-templates');
 });
@@ -2959,6 +3153,16 @@ $router->post('/admin/recurring-tickets/create', function () {
         $row['start_date'], $nextRun->format('Y-m-d H:i:s'), $row['is_active'],
         Auth::id(), Auth::id(),
     ]);
+    $newId = (int) $db->lastInsertId();
+    logAudit(
+        'recurring_ticket.created',
+        $newId,
+        'recurring_ticket',
+        'name=' . $row['name']
+            . '; frequency=' . $row['frequency']
+            . '; next_run=' . $nextRun->format('Y-m-d')
+            . '; active=' . $row['is_active']
+    );
 
     flash('success', 'Recurring schedule created. First ticket will fire on ' . $nextRun->format('M j, Y') . '.');
     redirect('/admin/recurring-tickets');
@@ -3055,6 +3259,26 @@ $router->post('/admin/recurring-tickets/{id}/edit', function (array $p) {
         Auth::id(), $id,
     ]);
 
+    logAuditChange(
+        'recurring_ticket.updated',
+        $id,
+        'recurring_ticket',
+        [
+            'name'           => $existing['name'],
+            'frequency'      => $existing['frequency'],
+            'interval_value' => $existing['interval_value'],
+            'is_active'      => $existing['is_active'],
+            'next_run_at'    => $existing['next_run_at'],
+        ],
+        [
+            'name'           => $row['name'],
+            'frequency'      => $row['frequency'],
+            'interval_value' => $row['interval_value'],
+            'is_active'      => $row['is_active'],
+            'next_run_at'    => $nextRun->format('Y-m-d H:i:s'),
+        ]
+    );
+
     flash('success', 'Recurring schedule updated.' . ($cadenceChanged ? ' Next run recalculated to ' . $nextRun->format('M j, Y') . '.' : ''));
     redirect('/admin/recurring-tickets');
 });
@@ -3069,6 +3293,15 @@ $router->post('/admin/recurring-tickets/{id}/toggle', function (array $p) {
     $db = Database::connect();
     $db->prepare('UPDATE recurring_tickets SET is_active = 1 - is_active, updated_by = ? WHERE id = ?')
         ->execute([Auth::id(), $id]);
+    $stateStmt = $db->prepare('SELECT is_active, name FROM recurring_tickets WHERE id = ?');
+    $stateStmt->execute([$id]);
+    $state = $stateStmt->fetch(\PDO::FETCH_ASSOC) ?: ['is_active' => null, 'name' => ''];
+    logAudit(
+        'recurring_ticket.toggled',
+        $id,
+        'recurring_ticket',
+        'name=' . $state['name'] . '; is_active=' . $state['is_active']
+    );
     flash('success', 'Schedule status updated.');
     redirect('/admin/recurring-tickets');
 });
@@ -3102,6 +3335,13 @@ $router->post('/admin/recurring-tickets/{id}/run-now', function (array $p) {
         'UPDATE recurring_tickets SET last_run_at = NOW(), last_ticket_id = ?, run_count = run_count + 1 WHERE id = ?'
     )->execute([$ticketId, $id]);
 
+    logAudit(
+        'recurring_ticket.run_now',
+        $id,
+        'recurring_ticket',
+        'name=' . $row['name'] . '; ticket_id=' . $ticketId
+    );
+
     flash('success', 'Ticket #' . $ticketId . ' created from schedule.');
     redirect('/admin/recurring-tickets');
 });
@@ -3113,8 +3353,12 @@ $router->post('/admin/recurring-tickets/{id}/delete', function (array $p) {
         flash('error', 'Invalid request.');
         redirect('/admin/recurring-tickets');
     }
-    $db = Database::connect();
+    $db   = Database::connect();
+    $name = $db->prepare('SELECT name FROM recurring_tickets WHERE id = ?');
+    $name->execute([$id]);
+    $rname = (string) ($name->fetchColumn() ?: '');
     $db->prepare('DELETE FROM recurring_tickets WHERE id = ?')->execute([$id]);
+    logAudit('recurring_ticket.deleted', $id, 'recurring_ticket', 'name=' . $rname);
     flash('success', 'Recurring schedule deleted.');
     redirect('/admin/recurring-tickets');
 });
@@ -5076,6 +5320,8 @@ $router->post('/admin/kb/categories/create', function () {
     $isPublic = isset($_POST['is_public']) ? 1 : 0;
     $db->prepare('INSERT INTO kb_categories (name, slug, description, is_public, sort_order) VALUES (?, ?, ?, ?, ?)')
         ->execute([$name, $slug, $desc, $isPublic, $order]);
+    $newId = (int) $db->lastInsertId();
+    logAudit('kb.category.created', $newId, 'kb_category', 'name=' . $name . '; is_public=' . $isPublic);
     flash('success', 'Category created.');
     redirect('/admin/kb/categories');
 });
@@ -5114,9 +5360,19 @@ $router->post('/admin/kb/categories/{id}/edit', function (array $p) {
     if ($existing->fetch()) {
         $slug .= '-' . time();
     }
+    $beforeStmt = $db->prepare('SELECT name, is_public, sort_order FROM kb_categories WHERE id = ?');
+    $beforeStmt->execute([$id]);
+    $before = $beforeStmt->fetch(\PDO::FETCH_ASSOC) ?: [];
     $isPublic = isset($_POST['is_public']) ? 1 : 0;
     $db->prepare('UPDATE kb_categories SET name=?, slug=?, description=?, is_public=?, sort_order=? WHERE id=?')
         ->execute([$name, $slug, $desc, $isPublic, $order, $id]);
+    logAuditChange(
+        'kb.category.updated',
+        $id,
+        'kb_category',
+        $before,
+        ['name' => $name, 'is_public' => $isPublic, 'sort_order' => $order]
+    );
     flash('success', 'Category updated.');
     redirect('/admin/kb/categories');
 });
@@ -5127,7 +5383,13 @@ $router->post('/admin/kb/categories/{id}/delete', function (array $p) {
         flash('error', 'Invalid request.');
         redirect('/admin/kb/categories');
     }
-    Database::connect()->prepare('DELETE FROM kb_categories WHERE id = ?')->execute([(int) $p['id']]);
+    $id   = (int) $p['id'];
+    $db   = Database::connect();
+    $nameStmt = $db->prepare('SELECT name FROM kb_categories WHERE id = ?');
+    $nameStmt->execute([$id]);
+    $cname = (string) ($nameStmt->fetchColumn() ?: '');
+    $db->prepare('DELETE FROM kb_categories WHERE id = ?')->execute([$id]);
+    logAudit('kb.category.deleted', $id, 'kb_category', 'name=' . $cname);
     flash('success', 'Category deleted.');
     redirect('/admin/kb/categories');
 });
@@ -5177,6 +5439,8 @@ $router->post('/admin/kb/folders/create', function () {
     }
     $db->prepare('INSERT INTO kb_folders (category_id, name, slug, description, sort_order) VALUES (?, ?, ?, ?, ?)')
         ->execute([$categoryId, $name, $slug, $desc, $order]);
+    $newId = (int) $db->lastInsertId();
+    logAudit('kb.folder.created', $newId, 'kb_folder', 'name=' . $name . '; category_id=' . $categoryId);
     flash('success', 'Folder created.');
     redirect('/admin/kb/folders');
 });
@@ -5218,8 +5482,18 @@ $router->post('/admin/kb/folders/{id}/edit', function (array $p) {
     if ($existing->fetch()) {
         $slug .= '-' . time();
     }
+    $beforeStmt = $db->prepare('SELECT category_id, name, sort_order FROM kb_folders WHERE id = ?');
+    $beforeStmt->execute([$id]);
+    $before = $beforeStmt->fetch(\PDO::FETCH_ASSOC) ?: [];
     $db->prepare('UPDATE kb_folders SET category_id=?, name=?, slug=?, description=?, sort_order=? WHERE id=?')
         ->execute([$categoryId, $name, $slug, $desc, $order, $id]);
+    logAuditChange(
+        'kb.folder.updated',
+        $id,
+        'kb_folder',
+        $before,
+        ['category_id' => $categoryId, 'name' => $name, 'sort_order' => $order]
+    );
     flash('success', 'Folder updated.');
     redirect('/admin/kb/folders');
 });
@@ -5230,7 +5504,13 @@ $router->post('/admin/kb/folders/{id}/delete', function (array $p) {
         flash('error', 'Invalid request.');
         redirect('/admin/kb/folders');
     }
-    Database::connect()->prepare('DELETE FROM kb_folders WHERE id = ?')->execute([(int) $p['id']]);
+    $id   = (int) $p['id'];
+    $db   = Database::connect();
+    $nameStmt = $db->prepare('SELECT name FROM kb_folders WHERE id = ?');
+    $nameStmt->execute([$id]);
+    $fname = (string) ($nameStmt->fetchColumn() ?: '');
+    $db->prepare('DELETE FROM kb_folders WHERE id = ?')->execute([$id]);
+    logAudit('kb.folder.deleted', $id, 'kb_folder', 'name=' . $fname);
     flash('success', 'Folder deleted.');
     redirect('/admin/kb/folders');
 });
@@ -5309,6 +5589,7 @@ $router->post('/admin/kb/articles/create', function () {
     // Save initial revision
     $db->prepare('INSERT INTO kb_article_revisions (article_id, title, body_markdown, edited_by) VALUES (?, ?, ?, ?)')
        ->execute([$newId, $title, $body, Auth::id()]);
+    logAudit('kb.article.created', $newId, 'kb_article', 'title=' . $title . '; folder_id=' . $folderId . '; status=' . $status);
     flash('success', 'Article created.');
     redirect('/admin/kb/articles');
 });
@@ -5359,8 +5640,9 @@ $router->post('/admin/kb/articles/{id}/edit', function (array $p) {
         $slug .= '-' . time();
     }
 
-    // Determine published_at
-    $oldStmt = $db->prepare('SELECT status, published_at FROM kb_articles WHERE id = ?');
+    // Determine published_at — also pulls folder_id so the audit-log diff
+    // below sees the prior folder when an article is moved between folders.
+    $oldStmt = $db->prepare('SELECT status, published_at, folder_id FROM kb_articles WHERE id = ?');
     $oldStmt->execute([$id]);
     $old = $oldStmt->fetch();
     if ($status === 'published' && ($old['status'] ?? '') !== 'published') {
@@ -5383,6 +5665,18 @@ $router->post('/admin/kb/articles/{id}/edit', function (array $p) {
     $db->prepare(
         'UPDATE kb_articles SET folder_id=?, title=?, slug=?, body_markdown=?, status=?, published_at=?, sort_order=? WHERE id=?'
     )->execute([$folderId, $title, $slug, $body, $status, $publishedAt, $order, $id]);
+    // $snapRow holds title/body before this write; $old holds status/published_at
+    logAuditChange(
+        'kb.article.updated',
+        $id,
+        'kb_article',
+        [
+            'title'     => $snapRow['title'] ?? null,
+            'folder_id' => $old['folder_id'] ?? null,
+            'status'    => $old['status'] ?? null,
+        ],
+        ['title' => $title, 'folder_id' => $folderId, 'status' => $status]
+    );
     flash('success', 'Article updated.');
     redirect(Auth::role() === 'admin' ? '/admin/kb/articles' : '/agent/kb');
 });
@@ -5393,7 +5687,13 @@ $router->post('/admin/kb/articles/{id}/delete', function (array $p) {
         flash('error', 'Invalid request.');
         redirect('/admin/kb/articles');
     }
-    Database::connect()->prepare('DELETE FROM kb_articles WHERE id = ?')->execute([(int) $p['id']]);
+    $id   = (int) $p['id'];
+    $db   = Database::connect();
+    $tStmt = $db->prepare('SELECT title FROM kb_articles WHERE id = ?');
+    $tStmt->execute([$id]);
+    $title = (string) ($tStmt->fetchColumn() ?: '');
+    $db->prepare('DELETE FROM kb_articles WHERE id = ?')->execute([$id]);
+    logAudit('kb.article.deleted', $id, 'kb_article', 'title=' . $title);
     flash('success', 'Article deleted.');
     redirect('/admin/kb/articles');
 });
@@ -5814,6 +6114,12 @@ $router->post('/admin/kb/import/confirm', function () {
         }
 
         $db->commit();
+        logAudit(
+            'kb.import_confirmed',
+            null,
+            'kb_article',
+            'articles_imported=' . $imported . '; publish_all=' . ($publishAll ? 1 : 0)
+        );
         flash('success', "Successfully imported {$imported} KB article(s).");
         redirect('/admin/kb/articles');
     } catch (PDOException $e) {
@@ -5877,15 +6183,34 @@ $router->post('/admin/settings/email', function () {
         'smtp_debug'       => isset($_POST['smtp_debug']) ? '1' : '0',
     ];
 
+    // Capture prior values for the audit diff (secret excluded — handled separately).
+    $smtpBefore = [];
+    foreach ($fields as $k => $_) {
+        $smtpBefore[$k] = getSetting($k, '');
+    }
+    $smtpBefore['smtp_password'] = '(unchanged)';
+    $smtpAfter = $fields;
+    $smtpAfter['smtp_password'] = '(unchanged)';
+
     // Only update password if a new one was provided (don't blank it on save)
     $password = $_POST['smtp_password'] ?? '';
     if ($password !== '') {
         $fields['smtp_password'] = $password;
+        $smtpAfter['smtp_password'] = '(rotated)';
     }
 
     foreach ($fields as $key => $value) {
         setSetting($key, $value);
     }
+
+    logAuditChange(
+        'smtp.settings_changed',
+        null,
+        null,
+        $smtpBefore,
+        $smtpAfter,
+        ['smtp_password']
+    );
 
     flash('success', 'Email settings saved.');
     redirect('/admin/settings');
@@ -5906,10 +6231,22 @@ $router->post('/admin/settings/graph', function () {
         'graph_mailbox'   => trim($_POST['graph_mailbox'] ?? ''),
     ];
 
+    // Snapshot prior values for the audit diff (secret handled separately).
+    $graphBefore = [];
+    foreach ($fields as $k => $_) {
+        $graphBefore[$k] = getSetting($k, '');
+    }
+    $graphBefore['graph_secret_expires_at'] = getSetting('graph_secret_expires_at', '');
+    $graphBefore['graph_client_secret']     = '(unchanged)';
+    $graphAfter  = $fields;
+    $graphAfter['graph_secret_expires_at']  = trim($_POST['graph_secret_expires_at'] ?? '');
+    $graphAfter['graph_client_secret']      = '(unchanged)';
+
     // Only update client secret if a new one was provided
     $secret = $_POST['graph_client_secret'] ?? '';
     if ($secret !== '') {
         $fields['graph_client_secret'] = $secret;
+        $graphAfter['graph_client_secret'] = '(rotated)';
     }
 
     foreach ($fields as $key => $value) {
@@ -5927,6 +6264,15 @@ $router->post('/admin/settings/graph', function () {
         }
         setSetting('graph_secret_expires_at', $newExpiry);
     }
+
+    logAuditChange(
+        'graph.settings_changed',
+        null,
+        null,
+        $graphBefore,
+        $graphAfter,
+        ['graph_client_secret']
+    );
 
     // Ensure log directory exists
     @mkdir(ROOT_DIR . '/storage/logs', 0755, true);
@@ -5976,9 +6322,16 @@ $router->post('/admin/settings/email-to-ticket', function () {
         'email_to_ticket_default_priority_id' => trim($_POST['email_to_ticket_default_priority_id'] ?? ''),
     ];
 
+    $before = [];
+    foreach ($fields as $k => $_) {
+        $before[$k] = getSetting($k, '');
+    }
+
     foreach ($fields as $key => $value) {
         setSetting($key, $value);
     }
+
+    logAuditChange('email_to_ticket.settings_changed', null, null, $before, $fields);
 
     flash('success', 'Email-to-Ticket settings saved.');
     redirect('/admin/settings');
@@ -6097,12 +6450,14 @@ $router->post('/admin/settings/email-templates', function () {
         if ($tpl !== 'csat_survey') {
             setSetting("email_button_{$tpl}", '');
         }
+        logAudit('email_template.reset', null, null, 'template=' . $tpl);
         flash('success', 'Email template reset to defaults.');
         redirect('/admin/settings/email-templates?tab=' . $tpl);
     }
 
     if (isset($_POST['reset_footer'])) {
         setSetting('email_footer_text', '');
+        logAudit('email_template.reset', null, null, 'template=footer');
         flash('success', 'Footer text reset to default.');
         redirect('/admin/settings/email-templates?tab=shared');
     }
@@ -6128,6 +6483,8 @@ $router->post('/admin/settings/email-templates', function () {
         }
         flash('success', 'Email template saved.');
     }
+
+    logAudit('email_template.saved', null, null, 'tab=' . $tab);
 
     redirect('/admin/settings/email-templates?tab=' . urlencode($tab));
 });
@@ -6174,9 +6531,15 @@ $router->post('/admin/settings/email-notifications', function () {
         'cc_new_ticket', 'cc_note_added',
     ];
 
+    $before = [];
+    $after  = [];
     foreach ($keys as $k) {
-        setSetting('email_notify:' . $k, isset($_POST[$k]) ? '1' : '0');
+        $before[$k] = getSetting('email_notify:' . $k, '1');
+        $after[$k]  = isset($_POST[$k]) ? '1' : '0';
+        setSetting('email_notify:' . $k, $after[$k]);
     }
+
+    logAuditChange('email_notifications.settings_changed', null, null, $before, $after);
 
     flash('success', 'Email notification settings saved.');
     redirect('/admin/settings/email-notifications');
@@ -6215,8 +6578,17 @@ $router->post('/admin/settings/business-hours', function () {
         }
     }
 
+    $beforeTz       = getSetting('business_hours_timezone', '');
+    $beforeSchedule = getSetting('business_hours_schedule', '');
     setSetting('business_hours_timezone', $timezone);
     setSetting('business_hours_schedule', json_encode($schedule));
+    logAuditChange(
+        'business_hours.updated',
+        null,
+        null,
+        ['timezone' => $beforeTz, 'schedule' => $beforeSchedule],
+        ['timezone' => $timezone, 'schedule' => json_encode($schedule)]
+    );
 
     flash('success', 'Business hours saved.');
     redirect('/admin/settings/business-hours');
@@ -6266,6 +6638,13 @@ $router->post('/admin/settings/holidays', function () {
         }
         redirect('/admin/settings/holidays');
     }
+    $newId = (int) $db->lastInsertId();
+    logAudit(
+        'holiday.created',
+        $newId,
+        'holiday',
+        'date=' . $dateStr . '; name=' . $name . '; exclude_from_sla=' . $exclude
+    );
 
     Sla::recalculateAll($db);
     flash('success', 'Holiday added.');
@@ -6281,7 +6660,16 @@ $router->post('/admin/settings/holidays/delete', function () {
 
     $id = (int) ($_POST['id'] ?? 0);
     $db = Database::connect();
+    $info = $db->prepare('SELECT holiday_date, name FROM holidays WHERE id = ?');
+    $info->execute([$id]);
+    $hRow = $info->fetch(\PDO::FETCH_ASSOC) ?: ['holiday_date' => '', 'name' => ''];
     $db->prepare('DELETE FROM holidays WHERE id = ?')->execute([$id]);
+    logAudit(
+        'holiday.deleted',
+        $id,
+        'holiday',
+        'date=' . $hRow['holiday_date'] . '; name=' . $hRow['name']
+    );
 
     Sla::recalculateAll($db);
     flash('success', 'Holiday removed.');
@@ -6298,6 +6686,15 @@ $router->post('/admin/settings/holidays/toggle', function () {
     $id = (int) ($_POST['id'] ?? 0);
     $db = Database::connect();
     $db->prepare('UPDATE holidays SET exclude_from_sla = 1 - exclude_from_sla WHERE id = ?')->execute([$id]);
+    $stateStmt = $db->prepare('SELECT exclude_from_sla, holiday_date, name FROM holidays WHERE id = ?');
+    $stateStmt->execute([$id]);
+    $hState = $stateStmt->fetch(\PDO::FETCH_ASSOC) ?: ['exclude_from_sla' => null, 'holiday_date' => '', 'name' => ''];
+    logAudit(
+        'holiday.toggled',
+        $id,
+        'holiday',
+        'date=' . $hState['holiday_date'] . '; name=' . $hState['name'] . '; exclude_from_sla=' . $hState['exclude_from_sla']
+    );
 
     Sla::recalculateAll($db);
     redirect('/admin/settings/holidays');
@@ -6343,6 +6740,13 @@ $router->post('/admin/settings/holidays/auto-populate', function () {
     }
 
     Sla::recalculateAll($db);
+
+    logAudit(
+        'holiday.auto_populated',
+        null,
+        'holiday',
+        'country=' . $country . '; year=' . $year . '; added=' . $added . '; skipped=' . $skipped
+    );
 
     $countryName = Holidays::supportedCountries()[$country];
     $msg = "Added {$added} " . ($added === 1 ? 'holiday' : 'holidays') . " for {$countryName} ({$year}).";
@@ -6392,6 +6796,7 @@ $router->post('/admin/settings/sla-policies', function () {
         'INSERT INTO sla_policies (type_id, priority_id, first_response_minutes, resolution_minutes) VALUES (?, ?, ?, ?)'
     );
 
+    $rowsWritten = 0;
     foreach ($policiesData as $typeKey => $priorities) {
         $typeId = (int) $typeKey === 0 ? null : (int) $typeKey;
         foreach ($priorities as $priorityId => $data) {
@@ -6401,9 +6806,17 @@ $router->post('/admin/settings/sla-policies', function () {
 
             if ($firstResponse > 0 && $resolution > 0) {
                 $insert->execute([$typeId, $priorityId, $firstResponse, $resolution]);
+                $rowsWritten++;
             }
         }
     }
+
+    logAudit(
+        'sla.policies_saved',
+        null,
+        'sla_policy',
+        'rules_written=' . $rowsWritten
+    );
 
     flash('success', 'SLA policies saved.');
     redirect('/admin/settings/sla-policies');
@@ -6417,6 +6830,7 @@ $router->post('/admin/settings/sla-recalculate', function () {
     }
 
     $count = Sla::recalculateAll(Database::connect());
+    logAudit('sla.recalculated', null, 'sla_policy', 'tickets_updated=' . (int) $count);
     flash('success', "SLA recalculated for {$count} ticket(s).");
     redirect('/admin/settings/sla-policies');
 });
@@ -7116,6 +7530,13 @@ $router->post('/admin/settings/import/confirm', function () {
         }
     }
 
+    logAudit(
+        'ticket.import_confirmed',
+        null,
+        'ticket',
+        'imported=' . $imported . '; skipped=' . $skipped
+    );
+
     $msg = "Successfully imported {$imported} ticket(s).";
     if ($skipped > 0) {
         $msg .= " {$skipped} row(s) were skipped — see the import page to download them.";
@@ -7426,6 +7847,13 @@ $router->post('/admin/settings/import-users/confirm', function () {
         flash('error', 'Import failed: ' . $e->getMessage());
         redirect('/admin/settings/import-users');
     }
+
+    logAudit(
+        'user.import_confirmed',
+        null,
+        'user',
+        'imported=' . $imported . '; skipped=' . $skipped
+    );
 
     $msg = "Successfully imported {$imported} user(s).";
     if ($skipped > 0) {
@@ -7740,17 +8168,29 @@ $router->post('/admin/settings/branding', function () {
         setSetting('branding_logo', $filename);
     }
 
-    // Save settings
-    setSetting('branding_app_name', $appName);
-    setSetting('branding_navbar_icon', $navbarIcon);
-    setSetting('branding_primary_color', $primaryColor);
-    setSetting('branding_primary_hover', $primaryHover);
-    setSetting('branding_navbar_start', $navbarStart);
-    setSetting('branding_navbar_end', $navbarEnd);
-    setSetting('branding_timeline_note_bg',       $timelineNoteBg);
-    setSetting('branding_timeline_note_accent',   $timelineNoteAccent);
-    setSetting('branding_timeline_system_bg',     $timelineSystemBg);
-    setSetting('branding_timeline_system_accent', $timelineSystemAccent);
+    // Capture before-state for non-binary branding settings (logo handled
+    // separately above — the audit row marks whether the file changed).
+    $brandFields = [
+        'branding_app_name'              => $appName,
+        'branding_navbar_icon'           => $navbarIcon,
+        'branding_primary_color'         => $primaryColor,
+        'branding_primary_hover'         => $primaryHover,
+        'branding_navbar_start'          => $navbarStart,
+        'branding_navbar_end'            => $navbarEnd,
+        'branding_timeline_note_bg'      => $timelineNoteBg,
+        'branding_timeline_note_accent'  => $timelineNoteAccent,
+        'branding_timeline_system_bg'    => $timelineSystemBg,
+        'branding_timeline_system_accent' => $timelineSystemAccent,
+    ];
+    $brandBefore = [];
+    foreach ($brandFields as $k => $_) {
+        $brandBefore[$k] = getSetting($k, '');
+    }
+    foreach ($brandFields as $key => $value) {
+        setSetting($key, $value);
+    }
+
+    logAuditChange('branding.settings_changed', null, null, $brandBefore, $brandFields);
 
     flash('success', 'Branding settings updated successfully.');
     redirect('/admin/settings/branding');
@@ -7851,6 +8291,7 @@ $router->post('/admin/settings/labels/upload', function () {
     }
 
     setSetting('custom_labels', json_encode($custom));
+    logAudit('labels.uploaded', null, null, 'custom_keys=' . count($custom));
     redirect('/admin/settings/labels?saved=1');
 });
 
@@ -7861,6 +8302,7 @@ $router->post('/admin/settings/labels/reset', function () {
         redirect('/admin/settings/labels');
     }
     setSetting('custom_labels', '{}');
+    logAudit('labels.reset', null, null, null);
     redirect('/admin/settings/labels?reset=1');
 });
 
@@ -7928,6 +8370,13 @@ $router->post('/admin/settings/automations/create', function () {
     $db->prepare(
         'INSERT INTO automations (name, trigger_event, conditions, actions, is_enabled, sort_order) VALUES (?, ?, ?, ?, ?, ?)'
     )->execute([$name, $triggerEvent, json_encode($conditions), json_encode($actions), $isEnabled, $sortOrder]);
+    $newId = (int) $db->lastInsertId();
+    logAudit(
+        'automation.created',
+        $newId,
+        'automation',
+        'name=' . $name . '; trigger=' . $triggerEvent . '; enabled=' . $isEnabled . '; actions=' . count($actions)
+    );
 
     flash('success', 'Automation created.');
     redirect('/admin/settings/automations');
@@ -7992,9 +8441,21 @@ $router->post('/admin/settings/automations/{id}/edit', function (array $p) {
         redirect("/admin/settings/automations/{$id}/edit");
     }
 
+    $priorStmt = $db->prepare('SELECT name, trigger_event, is_enabled, sort_order FROM automations WHERE id = ?');
+    $priorStmt->execute([$id]);
+    $autoPrior = $priorStmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+
     $db->prepare(
         'UPDATE automations SET name = ?, trigger_event = ?, conditions = ?, actions = ?, is_enabled = ?, sort_order = ? WHERE id = ?'
     )->execute([$name, $triggerEvent, json_encode($conditions), json_encode($actions), $isEnabled, $sortOrder, $id]);
+
+    logAuditChange(
+        'automation.updated',
+        $id,
+        'automation',
+        $autoPrior,
+        ['name' => $name, 'trigger_event' => $triggerEvent, 'is_enabled' => $isEnabled, 'sort_order' => $sortOrder]
+    );
 
     flash('success', 'Automation updated.');
     redirect('/admin/settings/automations');
@@ -8006,8 +8467,13 @@ $router->post('/admin/settings/automations/{id}/delete', function (array $p) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/automations');
     }
-    $db = Database::connect();
-    $db->prepare('DELETE FROM automations WHERE id = ?')->execute([(int) $p['id']]);
+    $id  = (int) $p['id'];
+    $db  = Database::connect();
+    $nm  = $db->prepare('SELECT name FROM automations WHERE id = ?');
+    $nm->execute([$id]);
+    $aname = (string) ($nm->fetchColumn() ?: '');
+    $db->prepare('DELETE FROM automations WHERE id = ?')->execute([$id]);
+    logAudit('automation.deleted', $id, 'automation', 'name=' . $aname);
     flash('success', 'Automation deleted.');
     redirect('/admin/settings/automations');
 });
@@ -8028,6 +8494,12 @@ $router->post('/admin/settings/automations/{id}/toggle', function (array $p) {
     }
     $newState = $row['is_enabled'] ? 0 : 1;
     $db->prepare('UPDATE automations SET is_enabled = ? WHERE id = ?')->execute([$newState, (int) $p['id']]);
+    logAudit(
+        'automation.toggled',
+        (int) $p['id'],
+        'automation',
+        'is_enabled=' . $newState
+    );
     flash('success', $newState ? 'Automation enabled.' : 'Automation disabled.');
     redirect('/admin/settings/automations');
 });
@@ -8178,6 +8650,13 @@ $router->post('/admin/settings/automations/{id}/run', function (array $p) {
         $affected++;
     }
 
+    logAudit(
+        'automation.run_now',
+        (int) $auto['id'],
+        'automation',
+        'name=' . $auto['name'] . '; tickets_affected=' . $affected
+    );
+
     flash('success', "Automation '{$auto['name']}' ran on {$affected} ticket" . ($affected !== 1 ? 's' : '') . '.');
     redirect('/admin/settings/automations');
 });
@@ -8299,6 +8778,13 @@ $router->post('/admin/settings/escalations/create', function () {
         'INSERT INTO escalation_rules (name, conditions, actions, cooldown_hours, is_enabled, sort_order)
          VALUES (?, ?, ?, ?, ?, ?)'
     )->execute([$name, json_encode($conditions), json_encode($actions), $cooldown, $isEnabled, $sortOrder]);
+    $newId = (int) $db->lastInsertId();
+    logAudit(
+        'escalation_rule.created',
+        $newId,
+        'escalation_rule',
+        'name=' . $name . '; enabled=' . $isEnabled . '; cooldown_hours=' . $cooldown . '; actions=' . count($actions)
+    );
 
     flash('success', 'Escalation rule created.');
     redirect('/admin/settings/escalations');
@@ -8353,9 +8839,21 @@ $router->post('/admin/settings/escalations/{id}/edit', function (array $p) {
         redirect('/admin/settings/escalations/' . (int) $p['id'] . '/edit');
     }
 
+    $priorRule = $db->prepare('SELECT name, is_enabled, cooldown_hours, sort_order FROM escalation_rules WHERE id = ?');
+    $priorRule->execute([(int) $p['id']]);
+    $rulePrior = $priorRule->fetch(\PDO::FETCH_ASSOC) ?: [];
+
     $db->prepare(
         'UPDATE escalation_rules SET name = ?, conditions = ?, actions = ?, cooldown_hours = ?, is_enabled = ?, sort_order = ? WHERE id = ?'
     )->execute([$name, json_encode($conditions), json_encode($actions), $cooldown, $isEnabled, $sortOrder, (int) $p['id']]);
+
+    logAuditChange(
+        'escalation_rule.updated',
+        (int) $p['id'],
+        'escalation_rule',
+        $rulePrior,
+        ['name' => $name, 'is_enabled' => $isEnabled, 'cooldown_hours' => $cooldown, 'sort_order' => $sortOrder]
+    );
 
     flash('success', 'Escalation rule updated.');
     redirect('/admin/settings/escalations');
@@ -8370,6 +8868,15 @@ $router->post('/admin/settings/escalations/{id}/toggle', function (array $p) {
     $db = Database::connect();
     $db->prepare('UPDATE escalation_rules SET is_enabled = NOT is_enabled WHERE id = ?')
        ->execute([(int) $p['id']]);
+    $stateStmt = $db->prepare('SELECT name, is_enabled FROM escalation_rules WHERE id = ?');
+    $stateStmt->execute([(int) $p['id']]);
+    $rstate = $stateStmt->fetch(\PDO::FETCH_ASSOC) ?: ['name' => '', 'is_enabled' => null];
+    logAudit(
+        'escalation_rule.toggled',
+        (int) $p['id'],
+        'escalation_rule',
+        'name=' . $rstate['name'] . '; is_enabled=' . $rstate['is_enabled']
+    );
     redirect('/admin/settings/escalations');
 });
 
@@ -8379,8 +8886,13 @@ $router->post('/admin/settings/escalations/{id}/delete', function (array $p) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/escalations');
     }
-    $db = Database::connect();
-    $db->prepare('DELETE FROM escalation_rules WHERE id = ?')->execute([(int) $p['id']]);
+    $id   = (int) $p['id'];
+    $db   = Database::connect();
+    $nm   = $db->prepare('SELECT name FROM escalation_rules WHERE id = ?');
+    $nm->execute([$id]);
+    $rname = (string) ($nm->fetchColumn() ?: '');
+    $db->prepare('DELETE FROM escalation_rules WHERE id = ?')->execute([$id]);
+    logAudit('escalation_rule.deleted', $id, 'escalation_rule', 'name=' . $rname);
     flash('success', 'Escalation rule deleted.');
     redirect('/admin/settings/escalations');
 });
@@ -8401,6 +8913,7 @@ $router->post('/admin/settings/escalations/run-now', function () {
         'code'  => $returnCode,
         'time'  => date('Y-m-d H:i:s'),
     ];
+    logAudit('escalation.run_now', null, null, 'exit_code=' . $returnCode);
     redirect('/admin/settings/escalations');
 });
 
@@ -8485,6 +8998,11 @@ $router->post('/admin/settings/danger-zone/reset', function () {
     // empty schema.
     $tables = $db->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
     $tables = array_filter($tables, static fn($t) => $t !== 'schema_migrations');
+
+    // Log this BEFORE we wipe the audit_log table — the row will get truncated
+    // along with everything else, but a deliberate write here at least gives
+    // the running request a record in memory before the destructive call.
+    logAudit('system.factory_reset', null, null, 'tables_truncated=' . count($tables));
 
     $db->exec('SET FOREIGN_KEY_CHECKS = 0');
     foreach ($tables as $table) {
@@ -9246,7 +9764,10 @@ $router->post('/admin/settings/tags', function () {
         redirect('/admin/settings/tags');
     }
 
-    setSetting('tags_enabled', isset($_POST['tags_enabled']) ? '1' : '0');
+    $before = getSetting('tags_enabled', '1');
+    $after  = isset($_POST['tags_enabled']) ? '1' : '0';
+    setSetting('tags_enabled', $after);
+    logAuditChange('tags.settings_changed', null, null, ['tags_enabled' => $before], ['tags_enabled' => $after]);
 
     flash('success', 'Tag settings saved.');
     redirect('/admin/settings/tags');
@@ -9288,7 +9809,15 @@ $router->post('/admin/settings/organization', function () {
         redirect('/admin/settings/organization');
     }
 
+    $before = getSetting('organization_type', 'other');
     setSetting('organization_type', $submitted);
+    logAuditChange(
+        'organization.settings_changed',
+        null,
+        null,
+        ['organization_type' => $before],
+        ['organization_type' => $submitted]
+    );
     flash('success', 'Organization settings saved.');
     redirect('/admin/settings/organization');
 });
@@ -9313,10 +9842,22 @@ $router->post('/admin/settings/csat', function () {
         redirect('/admin/settings/csat');
     }
 
-    setSetting('csat_enabled', isset($_POST['csat_enabled']) ? '1' : '0');
+    $before = [
+        'csat_enabled'        => getSetting('csat_enabled', '0'),
+        'csat_trigger_status' => getSetting('csat_trigger_status', 'resolved'),
+    ];
+    $enabled = isset($_POST['csat_enabled']) ? '1' : '0';
     $trigger = in_array($_POST['csat_trigger_status'] ?? '', ['resolved', 'closed'], true)
         ? $_POST['csat_trigger_status'] : 'resolved';
+    setSetting('csat_enabled', $enabled);
     setSetting('csat_trigger_status', $trigger);
+    logAuditChange(
+        'csat.settings_changed',
+        null,
+        null,
+        $before,
+        ['csat_enabled' => $enabled, 'csat_trigger_status' => $trigger]
+    );
 
     flash('success', 'CSAT settings saved.');
     redirect('/admin/settings/csat');
@@ -9759,6 +10300,13 @@ $router->post('/admin/settings/scheduled-reports/create', function () {
         'INSERT INTO scheduled_reports (name, report_type, recipients, frequency, send_day, date_range_days, is_enabled)
          VALUES (?, ?, ?, ?, ?, ?, ?)'
     )->execute([$name, $reportType, json_encode(array_values($recipients)), $frequency, $sendDay, $dateRangeDays, $enabled]);
+    $newId = (int) $db->lastInsertId();
+    logAudit(
+        'scheduled_report.created',
+        $newId,
+        'scheduled_report',
+        'name=' . $name . '; type=' . $reportType . '; frequency=' . $frequency . '; recipients=' . count($recipients)
+    );
 
     flash('success', "Scheduled report \"{$name}\" created.");
     redirect('/admin/settings/scheduled-reports');
@@ -9800,9 +10348,21 @@ $router->post('/admin/settings/scheduled-reports/{id}/edit', function (array $va
         redirect("/admin/settings/scheduled-reports/{$id}/edit");
     }
 
+    $priorRpt = $db->prepare('SELECT name, report_type, frequency, is_enabled FROM scheduled_reports WHERE id = ?');
+    $priorRpt->execute([$id]);
+    $rptPrior = $priorRpt->fetch(\PDO::FETCH_ASSOC) ?: [];
+
     $db->prepare(
         'UPDATE scheduled_reports SET name=?, report_type=?, recipients=?, frequency=?, send_day=?, date_range_days=?, is_enabled=? WHERE id=?'
     )->execute([$name, $reportType, json_encode(array_values($recipients)), $frequency, $sendDay, $dateRangeDays, $enabled, $id]);
+
+    logAuditChange(
+        'scheduled_report.updated',
+        $id,
+        'scheduled_report',
+        $rptPrior,
+        ['name' => $name, 'report_type' => $reportType, 'frequency' => $frequency, 'is_enabled' => $enabled]
+    );
 
     flash('success', "Scheduled report \"{$name}\" updated.");
     redirect('/admin/settings/scheduled-reports');
@@ -9814,8 +10374,13 @@ $router->post('/admin/settings/scheduled-reports/{id}/delete', function (array $
         flash('error', 'Invalid request.');
         redirect('/admin/settings/scheduled-reports');
     }
-    $db = Database::connect();
-    $db->prepare('DELETE FROM scheduled_reports WHERE id = ?')->execute([(int)$vars['id']]);
+    $id   = (int) $vars['id'];
+    $db   = Database::connect();
+    $nm   = $db->prepare('SELECT name FROM scheduled_reports WHERE id = ?');
+    $nm->execute([$id]);
+    $rname = (string) ($nm->fetchColumn() ?: '');
+    $db->prepare('DELETE FROM scheduled_reports WHERE id = ?')->execute([$id]);
+    logAudit('scheduled_report.deleted', $id, 'scheduled_report', 'name=' . $rname);
     flash('success', 'Scheduled report deleted.');
     redirect('/admin/settings/scheduled-reports');
 });
@@ -9831,8 +10396,15 @@ $router->post('/admin/settings/scheduled-reports/{id}/toggle', function (array $
     $stmt->execute([(int)$vars['id']]);
     $row  = $stmt->fetch();
     if (!$row) { redirect('/admin/settings/scheduled-reports'); }
+    $newState = $row['is_enabled'] ? 0 : 1;
     $db->prepare('UPDATE scheduled_reports SET is_enabled = ? WHERE id = ?')
-       ->execute([$row['is_enabled'] ? 0 : 1, (int)$vars['id']]);
+       ->execute([$newState, (int)$vars['id']]);
+    logAudit(
+        'scheduled_report.toggled',
+        (int) $vars['id'],
+        'scheduled_report',
+        'is_enabled=' . $newState
+    );
     redirect('/admin/settings/scheduled-reports');
 });
 
@@ -10122,6 +10694,13 @@ $router->post('/admin/forms/{typeId}/field/create', function (array $p) {
         }
     }
 
+    logAudit(
+        'form_field.created',
+        $newId,
+        'form_field',
+        'type=' . $fieldType . '; label=' . $label . '; added_to_type_id=' . $typeId . '; shared_with=' . count($shareWith)
+    );
+
     $row = $db->prepare('SELECT * FROM ticket_form_fields WHERE id = ?');
     $row->execute([$newId]);
     echo json_encode(['success' => true, 'field' => $row->fetch()]);
@@ -10231,6 +10810,8 @@ $router->post('/admin/forms/field/{id}/update', function (array $p) {
         }
     }
 
+    logAudit('form_field.updated', $id, 'form_field', 'label=' . $label);
+
     echo json_encode(['success' => true]);
     exit;
 });
@@ -10241,6 +10822,9 @@ $router->post('/admin/forms/field/{id}/delete', function (array $p) {
     header('Content-Type: application/json');
     $id = (int) $p['id'];
     $db = Database::connect();
+    $lblStmt = $db->prepare('SELECT label, field_type FROM ticket_form_fields WHERE id = ?');
+    $lblStmt->execute([$id]);
+    $fInfo = $lblStmt->fetch(\PDO::FETCH_ASSOC) ?: ['label' => '', 'field_type' => ''];
     $db->prepare(
         'UPDATE ticket_form_fields SET deleted_at = NOW() WHERE id = ? AND deleted_at IS NULL'
     )->execute([$id]);
@@ -10248,6 +10832,12 @@ $router->post('/admin/forms/field/{id}/delete', function (array $p) {
     $db->prepare(
         'DELETE FROM ticket_type_form_layout WHERE field_kind = "custom" AND field_key = ?'
     )->execute([(string) $id]);
+    logAudit(
+        'form_field.deleted',
+        $id,
+        'form_field',
+        'label=' . $fInfo['label'] . '; type=' . $fInfo['field_type']
+    );
     echo json_encode(['success' => true]);
     exit;
 });
@@ -10852,10 +11442,30 @@ $router->post('/admin/settings/stale-tickets', function () {
     $threshold = max(0, (int) ($_POST['stale_threshold_hours'] ?? 72));
     $recheck   = max(1, (int) ($_POST['stale_recheck_hours']   ?? 24));
 
+    $before = [
+        'stale_threshold_hours'              => getSetting('stale_threshold_hours', '72'),
+        'stale_recheck_hours'                => getSetting('stale_recheck_hours', '24'),
+        'email_notify:ticket_stale_agent'    => getSetting('email_notify:ticket_stale_agent', '1'),
+        'email_notify:ticket_stale_requester' => getSetting('email_notify:ticket_stale_requester', '1'),
+    ];
+
     setSetting('stale_threshold_hours', (string) $threshold);
     setSetting('stale_recheck_hours',   (string) $recheck);
     setSetting('email_notify:ticket_stale_agent',     isset($_POST['notify_agent'])     ? '1' : '0');
     setSetting('email_notify:ticket_stale_requester', isset($_POST['notify_requester']) ? '1' : '0');
+
+    logAuditChange(
+        'stale_tickets.settings_changed',
+        null,
+        null,
+        $before,
+        [
+            'stale_threshold_hours'              => (string) $threshold,
+            'stale_recheck_hours'                => (string) $recheck,
+            'email_notify:ticket_stale_agent'    => isset($_POST['notify_agent'])     ? '1' : '0',
+            'email_notify:ticket_stale_requester' => isset($_POST['notify_requester']) ? '1' : '0',
+        ]
+    );
 
     flash('success', 'Stale ticket settings saved.');
     redirect('/admin/settings/stale-tickets');
