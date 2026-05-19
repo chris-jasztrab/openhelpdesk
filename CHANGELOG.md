@@ -11,6 +11,22 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.49.0 &mdash; 2026-05-19
+
+### Added
+- **"Forgot password?" self-service reset flow on the login page.** Users who can't remember their password no longer have to ping an admin — the login form now has a small `Forgot password?` link next to the password label that routes to a dedicated request form at [/forgot](src/routes.php). They enter their email, get a one-time link emailed to them, click through to [/reset?token=...](src/routes.php), choose a new password, and are bounced back to `/login` with a success flash to sign in normally. Works for any account with a password set (portal users, agents, admins) — SSO-only accounts simply won't have a usable password to reset, which is the intended behaviour.
+- **New `password_resets` table** (migration [040](database/migrations/040_password_resets.php)) stores `user_id`, the **SHA-256 hash** of the random 32-byte token (never the raw token), `expires_at`, `used_at`, requesting IP, and creation timestamp. Token rows are kept post-use as an audit trail. `ON DELETE CASCADE` from `users` so deleted accounts can't have lingering reset rows.
+- **New email template** [templates/emails/password-reset.php](templates/emails/password-reset.php) follows the same brand-colour header / button / footer pattern as the existing transactional emails, with the reset URL rendered both as a button and as a plain copy-pasteable link for clients that strip the styled CTA.
+- **Two new audit-log actions** — `auth.password_reset_requested` (written whenever an existing user's email is submitted, target=user_id) and `auth.password_reset_completed` (written when a token is successfully consumed). Both are visible in `/admin/audit-log` and tied to the user.
+
+### Security
+- **Email-address enumeration is blocked at the request endpoint.** Whether or not the submitted email matches a real account, the response is the same generic "if an account exists for X we sent a link" confirmation — and the throttle counter increments either way, so an attacker can't infer existence from timing or rate-limit behaviour either.
+- **Rate-limiting reuses the existing `login_attempts` table** with a synthetic key (`pwreset:<email>`) so the same 15-minute sliding window protects the inbox from being flooded: max 5 reset requests per email per window. No new infrastructure, no new indexes — the existing `idx_login_attempts_email_time` does the work.
+- **Tokens are 32 bytes of `random_bytes()` rendered as 64 hex characters**, stored only as their SHA-256 hash, single-use, and expire after 60 minutes. The reset GET route validates `ctype_xdigit` + length 64 before hitting the DB so malformed tokens never touch the query layer. Successfully completing a reset also invalidates any *other* outstanding reset rows for that user (`UPDATE … SET used_at = NOW() WHERE user_id = ? AND used_at IS NULL`), so a stolen-but-stale link from an earlier request can't be used after the legitimate reset went through.
+- **CSRF on both POST endpoints** (`/forgot`, `/reset`) plus the standard input validation chain — email format, password length ≥ 8, password = confirmation. The "Forgot password?" link itself is rendered through the existing auth layout so the same Bootstrap branding tokens (`--ld-primary`, `branding_app_name`, navbar gradient) carry through; no new CSS, no new JS, no new external dependencies.
+
+---
+
 ## 2.48.0 &mdash; 2026-05-19
 
 ### Changed

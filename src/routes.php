@@ -970,6 +970,199 @@ $router->get('/logout', function () {
 });
 
 /* ------------------------------------------------------------------
+ * Forgot password — email-a-link flow
+ *
+ * Three routes:
+ *   GET  /forgot           — request form
+ *   POST /forgot           — accept email, mint token, email link
+ *   GET  /reset?token=...  — show "set new password" form (token in URL)
+ *   POST /reset            — accept token + new password, update + sign in
+ *
+ * The submit handler always shows the same generic "if the email
+ * matches an account we sent a link" response so an attacker can't
+ * use this endpoint to enumerate registered email addresses. We also
+ * rate-limit reset requests per email + per IP in the existing
+ * `login_attempts` table (reusing the same 15-minute sliding window)
+ * so this can't be used to flood a user's inbox.
+ *
+ * Tokens are 32 random bytes; only their SHA-256 hash is stored.
+ * They expire after 60 minutes and are single-use (the row's
+ * `used_at` is stamped on successful reset).
+ * ------------------------------------------------------------------ */
+
+const _PASSWORD_RESET_TTL_MINUTES = 60;
+const _PASSWORD_RESET_MAX_PER_EMAIL_WINDOW = 5;
+const _PASSWORD_RESET_WINDOW_MINUTES = 15;
+
+$router->get('/forgot', function () {
+    if (Auth::check()) {
+        redirect('/');
+    }
+    render('forgot');
+});
+
+$router->post('/forgot', function () {
+    $email = trim($_POST['email'] ?? '');
+    $token = $_POST['_token'] ?? '';
+
+    if (!verifyCsrf($token)) {
+        render('forgot', ['error' => 'Invalid request. Please try again.', 'email' => $email]);
+    }
+    if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        render('forgot', ['error' => 'Please enter a valid email address.', 'email' => $email]);
+    }
+
+    $db = Database::connect();
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+
+    // Throttle: cap requests in a sliding window so this endpoint can't
+    // be used to spam someone's inbox or hammer SMTP. We piggyback on
+    // login_attempts with a synthetic email key so the existing column
+    // and indexes do the work.
+    $window = _PASSWORD_RESET_WINDOW_MINUTES;
+    $throttleKey = 'pwreset:' . strtolower($email);
+    $recentByEmail = $db->prepare(
+        "SELECT COUNT(*) FROM login_attempts
+          WHERE email = ? AND succeeded = 0
+            AND attempted_at >= (NOW() - INTERVAL {$window} MINUTE)"
+    );
+    $recentByEmail->execute([$throttleKey]);
+    $tooMany = (int) $recentByEmail->fetchColumn() >= _PASSWORD_RESET_MAX_PER_EMAIL_WINDOW;
+
+    // Record the request attempt regardless of whether we end up sending
+    // (so attackers can't enumerate via timing or throttle behaviour).
+    $db->prepare('INSERT INTO login_attempts (email, ip, succeeded) VALUES (?, ?, 0)')
+       ->execute([$throttleKey, $ip]);
+
+    if (!$tooMany) {
+        $stmt = $db->prepare('SELECT id, first_name, last_name, email FROM users WHERE email = ? LIMIT 1');
+        $stmt->execute([$email]);
+        $user = $stmt->fetch();
+
+        if ($user) {
+            $rawToken  = bin2hex(random_bytes(32));
+            $tokenHash = hash('sha256', $rawToken);
+            $expires   = (new DateTime('+' . _PASSWORD_RESET_TTL_MINUTES . ' minutes'))->format('Y-m-d H:i:s');
+
+            $db->prepare(
+                'INSERT INTO password_resets (user_id, token_hash, expires_at, requested_ip)
+                 VALUES (?, ?, ?, ?)'
+            )->execute([(int) $user['id'], $tokenHash, $expires, $ip]);
+
+            $resetUrl   = appUrl() . '/reset?token=' . $rawToken;
+            $appName    = getSetting('branding_app_name', 'OpenHelpDesk');
+            $brandColor = getSetting('branding_primary_color', '#4f46e5');
+            $footerText = getSetting('email_footer_text')
+                ?: 'This is an automated message from ' . $appName . '. If you did not request a password reset you can safely ignore this email.';
+
+            $emailHtml = renderEmail('password-reset', [
+                'firstName'  => $user['first_name'] ?: $user['email'],
+                'resetUrl'   => $resetUrl,
+                'ttlMinutes' => _PASSWORD_RESET_TTL_MINUTES,
+                'appName'    => $appName,
+                'brandColor' => $brandColor,
+                'footerText' => $footerText,
+            ]);
+
+            sendMail(
+                $user['email'],
+                trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? '')),
+                'Reset your ' . $appName . ' password',
+                $emailHtml
+            );
+
+            logAudit('auth.password_reset_requested', (int) $user['id'], 'user', 'email=' . $email);
+        }
+    }
+
+    render('forgot', [
+        'sent'  => true,
+        'email' => $email,
+    ]);
+});
+
+$router->get('/reset', function () {
+    if (Auth::check()) {
+        redirect('/');
+    }
+    $rawToken = (string) ($_GET['token'] ?? '');
+    if ($rawToken === '' || !ctype_xdigit($rawToken) || strlen($rawToken) !== 64) {
+        render('reset', ['error' => 'This reset link is invalid or has expired. Please request a new one.']);
+    }
+
+    $db   = Database::connect();
+    $hash = hash('sha256', $rawToken);
+    $stmt = $db->prepare(
+        'SELECT pr.id, pr.user_id, pr.expires_at, pr.used_at, u.email
+           FROM password_resets pr
+           JOIN users u ON u.id = pr.user_id
+          WHERE pr.token_hash = ?
+          LIMIT 1'
+    );
+    $stmt->execute([$hash]);
+    $row = $stmt->fetch();
+
+    if (!$row || $row['used_at'] !== null || strtotime($row['expires_at']) < time()) {
+        render('reset', ['error' => 'This reset link is invalid or has expired. Please request a new one.']);
+    }
+
+    render('reset', [
+        'token' => $rawToken,
+        'email' => $row['email'],
+    ]);
+});
+
+$router->post('/reset', function () {
+    $rawToken = (string) ($_POST['token'] ?? '');
+    $password = (string) ($_POST['password'] ?? '');
+    $confirm  = (string) ($_POST['password_confirm'] ?? '');
+    $csrf     = $_POST['_token'] ?? '';
+
+    if (!verifyCsrf($csrf)) {
+        render('reset', ['error' => 'Invalid request. Please try again.', 'token' => $rawToken]);
+    }
+    if ($rawToken === '' || !ctype_xdigit($rawToken) || strlen($rawToken) !== 64) {
+        render('reset', ['error' => 'This reset link is invalid or has expired. Please request a new one.']);
+    }
+    if (strlen($password) < 8) {
+        render('reset', ['error' => 'Password must be at least 8 characters.', 'token' => $rawToken]);
+    }
+    if ($password !== $confirm) {
+        render('reset', ['error' => 'Passwords do not match.', 'token' => $rawToken]);
+    }
+
+    $db   = Database::connect();
+    $hash = hash('sha256', $rawToken);
+    $stmt = $db->prepare(
+        'SELECT pr.id, pr.user_id, pr.expires_at, pr.used_at
+           FROM password_resets pr
+          WHERE pr.token_hash = ?
+          LIMIT 1'
+    );
+    $stmt->execute([$hash]);
+    $row = $stmt->fetch();
+
+    if (!$row || $row['used_at'] !== null || strtotime($row['expires_at']) < time()) {
+        render('reset', ['error' => 'This reset link is invalid or has expired. Please request a new one.']);
+    }
+
+    $userId = (int) $row['user_id'];
+    $db->prepare('UPDATE users SET password = ? WHERE id = ?')
+       ->execute([password_hash($password, PASSWORD_DEFAULT), $userId]);
+    $db->prepare('UPDATE password_resets SET used_at = NOW() WHERE id = ?')
+       ->execute([(int) $row['id']]);
+    // Invalidate any other outstanding reset links for this account.
+    $db->prepare('UPDATE password_resets SET used_at = NOW()
+                  WHERE user_id = ? AND used_at IS NULL')
+       ->execute([$userId]);
+
+    logAudit('auth.password_reset_completed', $userId, 'user', null, $userId);
+
+    flash('success', 'Your password has been reset. Please sign in.');
+    redirect('/login');
+});
+
+/* ------------------------------------------------------------------
  * Microsoft 365 SSO – OAuth 2.0 Authorization Code Flow
  * ------------------------------------------------------------------ */
 

@@ -16,6 +16,12 @@ $pageTitle = 'Sign In';
                 <span>Setup complete! Sign in with your new admin account.</span>
             </div>
             <?php endif; ?>
+            <?php if ($flashSuccess = getFlash('success')): ?>
+            <div class="alert alert-success d-flex align-items-center" role="status" aria-live="polite">
+                <i class="bi bi-check-circle-fill me-2" aria-hidden="true"></i>
+                <span><?= e($flashSuccess) ?></span>
+            </div>
+            <?php endif; ?>
             <?php if (!empty($error)): ?>
             <div class="alert alert-danger d-flex align-items-center" role="alert" aria-live="assertive">
                 <i class="bi bi-exclamation-triangle-fill me-2" aria-hidden="true"></i>
@@ -37,8 +43,11 @@ $pageTitle = 'Sign In';
                 </div>
 
                 <div class="mb-4">
-                    <label for="password" class="form-label fw-semibold">Password</label>
-                    <div class="input-group">
+                    <div class="d-flex justify-content-between align-items-baseline">
+                        <label for="password" class="form-label fw-semibold mb-0">Password</label>
+                        <a href="/forgot" class="small text-decoration-none">Forgot password?</a>
+                    </div>
+                    <div class="input-group mt-1">
                         <span class="input-group-text" aria-hidden="true"><i class="bi bi-lock"></i></span>
                         <input type="password" class="form-control" id="password" name="password"
                                placeholder="Enter your password" required autocomplete="current-password">
