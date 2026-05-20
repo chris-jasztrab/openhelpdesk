@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.50.3 &mdash; 2026-05-20
+
+### Fixed
+- **Admin ticket view now scopes and trims custom fields like the agent/portal views.** The 2.50.1/2.50.2 fixes were applied to the agent and portal ticket views but missed the dedicated `GET /admin/tickets/{id}` route in [src/routes/admin.php](src/routes/admin.php), which still queried every custom field and rendered empty ones as bare "&mdash;" rows. It now uses the same `getFormLayoutForType()` scoping (fields on the ticket type's form, plus any with a stored value) and `customFieldHasDisplayValue()` filtering as the other two views.
+
+---
+
 ## 2.50.2 &mdash; 2026-05-20
 
 ### Changed
