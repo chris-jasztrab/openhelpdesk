@@ -10,6 +10,7 @@ $statusColors   = ['open' => 'primary', 'in_progress' => 'warning', 'pending' =>
 $statusLabels   = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 'Pending', 'waiting_on_customer' => 'Waiting on Customer', 'waiting_on_third_party' => 'Waiting on Third Party', 'resolved' => 'Resolved', 'closed' => 'Closed'];
 $slaStateColors = ['on_track' => 'success', 'warning' => 'warning', 'breached' => 'danger'];
 $allColumns     = ticketColumnDefinitions();
+if (!slaEnabled()) { unset($allColumns['sla']); }
 ?>
 <div class=" mb-4">
     <div>

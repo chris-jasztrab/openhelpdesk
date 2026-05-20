@@ -13,6 +13,7 @@ $hasFilters = array_filter($filters, fn($v) => is_array($v) ? !empty($v) : $v !=
 $sortParams = array_filter($filters, fn($v) => is_array($v) ? !empty($v) : $v !== '');
 if ($perPage !== 25) $sortParams['per_page'] = $perPage;
 $allColumns = ticketColumnDefinitions();
+if (!slaEnabled()) { unset($allColumns['sla']); }
 $colCount = 3 + count($visibleColumns); // checkbox + id + subject + visible toggleable columns
 $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : '');
 ?>

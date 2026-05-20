@@ -53,14 +53,14 @@ $hasFilters = $statusFilter !== '' || $ageFilter !== null;
                     <th>Status</th>
                     <th>Priority</th>
                     <th>Agent</th>
-                    <th>SLA</th>
+                    <?php if (slaEnabled()): ?><th>SLA</th><?php endif; ?>
                     <th>Age</th>
                     <th>Created</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($tickets)): ?>
-                <tr><td colspan="8" class="text-center py-4 text-muted">No unresolved tickets match the current filter.</td></tr>
+                <tr><td colspan="<?= slaEnabled() ? 8 : 7 ?>" class="text-center py-4 text-muted">No unresolved tickets match the current filter.</td></tr>
                 <?php else: foreach ($tickets as $t): ?>
                 <tr>
                     <td><a href="/admin/tickets/<?= (int) $t['id'] ?>" class="fw-semibold">#<?= (int) $t['id'] ?></a></td>
@@ -74,6 +74,7 @@ $hasFilters = $statusFilter !== '' || $ageFilter !== null;
                         <?php endif; ?>
                     </td>
                     <td><?= e($t['agent_name'] ?? 'Unassigned') ?></td>
+                    <?php if (slaEnabled()): ?>
                     <td>
                         <?php if ($t['sla_state']):
                             $slaColor = match ($t['sla_state']) {
@@ -87,6 +88,7 @@ $hasFilters = $statusFilter !== '' || $ageFilter !== null;
                             <span class="text-muted">—</span>
                         <?php endif; ?>
                     </td>
+                    <?php endif; ?>
                     <td class="text-muted small"><?= e($t['age_display']) ?></td>
                     <td class="text-muted small"><?= date('M j, Y', strtotime($t['created_at'])) ?></td>
                 </tr>

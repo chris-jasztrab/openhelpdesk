@@ -14,6 +14,38 @@ $breadcrumbs  = [
 
 <?php require ROOT_DIR . '/templates/partials/settings-nav.php'; ?>
 
+<!-- SLA master toggle -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body p-4">
+        <form method="POST" action="/admin/settings/sla-toggle" class="d-flex justify-content-between align-items-start gap-3">
+            <?= csrfField() ?>
+            <div>
+                <div class="form-check form-switch mb-1">
+                    <input class="form-check-input" type="checkbox" role="switch"
+                           name="sla_enabled" id="sla_enabled" value="1"
+                           <?= slaEnabled() ? 'checked' : '' ?>>
+                    <label class="form-check-label fw-semibold" for="sla_enabled">Enable SLA tracking</label>
+                </div>
+                <p class="text-muted small mb-0">
+                    When disabled, SLA timers are not started, recalculated, or shown anywhere &mdash;
+                    on tickets, ticket lists, or reports. Existing policies and past SLA data are kept,
+                    so you can re-enable at any time.
+                </p>
+            </div>
+            <button type="submit" class="btn btn-outline-secondary flex-shrink-0">
+                <i class="bi bi-check-lg me-1"></i>Save
+            </button>
+        </form>
+    </div>
+</div>
+
+<?php if (!slaEnabled()): ?>
+<div class="alert alert-warning d-flex align-items-center">
+    <i class="bi bi-exclamation-triangle me-2"></i>
+    <div>SLA tracking is currently <strong>disabled</strong>. The policies below are saved but not applied to tickets.</div>
+</div>
+<?php endif; ?>
+
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h5 class="fw-bold mb-1">SLA Policies</h5>

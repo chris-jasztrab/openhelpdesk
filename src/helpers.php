@@ -655,6 +655,18 @@ function setSetting(string $key, string $value): void
     )->execute([$key, $value]);
 }
 
+/**
+ * Whether SLA tracking is enabled site-wide. Defaults to enabled.
+ *
+ * When off, SLA timers are not initialized, recalculated, paused/resumed, or
+ * displayed anywhere (tickets, ticket lists, reports). Existing SLA policies
+ * and historical SLA data are kept, so the feature can be re-enabled freely.
+ */
+function slaEnabled(): bool
+{
+    return getSetting('sla_enabled', '1') === '1';
+}
+
 /* ── Auto-assignment helpers ──────────────────────────────────── */
 
 /**
@@ -1931,12 +1943,19 @@ function ticketColumnsHiddenByDefault(): array
 
 function getUserColumns(int $userId): array
 {
+    $defaults = array_diff(array_keys(ticketColumnDefinitions()), ticketColumnsHiddenByDefault());
     $json = getSetting("ticket_columns:{$userId}", '');
     if ($json === '') {
-        return array_diff(array_keys(ticketColumnDefinitions()), ticketColumnsHiddenByDefault());
+        $cols = $defaults;
+    } else {
+        $decoded = json_decode($json, true);
+        $cols = is_array($decoded) ? $decoded : $defaults;
     }
-    $cols = json_decode($json, true);
-    return is_array($cols) ? $cols : array_diff(array_keys(ticketColumnDefinitions()), ticketColumnsHiddenByDefault());
+    // SLA disabled site-wide — never expose the SLA column.
+    if (!slaEnabled()) {
+        $cols = array_values(array_filter($cols, static fn ($c) => $c !== 'sla'));
+    }
+    return $cols;
 }
 
 function setUserColumns(int $userId, array $columns): void

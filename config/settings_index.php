@@ -257,6 +257,11 @@ return [
     // =======================================================================
     // SLA Policies  (/admin/settings/sla-policies)
     // =======================================================================
+    ['label' => 'Enable SLA Tracking',          'description' => 'Turn SLA timers on or off across the entire site',
+     'group' => 'Scheduling', 'page_label' => 'SLA Policies', 'page_url' => '/admin/settings/sla-policies',
+     'section' => 'SLA Policies', 'anchor' => 'sla_enabled',
+     'keywords' => 'sla enable disable turn off toggle service level agreement'],
+
     ['label' => 'First Response Target',        'description' => 'Per type/priority — minutes to first agent reply',
      'group' => 'Scheduling', 'page_label' => 'SLA Policies', 'page_url' => '/admin/settings/sla-policies',
      'section' => 'SLA Policies', 'anchor' => '',

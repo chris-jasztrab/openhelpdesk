@@ -12,6 +12,7 @@ $slaStateColors = ['on_track' => 'success', 'warning' => 'warning', 'breached' =
 $hasFilters = array_filter($filters, fn($v) => is_array($v) ? !empty($v) : $v !== '');
 $sortParams = array_filter($filters, fn($v) => is_array($v) ? !empty($v) : $v !== '');
 $allColumns = ticketColumnDefinitions();
+if (!slaEnabled()) { unset($allColumns['sla']); }
 $colCount = 3 + count($visibleColumns); // checkbox + id + subject + visible toggleable columns
 $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : '');
 ?>

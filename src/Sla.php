@@ -186,6 +186,10 @@ class Sla
      */
     public static function recalculateAll(PDO $db): int
     {
+        if (!slaEnabled()) {
+            return 0; // SLA disabled site-wide
+        }
+
         $stmt = $db->query(
             "SELECT id, created_at, first_response_due_at, resolution_due_at,
                     first_responded_at, sla_state, sla_paused_at
@@ -239,6 +243,10 @@ class Sla
      */
     public static function initializeForTicket(PDO $db, int $ticketId, int $priorityId, ?int $typeId = null): void
     {
+        if (!slaEnabled()) {
+            return; // SLA disabled site-wide
+        }
+
         $biz = self::getBusinessSchedule();
         if ($biz === null) {
             return; // No business hours configured
@@ -279,6 +287,10 @@ class Sla
      */
     public static function pause(PDO $db, int $ticketId): void
     {
+        if (!slaEnabled()) {
+            return; // SLA disabled site-wide
+        }
+
         $db->prepare('UPDATE tickets SET sla_paused_at = NOW() WHERE id = ? AND sla_paused_at IS NULL')
             ->execute([$ticketId]);
 
@@ -293,6 +305,10 @@ class Sla
      */
     public static function resume(PDO $db, int $ticketId): void
     {
+        if (!slaEnabled()) {
+            return; // SLA disabled site-wide
+        }
+
         $stmt = $db->prepare(
             'SELECT sla_paused_at, first_response_due_at, resolution_due_at, first_responded_at FROM tickets WHERE id = ?'
         );
@@ -349,6 +365,10 @@ class Sla
      */
     public static function onPriorityChanged(PDO $db, int $ticketId, int $newPriorityId, ?int $typeId = null): void
     {
+        if (!slaEnabled()) {
+            return; // SLA disabled site-wide
+        }
+
         $biz = self::getBusinessSchedule();
         if ($biz === null) {
             return;
@@ -404,6 +424,10 @@ class Sla
      */
     public static function onTypeChanged(PDO $db, int $ticketId, ?int $newTypeId): void
     {
+        if (!slaEnabled()) {
+            return; // SLA disabled site-wide
+        }
+
         $biz = self::getBusinessSchedule();
         if ($biz === null) {
             return;

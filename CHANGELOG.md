@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.50.0 &mdash; 2026-05-20
+
+### Added
+- **Site-wide SLA on/off toggle.** A new "Enable SLA tracking" switch at the top of [Settings › SLA Policies](templates/pages/admin/settings/sla-policies.php) turns SLA tracking off — or back on — for the whole site. When disabled, [src/Sla.php](src/Sla.php) skips all timer work: new tickets get no first-response/resolution due dates, priority/type changes and pending pause/resume no longer touch SLA, and the `public/sla-cron.php` recalculation becomes a no-op. The SLA state badge and SLA card are hidden on agent and admin ticket views; the "SLA" column drops out of every ticket list and its column picker; the SLA column is removed from the Unresolved Tickets report; and the SLA Compliance report shows a "disabled" banner. Existing SLA policies and historical SLA data are left intact, so the feature can be re-enabled at any time. Backed by the new `sla_enabled` setting, which defaults to enabled — existing installs are unaffected.
+
+---
+
 ## 2.49.3 &mdash; 2026-05-20
 
 ### Fixed

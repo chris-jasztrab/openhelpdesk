@@ -127,7 +127,7 @@ if ($solutionTimelineId > 0) {
                 <?= e($ticket['priority_name']) ?>
             </span>
             <?php endif; ?>
-            <?php if ($ticket['sla_state']): ?>
+            <?php if (slaEnabled() && $ticket['sla_state']): ?>
             <span class="badge bg-<?= $slaStateColors[$ticket['sla_state']] ?? 'secondary' ?> fs-6">
                 <i class="bi bi-stopwatch me-1"></i><?= e($slaStateLabels[$ticket['sla_state']] ?? $ticket['sla_state']) ?>
             </span>
@@ -828,7 +828,7 @@ if ($solutionTimelineId > 0) {
         </div>
 
         <!-- SLA Info -->
-        <?php if ($ticket['sla_state']): ?>
+        <?php if (slaEnabled() && $ticket['sla_state']): ?>
         <div class="card border-0 shadow-sm mt-4">
             <div class="card-header bg-white border-bottom">
                 <h5 class="mb-0 fw-semibold"><i class="bi bi-stopwatch me-2"></i>SLA</h5>

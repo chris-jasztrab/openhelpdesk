@@ -6835,6 +6835,22 @@ $router->post('/admin/settings/sla-recalculate', function () {
     redirect('/admin/settings/sla-policies');
 });
 
+$router->post('/admin/settings/sla-toggle', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/sla-policies');
+    }
+
+    $enabled = isset($_POST['sla_enabled']) ? '1' : '0';
+    setSetting('sla_enabled', $enabled);
+    logAudit('sla.toggled', null, 'setting', 'sla_enabled=' . $enabled);
+    flash('success', $enabled === '1'
+        ? 'SLA tracking enabled.'
+        : 'SLA tracking disabled site-wide.');
+    redirect('/admin/settings/sla-policies');
+});
+
 /* ==================================================================
  * ADMIN – Import Tickets from CSV
  * ================================================================== */
