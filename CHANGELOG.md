@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.50.1 &mdash; 2026-05-20
+
+### Fixed
+- **Ticket views no longer show custom fields from other ticket types' forms.** When viewing a ticket, the agent ([src/routes/agent.php](src/routes/agent.php)) and portal ([src/routes/portal.php](src/routes/portal.php)) views queried *every* custom field in the system and rendered them all, so a field added to one ticket type's form appeared (as an empty "&mdash;" row) on tickets of every other type. Both views now build the Custom Fields panel from `getFormLayoutForType()` for the ticket's own type, showing only the non-hidden fields on that type's form. Any field that already has a stored value for the ticket is still shown even if it was later removed from the form, so historically-submitted data is never dropped.
+
+---
+
 ## 2.50.0 &mdash; 2026-05-20
 
 ### Added

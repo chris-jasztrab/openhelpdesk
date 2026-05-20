@@ -994,24 +994,45 @@ $router->get('/agent/tickets/{id}', function (array $p) {
     // Groups for assignment dropdown
     $groups = $db->query('SELECT id, name FROM groups ORDER BY name')->fetchAll();
 
-    // Custom form fields + stored values
-    $customFields = $db->query('SELECT * FROM ticket_form_fields WHERE deleted_at IS NULL ORDER BY id')->fetchAll();
-    $fieldValues  = [];
-    $fieldOptions = [];
-    if ($customFields) {
-        $fvStmt = $db->prepare('SELECT field_id, value FROM ticket_field_values WHERE ticket_id = ?');
-        $fvStmt->execute([$ticket['id']]);
-        foreach ($fvStmt->fetchAll() as $fv) {
-            $fieldValues[$fv['field_id']] = $fv['value'];
+    // Custom form fields + stored values. Only show fields on this ticket
+    // type's form — plus any field that already has a stored value, so a
+    // value submitted before the form changed is never silently dropped.
+    $fieldValues = [];
+    $fvStmt = $db->prepare('SELECT field_id, value FROM ticket_field_values WHERE ticket_id = ?');
+    $fvStmt->execute([$ticket['id']]);
+    foreach ($fvStmt->fetchAll() as $fv) {
+        $fieldValues[(int) $fv['field_id']] = $fv['value'];
+    }
+
+    $customFields = [];
+    $seenFieldIds = [];
+    foreach (getFormLayoutForType($db, (int) $ticket['type_id'], true) as $row) {
+        if ($row['kind'] === 'custom' && $row['field']) {
+            $customFields[] = $row['field'];
+            $seenFieldIds[(int) $row['field']['id']] = true;
         }
-        foreach ($customFields as $f) {
-            if (in_array($f['field_type'], ['dropdown', 'dependent'], true)) {
-                $s = $db->prepare(
-                    'SELECT * FROM ticket_form_field_options WHERE field_id = ? ORDER BY parent_option_id, sort_order'
-                );
-                $s->execute([$f['id']]);
-                $fieldOptions[$f['id']] = $s->fetchAll();
-            }
+    }
+    // Fields with a stored value but no longer on this type's form.
+    $orphanIds = array_diff(array_keys($fieldValues), array_keys($seenFieldIds));
+    if ($orphanIds) {
+        $ph = implode(',', array_fill(0, count($orphanIds), '?'));
+        $oStmt = $db->prepare(
+            "SELECT id, field_type, label, placeholder, config
+             FROM ticket_form_fields
+             WHERE id IN ($ph) AND deleted_at IS NULL ORDER BY id"
+        );
+        $oStmt->execute(array_values($orphanIds));
+        $customFields = array_merge($customFields, $oStmt->fetchAll());
+    }
+
+    $fieldOptions = [];
+    foreach ($customFields as $f) {
+        if (in_array($f['field_type'], ['dropdown', 'dependent'], true)) {
+            $s = $db->prepare(
+                'SELECT * FROM ticket_form_field_options WHERE field_id = ? ORDER BY parent_option_id, sort_order'
+            );
+            $s->execute([$f['id']]);
+            $fieldOptions[$f['id']] = $s->fetchAll();
         }
     }
 
