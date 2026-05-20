@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.49.2 &mdash; 2026-05-20
+
+### Fixed
+- **Admin-dashboard "Recent Activity" no longer shows raw HTML markup.** The timeline-entry preview at [templates/pages/admin/dashboard.php](templates/pages/admin/dashboard.php) escaped `ticket_timeline.details` directly with `e()`, so comment-body entries rendered visible `<p>` tags and `&nbsp;` entities (e.g. ticket 44992 showed `<p>Hi Julia,</p>...`). The preview now strips tags and decodes entities to plain text before display.
+
+---
+
 ## 2.49.1 &mdash; 2026-05-19
 
 ### Fixed

@@ -54,8 +54,16 @@ $actionIcons = [
                                 <?= e($a['user_name'] ?? 'System') ?> &mdash;
                                 <?= e(ucfirst(str_replace('_', ' ', $a['action']))) ?>
                             </div>
-                            <?php if ($a['details']): ?>
-                            <div class="text-muted small text-truncate" style="max-width:500px;"><?= e($a['details']) ?></div>
+                            <?php
+                            // ticket_timeline.details holds raw HTML (e.g. comment bodies);
+                            // strip tags and decode entities so the preview shows plain text.
+                            $detailsText = trim(preg_replace('/\s+/', ' ', html_entity_decode(
+                                strip_tags(str_replace('<', ' <', (string) $a['details'])),
+                                ENT_QUOTES | ENT_HTML5
+                            )));
+                            ?>
+                            <?php if ($detailsText !== ''): ?>
+                            <div class="text-muted small text-truncate" style="max-width:500px;"><?= e($detailsText) ?></div>
                             <?php endif; ?>
                         </div>
                     </div>
