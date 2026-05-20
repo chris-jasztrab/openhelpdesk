@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.50.2 &mdash; 2026-05-20
+
+### Changed
+- **Empty custom fields are now hidden on ticket views.** Following 2.50.1, the agent and portal ticket views still listed every custom field on the type's form even when it had no value, rendering a row of bare "&mdash;" placeholders. A new `customFieldHasDisplayValue()` helper in [src/helpers.php](src/helpers.php) decides per field type whether a stored value would render real data, and [src/routes/agent.php](src/routes/agent.php) / [src/routes/portal.php](src/routes/portal.php) now filter the Custom Fields panel down to fields with an actual value — if none remain, the panel itself is hidden. Checkboxes are always shown (they render Yes/No, never a placeholder).
+
+---
+
 ## 2.50.1 &mdash; 2026-05-20
 
 ### Fixed

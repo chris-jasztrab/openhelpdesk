@@ -628,6 +628,17 @@ $router->get('/portal/tickets/{id}', function (array $p) {
         }
     }
 
+    // Drop fields with nothing to show — the view would render them as a
+    // bare "—" placeholder, which is just noise on the ticket.
+    $customFields = array_values(array_filter(
+        $customFields,
+        fn($f) => customFieldHasDisplayValue(
+            $f['field_type'],
+            $fieldValues[$f['id']] ?? '',
+            $fieldOptions[$f['id']] ?? []
+        )
+    ));
+
     $isOwner = (int) $ticket['created_by'] === (int) $uid;
 
     // Escalation context (owners only — only the requester can escalate their own ticket)

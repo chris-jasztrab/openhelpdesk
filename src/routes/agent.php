@@ -1036,6 +1036,17 @@ $router->get('/agent/tickets/{id}', function (array $p) {
         }
     }
 
+    // Drop fields with nothing to show — the view would render them as a
+    // bare "—" placeholder, which is just noise on the ticket.
+    $customFields = array_values(array_filter(
+        $customFields,
+        fn($f) => customFieldHasDisplayValue(
+            $f['field_type'],
+            $fieldValues[$f['id']] ?? '',
+            $fieldOptions[$f['id']] ?? []
+        )
+    ));
+
     // Is the current user watching this ticket?
     $watchStmt = $db->prepare('SELECT 1 FROM ticket_watchers WHERE ticket_id = ? AND user_id = ?');
     $watchStmt->execute([$ticket['id'], Auth::id()]);

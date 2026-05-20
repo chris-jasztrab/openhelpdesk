@@ -383,6 +383,44 @@ function getCustomFieldTypeMap(PDO $db): array
     return $map;
 }
 
+/**
+ * Whether a stored custom-field value is worth showing on the ticket-view
+ * "Custom Fields" panel — i.e. it would render real data rather than the
+ * bare "&mdash;" placeholder. A checkbox always counts (it renders Yes/No).
+ * Mirrors the per-type rendering in the agent/portal ticket-view templates.
+ */
+function customFieldHasDisplayValue(string $fieldType, $value, array $options = []): bool
+{
+    if ($fieldType === 'checkbox') {
+        return true;
+    }
+    $value = (string) ($value ?? '');
+    if ($value === '') {
+        return false;
+    }
+    if ($fieldType === 'dropdown') {
+        foreach ($options as $o) {
+            if ((int) $o['id'] === (int) $value) return true;
+        }
+        return false;
+    }
+    if ($fieldType === 'dependent') {
+        $dep = json_decode($value, true) ?: [];
+        foreach (['l1', 'l2', 'l3'] as $lk) {
+            if (empty($dep[$lk])) continue;
+            foreach ($options as $o) {
+                if ((int) $o['id'] === (int) $dep[$lk]) return true;
+            }
+        }
+        return false;
+    }
+    if ($fieldType === 'date_range') {
+        $dr = json_decode($value, true) ?: [];
+        return !empty($dr['from']) || !empty($dr['to']);
+    }
+    return true;
+}
+
 /* ── Flash messages ───────────────────────────────────────────── */
 
 function flash(string $key, string $message): void
