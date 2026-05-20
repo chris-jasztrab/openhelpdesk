@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.49.3 &mdash; 2026-05-20
+
+### Fixed
+- **Agent floor-ticket timeline no longer shows literal `&nbsp;` entities.** The per-ticket "Recent activity" body at [templates/pages/agent/floor-ticket.php](templates/pages/agent/floor-ticket.php) stripped HTML tags but escaped the result with `e()` without decoding entities, so `&nbsp;` in comment bodies rendered as visible `&nbsp;` text. It now decodes entities and inserts separators before tags (same plain-text treatment as the admin-dashboard fix in 2.49.2).
+
+---
+
 ## 2.49.2 &mdash; 2026-05-20
 
 ### Fixed

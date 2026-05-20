@@ -308,8 +308,16 @@ $ticketId = (int) $ticket['id'];
                             <?= e($tlAgeStr) ?>
                             <?php if (!empty($tl['is_internal'])): ?> · <span title="Internal note"><i class="bi bi-lock-fill"></i> internal</span><?php endif; ?>
                         </div>
-                        <?php if (!empty($tl['details'])): ?>
-                            <div class="tl-body"><?= nl2br(e(strip_tags((string) $tl['details']))) ?></div>
+                        <?php
+                        // details holds raw HTML (e.g. comment bodies); strip tags and
+                        // decode entities so the body shows plain text, not markup.
+                        $tlBody = trim(preg_replace('/\s+/', ' ', html_entity_decode(
+                            strip_tags(str_replace('<', ' <', (string) ($tl['details'] ?? ''))),
+                            ENT_QUOTES | ENT_HTML5
+                        )));
+                        ?>
+                        <?php if ($tlBody !== ''): ?>
+                            <div class="tl-body"><?= e($tlBody) ?></div>
                         <?php endif; ?>
                     </li>
                 <?php endforeach; ?>
