@@ -409,7 +409,7 @@ localdesk/
 ├── database/
 │   ├── migrations/             # Numbered migration files (auto-applied on startup)
 │   ├── migrate.php             # Migration runner (invoked by src/bootstrap.php each request)
-│   ├── schema.sql              # Full database schema snapshot (49 tables)
+│   ├── schema.sql              # Full database schema snapshot (50 tables)
 │   ├── seed.php                # Drop, recreate, and seed demo data (dev only)
 │   └── seed_test_data.php      # Drop, recreate, and seed two months of test data (dev only)
 ├── public/

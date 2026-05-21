@@ -36,11 +36,15 @@ return static function (PDO $pdo): void {
     // Now drop the old unique index on priority_id
     $pdo->exec("ALTER TABLE `sla_policies` DROP INDEX `priority_id`");
 
-    // Re-add the FK on priority_id, plus the new composite unique and type_id FK
+    // Re-add the FK on priority_id, plus the new composite unique and type_id FK.
+    // The type_id FK must be ON DELETE RESTRICT (not CASCADE): type_id is the base
+    // column of the `type_id_norm` generated column, and MySQL 8 rejects a
+    // cascading FK on such a column (errno 1215). MariaDB allows it, but keeping
+    // RESTRICT here makes the migration portable across both engines.
     $pdo->exec("
         ALTER TABLE `sla_policies`
         ADD UNIQUE KEY `uniq_type_priority` (`type_id_norm`, `priority_id`),
         ADD FOREIGN KEY (`priority_id`) REFERENCES `ticket_priorities`(`id`) ON DELETE CASCADE,
-        ADD FOREIGN KEY (`type_id`) REFERENCES `ticket_types`(`id`) ON DELETE CASCADE
+        ADD FOREIGN KEY (`type_id`) REFERENCES `ticket_types`(`id`) ON DELETE RESTRICT
     ");
 };

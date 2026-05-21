@@ -330,7 +330,7 @@ Sensible defaults:
 The installer recaps every value you entered (passwords masked) and waits for you to click **Run Installation**. When you do, it:
 
 1. Writes `.env` with the values you gave it.
-2. Connects to the database and applies `database/schema.sql` (49 tables).
+2. Connects to the database and applies `database/schema.sql` (50 tables).
 3. Records every existing migration as already-applied in `schema_migrations` so future migrations layer on cleanly without re-running history.
 4. Seeds the four default priorities — Low, Medium, High, Critical — each with a colour.
 5. Creates your admin user.

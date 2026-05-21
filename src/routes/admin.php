@@ -1974,6 +1974,12 @@ $router->post('/admin/types/{id}/delete', function (array $p) {
         $db->prepare('UPDATE tickets SET type_id = ? WHERE type_id = ?')->execute([$newTypeId, $id]);
     }
 
+    // sla_policies.type_id uses an ON DELETE RESTRICT foreign key (it cannot
+    // cascade — MySQL forbids a cascading FK on the base column of the
+    // `type_id_norm` generated column), so clear per-type SLA policies by hand
+    // before deleting the type, or the DELETE below would be rejected.
+    $db->prepare('DELETE FROM sla_policies WHERE type_id = ?')->execute([$id]);
+
     $db->prepare('DELETE FROM ticket_types WHERE id = ?')->execute([$id]);
 
     // Audit log + email alert for confidential type deletion

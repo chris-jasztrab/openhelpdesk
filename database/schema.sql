@@ -352,6 +352,19 @@ CREATE TABLE IF NOT EXISTS `notifications` (
   CONSTRAINT `notifications_ibfk_3` FOREIGN KEY (`timeline_id`) REFERENCES `ticket_timeline` (`id`) ON DELETE CASCADE,
   CONSTRAINT `notifications_ibfk_4` FOREIGN KEY (`mentioned_by`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS `password_resets` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` int(10) unsigned NOT NULL,
+  `token_hash` char(64) NOT NULL,
+  `expires_at` datetime NOT NULL,
+  `used_at` datetime DEFAULT NULL,
+  `requested_ip` varchar(45) DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_password_resets_token` (`token_hash`),
+  KEY `idx_password_resets_user` (`user_id`,`created_at`),
+  CONSTRAINT `fk_password_resets_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE IF NOT EXISTS `recurring_tickets` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `name` varchar(255) NOT NULL,
@@ -447,7 +460,11 @@ CREATE TABLE IF NOT EXISTS `sla_policies` (
   KEY `priority_id` (`priority_id`),
   KEY `type_id` (`type_id`),
   CONSTRAINT `sla_policies_ibfk_1` FOREIGN KEY (`priority_id`) REFERENCES `ticket_priorities` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `sla_policies_ibfk_2` FOREIGN KEY (`type_id`) REFERENCES `ticket_types` (`id`) ON DELETE CASCADE
+  -- type_id MUST stay ON DELETE RESTRICT, not CASCADE: it is the base column of
+  -- the `type_id_norm` generated column, and MySQL 8 (unlike MariaDB) rejects a
+  -- cascading foreign key on such a column with "errno 1215". The ticket-type
+  -- delete handler clears dependent sla_policies rows explicitly instead.
+  CONSTRAINT `sla_policies_ibfk_2` FOREIGN KEY (`type_id`) REFERENCES `ticket_types` (`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE IF NOT EXISTS `status_banners` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,

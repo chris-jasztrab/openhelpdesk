@@ -11,6 +11,14 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.52.2 &mdash; 2026-05-21
+
+### Fixed
+- **A fresh install now completes on MySQL 8.** The installer aborted at the schema step with `SQLSTATE[HY000]: General error: 1215 Cannot add foreign key constraint`. The cause was in [database/schema.sql](database/schema.sql): the `sla_policies` table has a stored generated column `type_id_norm` (`COALESCE(type_id, 0)`, used for NULL-safe uniqueness), and its `type_id` foreign key to `ticket_types` was declared `ON DELETE CASCADE`. MySQL 8 rejects a cascading foreign key on the base column of a generated column; MariaDB allows it, so the MariaDB-dumped schema passed on dev but failed on a MySQL 8 target. The `sla_policies` → `ticket_types` foreign key (and the matching `ADD FOREIGN KEY` in [migration 018](database/migrations/018_sla_policies_type_id.php)) is now `ON DELETE RESTRICT`, which both engines accept. To preserve the previous cleanup behaviour, the ticket-type delete handler in [src/routes/admin.php](src/routes/admin.php) now removes that type's `sla_policies` rows explicitly before deleting the type. The `priority_id` foreign key keeps `ON DELETE CASCADE` — it is not a generated-column base column and was never affected.
+- **Fresh installs now create the `password_resets` table.** [database/schema.sql](database/schema.sql) was missing the `password_resets` table (introduced by [migration 040](database/migrations/040_password_resets.php)). Because the installer applies `schema.sql` and then records every migration as already-applied baseline, migration 040 never ran on a fresh install and the table was absent — the "Forgot password" / self-service reset flow would fail. The table is now part of `schema.sql` (50 tables total). Existing installs that already ran migration 040 are unaffected; the `CREATE TABLE IF NOT EXISTS` is a no-op for them.
+
+---
+
 ## 2.52.1 &mdash; 2026-05-21
 
 ### Documentation
