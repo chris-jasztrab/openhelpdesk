@@ -2074,6 +2074,23 @@ function emailContent(string $content): string
 
 function sendMail(string $toEmail, string $toName, string $subject, string $htmlBody, string $textBody = '', ?int $ticketId = null): string|false
 {
+    // Outbound-mail kill switch. Dev and test instances set MAIL_ENABLED=false
+    // in .env so running the suite (or local dev) never delivers real mail to
+    // real recipients — the helpdesk DB carries live SMTP credentials, so a
+    // single test ticket would otherwise email every member of a notified group.
+    if (env('MAIL_ENABLED', 'true') === 'false') {
+        $logDir = ROOT_DIR . '/storage/logs';
+        if (is_dir($logDir)) {
+            file_put_contents(
+                $logDir . '/smtp.log',
+                sprintf("[%s] sendMail() SKIPPED — MAIL_ENABLED=false — to=%s subject=%s\n",
+                    date('Y-m-d H:i:s'), $toEmail, $subject),
+                FILE_APPEND | LOCK_EX
+            );
+        }
+        return false;
+    }
+
     $host = getSetting('smtp_host');
     if ($host === '') {
         return false; // SMTP not configured — silently skip

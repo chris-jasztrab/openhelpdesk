@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.51.1 &mdash; 2026-05-21
+
+### Fixed
+- **The test suite no longer delivers real email to real recipients.** `sendMail()` in [src/helpers.php](src/helpers.php) now honours a `MAIL_ENABLED` flag in `.env` — when set to `false` it logs a skipped-send line to `storage/logs/smtp.log` and returns without contacting SMTP. Dev, staging, and test instances should set `MAIL_ENABLED=false` (now the default in this repo's `.env` and documented in [.env.example](.env.example) and [phpunit.xml](phpunit.xml)). Previously, because feature tests create real tickets against a database that carries live SMTP credentials, every test ticket fired `notifyGroupMembers()` and emailed every member of a notified group — so running the suite locally sent `[TEST]` "New Ticket" messages to live staff. Production omits the flag (or sets it `true`) and is unaffected.
+
+---
+
 ## 2.51.0 &mdash; 2026-05-21
 
 ### Added

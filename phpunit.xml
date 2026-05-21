@@ -16,6 +16,10 @@
         <!--
             Override these with environment variables or edit here.
             TEST_BASE_URL: URL the app is served at (e.g. php -S localhost:8000 -t public)
+
+            IMPORTANT: the app instance under test must run with MAIL_ENABLED=false
+            in its .env. Feature tests create real tickets, which notify real
+            group members — without the kill switch the suite emails live staff.
         -->
         <env name="TEST_BASE_URL" value="http://localhost:8000"/>
     </php>
