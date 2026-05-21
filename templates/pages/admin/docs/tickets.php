@@ -142,6 +142,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-intersect text-primary me-2"></i>Merging Tickets</h5>
 <p class="text-muted mb-2">When a requester submits duplicate tickets about the same issue, you can merge them. The secondary ticket is closed and its history is linked to the primary ticket.</p>
+<p class="text-muted mb-2">To stop duplicates from being filed in the first place, see <a href="/admin/docs/ai#duplicate-detection">AI duplicate-ticket detection</a> — an optional check that warns the submitter when their new ticket looks like one that already exists.</p>
 <ol class="text-muted mb-3">
     <li>Open the ticket you want to keep as the <strong>primary</strong>.</li>
     <li>Click <strong>Merge</strong> in the ticket actions panel.</li>
@@ -163,7 +164,29 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
     <li><strong>Internal Notes</strong> — private agent notes (highlighted with your configured note colour). Never visible to portal users.</li>
     <li><strong>System Events</strong> — status changes, priority changes, assignments, SLA updates, merges (highlighted with your configured system colour). Visible to agents and admins only — portal users do not see system events.</li>
 </ul>
-<p class="text-muted mb-0">File attachments are displayed <strong>inline</strong> within the timeline entry they were uploaded with, so agents can preview images and download files without leaving the ticket view.</p>
+<p class="text-muted mb-2">File attachments are displayed <strong>inline</strong> within the timeline entry they were uploaded with, so agents can preview images and download files without leaving the ticket view.</p>
+<h6 class="fw-semibold mt-3">Hiding system &amp; AI notes</h6>
+<p class="text-muted mb-2">A busy timeline can fill with automated entries — SLA timer events, escalation reminders, automatic group assignment, AI classifications. Admins get two switches in the <strong>Timeline</strong> card header to declutter the view:</p>
+<ul class="text-muted mb-2">
+    <li><strong>System notes</strong> — shows or hides <em>every</em> automated, human-author-less entry.</li>
+    <li><strong>AI notes</strong> — shows or hides just the AI-generated entries (group classification, skill suggestions). This switch only appears when the ticket actually has AI notes. AI notes are a subset of system notes, so turning <em>System notes</em> off also hides AI notes.</li>
+</ul>
+<p class="text-muted mb-0">Flipping a switch takes effect instantly and is remembered for your account across every ticket and session — it sets the same per-user default you can also change at <strong>My Profile → System Timeline Notes / AI Timeline Notes</strong>. The notes are only hidden from view, never deleted, and the switches are admin-only; agents and portal users are unaffected. Defaults to showing everything.</p>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4" id="solution">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-check-circle text-success me-2"></i>Marking a Comment as the Solution</h5>
+<p class="text-muted mb-2">On a long ticket the answer often ends up buried halfway down the timeline. Agents and admins can flag the comment that resolved the issue so everyone can jump straight to it.</p>
+<ul class="text-muted mb-2">
+    <li>Every customer-visible reply in the timeline shows a small <strong>Mark as solution</strong> button next to its timestamp. Click it to flag that comment.</li>
+    <li>Once a comment is marked, a green alert with a <strong>Go to solution</strong> button appears at the top of the ticket — on the agent, admin, <em>and</em> the requester's portal view. It scrolls to the marked comment, which gets a green left border and a <strong>Solution</strong> badge.</li>
+    <li>A ticket has one solution at a time. Marking a different comment replaces the previous one; use <strong>Unmark</strong> to clear it.</li>
+</ul>
+<div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
+    Internal notes can't be marked — the requester can't see them, so a "Go to solution" link would point at nothing on the portal. Marking a solution does <em>not</em> change the ticket status: you can flag a candidate fix while a ticket is still <em>Waiting on Customer</em> and resolve it separately. On the portal the button is labelled <strong>Answer</strong> by default — rename it under <a href="/admin/settings/labels">Settings → Application name &amp; labels</a>.
+</div>
 </div>
 </div>
 
@@ -227,15 +250,21 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-ui-checks-grid text-primary me-2"></i>What the Form Builder is for</h5>
-<p class="text-muted mb-2">The <strong>Ticket Form Builder</strong> at <a href="/admin/workflows/ticket-fields"><strong>Admin → Settings → Custom Fields</strong></a> controls everything that appears on the <em>New Ticket</em> form — both on the public portal and inside the admin/agent "Create Ticket" view. Anything you change here takes effect immediately for the next person who opens the form. There is no "publish" step.</p>
-<p class="text-muted mb-2">The page shows three kinds of rows in a single, drag-to-reorder list:</p>
+<p class="text-muted mb-2">The <strong>Form Builder</strong> at <a href="/admin/workflows/ticket-fields"><strong>Admin → Settings → Custom Fields</strong></a> controls everything that appears on the <em>New Ticket</em> form — both on the public portal and inside the admin/agent "Create Ticket" view. Anything you change here takes effect immediately for the next person who opens the form. There is no "publish" step.</p>
+<p class="text-muted mb-2"><strong>Every ticket type has its own form.</strong> The page is laid out as a left rail of ticket types and a canvas:</p>
 <ul class="text-muted mb-3">
-    <li><strong>Pinned Fields</strong> — <em>Subject</em> and <em>Description</em>. Always at the very top of the form. Their labels can be renamed (pencil icon), but they can't be moved or removed.</li>
-    <li><strong>System Fields</strong> — <em>Ticket Type</em>, <em>Location</em>, <em>Priority</em>, <em>Tags</em>, and <em>Attachments</em>. Built-in fields the application needs in order to function. You can rename them, toggle <em>required</em> on the ones that support it, and drag them up or down relative to the custom fields. They can't be deleted.</li>
-    <li><strong>Custom Fields</strong> — anything you add via the <strong>+ Add Custom Field</strong> dropdown. Twelve field types are supported (see the table below). Custom fields can be edited, deleted, reordered, marked required, hidden from portal users, and scoped to specific ticket types.</li>
+    <li><strong>Type rail (left)</strong> — pick the ticket type whose form you want to edit. The canvas swaps to that type's layout.</li>
+    <li><strong>Canvas (middle)</strong> — the fields on the selected type's form, in the order requesters see them.</li>
+    <li><strong>Live Preview (right)</strong> — an optional pane (see below) showing the real portal form for that type.</li>
+</ul>
+<p class="text-muted mb-2">The canvas shows three kinds of rows:</p>
+<ul class="text-muted mb-3">
+    <li><strong>Pinned Fields</strong> — <em>Subject</em> and <em>Description</em>. Always at the very top of every type's form, always Required, and can't be moved or removed. Their labels can be renamed (pencil icon).</li>
+    <li><strong>System Fields</strong> — <em>Ticket Type</em>, <em>Location</em>, <em>Priority</em>, <em>Tags</em>, and <em>Attachments</em>. Built-in fields the application needs in order to function. You can rename them, drag them to reorder, and change their visibility (Required / Optional / Hidden) per type. They can't be deleted.</li>
+    <li><strong>Custom Fields</strong> — anything you add via <strong>Add field</strong>. Twelve field types are supported (see the table below). Custom fields can be edited, reordered, given a visibility per type, shared onto other types, removed from a type, or deleted entirely.</li>
 </ul>
 <div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
-    The order of rows on this page <em>is</em> the order users see on the form. Pinned fields are locked at the top; everything else flows in whatever order you arrange. There is no separate "form layout" screen.
+    Drag, reorder and visibility changes apply to the <em>currently selected ticket type only</em>. The same custom field can be Required on one type, Optional on another, and Hidden on a third — each type carries its own authoritative layout.
 </div>
 </div>
 </div>
@@ -263,63 +292,59 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
     </tbody>
 </table>
 </div>
-<p class="text-muted small mt-3 mb-0"><strong>About requirement and visibility:</strong> Most types let you mark them <em>Required</em> (red badge) and let you <em>Hide from portal users</em> (eye-slash icon). Hidden fields are still shown on the admin <em>Create Ticket</em> view — useful for admin-only metadata you don't want patrons filling in. <em>Text Block</em> and <em>Image</em> are display-only, so they don't have these toggles.</p>
+<p class="text-muted small mt-3 mb-0"><strong>About requirement and visibility:</strong> Whether a field is Required, Optional, or Hidden is set <em>per ticket type</em> with the visibility pill on each row — see the next section. <em>Text Block</em> and <em>Image</em> are display-only, so their pill is fixed to Optional (they collect no input).</p>
 </div>
 </div>
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-tag-fill text-primary me-2"></i>Field Scope: Global vs Specific to Ticket Type</h5>
-<p class="text-muted mb-2">Every custom field has a <strong>scope</strong> that decides which ticket types' forms it appears on. Scope is shown as a coloured pill in the field's row on the builder list:</p>
+<h5 class="fw-semibold mb-3"><i class="bi bi-eye-fill text-primary me-2"></i>Field Visibility: Required, Optional, Hidden</h5>
+<p class="text-muted mb-2">Every field row carries a coloured <strong>visibility pill</strong>. Click it to cycle the field through three states — for the <em>currently selected ticket type</em> only:</p>
 <ul class="text-muted mb-3">
-    <li><span class="scope-pill scope-global" style="display:inline-flex;align-items:center;gap:.3rem;font-size:.7rem;padding:.2rem .55rem;border-radius:999px;background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;"><i class="bi bi-globe2"></i>Global</span> &nbsp; The field appears on the form regardless of which ticket type the user picks. Use this for things you always want to ask — <em>"Have you tried turning it off and on again?"</em>, <em>"Where can we reach you?"</em>.</li>
-    <li><span class="scope-pill scope-specific" style="display:inline-flex;align-items:center;gap:.3rem;font-size:.7rem;padding:.2rem .55rem;border-radius:999px;background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;"><i class="bi bi-tag-fill"></i>2 types</span> &nbsp; The field <em>only</em> appears when the user picks one of the listed ticket types. Hover the pill to see the names. Use this for type-specific data — a "printer model" field that only makes sense on <em>Printer Issue</em> tickets, an "outage start time" that only makes sense on <em>Outage Report</em>.</li>
+    <li><span class="badge" style="background:#fee2e2;color:#991b1b;">Required</span> &nbsp; The field shows on the form and must be filled in before the ticket can be submitted.</li>
+    <li><span class="badge" style="background:#e0e7ff;color:#3730a3;">Optional</span> &nbsp; The field shows on the form but can be left blank.</li>
+    <li><span class="badge" style="background:#f1f5f9;color:#475569;">Hidden</span> &nbsp; The field does not appear on that type's form at all. Hidden rows are drawn with a hatched background in the builder so the state is obvious at a glance.</li>
 </ul>
-<p class="text-muted mb-2">Setting the scope happens inside the field's edit dialog (pencil icon). The first thing in the dialog is a segmented switch:</p>
-<div class="bg-light rounded p-3 mb-3">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;background:#f1f5f9;border-radius:.55rem;padding:.25rem;">
-        <div style="text-align:center;padding:.55rem .5rem;border-radius:.4rem;background:#fff;color:#4f46e5;font-size:.85rem;font-weight:500;box-shadow:0 1px 2px rgba(15,23,42,.06);"><i class="bi bi-globe2 me-1"></i>All ticket types</div>
-        <div style="text-align:center;padding:.55rem .5rem;border-radius:.4rem;color:#64748b;font-size:.85rem;font-weight:500;"><i class="bi bi-tag-fill me-1"></i>Only specific types</div>
-    </div>
-</div>
-<p class="text-muted mb-2">Pick <strong>All ticket types</strong> for a global field. Pick <strong>Only specific types</strong> to reveal a checkbox grid of every ticket type — tick the ones the field should appear on. The form refuses to save a "specific" field with zero boxes ticked, so you can't accidentally orphan a field by switching modes and not picking anything.</p>
-<p class="text-muted mb-0">Switching back from <em>Specific</em> to <em>All</em> automatically clears the checkbox state, so a stale list can never be saved by accident.</p>
-</div>
-</div>
-
-<div class="card border-0 shadow-sm mb-4">
-<div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-eye-fill text-primary me-2"></i>"Preview as" — Filter the List by Ticket Type</h5>
-<p class="text-muted mb-2">Once you start scoping fields to specific types, the field list quickly becomes hard to read at a glance — you can't easily answer <em>"what does the form actually look like for a Hardware ticket?"</em> just by scanning the rows. The <strong>Preview as</strong> chip strip at the top of the Form Fields card solves that.</p>
-<p class="text-muted mb-2">The strip is a horizontal scrolling row of chips — one for each ticket type, plus an <em>All types</em> chip on the left. Each chip carries a count of how many fields would land on that type's form (Pinned + System + every Global custom field + every Specific-to-this-type custom field).</p>
-<p class="text-muted mb-2">Click any chip and the field list filters in place to show <em>exactly</em> the fields a user filling in that ticket type would see, in the order they'd see them. Custom fields that don't apply to the chosen type are hidden. The visible custom rows pick up a subtle left-border accent so you can see scope at a glance:</p>
-<ul class="text-muted mb-3">
-    <li><strong>Grey accent</strong> — Global field (would appear on every type, including this one).</li>
-    <li><strong>Indigo accent</strong> — Specific to the currently-filtered type.</li>
-</ul>
-<p class="text-muted mb-2">An indigo banner appears at the top of the card while a filter is active, naming the ticket type and the visible field count. <strong>Drag-to-reorder is disabled while a filter is on</strong> — ordering is global, not per-type, and the banner spells that out: <em>"Reordering applies to all forms; switch to All types to reorder."</em> Click the <em>Clear</em> button on the banner (or the <em>All types</em> chip) to leave the filter view.</p>
+<p class="text-muted mb-2">Because visibility is per-type, the same field can be Required on <em>Hardware Issue</em>, Optional on <em>General Enquiry</em>, and Hidden on <em>Lost &amp; Found</em> — no global setting, no juggling separate screens.</p>
+<p class="text-muted mb-2"><strong>Subject</strong> and <strong>Description</strong> are pinned and locked to Required. The <strong>Priority</strong> system field is a good Hidden candidate for ticket types where the requester shouldn't be picking severity (e.g. a "Key cut request" type where every ticket lands at the same urgency).</p>
 <div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
-    Quality-of-life: when a type filter is active and you click <strong>+ Add Custom Field</strong>, the new field's edit dialog opens pre-scoped to that type. So if you're previewing the <em>Hardware</em> form and add a "Printer model" field, it lands on the <em>Hardware</em> form by default — no need to remember to flip the scope after creating it.
+    Visibility is enforced on the server, not just in the browser. A Required field still fails closed if its input is stripped, and when <strong>Priority</strong> is Hidden the ticket is created with the system default priority so SLA timers, escalation, and list views keep working — agents can still change it afterwards.
 </div>
 </div>
 </div>
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-display text-primary me-2"></i>Live Preview Pane</h5>
-<p class="text-muted mb-2">The chip strip filters the <em>builder list</em>, but the builder list is still a list of admin rows — labels, badges, edit buttons. To see what the form genuinely <em>looks like</em> to a user (with the actual input controls, dropdown options, dependent cascades, image fields, text blocks, all rendered for real), click the <strong>Live Preview</strong> button next to <em>+ Add Custom Field</em>.</p>
-<p class="text-muted mb-2">The page splits into two columns:</p>
+<h5 class="fw-semibold mb-3"><i class="bi bi-arrow-left-right text-primary me-2"></i>Adding &amp; Sharing Fields Across Ticket Types</h5>
+<p class="text-muted mb-2">Two buttons at the bottom of the canvas add fields to the selected type's form:</p>
 <ul class="text-muted mb-3">
-    <li><strong>Left column</strong> — the field-builder list as before. Filtering with the <em>Preview as</em> chip strip still works.</li>
-    <li><strong>Right column</strong> — a pinned preview pane that iframes the real <code>/portal/tickets/create</code> page in a chrome-less <em>preview mode</em> (no navbar, no sidebar, no tour overlays, the <em>Submit</em> button is disabled). The preview is the actual portal renderer — there is no parallel "preview engine" that could ever drift out of sync with what users see.</li>
+    <li><strong>Add field</strong> — creates a brand-new custom field (pick one of the twelve types) and places it on this type's form.</li>
+    <li><strong>Add existing field</strong> — picks a custom field that already exists on another type and shares it onto this one. The field definition (label, options, etc.) is shared; only the visibility and position are per-type.</li>
 </ul>
-<p class="text-muted mb-2">Switching chips on the left swaps the preview's <code>type_id</code> deep-link, so the iframe always reflects the form for the currently-filtered ticket type — including dynamic show/hide of type-scoped fields, dependent cascades, image fields, and text blocks. Adding, editing, deleting, or reordering a field automatically reloads the iframe, and the pane has its own controls in its header:</p>
+<p class="text-muted mb-2">To manage which types a field appears on, click the <strong>pencil</strong> icon on its row. The edit dialog has an <strong>"Also show this field on"</strong> checkbox list of every ticket type — tick a type to add the field to its form, untick to remove it. You can also set a per-type <strong>label override</strong> here so the same field can read "Device model" on one type and "Equipment ID" on another.</p>
+<p class="text-muted mb-2">Two ways to take a field off a form:</p>
 <ul class="text-muted mb-3">
-    <li><strong>Reload</strong> (circular arrow) — manually refresh the preview, e.g. after editing something in another tab.</li>
-    <li><strong>Open in new tab</strong> (square-arrow icon) — opens the live (non-preview) form in a new tab with the type pre-selected, so you can submit a real test ticket if you want to.</li>
-    <li><strong>Close</strong> — collapses the preview pane back to a single-column builder.</li>
+    <li><strong>Remove from this type</strong> (the <strong>&times;</strong> on the row) — drops the field from the selected type's form only. The field definition is preserved and tickets that already used it keep their saved values; re-add it any time via <em>Add existing field</em>.</li>
+    <li><strong>Delete field entirely</strong> (red button in the edit dialog) — removes the field from <em>every</em> ticket type. Use this only when the field is genuinely retired.</li>
 </ul>
-<p class="text-muted small mb-0">On screens narrower than 1200&nbsp;px the preview drops below the field list rather than next to it, so the form remains readable on laptops and tablets.</p>
+<div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
+    Removing a field from a type — or deleting it entirely — never destroys data already entered on past tickets. Historical values are always retained and still shown on those tickets.
+</div>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-display text-primary me-2"></i>Live Preview</h5>
+<p class="text-muted mb-2">The canvas is a list of admin rows — labels, badges, pills. To see what the form genuinely <em>looks like</em> to a requester, click the <strong>Live Preview</strong> button at the top right of the page. A third column opens alongside the canvas.</p>
+<p class="text-muted mb-2">The preview pane iframes the real <code>/portal/tickets/create</code> page for the selected ticket type, in a chrome-less embed mode (no navbar, no sidebar). It is the actual portal renderer, so the input controls, dropdown options, dependent cascades, image fields, and text blocks all render exactly as a requester will see them — there is no separate "preview engine" to drift out of sync.</p>
+<p class="text-muted mb-2">Switching ticket types in the left rail swaps the preview to that type's form. The pane header has three controls:</p>
+<ul class="text-muted mb-3">
+    <li><strong>Reload</strong> (circular arrow) — refresh the preview after a change.</li>
+    <li><strong>Open in new tab</strong> (box-arrow icon) — opens the live form in a new tab with the type pre-selected, so you can submit a real test ticket.</li>
+    <li><strong>Close</strong> — collapses the preview back to a two-column builder.</li>
+</ul>
+<p class="text-muted small mb-0">Whether the preview pane is open is remembered in your browser, so it stays open the next time you visit the builder. On narrow screens the preview drops below the canvas rather than beside it.</p>
 </div>
 </div>
 

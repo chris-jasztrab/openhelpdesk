@@ -24,6 +24,23 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-toggle-on text-primary me-2"></i>Turning SLA Tracking On or Off</h5>
+<p class="text-muted mb-2">SLA tracking is a site-wide feature you can switch off entirely. The <strong>Enable SLA tracking</strong> switch at the top of <a href="/admin/settings/sla-policies"><strong>Admin → Settings → SLA Policies</strong></a> controls it for the whole helpdesk.</p>
+<p class="text-muted mb-2">While SLA tracking is <strong>disabled</strong>:</p>
+<ul class="text-muted mb-2">
+    <li>New tickets get no first-response or resolution due dates, and priority/type changes and pending pauses no longer touch SLA.</li>
+    <li>The SLA state badge and the SLA card disappear from agent and admin ticket views.</li>
+    <li>The <strong>SLA</strong> column drops out of every ticket list (and its column picker) and the Unresolved Tickets report.</li>
+    <li>The SLA Compliance report shows a "disabled" banner instead of figures.</li>
+</ul>
+<div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
+    Switching SLA tracking off leaves your existing policies and all historical SLA data intact — nothing is deleted. Turn the switch back on and tracking resumes for tickets created from that point. SLA tracking is <strong>enabled by default</strong>.
+</div>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-plus-circle text-primary me-2"></i>Creating an SLA Policy</h5>
 <ol class="text-muted mb-3">
     <li>Go to <a href="/admin/sla"><strong>Admin → SLA Policies</strong></a>.</li>

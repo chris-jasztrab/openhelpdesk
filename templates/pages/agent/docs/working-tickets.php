@@ -104,7 +104,23 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/agent/help'], ['label' => 'Worki
     <li><strong>Internal Notes</strong> — private agent notes, highlighted in your configured note colour. Never shown to portal users.</li>
     <li><strong>System Events</strong> — status changes, assignments, priority changes, SLA events, merges, highlighted in your configured system colour. Not visible to portal users.</li>
 </ul>
-<p class="text-muted mb-0">File attachments are shown inline within the entry they were uploaded with. The timeline loads the 10 most recent entries first — click <strong>Load older entries</strong> to see the full history.</p>
+<p class="text-muted mb-2">File attachments are shown inline within the entry they were uploaded with. The timeline loads the 10 most recent entries first — click <strong>Load older entries</strong> to see the full history.</p>
+<div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
+    Admins see two switches in the Timeline header — <strong>System notes</strong> and <strong>AI notes</strong> — to hide automated entries (SLA events, AI classifications, and similar) and keep the focus on the conversation. The choice sticks to the admin's account across tickets. The notes are only hidden from view, never deleted.
+</div>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-check-circle text-success me-2"></i>Marking a Comment as the Solution</h5>
+<p class="text-muted mb-2">When a ticket's answer is buried partway down a long timeline, you can flag the comment that resolved it:</p>
+<ul class="text-muted mb-2">
+    <li>Every customer-visible reply shows a small <strong>Mark as solution</strong> button next to its timestamp. Click it to flag that comment.</li>
+    <li>The ticket then shows a green alert with a <strong>Go to solution</strong> button at the top — for you, for admins, and for the requester on their portal view — that jumps to the marked comment.</li>
+    <li>There is one solution per ticket; marking another comment replaces it, and <strong>Unmark</strong> clears it.</li>
+</ul>
+<p class="text-muted mb-0">Internal notes can't be marked (the requester can't see them). Marking a solution does not change the ticket's status — resolve it separately when you're ready.</p>
 </div>
 </div>
 

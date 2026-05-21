@@ -60,6 +60,33 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 </div>
 </div>
 
+<div class="card border-0 shadow-sm mb-4" id="duplicate-detection">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-files text-info me-2"></i>Duplicate-Ticket Detection</h5>
+<p class="text-muted mb-3">Sites with multiple shifts often file the same ticket twice — staff don't routinely scan every open ticket before opening their own. Duplicate detection asks the AI, at submit time, whether the new ticket looks like one that already exists, and warns the submitter before the duplicate is created.</p>
+
+<h6 class="fw-semibold mt-3 mb-2">How it works</h6>
+<ol class="text-muted mb-3">
+    <li>When someone clicks <strong>Submit</strong> on a ticket type that has duplicate detection enabled, the new subject + description are run through AI against open, non-confidential tickets at the same location (last 14 days, up to 30 candidates).</li>
+    <li>Any match scoring above the type's confidence threshold is shown in a warning card on the create form: <em>"Oops! It looks like someone else might have already submitted a ticket for this issue."</em></li>
+    <li>The submitter can click <strong>Click here to see this ticket</strong> to preview the matched ticket — subject, status, when it was opened, who reported it, description, and reply count — in a modal, without leaving the form.</li>
+    <li>If it really is a different issue, they click <strong>Create anyway — This is a Different Issue</strong> to override and submit normally.</li>
+</ol>
+
+<h6 class="fw-semibold mt-3 mb-2">Turning it on</h6>
+<p class="text-muted mb-2">Duplicate detection is configured <strong>per ticket type</strong>, not globally. Edit a ticket type at <a href="/admin/types"><strong>Admin → Settings → Ticket Types</strong></a>:</p>
+<ul class="text-muted mb-3">
+    <li>Tick <strong>AI duplicate check</strong> to enable it for that type.</li>
+    <li>Set the <strong>threshold</strong> (0.50–0.99, default 0.75) — higher means only very close matches are flagged.</li>
+    <li>The toggle is blocked while <strong>Confidential</strong> is checked — confidential bodies are never sent to an AI provider, and confidential tickets never appear as candidate matches.</li>
+</ul>
+
+<div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
+    The check is wired into all three create paths (portal, agent/admin form, and floor-mode quick-create) and <strong>soft-fails</strong>: if the provider times out or errors, the ticket is created normally — duplicate detection never blocks submission. When a submitter overrides the warning, an <code>ai_duplicate_warned</code> note is added to the new ticket's timeline (visible to admins) recording which tickets it was flagged against.
+</div>
+</div>
+</div>
+
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-shield-lock text-success me-2"></i>Privacy &amp; Confidential Tickets</h5>
@@ -229,7 +256,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <h5 class="fw-semibold mb-3"><i class="bi bi-pencil-square text-primary me-2"></i>Override &amp; Re-Classify</h5>
 <p class="text-muted mb-2">Every ticket detail page has an <strong>AI Classification</strong> card in the sidebar (when enabled or when a verdict exists). From there:</p>
 <ul class="text-muted mb-0">
-    <li><strong>Override</strong> — open a modal and tick the skills the ticket actually needs. Your selection replaces the AI's for routing; the original verdict stays on the record. The override is audit-logged as <code>ai_classification_override</code> and posted as an internal timeline entry.</li>
+    <li><strong>Override</strong> — open a modal and tick the skills the ticket actually needs. Your selection replaces the AI's for routing; the original verdict stays on the record. The override is audit-logged as <code>ai.classification_override</code> and posted as an internal timeline entry.</li>
     <li><strong>Re-classify</strong> — re-runs the AI call (e.g. after editing the subject / body). Creates a fresh <code>ai_classifications</code> row; history is preserved.</li>
     <li><strong>Classify now</strong> — appears when a ticket has no classification yet (e.g. AI was disabled when it was created).</li>
 </ul>
@@ -266,7 +293,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <ul class="text-muted mb-0">
     <li>Every classification persists provider, model, latency, prompt + output token counts, and the raw provider response (for debugging).</li>
     <li>Internal timeline entries: <code>ai_classified</code> on every classification, <code>ai_priority_bumped</code> when sentiment triggers a bump, <code>ai_override</code> when a human edits the suggestion. Portal users never see these.</li>
-    <li>Audit log entries: <code>ai_settings_saved</code>, <code>ai_backfill_run</code>, <code>ai_classification_override</code>.</li>
+    <li>Audit log entries: <code>ai.settings_changed</code>, <code>ai.backfill_run</code>, <code>ai.classification_override</code> (visible in the <a href="/admin/audit-log">Audit Log</a>).</li>
     <li>The Recent Classifications strip on the AI settings page surfaces the last 10 runs at a glance — handy for confirming the integration is healthy after a model swap.</li>
 </ul>
 </div>

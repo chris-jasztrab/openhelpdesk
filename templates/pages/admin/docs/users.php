@@ -325,6 +325,22 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-key text-primary me-2"></i>Resetting a Forgotten Password</h5>
+<p class="text-muted mb-2">Users who can't remember their password don't need to contact an admin. The login page has a <strong>Forgot password?</strong> link next to the password field:</p>
+<ol class="text-muted mb-2">
+    <li>The user enters their email address on the request form.</li>
+    <li>If an account with a password exists for that address, a one-time reset link is emailed to them. The link is valid for 60 minutes and can be used once.</li>
+    <li>They click through, choose a new password, and are returned to the login page to sign in.</li>
+</ol>
+<p class="text-muted mb-2">This works for any account that has a password — portal users, agents, and admins alike. Accounts that sign in only through <a href="/admin/docs/sso">Microsoft 365 SSO</a> have no password to reset, which is expected.</p>
+<div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
+    The request form gives the same "if an account exists, we've sent a link" confirmation whether or not the email matches a real account, so it can't be used to discover which addresses have accounts. Requests are rate-limited per email address. Both the request and the completed reset are recorded in the <a href="#audit-log">audit log</a>. Admins can still reset a user's password directly from <a href="/admin/users">Admin → Users</a>.
+</div>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-shield-lock text-primary me-2"></i>Two-Factor Authentication (2FA)</h5>
 <p class="text-muted mb-2">Admins and agents can enable TOTP-based two-factor authentication from their profile page (<a href="/profile/2fa/setup"><strong>My Profile → Security → Enable 2FA</strong></a>).</p>
 <ol class="text-muted mb-3">
@@ -389,11 +405,30 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 </div>
 </div>
 
-<div class="card border-0 shadow-sm mb-4">
+<div class="card border-0 shadow-sm mb-4" id="audit-log">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-journal-text text-primary me-2"></i>Audit Log</h5>
-<p class="text-muted mb-2">Every significant admin action is recorded in the audit log, accessible at <a href="/admin/audit-log"><strong>Admin → Audit Log</strong></a>. Each entry shows the actor (who did it), the action taken, the target record, and a timestamp.</p>
-<p class="text-muted mb-0">Logged actions include: user creation and deletion, role changes, settings updates, SLA policy changes, automation rule changes, and more.</p>
+<p class="text-muted mb-2">Every significant action is recorded in the audit log at <a href="/admin/audit-log"><strong>Admin → Audit Log</strong></a>. Each entry shows the actor (who did it), the action, the target record, an IP address where one was captured, and a timestamp.</p>
+
+<h6 class="fw-semibold mt-3 mb-2">What gets logged</h6>
+<p class="text-muted mb-2">Coverage is broad — essentially every create, update, and delete across the admin surface, scaled to the actor's privilege. Highlights:</p>
+<ul class="text-muted mb-3">
+    <li><strong>Authentication</strong> — logins, failed logins, logouts, password changes, password resets, 2FA enable/disable/reset, and API-token issuance &amp; rotation.</li>
+    <li><strong>Configuration CRUD</strong> — locations, priorities, ticket types, groups, canned responses, agent skills, ticket templates, recurring tickets, automations, escalation rules, SLA policies, business hours &amp; holidays, scheduled reports, form fields, the knowledge base, and tenant settings (SMTP, Microsoft Graph, branding, email templates, and more). Update entries carry a <code>field: old → new</code> diff so you can see exactly what changed; secrets such as passwords and client secrets are recorded as <em>(rotated)</em> / <em>(changed)</em>, never in clear text.</li>
+    <li><strong>Bulk &amp; mass operations</strong> — bulk ticket close/assign/merge/delete, CSV imports (tickets, users, KB articles), backups, and the danger-zone factory reset, each with affected-row counts.</li>
+    <li><strong>Confidential access</strong> — every view of, and change to, a confidential group or ticket type (see <em>Confidential Groups</em> above).</li>
+</ul>
+
+<h6 class="fw-semibold mt-3 mb-2">Filtering &amp; the ticket timeline</h6>
+<p class="text-muted mb-2">The viewer can be filtered by actor, action, and date range. It also folds in <strong>per-ticket timeline events</strong> — status, priority, assignment, group, type, merge, escalation, and creation — so "who did what" lives in one pane without leaving the audit log:</p>
+<ul class="text-muted mb-3">
+    <li>A <strong>Source</strong> filter switches between <em>All sources</em>, <em>Audit log only</em>, and <em>Ticket history only</em>.</li>
+    <li>Each row carries a coloured <strong>Source</strong> badge — grey <em>Audit</em> or blue <em>Timeline</em> — so it's clear which write path it came from.</li>
+    <li>Ticket references in the detail column are clickable and open the ticket.</li>
+</ul>
+
+<h6 class="fw-semibold mt-3 mb-2">Pruning old entries</h6>
+<p class="text-muted mb-0">The audit log keeps entries forever by default. To trim it, use the red <strong>Prune older entries</strong> button in the page header: pick a cut-off date and confirm, and every entry older than that date is permanently deleted. The prune itself is logged (with the cut-off and the deleted-row count), so the record that pruning happened survives even after the pruned rows are gone.</p>
 </div>
 </div>
 

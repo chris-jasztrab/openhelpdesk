@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.52.1 &mdash; 2026-05-21
+
+### Documentation
+- **In-app help docs brought up to date with the last two weeks of features.** None of the feature work since 2.38.0 had reached the `/admin/docs` and `/agent/help` pages; this pass closes the gap. The **Form Builder** section of [admin/docs/tickets.php](templates/pages/admin/docs/tickets.php) was rewritten for the 2.42.0 per-ticket-type editor — the old copy still described the retired global field list with scope pills, the "Preview as" chip strip, and the segmented all/specific switch. It now covers the type rail, the per-type canvas, the Required/Optional/Hidden visibility pill (which also absorbs the 2.41.0 per-type priority visibility), sharing fields across types via *Add existing field* and the edit dialog, removing vs. deleting fields, and the current Live Preview pane. New sections added: **Marking a Comment as the Solution** (2.44.0) and **hiding system/AI timeline notes** (2.51.0/2.52.0) in [tickets.php](templates/pages/admin/docs/tickets.php) and [agent/docs/working-tickets.php](templates/pages/agent/docs/working-tickets.php); the **site-wide SLA on/off toggle** (2.50.0) in [sla.php](templates/pages/admin/docs/sla.php); **AI duplicate-ticket detection** (2.38.0) in [ai.php](templates/pages/admin/docs/ai.php); and a **forgot-password / self-service reset** section plus an expanded **Audit Log** card — broader coverage, the prune UI, and the unified ticket-timeline Source filter (2.45.0–2.48.0) — in [users.php](templates/pages/admin/docs/users.php). The docs search index in [admin/docs/index.php](templates/pages/admin/docs/index.php) was refreshed: stale form-builder search terms replaced, new entries added for every feature above. No code or behaviour changes — documentation only.
+
+---
+
 ## 2.52.0 &mdash; 2026-05-21
 
 ### Added
