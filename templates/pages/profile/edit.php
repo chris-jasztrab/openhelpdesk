@@ -69,6 +69,34 @@ $breadcrumbs = [
                 </div>
             </div>
 
+            <?php if ($user['role'] === 'admin'): ?>
+            <!-- AI Timeline Notes (admin only) -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-transparent fw-semibold">
+                    <i class="bi bi-robot me-1"></i>AI Timeline Notes
+                </div>
+                <div class="card-body">
+                    <div class="d-flex align-items-start gap-3">
+                        <div class="form-check form-switch mb-0 pt-1">
+                            <input class="form-check-input" type="checkbox"
+                                   name="ai_notes_visible" id="aiNotesVisible" value="1"
+                                   <?= !empty($aiNotesVisible) ? 'checked' : '' ?>>
+                        </div>
+                        <label class="mb-0 flex-grow-1" for="aiNotesVisible" style="cursor:pointer;">
+                            <div class="fw-semibold small">
+                                <i class="bi bi-eye me-1 text-muted"></i>Show AI notes in ticket timelines
+                            </div>
+                            <div class="text-muted" style="font-size:.8rem;">
+                                AI-generated system notes are added to ticket timelines automatically.
+                                Turn this off to hide them by default &mdash; they are never deleted, and
+                                you can still show or hide them per ticket with the toggle on each timeline.
+                            </div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+
             <!-- Notification Preferences -->
             <div id="tour-portal-notifications" class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-transparent fw-semibold">

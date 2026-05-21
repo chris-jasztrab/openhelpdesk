@@ -705,6 +705,19 @@ function slaEnabled(): bool
     return getSetting('sla_enabled', '1') === '1';
 }
 
+/**
+ * Whether the current user wants AI-generated system notes shown in ticket
+ * timelines. Stored per-user as `ai_notes_visible:<id>`, defaults to visible.
+ *
+ * Only admins ever see AI notes, so this preference is meaningful for admins
+ * only — but it is safe to call for any authenticated user. The notes are
+ * never deleted; this only controls display.
+ */
+function aiNotesVisible(): bool
+{
+    return getSetting('ai_notes_visible:' . Auth::id(), '1') === '1';
+}
+
 /* ── Auto-assignment helpers ──────────────────────────────────── */
 
 /**

@@ -31,6 +31,10 @@
             background-color: var(--ld-timeline-system-bg) !important;
             border-left: 3px solid var(--ld-timeline-system-accent) !important;
         }
+        /* When an admin hides AI notes, the rows stay in the DOM but are
+           visually removed. !important so the "show older updates" collapser,
+           which sets an inline display style, cannot reveal a hidden AI row. */
+        .ai-notes-hidden .ld-timeline-ai { display: none !important; }
         body { background-color: #f1f5f9; overflow-x: hidden; }
         .navbar { background: linear-gradient(135deg, <?= e(getSetting('branding_navbar_start', '#1e1b4b')) ?> 0%, <?= e(getSetting('branding_navbar_end', '#312e81')) ?> 100%) !important; }
         /* Header sits above all page-level sticky content (Bootstrap .sticky-top = 1020,

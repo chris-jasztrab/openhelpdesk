@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.51.0 &mdash; 2026-05-21
+
+### Added
+- **Admins can hide AI system notes from ticket timelines.** AI-generated system notes (group classification, skill suggestions, and similar) are still recorded, but an admin who doesn't want to see them can now turn them off. Each detailed ticket timeline — the [agent](templates/pages/agent/tickets/view.php) and [admin](templates/pages/admin/tickets/view.php) ticket views — gets an "AI notes" switch in the Timeline card header that shows or hides the notes instantly, and the floor (tablet) ticket view ([templates/pages/agent/floor-ticket.php](templates/pages/agent/floor-ticket.php)) follows the same preference without its own switch. A matching toggle on the [profile page](templates/pages/profile/edit.php) sets the account-wide default. The timeline switch and the profile toggle are one shared per-user setting (`ai_notes_visible:<id>`): flipping the switch persists immediately via the new `POST /profile/ai-notes` endpoint in [src/routes.php](src/routes.php), so the choice sticks across tickets and sessions. The notes are only hidden from view, never deleted, and can be shown again at any time. Backed by the new `aiNotesVisible()` helper in [src/helpers.php](src/helpers.php); defaults to visible, so existing installs are unaffected.
+
+---
+
 ## 2.50.3 &mdash; 2026-05-20
 
 ### Fixed

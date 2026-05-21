@@ -1604,7 +1604,11 @@ $router->get('/profile', function () {
     }
 
     $theme = getSetting('ui_theme:' . Auth::id(), 'light');
-    render('profile/edit', ['profileUser' => $user, 'theme' => $theme]);
+    render('profile/edit', [
+        'profileUser'    => $user,
+        'theme'          => $theme,
+        'aiNotesVisible' => aiNotesVisible(),
+    ]);
 });
 
 $router->post('/profile', function () {
@@ -1649,6 +1653,12 @@ $router->post('/profile', function () {
     $theme = in_array($_POST['theme'] ?? '', ['light', 'dark'], true) ? $_POST['theme'] : 'light';
     setSetting('ui_theme:' . $userId, $theme);
 
+    // Save AI-notes timeline preference. The toggle only renders for admins,
+    // so a non-admin POST must not be allowed to clear an unrelated setting.
+    if (Auth::role() === 'admin') {
+        setSetting('ai_notes_visible:' . $userId, isset($_POST['ai_notes_visible']) ? '1' : '0');
+    }
+
     // Save notification preferences
     $db->prepare(
         'UPDATE users SET
@@ -1691,6 +1701,25 @@ $router->post('/profile', function () {
 
     flash('success', 'Profile updated successfully.');
     redirect('/profile');
+});
+
+/**
+ * AJAX endpoint for the AI-notes show/hide slider on ticket timelines.
+ * Persists the same per-user `ai_notes_visible` setting the profile form
+ * saves, so the slider and the profile toggle stay in sync.
+ */
+$router->post('/profile/ai-notes', function () {
+    Auth::requireAuth();
+    header('Content-Type: application/json');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        http_response_code(403);
+        echo json_encode(['ok' => false]);
+        exit;
+    }
+    $visible = ($_POST['visible'] ?? '') === '1' ? '1' : '0';
+    setSetting('ai_notes_visible:' . Auth::id(), $visible);
+    echo json_encode(['ok' => true, 'visible' => $visible === '1']);
+    exit;
 });
 
 $router->post('/profile/password', function () {

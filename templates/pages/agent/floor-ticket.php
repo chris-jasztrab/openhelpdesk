@@ -288,6 +288,17 @@ $ticketId = (int) $ticket['id'];
 
     <section class="section">
         <h3>Recent activity</h3>
+        <?php
+        // Admins who hid AI notes (profile / ticket timeline slider) don't see
+        // them here either. The floor view has no slider — it just follows the
+        // profile preference. The notes are never deleted, only hidden.
+        if (Auth::role() === 'admin' && !aiNotesVisible()) {
+            $timeline = array_values(array_filter($timeline, fn($tl) =>
+                !($tl['is_internal'] && trim($tl['user_name'] ?? '') === ''
+                  && str_starts_with((string) $tl['action'], 'ai_'))
+            ));
+        }
+        ?>
         <?php if (empty($timeline)): ?>
             <div style="color:#64748b;font-size:.9rem;">No activity yet.</div>
         <?php else: ?>

@@ -195,9 +195,33 @@ if ($solutionTimelineId > 0) {
         <?php endif; ?>
 
         <!-- Timeline -->
+        <?php
+        // AI-notes visibility: admins can hide AI-generated system notes from
+        // the timeline. The notes still render into the DOM — a CSS class on
+        // the list hides them — so the slider toggles them without a reload.
+        $aiNotesOn  = aiNotesVisible();
+        $hasAiNotes = false;
+        foreach ($timeline as $__tl) {
+            if ($__tl['is_internal'] && !$__tl['user_name']
+                && str_starts_with((string) $__tl['action'], 'ai_')) {
+                $hasAiNotes = true;
+                break;
+            }
+        }
+        ?>
         <div class="card border-0 shadow-sm">
-            <div class="card-header bg-white border-bottom">
+            <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between">
                 <h5 class="mb-0 fw-semibold"><i class="bi bi-clock-history me-2"></i>Timeline</h5>
+                <?php if ($hasAiNotes): ?>
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" role="switch"
+                           id="aiNotesToggle" <?= $aiNotesOn ? 'checked' : '' ?>>
+                    <label class="form-check-label small text-muted" for="aiNotesToggle"
+                           title="Show or hide AI-generated system notes on this timeline">
+                        <i class="bi bi-robot me-1"></i>AI notes
+                    </label>
+                </div>
+                <?php endif; ?>
             </div>
             <div class="card-body p-0">
                 <?php if (empty($timeline)): ?>
@@ -205,7 +229,7 @@ if ($solutionTimelineId > 0) {
                 <?php else:
                 $tlHidden = max(0, count($timeline) - 10);
                 ?>
-                <div class="list-group list-group-flush">
+                <div class="list-group list-group-flush<?= $aiNotesOn ? '' : ' ai-notes-hidden' ?>" id="timelineList">
                     <?php foreach ($timeline as $tlIdx => $entry):
                         $isSolution = $solutionTimelineId > 0 && (int) $entry['id'] === $solutionTimelineId;
                         // Never let the marked solution be hidden inside the
@@ -214,7 +238,9 @@ if ($solutionTimelineId > 0) {
                         $isOlder    = !$isSolution && $tlIdx >= 10;
                         $isNote     = $entry['is_internal'] && $entry['user_name'];
                         $isSystem   = $entry['is_internal'] && !$entry['user_name'];
+                        $isAi       = $isSystem && str_starts_with((string) $entry['action'], 'ai_');
                         $tlClass    = $isNote ? 'ld-timeline-note' : ($isSystem ? 'ld-timeline-system' : '');
+                        if ($isAi)       $tlClass .= ' ld-timeline-ai';
                         if ($isSolution) $tlClass .= ' ld-timeline-solution';
                         $canMarkSolution = $entry['action'] === 'comment' && empty($entry['is_internal']);
                     ?>
@@ -325,6 +351,29 @@ if ($solutionTimelineId > 0) {
                 <?php endif; ?>
             </div>
         </div>
+
+        <?php if ($hasAiNotes): ?>
+        <script>
+        // AI-notes slider: flips a CSS class on the timeline list so the rows
+        // hide instantly, and persists the choice to the admin's profile so it
+        // sticks across tickets and sessions (same setting as the profile page).
+        (function () {
+            var toggle = document.getElementById('aiNotesToggle');
+            var list   = document.getElementById('timelineList');
+            if (!toggle || !list) return;
+            var csrf = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
+            toggle.addEventListener('change', function () {
+                var on = toggle.checked;
+                list.classList.toggle('ai-notes-hidden', !on);
+                fetch('/profile/ai-notes', {
+                    method:  'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body:    '_token=' + encodeURIComponent(csrf) + '&visible=' + (on ? '1' : '0'),
+                }).catch(function () {});
+            });
+        })();
+        </script>
+        <?php endif; ?>
 
         <!-- Reply / Forward / Note action bar -->
         <div class="d-flex gap-2 mt-4" id="replyActionBar">
