@@ -289,14 +289,22 @@ $ticketId = (int) $ticket['id'];
     <section class="section">
         <h3>Recent activity</h3>
         <?php
-        // Admins who hid AI notes (profile / ticket timeline slider) don't see
-        // them here either. The floor view has no slider — it just follows the
-        // profile preference. The notes are never deleted, only hidden.
-        if (Auth::role() === 'admin' && !aiNotesVisible()) {
-            $timeline = array_values(array_filter($timeline, fn($tl) =>
-                !($tl['is_internal'] && trim($tl['user_name'] ?? '') === ''
-                  && str_starts_with((string) $tl['action'], 'ai_'))
-            ));
+        // Admins who hid system notes or AI notes (profile / ticket timeline
+        // slider) don't see them here either. The floor view has no slider —
+        // it just follows the profile preference. The notes are never deleted,
+        // only hidden. Hiding system notes already covers AI notes (a subset),
+        // so the AI-only filter is the fallback when system notes are shown.
+        if (Auth::role() === 'admin') {
+            if (!systemNotesVisible()) {
+                $timeline = array_values(array_filter($timeline, fn($tl) =>
+                    !($tl['is_internal'] && trim($tl['user_name'] ?? '') === '')
+                ));
+            } elseif (!aiNotesVisible()) {
+                $timeline = array_values(array_filter($timeline, fn($tl) =>
+                    !($tl['is_internal'] && trim($tl['user_name'] ?? '') === ''
+                      && str_starts_with((string) $tl['action'], 'ai_'))
+                ));
+            }
         }
         ?>
         <?php if (empty($timeline)): ?>

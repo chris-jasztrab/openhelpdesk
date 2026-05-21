@@ -1605,9 +1605,10 @@ $router->get('/profile', function () {
 
     $theme = getSetting('ui_theme:' . Auth::id(), 'light');
     render('profile/edit', [
-        'profileUser'    => $user,
-        'theme'          => $theme,
-        'aiNotesVisible' => aiNotesVisible(),
+        'profileUser'        => $user,
+        'theme'              => $theme,
+        'aiNotesVisible'     => aiNotesVisible(),
+        'systemNotesVisible' => systemNotesVisible(),
     ]);
 });
 
@@ -1653,10 +1654,11 @@ $router->post('/profile', function () {
     $theme = in_array($_POST['theme'] ?? '', ['light', 'dark'], true) ? $_POST['theme'] : 'light';
     setSetting('ui_theme:' . $userId, $theme);
 
-    // Save AI-notes timeline preference. The toggle only renders for admins,
-    // so a non-admin POST must not be allowed to clear an unrelated setting.
+    // Save AI / system note timeline preferences. The toggles only render for
+    // admins, so a non-admin POST must not be allowed to clear these settings.
     if (Auth::role() === 'admin') {
         setSetting('ai_notes_visible:' . $userId, isset($_POST['ai_notes_visible']) ? '1' : '0');
+        setSetting('system_notes_visible:' . $userId, isset($_POST['system_notes_visible']) ? '1' : '0');
     }
 
     // Save notification preferences
@@ -1718,6 +1720,25 @@ $router->post('/profile/ai-notes', function () {
     }
     $visible = ($_POST['visible'] ?? '') === '1' ? '1' : '0';
     setSetting('ai_notes_visible:' . Auth::id(), $visible);
+    echo json_encode(['ok' => true, 'visible' => $visible === '1']);
+    exit;
+});
+
+/**
+ * AJAX endpoint for the system-notes show/hide slider on ticket timelines.
+ * Persists the same per-user `system_notes_visible` setting the profile form
+ * saves, so the slider and the profile toggle stay in sync.
+ */
+$router->post('/profile/system-notes', function () {
+    Auth::requireAuth();
+    header('Content-Type: application/json');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        http_response_code(403);
+        echo json_encode(['ok' => false]);
+        exit;
+    }
+    $visible = ($_POST['visible'] ?? '') === '1' ? '1' : '0';
+    setSetting('system_notes_visible:' . Auth::id(), $visible);
     echo json_encode(['ok' => true, 'visible' => $visible === '1']);
     exit;
 });

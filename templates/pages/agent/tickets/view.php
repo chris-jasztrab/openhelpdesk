@@ -245,18 +245,26 @@ if ($solutionTimelineId > 0) {
         <?php endif; ?>
 
         <?php
-        // AI-notes visibility: admins can hide AI-generated system notes from
-        // the timeline. The notes still render into the DOM — a CSS class on
-        // the list hides them — so the slider toggles them without a reload.
-        $isAdmin    = Auth::role() === 'admin';
-        $aiNotesOn  = !$isAdmin || aiNotesVisible();
-        $hasAiNotes = false;
+        // Timeline-note visibility: admins can hide AI-generated notes, or all
+        // automated system notes, from the timeline. The notes still render
+        // into the DOM — CSS classes on the list hide them — so the sliders
+        // toggle them without a reload. AI notes are a subset of system notes.
+        $isAdmin        = Auth::role() === 'admin';
+        $aiNotesOn      = !$isAdmin || aiNotesVisible();
+        $systemNotesOn  = !$isAdmin || systemNotesVisible();
+        $hasAiNotes     = false;
+        $hasSystemNotes = false;
         if ($isAdmin) {
             foreach ($timeline as $__tl) {
-                if ($__tl['is_internal'] && !$__tl['user_name']
-                    && str_starts_with((string) $__tl['action'], 'ai_')) {
+                if (!$__tl['is_internal'] || $__tl['user_name']) {
+                    continue;
+                }
+                $hasSystemNotes = true;
+                if (str_starts_with((string) $__tl['action'], 'ai_')) {
                     $hasAiNotes = true;
-                    break;
+                }
+                if ($hasAiNotes) {
+                    break; // both flags are now set
                 }
             }
         }
@@ -264,14 +272,26 @@ if ($solutionTimelineId > 0) {
         <div class="card border-0 shadow-sm" id="tour-ticket-timeline">
             <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between">
                 <h5 class="mb-0 fw-semibold"><i class="bi bi-clock-history me-2"></i>Timeline</h5>
-                <?php if ($isAdmin && $hasAiNotes): ?>
-                <div class="form-check form-switch mb-0">
-                    <input class="form-check-input" type="checkbox" role="switch"
-                           id="aiNotesToggle" <?= $aiNotesOn ? 'checked' : '' ?>>
-                    <label class="form-check-label small text-muted" for="aiNotesToggle"
-                           title="Show or hide AI-generated system notes on this timeline">
-                        <i class="bi bi-robot me-1"></i>AI notes
-                    </label>
+                <?php if ($isAdmin && $hasSystemNotes): ?>
+                <div class="d-flex align-items-center gap-3">
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" role="switch"
+                               id="systemNotesToggle" <?= $systemNotesOn ? 'checked' : '' ?>>
+                        <label class="form-check-label small text-muted" for="systemNotesToggle"
+                               title="Show or hide automated system notes on this timeline">
+                            <i class="bi bi-gear me-1"></i>System notes
+                        </label>
+                    </div>
+                    <?php if ($hasAiNotes): ?>
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" role="switch"
+                               id="aiNotesToggle" <?= $aiNotesOn ? 'checked' : '' ?>>
+                        <label class="form-check-label small text-muted" for="aiNotesToggle"
+                               title="Show or hide AI-generated system notes on this timeline">
+                            <i class="bi bi-robot me-1"></i>AI notes
+                        </label>
+                    </div>
+                    <?php endif; ?>
                 </div>
                 <?php endif; ?>
             </div>
@@ -281,7 +301,7 @@ if ($solutionTimelineId > 0) {
                 <?php else:
                 $tlHidden = max(0, count($timeline) - 10);
                 ?>
-                <div class="list-group list-group-flush<?= $aiNotesOn ? '' : ' ai-notes-hidden' ?>" id="timelineList">
+                <div class="list-group list-group-flush<?= $aiNotesOn ? '' : ' ai-notes-hidden' ?><?= $systemNotesOn ? '' : ' system-notes-hidden' ?>" id="timelineList">
                     <?php foreach ($timeline as $tlIdx => $entry):
                         $isSystem   = $entry['is_internal'] && !$entry['user_name'];
                         $isAi       = $isSystem && str_starts_with((string) $entry['action'], 'ai_');
@@ -408,25 +428,31 @@ if ($solutionTimelineId > 0) {
             </div>
         </div>
 
-        <?php if ($isAdmin && $hasAiNotes): ?>
+        <?php if ($isAdmin && $hasSystemNotes): ?>
         <script>
-        // AI-notes slider: flips a CSS class on the timeline list so the rows
-        // hide instantly, and persists the choice to the user's profile so it
-        // sticks across tickets and sessions (same setting as the profile page).
+        // Timeline-note sliders: each flips a CSS class on the timeline list so
+        // the rows hide instantly, and persists the choice to the user's
+        // profile so it sticks across tickets and sessions (same settings as
+        // the profile page).
         (function () {
-            var toggle = document.getElementById('aiNotesToggle');
-            var list   = document.getElementById('timelineList');
-            if (!toggle || !list) return;
+            var list = document.getElementById('timelineList');
+            if (!list) return;
             var csrf = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
-            toggle.addEventListener('change', function () {
-                var on = toggle.checked;
-                list.classList.toggle('ai-notes-hidden', !on);
-                fetch('/profile/ai-notes', {
-                    method:  'POST',
-                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                    body:    '_token=' + encodeURIComponent(csrf) + '&visible=' + (on ? '1' : '0'),
-                }).catch(function () {});
-            });
+            function wire(toggleId, cssClass, endpoint) {
+                var toggle = document.getElementById(toggleId);
+                if (!toggle) return;
+                toggle.addEventListener('change', function () {
+                    var on = toggle.checked;
+                    list.classList.toggle(cssClass, !on);
+                    fetch(endpoint, {
+                        method:  'POST',
+                        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                        body:    '_token=' + encodeURIComponent(csrf) + '&visible=' + (on ? '1' : '0'),
+                    }).catch(function () {});
+                });
+            }
+            wire('systemNotesToggle', 'system-notes-hidden', '/profile/system-notes');
+            wire('aiNotesToggle',     'ai-notes-hidden',     '/profile/ai-notes');
         })();
         </script>
         <?php endif; ?>

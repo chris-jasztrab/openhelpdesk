@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.52.0 &mdash; 2026-05-21
+
+### Added
+- **Admins can hide all system notes from ticket timelines.** Alongside the existing "AI notes" switch, each detailed ticket timeline — the [agent](templates/pages/agent/tickets/view.php) and [admin](templates/pages/admin/tickets/view.php) ticket views — now gets a "System notes" switch in the Timeline card header. It shows or hides every automated, human-author-less timeline entry (SLA timer events, escalation reminders, automatic group assignment, AI classifications, and similar) instantly, and the floor (tablet) ticket view ([templates/pages/agent/floor-ticket.php](templates/pages/agent/floor-ticket.php)) follows the same preference without its own switch. A matching toggle on the [profile page](templates/pages/profile/edit.php) sets the account-wide default. The timeline switch and the profile toggle share one per-user setting (`system_notes_visible:<id>`): flipping the switch persists immediately via the new `POST /profile/system-notes` endpoint in [src/routes.php](src/routes.php), so the choice sticks across tickets and sessions. AI notes are a subset of system notes, so hiding system notes also hides AI notes; the two switches are otherwise independent. The notes are only hidden from view, never deleted. Backed by the new `systemNotesVisible()` helper in [src/helpers.php](src/helpers.php); defaults to visible, so existing installs are unaffected.
+
+---
+
 ## 2.51.1 &mdash; 2026-05-21
 
 ### Fixed

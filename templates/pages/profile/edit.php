@@ -70,6 +70,34 @@ $breadcrumbs = [
             </div>
 
             <?php if ($user['role'] === 'admin'): ?>
+            <!-- System Timeline Notes (admin only) -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-transparent fw-semibold">
+                    <i class="bi bi-gear me-1"></i>System Timeline Notes
+                </div>
+                <div class="card-body">
+                    <div class="d-flex align-items-start gap-3">
+                        <div class="form-check form-switch mb-0 pt-1">
+                            <input class="form-check-input" type="checkbox"
+                                   name="system_notes_visible" id="systemNotesVisible" value="1"
+                                   <?= !empty($systemNotesVisible) ? 'checked' : '' ?>>
+                        </div>
+                        <label class="mb-0 flex-grow-1" for="systemNotesVisible" style="cursor:pointer;">
+                            <div class="fw-semibold small">
+                                <i class="bi bi-eye me-1 text-muted"></i>Show system notes in ticket timelines
+                            </div>
+                            <div class="text-muted" style="font-size:.8rem;">
+                                System notes are automated timeline entries with no human author &mdash;
+                                SLA timer events, escalation reminders, automatic group assignment, and AI
+                                classifications. Turn this off to hide all of them by default &mdash; they
+                                are never deleted, and you can still show or hide them per ticket with the
+                                toggle on each timeline.
+                            </div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
             <!-- AI Timeline Notes (admin only) -->
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-transparent fw-semibold">
@@ -90,6 +118,7 @@ $breadcrumbs = [
                                 AI-generated system notes are added to ticket timelines automatically.
                                 Turn this off to hide them by default &mdash; they are never deleted, and
                                 you can still show or hide them per ticket with the toggle on each timeline.
+                                (Hiding all system notes above also hides these.)
                             </div>
                         </label>
                     </div>

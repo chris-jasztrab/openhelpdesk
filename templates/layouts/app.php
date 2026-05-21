@@ -35,6 +35,9 @@
            visually removed. !important so the "show older updates" collapser,
            which sets an inline display style, cannot reveal a hidden AI row. */
         .ai-notes-hidden .ld-timeline-ai { display: none !important; }
+        /* Same idea for "all system notes". AI notes carry the
+           .ld-timeline-system class too, so this hides them as well. */
+        .system-notes-hidden .ld-timeline-system { display: none !important; }
         body { background-color: #f1f5f9; overflow-x: hidden; }
         .navbar { background: linear-gradient(135deg, <?= e(getSetting('branding_navbar_start', '#1e1b4b')) ?> 0%, <?= e(getSetting('branding_navbar_end', '#312e81')) ?> 100%) !important; }
         /* Header sits above all page-level sticky content (Bootstrap .sticky-top = 1020,
