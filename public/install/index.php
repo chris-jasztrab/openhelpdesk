@@ -337,6 +337,22 @@ function handleInstall(): void
 
 function checkRequirements(): array
 {
+    // URL rewriting — every request is routed through public/index.php by
+    // mod_rewrite. Without it the installer still completes, but every route
+    // (e.g. /login) returns 404 afterward. apache_get_modules() only exists
+    // when PHP runs as an Apache module; under PHP-FPM/FastCGI/nginx/IIS we
+    // can't introspect, so the check passes with a "please verify" note
+    // rather than blocking those setups.
+    if (function_exists('apache_get_modules')) {
+        $rewriteOk   = in_array('mod_rewrite', apache_get_modules(), true);
+        $rewriteNote = $rewriteOk
+            ? 'Apache mod_rewrite is enabled'
+            : 'Apache mod_rewrite is OFF — run "a2enmod rewrite", then restart Apache';
+    } else {
+        $rewriteOk   = true;
+        $rewriteNote = 'Could not auto-detect — ensure URL rewriting is enabled (Apache mod_rewrite, or the nginx / IIS equivalent)';
+    }
+
     $checks = [
         ['PHP ≥ 8.0',            PHP_VERSION_ID >= 80000,                                  'PHP ' . PHP_VERSION . ' installed'],
         ['PDO extension',         extension_loaded('pdo'),                                   'Required for database access'],
@@ -344,6 +360,7 @@ function checkRequirements(): array
         ['mbstring extension',    extension_loaded('mbstring'),                              'Required for multi-byte string handling'],
         ['JSON extension',        extension_loaded('json'),                                  'Required for data encoding'],
         ['OpenSSL extension',     extension_loaded('openssl'),                               'Required for secure connections'],
+        ['URL rewriting',         $rewriteOk,                                                $rewriteNote],
         ['Composer autoloader',   file_exists(INSTALL_ROOT . '/vendor/autoload.php'),        'Run `composer install` if missing'],
         ['.env file writable',    is_writable(INSTALL_ROOT) || (file_exists(INSTALL_ROOT . '/.env') && is_writable(INSTALL_ROOT . '/.env')), 'Project root must be writable'],
         ['storage/ writable',     is_writable(INSTALL_ROOT . '/storage') || is_writable(INSTALL_ROOT), 'storage/ directory must be writable'],

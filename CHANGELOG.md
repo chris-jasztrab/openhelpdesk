@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.52.3 &mdash; 2026-05-21
+
+### Added
+- **The installer's Requirements step now checks that URL rewriting is enabled.** A fresh install on a web server missing Apache `mod_rewrite` completed the six-step wizard with a green success page and then returned a 404 on the very first click — `/login` — because every request is meant to route through `public/index.php` and nothing rewrites it there. [public/install/index.php](public/install/index.php) now adds a **URL rewriting** row to the Step 1 check-list: when PHP runs as an Apache module it inspects `apache_get_modules()` and fails the check (blocking **Continue**) if `mod_rewrite` is absent, with a note to run `a2enmod rewrite` and restart Apache. Under PHP-FPM/FastCGI, nginx, or IIS — where Apache's module list can't be introspected — the check passes with a "could not auto-detect, please verify" note rather than blocking those setups. This surfaces the misconfiguration before the wizard reports success instead of after.
+
+---
+
 ## 2.52.2 &mdash; 2026-05-21
 
 ### Fixed

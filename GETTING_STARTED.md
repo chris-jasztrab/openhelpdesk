@@ -283,15 +283,18 @@ Visit `http://your-server/install/` in a browser. You'll be walked through six s
 
 ### Step 1 — Requirements
 
-A green check-list of nine items:
+A green check-list:
 
 - PHP ≥ 8.0
 - `pdo`, `pdo_mysql`, `mbstring`, `json`, `openssl`, `fileinfo`, and `zip` extensions
+- URL rewriting active (Apache `mod_rewrite`, or the nginx / IIS equivalent)
 - Composer autoloader (`vendor/autoload.php`) present
 - Project root writable (so `.env` can be created)
 - `storage/` writable
 
-Every box must be green before **Continue** unlocks. If something is red, the inline help text tells you what to install or chmod.
+Every box must be green before **Continue** unlocks. If something is red, the inline help text tells you what to install, enable, or chmod.
+
+> The **URL rewriting** check guards against a nasty failure mode: without `mod_rewrite` the wizard finishes cleanly and then every route (starting with `/login`) returns 404, because nothing routes requests through `public/index.php`. When PHP runs as an Apache module the installer detects this directly; under PHP-FPM, nginx, or IIS it can't introspect the web server, so it passes the check with a "please verify" note instead of blocking you.
 
 ### Step 2 — Database
 
