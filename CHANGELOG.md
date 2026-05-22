@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.52.4 &mdash; 2026-05-22
+
+### Fixed
+- **The Type column in the ticket list now opens its dropdown from anywhere in the cell.** On the agent and admin ticket lists ([templates/pages/agent/tickets/index.php](templates/pages/agent/tickets/index.php), [templates/pages/admin/tickets/index.php](templates/pages/admin/tickets/index.php)) the **Assigned To** and **Group** quick-change cells open their dropdown when you click anywhere in the cell, but **Type** required clicking precisely on the small chevron button — the only column whose `quick-*-wrap` span had no click handler. The Type wrap now gets the same wrap-level click listener (open on any click except a re-click of the button, which closes), the cell stops row-navigation propagation like the other two, and the outside-click close logic checks `.quick-type-wrap` instead of just `.quick-type-btn`. All three quick-change columns now behave identically.
+
+---
+
 ## 2.52.3 &mdash; 2026-05-21
 
 ### Added

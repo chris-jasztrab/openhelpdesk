@@ -468,8 +468,8 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                         </td>
                         <?php endif; ?>
                         <?php if (in_array('type', $visibleColumns)): ?>
-                        <td style="white-space:nowrap;">
-                            <span class="d-inline-flex align-items-center gap-1 quick-type-wrap" data-ticket-id="<?= (int)$t['id'] ?>">
+                        <td style="white-space:nowrap;cursor:default;" onclick="event.stopPropagation()">
+                            <span class="d-inline-flex align-items-center gap-1 quick-type-wrap" data-ticket-id="<?= (int)$t['id'] ?>" style="cursor:pointer;">
                                 <span class="quick-type-badge"><?php if ($t['type_name']): ?><span class="badge" style="background:<?= e($t['type_color'] ?: '#6c757d') ?>;"><?= e($t['type_name']) ?></span><?php else: ?><span class="text-muted small">Not Set</span><?php endif; ?></span>
                                 <button class="btn btn-link btn-sm p-0 border-0 text-muted quick-type-btn" type="button" title="Change type" style="line-height:1;"><i class="bi bi-chevron-down" style="font-size:0.65rem;"></i></button>
                             </span>
@@ -887,6 +887,13 @@ document.getElementById('deleteFilterModal').addEventListener('show.bs.modal', f
                 if (btn) { e.stopPropagation(); if (activeBtn === btn) { closeMenu(); } else { openMenu(btn, 'group'); } }
             });
         });
+        document.querySelectorAll('.quick-type-wrap').forEach(function (wrap) {
+            wrap.addEventListener('click', function (e) {
+                if (e.target.closest('.quick-type-btn')) return;
+                var btn = wrap.querySelector('.quick-type-btn');
+                if (btn) { e.stopPropagation(); if (activeBtn === btn) { closeMenu(); } else { openMenu(btn, 'type'); } }
+            });
+        });
 
         document.addEventListener('click', function (e) {
             var item = e.target.closest('.quick-menu-item');
@@ -950,7 +957,7 @@ document.getElementById('deleteFilterModal').addEventListener('show.bs.modal', f
                 }
                 return;
             }
-            if (!e.target.closest('.quick-assign-wrap') && !e.target.closest('.quick-type-btn') && !e.target.closest('.quick-group-wrap') && !(activeMenu && activeMenu.contains(e.target))) {
+            if (!e.target.closest('.quick-assign-wrap') && !e.target.closest('.quick-type-wrap') && !e.target.closest('.quick-group-wrap') && !(activeMenu && activeMenu.contains(e.target))) {
                 closeMenu();
             }
         });
