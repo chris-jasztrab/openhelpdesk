@@ -43,15 +43,15 @@ unset($_SESSION['_escalation_run']);
 <?php else: ?>
 <div class="card border-0 shadow-sm mb-4">
     <div class="table-responsive">
-        <table class="table table-hover mb-0 align-middle">
+        <table class="table table-hover mb-0 align-middle"
+               data-sortable-list data-reorder-url="/admin/settings/escalations/reorder">
             <thead class="table-light">
                 <tr>
-                    <th style="width:40px;">#</th>
-                    <th>Name</th>
+                    <th data-sort-col="name">Name</th>
                     <th>Conditions</th>
                     <th>Actions</th>
-                    <th style="width:90px;">Cooldown</th>
-                    <th style="width:80px;">Enabled</th>
+                    <th style="width:90px;" data-sort-col="cooldown">Cooldown</th>
+                    <th style="width:80px;" data-sort-col="enabled">Enabled</th>
                     <th style="width:120px;"></th>
                 </tr>
             </thead>
@@ -100,9 +100,8 @@ unset($_SESSION['_escalation_run']);
                     'add_internal_note'     => 'Add note',
                 ];
             ?>
-            <tr class="<?= $rule['is_enabled'] ? '' : 'opacity-50' ?>">
-                <td class="text-muted small"><?= (int) $rule['sort_order'] ?></td>
-                <td class="fw-semibold"><?= e($rule['name']) ?></td>
+            <tr data-id="<?= (int) $rule['id'] ?>" class="<?= $rule['is_enabled'] ? '' : 'opacity-50' ?>">
+                <td class="fw-semibold" data-sort-value="<?= e($rule['name']) ?>"><?= e($rule['name']) ?></td>
                 <td style="font-size:.8rem;">
                     <?php foreach ($conditions as $c): ?>
                         <?php
@@ -129,10 +128,10 @@ unset($_SESSION['_escalation_run']);
                         </span>
                     <?php endforeach; ?>
                 </td>
-                <td class="text-muted small">
+                <td class="text-muted small" data-sort-value="<?= (int) $rule['cooldown_hours'] ?>">
                     <?= $rule['cooldown_hours'] > 0 ? $rule['cooldown_hours'] . 'h' : 'Once' ?>
                 </td>
-                <td>
+                <td data-sort-value="<?= $rule['is_enabled'] ? '1' : '0' ?>">
                     <form method="POST" action="/admin/settings/escalations/<?= (int) $rule['id'] ?>/toggle">
                         <?= csrfField() ?>
                         <button type="submit" class="btn btn-sm <?= $rule['is_enabled'] ? 'btn-success' : 'btn-outline-secondary' ?>" style="min-width:62px;">
@@ -232,3 +231,4 @@ document.getElementById('deleteEscalationModal').addEventListener('show.bs.modal
 </script>
 
 <?php require ROOT_DIR . '/templates/partials/settings-nav-end.php'; ?>
+<?php require ROOT_DIR . '/templates/partials/sortable-list.php'; ?>

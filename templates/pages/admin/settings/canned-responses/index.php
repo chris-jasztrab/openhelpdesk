@@ -48,25 +48,24 @@ $breadcrumbs  = [
 <?php else: ?>
 <div class="card border-0 shadow-sm">
     <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
+        <table class="table table-hover align-middle mb-0"
+               data-sortable-list data-reorder-url="/admin/settings/canned-responses/reorder">
             <thead class="table-light">
                 <tr>
-                    <th>Title</th>
+                    <th data-sort-col="title">Title</th>
                     <th>Preview</th>
-                    <th style="width:90px;">Sort</th>
                     <th style="width:110px;">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 <?php foreach ($responses as $r): ?>
-                <tr>
-                    <td class="fw-semibold"><?= e($r['title']) ?></td>
+                <tr data-id="<?= (int) $r['id'] ?>">
+                    <td class="fw-semibold" data-sort-value="<?= e($r['title']) ?>"><?= e($r['title']) ?></td>
                     <td class="text-muted small" style="max-width:380px;">
                         <span style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">
                             <?= e($r['body']) ?>
                         </span>
                     </td>
-                    <td class="text-muted"><?= (int) $r['sort_order'] ?></td>
                     <td>
                         <div class="d-flex gap-1">
                             <a href="/admin/settings/canned-responses/<?= (int) $r['id'] ?>/edit"
@@ -124,3 +123,4 @@ document.getElementById('deleteCannedResponseModal').addEventListener('show.bs.m
 </script>
 
 <?php require ROOT_DIR . '/templates/partials/settings-nav-end.php'; ?>
+<?php require ROOT_DIR . '/templates/partials/sortable-list.php'; ?>

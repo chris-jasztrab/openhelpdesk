@@ -37,28 +37,28 @@ $breadcrumbs  = [
 
 <div class="card border-0 shadow-sm">
     <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
+        <table class="table table-hover align-middle mb-0"
+               data-sortable-list data-reorder-url="/admin/skills/reorder">
             <thead class="table-light">
                 <tr>
-                    <th>Name</th>
-                    <th>Scope</th>
+                    <th data-sort-col="name">Name</th>
+                    <th data-sort-col="scope">Scope</th>
                     <th>Description</th>
-                    <th>Agents</th>
-                    <th>Required by Types</th>
-                    <th>Sort</th>
+                    <th data-sort-col="agents">Agents</th>
+                    <th data-sort-col="types">Required by Types</th>
                     <th style="width:110px">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($skills)): ?>
-                <tr><td colspan="7" class="text-center py-4 text-muted">No skills defined yet.</td></tr>
+                <tr><td colspan="6" class="text-center py-4 text-muted">No skills defined yet.</td></tr>
                 <?php else: ?>
                     <?php foreach ($skills as $s): ?>
-                    <tr>
-                        <td class="fw-semibold">
+                    <tr data-id="<?= (int) $s['id'] ?>">
+                        <td class="fw-semibold" data-sort-value="<?= e($s['name']) ?>">
                             <i class="bi bi-mortarboard text-muted me-1"></i><?= e($s['name']) ?>
                         </td>
-                        <td>
+                        <td data-sort-value="<?= e(empty($s['group_id']) ? 'Global' : ($s['group_name'] ?? 'Group')) ?>">
                             <?php if (empty($s['group_id'])): ?>
                                 <span class="badge bg-secondary bg-opacity-10 text-secondary"><i class="bi bi-globe me-1"></i>Global</span>
                             <?php else: ?>
@@ -66,13 +66,12 @@ $breadcrumbs  = [
                             <?php endif; ?>
                         </td>
                         <td class="text-muted small" style="max-width:300px;"><?= e($s['description'] ? mb_strimwidth($s['description'], 0, 80, '...') : '—') ?></td>
-                        <td>
+                        <td data-sort-value="<?= (int) $s['agent_count'] ?>">
                             <span class="badge bg-primary bg-opacity-10 text-primary"><?= (int) $s['agent_count'] ?> agent<?= (int) $s['agent_count'] !== 1 ? 's' : '' ?></span>
                         </td>
-                        <td>
+                        <td data-sort-value="<?= (int) $s['type_count'] ?>">
                             <span class="badge bg-info bg-opacity-10 text-info"><?= (int) $s['type_count'] ?> type<?= (int) $s['type_count'] !== 1 ? 's' : '' ?></span>
                         </td>
-                        <td class="text-muted"><?= (int) $s['sort_order'] ?></td>
                         <td>
                             <div class="d-flex gap-1">
                                 <a href="/admin/skills/<?= $s['id'] ?>/edit" class="btn btn-sm btn-outline-primary" title="Edit">
@@ -221,3 +220,4 @@ document.getElementById('deleteSkillModal').addEventListener('show.bs.modal', fu
 </script>
 
 <?php require ROOT_DIR . '/templates/partials/settings-nav-end.php'; ?>
+<?php require ROOT_DIR . '/templates/partials/sortable-list.php'; ?>

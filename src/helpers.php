@@ -155,6 +155,52 @@ function verifyCsrf(?string $token): bool
     return hash_equals($_SESSION['csrf_token'] ?? '', $token);
 }
 
+/**
+ * Persist a custom sort_order for a list, given the desired row order.
+ * Backs the drag-to-reorder + Save Order UI in templates/partials/sortable-list.php.
+ *
+ * Reads the POST body (JSON { ids: [...] }) and the X-CSRF-Token header,
+ * writes sort_order = position * 10 for each matching row, and emits the
+ * JSON response. Always exits after responding.
+ */
+function handleSortableReorder(string $table, string $idColumn = 'id'): void
+{
+    header('Content-Type: application/json');
+    if (!verifyCsrf($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '')) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Invalid CSRF token.']);
+        exit;
+    }
+    $body = json_decode(file_get_contents('php://input'), true);
+    $ids  = $body['ids'] ?? null;
+    if (!is_array($ids)) {
+        echo json_encode(['success' => false, 'error' => 'Missing ids.']);
+        exit;
+    }
+    // Whitelist table + column names against literal allow-list — these are
+    // hardcoded in admin routes, never user-supplied, but defence in depth.
+    if (!preg_match('/^[a-zA-Z0-9_]+$/', $table) || !preg_match('/^[a-zA-Z0-9_]+$/', $idColumn)) {
+        echo json_encode(['success' => false, 'error' => 'Bad table.']);
+        exit;
+    }
+
+    $db   = Database::connect();
+    $stmt = $db->prepare("UPDATE `{$table}` SET sort_order = ? WHERE `{$idColumn}` = ?");
+    $db->beginTransaction();
+    try {
+        foreach ($ids as $i => $id) {
+            $stmt->execute([$i * 10, (int) $id]);
+        }
+        $db->commit();
+    } catch (Throwable $e) {
+        $db->rollBack();
+        echo json_encode(['success' => false, 'error' => 'Could not save order.']);
+        exit;
+    }
+    echo json_encode(['success' => true]);
+    exit;
+}
+
 /* ── Output helpers ───────────────────────────────────────────── */
 
 function e(?string $value): string

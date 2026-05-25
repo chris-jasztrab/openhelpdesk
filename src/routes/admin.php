@@ -1524,6 +1524,11 @@ $router->get('/admin/priorities', function () {
     render('admin/priorities/index', ['priorities' => $priorities]);
 });
 
+$router->post('/admin/priorities/reorder', function () {
+    Auth::requireRole('admin');
+    handleSortableReorder('ticket_priorities');
+});
+
 $router->get('/admin/priorities/create', function () {
     Auth::requireRole('admin');
     render('admin/priorities/form', ['editing' => null]);
@@ -1621,6 +1626,11 @@ $router->get('/admin/types', function () {
     Auth::requireRole('admin');
     $types = Database::connect()->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
     render('admin/types/index', ['types' => $types]);
+});
+
+$router->post('/admin/types/reorder', function () {
+    Auth::requireRole('admin');
+    handleSortableReorder('ticket_types');
 });
 
 $router->get('/admin/types/create', function () {
@@ -2020,6 +2030,11 @@ $router->get('/admin/settings/canned-responses', function () {
     render('admin/settings/canned-responses/index', ['responses' => $responses]);
 });
 
+$router->post('/admin/settings/canned-responses/reorder', function () {
+    Auth::requireRole('admin');
+    handleSortableReorder('canned_responses');
+});
+
 $router->get('/admin/settings/canned-responses/create', function () {
     Auth::requireRole('admin');
     render('admin/settings/canned-responses/form', ['editing' => null]);
@@ -2128,6 +2143,11 @@ $router->get('/admin/groups', function () {
          ORDER BY g.sort_order, g.name'
     )->fetchAll();
     render('admin/groups/index', ['groups' => $groups]);
+});
+
+$router->post('/admin/groups/reorder', function () {
+    Auth::requireRole('admin');
+    handleSortableReorder('groups');
 });
 
 $router->get('/admin/groups/create', function () {
@@ -2585,6 +2605,11 @@ $router->get('/admin/skills', function () {
          ORDER BY s.sort_order, s.name"
     )->fetchAll();
     render('admin/skills/index', ['skills' => $skills]);
+});
+
+$router->post('/admin/skills/reorder', function () {
+    Auth::requireRole('admin');
+    handleSortableReorder('agent_skills');
 });
 
 $router->get('/admin/skills/create', function () {
@@ -5327,6 +5352,11 @@ $router->get('/admin/kb/categories', function () {
     render('admin/kb/categories/index', ['categories' => $categories]);
 });
 
+$router->post('/admin/kb/categories/reorder', function () {
+    Auth::requireRole('admin');
+    handleSortableReorder('kb_categories');
+});
+
 $router->get('/admin/kb/categories/create', function () {
     Auth::requireRole('admin');
     render('admin/kb/categories/form', ['editing' => null]);
@@ -5444,6 +5474,11 @@ $router->get('/admin/kb/folders', function () {
          ORDER BY c.sort_order, c.name, f.sort_order, f.name'
     )->fetchAll();
     render('admin/kb/folders/index', ['folders' => $folders]);
+});
+
+$router->post('/admin/kb/folders/reorder', function () {
+    Auth::requireRole('admin');
+    handleSortableReorder('kb_folders');
 });
 
 $router->get('/admin/kb/folders/create', function () {
@@ -8380,6 +8415,11 @@ $router->get('/admin/settings/automations', function () {
     render('admin/automations/index', array_merge(['automations' => $automations], $refData));
 });
 
+$router->post('/admin/settings/automations/reorder', function () {
+    Auth::requireRole('admin');
+    handleSortableReorder('automations');
+});
+
 $router->get('/admin/settings/automations/create', function () {
     Auth::requireRole('admin');
     $db = Database::connect();
@@ -8793,6 +8833,11 @@ $router->get('/admin/settings/escalations', function () {
     $db = Database::connect();
     $rules = $db->query('SELECT * FROM escalation_rules ORDER BY sort_order, id')->fetchAll();
     render('admin/settings/escalations/index', ['rules' => $rules]);
+});
+
+$router->post('/admin/settings/escalations/reorder', function () {
+    Auth::requireRole('admin');
+    handleSortableReorder('escalation_rules');
 });
 
 $router->get('/admin/settings/escalations/create', function () {

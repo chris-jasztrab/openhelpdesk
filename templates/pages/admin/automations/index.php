@@ -117,14 +117,15 @@ $renderConditions = function (array $conditions) use ($renderCond): string {
 
 <div class="card border-0 shadow-sm">
     <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
+        <table class="table table-hover align-middle mb-0"
+               data-sortable-list data-reorder-url="/admin/settings/automations/reorder">
             <thead class="table-light">
                 <tr>
-                    <th>Name</th>
-                    <th>Trigger</th>
+                    <th data-sort-col="name">Name</th>
+                    <th data-sort-col="trigger">Trigger</th>
                     <th>Conditions</th>
                     <th>Actions</th>
-                    <th>Enabled</th>
+                    <th data-sort-col="enabled">Enabled</th>
                     <th style="width:140px">Actions</th>
                 </tr>
             </thead>
@@ -136,11 +137,11 @@ $renderConditions = function (array $conditions) use ($renderCond): string {
                         $conditions = json_decode($auto['conditions'], true) ?: [];
                         $actions    = json_decode($auto['actions'], true) ?: [];
                     ?>
-                    <tr class="<?= !$auto['is_enabled'] ? 'opacity-50' : '' ?>">
-                        <td class="fw-semibold">
+                    <tr data-id="<?= (int) $auto['id'] ?>" class="<?= !$auto['is_enabled'] ? 'opacity-50' : '' ?>">
+                        <td class="fw-semibold" data-sort-value="<?= e($auto['name']) ?>">
                             <i class="bi bi-lightning text-warning me-1"></i><?= e($auto['name']) ?>
                         </td>
-                        <td>
+                        <td data-sort-value="<?= e($triggerLabels[$auto['trigger_event']] ?? $auto['trigger_event']) ?>">
                             <span class="badge bg-info bg-opacity-10 text-info">
                                 <?= e($triggerLabels[$auto['trigger_event']] ?? $auto['trigger_event']) ?>
                             </span>
@@ -257,3 +258,4 @@ document.getElementById('runAutomationModal').addEventListener('show.bs.modal', 
 </script>
 
 <?php require ROOT_DIR . '/templates/partials/settings-nav-end.php'; ?>
+<?php require ROOT_DIR . '/templates/partials/sortable-list.php'; ?>

@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.55.0 &mdash; 2026-05-25
+
+### Added
+- **Admin lists can now be reordered by drag-and-drop, with click-to-sort column headers.** The order that Ticket Types, Groups, Priorities, Skills, Automations, Canned Responses, Escalation Rules, KB Categories, and KB Folders appear in &mdash; in their settings tables, and everywhere those values surface as dropdowns on the agent and portal sides &mdash; was governed by a `sort_order` column that was only editable as a raw integer on each item's edit form. Setting a custom order meant editing every row, juggling values like 10/20/30, and reloading the list to see the result. There is now a grip handle on the left of every row: drag a row to a new position and the new order is saved immediately. Any sortable column header (Name, Members, Created, etc.) is also clickable &mdash; clicking re-sorts the visible rows ascending/descending, and a yellow toolbar appears above the table with **Save Order** and **Revert** buttons so the user has to explicitly commit a sort-by-column action before it overwrites the existing custom order. This safer pattern means a stray click on a header never destroys a carefully-curated drag arrangement. Delivered as a single shared partial &mdash; [templates/partials/sortable-list.php](templates/partials/sortable-list.php) &mdash; that auto-enhances any `<table data-sortable-list data-reorder-url="...">` on the page by injecting the handle column, wiring SortableJS, decorating headers with `data-sort-col`, and posting `{ ids: [...] }` to the per-resource reorder endpoint. The matching backend helper &mdash; `handleSortableReorder()` in [src/helpers.php](src/helpers.php) &mdash; verifies CSRF, whitelists the table name, and writes `sort_order = position * 10` inside a transaction so a partial failure doesn't leave the list half-reordered. New routes: `POST /admin/types/reorder`, `/admin/groups/reorder`, `/admin/priorities/reorder`, `/admin/skills/reorder`, `/admin/settings/automations/reorder`, `/admin/settings/canned-responses/reorder`, `/admin/settings/escalations/reorder`, `/admin/kb/categories/reorder`, `/admin/kb/folders/reorder`. The redundant raw "Sort Order" integer column was dropped from each list (the drag handle and the row position now communicate it directly), and date/badge/count cells gained `data-sort-value` attributes so header-click sort compares timestamps, integers, and label text rather than rendered HTML.
+
+---
+
 ## 2.54.0 &mdash; 2026-05-25
 
 ### Changed

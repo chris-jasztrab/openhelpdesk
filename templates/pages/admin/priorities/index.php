@@ -23,30 +23,29 @@ $breadcrumbs  = [
 
 <div class="card border-0 shadow-sm">
     <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
+        <table class="table table-hover align-middle mb-0"
+               data-sortable-list data-reorder-url="/admin/priorities/reorder">
             <thead class="table-light">
                 <tr>
                     <th style="width:60px">Color</th>
-                    <th>Name</th>
-                    <th>Sort Order</th>
-                    <th>Created</th>
+                    <th data-sort-col="name">Name</th>
+                    <th data-sort-col="created">Created</th>
                     <th style="width:110px">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($priorities)): ?>
-                <tr><td colspan="5" class="text-center py-4 text-muted">No priorities found.</td></tr>
+                <tr><td colspan="4" class="text-center py-4 text-muted">No priorities found.</td></tr>
                 <?php else: ?>
                     <?php foreach ($priorities as $p): ?>
-                    <tr>
+                    <tr data-id="<?= (int) $p['id'] ?>">
                         <td>
                             <span class="badge badge-vivid rounded-pill" style="background:<?= e($p['color']) ?>;min-width:28px;">&nbsp;</span>
                         </td>
-                        <td class="fw-semibold">
+                        <td class="fw-semibold" data-sort-value="<?= e($p['name']) ?>">
                             <span class="badge" style="background:<?= e($p['color']) ?>;"><?= e($p['name']) ?></span>
                         </td>
-                        <td class="text-muted"><?= (int) $p['sort_order'] ?></td>
-                        <td class="text-muted small"><?= date('M j, Y', strtotime($p['created_at'])) ?></td>
+                        <td class="text-muted small" data-sort-value="<?= e($p['created_at']) ?>"><?= date('M j, Y', strtotime($p['created_at'])) ?></td>
                         <td>
                             <div class="d-flex gap-1">
                                 <a href="/admin/priorities/<?= $p['id'] ?>/edit" class="btn btn-sm btn-outline-primary" title="Edit">
@@ -102,3 +101,4 @@ document.getElementById('deletePriorityModal').addEventListener('show.bs.modal',
 </script>
 
 <?php require ROOT_DIR . '/templates/partials/settings-nav-end.php'; ?>
+<?php require ROOT_DIR . '/templates/partials/sortable-list.php'; ?>

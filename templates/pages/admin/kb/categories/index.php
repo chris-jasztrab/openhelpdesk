@@ -25,30 +25,29 @@ $breadcrumbs  = [
 
 <div class="card border-0 shadow-sm">
     <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
+        <table class="table table-hover align-middle mb-0"
+               data-sortable-list data-reorder-url="/admin/kb/categories/reorder">
             <thead class="table-light">
                 <tr>
-                    <th>Name</th>
-                    <th>Slug</th>
+                    <th data-sort-col="name">Name</th>
+                    <th data-sort-col="slug">Slug</th>
                     <th>Description</th>
-                    <th>Order</th>
-                    <th>Public</th>
+                    <th data-sort-col="public">Public</th>
                     <th style="width:130px">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($categories)): ?>
-                <tr><td colspan="6" class="text-center py-4 text-muted">No categories yet.</td></tr>
+                <tr><td colspan="5" class="text-center py-4 text-muted">No categories yet.</td></tr>
                 <?php else: ?>
                     <?php foreach ($categories as $cat): ?>
-                    <tr>
-                        <td class="fw-semibold">
+                    <tr data-id="<?= (int) $cat['id'] ?>">
+                        <td class="fw-semibold" data-sort-value="<?= e($cat['name']) ?>">
                             <i class="bi bi-collection text-muted me-1"></i><?= e($cat['name']) ?>
                         </td>
                         <td class="text-muted small"><?= e($cat['slug']) ?></td>
                         <td class="text-muted small" style="max-width:260px;"><?= e($cat['description'] ? mb_strimwidth($cat['description'], 0, 80, '...') : '—') ?></td>
-                        <td class="text-muted"><?= (int) $cat['sort_order'] ?></td>
-                        <td>
+                        <td data-sort-value="<?= $cat['is_public'] ? '1' : '0' ?>">
                             <?php if ($cat['is_public']): ?>
                                 <a href="/kb/<?= e($cat['slug']) ?>" target="_blank"
                                    class="badge bg-success text-decoration-none" title="View public page">
@@ -111,3 +110,4 @@ document.getElementById('deleteCategoryModal').addEventListener('show.bs.modal',
     document.getElementById('deleteCategoryForm').action = '/admin/kb/categories/' + btn.dataset.id + '/delete';
 });
 </script>
+<?php require ROOT_DIR . '/templates/partials/sortable-list.php'; ?>

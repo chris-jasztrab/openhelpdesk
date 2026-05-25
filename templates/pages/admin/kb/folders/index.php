@@ -25,28 +25,27 @@ $breadcrumbs  = [
 
 <div class="card border-0 shadow-sm">
     <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
+        <table class="table table-hover align-middle mb-0"
+               data-sortable-list data-reorder-url="/admin/kb/folders/reorder">
             <thead class="table-light">
                 <tr>
-                    <th>Name</th>
-                    <th>Category</th>
-                    <th>Slug</th>
-                    <th>Order</th>
+                    <th data-sort-col="name">Name</th>
+                    <th data-sort-col="category">Category</th>
+                    <th data-sort-col="slug">Slug</th>
                     <th style="width:110px">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($folders)): ?>
-                <tr><td colspan="5" class="text-center py-4 text-muted">No folders yet.</td></tr>
+                <tr><td colspan="4" class="text-center py-4 text-muted">No folders yet.</td></tr>
                 <?php else: ?>
                     <?php foreach ($folders as $f): ?>
-                    <tr>
-                        <td class="fw-semibold">
+                    <tr data-id="<?= (int) $f['id'] ?>">
+                        <td class="fw-semibold" data-sort-value="<?= e($f['name']) ?>">
                             <i class="bi bi-folder text-muted me-1"></i><?= e($f['name']) ?>
                         </td>
-                        <td><span class="badge bg-light text-dark border"><?= e($f['category_name'] ?? '—') ?></span></td>
+                        <td data-sort-value="<?= e($f['category_name'] ?? '') ?>"><span class="badge bg-light text-dark border"><?= e($f['category_name'] ?? '—') ?></span></td>
                         <td class="text-muted small"><?= e($f['slug']) ?></td>
-                        <td class="text-muted"><?= (int) $f['sort_order'] ?></td>
                         <td>
                             <div class="d-flex gap-1">
                                 <a href="/admin/kb/folders/<?= $f['id'] ?>/edit" class="btn btn-sm btn-outline-primary" title="Edit">
@@ -100,3 +99,4 @@ document.getElementById('deleteFolderModal').addEventListener('show.bs.modal', f
     document.getElementById('deleteFolderForm').action = '/admin/kb/folders/' + btn.dataset.id + '/delete';
 });
 </script>
+<?php require ROOT_DIR . '/templates/partials/sortable-list.php'; ?>

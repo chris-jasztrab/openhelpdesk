@@ -23,15 +23,15 @@ $breadcrumbs  = [
 
 <div class="card border-0 shadow-sm">
     <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
+        <table class="table table-hover align-middle mb-0"
+               data-sortable-list data-reorder-url="/admin/groups/reorder">
             <thead class="table-light">
                 <tr>
-                    <th>Name</th>
+                    <th data-sort-col="name">Name</th>
                     <th>Description</th>
-                    <th>Members</th>
-                    <th>Auto-Assign</th>
-                    <th>Sort Order</th>
-                    <th>Created</th>
+                    <th data-sort-col="members">Members</th>
+                    <th data-sort-col="strategy">Auto-Assign</th>
+                    <th data-sort-col="created">Created</th>
                     <th style="width:110px">Actions</th>
                 </tr>
             </thead>
@@ -46,26 +46,25 @@ $breadcrumbs  = [
                 ];
                 ?>
                 <?php if (empty($groups)): ?>
-                <tr><td colspan="7" class="text-center py-4 text-muted">No groups found.</td></tr>
+                <tr><td colspan="6" class="text-center py-4 text-muted">No groups found.</td></tr>
                 <?php else: ?>
                     <?php foreach ($groups as $g): ?>
                     <?php [$sLabel, $sColor] = $strategyLabels[$g['assign_strategy'] ?? 'manual'] ?? ['Manual', 'secondary']; ?>
-                    <tr>
-                        <td class="fw-semibold">
+                    <tr data-id="<?= (int) $g['id'] ?>">
+                        <td class="fw-semibold" data-sort-value="<?= e($g['name']) ?>">
                             <i class="bi bi-people-fill text-muted me-1"></i><?= e($g['name']) ?>
                             <?php if (!empty($g['is_confidential'])): ?>
                             <i class="bi bi-shield-lock text-warning ms-1" title="Confidential — members are alerted when new users are added"></i>
                             <?php endif; ?>
                         </td>
                         <td class="text-muted small" style="max-width:300px;"><?= e($g['description'] ? mb_strimwidth($g['description'], 0, 80, '...') : '—') ?></td>
-                        <td>
+                        <td data-sort-value="<?= (int) $g['member_count'] ?>">
                             <span class="badge bg-primary bg-opacity-10 text-primary"><?= (int) $g['member_count'] ?> member<?= (int) $g['member_count'] !== 1 ? 's' : '' ?></span>
                         </td>
-                        <td>
+                        <td data-sort-value="<?= e($sLabel) ?>">
                             <span class="badge bg-<?= e($sColor) ?> bg-opacity-10 text-<?= e($sColor) ?>"><?= e($sLabel) ?></span>
                         </td>
-                        <td class="text-muted"><?= (int) $g['sort_order'] ?></td>
-                        <td class="text-muted small"><?= date('M j, Y', strtotime($g['created_at'])) ?></td>
+                        <td class="text-muted small" data-sort-value="<?= e($g['created_at']) ?>"><?= date('M j, Y', strtotime($g['created_at'])) ?></td>
                         <td>
                             <div class="d-flex gap-1">
                                 <a href="/admin/groups/<?= $g['id'] ?>/edit" class="btn btn-sm btn-outline-primary" title="Edit">
@@ -121,3 +120,4 @@ document.getElementById('deleteGroupModal').addEventListener('show.bs.modal', fu
 </script>
 
 <?php require ROOT_DIR . '/templates/partials/settings-nav-end.php'; ?>
+<?php require ROOT_DIR . '/templates/partials/sortable-list.php'; ?>
