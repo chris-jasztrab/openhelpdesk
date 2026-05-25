@@ -9927,8 +9927,12 @@ $router->post('/admin/settings/organization', function () {
 $router->get('/admin/settings/csat', function () {
     Auth::requireRole('admin');
     $settings = [
-        'csat_enabled'        => getSetting('csat_enabled', '0'),
-        'csat_trigger_status' => getSetting('csat_trigger_status', 'resolved'),
+        'csat_enabled'               => getSetting('csat_enabled', '0'),
+        'csat_trigger_status'        => getSetting('csat_trigger_status', 'resolved'),
+        'csat_mode'                  => getSetting('csat_mode', 'internal'),
+        'csat_external_url'          => getSetting('csat_external_url', ''),
+        'csat_external_dashboard_url'=> getSetting('csat_external_dashboard_url', ''),
+        'csat_show_reopen'           => getSetting('csat_show_reopen', '1'),
     ];
     render('admin/settings/csat', compact('settings'));
 });
@@ -9941,20 +9945,58 @@ $router->post('/admin/settings/csat', function () {
     }
 
     $before = [
-        'csat_enabled'        => getSetting('csat_enabled', '0'),
-        'csat_trigger_status' => getSetting('csat_trigger_status', 'resolved'),
+        'csat_enabled'               => getSetting('csat_enabled', '0'),
+        'csat_trigger_status'        => getSetting('csat_trigger_status', 'resolved'),
+        'csat_mode'                  => getSetting('csat_mode', 'internal'),
+        'csat_external_url'          => getSetting('csat_external_url', ''),
+        'csat_external_dashboard_url'=> getSetting('csat_external_dashboard_url', ''),
+        'csat_show_reopen'           => getSetting('csat_show_reopen', '1'),
     ];
     $enabled = isset($_POST['csat_enabled']) ? '1' : '0';
     $trigger = in_array($_POST['csat_trigger_status'] ?? '', ['resolved', 'closed'], true)
         ? $_POST['csat_trigger_status'] : 'resolved';
+    $mode = ($_POST['csat_mode'] ?? '') === 'external' ? 'external' : 'internal';
+    $extUrl = trim($_POST['csat_external_url'] ?? '');
+    $extDash = trim($_POST['csat_external_dashboard_url'] ?? '');
+    $showReopen = isset($_POST['csat_show_reopen']) ? '1' : '0';
+
+    // If admin picked External but left URL blank, flag it and don't switch
+    // mode — otherwise the next ticket-resolve would silently send nothing.
+    if ($mode === 'external' && $extUrl === '') {
+        flash('error', 'External survey URL is required when Survey type is set to External.');
+        redirect('/admin/settings/csat');
+        return;
+    }
+    if ($extUrl !== '' && !filter_var($extUrl, FILTER_VALIDATE_URL)) {
+        flash('error', 'External survey URL must be a valid URL (e.g. https://...).');
+        redirect('/admin/settings/csat');
+        return;
+    }
+    if ($extDash !== '' && !filter_var($extDash, FILTER_VALIDATE_URL)) {
+        flash('error', 'External dashboard URL must be a valid URL (e.g. https://...).');
+        redirect('/admin/settings/csat');
+        return;
+    }
+
     setSetting('csat_enabled', $enabled);
     setSetting('csat_trigger_status', $trigger);
+    setSetting('csat_mode', $mode);
+    setSetting('csat_external_url', $extUrl);
+    setSetting('csat_external_dashboard_url', $extDash);
+    setSetting('csat_show_reopen', $showReopen);
     logAuditChange(
         'csat.settings_changed',
         null,
         null,
         $before,
-        ['csat_enabled' => $enabled, 'csat_trigger_status' => $trigger]
+        [
+            'csat_enabled'                => $enabled,
+            'csat_trigger_status'         => $trigger,
+            'csat_mode'                   => $mode,
+            'csat_external_url'           => $extUrl,
+            'csat_external_dashboard_url' => $extDash,
+            'csat_show_reopen'            => $showReopen,
+        ]
     );
 
     flash('success', 'CSAT settings saved.');
@@ -10015,10 +10057,30 @@ $router->post('/admin/settings/csat/test', function () {
     }
 
     $appUrl     = env('APP_URL', 'http://localhost:8000');
-    $surveyUrl  = $appUrl . '/survey/' . $token;
-    $reopenUrl  = $appUrl . '/survey/' . $token . '/reopen';
     $brandColor = getSetting('branding_primary_color', '#4f46e5');
     $appName    = getSetting('app_name', 'OpenHelpDesk');
+    $mode       = getSetting('csat_mode', 'internal');
+    $showReopen = getSetting('csat_show_reopen', '1') === '1';
+
+    if ($mode === 'external') {
+        $extUrl = trim(getSetting('csat_external_url', ''));
+        if ($extUrl === '') {
+            flash('error', 'External survey URL is not configured — set it above before sending a test.');
+            redirect('/admin/settings/csat');
+            return;
+        }
+        $surveyUrl = csatSubstitutePlaceholders($extUrl, [
+            'ticket_id'  => (string) $ticket['id'],
+            'user_email' => $email,
+            'first_name' => 'Admin',
+            'last_name'  => '',
+            'user_name'  => 'Admin',
+            'subject'    => $ticket['subject'],
+        ]);
+    } else {
+        $surveyUrl = $appUrl . '/survey/' . $token;
+    }
+    $reopenUrl = $showReopen ? $appUrl . '/survey/' . $token . '/reopen' : '';
 
     $tpl = getEmailTpl('csat_survey', [
         'ticket_id'  => $ticket['id'],
@@ -10034,6 +10096,7 @@ $router->post('/admin/settings/csat/test', function () {
         'firstName'  => 'Admin',
         'surveyUrl'  => $surveyUrl,
         'reopenUrl'  => $reopenUrl,
+        'showReopen' => $showReopen,
         'brandColor' => $brandColor,
         'appName'    => $appName,
         'introText'  => $tpl['intro'],

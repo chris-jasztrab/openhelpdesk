@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.57.0 &mdash; 2026-05-25
+
+### Added
+- **CSAT surveys can now be delegated to an external service (HappyOrNot, SurveyGizmo, Jotform, Typeform, etc.) instead of the built-in 1&ndash;5 star page.** Every site that had its own customer-feedback tooling was forced to either turn CSAT off (losing the trigger-on-resolve email entirely) or run two parallel surveys for the same ticket. [admin/settings/csat](templates/pages/admin/settings/csat.php) gains a **Survey type** radio (Built-in &middot; External) and, when External is selected, two new URL fields: the **External survey URL** the rating button links to, and an optional **External dashboard URL** used by the Reports page as a "jump to your survey provider" shortcut. The survey URL accepts placeholders that are URL-encoded at send time &mdash; `{ticket_id}`, `{user_email}`, `{first_name}`, `{last_name}`, `{user_name}`, `{subject}` &mdash; so SurveyGizmo / Jotform / Typeform can pre-fill or correlate responses to the originating ticket. HappyOrNot and other single-URL providers just paste their link and ignore the placeholders. A separate **Include &ldquo;No, please reopen it&rdquo; button** switch was added too &mdash; on by default for both modes &mdash; because external surveys can't trigger ticket reopens, so admins who want a "reopen if not actually resolved" path need to keep that button visible while the rating step itself goes elsewhere. With it off, the email collapses to a single centered **Rate your experience** button styled in the brand colour. [sendCsatSurvey()](src/helpers.php) was updated to branch on the new `csat_mode` setting, substitute placeholders via a new `csatSubstitutePlaceholders()` helper, and bail without burning the one-survey-per-ticket slot if External is selected but the URL is blank. The admin test-send handler in [src/routes/admin.php](src/routes/admin.php) mirrors the same logic so admins can preview the external flow end-to-end before going live. The [csat-survey email template](templates/emails/csat-survey.php) renders the two-button or one-button layout based on a new `$showReopen` flag. The [Satisfaction report](templates/pages/admin/reports/csat.php) shows a banner when External mode is on, noting that ratings live in the external service and counts on the page only reflect surveys *sent*, with an "Open external dashboard" button when the dashboard URL is set. New settings: `csat_mode` (default `internal`), `csat_external_url`, `csat_external_dashboard_url`, `csat_show_reopen` (default `1`). All six CSAT settings are now captured in the audit log on save.
+
+---
+
 ## 2.56.0 &mdash; 2026-05-25
 
 ### Changed

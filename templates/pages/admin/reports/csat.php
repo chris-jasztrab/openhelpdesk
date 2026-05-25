@@ -15,6 +15,26 @@ $breadcrumbs  = [
     <p class="text-muted mb-0">Customer satisfaction survey results</p>
 </div>
 
+<?php
+$csatMode      = getSetting('csat_mode', 'internal');
+$csatExtDash   = trim(getSetting('csat_external_dashboard_url', ''));
+?>
+<?php if ($csatMode === 'external'): ?>
+<div class="alert alert-info d-flex align-items-center justify-content-between">
+    <div>
+        <i class="bi bi-box-arrow-up-right me-2"></i>
+        <strong>External survey mode is active.</strong>
+        Ratings and comments are collected by the external survey service, not stored locally.
+        The numbers below count surveys <em>sent</em> from this app only.
+    </div>
+    <?php if ($csatExtDash !== ''): ?>
+    <a href="<?= e($csatExtDash) ?>" target="_blank" rel="noopener" class="btn btn-sm btn-primary text-white ms-3">
+        <i class="bi bi-box-arrow-up-right me-1"></i>Open external dashboard
+    </a>
+    <?php endif; ?>
+</div>
+<?php endif; ?>
+
 
 <!-- Date range filter -->
 <div class="d-flex align-items-center gap-2 mb-4 text-muted small">

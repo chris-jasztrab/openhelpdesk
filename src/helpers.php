@@ -3757,15 +3757,37 @@ function sendCsatSurvey(\PDO $db, int $ticketId): void
         return; // user opted out of satisfaction surveys
     }
 
+    $mode = getSetting('csat_mode', 'internal');
+
+    // External mode requires a configured URL — bail (and don't burn the
+    // one-survey-per-ticket slot) if the admin has selected External but
+    // left the URL blank.
+    if ($mode === 'external' && trim(getSetting('csat_external_url', '')) === '') {
+        return;
+    }
+
     $token = bin2hex(random_bytes(32));
     $db->prepare('INSERT INTO csat_surveys (ticket_id, user_id, token) VALUES (?, ?, ?)')
        ->execute([$ticketId, (int) $row['user_id'], $token]);
 
     $appUrl     = env('APP_URL', 'http://localhost:8000');
-    $surveyUrl  = $appUrl . '/survey/' . $token;
-    $reopenUrl  = $appUrl . '/survey/' . $token . '/reopen';
     $brandColor = getSetting('branding_primary_color', '#4f46e5');
     $appName    = getSetting('app_name', 'OpenHelpDesk');
+    $showReopen = getSetting('csat_show_reopen', '1') === '1';
+
+    if ($mode === 'external') {
+        $surveyUrl = csatSubstitutePlaceholders(getSetting('csat_external_url', ''), [
+            'ticket_id'  => (string) $ticketId,
+            'user_email' => $row['email'],
+            'first_name' => $row['first_name'],
+            'last_name'  => $row['last_name'],
+            'user_name'  => $row['first_name'] . ' ' . $row['last_name'],
+            'subject'    => $row['subject'],
+        ]);
+    } else {
+        $surveyUrl = $appUrl . '/survey/' . $token;
+    }
+    $reopenUrl = $showReopen ? $appUrl . '/survey/' . $token . '/reopen' : '';
 
     $tpl = getEmailTpl('csat_survey', [
         'ticket_id'  => $ticketId,
@@ -3781,6 +3803,7 @@ function sendCsatSurvey(\PDO $db, int $ticketId): void
         'firstName'  => $row['first_name'],
         'surveyUrl'  => $surveyUrl,
         'reopenUrl'  => $reopenUrl,
+        'showReopen' => $showReopen,
         'brandColor' => $brandColor,
         'appName'    => $appName,
         'introText'  => $tpl['intro'],
@@ -3795,6 +3818,19 @@ function sendCsatSurvey(\PDO $db, int $ticketId): void
         '',
         $ticketId
     );
+}
+
+/**
+ * Substitute {placeholder} tokens in a URL with URL-encoded values.
+ * Unknown tokens are left as-is so they remain visible for debugging.
+ */
+function csatSubstitutePlaceholders(string $url, array $values): string
+{
+    $map = [];
+    foreach ($values as $key => $value) {
+        $map['{' . $key . '}'] = rawurlencode((string) $value);
+    }
+    return strtr($url, $map);
 }
 
 /* ── Name helpers ─────────────────────────────────────────────── */
