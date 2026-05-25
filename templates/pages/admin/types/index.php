@@ -43,7 +43,7 @@ $breadcrumbs  = [
                     ?>
                     <tr>
                         <td>
-                            <span class="badge rounded-pill" style="background:<?= e($t['color'] ?: '#6c757d') ?>;min-width:28px;">&nbsp;</span>
+                            <span class="badge badge-vivid rounded-pill" style="background:<?= e($t['color'] ?: '#6c757d') ?>;min-width:28px;">&nbsp;</span>
                         </td>
                         <td class="fw-semibold">
                             <span class="badge" style="background:<?= e($t['color'] ?: '#6c757d') ?>;"><?= e($t['name']) ?></span>

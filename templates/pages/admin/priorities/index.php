@@ -40,7 +40,7 @@ $breadcrumbs  = [
                     <?php foreach ($priorities as $p): ?>
                     <tr>
                         <td>
-                            <span class="badge rounded-pill" style="background:<?= e($p['color']) ?>;min-width:28px;">&nbsp;</span>
+                            <span class="badge badge-vivid rounded-pill" style="background:<?= e($p['color']) ?>;min-width:28px;">&nbsp;</span>
                         </td>
                         <td class="fw-semibold">
                             <span class="badge" style="background:<?= e($p['color']) ?>;"><?= e($p['name']) ?></span>

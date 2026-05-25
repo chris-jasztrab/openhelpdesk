@@ -79,7 +79,7 @@ $breadcrumbs  = [
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" id="sla-tab-<?= $type['id'] ?>" data-bs-toggle="tab" data-bs-target="#sla-pane-<?= $type['id'] ?>"
                             type="button" role="tab" aria-controls="sla-pane-<?= $type['id'] ?>" aria-selected="false">
-                        <span class="badge me-1" style="background:<?= e($type['color']) ?>;">&nbsp;</span><?= e($type['name']) ?>
+                        <span class="badge badge-vivid me-1" style="background:<?= e($type['color']) ?>;">&nbsp;</span><?= e($type['name']) ?>
                     </button>
                 </li>
                 <?php endforeach; ?>

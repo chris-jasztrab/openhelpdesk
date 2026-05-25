@@ -332,6 +332,7 @@
             *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
         }
     </style>
+    <?php require ROOT_DIR . '/templates/partials/badge-soft-styles.php'; ?>
 </head>
 <body class="<?= !empty($embedMode) ? 'embed-mode' : '' ?>">
     <a class="skip-link" href="#main-content">Skip to main content</a>

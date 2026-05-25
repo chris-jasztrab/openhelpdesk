@@ -209,7 +209,7 @@ $breadcrumbs  = [
                              style="background:<?= e($timelineNoteBg) ?>; border-left:3px solid <?= e($timelineNoteAccent) ?> !important;">
                             <i class="bi bi-lock-fill me-2" id="previewNoteIcon" style="color:<?= e($timelineNoteAccent) ?>;"></i>
                             <strong>Agent Name</strong> <span class="text-muted ms-1">Internal Note</span>
-                            <span class="badge ms-1 small" id="previewNoteBadge" style="background:<?= e($timelineNoteAccent) ?>; color:#fff;">Internal</span>
+                            <span class="badge badge-vivid ms-1 small" id="previewNoteBadge" style="background:<?= e($timelineNoteAccent) ?>; color:#fff;">Internal</span>
                         </div>
                         <div class="px-3 py-2 border-bottom" id="previewSystemRow"
                              style="background:<?= e($timelineSystemBg) ?>; border-left:3px solid <?= e($timelineSystemAccent) ?> !important;">
@@ -268,7 +268,7 @@ $breadcrumbs  = [
                             <button type="button" class="btn btn-sm btn-outline-secondary ms-1">Secondary</button>
                         </div>
                         <div class="d-flex gap-2 mb-3">
-                            <span class="badge preview-badge" id="previewBadge"
+                            <span class="badge badge-vivid preview-badge" id="previewBadge"
                                   style="background:<?= e($primaryColor) ?>; color:#fff;">Active</span>
                             <span class="badge bg-secondary">Inactive</span>
                         </div>

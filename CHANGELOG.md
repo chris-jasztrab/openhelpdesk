@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.54.0 &mdash; 2026-05-25
+
+### Changed
+- **Status, priority, type, and other coloured labels are now muted "soft chips" instead of vivid blocks.** Every list and detail view in the app was full of fully-saturated badges &mdash; a bright red **High** priority, a saturated green **Resolved** status, a vibrant indigo type chip &mdash; that drew the eye away from the actual ticket text and made busy pages feel noisy. Labels now render as a light tint of the original colour with dark, readable text (and the inverse in dark mode), preserving the colour identity (red still reads as red, green as green) without shouting. Delivered as a single shared partial &mdash; [templates/partials/badge-soft-styles.php](templates/partials/badge-soft-styles.php), loaded from the [app](templates/layouts/app.php) and [base](templates/layouts/base.php) layouts &mdash; so the change applies everywhere a `.badge` appears without touching individual templates. Bootstrap's `bg-primary`/`bg-success`/`bg-warning`/`bg-danger`/`bg-info`/`bg-secondary`/`bg-dark` status badges get explicit muted overrides; inline-coloured badges (priority, type, tag, custom field options) are toned down via a translucent overlay on top of the inline `background:` declaration &mdash; that overlay is `!important` so it survives the inline shorthand. A handful of places that genuinely need the raw colour to show through &mdash; the small "swatch" indicators on the [admin priorities list](templates/pages/admin/priorities/index.php) and [admin types list](templates/pages/admin/types/index.php), the per-type tab swatches on [SLA policies](templates/pages/admin/settings/sla-policies.php), the navbar/timeline-note previews on [Branding settings](templates/pages/admin/settings/branding.php), and the deliberately-pale visibility-pill legend on the [ticket types docs](templates/pages/admin/docs/tickets.php) &mdash; opt out with a new `.badge-vivid` class.
+
+---
+
 ## 2.53.0 &mdash; 2026-05-22
 
 ### Added

@@ -301,9 +301,9 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <h5 class="fw-semibold mb-3"><i class="bi bi-eye-fill text-primary me-2"></i>Field Visibility: Required, Optional, Hidden</h5>
 <p class="text-muted mb-2">Every field row carries a coloured <strong>visibility pill</strong>. Click it to cycle the field through three states — for the <em>currently selected ticket type</em> only:</p>
 <ul class="text-muted mb-3">
-    <li><span class="badge" style="background:#fee2e2;color:#991b1b;">Required</span> &nbsp; The field shows on the form and must be filled in before the ticket can be submitted.</li>
-    <li><span class="badge" style="background:#e0e7ff;color:#3730a3;">Optional</span> &nbsp; The field shows on the form but can be left blank.</li>
-    <li><span class="badge" style="background:#f1f5f9;color:#475569;">Hidden</span> &nbsp; The field does not appear on that type's form at all. Hidden rows are drawn with a hatched background in the builder so the state is obvious at a glance.</li>
+    <li><span class="badge badge-vivid" style="background:#fee2e2;color:#991b1b;">Required</span> &nbsp; The field shows on the form and must be filled in before the ticket can be submitted.</li>
+    <li><span class="badge badge-vivid" style="background:#e0e7ff;color:#3730a3;">Optional</span> &nbsp; The field shows on the form but can be left blank.</li>
+    <li><span class="badge badge-vivid" style="background:#f1f5f9;color:#475569;">Hidden</span> &nbsp; The field does not appear on that type's form at all. Hidden rows are drawn with a hatched background in the builder so the state is obvious at a glance.</li>
 </ul>
 <p class="text-muted mb-2">Because visibility is per-type, the same field can be Required on <em>Hardware Issue</em>, Optional on <em>General Enquiry</em>, and Hidden on <em>Lost &amp; Found</em> — no global setting, no juggling separate screens.</p>
 <p class="text-muted mb-2"><strong>Subject</strong> and <strong>Description</strong> are pinned and locked to Required. The <strong>Priority</strong> system field is a good Hidden candidate for ticket types where the requester shouldn't be picking severity (e.g. a "Key cut request" type where every ticket lands at the same urgency).</p>
