@@ -120,5 +120,6 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <?php require ROOT_DIR . '/templates/partials/pwa-install.php'; ?>
+    <?php require ROOT_DIR . '/templates/partials/table-resize.php'; ?>
 </body>
 </html>

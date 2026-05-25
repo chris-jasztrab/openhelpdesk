@@ -810,11 +810,14 @@ document.getElementById('deleteFilterModal').addEventListener('show.bs.modal', f
         function resizeColumns() {
             var tbl = document.getElementById("ticketTable");
             if (!tbl) return;
-            var ths = tbl.querySelectorAll("thead th:not(.subject-col)");
+            // Leave columns the user has manually resized alone — their width is intentional.
+            var ths = tbl.querySelectorAll("thead th:not(.subject-col):not([data-ld-resized])");
             ths.forEach(function(th) { th.style.width = ''; });
             tbl.style.tableLayout = 'auto';
             ths.forEach(function(th) { th.style.width = th.offsetWidth + 'px'; });
             tbl.style.tableLayout = 'fixed';
+            // Re-pin the overall table width so the resizable-column layout stays consistent.
+            if (window.LDColResize) window.LDColResize.syncTableWidth(tbl);
         }
 
         function openMenu(btn, kind) {

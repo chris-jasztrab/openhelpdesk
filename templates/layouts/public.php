@@ -144,5 +144,6 @@
     })();
     </script>
     <?php require ROOT_DIR . '/templates/partials/pwa-install.php'; ?>
+    <?php require ROOT_DIR . '/templates/partials/table-resize.php'; ?>
 </body>
 </html>

@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.53.0 &mdash; 2026-05-22
+
+### Added
+- **Every table column can now be resized by dragging its header — "grab bars".** Each list in the app (tickets, users, groups, knowledge base, reports, settings tables, and so on) hung onto whatever column widths the layout happened to produce; a long subject or location name would either get clipped or hog the row, with no way for the user to rebalance it. There is now a resize handle on the right edge of every column header: hover it and the cursor becomes a `col-resize` grip, drag to make the column wider or narrower. Widening past the card edge scrolls the table horizontally instead of overflowing. Chosen widths are remembered per page in `localStorage`, so a list comes back the way each person left it (per browser). This is delivered as a single site-wide enhancement — [templates/partials/table-resize.php](templates/partials/table-resize.php), loaded from the [app](templates/layouts/app.php), [base](templates/layouts/base.php) and [public](templates/layouts/public.php) layouts — that auto-attaches to any table with a plain single-row header; no per-page markup was needed. It measures each column's natural width first and then switches the table to `table-layout: fixed`, so a table looks identical until the user actually drags something. Tables with grouped/multi-row headers (some report views) are skipped, since a single per-column width can't represent a merged header; a table can also opt out explicitly with a `data-no-resize` attribute. On the admin and agent ticket lists ([templates/pages/admin/tickets/index.php](templates/pages/admin/tickets/index.php), [templates/pages/agent/tickets/index.php](templates/pages/agent/tickets/index.php)) the existing `resizeColumns()` auto-fit — which re-measures columns after an inline quick-change — now skips any column the user has hand-sized and re-pins the overall table width, so a manual width survives a quick assign/type/group change.
+
+---
+
 ## 2.52.4 &mdash; 2026-05-22
 
 ### Fixed

@@ -449,5 +449,6 @@
     })();
     </script>
     <?php endif; ?>
+    <?php require ROOT_DIR . '/templates/partials/table-resize.php'; ?>
 </body>
 </html>
