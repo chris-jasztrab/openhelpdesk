@@ -123,10 +123,35 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <p class="text-muted mb-2">Agents and admins can update key ticket fields directly from the ticket list without opening the ticket. Each row shows chevron icons (<i class="bi bi-chevron-down"></i>) in the <strong>Agent</strong>, <strong>Type</strong>, and <strong>Group</strong> columns. Hovering a cell reveals the chevron; clicking it opens a small dropdown to change that field immediately.</p>
 <ul class="text-muted mb-3">
     <li><strong>Agent column</strong> — quick-assign to any agent (filtered to the ticket's group if one is set).</li>
-    <li><strong>Type column</strong> — change the ticket type in one click.</li>
+    <li><strong>Type column</strong> — change the ticket type in one click. The whole cell is clickable, not just the chevron.</li>
     <li><strong>Group column</strong> — reassign to a different group.</li>
 </ul>
 <p class="text-muted mb-0">The same inline actions are available in the <strong>Recent Tickets</strong> widget on the agent dashboard. A column picker on the dashboard widget lets you choose which columns are displayed.</p>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4" id="reordering-admin-lists">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-grip-vertical text-primary me-2"></i>Reordering &amp; Sorting Admin Lists</h5>
+<p class="text-muted mb-2">The order that <strong>Ticket Types</strong>, <strong>Groups</strong>, <strong>Priorities</strong>, <strong>Skills</strong>, <strong>Automations</strong>, <strong>Canned Responses</strong>, <strong>Escalation Rules</strong>, <strong>KB Categories</strong>, and <strong>KB Folders</strong> appear in &mdash; both on their settings tables and in every dropdown where those values surface on the agent and portal sides &mdash; can be set directly from each list.</p>
+<p class="text-muted mb-2"><strong>Drag to reorder.</strong> Every row in those lists has a grip handle <i class="bi bi-grip-vertical"></i> on the left. Drag a row up or down and the new order saves immediately &mdash; no edit form, no integer to juggle.</p>
+<p class="text-muted mb-2"><strong>Click a header to sort.</strong> Any sortable column header (Name, Members, Created, etc.) is clickable. Clicking re-sorts the visible rows ascending or descending. Because this overwrites your existing custom order, a yellow toolbar with <strong>Save Order</strong> and <strong>Revert</strong> buttons appears above the table &mdash; the sort is only committed once you click <strong>Save Order</strong>, so a stray click on a header never destroys a curated arrangement.</p>
+<div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
+    The old raw "Sort Order" integer column has been retired from every list &mdash; the row position now communicates it directly. Existing custom orders are preserved.
+</div>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4" id="resizing-columns">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-arrows text-primary me-2"></i>Resizing Columns</h5>
+<p class="text-muted mb-2">Every column on every list in the app can be widened or narrowed by dragging its right edge. Hover the line between two column headers, the cursor turns into a resize grip, and you can drag to set the width.</p>
+<ul class="text-muted mb-0">
+    <li>Chosen widths are remembered per page in your browser &mdash; lists come back the way each person leaves them.</li>
+    <li>Widening past the card edge scrolls the table horizontally rather than overflowing.</li>
+    <li>Works on the ticket lists, user list, KB lists, reports, and every settings table. A handful of tables with merged/multi-row headers are skipped (a single column width can't represent a merged header).</li>
+    <li>On the ticket lists, a column you have hand-sized is not touched by the existing auto-fit when an inline quick-change is made &mdash; only un-resized columns are re-measured.</li>
+</ul>
 </div>
 </div>
 

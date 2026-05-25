@@ -241,6 +241,14 @@ $breadcrumbs  = [['label' => 'Admin', 'url' => '/admin'], ['label' => 'Docs']];
         ["Audit log coverage config CRUD field diff old new", "/admin/docs/users#audit-log", "Users and Roles"],
         ["AI duplicate ticket detection on submit warning", "/admin/docs/ai#duplicate-detection", "AI Classification"],
         ["Duplicate check per ticket type confidence threshold", "/admin/docs/ai#duplicate-detection", "AI Classification"],
+        ["Resize column width drag header edge grip remember per page", "/admin/docs/tickets#resizing-columns", "Tickets"],
+        ["Column width localStorage table layout fixed auto-fit", "/admin/docs/tickets#resizing-columns", "Tickets"],
+        ["Resize columns ticket list users KB reports settings tables", "/admin/docs/tickets#resizing-columns", "Tickets"],
+        ["Reorder admin list drag grip handle sort_order ticket types priorities groups skills", "/admin/docs/tickets#reordering-admin-lists", "Tickets"],
+        ["Reorder automations canned responses escalation rules KB categories folders drag", "/admin/docs/tickets#reordering-admin-lists", "Tickets"],
+        ["Click header sort column ascending descending Save Order Revert yellow toolbar", "/admin/docs/tickets#reordering-admin-lists", "Tickets"],
+        ["Sort admin settings list by name members created column header", "/admin/docs/tickets#reordering-admin-lists", "Tickets"],
+        ["Drag handle row position custom order admin lists", "/admin/docs/tickets#reordering-admin-lists", "Tickets"],
     ];
     var input = document.getElementById("docsSearch");
     var box = document.getElementById("docsSearchResults");

@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.55.1 &mdash; 2026-05-25
+
+### Documentation
+- **In-app help now covers drag-to-resize column widths (2.53.0) and drag-to-reorder + click-to-sort admin lists (2.55.0).** Neither feature had landed in the help docs, so two new cards were added to [admin/docs/tickets.php](templates/pages/admin/docs/tickets.php): **Reordering &amp; Sorting Admin Lists** (the grip handle on Ticket Types, Groups, Priorities, Skills, Automations, Canned Responses, Escalation Rules, KB Categories, and KB Folders, plus the click-header sort with its Save Order / Revert toolbar) and **Resizing Columns** (the drag-to-resize handle on every list, per-page persistence in `localStorage`, the merged-header opt-out, and the inline-quick-change auto-fit interaction). The agent-side [ticket-list.php](templates/pages/agent/docs/ticket-list.php) gets a matching **Resizing Columns** card. Inline Ticket List Actions (Type column) was clarified to note the whole cell is clickable now, not just the chevron (2.52.4). The admin and agent docs search indexes ([admin/docs/index.php](templates/pages/admin/docs/index.php), [agent/docs/index.php](templates/pages/agent/docs/index.php)) gained entries for both features so search finds them. No code or behaviour changes &mdash; documentation only.
+
+---
+
 ## 2.55.0 &mdash; 2026-05-25
 
 ### Added

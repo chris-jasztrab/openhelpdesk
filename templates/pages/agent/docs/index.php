@@ -85,6 +85,8 @@ $breadcrumbs  = [['label' => 'Help']];
         ["Quick create photo camera voice dictate barcode scan asset", "/agent/help/floor", "Floor Mode"],
         ["Floor ticket detail claim release status resolve in progress pending reopen", "/agent/help/floor", "Floor Mode"],
         ["Full ticket details floor close X return", "/agent/help/floor", "Floor Mode"],
+        ["Resize columns drag header edge grip ticket list", "/agent/help/ticket-list", "Ticket List & Filters"],
+        ["Column width remembered per page browser localStorage", "/agent/help/ticket-list", "Ticket List & Filters"],
     ];
     var input = document.getElementById("helpSearch");
     var box = document.getElementById("helpSearchResults");

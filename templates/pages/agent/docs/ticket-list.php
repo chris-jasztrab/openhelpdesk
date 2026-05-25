@@ -107,5 +107,18 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/agent/help'], ['label' => 'Ticke
 </div>
 </div>
 
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-arrows text-primary me-2"></i>Resizing Columns</h5>
+<p class="text-muted mb-2">Every column can be widened or narrowed by dragging its right edge. Hover the line between two column headers and the cursor turns into a resize grip <i class="bi bi-arrows"></i>; drag left or right to set the width.</p>
+<ul class="text-muted mb-0">
+    <li>Widening past the edge of the card scrolls the table horizontally rather than overflowing.</li>
+    <li>Your widths are remembered per page in your browser, so the list comes back the way you left it next time.</li>
+    <li>This works on every list in the app &mdash; tickets, users, KB, reports, settings tables &mdash; not just the ticket list.</li>
+    <li>A manual width sticks even after a quick-change in an inline cell; the auto-fit only adjusts columns you have not hand-sized.</li>
+</ul>
+</div>
+</div>
+
 </div><!-- col -->
 </div><!-- row -->
