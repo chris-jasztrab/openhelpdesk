@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.57.1 &mdash; 2026-05-25
+
+### Documentation
+- **In-app help now covers Satisfaction Surveys end-to-end, including the new external-provider mode (2.57.0).** CSAT had no dedicated docs page &mdash; the docs search-index even shipped with a broken pointer (<em>"CSAT satisfaction survey"</em> jumped to [admin/docs/portal](templates/pages/admin/docs/portal.php), which never said a word about surveys). A new [admin/docs/csat.php](templates/pages/admin/docs/csat.php) page now lives under <strong>Admin &rarr; Docs &rarr; Satisfaction Surveys</strong>: how/when surveys are sent (trigger status, one-per-ticket guard, requester opt-out), the Built-in vs External mode trade-off, the full placeholder reference (<code>{ticket_id}</code>, <code>{user_email}</code>, <code>{first_name}</code>, <code>{last_name}</code>, <code>{user_name}</code>, <code>{subject}</code>) with per-provider notes for HappyOrNot, SurveyGizmo/Alchemer, Jotform, Typeform, and Microsoft Forms, the reopen-button switch (with the explicit warning that external surveys can't trigger reopens on their own), what the Satisfaction report shows in each mode (and how the optional dashboard URL surfaces as an "Open external dashboard" button), the test-send preview, and a full settings reference table. The page is registered in the docs router (`$validDocPages` + `$titles` in [src/routes/admin.php](src/routes/admin.php)), added to the docs sidebar at [templates/partials/docs-nav.php](templates/partials/docs-nav.php), and gets its own card on the [docs overview grid](templates/pages/admin/docs/index.php). The dead search-index pointer was rewritten to target the new page, and six fresh entries were added so searches for <em>"external survey"</em>, <em>"HappyOrNot"</em>, <em>"SurveyGizmo"</em>, <em>"placeholders"</em>, <em>"reopen button"</em>, <em>"trigger status"</em>, <em>"external dashboard"</em>, and <em>"test survey"</em> all land on the right spot. No code or behaviour changes &mdash; documentation only.
+
+---
+
 ## 2.57.0 &mdash; 2026-05-25
 
 ### Added

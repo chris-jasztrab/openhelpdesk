@@ -11,6 +11,7 @@ $docsNav = [
     ['url' => '/admin/docs/ai',                'label' => 'AI Classification',     'icon' => 'bi-cpu'],
     ['url' => '/admin/docs/branding',          'label' => 'Branding',              'icon' => 'bi-palette'],
     ['url' => '/admin/docs/portal',            'label' => 'Portal',                'icon' => 'bi-globe2'],
+    ['url' => '/admin/docs/csat',              'label' => 'Satisfaction Surveys',  'icon' => 'bi-star'],
     ['url' => '/admin/docs/import',            'label' => 'Importing Tickets',     'icon' => 'bi-cloud-upload'],
     ['url' => '/admin/docs/kb',                'label' => 'Knowledge Base',        'icon' => 'bi-book'],
     ['url' => '/admin/docs/sso',               'label' => 'Single Sign-On',        'icon' => 'bi-shield-lock'],
