@@ -6,18 +6,8 @@ $breadcrumbs = [
     ['label' => 'Dashboard'],
 ];
 $sidebarItems = adminSidebar('dashboard');
-$actionIcons = [
-    'created'          => 'bi-plus-circle text-success',
-    'comment'          => 'bi-chat-dots text-primary',
-    'internal_note'    => 'bi-lock text-secondary',
-    'status_changed'   => 'bi-arrow-repeat text-warning',
-    'priority_changed' => 'bi-flag text-info',
-    'assigned'         => 'bi-person-check text-primary',
-    'sla_initialized'  => 'bi-stopwatch text-info',
-    'sla_paused'       => 'bi-pause-circle text-warning',
-    'sla_resumed'      => 'bi-play-circle text-success',
-    'first_response'   => 'bi-reply text-success',
-];
+$statusColors = ['open' => 'primary', 'in_progress' => 'warning', 'pending' => 'info', 'waiting_on_customer' => 'warning', 'waiting_on_third_party' => 'dark', 'resolved' => 'success', 'closed' => 'secondary'];
+$statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 'Pending', 'waiting_on_customer' => 'Waiting on Customer', 'waiting_on_third_party' => 'Waiting on Third Party', 'resolved' => 'Resolved', 'closed' => 'Closed'];
 ?>
 <?php $autoShowTour = !empty($showOnboarding); ?>
 <?php require ROOT_DIR . '/templates/partials/onboarding-tour.php'; ?>
@@ -32,39 +22,41 @@ $actionIcons = [
     <div class="col-lg-8">
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white border-bottom">
-                <h5 class="mb-0 fw-semibold"><i class="bi bi-activity me-2"></i>Recent Activity</h5>
+                <h5 class="mb-0 fw-semibold"><i class="bi bi-ticket-detailed me-2"></i>Recent Tickets</h5>
             </div>
-            <?php if (empty($recentActivity)): ?>
+            <?php if (empty($recentTickets)): ?>
             <div class="card-body text-center py-5 text-muted">
                 <i class="bi bi-clock-history fs-1 d-block mb-2"></i>
-                <p class="mb-0">No recent activity to show.</p>
+                <p class="mb-0">No recent tickets to show.</p>
             </div>
             <?php else: ?>
             <div class="list-group list-group-flush">
-                <?php foreach ($recentActivity as $a): ?>
-                <a href="/admin/tickets/<?= $a['ticket_id'] ?>" class="list-group-item list-group-item-action py-3">
+                <?php foreach ($recentTickets as $t): ?>
+                <a href="/admin/tickets/<?= $t['id'] ?>" class="list-group-item list-group-item-action py-3">
                     <div class="d-flex align-items-start gap-3">
-                        <i class="bi <?= $actionIcons[$a['action']] ?? 'bi-circle text-muted' ?> fs-5 mt-1"></i>
-                        <div class="flex-grow-1">
-                            <div class="d-flex justify-content-between">
-                                <span class="fw-semibold"><?= e($a['ticket_subject'] ?? 'Ticket #' . $a['ticket_id']) ?></span>
-                                <small class="text-muted"><?= date('M j, g:ia', strtotime($a['created_at'])) ?></small>
+                        <div class="flex-grow-1 min-w-0">
+                            <div class="d-flex justify-content-between gap-2">
+                                <span class="fw-semibold text-truncate">
+                                    <span class="text-muted fw-normal me-1">#<?= $t['id'] ?></span>
+                                    <?= e($t['subject']) ?>
+                                </span>
+                                <small class="text-muted flex-shrink-0"><?= date('M j, g:ia', strtotime($t['updated_at'])) ?></small>
                             </div>
-                            <div class="text-muted small">
-                                <?= e($a['user_name'] ?? 'System') ?> &mdash;
-                                <?= e(ucfirst(str_replace('_', ' ', $a['action']))) ?>
+                            <div class="small mt-1 d-flex flex-wrap gap-2 align-items-center">
+                                <span class="badge bg-<?= $statusColors[$t['status']] ?? 'secondary' ?>">
+                                    <?= e($statusLabels[$t['status']] ?? $t['status']) ?>
+                                </span>
+                                <?php if (!empty($t['type_name'])): ?>
+                                <span class="badge" style="background:<?= e($t['type_color'] ?? '#6c757d') ?>;">
+                                    <?= e($t['type_name']) ?>
+                                </span>
+                                <?php endif; ?>
+                                <?php if (!empty($t['priority_name'])): ?>
+                                <span class="badge" style="background:<?= e($t['priority_color'] ?? '#6c757d') ?>;">
+                                    <?= e($t['priority_name']) ?>
+                                </span>
+                                <?php endif; ?>
                             </div>
-                            <?php
-                            // ticket_timeline.details holds raw HTML (e.g. comment bodies);
-                            // strip tags and decode entities so the preview shows plain text.
-                            $detailsText = trim(preg_replace('/\s+/', ' ', html_entity_decode(
-                                strip_tags(str_replace('<', ' <', (string) $a['details'])),
-                                ENT_QUOTES | ENT_HTML5
-                            )));
-                            ?>
-                            <?php if ($detailsText !== ''): ?>
-                            <div class="text-muted small text-truncate" style="max-width:500px;"><?= e($detailsText) ?></div>
-                            <?php endif; ?>
                         </div>
                     </div>
                 </a>

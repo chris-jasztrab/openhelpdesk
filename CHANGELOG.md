@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.56.0 &mdash; 2026-05-25
+
+### Changed
+- **Admin dashboard now lists Recent Tickets instead of Recent Activity.** The dashboard's main panel previously joined `ticket_timeline` and surfaced the last 10 individual events &mdash; so a single noisy ticket (one that got assigned, replied to, status-changed, and SLA-paused in quick succession) would push everything else off the list, and admins had to scan past four rows for the same ticket subject before finding any other work. The panel now queries `tickets` directly and shows the 10 most recently-updated tickets, one row per ticket, ordered by `t.updated_at DESC`. Each row links straight to `/admin/tickets/{id}` and renders the subject, ID, status badge, type chip, priority chip, and the last-updated timestamp &mdash; same chip styling used on the admin tickets list so the dashboard reads consistently. Confidential tickets are filtered out at the SQL layer using the same rule the rest of the admin UI uses ([isTicketRedactedForUser()](src/helpers.php) in [src/helpers.php](src/helpers.php)): a ticket whose type has `is_confidential = 1` and a `group_id` is hidden from any admin who is not a member of that group. The filter is applied via a `NOT (... AND tt.group_id NOT IN (...))` clause built from the current admin's `group_user_map` rows, so non-confidential tickets and tickets whose confidential group the admin belongs to still appear normally. Updated [templates/pages/admin/dashboard.php](templates/pages/admin/dashboard.php) (panel header, list markup, status badge / chip rendering) and the `/admin` handler in [src/routes.php](src/routes.php) (replaced the `ticket_timeline` query with the tickets query + group filter, renamed the render key from `recentActivity` to `recentTickets`). The old `$actionIcons` map is gone since per-action icons are no longer rendered.
+
+---
+
 ## 2.55.1 &mdash; 2026-05-25
 
 ### Documentation

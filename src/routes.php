@@ -2553,14 +2553,27 @@ $router->get('/admin', function () {
     $totalUsers = (int) $db->query("SELECT COUNT(*) FROM users")->fetchColumn();
     $totalAgents = (int) $db->query("SELECT COUNT(*) FROM users WHERE role IN ('agent','admin','power_user')")->fetchColumn();
 
-    // Recent activity (last 10 timeline entries)
-    $recentActivity = $db->query(
-        "SELECT tl.*, t.subject AS ticket_subject,
-                CONCAT(u.first_name, ' ', u.last_name) AS user_name
-         FROM ticket_timeline tl
-         LEFT JOIN tickets t ON tl.ticket_id = t.id
-         LEFT JOIN users u ON tl.user_id = u.id
-         ORDER BY tl.created_at DESC
+    // Recent tickets (last 10 by most-recent activity). Hide tickets whose
+    // type is confidential + group-scoped unless the current admin is a
+    // member of that group.
+    $gs = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
+    $gs->execute([Auth::id()]);
+    $adminGroupIds = array_map('intval', $gs->fetchAll(PDO::FETCH_COLUMN));
+    $groupInList   = $adminGroupIds ? implode(',', $adminGroupIds) : '0';
+
+    $recentTickets = $db->query(
+        "SELECT t.id, t.subject, t.status, t.updated_at,
+                tp.name AS priority_name, tp.color AS priority_color,
+                tt.name AS type_name, tt.color AS type_color
+         FROM tickets t
+         LEFT JOIN ticket_priorities tp ON t.priority_id = tp.id
+         LEFT JOIN ticket_types tt ON t.type_id = tt.id
+         WHERE NOT (
+             COALESCE(tt.is_confidential, 0) = 1
+             AND tt.group_id IS NOT NULL
+             AND tt.group_id NOT IN ({$groupInList})
+         )
+         ORDER BY t.updated_at DESC
          LIMIT 10"
     )->fetchAll();
 
@@ -2569,7 +2582,7 @@ $router->get('/admin', function () {
         'openTickets'    => $openTickets,
         'totalUsers'     => $totalUsers,
         'totalAgents'    => $totalAgents,
-        'recentActivity' => $recentActivity,
+        'recentTickets'  => $recentTickets,
         'showOnboarding' => getSetting('show_onboarding', '0') === '1' || isset($_GET['tour']),
     ]);
 });
