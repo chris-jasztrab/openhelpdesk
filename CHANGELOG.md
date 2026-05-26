@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.57.2 &mdash; 2026-05-26
+
+### Fixed
+- **Changing the Type dropdown on a ticket no longer leaves the Update button stuck disabled.** The right-side ticket-properties form gained a Type selector earlier, but the bit of JS that enables the Update button when a field changes was never taught about it &mdash; it only watched `status`, `priority_id`, `assigned_to`, and `group_id`. So picking a different type updated the dropdown's value but the submit button stayed greyed out and there was no way to save the change without also poking one of the other four fields. The backend update handler in [src/routes/agent.php](src/routes/agent.php) has accepted `type_id` the whole time; this was purely a missing entry in the watcher array in [templates/pages/agent/tickets/view.php](templates/pages/agent/tickets/view.php). Added `type_id` to the list &mdash; one-line fix.
+
+---
+
 ## 2.57.1 &mdash; 2026-05-25
 
 ### Documentation

@@ -1466,7 +1466,7 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
 /* ── Update Ticket Button – enable only when a field has changed ── */
 (function () {
     var btn    = document.getElementById('updateTicketBtn');
-    var fields = ['status', 'priority_id', 'assigned_to', 'group_id'];
+    var fields = ['status', 'priority_id', 'assigned_to', 'group_id', 'type_id'];
     var initial = {};
     fields.forEach(function (id) {
         var el = document.getElementById(id);
