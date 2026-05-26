@@ -1,6 +1,6 @@
 <?php
 $layout       = 'app';
-$pageTitle    = 'Ticket Types &mdash; Settings Matrix';
+$pageTitle    = 'Ticket Types — Settings Matrix';
 $sidebarItems = adminSidebar('settings');
 $breadcrumbs  = [
     ['label' => 'Admin',        'url' => '/admin'],
@@ -22,7 +22,7 @@ $columns = [
 function tt_cell_yes(): string { return '<span class="mx-on">&#10003;</span>'; }
 function tt_cell_no(): string  { return '<span class="mx-off">&minus;</span>'; }
 ?>
-<div class="mb-4">
+<div class="mb-4 d-print-none">
     <h2 class="fw-bold mb-0">Settings</h2>
 </div>
 
@@ -133,10 +133,40 @@ function tt_cell_no(): string  { return '<span class="mx-off">&minus;</span>'; }
     .mx-on  { color: #0a7d2c; font-weight: 700; }
     .mx-off { color: #cbd0d5; font-weight: 700; }
     @media print {
-        .docs-nav, aside, nav, .breadcrumb, .btn, header { display: none !important; }
-        .settings-nav-group, #settingsNavSearch, #settingsSearchResults { display: none !important; }
+        @page { size: Letter landscape; margin: 0.4in; }
+
+        /* Hide app chrome and the page bits that don't belong on paper. */
+        aside, nav, header, .breadcrumb, .btn, .docs-nav,
+        .ld-banner,
+        .d-print-none {
+            display: none !important;
+        }
+        /* Hide the settings sub-nav sidebar (the only .flex-shrink-0 sibling of .flex-grow-1 in this layout). */
+        .d-flex > .flex-shrink-0 { display: none !important; }
+
+        /* Body / page-shell resets so the table can use the full sheet. */
+        body { background: #fff !important; margin: 0 !important; padding: 0 !important; }
+        .container, .container-fluid, main { width: 100% !important; max-width: none !important; padding: 0 !important; margin: 0 !important; }
+        .d-flex > .flex-grow-1 { width: 100% !important; max-width: none !important; flex: 1 1 100% !important; }
+        .card { border: 0 !important; box-shadow: none !important; }
+        .card-body { padding: 0 !important; }
+
+        /* Make the matrix itself compact enough for one page. */
+        table.tt-matrix { font-size: 9.5pt; }
+        table.tt-matrix th, table.tt-matrix td { padding: 3px 6px !important; }
+        table.tt-matrix th.tt-rot { height: 110px !important; }
+        table.tt-matrix th.tt-rot .tt-rot-inner { height: 100px !important; }
+        table.tt-matrix th.tt-rot .tt-rot-inner span { font-size: 9pt !important; }
+        table.tt-matrix td.tt-c { font-size: 11pt !important; width: 44px !important; }
+        table.tt-matrix td.tt-name .text-muted { font-size: 8pt !important; }
+
+        /* Preserve striping, swatches, check colours. */
         table.tt-matrix thead th { background: #f4f4f5 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         table.tt-matrix tbody tr:nth-child(even) td { background: #fafafa !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        .tt-swatch { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .tt-swatch, .mx-on, .mx-off { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+        /* Prevent row splitting across page breaks. */
+        table.tt-matrix tr, table.tt-matrix td, table.tt-matrix th { page-break-inside: avoid; }
+        thead { display: table-header-group; }
     }
 </style>

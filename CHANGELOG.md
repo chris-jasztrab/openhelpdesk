@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.58.1 &mdash; 2026-05-26
+
+### Fixed
+- **Printing the Ticket Types Settings Matrix is now a single landscape sheet without the site chrome.** The 2.58.0 print stylesheet missed three things: the site-wide status banner ([templates/partials/status-banner.php](templates/partials/status-banner.php), class `ld-banner`) printed at the top of every page; the "Settings" page heading ate vertical space; and the matrix overflowed onto a second page in portrait. [templates/pages/admin/types/matrix.php](templates/pages/admin/types/matrix.php) now hides `.ld-banner`, the "Settings" heading (via `d-print-none`), and the settings sub-nav sidebar in print, switches `@page` to Letter landscape with 0.4" margins, and tightens row/column padding and font sizes so a 12-row matrix prints on one page with room to grow. Also fixed the page title showing a literal `&mdash;` instead of an em-dash &mdash; the title is set as a plain PHP string, not HTML, so the entity wasn't being decoded.
+
+---
+
 ## 2.58.0 &mdash; 2026-05-26
 
 ### Added
