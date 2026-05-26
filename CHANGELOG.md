@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.58.3 &mdash; 2026-05-26
+
+### Fixed
+- **Matrix print now actually fits on a single sheet.** 2.58.2 emulated the print stylesheet via Playwright's `media: print` and looked fine, but the *real* browser print pipeline (Chrome DevTools' page.pdf, same one File &rarr; Print uses) still split the 12-row matrix onto two pages because the on-screen page heading, description paragraph, and per-row group-name sub-line ate too much vertical space. In print, [templates/pages/admin/types/matrix.php](templates/pages/admin/types/matrix.php) now hides the screen heading + description (`d-print-none`), replaces them with a compact one-line print-only title that includes today's date, drops the per-row group-name sub-text (which was a screen convenience &mdash; the "Group assigned" column already encodes the boolean), tightens row padding to 2px, drops the rotated header to 130px at 9pt body / 8.5pt header, and trims the legend's margin and font. Re-verified by rendering an actual landscape Letter PDF: **1 page** with all 12 ticket types.
+
+---
+
 ## 2.58.2 &mdash; 2026-05-26
 
 ### Fixed

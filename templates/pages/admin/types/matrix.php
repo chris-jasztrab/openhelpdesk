@@ -28,7 +28,7 @@ function tt_cell_no(): string  { return '<span class="mx-off">&minus;</span>'; }
 
 <?php require ROOT_DIR . '/templates/partials/settings-nav.php'; ?>
 
-<div class="d-flex justify-content-between align-items-start mb-3">
+<div class="d-flex justify-content-between align-items-start mb-3 d-print-none">
     <div>
         <h5 class="fw-semibold mb-1"><i class="bi bi-grid-3x3-gap me-2"></i>Ticket Types &mdash; Settings Matrix</h5>
         <p class="text-muted mb-0" style="font-size:.875rem;">
@@ -43,6 +43,12 @@ function tt_cell_no(): string  { return '<span class="mx-off">&minus;</span>'; }
             <i class="bi bi-printer me-1"></i>Print
         </button>
     </div>
+</div>
+
+<!-- Print-only title — short, single line, replaces the screen header above. -->
+<div class="d-none d-print-block mb-2" style="font-weight:600;font-size:11pt;">
+    Ticket Types &mdash; Settings Matrix
+    <span class="text-muted" style="font-weight:400;font-size:9pt;">&nbsp;&middot;&nbsp; <?= date('Y-m-d') ?></span>
 </div>
 
 <div class="card border-0 shadow-sm">
@@ -152,13 +158,17 @@ function tt_cell_no(): string  { return '<span class="mx-off">&minus;</span>'; }
         .card-body { padding: 0 !important; }
 
         /* Make the matrix itself compact enough for one page. */
-        table.tt-matrix { font-size: 9.5pt; }
-        table.tt-matrix th, table.tt-matrix td { padding: 3px 6px !important; }
-        table.tt-matrix th.tt-rot { height: 140px !important; }
-        table.tt-matrix th.tt-rot .tt-rot-inner { height: 130px !important; }
+        table.tt-matrix { font-size: 9pt; }
+        table.tt-matrix th, table.tt-matrix td { padding: 2px 6px !important; line-height: 1.25 !important; }
+        table.tt-matrix th.tt-rot { height: 130px !important; padding-bottom: 2px !important; }
+        table.tt-matrix th.tt-rot .tt-rot-inner { height: 122px !important; }
         table.tt-matrix th.tt-rot .tt-rot-inner span { font-size: 8.5pt !important; }
-        table.tt-matrix td.tt-c { font-size: 11pt !important; width: 44px !important; }
-        table.tt-matrix td.tt-name .text-muted { font-size: 8pt !important; }
+        table.tt-matrix td.tt-c { font-size: 10.5pt !important; width: 42px !important; }
+        /* Hide the secondary group-name line under each ticket type — saves ~12 rows of vertical space. */
+        table.tt-matrix td.tt-name .text-muted { display: none !important; }
+
+        /* Tighten the legend below the table. */
+        .card-body > .d-flex.mt-3 { margin-top: 4px !important; font-size: 7.5pt !important; gap: .5rem !important; }
 
         /* Preserve striping, swatches, check colours. */
         table.tt-matrix thead th { background: #f4f4f5 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
