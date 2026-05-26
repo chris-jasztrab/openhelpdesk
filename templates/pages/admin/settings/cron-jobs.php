@@ -8,35 +8,43 @@ $breadcrumbs  = [
     ['label' => 'Cron Jobs'],
 ];
 
-// Platform detection — Linux/macOS users get crontab lines; Windows users
-// get Task Scheduler (schtasks) commands. Mixing slashes from a Linux-style
-// cron line with a Windows ROOT_DIR produces a path that's invalid on either.
+// Detected platform — drives the default-selected tab. Both platforms'
+// commands are always rendered; the tab only controls which one is visible.
 $isWindows = stripos(PHP_OS, 'WIN') === 0;
-$phpBin    = $isWindows ? str_replace('/', '\\', PHP_BINARY) : 'php';
-$rootPath  = $isWindows ? str_replace('/', '\\', ROOT_DIR) : rtrim(ROOT_DIR, '/');
-$sep       = $isWindows ? '\\' : '/';
 
-// Build the platform-appropriate scheduler command for a job.
-// $cronSchedule is the Linux cron expression (kept as canonical because it's
-// terse and unambiguous); $schtasksArgs is the Windows /SC … /MO … pair.
-$buildCommand = static function (string $cronSchedule, string $schtasksArgs, string $scriptRel, string $logRel, string $taskName)
-    use ($isWindows, $phpBin, $rootPath, $sep): string {
-    if ($isWindows) {
-        $script = $rootPath . $sep . str_replace('/', $sep, $scriptRel);
-        // schtasks /TR wraps program+args in one double-quoted string and
-        // accepts single quotes around inner paths — cleaner than the
-        // backslash-escape form, and works in both cmd.exe and PowerShell.
-        return sprintf(
-            "schtasks /Create /TN \"%s\" /TR \"'%s' '%s'\" %s /F",
-            $taskName,
-            $phpBin,
-            $script,
-            $schtasksArgs
-        );
-    }
-    $script = $rootPath . '/' . $scriptRel;
-    $log    = $rootPath . '/' . $logRel;
-    return $cronSchedule . ' ' . $phpBin . ' ' . $script . ' >> ' . $log . ' 2>&1';
+// ── Path/binary helpers ─────────────────────────────────────────────
+// When we know the install lives on this OS, we emit its real absolute paths
+// (copy-and-paste ready). When we're showing the *other* platform's tab, we
+// fall back to a conventional placeholder so the command is at least shaped
+// correctly — the user replaces the path with their own.
+$linuxRoot   = $isWindows ? '/var/www/freshwpl'           : rtrim(ROOT_DIR, '/');
+$linuxPhp    = 'php';
+
+$windowsRoot = $isWindows ? str_replace('/', '\\', rtrim(ROOT_DIR, '/')) : 'C:\\xampp\\htdocs\\freshwpl';
+$windowsPhp  = $isWindows ? str_replace('/', '\\', PHP_BINARY)           : 'C:\\xampp\\php\\php.exe';
+
+// Linux cron line: `*/5 * * * * php /path/script.php >> /path/log 2>&1`
+$buildLinux = static function (string $cron, string $scriptRel, string $logRel)
+    use ($linuxRoot, $linuxPhp): string {
+    $script = $linuxRoot . '/' . $scriptRel;
+    $log    = $linuxRoot . '/' . $logRel;
+    return $cron . ' ' . $linuxPhp . ' ' . $script . ' >> ' . $log . ' 2>&1';
+};
+
+// Windows schtasks command. The `/TR "'php' 'script'"` pattern (single quotes
+// inside double quotes) is schtasks' supported way to embed two
+// space-containing paths in one /TR value, and it parses identically in
+// cmd.exe and PowerShell. /F overwrites an existing task with the same name.
+$buildWindows = static function (string $schedArgs, string $scriptRel, string $taskName)
+    use ($windowsRoot, $windowsPhp): string {
+    $script = $windowsRoot . '\\' . str_replace('/', '\\', $scriptRel);
+    return sprintf(
+        "schtasks /Create /TN \"%s\" /TR \"'%s' '%s'\" %s /F",
+        $taskName,
+        $windowsPhp,
+        $script,
+        $schedArgs
+    );
 };
 
 $cronJobs = [
@@ -46,8 +54,10 @@ $cronJobs = [
         'description'      => 'Recalculates SLA status (breached / at-risk) for all active tickets. Should run frequently so SLA breaches are detected promptly.',
         'frequency'        => 'Every 5 minutes',
         'interval_seconds' => 300,
-        'command'          => $buildCommand('*/5 * * * *', '/SC MINUTE /MO 5', 'public/sla-cron.php', 'storage/logs/sla-cron.log', 'OpenHelpDesk SLA Recalculation'),
-        'log'              => $rootPath . $sep . 'storage' . $sep . 'logs' . $sep . 'sla-cron.log',
+        'cron_linux'       => $buildLinux('*/5 * * * *', 'public/sla-cron.php', 'storage/logs/sla-cron.log'),
+        'cron_windows'     => $buildWindows('/SC MINUTE /MO 5', 'public/sla-cron.php', 'OpenHelpDesk SLA Recalculation'),
+        'log_linux'        => $linuxRoot . '/storage/logs/sla-cron.log',
+        'log_windows'      => $windowsRoot . '\\storage\\logs\\sla-cron.log',
         'required'         => true,
         'note'             => 'Can also be triggered via HTTP: <code>GET /sla-cron.php?token=YOUR_SECRET_TOKEN</code>. Set <code>SLA_CRON_TOKEN</code> in your <code>.env</code> file when using HTTP mode.',
     ],
@@ -57,8 +67,10 @@ $cronJobs = [
         'description'      => 'Polls the configured Microsoft 365 mailbox via the Graph API for new replies and appends them to the matching ticket timeline.',
         'frequency'        => 'Every 5 minutes',
         'interval_seconds' => 300,
-        'command'          => $buildCommand('*/5 * * * *', '/SC MINUTE /MO 5', 'scripts/process-replies.php', 'storage/logs/graph-mail.log', 'OpenHelpDesk Inbound Email'),
-        'log'              => $rootPath . $sep . 'storage' . $sep . 'logs' . $sep . 'graph-mail.log',
+        'cron_linux'       => $buildLinux('*/5 * * * *', 'scripts/process-replies.php', 'storage/logs/graph-mail.log'),
+        'cron_windows'     => $buildWindows('/SC MINUTE /MO 5', 'scripts/process-replies.php', 'OpenHelpDesk Inbound Email'),
+        'log_linux'        => $linuxRoot . '/storage/logs/graph-mail.log',
+        'log_windows'      => $windowsRoot . '\\storage\\logs\\graph-mail.log',
         'required'         => false,
         'note'             => 'Only required if you have Microsoft Graph / inbound email configured in Admin → Settings → Email / SMTP.',
     ],
@@ -68,8 +80,10 @@ $cronJobs = [
         'description'      => 'Evaluates all enabled escalation rules against open tickets and fires any configured actions (reassign, notify, change priority, etc.).',
         'frequency'        => 'Every 15 minutes',
         'interval_seconds' => 900,
-        'command'          => $buildCommand('*/15 * * * *', '/SC MINUTE /MO 15', 'scripts/process-escalations.php', 'storage/logs/escalations.log', 'OpenHelpDesk Escalations'),
-        'log'              => $rootPath . $sep . 'storage' . $sep . 'logs' . $sep . 'escalations.log',
+        'cron_linux'       => $buildLinux('*/15 * * * *', 'scripts/process-escalations.php', 'storage/logs/escalations.log'),
+        'cron_windows'     => $buildWindows('/SC MINUTE /MO 15', 'scripts/process-escalations.php', 'OpenHelpDesk Escalations'),
+        'log_linux'        => $linuxRoot . '/storage/logs/escalations.log',
+        'log_windows'      => $windowsRoot . '\\storage\\logs\\escalations.log',
         'required'         => false,
         'note'             => 'Only required if you have escalation rules configured in Admin → Settings → Escalations.',
     ],
@@ -79,8 +93,10 @@ $cronJobs = [
         'description'      => 'Checks for any scheduled reports that are due and emails summaries to the configured recipients.',
         'frequency'        => 'Every 30 minutes',
         'interval_seconds' => 1800,
-        'command'          => $buildCommand('*/30 * * * *', '/SC MINUTE /MO 30', 'scripts/process-scheduled-reports.php', 'storage/logs/scheduled-reports.log', 'OpenHelpDesk Scheduled Reports'),
-        'log'              => $rootPath . $sep . 'storage' . $sep . 'logs' . $sep . 'scheduled-reports.log',
+        'cron_linux'       => $buildLinux('*/30 * * * *', 'scripts/process-scheduled-reports.php', 'storage/logs/scheduled-reports.log'),
+        'cron_windows'     => $buildWindows('/SC MINUTE /MO 30', 'scripts/process-scheduled-reports.php', 'OpenHelpDesk Scheduled Reports'),
+        'log_linux'        => $linuxRoot . '/storage/logs/scheduled-reports.log',
+        'log_windows'      => $windowsRoot . '\\storage\\logs\\scheduled-reports.log',
         'required'         => false,
         'note'             => 'Only required if you have scheduled reports configured in Admin → Reports → Scheduled Reports.',
     ],
@@ -90,8 +106,10 @@ $cronJobs = [
         'description'      => 'Mints tickets from active recurring schedules whose <code>next_run_at</code> has passed (e.g. monthly toner audit, quarterly HVAC, annual fire inspection), then advances each schedule to its next firing slot.',
         'frequency'        => 'Every 15 minutes',
         'interval_seconds' => 900,
-        'command'          => $buildCommand('*/15 * * * *', '/SC MINUTE /MO 15', 'scripts/process-recurring-tickets.php', 'storage/logs/recurring-tickets.log', 'OpenHelpDesk Recurring Tickets'),
-        'log'              => $rootPath . $sep . 'storage' . $sep . 'logs' . $sep . 'recurring-tickets.log',
+        'cron_linux'       => $buildLinux('*/15 * * * *', 'scripts/process-recurring-tickets.php', 'storage/logs/recurring-tickets.log'),
+        'cron_windows'     => $buildWindows('/SC MINUTE /MO 15', 'scripts/process-recurring-tickets.php', 'OpenHelpDesk Recurring Tickets'),
+        'log_linux'        => $linuxRoot . '/storage/logs/recurring-tickets.log',
+        'log_windows'      => $windowsRoot . '\\storage\\logs\\recurring-tickets.log',
         'required'         => false,
         'note'             => 'Only required if you have recurring schedules configured in Admin → Recurring Tickets. Missed-tick safe — does not back-fill if cron pauses.',
     ],
@@ -101,8 +119,10 @@ $cronJobs = [
         'description'      => 'Finds active tickets that have had no activity for longer than the configured stale threshold and emails both the assigned agent and the requester. Skips resolved, closed, and waiting-on-customer/third-party statuses.',
         'frequency'        => 'Every hour',
         'interval_seconds' => 3600,
-        'command'          => $buildCommand('0 * * * *', '/SC HOURLY', 'scripts/process-stale-tickets.php', 'storage/logs/stale-tickets.log', 'OpenHelpDesk Stale Tickets'),
-        'log'              => $rootPath . $sep . 'storage' . $sep . 'logs' . $sep . 'stale-tickets.log',
+        'cron_linux'       => $buildLinux('0 * * * *', 'scripts/process-stale-tickets.php', 'storage/logs/stale-tickets.log'),
+        'cron_windows'     => $buildWindows('/SC HOURLY', 'scripts/process-stale-tickets.php', 'OpenHelpDesk Stale Tickets'),
+        'log_linux'        => $linuxRoot . '/storage/logs/stale-tickets.log',
+        'log_windows'      => $windowsRoot . '\\storage\\logs\\stale-tickets.log',
         'required'         => false,
         'note'             => 'Configure the threshold and per-type overrides in Admin → Settings → Stale Tickets.',
     ],
@@ -112,8 +132,10 @@ $cronJobs = [
         'description'      => 'Sends email reminders to all administrators when the Microsoft Graph app secret is approaching its expiry date. Reminds at 30 days, 7 days, and on the day of expiry.',
         'frequency'        => 'Once daily',
         'interval_seconds' => 86400,
-        'command'          => $buildCommand('0 8 * * *', '/SC DAILY /ST 08:00', 'scripts/process-secret-reminders.php', 'storage/logs/secret-reminders.log', 'OpenHelpDesk Secret Reminders'),
-        'log'              => $rootPath . $sep . 'storage' . $sep . 'logs' . $sep . 'secret-reminders.log',
+        'cron_linux'       => $buildLinux('0 8 * * *', 'scripts/process-secret-reminders.php', 'storage/logs/secret-reminders.log'),
+        'cron_windows'     => $buildWindows('/SC DAILY /ST 08:00', 'scripts/process-secret-reminders.php', 'OpenHelpDesk Secret Reminders'),
+        'log_linux'        => $linuxRoot . '/storage/logs/secret-reminders.log',
+        'log_windows'      => $windowsRoot . '\\storage\\logs\\secret-reminders.log',
         'required'         => false,
         'note'             => 'Only required if you have a Microsoft Graph app secret expiry date configured in Admin → Settings → Email / SMTP.',
     ],
@@ -127,10 +149,11 @@ $fmtAgo = static function (int $seconds): string {
     return (int) floor($seconds / 86400) . 'd ago';
 };
 
-// Returns ['status' => ok|stale|missing, 'age' => int seconds|null, 'mtime' => int|null]
-// A job is considered "running" if its log was touched within 2x its expected interval.
-$cronStatus = static function (array $job): array {
-    $path = $job['log'] ?? '';
+// Status checking only makes sense for THIS server's log file — i.e. the
+// platform we're actually running on. We don't know the remote machine's log
+// state if a Linux admin is viewing the Windows tab from a Linux server.
+$cronStatus = static function (array $job) use ($isWindows): array {
+    $path = $isWindows ? ($job['log_windows'] ?? '') : ($job['log_linux'] ?? '');
     if ($path === '' || !is_file($path)) {
         return ['status' => 'missing', 'age' => null, 'mtime' => null];
     }
@@ -146,6 +169,8 @@ $cronStatus = static function (array $job): array {
         'mtime'  => $mtime,
     ];
 };
+
+$defaultPlatform = $isWindows ? 'windows' : 'linux';
 ?>
 <div class="mb-4">
     <h2 class="fw-bold mb-0">Settings</h2>
@@ -157,14 +182,28 @@ $cronStatus = static function (array $job): array {
     <h5 class="fw-semibold mb-1"><i class="bi bi-clock me-2"></i>Cron Jobs</h5>
     <p class="text-muted mb-0" style="font-size:.875rem;">
         These background scripts must be scheduled on your server for certain features to function automatically.
-        <?php if ($isWindows): ?>
-        Run each <code>schtasks</code> command below in an <strong>elevated</strong> PowerShell or Command Prompt
-        (Run as Administrator) to register it with Windows Task Scheduler.
-        <?php else: ?>
-        Add them to your server's crontab using <code>crontab -e</code>.
-        <?php endif; ?>
+        Choose your platform below to see the matching commands &mdash; <strong>Linux/macOS</strong> uses
+        <code>crontab</code> and <strong>Windows</strong> uses <code>schtasks</code> (Task Scheduler).
     </p>
 </div>
+
+<!-- Platform toggle — flips visibility of .platform-linux / .platform-windows blocks below. -->
+<ul class="nav nav-pills mb-4" id="platformTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link platform-tab <?= $defaultPlatform === 'linux' ? 'active' : '' ?>"
+                data-platform="linux" type="button">
+            <i class="bi bi-ubuntu me-1"></i>Linux / macOS
+            <?php if (!$isWindows): ?><span class="badge bg-light text-dark ms-1">Detected</span><?php endif; ?>
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link platform-tab <?= $defaultPlatform === 'windows' ? 'active' : '' ?>"
+                data-platform="windows" type="button">
+            <i class="bi bi-windows me-1"></i>Windows
+            <?php if ($isWindows): ?><span class="badge bg-light text-dark ms-1">Detected</span><?php endif; ?>
+        </button>
+    </li>
+</ul>
 
 <?php
 $summary = ['ok' => 0, 'stale' => 0, 'missing' => 0];
@@ -217,28 +256,50 @@ foreach ($cronJobs as $j) {
     </div>
 </div>
 
-<div class="alert alert-info d-flex gap-3 align-items-start mb-4">
+<!-- Linux-only instruction banner -->
+<div class="alert alert-info d-flex gap-3 align-items-start mb-4 platform-linux <?= $defaultPlatform === 'linux' ? '' : 'd-none' ?>">
     <i class="bi bi-info-circle-fill fs-5 mt-1 flex-shrink-0"></i>
     <div class="small">
-        <?php if ($isWindows): ?>
-        <strong>How to register a task:</strong> Open an <strong>elevated</strong> PowerShell or Command Prompt,
-        paste the <code>schtasks /Create …</code> command, and press Enter. Replace existing entries with <code>/F</code>
-        already included. Click any command to copy it to the clipboard.
-        <?php else: ?>
         <strong>How to edit your crontab:</strong> Run <code>crontab -e</code> on your server, paste the desired
-        cron lines, save, and exit. All paths below are absolute paths for your installation.
-        Click any command to copy it to the clipboard.
+        cron lines, save, and exit.
+        <?php if ($isWindows): ?>
+            The paths below use the conventional Linux web-root <code>/var/www/freshwpl</code> as a placeholder &mdash;
+            replace it with your actual install path.
+        <?php else: ?>
+            All paths below are absolute paths for your installation.
         <?php endif; ?>
+        Click any command to copy it to the clipboard.
         <br>
         <strong>Status detection:</strong> Each job is checked by the modified time of its log file.
-        A job shows <span class="badge bg-success">Running</span> if its log was written within 2× its expected interval,
+        A job shows <span class="badge bg-success">Running</span> if its log was written within 2&times; its expected interval,
         <span class="badge bg-warning text-dark">Stale</span> if it's older than that,
         or <span class="badge bg-light text-muted border">Not configured</span> if no log file exists.
-        A manual "Run Now" counts as a run for detection purposes.
     </div>
 </div>
 
-<?php foreach ($cronJobs as $job): ?>
+<!-- Windows-only instruction banner -->
+<div class="alert alert-info d-flex gap-3 align-items-start mb-4 platform-windows <?= $defaultPlatform === 'windows' ? '' : 'd-none' ?>">
+    <i class="bi bi-info-circle-fill fs-5 mt-1 flex-shrink-0"></i>
+    <div class="small">
+        <strong>How to register a task:</strong> Open an <strong>elevated</strong> PowerShell or Command Prompt
+        (Run as Administrator), paste a <code>schtasks /Create &hellip;</code> command, and press Enter. The
+        <code>/F</code> flag overwrites an existing task with the same name, so you can safely re-run a command
+        to update its schedule. You can also create tasks via <strong>Task Scheduler &rarr; Create Basic Task</strong>
+        in the GUI if you prefer &mdash; use the trigger and program/arguments from each command below.
+        <?php if (!$isWindows): ?>
+            The paths below use <code>C:\xampp\htdocs\freshwpl</code> and <code>C:\xampp\php\php.exe</code> as
+            placeholders (typical for XAMPP) &mdash; replace them with your actual install paths.
+        <?php endif; ?>
+        Click any command to copy it to the clipboard.
+        <br>
+        <strong>Status detection:</strong> Each job is checked by the modified time of its log file.
+        A job shows <span class="badge bg-success">Running</span> if its log was written within 2&times; its expected interval,
+        <span class="badge bg-warning text-dark">Stale</span> if it's older than that,
+        or <span class="badge bg-light text-muted border">Not configured</span> if no log file exists.
+    </div>
+</div>
+
+<?php foreach ($cronJobs as $idx => $job): ?>
     <?php
     $st     = $cronStatus($job);
     $ageStr = $st['age'] !== null ? $fmtAgo((int) $st['age']) : '';
@@ -253,14 +314,14 @@ foreach ($cronJobs as $j) {
         <div class="d-flex gap-2 flex-wrap justify-content-end">
             <?php if ($st['status'] === 'ok'): ?>
                 <span class="badge bg-success" title="Log last written <?= e($mtStr) ?>">
-                    <i class="bi bi-check-circle me-1"></i>Running · <?= e($ageStr) ?>
+                    <i class="bi bi-check-circle me-1"></i>Running &middot; <?= e($ageStr) ?>
                 </span>
             <?php elseif ($st['status'] === 'stale'): ?>
-                <span class="badge bg-warning text-dark" title="Log last written <?= e($mtStr) ?>; exceeds 2× expected interval">
-                    <i class="bi bi-exclamation-triangle me-1"></i>Stale · <?= e($ageStr) ?>
+                <span class="badge bg-warning text-dark" title="Log last written <?= e($mtStr) ?>; exceeds 2&times; expected interval">
+                    <i class="bi bi-exclamation-triangle me-1"></i>Stale &middot; <?= e($ageStr) ?>
                 </span>
             <?php else: ?>
-                <span class="badge bg-light text-muted border" title="No log file yet — job has never written output">
+                <span class="badge bg-light text-muted border" title="No log file yet on this server">
                     <i class="bi bi-dash-circle me-1"></i>Not configured
                 </span>
             <?php endif; ?>
@@ -277,15 +338,36 @@ foreach ($cronJobs as $j) {
     <div class="card-body p-4">
         <p class="text-muted small mb-3"><?= e($job['description']) ?></p>
 
-        <label class="form-label small fw-semibold text-muted text-uppercase" style="font-size:.7rem;letter-spacing:.05em;"><?= $isWindows ? 'Task Scheduler command' : 'Crontab entry' ?></label>
-        <div class="position-relative">
-            <code class="d-block bg-light border rounded p-3 small user-select-all pe-5 cron-command"
-                  style="word-break:break-all;"><?= e($job['command']) ?></code>
-            <button class="btn btn-sm btn-outline-secondary position-absolute top-0 end-0 m-2 copy-btn"
-                    data-command="<?= e($job['command']) ?>"
-                    title="Copy to clipboard">
-                <i class="bi bi-clipboard"></i>
-            </button>
+        <!-- Linux command -->
+        <div class="platform-linux <?= $defaultPlatform === 'linux' ? '' : 'd-none' ?>">
+            <label class="form-label small fw-semibold text-muted text-uppercase" style="font-size:.7rem;letter-spacing:.05em;">
+                Crontab entry
+            </label>
+            <div class="position-relative">
+                <code class="d-block bg-light border rounded p-3 small user-select-all pe-5 cron-command"
+                      style="word-break:break-all;"><?= e($job['cron_linux']) ?></code>
+                <button class="btn btn-sm btn-outline-secondary position-absolute top-0 end-0 m-2 copy-btn"
+                        data-command="<?= e($job['cron_linux']) ?>"
+                        title="Copy to clipboard">
+                    <i class="bi bi-clipboard"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Windows command -->
+        <div class="platform-windows <?= $defaultPlatform === 'windows' ? '' : 'd-none' ?>">
+            <label class="form-label small fw-semibold text-muted text-uppercase" style="font-size:.7rem;letter-spacing:.05em;">
+                Task Scheduler command
+            </label>
+            <div class="position-relative">
+                <code class="d-block bg-light border rounded p-3 small user-select-all pe-5 cron-command"
+                      style="word-break:break-all;"><?= e($job['cron_windows']) ?></code>
+                <button class="btn btn-sm btn-outline-secondary position-absolute top-0 end-0 m-2 copy-btn"
+                        data-command="<?= e($job['cron_windows']) ?>"
+                        title="Copy to clipboard">
+                    <i class="bi bi-clipboard"></i>
+                </button>
+            </div>
         </div>
 
         <?php if (!empty($job['note'])): ?>
@@ -293,7 +375,12 @@ foreach ($cronJobs as $j) {
         <?php endif; ?>
 
         <div class="mt-3 pt-3 border-top d-flex flex-wrap gap-3 align-items-center justify-content-between">
-            <span class="text-muted small"><i class="bi bi-file-text me-1"></i>Log file: <code><?= e($job['log']) ?></code></span>
+            <span class="text-muted small platform-linux <?= $defaultPlatform === 'linux' ? '' : 'd-none' ?>">
+                <i class="bi bi-file-text me-1"></i>Log file: <code><?= e($job['log_linux']) ?></code>
+            </span>
+            <span class="text-muted small platform-windows <?= $defaultPlatform === 'windows' ? '' : 'd-none' ?>">
+                <i class="bi bi-file-text me-1"></i>Log file: <code><?= e($job['log_windows']) ?></code>
+            </span>
             <?php if ($st['mtime'] !== null): ?>
             <span class="text-muted small"><i class="bi bi-clock-history me-1"></i>Last run: <?= e($mtStr) ?></span>
             <?php else: ?>
@@ -307,28 +394,61 @@ foreach ($cronJobs as $j) {
 <!-- Combined block -->
 <div class="card border-0 shadow-sm">
     <div class="card-header bg-white py-3">
-        <h6 class="mb-0 fw-semibold"><i class="bi bi-terminal me-2"></i><?= $isWindows ? 'Combined Task Scheduler Commands' : 'Combined Crontab Block' ?></h6>
+        <h6 class="mb-0 fw-semibold">
+            <i class="bi bi-terminal me-2"></i>
+            <span class="platform-linux <?= $defaultPlatform === 'linux' ? '' : 'd-none' ?>">Combined Crontab Block</span>
+            <span class="platform-windows <?= $defaultPlatform === 'windows' ? '' : 'd-none' ?>">Combined Task Scheduler Commands</span>
+        </h6>
     </div>
     <div class="card-body p-4">
-        <p class="text-muted small mb-3">
-            <?= $isWindows
-                ? 'Run all of these in an <strong>elevated</strong> PowerShell or Command Prompt:'
-                : 'Copy all entries at once and paste into your crontab:' ?>
+        <p class="text-muted small mb-3 platform-linux <?= $defaultPlatform === 'linux' ? '' : 'd-none' ?>">
+            Copy all entries at once and paste into your crontab (run <code>crontab -e</code>):
         </p>
-        <div class="position-relative">
-            <pre class="bg-light border rounded p-3 small mb-0 user-select-all pe-5" id="combinedBlock" style="white-space:pre-wrap;word-break:break-all;"><?php
-$lines = array_map(fn($j) => $j['command'], $cronJobs);
-echo e(implode("\n", $lines));
-?></pre>
+        <p class="text-muted small mb-3 platform-windows <?= $defaultPlatform === 'windows' ? '' : 'd-none' ?>">
+            Run all of these in an <strong>elevated</strong> PowerShell or Command Prompt:
+        </p>
+
+        <!-- Linux combined -->
+        <div class="position-relative platform-linux <?= $defaultPlatform === 'linux' ? '' : 'd-none' ?>">
+            <pre class="bg-light border rounded p-3 small mb-0 user-select-all pe-5"
+                 id="combinedLinux"
+                 style="white-space:pre-wrap;word-break:break-all;"><?= e(implode("\n", array_column($cronJobs, 'cron_linux'))) ?></pre>
             <button class="btn btn-sm btn-outline-secondary position-absolute top-0 end-0 m-2"
-                    onclick="copyBlock()" title="Copy all">
-                <i class="bi bi-clipboard" id="copyBlockIcon"></i>
+                    data-target="combinedLinux" onclick="copyBlock(this)" title="Copy all">
+                <i class="bi bi-clipboard"></i>
+            </button>
+        </div>
+
+        <!-- Windows combined -->
+        <div class="position-relative platform-windows <?= $defaultPlatform === 'windows' ? '' : 'd-none' ?>">
+            <pre class="bg-light border rounded p-3 small mb-0 user-select-all pe-5"
+                 id="combinedWindows"
+                 style="white-space:pre-wrap;word-break:break-all;"><?= e(implode("\n", array_column($cronJobs, 'cron_windows'))) ?></pre>
+            <button class="btn btn-sm btn-outline-secondary position-absolute top-0 end-0 m-2"
+                    data-target="combinedWindows" onclick="copyBlock(this)" title="Copy all">
+                <i class="bi bi-clipboard"></i>
             </button>
         </div>
     </div>
 </div>
 
 <script>
+// Platform toggle — flips d-none on every .platform-linux / .platform-windows
+// element on the page. Cheap, no per-element state, no framework needed.
+document.querySelectorAll('.platform-tab').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+        const platform = btn.dataset.platform;
+        document.querySelectorAll('.platform-tab').forEach(function (b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        document.querySelectorAll('.platform-linux').forEach(function (el) {
+            el.classList.toggle('d-none', platform !== 'linux');
+        });
+        document.querySelectorAll('.platform-windows').forEach(function (el) {
+            el.classList.toggle('d-none', platform !== 'windows');
+        });
+    });
+});
+
 document.querySelectorAll('.copy-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
         navigator.clipboard.writeText(btn.dataset.command).then(function () {
@@ -339,10 +459,10 @@ document.querySelectorAll('.copy-btn').forEach(function (btn) {
     });
 });
 
-function copyBlock() {
-    const text = document.getElementById('combinedBlock').textContent;
+function copyBlock(btn) {
+    const text = document.getElementById(btn.dataset.target).textContent;
     navigator.clipboard.writeText(text).then(function () {
-        const icon = document.getElementById('copyBlockIcon');
+        const icon = btn.querySelector('i');
         icon.className = 'bi bi-check text-success';
         setTimeout(function () { icon.className = 'bi bi-clipboard'; }, 2000);
     });

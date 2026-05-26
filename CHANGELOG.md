@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.59.0 &mdash; 2026-05-26
+
+### Added
+- **Cron Jobs page now shows both Linux and Windows commands side by side.** Previously [templates/pages/admin/settings/cron-jobs.php](templates/pages/admin/settings/cron-jobs.php) auto-detected the host platform (via `PHP_OS`) and emitted *only* the matching command &mdash; great for Linux servers, invisible for Windows admins reading the docs from a Linux host (or vice versa). The page now renders a pill-tab toggle at the top (**Linux / macOS** vs **Windows**) that flips visibility across every command block, including each per-job card, the per-job log-file line, and the combined block at the bottom. The detected platform is the default tab and gets a "Detected" badge. Windows commands use the `schtasks /Create /TN "&hellip;" /TR "'php.exe' 'script.php'" /SC &hellip; /F` shape, which parses identically in both cmd.exe and PowerShell. When viewing the non-host platform, paths fall back to conventional placeholders (`/var/www/freshwpl` for Linux, `C:\xampp\htdocs\freshwpl` / `C:\xampp\php\php.exe` for Windows-on-XAMPP) with a banner reminding the admin to substitute their real install path.
+
+---
+
 ## 2.58.3 &mdash; 2026-05-26
 
 ### Fixed
