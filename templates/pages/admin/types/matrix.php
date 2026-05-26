@@ -154,9 +154,9 @@ function tt_cell_no(): string  { return '<span class="mx-off">&minus;</span>'; }
         /* Make the matrix itself compact enough for one page. */
         table.tt-matrix { font-size: 9.5pt; }
         table.tt-matrix th, table.tt-matrix td { padding: 3px 6px !important; }
-        table.tt-matrix th.tt-rot { height: 110px !important; }
-        table.tt-matrix th.tt-rot .tt-rot-inner { height: 100px !important; }
-        table.tt-matrix th.tt-rot .tt-rot-inner span { font-size: 9pt !important; }
+        table.tt-matrix th.tt-rot { height: 140px !important; }
+        table.tt-matrix th.tt-rot .tt-rot-inner { height: 130px !important; }
+        table.tt-matrix th.tt-rot .tt-rot-inner span { font-size: 8.5pt !important; }
         table.tt-matrix td.tt-c { font-size: 11pt !important; width: 44px !important; }
         table.tt-matrix td.tt-name .text-muted { font-size: 8pt !important; }
 

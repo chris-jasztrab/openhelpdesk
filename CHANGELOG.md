@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.58.2 &mdash; 2026-05-26
+
+### Fixed
+- **Matrix print headers no longer clip long column labels.** 2.58.1 shrank the rotated header height to 110px, which truncated longer labels like "Show 'To' / Location" and "Custom stale threshold" at the top edge in print. Print header height is now 140px with an 8.5pt font &mdash; still tighter than the on-screen 150px, but enough room for every label to render in full. The matrix still fits on one landscape sheet.
+
+---
+
 ## 2.58.1 &mdash; 2026-05-26
 
 ### Fixed
