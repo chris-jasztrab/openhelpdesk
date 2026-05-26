@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.57.3 &mdash; 2026-05-26
+
+### Fixed
+- **Type-change Update-button fix now applies to the admin ticket view too.** 2.57.2 fixed the watcher on [templates/pages/agent/tickets/view.php](templates/pages/agent/tickets/view.php) but the admin route has a parallel copy of the same form at [templates/pages/admin/tickets/view.php](templates/pages/admin/tickets/view.php), and admins viewing tickets through `/admin/tickets/<id>` were still hitting the original bug. Added `type_id` to the watcher array in the admin template as well.
+
+---
+
 ## 2.57.2 &mdash; 2026-05-26
 
 ### Fixed
