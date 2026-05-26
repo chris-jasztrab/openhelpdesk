@@ -1634,6 +1634,17 @@ $router->post('/admin/types/reorder', function () {
     handleSortableReorder('ticket_types');
 });
 
+$router->get('/admin/types/matrix', function () {
+    Auth::requireRole('admin');
+    $types = Database::connect()->query(
+        'SELECT tt.*, g.name AS group_name
+         FROM ticket_types tt
+         LEFT JOIN `groups` g ON g.id = tt.group_id
+         ORDER BY tt.sort_order, tt.name'
+    )->fetchAll();
+    render('admin/types/matrix', ['types' => $types]);
+});
+
 $router->get('/admin/types/create', function () {
     Auth::requireRole('admin');
     $db     = Database::connect();

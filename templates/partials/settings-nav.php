@@ -25,6 +25,8 @@ $settingsNavGroups = [
          'keywords' => 'urgency severity high low critical'],
         ['label' => 'Ticket Types',           'url' => '/admin/types',      'icon' => 'bi-tags',
          'keywords' => 'category classification kind incident request'],
+        ['label' => 'Type Settings Matrix',   'url' => '/admin/types/matrix', 'icon' => 'bi-grid-3x3-gap',
+         'keywords' => 'matrix overview chart confidential ai routing duplicate threshold compare summary print'],
         ['label' => 'Groups',                 'url' => '/admin/groups',     'icon' => 'bi-people-fill',
          'keywords' => 'team queue assignee department'],
         ['label' => 'Agent Skills',           'url' => '/admin/skills',     'icon' => 'bi-mortarboard',
@@ -79,6 +81,21 @@ $settingsNavGroups = [
 ];
 $currentPath          = currentPath();
 $settingsSearchIndex  = require ROOT_DIR . '/config/settings_index.php';
+
+// Pick a single active URL via longest-prefix match, so a sub-page like
+// /admin/types/matrix doesn't also highlight its parent /admin/types.
+$activeNavUrl = '';
+foreach ($settingsNavGroups as $_grp) {
+    foreach ($_grp as $_it) {
+        $url   = $_it['url'];
+        $exact = $_it['exact'] ?? false;
+        $hit   = $currentPath === $url || (!$exact && str_starts_with($currentPath, $url . '/'));
+        if ($hit && strlen($url) > strlen($activeNavUrl)) {
+            $activeNavUrl = $url;
+        }
+    }
+}
+unset($_grp, $_it);
 ?>
 <div class="d-flex gap-4 align-items-start">
     <div class="flex-shrink-0" style="width:190px;">
@@ -114,7 +131,7 @@ $settingsSearchIndex  = require ROOT_DIR . '/config/settings_index.php';
                     </div>
                     <?php foreach ($items as $item): ?>
                     <?php
-                        $isActive    = $currentPath === $item['url'] || (!($item['exact'] ?? false) && str_starts_with($currentPath, $item['url'] . '/'));
+                        $isActive    = $item['url'] === $activeNavUrl;
                         $searchBlob  = strtolower($item['label'] . ' ' . $groupLabel . ' ' . ($item['keywords'] ?? ''));
                     ?>
                     <a class="d-flex align-items-center nav-link py-1 px-2 small rounded mb-0 settings-nav-item <?= $isActive ? 'fw-semibold' : 'text-muted' ?>"
