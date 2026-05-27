@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.60.0 &mdash; 2026-05-27
+
+### Added
+- **Phase 1 of configurable ticket statuses &mdash; new `ticket_statuses` lookup table seeded with the 7 original statuses.** This is infrastructure only; behavior is unchanged until later phases wire up the helpers, refactor the hardcoded SQL, and add the admin settings UI. Migration [database/migrations/041_ticket_statuses.php](database/migrations/041_ticket_statuses.php) (a) creates `ticket_statuses` with columns `slug`, `label`, `bucket` (`open`/`closed`), `pauses_sla`, `sort_order`, `color`, `is_default_new`/`is_default_resolved`/`is_default_closed`, `is_system`, `is_active`, plus a unique index on `slug` and a composite index on `(bucket, is_active, sort_order)`; (b) seeds the 7 existing slugs verbatim (`open`, `in_progress`, `pending`, `waiting_on_customer`, `waiting_on_third_party`, `resolved`, `closed`) with their original ordering, bucket assignments, SLA-pause flags, and the three default-target flags pointing at `open` / `resolved` / `closed`; (c) verifies every distinct value in `tickets.status` matches a seeded slug and aborts otherwise; (d) `ALTER`s `tickets.status` from a 7-value `ENUM` to `VARCHAR(64) NOT NULL DEFAULT 'open'` so future admin-defined slugs are accepted; (e) adds `idx_tickets_status` (none existed). Existing rows are preserved bit-for-bit &mdash; the slug strings carry over unchanged. New `tests/Feature/MigrationStatusesTest.php` (11 tests / 40 assertions) locks the schema shape, the seed contents, and the column conversion in place.
+
+---
+
 ## 2.59.1 &mdash; 2026-05-27
 
 ### Fixed
