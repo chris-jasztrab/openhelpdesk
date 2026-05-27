@@ -8,11 +8,12 @@
  * articles); `sanitizeBannerHtml()` strips <script>, inline event
  * handlers and `javascript:` URLs as a defence-in-depth measure.
  *
- * Per-user dismissal is client-side via localStorage and keyed by
- * `id_updated_at` so editing a banner re-surfaces it for users who'd
- * previously dismissed the older copy. Agents and admins also get a
- * Clear/Edit row of buttons inline so they can act on a posted incident
- * without navigating away.
+ * Per-user dismissal is stored server-side in $_SESSION (keyed by
+ * banner id + updated_at) so the choice persists across tabs and page
+ * loads for the rest of the session. Editing a banner bumps updated_at
+ * and re-surfaces it for users who'd previously dismissed the older
+ * copy. Agents and admins also get a Clear/Edit row of buttons inline
+ * so they can act on a posted incident without navigating away.
  */
 $_banners = getActiveBanners();
 if (empty($_banners)) {
@@ -34,15 +35,13 @@ $_severityIcon = [
 <div id="ld-status-banners" class="mb-3">
     <?php foreach ($_banners as $_b): ?>
         <?php
-        $_dismissKey = 'ld_banner_' . (int) $_b['id'] . '_' . strtotime($_b['updated_at']);
-        $_cls        = $_severityClass[$_b['severity']] ?? 'alert-warning';
-        $_icon       = $_severityIcon[$_b['severity']] ?? 'bi-exclamation-triangle-fill';
+        $_cls  = $_severityClass[$_b['severity']] ?? 'alert-warning';
+        $_icon = $_severityIcon[$_b['severity']] ?? 'bi-exclamation-triangle-fill';
         ?>
         <div class="alert <?= $_cls ?> d-flex align-items-start gap-3 shadow-sm ld-banner"
              role="<?= $_b['severity'] === 'critical' ? 'alert' : 'status' ?>"
              aria-live="<?= $_b['severity'] === 'critical' ? 'assertive' : 'polite' ?>"
-             data-banner-id="<?= (int) $_b['id'] ?>"
-             data-dismiss-key="<?= e($_dismissKey) ?>">
+             data-banner-id="<?= (int) $_b['id'] ?>">
             <div class="flex-shrink-0 fs-4 lh-1 pt-1">
                 <i class="bi <?= $_icon ?>" aria-hidden="true"></i>
             </div>
@@ -97,19 +96,35 @@ $_severityIcon = [
 </style>
 <script>
 (function () {
-    document.querySelectorAll('#ld-status-banners .ld-banner').forEach(function (el) {
-        var key = el.getAttribute('data-dismiss-key');
-        if (key && window.localStorage && localStorage.getItem(key) === '1') {
-            el.style.display = 'none';
-            return;
-        }
+    var wrap  = document.getElementById('ld-status-banners');
+    if (!wrap) return;
+    var csrf  = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
+
+    wrap.querySelectorAll('.ld-banner').forEach(function (el) {
         var btn = el.querySelector('.ld-banner-dismiss');
         if (!btn) return;
         btn.addEventListener('click', function () {
-            try { if (key && window.localStorage) localStorage.setItem(key, '1'); } catch (e) {}
+            var id = el.getAttribute('data-banner-id');
+            // Fire-and-forget — server records the dismissal in $_SESSION so
+            // it sticks across tabs/page loads. If the request fails, the
+            // banner just reappears on the next load (acceptable).
+            try {
+                fetch('/api/banners/' + encodeURIComponent(id) + '/dismiss', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'X-CSRF-Token': csrf },
+                    keepalive: true
+                }).catch(function () {});
+            } catch (e) { /* ignore */ }
+
             el.style.transition = 'opacity .15s ease';
             el.style.opacity = '0';
-            setTimeout(function () { el.style.display = 'none'; }, 150);
+            setTimeout(function () {
+                el.remove();
+                // When the last banner goes, drop the wrapper too so its
+                // mb-3 doesn't leave a gap at the top of the page.
+                if (!wrap.querySelector('.ld-banner')) wrap.remove();
+            }, 150);
         });
     });
 })();

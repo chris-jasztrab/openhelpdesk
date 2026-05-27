@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.59.1 &mdash; 2026-05-27
+
+### Fixed
+- **Dismissing the status banner now sticks across tabs and page loads, and no longer leaves blank space behind.** Previously [templates/partials/status-banner.php](templates/partials/status-banner.php) recorded dismissal only in `localStorage` and hid the alert via `display: none`. In practice that meant a) opening a new tab re-surfaced the banner (cross-tab `localStorage` reads weren't reliable for some users), and b) the wrapper `<div class="mb-3">` stayed in the DOM, leaving a chunk of empty space at the top of the page between the breadcrumb and the page content. Dismissal now POSTs to a new `POST /api/banners/{id}/dismiss` endpoint that stores the chosen banner+`updated_at` pair in `$_SESSION['dismissed_banners']`, and `getActiveBanners()` filters those out before render &mdash; so on every subsequent page in every tab, the banner simply isn't emitted (no wrapper, no margin, no gap). Editing a banner bumps `updated_at` and re-surfaces it as before. The dismiss button itself also now drops the wrapper element after the last banner fades, so the current page reflows immediately without waiting for the next navigation.
+
+---
+
 ## 2.59.0 &mdash; 2026-05-26
 
 ### Added

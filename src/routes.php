@@ -783,6 +783,37 @@ $router->post('/api/presence/leave', function () {
 });
 
 /* ------------------------------------------------------------------
+ * Status-banner dismissal (per-session)
+ * ------------------------------------------------------------------
+ * Stores "user X dismissed banner Y@updated_at Z" in $_SESSION so the
+ * banner stays hidden across tabs and page loads for the rest of the
+ * session. Editing a banner bumps updated_at, which invalidates prior
+ * dismissals (intentional — the message changed, surface it again).
+ * ------------------------------------------------------------------ */
+$router->post('/api/banners/{id}/dismiss', function (array $p) {
+    Auth::requireAuth();
+    header('Content-Type: application/json');
+    if (!verifyCsrf($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '')) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Invalid CSRF token']);
+        exit;
+    }
+    $id = (int) $p['id'];
+    $stmt = Database::connect()->prepare('SELECT updated_at FROM status_banners WHERE id = ?');
+    $stmt->execute([$id]);
+    $updatedAt = $stmt->fetchColumn();
+    if (!$updatedAt) {
+        http_response_code(404);
+        echo json_encode(['ok' => false, 'error' => 'Banner not found']);
+        exit;
+    }
+    $key = $id . '_' . strtotime((string) $updatedAt);
+    $_SESSION['dismissed_banners'][$key] = true;
+    echo json_encode(['ok' => true]);
+    exit;
+});
+
+/* ------------------------------------------------------------------
  * Global Search (JSON API)
  * ------------------------------------------------------------------ */
 $router->get('/search', function () {

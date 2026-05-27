@@ -5434,7 +5434,19 @@ function getActiveBanners(): array
 
     $stmt = $db->prepare($sql);
     $stmt->execute($params);
-    return $stmt->fetchAll();
+    $rows = $stmt->fetchAll();
+
+    // Per-session dismissal: writes to $_SESSION['dismissed_banners'][$key]
+    // by POST /api/banners/{id}/dismiss. Key includes updated_at so editing
+    // a banner re-surfaces it for users who'd dismissed the older copy.
+    $dismissed = $_SESSION['dismissed_banners'] ?? [];
+    if ($dismissed) {
+        $rows = array_values(array_filter($rows, static function ($b) use ($dismissed) {
+            $key = (int) $b['id'] . '_' . strtotime($b['updated_at']);
+            return empty($dismissed[$key]);
+        }));
+    }
+    return $rows;
 }
 
 /**
