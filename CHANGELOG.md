@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.61.0 &mdash; 2026-05-27
+
+### Added
+- **Admin settings page for ticket statuses &mdash; admins can now add, rename, recolor, re&dash;order, and deactivate ticket statuses without touching code.** This is the feature that unlocks the previous three releases of plumbing. New route: [/admin/settings/ticket-statuses](http://localhost:8000/admin/settings/ticket-statuses), reachable from the Settings sidebar under "Organization" (between Locations and Ticket Types). The page lists every status &mdash; including deactivated ones &mdash; with its live badge preview, slug, bucket, SLA-pause flag, default-target flags, and active state. Each row has a drag handle (powered by the existing [templates/partials/sortable-list.php](templates/partials/sortable-list.php) infrastructure) so reorder persists immediately to all status dropdowns site-wide. **Add Status** opens a modal asking for a label, slug (auto-suggested from the label, but editable on create &mdash; <em>permanent</em> after that), bucket (Open/Closed), color picker, and a "Pause SLA" toggle. **Edit** opens a modal with everything except the slug. **Set default** (a gear menu in the Defaults column) promotes a status to the default-for-new, default-for-resolved, or default-for-closed flag; promoting a status clears whichever row previously held that flag in the same transaction. **Delete** is allowed only for non-system, unused custom statuses &mdash; built-in statuses can be deactivated but not deleted, and any status with tickets pointing at it is blocked with a count of how many. New endpoints: `POST /create`, `POST /{id}/edit`, `POST /{id}/set-default`, `POST /reorder`, `POST /{id}/delete` (all admin-only, all CSRF-protected). All writes call `ticketStatusCacheRefresh()` so the change is visible without a full page reload. Audit log entries: `status.created`, `status.updated`, `status.default_changed`, `status.deleted`. New `tests/Feature/Admin/TicketStatusesTest.php` (16 tests covering access control, page render, create+validation, edit+slug-immutability, default promotion, reorder persistence, and the baseline delete guards). Phase-4 delete guards are intentionally minimal &mdash; Phase 5 will add last-in-bucket protection, default-reassignment flows, and reference checks against automations/escalation rules.
+
+---
+
 ## 2.60.2 &mdash; 2026-05-27
 
 ### Changed

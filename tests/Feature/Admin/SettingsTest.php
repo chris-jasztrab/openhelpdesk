@@ -38,6 +38,7 @@ class SettingsTest extends TestCase
             ['/admin/settings/scheduled-reports',   'Scheduled'],
             ['/admin/settings/backup',              'Backup'],
             ['/admin/workflows/ticket-fields',      'Custom'],
+            ['/admin/settings/ticket-statuses',     'Ticket Statuses'],
             ['/admin/settings/danger-zone',         'Danger Zone'],
         ];
     }

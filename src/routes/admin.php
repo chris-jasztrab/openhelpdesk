@@ -9888,6 +9888,214 @@ $router->post('/admin/settings/tags', function () {
 });
 
 /* ==================================================================
+ * ADMIN – Ticket Status Management
+ *
+ * CRUD + drag-reorder for the `ticket_statuses` lookup table that backs
+ * configurable ticket statuses. Slugs are immutable after create so the
+ * SQL semantics scattered through the codebase stay stable. Bucket,
+ * label, color, sort_order, pauses_sla, is_active, and the three
+ * is_default_* flags are freely editable.
+ *
+ * Guardrails in this phase are deliberately minimal — system rows are
+ * protected from outright deletion and in-use slugs block deletion.
+ * Richer protections (last-in-bucket, default-reassignment, reference
+ * checks against automations/escalations) come in Phase 5.
+ * ================================================================== */
+
+$router->get('/admin/settings/ticket-statuses', function () {
+    Auth::requireRole('admin');
+    // Force a fresh read in case we just edited and the cache was primed.
+    ticketStatusCacheRefresh();
+    $statuses = ticketStatuses();   // includes inactive rows for the admin view
+    render('admin/settings/ticket-statuses', compact('statuses'));
+});
+
+$router->post('/admin/settings/ticket-statuses/reorder', function () {
+    Auth::requireRole('admin');
+    handleSortableReorder('ticket_statuses');
+    ticketStatusCacheRefresh();
+});
+
+$router->post('/admin/settings/ticket-statuses/create', function () {
+    Auth::requireRole('admin');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/ticket-statuses');
+    }
+
+    $slug   = strtolower(trim($_POST['slug'] ?? ''));
+    $label  = trim($_POST['label'] ?? '');
+    $bucket = in_array($_POST['bucket'] ?? '', ['open', 'closed'], true) ? $_POST['bucket'] : 'open';
+    $color  = preg_match('/^#[0-9a-fA-F]{6}$/', $_POST['color'] ?? '') ? $_POST['color'] : '#6c757d';
+    $pauses = !empty($_POST['pauses_sla']) ? 1 : 0;
+
+    // Slug rules: starts with a lowercase letter, then lowercase letters,
+    // digits, and underscores only, max 64. Same shape as the seeded slugs.
+    if (!preg_match('/^[a-z][a-z0-9_]{0,63}$/', $slug)) {
+        flashInput($_POST);
+        flash('error', 'Slug must start with a lowercase letter and contain only lowercase letters, digits, and underscores (max 64 chars).');
+        redirect('/admin/settings/ticket-statuses');
+    }
+    if ($label === '') {
+        flashInput($_POST);
+        flash('error', 'Label is required.');
+        redirect('/admin/settings/ticket-statuses');
+    }
+
+    $db       = Database::connect();
+    $maxOrder = (int) $db->query('SELECT COALESCE(MAX(sort_order), 0) FROM ticket_statuses')->fetchColumn();
+
+    try {
+        $db->prepare(
+            'INSERT INTO ticket_statuses
+                (slug, label, bucket, pauses_sla, color, sort_order, is_system, is_active)
+             VALUES (?, ?, ?, ?, ?, ?, 0, 1)'
+        )->execute([$slug, $label, $bucket, $pauses, $color, $maxOrder + 1]);
+        $newId = (int) $db->lastInsertId();
+        logAudit('status.created', $newId, 'ticket_status', "slug={$slug}; label={$label}; bucket={$bucket}");
+        ticketStatusCacheRefresh();
+        flash('success', "Status \"{$label}\" created.");
+    } catch (\PDOException $e) {
+        flashInput($_POST);
+        if (str_contains($e->getMessage(), 'uniq_ticket_statuses_slug')) {
+            flash('error', "Slug \"{$slug}\" is already in use.");
+        } else {
+            flash('error', 'Could not create status: ' . $e->getMessage());
+        }
+    }
+    redirect('/admin/settings/ticket-statuses');
+});
+
+$router->post('/admin/settings/ticket-statuses/{id}/edit', function (array $p) {
+    Auth::requireRole('admin');
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/ticket-statuses');
+    }
+    $db   = Database::connect();
+    $stmt = $db->prepare('SELECT * FROM ticket_statuses WHERE id = ?');
+    $stmt->execute([$id]);
+    $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+    if (!$row) {
+        flash('error', 'Status not found.');
+        redirect('/admin/settings/ticket-statuses');
+    }
+
+    $label  = trim($_POST['label'] ?? '');
+    $bucket = in_array($_POST['bucket'] ?? '', ['open', 'closed'], true) ? $_POST['bucket'] : (string) $row['bucket'];
+    $color  = preg_match('/^#[0-9a-fA-F]{6}$/', $_POST['color'] ?? '') ? $_POST['color'] : (string) $row['color'];
+    $pauses = !empty($_POST['pauses_sla']) ? 1 : 0;
+    $active = !empty($_POST['is_active']) ? 1 : 0;
+
+    if ($label === '') {
+        flash('error', 'Label is required.');
+        redirect('/admin/settings/ticket-statuses');
+    }
+
+    // Slug is intentionally not read from the request — it's immutable
+    // after create so the SQL semantics in the codebase stay stable.
+    $db->prepare(
+        'UPDATE ticket_statuses SET label=?, bucket=?, color=?, pauses_sla=?, is_active=? WHERE id=?'
+    )->execute([$label, $bucket, $color, $pauses, $active, $id]);
+
+    logAuditChange(
+        'status.updated', $id, 'ticket_status',
+        [
+            'label'      => $row['label'],
+            'bucket'     => $row['bucket'],
+            'color'      => $row['color'],
+            'pauses_sla' => $row['pauses_sla'],
+            'is_active'  => $row['is_active'],
+        ],
+        [
+            'label'      => $label,
+            'bucket'     => $bucket,
+            'color'      => $color,
+            'pauses_sla' => $pauses,
+            'is_active'  => $active,
+        ]
+    );
+    ticketStatusCacheRefresh();
+    flash('success', "Status \"{$label}\" updated.");
+    redirect('/admin/settings/ticket-statuses');
+});
+
+$router->post('/admin/settings/ticket-statuses/{id}/set-default', function (array $p) {
+    Auth::requireRole('admin');
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/ticket-statuses');
+    }
+    $kind = (string) ($_POST['kind'] ?? '');
+    $columnMap = [
+        'new'      => 'is_default_new',
+        'resolved' => 'is_default_resolved',
+        'closed'   => 'is_default_closed',
+    ];
+    if (!isset($columnMap[$kind])) {
+        flash('error', 'Unknown default kind.');
+        redirect('/admin/settings/ticket-statuses');
+    }
+    $col = $columnMap[$kind];
+
+    $db = Database::connect();
+    $db->beginTransaction();
+    try {
+        $db->exec("UPDATE ticket_statuses SET {$col} = 0");
+        $db->prepare("UPDATE ticket_statuses SET {$col} = 1 WHERE id = ?")->execute([$id]);
+        $db->commit();
+        ticketStatusCacheRefresh();
+        logAudit('status.default_changed', $id, 'ticket_status', "kind={$kind}");
+        flash('success', 'Default updated.');
+    } catch (\PDOException $e) {
+        $db->rollBack();
+        flash('error', 'Could not update default: ' . $e->getMessage());
+    }
+    redirect('/admin/settings/ticket-statuses');
+});
+
+$router->post('/admin/settings/ticket-statuses/{id}/delete', function (array $p) {
+    Auth::requireRole('admin');
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/ticket-statuses');
+    }
+
+    $db   = Database::connect();
+    $stmt = $db->prepare('SELECT * FROM ticket_statuses WHERE id = ?');
+    $stmt->execute([$id]);
+    $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+    if (!$row) {
+        flash('error', 'Status not found.');
+        redirect('/admin/settings/ticket-statuses');
+    }
+
+    // Phase-4 baseline guards (Phase 5 adds last-in-bucket + default-reassign
+    // + automation-reference checks).
+    if ((int) $row['is_system'] === 1) {
+        flash('error', "\"{$row['label']}\" is a built-in status and cannot be deleted. Deactivate it instead.");
+        redirect('/admin/settings/ticket-statuses');
+    }
+
+    $count = $db->prepare('SELECT COUNT(*) FROM tickets WHERE status = ?');
+    $count->execute([$row['slug']]);
+    $usedBy = (int) $count->fetchColumn();
+    if ($usedBy > 0) {
+        flash('error', "Cannot delete \"{$row['label']}\" — {$usedBy} ticket(s) still have this status. Reassign them first.");
+        redirect('/admin/settings/ticket-statuses');
+    }
+
+    $db->prepare('DELETE FROM ticket_statuses WHERE id = ?')->execute([$id]);
+    logAudit('status.deleted', $id, 'ticket_status', "slug={$row['slug']}; label={$row['label']}");
+    ticketStatusCacheRefresh();
+    flash('success', "Status \"{$row['label']}\" deleted.");
+    redirect('/admin/settings/ticket-statuses');
+});
+
+/* ==================================================================
  * ADMIN – Organization Settings
  *
  * Stored as a single key (`organization_type`) in the `settings` table.
