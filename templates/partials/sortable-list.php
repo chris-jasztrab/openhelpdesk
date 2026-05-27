@@ -67,7 +67,12 @@
                 animation: 150,
                 ghostClass: 'sortable-ghost',
                 chosenClass: 'sortable-chosen',
-                onEnd: function () { commit(true); }
+                onEnd: function () {
+                    var beforeCommit = currentOrder(tbody);
+                    commit(true, function (ok) {
+                        if (ok) showSavedToast(table);
+                    });
+                }
             });
         }
 
@@ -101,19 +106,24 @@
             toolbar.style.display = sameOrder(currentOrder(tbody), savedOrder) ? 'none' : 'flex';
         }
 
-        function commit(silent) {
+        function commit(silent, done) {
             var ids = currentOrder(tbody);
             postJson(endpoint, { ids: ids.map(function (s) { return parseInt(s, 10); }) })
                 .then(function (j) {
-                    if (j && j.success) {
+                    var ok = !!(j && j.success);
+                    if (ok) {
                         savedOrder = ids;
                         if (!silent) flash(toolbar, 'Saved');
                         refreshToolbar();
                     } else {
                         alert((j && j.error) || 'Could not save order.');
                     }
+                    if (done) done(ok);
                 })
-                .catch(function () { alert('Network error saving order.'); });
+                .catch(function () {
+                    alert('Network error saving order.');
+                    if (done) done(false);
+                });
         }
 
         toolbar.querySelector('[data-sortable-save]').addEventListener('click', function () { commit(false); });
@@ -247,6 +257,32 @@
         badge.innerHTML = '<i class="bi bi-check2 me-1"></i>' + msg;
         el.appendChild(badge);
         setTimeout(function () { badge.remove(); }, 1500);
+    }
+
+    // Floating "Saved" toast for silent drag-end commits — the toolbar is
+    // hidden once savedOrder matches currentOrder, so its flash() badge
+    // wouldn't be visible. This toast lives outside the toolbar.
+    function showSavedToast(table) {
+        var wrap = table.closest('.card') || table.parentNode;
+        if (!wrap) return;
+        var prev = wrap.querySelector('.sortable-saved-toast');
+        if (prev) prev.remove();
+
+        var toast = document.createElement('div');
+        toast.className = 'sortable-saved-toast';
+        toast.style.cssText =
+            'position:absolute;top:8px;right:8px;'
+          + 'background:#198754;color:#fff;padding:4px 12px;'
+          + 'border-radius:.375rem;font-size:.875rem;font-weight:600;'
+          + 'box-shadow:0 2px 8px rgba(0,0,0,.15);z-index:1050;'
+          + 'transition:opacity .3s;';
+        toast.innerHTML = '<i class="bi bi-check2 me-1"></i>Order saved';
+
+        var prevPos = wrap.style.position;
+        if (!prevPos || prevPos === 'static') wrap.style.position = 'relative';
+        wrap.appendChild(toast);
+        setTimeout(function () { toast.style.opacity = '0'; }, 1200);
+        setTimeout(function () { toast.remove(); }, 1500);
     }
 })();
 </script>

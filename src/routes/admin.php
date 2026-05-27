@@ -10048,6 +10048,57 @@ $router->post('/admin/settings/ticket-statuses/{id}/edit', function (array $p) {
     redirect('/admin/settings/ticket-statuses');
 });
 
+$router->post('/admin/settings/ticket-statuses/{id}/toggle-active', function (array $p) {
+    Auth::requireRole('admin');
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/ticket-statuses');
+    }
+    $db   = Database::connect();
+    $stmt = $db->prepare('SELECT * FROM ticket_statuses WHERE id = ?');
+    $stmt->execute([$id]);
+    $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+    if (!$row) {
+        redirect('/admin/settings/ticket-statuses');
+    }
+
+    $wasActive = (int) $row['is_active'] === 1;
+    $newActive = $wasActive ? 0 : 1;
+
+    // Same guardrails as the edit deactivation path: don't deactivate a row
+    // that holds a default flag or is the only active in its bucket.
+    if ($wasActive && $newActive === 0) {
+        $defaultBlocks = [];
+        if ((int) $row['is_default_new'])      $defaultBlocks[] = 'new tickets';
+        if ((int) $row['is_default_resolved']) $defaultBlocks[] = 'resolved emails';
+        if ((int) $row['is_default_closed'])   $defaultBlocks[] = 'closed emails';
+        if (!empty($defaultBlocks)) {
+            flash('error', "Cannot deactivate \"{$row['label']}\" — it's the default for " . implode(' + ', $defaultBlocks)
+                . '. Promote another status to that role first.');
+            redirect('/admin/settings/ticket-statuses');
+        }
+        $bucketActive = $db->prepare(
+            'SELECT COUNT(*) FROM ticket_statuses WHERE bucket = ? AND is_active = 1 AND id != ?'
+        );
+        $bucketActive->execute([$row['bucket'], $id]);
+        if ((int) $bucketActive->fetchColumn() === 0) {
+            flash('error', "Cannot deactivate \"{$row['label']}\" — it's the only active status in the «{$row['bucket']}» bucket.");
+            redirect('/admin/settings/ticket-statuses');
+        }
+    }
+
+    $db->prepare('UPDATE ticket_statuses SET is_active = ? WHERE id = ?')->execute([$newActive, $id]);
+    logAuditChange(
+        'status.updated', $id, 'ticket_status',
+        ['is_active' => $row['is_active']],
+        ['is_active' => $newActive]
+    );
+    ticketStatusCacheRefresh();
+    flash('success', "\"{$row['label']}\" " . ($newActive ? 'activated' : 'deactivated') . '.');
+    redirect('/admin/settings/ticket-statuses');
+});
+
 $router->post('/admin/settings/ticket-statuses/{id}/set-default', function (array $p) {
     Auth::requireRole('admin');
     $id = (int) $p['id'];
@@ -10111,8 +10162,11 @@ $router->post('/admin/settings/ticket-statuses/{id}/delete', function (array $p)
     $stmt = $db->prepare('SELECT * FROM ticket_statuses WHERE id = ?');
     $stmt->execute([$id]);
     $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+    // Silently redirect on missing row — most commonly hit when an accidental
+    // double-submit fires a delete POST against a row the first POST already
+    // removed. Showing "Status not found" in that case is confusing because
+    // the user just saw a "deleted successfully" flash on the previous render.
     if (!$row) {
-        flash('error', 'Status not found.');
         redirect('/admin/settings/ticket-statuses');
     }
 

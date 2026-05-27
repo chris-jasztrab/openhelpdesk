@@ -35,7 +35,7 @@ unset($_SESSION['_old_input']);
 <div class="alert alert-info py-2 small mb-3">
     <i class="bi bi-info-circle me-1"></i>
     <strong>Buckets</strong> determine business logic: tickets in the <em>open</em> bucket count toward "open" dashboard tiles and SLA tracking; tickets in the <em>closed</em> bucket are treated as resolved (and trigger the resolved/closed email + CSAT flows when set as the default for those kinds).
-    Built-in statuses can be relabeled or recolored but not deleted — deactivate them instead.
+    Built-in statuses can be relabeled or recolored but not deleted &mdash; to <strong>hide one from dropdowns</strong>, click the green checkmark in the <em>Active</em> column to toggle it off. Existing tickets keep their stored status either way.
 </div>
 
 <div class="card border-0 shadow-sm">
@@ -136,11 +136,18 @@ unset($_SESSION['_old_input']);
                         </div>
                     </td>
                     <td class="text-center">
-                        <?php if ($s['is_active']): ?>
-                            <i class="bi bi-check-circle-fill text-success" title="Available in dropdowns"></i>
-                        <?php else: ?>
-                            <i class="bi bi-eye-slash text-muted" title="Hidden — historical tickets still display this status"></i>
-                        <?php endif; ?>
+                        <form method="POST" action="/admin/settings/ticket-statuses/<?= (int) $s['id'] ?>/toggle-active" class="m-0">
+                            <?= csrfField() ?>
+                            <?php if ($s['is_active']): ?>
+                                <button type="submit" class="btn btn-sm btn-link p-0 text-success" title="Active &mdash; click to deactivate">
+                                    <i class="bi bi-check-circle-fill fs-5"></i>
+                                </button>
+                            <?php else: ?>
+                                <button type="submit" class="btn btn-sm btn-link p-0 text-muted" title="Inactive &mdash; click to activate">
+                                    <i class="bi bi-eye-slash fs-5"></i>
+                                </button>
+                            <?php endif; ?>
+                        </form>
                     </td>
                     <td>
                         <div class="d-flex gap-1">
@@ -438,6 +445,19 @@ window.ticketStatusTicketCounts = <?= json_encode($ticketCountsBySlug, JSON_UNES
     });
     document.getElementById('addStatusModal').addEventListener('hidden.bs.modal', function () {
         slugTouched = false;
+    });
+
+    // Submit-button double-click guard. Once any form on this page is
+    // submitted, disable its submit buttons so an over-eager second click
+    // doesn't fire a duplicate POST against an already-changed row.
+    document.querySelectorAll('form').forEach(function (form) {
+        form.addEventListener('submit', function () {
+            Array.from(form.querySelectorAll('button[type="submit"]')).forEach(function (btn) {
+                btn.disabled = true;
+                btn.dataset.originalHtml = btn.innerHTML;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Working…';
+            });
+        });
     });
 })();
 </script>

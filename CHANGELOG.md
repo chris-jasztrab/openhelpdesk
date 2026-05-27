@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.61.2 &mdash; 2026-05-27
+
+### Fixed
+- **Ticket status admin page UX fixes from first-touch testing.** Four issues surfaced when an admin walked through the new page: (1) **No visible deactivate control.** Built-in statuses (correctly) can't be deleted, and the only way to hide one from dropdowns was buried inside the Edit modal as an "Active" checkbox — making it look like there was no way to remove a built-in status at all. Fixed by adding an **inline Active toggle** in the table's Active column: the green check / grey eye-slash icon is now a single-click button that POSTs to a new `/admin/settings/ticket-statuses/{id}/toggle-active` endpoint (carrying the same Phase 5 guardrails — refuses to deactivate a default-flag holder or the last active in a bucket). The help banner was also reworded to point at the inline toggle. (2) **"Status not found" flash after a successful reassign-then-delete.** Caused by an accidental double-submit: the first POST deleted the row and redirected, the second POST hit the now-missing row and flashed the error. The delete handler now **silently redirects** when the row is already gone, on the reasoning that the user just saw a "deleted successfully" flash on the previous render — scaring them with a "not found" message confuses more than it helps. (3) **Same "Status not found" error when creating and immediately deleting a status.** Same double-submit root cause; same fix covers it. (4) **Drag-reorder appeared to not save.** It actually did save (DB inspection confirmed) but there was zero visible confirmation, so users assumed nothing happened. Added a floating green **"Order saved"** toast to [templates/partials/sortable-list.php](templates/partials/sortable-list.php) that appears briefly in the top-right of the card after every successful drag-end commit. Benefits the other sortable pages (priorities, types, escalation paths) as a side effect. Also added a **submit-button double-click guard** to every form on the ticket-statuses page: clicked submit buttons disable themselves and show a spinner until the redirect lands, so a fast double-click can't fire two POSTs. New tests: `test_toggle_active_flips_state`, `test_toggle_active_blocked_for_default_holder`. The existing helper tests were also relaxed to filter on `is_system=1` rather than assert exact row counts, so they tolerate admin-added custom statuses in the working DB.
+
+---
+
 ## 2.61.1 &mdash; 2026-05-27
 
 ### Added

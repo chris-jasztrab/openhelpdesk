@@ -523,6 +523,44 @@ class TicketStatusesTest extends TestCase
         $db->prepare('DELETE FROM automations WHERE id = ?')->execute([$autoId]);
     }
 
+    // ── toggle-active endpoint (inline button in the Active column) ───────────
+
+    public function test_toggle_active_flips_state(): void
+    {
+        // Create a custom open-bucket status so we can deactivate without
+        // tripping the last-active-in-bucket guard.
+        $this->post($this->adminClient(), '/admin/settings/ticket-statuses/create', [
+            'slug'   => 'test_toggle',
+            'label'  => '[TEST] Toggle',
+            'bucket' => 'open',
+            'color'  => '#778899',
+        ]);
+        $id = $this->statusId('test_toggle');
+        $this->assertGreaterThan(0, $id);
+
+        // Created active → toggle → inactive
+        $this->post($this->adminClient(), "/admin/settings/ticket-statuses/{$id}/toggle-active", []);
+        $check = \Database::connect()->prepare('SELECT is_active FROM ticket_statuses WHERE id = ?');
+        $check->execute([$id]);
+        $this->assertSame(0, (int) $check->fetchColumn(), 'should be inactive after first toggle');
+
+        // Toggle again → active
+        $this->post($this->adminClient(), "/admin/settings/ticket-statuses/{$id}/toggle-active", []);
+        $check->execute([$id]);
+        $this->assertSame(1, (int) $check->fetchColumn(), 'should be active again after second toggle');
+    }
+
+    public function test_toggle_active_blocked_for_default_holder(): void
+    {
+        // 'open' is default-new in the seed — toggling its active state should
+        // fail because that would remove the default-new fallback.
+        $id = $this->statusId('open');
+        $this->post($this->adminClient(), "/admin/settings/ticket-statuses/{$id}/toggle-active", []);
+        $check = \Database::connect()->prepare('SELECT is_active FROM ticket_statuses WHERE id = ?');
+        $check->execute([$id]);
+        $this->assertSame(1, (int) $check->fetchColumn(), 'default-holder must stay active');
+    }
+
     public function test_cannot_delete_status_referenced_by_automation(): void
     {
         // Create a deletable custom status, then an automation pointing at it,
