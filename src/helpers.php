@@ -930,6 +930,7 @@ function _autoAssignLeastLoaded(PDO $db, array $members): ?int
         return null;
     }
     $placeholders = implode(',', array_fill(0, count($members), '?'));
+    $notClosed    = ticketStatusSqlIn(ticketClosedBucketSlugs(), 'status', true);
     $stmt = $db->prepare(
         "SELECT u.id, COALESCE(c.cnt, 0) AS open_count
          FROM users u
@@ -937,7 +938,7 @@ function _autoAssignLeastLoaded(PDO $db, array $members): ?int
              SELECT assigned_to, COUNT(*) AS cnt
              FROM tickets
              WHERE assigned_to IN ($placeholders)
-               AND status NOT IN ('resolved','closed')
+               AND $notClosed
              GROUP BY assigned_to
          ) c ON c.assigned_to = u.id
          WHERE u.id IN ($placeholders)
@@ -1402,7 +1403,7 @@ function checkTicketDuplicates(int $userId, int $typeId, ?int $locationId, strin
     // still catch duplicates rather than silently skipping the check.
     $params = [];
     $where  = [
-        "t.status NOT IN ('resolved', 'closed')",
+        ticketStatusSqlIn(ticketClosedBucketSlugs(), 't.status', true),
         "t.merged_into_ticket_id IS NULL",
         "COALESCE(tt.is_confidential, 0) = 0",
         "t.created_at >= NOW() - INTERVAL 14 DAY",
@@ -1552,7 +1553,7 @@ function getDupPreviewTicket(int $userId, int $ticketId, bool $agentScope): ?arr
     if (!$row)                                                  { return null; }
     if ((int) $row['type_is_confidential'] === 1)               { return null; }
     if ($row['merged_into_ticket_id'] !== null)                 { return null; }
-    if (in_array($row['status'], ['resolved', 'closed'], true)) { return null; }
+    if (in_array($row['status'], ticketClosedBucketSlugs(), true)) { return null; }
 
     if (!$agentScope) {
         // Portal users: only show tickets at the user's own branch.
@@ -3239,16 +3240,23 @@ function notifyAgentNoteAdded(PDO $db, int $ticketId, string $message): void
  */
 function notifyRequesterStatusChanged(PDO $db, int $ticketId, string $newStatus): void
 {
-    $settingKey = match ($newStatus) {
-        'resolved' => 'requester_ticket_resolved',
-        'closed'   => 'requester_ticket_closed',
-        default    => null,
-    };
-    if ($settingKey === null || !emailNotifyEnabled($settingKey)) {
+    // Match the slug against the two semantic default flags rather than the
+    // literal strings 'resolved' / 'closed', so admins can rename either
+    // status without breaking the email + opt-in wiring.
+    if ($newStatus === ticketDefaultResolvedStatusSlug()) {
+        $settingKey   = 'requester_ticket_resolved';
+        $userCol      = 'notify_ticket_solved';
+        $templateKind = 'resolved';
+    } elseif ($newStatus === ticketDefaultClosedStatusSlug()) {
+        $settingKey   = 'requester_ticket_closed';
+        $userCol      = 'notify_ticket_closed';
+        $templateKind = 'closed';
+    } else {
         return;
     }
-
-    $userCol = $newStatus === 'resolved' ? 'notify_ticket_solved' : 'notify_ticket_closed';
+    if (!emailNotifyEnabled($settingKey)) {
+        return;
+    }
 
     $stmt = $db->prepare(
         "SELECT t.subject, u.id AS user_id, u.email, u.first_name, u.last_name, u.{$userCol} AS opted_in
@@ -3270,7 +3278,10 @@ function notifyRequesterStatusChanged(PDO $db, int $ticketId, string $newStatus)
         'closed'   => 'Your support ticket has been closed. Thank you for contacting us. If you need further assistance, please submit a new ticket.',
     ];
 
-    $tpl = getEmailTpl('ticket-status-' . $newStatus, [
+    // $templateKind is the semantic flag ('resolved' / 'closed') and stays
+    // stable even if an admin renames the underlying slug. $newStatus is the
+    // actual slug stored on the ticket — that's what the email body shows.
+    $tpl = getEmailTpl('ticket-status-' . $templateKind, [
         'ticket_id'  => $ticketId,
         'subject'    => $row['subject'],
         'user_name'  => $row['first_name'] . ' ' . $row['last_name'],
@@ -3283,7 +3294,7 @@ function notifyRequesterStatusChanged(PDO $db, int $ticketId, string $newStatus)
         'subject'     => $row['subject'],
         'newStatus'   => $newStatus,
         'ticketUrl'   => $ticketUrl,
-        'introText'   => !empty($tpl['intro']) ? $tpl['intro'] : $defaultIntros[$newStatus],
+        'introText'   => !empty($tpl['intro']) ? $tpl['intro'] : $defaultIntros[$templateKind],
         'buttonLabel' => !empty($tpl['button']) ? $tpl['button'] : 'View Ticket',
         'footerText'  => $tpl['footer'],
     ]);
@@ -3514,8 +3525,8 @@ function runEscalationRule(\PDO $db, array $rule, array $ticket): void
         'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, ?, ?, 1)'
     )->execute([$ticketId, 'escalation_triggered', "Escalation rule \"{$ruleName}\" triggered"]);
 
-    $validStatuses = ['open', 'in_progress', 'pending', 'waiting_on_customer', 'waiting_on_third_party', 'resolved', 'closed'];
-    $pausingStatuses = ['pending', 'waiting_on_customer', 'waiting_on_third_party'];
+    $validStatuses   = ticketActiveStatusSlugs();
+    $pausingStatuses = ticketSlaPausingSlugs();
 
     foreach ($actions as $act) {
         $actionType = $act['action'] ?? '';
@@ -4789,13 +4800,12 @@ function runAutomations(PDO $db, int $ticketId, string $triggerEvent): void
                     break;
 
                 case 'set_status':
-                    $validStatuses = ['open', 'in_progress', 'pending', 'waiting_on_customer', 'waiting_on_third_party', 'resolved', 'closed'];
-                    if (!in_array($val, $validStatuses, true)) {
+                    if (!in_array($val, ticketActiveStatusSlugs(), true)) {
                         break;
                     }
                     $oldStatus = $ticket['status'];
                     $db->prepare('UPDATE tickets SET status = ? WHERE id = ?')->execute([$val, $ticketId]);
-                    $pausingStatuses = ['pending', 'waiting_on_customer', 'waiting_on_third_party'];
+                    $pausingStatuses = ticketSlaPausingSlugs();
                     if (in_array($val, $pausingStatuses, true)) {
                         Sla::pause($db, $ticketId);
                     } elseif (in_array($oldStatus, $pausingStatuses, true)) {
@@ -5646,5 +5656,96 @@ function ticketStatusMeta(string $slug): ?array
 function ticketStatusCacheRefresh(): void
 {
     _ticketStatusCache(true);
+}
+
+/**
+ * Build a SQL `<col> IN (...)` (or `NOT IN (...)`) fragment from a slug array,
+ * with each value PDO-quoted so it's safe to string-concatenate into a query.
+ * Replaces the hardcoded `status IN ('open','in_progress','pending')` patterns
+ * scattered through the codebase. If $slugs is empty the fragment evaluates to
+ * a safe false (or true, for negate=true) so callers don't have to special-case
+ * the empty list.
+ */
+function ticketStatusSqlIn(array $slugs, string $col = 'status', bool $negate = false): string
+{
+    if (empty($slugs)) {
+        return $negate ? '1=1' : '1=0';
+    }
+    $pdo = Database::connect();
+    $quoted = array_map(static fn(string $s) => $pdo->quote($s), array_values($slugs));
+    $op = $negate ? 'NOT IN' : 'IN';
+    return "{$col} {$op} (" . implode(',', $quoted) . ")";
+}
+
+/**
+ * Pick a readable text color (black or white) for the given hex background.
+ * Uses ITU-R BT.601 luma; the 140 threshold is the same one Bootstrap uses
+ * internally for its `text-bg-*` utility classes, so admin-picked colors look
+ * consistent with the built-in ones.
+ */
+function ticketStatusTextColor(string $hex): string
+{
+    $hex = ltrim($hex, '#');
+    if (strlen($hex) === 3) {
+        $hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
+    }
+    if (strlen($hex) !== 6 || !ctype_xdigit($hex)) {
+        return '#ffffff';
+    }
+    $r = hexdec(substr($hex, 0, 2));
+    $g = hexdec(substr($hex, 2, 2));
+    $b = hexdec(substr($hex, 4, 2));
+    $luma = 0.299 * $r + 0.587 * $g + 0.114 * $b;
+    return $luma > 140 ? '#000000' : '#ffffff';
+}
+
+/**
+ * Slug → label map for active statuses, in sort_order. Use in template
+ * dropdown loops that previously iterated an inline $statusLabels array.
+ */
+function ticketStatusLabelMap(): array
+{
+    $map = [];
+    foreach (ticketActiveStatuses() as $s) {
+        $map[$s['slug']] = $s['label'];
+    }
+    return $map;
+}
+
+/**
+ * `style=""` attribute value for a status badge — background + auto-contrast
+ * text color. Use directly in templates that need a custom label (e.g., portal
+ * uses friendlier names than the slug suggests). When the label is the default,
+ * prefer `ticketStatusBadgeHtml()` instead.
+ */
+function ticketStatusBadgeStyle(string $slug): string
+{
+    $bg = ticketStatusColor($slug);
+    $fg = ticketStatusTextColor($bg);
+    return sprintf(
+        'background-color: %s; color: %s',
+        htmlspecialchars($bg, ENT_QUOTES),
+        $fg
+    );
+}
+
+/**
+ * Render the full status badge HTML for a slug. Replaces the per-template
+ * `$statusColors[$slug]` / `$statusLabels[$slug]` lookup tables. Uses inline
+ * style so admin-picked colors render without requiring CSS regeneration.
+ */
+function ticketStatusBadgeHtml(string $slug, string $extraClass = ''): string
+{
+    $bg = ticketStatusColor($slug);
+    $fg = ticketStatusTextColor($bg);
+    $label = ticketStatusLabel($slug);
+    $class = trim('badge ' . $extraClass);
+    return sprintf(
+        '<span class="%s" style="background-color: %s; color: %s">%s</span>',
+        htmlspecialchars($class, ENT_QUOTES),
+        htmlspecialchars($bg, ENT_QUOTES),
+        $fg,
+        htmlspecialchars($label, ENT_QUOTES)
+    );
 }
 

@@ -7,8 +7,10 @@ $breadcrumbs  = !empty($fromFloor) ? [] : [
     ['label' => label('portal.request.my_plural', 'My Requests'), 'url' => '/portal/tickets'],
     ['label' => '#' . $ticket['id']],
 ];
-$statusColors = ['open' => 'primary', 'in_progress' => 'warning', 'pending' => 'info', 'waiting_on_customer' => 'warning', 'waiting_on_third_party' => 'dark', 'resolved' => 'success', 'closed' => 'secondary'];
-$statusLabels = [
+// Portal uses friendlier labels than agents see; only the seeded slugs have
+// portal.status.* overrides — custom admin-added statuses fall back to their
+// configured label via ticketStatusLabel().
+$portalLabelOverrides = [
     'open'                   => label('portal.status.open', 'Submitted'),
     'in_progress'            => label('portal.status.in_progress', "We're working on it"),
     'pending'                => label('portal.status.pending', "We're waiting on someone else"),
@@ -17,6 +19,11 @@ $statusLabels = [
     'resolved'               => label('portal.status.resolved', 'Done'),
     'closed'                 => label('portal.status.closed', 'Closed'),
 ];
+$statusLabels = [];
+foreach (ticketActiveStatuses() as $__s) {
+    $statusLabels[$__s['slug']] = $portalLabelOverrides[$__s['slug']] ?? $__s['label'];
+}
+unset($__s);
 $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-person-check text-primary', 'status_changed' => 'bi-arrow-repeat text-warning', 'priority_changed' => 'bi-flag text-danger', 'comment' => 'bi-chat-dots text-info', 'edited' => 'bi-pencil text-secondary', 'escalated' => 'bi-arrow-up-circle text-danger'];
 
 // Resolve the marked-solution timeline row (if any). The portal $timeline
@@ -68,7 +75,7 @@ if ($solutionTimelineId > 0) {
     <div>
         <h2 class="fw-bold mb-1"><?= e($ticket['subject']) ?></h2>
         <div class="d-flex gap-2 align-items-center">
-            <span class="badge bg-<?= $statusColors[$ticket['status']] ?? 'secondary' ?> fs-6">
+            <span class="badge fs-6" style="<?= ticketStatusBadgeStyle($ticket['status']) ?>">
                 <?= e($statusLabels[$ticket['status']] ?? $ticket['status']) ?>
             </span>
             <?php if ((int) ($ticket['escalation_level'] ?? 0) > 0): ?>
@@ -455,7 +462,7 @@ if ($solutionTimelineId > 0) {
                 <dl class="mb-0">
                     <dt class="text-muted small">Status</dt>
                     <dd>
-                        <span class="badge bg-<?= $statusColors[$ticket['status']] ?? 'secondary' ?>">
+                        <span class="badge" style="<?= ticketStatusBadgeStyle($ticket['status']) ?>">
                             <?= e($statusLabels[$ticket['status']] ?? $ticket['status']) ?>
                         </span>
                     </dd>

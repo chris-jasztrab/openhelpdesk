@@ -6,8 +6,7 @@ $breadcrumbs  = [
     ['label' => 'Admin', 'url' => '/admin'],
     ['label' => 'Tickets'],
 ];
-$statusColors = ['open' => 'primary', 'in_progress' => 'warning', 'pending' => 'info', 'waiting_on_customer' => 'warning', 'waiting_on_third_party' => 'dark', 'resolved' => 'success', 'closed' => 'secondary'];
-$statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 'Pending', 'waiting_on_customer' => 'Waiting on Customer', 'waiting_on_third_party' => 'Waiting on Third Party', 'resolved' => 'Resolved', 'closed' => 'Closed'];
+$statusLabels = ticketStatusLabelMap();
 $slaStateColors = ['on_track' => 'success', 'warning' => 'warning', 'breached' => 'danger'];
 $hasFilters = array_filter($filters, fn($v) => is_array($v) ? !empty($v) : $v !== '');
 $sortParams = array_filter($filters, fn($v) => is_array($v) ? !empty($v) : $v !== '');
@@ -446,9 +445,7 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                         </td>
                         <?php if (in_array('status', $visibleColumns)): ?>
                         <td style="white-space:nowrap;">
-                            <span class="badge bg-<?= $statusColors[$t['status']] ?? 'secondary' ?>">
-                                <?= e($statusLabels[$t['status']] ?? $t['status']) ?>
-                            </span>
+                            <?= ticketStatusBadgeHtml($t['status']) ?>
                             <?php if ($t['merged_into_ticket_id']): ?>
                             <a href="/admin/tickets/<?= (int) $t['merged_into_ticket_id'] ?>" class="badge bg-secondary text-decoration-none ms-1" title="Merged into #<?= (int) $t['merged_into_ticket_id'] ?>">
                                 <i class="bi bi-arrow-right-circle"></i> Merged

@@ -15,8 +15,9 @@ $rail     = $ticket['priority_color'] ?: '#94a3b8';
 $status   = $ticket['status'];
 $ticketId = (int) $ticket['id'];
 
-// Patron-friendly status labels — same vocabulary as the dense portal view.
-$statusLabels = [
+// Patron-friendly status labels for the seeded slugs — custom admin-added
+// statuses fall back to their configured label.
+$portalLabelOverrides = [
     'open'                   => 'Submitted',
     'in_progress'            => "We're working on it",
     'pending'                => "We're waiting on someone",
@@ -25,8 +26,13 @@ $statusLabels = [
     'resolved'               => 'Done',
     'closed'                 => 'Closed',
 ];
+$statusLabels = [];
+foreach (ticketActiveStatuses() as $__s) {
+    $statusLabels[$__s['slug']] = $portalLabelOverrides[$__s['slug']] ?? $__s['label'];
+}
+unset($__s);
 
-$canClose  = $isOwner && !in_array($status, ['closed', 'resolved'], true);
+$canClose  = $isOwner && !in_array($status, ticketClosedBucketSlugs(), true);
 $canReply  = !in_array($status, ['closed'], true); // patrons can reply on resolved (re-open path)
 ?>
 <style>
@@ -168,7 +174,7 @@ $canReply  = !in_array($status, ['closed'], true); // patrons can reply on resol
     <section class="subject-card">
         <h1><?= e($ticket['subject']) ?></h1>
         <div class="pill-row">
-            <span class="pill status-<?= e($status) ?>"><?= e($statusLabels[$status] ?? ucfirst(str_replace('_', ' ', $status))) ?></span>
+            <span class="pill status-<?= e($status) ?>" style="<?= ticketStatusBadgeStyle($status) ?>"><?= e($statusLabels[$status] ?? ucfirst(str_replace('_', ' ', $status))) ?></span>
             <?php if (!empty($ticket['type_name'])): ?>
                 <span class="pill" style="background:<?= e($ticket['type_color'] ?: '#f1f5f9') ?>26;color:<?= e($ticket['type_color'] ?: '#1e293b') ?>;"><i class="bi bi-bookmark"></i><?= e($ticket['type_name']) ?></span>
             <?php endif; ?>

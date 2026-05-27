@@ -13,15 +13,7 @@ $triggerLabels = [
     'ticket_updated' => 'Ticket Updated',
 ];
 
-$statusOptions = [
-    'open'                   => 'Open',
-    'in_progress'            => 'In Progress',
-    'pending'                => 'Pending',
-    'waiting_on_customer'    => 'Waiting on Customer',
-    'waiting_on_third_party' => 'Waiting on Third Party',
-    'resolved'               => 'Resolved',
-    'closed'                 => 'Closed',
-];
+$statusOptions = ticketStatusLabelMap();
 
 // Build value-lookup maps so condition summaries show names, not IDs
 $valueLookup = ['status' => $statusOptions];

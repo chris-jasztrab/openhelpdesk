@@ -6,8 +6,7 @@ $breadcrumbs = [
     ['label' => 'Dashboard'],
 ];
 $sidebarItems = adminSidebar('dashboard');
-$statusColors = ['open' => 'primary', 'in_progress' => 'warning', 'pending' => 'info', 'waiting_on_customer' => 'warning', 'waiting_on_third_party' => 'dark', 'resolved' => 'success', 'closed' => 'secondary'];
-$statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 'Pending', 'waiting_on_customer' => 'Waiting on Customer', 'waiting_on_third_party' => 'Waiting on Third Party', 'resolved' => 'Resolved', 'closed' => 'Closed'];
+$statusLabels = ticketStatusLabelMap();
 ?>
 <?php $autoShowTour = !empty($showOnboarding); ?>
 <?php require ROOT_DIR . '/templates/partials/onboarding-tour.php'; ?>
@@ -43,9 +42,7 @@ $statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 
                                 <small class="text-muted flex-shrink-0"><?= date('M j, g:ia', strtotime($t['updated_at'])) ?></small>
                             </div>
                             <div class="small mt-1 d-flex flex-wrap gap-2 align-items-center">
-                                <span class="badge bg-<?= $statusColors[$t['status']] ?? 'secondary' ?>">
-                                    <?= e($statusLabels[$t['status']] ?? $t['status']) ?>
-                                </span>
+                                <?= ticketStatusBadgeHtml($t['status']) ?>
                                 <?php if (!empty($t['type_name'])): ?>
                                 <span class="badge" style="background:<?= e($t['type_color'] ?? '#6c757d') ?>;">
                                     <?= e($t['type_name']) ?>

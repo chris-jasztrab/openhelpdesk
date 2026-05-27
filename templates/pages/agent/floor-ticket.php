@@ -13,11 +13,7 @@ else                       $age = date('M j', $createdTs);
 
 $rail = $ticket['priority_color'] ?: '#94a3b8';
 
-$statusLabels = [
-    'open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 'Pending',
-    'waiting_on_customer' => 'Waiting (Customer)', 'waiting_on_third_party' => 'Waiting (3rd Party)',
-    'resolved' => 'Resolved', 'closed' => 'Closed',
-];
+$statusLabels = ticketStatusLabelMap();
 $status = $ticket['status'];
 $ticketId = (int) $ticket['id'];
 ?>
@@ -201,7 +197,7 @@ $ticketId = (int) $ticket['id'];
     <section class="subject-card">
         <h1><?= e($ticket['subject']) ?></h1>
         <div class="pill-row">
-            <span class="pill status-<?= e($status) ?>"><?= e($statusLabels[$status] ?? $status) ?></span>
+            <span class="pill status-<?= e($status) ?>" style="<?= ticketStatusBadgeStyle($status) ?>"><?= e($statusLabels[$status] ?? $status) ?></span>
             <?php if (!empty($ticket['priority_name'])): ?>
                 <span class="pill" style="background:<?= e($rail) ?>22;color:<?= e($rail) ?>;"><i class="bi bi-flag-fill"></i><?= e($ticket['priority_name']) ?></span>
             <?php endif; ?>
@@ -265,13 +261,15 @@ $ticketId = (int) $ticket['id'];
             <?php endif; ?>
 
             <?php
+            // Curated floor-view quick actions — pinned to the legacy slugs.
+            // If an admin has renamed those slugs the buttons silently drop out.
             $statusButtons = [
                 'in_progress' => ['In progress',  'a-progress', 'bi-play-fill'],
                 'pending'     => ['Pending',      'a-pending',  'bi-pause-fill'],
                 'resolved'    => ['Resolve',      'a-resolve',  'bi-check2-circle'],
             ];
-            if (in_array($status, ['resolved', 'closed'], true)) {
-                $statusButtons = ['open' => ['Reopen', 'a-reopen', 'bi-arrow-counterclockwise']] + $statusButtons;
+            if (in_array($status, ticketClosedBucketSlugs(), true)) {
+                $statusButtons = [ticketDefaultNewStatusSlug() => ['Reopen', 'a-reopen', 'bi-arrow-counterclockwise']] + $statusButtons;
                 unset($statusButtons['resolved']);
             }
             foreach ($statusButtons as $s => [$label, $cls, $icon]):

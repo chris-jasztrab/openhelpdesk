@@ -378,8 +378,7 @@ $bc = $badgeColors[$profileUser['role']] ?? 'secondary';
 <?php endif; ?>
 
 <?php
-$_statusColors    = ['open' => 'primary', 'in_progress' => 'warning', 'pending' => 'info', 'waiting_on_customer' => 'warning', 'waiting_on_third_party' => 'dark', 'resolved' => 'success', 'closed' => 'secondary'];
-$_allStatusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 'Pending', 'waiting_on_customer' => 'Waiting on Customer', 'waiting_on_third_party' => 'Waiting on Third Party', 'resolved' => 'Resolved', 'closed' => 'Closed'];
+$_allStatusLabels = ticketStatusLabelMap();
 $_hasFilters      = array_filter($userTicketFilters, fn($v) => is_array($v) ? !empty($v) : $v !== '');
 $_baseUrl         = '/admin/users/' . (int)$profileUser['id'];
 ?>
@@ -495,15 +494,12 @@ $_baseUrl         = '/admin/users/' . (int)$profileUser['id'];
                     </td>
                 </tr>
                 <?php else: ?>
-                    <?php foreach ($openTickets as $t):
-                        $_stLabel = $_allStatusLabels[$t['status']] ?? ucfirst(str_replace('_', ' ', $t['status']));
-                        $_stColor = $_statusColors[$t['status']] ?? 'secondary';
-                    ?>
+                    <?php foreach ($openTickets as $t): ?>
                     <tr style="cursor:pointer;" onclick="window.location='/admin/tickets/<?= (int)$t['id'] ?>'">
                         <td class="text-muted small fw-semibold">#<?= (int)$t['id'] ?></td>
                         <td class="fw-semibold"><?= e($t['subject']) ?></td>
                         <td>
-                            <span class="badge bg-<?= $_stColor ?>"><?= $_stLabel ?></span>
+                            <?= ticketStatusBadgeHtml($t['status']) ?>
                         </td>
                         <td>
                             <?php if ($t['priority_name'] ?? null): ?>

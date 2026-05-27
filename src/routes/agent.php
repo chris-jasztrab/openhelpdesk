@@ -213,7 +213,7 @@ $router->get('/agent/tickets', function () {
     }
 
     if ($fEscalatedToMe) {
-        $where[]  = "t.assigned_to = ? AND t.escalation_level > 0 AND t.status IN ('open','in_progress','pending')";
+        $where[]  = "t.assigned_to = ? AND t.escalation_level > 0 AND " . ticketStatusSqlIn(ticketOpenBucketSlugs(), 't.status');
         $params[] = Auth::id();
     }
 
@@ -1621,8 +1621,7 @@ $router->post('/agent/tickets/{id}/comment', function (array $p) {
 
     // Optional: change ticket status after posting
     $statusAfter  = trim($_POST['status_after'] ?? '');
-    $validStatuses = ['open', 'in_progress', 'pending', 'waiting_on_customer', 'waiting_on_third_party', 'resolved', 'closed'];
-    if ($statusAfter !== '' && in_array($statusAfter, $validStatuses, true)) {
+    if ($statusAfter !== '' && in_array($statusAfter, ticketActiveStatusSlugs(), true)) {
         $csStmt = $db->prepare('SELECT status FROM tickets WHERE id = ?');
         $csStmt->execute([$id]);
         $currentTicket = $csStmt->fetch();
@@ -1632,18 +1631,17 @@ $router->post('/agent/tickets/{id}/comment', function (array $p) {
             $db->prepare(
                 'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
             )->execute([$id, Auth::id(), 'status_changed', "Status changed from {$oldStatus} to {$statusAfter}"]);
-            $csatTrigger = getSetting('csat_trigger_status', 'resolved');
+            $csatTrigger = getSetting('csat_trigger_status', ticketDefaultResolvedStatusSlug());
             if ($statusAfter === $csatTrigger) {
                 sendCsatSurvey($db, $id);
             }
-            $pausingStatuses = ['pending', 'waiting_on_customer', 'waiting_on_third_party'];
+            $pausingStatuses = ticketSlaPausingSlugs();
             if (in_array($statusAfter, $pausingStatuses, true)) {
                 Sla::pause($db, $id);
             } elseif (in_array($oldStatus, $pausingStatuses, true)) {
                 Sla::resume($db, $id);
             }
-            $statusLabelsMap = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 'Pending', 'waiting_on_customer' => 'Waiting on Customer', 'waiting_on_third_party' => 'Waiting on Third Party', 'resolved' => 'Resolved', 'closed' => 'Closed'];
-            $base .= ' Status set to ' . ($statusLabelsMap[$statusAfter] ?? $statusAfter) . '.';
+            $base .= ' Status set to ' . ticketStatusLabel($statusAfter) . '.';
         }
     }
 
@@ -1678,8 +1676,7 @@ $router->post('/agent/tickets/{id}/update', function (array $p) {
 
     // Status change
     $newStatus = $_POST['status'] ?? '';
-    $validStatuses = ['open', 'in_progress', 'pending', 'waiting_on_customer', 'waiting_on_third_party', 'resolved', 'closed'];
-    if ($newStatus !== '' && in_array($newStatus, $validStatuses, true) && $newStatus !== $ticket['status']) {
+    if ($newStatus !== '' && in_array($newStatus, ticketActiveStatusSlugs(), true) && $newStatus !== $ticket['status']) {
         $oldStatus = $ticket['status'];
         $db->prepare('UPDATE tickets SET status = ? WHERE id = ?')->execute([$newStatus, $id]);
         $db->prepare(
@@ -1687,17 +1684,17 @@ $router->post('/agent/tickets/{id}/update', function (array $p) {
         )->execute([$id, Auth::id(), 'status_changed', "Status changed from {$oldStatus} to {$newStatus}"]);
         $changes[] = 'status';
 
-        if (in_array($newStatus, ['resolved', 'closed'], true)) {
+        if (in_array($newStatus, ticketClosedBucketSlugs(), true)) {
             notifyRequesterStatusChanged($db, $id, $newStatus);
         }
 
         // CSAT survey trigger
-        $csatTrigger = getSetting('csat_trigger_status', 'resolved');
+        $csatTrigger = getSetting('csat_trigger_status', ticketDefaultResolvedStatusSlug());
         if ($newStatus === $csatTrigger) {
             sendCsatSurvey($db, $id);
         }
 
-        $pausingStatuses = ['pending', 'waiting_on_customer', 'waiting_on_third_party'];
+        $pausingStatuses = ticketSlaPausingSlugs();
         if (in_array($newStatus, $pausingStatuses, true)) {
             Sla::pause($db, $id);
         } elseif (in_array($oldStatus, $pausingStatuses, true)) {

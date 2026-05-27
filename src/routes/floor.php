@@ -35,7 +35,7 @@ $router->get('/agent/floor', function () {
     $view = $_GET['view'] ?? 'all';
     if (!in_array($view, ['all', 'mine', 'unassigned'], true)) $view = 'all';
 
-    $where  = ["t.status IN ('open','in_progress','pending')"];
+    $where  = [ticketStatusSqlIn(ticketOpenBucketSlugs(), 't.status')];
     $params = [];
 
     // Group restriction — same rule as /agent/tickets.
@@ -80,7 +80,7 @@ $router->get('/agent/floor', function () {
     $tickets = $stmt->fetchAll();
 
     // Tab counts (all / mine / unassigned within group restriction)
-    $countWhere  = ["t.status IN ('open','in_progress','pending')"];
+    $countWhere  = [ticketStatusSqlIn(ticketOpenBucketSlugs(), 't.status')];
     $countParams = [];
     if (in_array(Auth::role(), ['agent', 'power_user'], true) && !empty($myGroups)) {
         $countWhere[]  = 't.group_id IN (' . implode(',', array_fill(0, count($myGroups), '?')) . ')';
@@ -296,24 +296,23 @@ $router->post('/agent/floor/tickets/{id}/action', function (array $p) {
         }
     } elseif ($action === 'status') {
         $newStatus = $_POST['status'] ?? '';
-        $valid = ['open', 'in_progress', 'pending', 'resolved', 'closed'];
-        if (in_array($newStatus, $valid, true) && $newStatus !== $ticket['status']) {
+        if (in_array($newStatus, ticketActiveStatusSlugs(), true) && $newStatus !== $ticket['status']) {
             $oldStatus = $ticket['status'];
             $db->prepare('UPDATE tickets SET status = ? WHERE id = ?')->execute([$newStatus, $id]);
             $db->prepare(
                 'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
             )->execute([$id, $userId, 'status_changed', "Status changed from {$oldStatus} to {$newStatus} (floor)"]);
 
-            $pausing = ['pending', 'waiting_on_customer', 'waiting_on_third_party'];
+            $pausing = ticketSlaPausingSlugs();
             if (in_array($newStatus, $pausing, true)) {
                 Sla::pause($db, $id);
             } elseif (in_array($oldStatus, $pausing, true)) {
                 Sla::resume($db, $id);
             }
-            if (in_array($newStatus, ['resolved', 'closed'], true)) {
+            if (in_array($newStatus, ticketClosedBucketSlugs(), true)) {
                 notifyRequesterStatusChanged($db, $id, $newStatus);
             }
-            $csatTrigger = getSetting('csat_trigger_status', 'resolved');
+            $csatTrigger = getSetting('csat_trigger_status', ticketDefaultResolvedStatusSlug());
             if ($newStatus === $csatTrigger) {
                 sendCsatSurvey($db, $id);
             }
@@ -388,7 +387,7 @@ $router->get('/portal/floor', function () {
          LEFT JOIN ticket_types     tt ON t.type_id     = tt.id
          LEFT JOIN locations        l  ON t.location_id = l.id
          WHERE t.created_by = ?
-         ORDER BY (t.status IN ('open','in_progress','pending')) DESC, t.updated_at DESC
+         ORDER BY (" . ticketStatusSqlIn(ticketOpenBucketSlugs(), 't.status') . ") DESC, t.updated_at DESC
          LIMIT 50"
     );
     $stmt->execute([Auth::id()]);

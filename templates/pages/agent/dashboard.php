@@ -6,8 +6,7 @@ $breadcrumbs = [
     ['label' => 'Dashboard'],
 ];
 $sidebarItems   = agentSidebar('dashboard');
-$statusColors   = ['open' => 'primary', 'in_progress' => 'warning', 'pending' => 'info', 'waiting_on_customer' => 'warning', 'waiting_on_third_party' => 'dark', 'resolved' => 'success', 'closed' => 'secondary'];
-$statusLabels   = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 'Pending', 'waiting_on_customer' => 'Waiting on Customer', 'waiting_on_third_party' => 'Waiting on Third Party', 'resolved' => 'Resolved', 'closed' => 'Closed'];
+$statusLabels   = ticketStatusLabelMap();
 $slaStateColors = ['on_track' => 'success', 'warning' => 'warning', 'breached' => 'danger'];
 $allColumns     = ticketColumnDefinitions();
 if (!slaEnabled()) { unset($allColumns['sla']); }
@@ -167,9 +166,7 @@ if (!slaEnabled()) { unset($allColumns['sla']); }
                     </td>
                     <?php if (in_array('status', $visibleColumns)): ?>
                     <td>
-                        <span class="badge bg-<?= $statusColors[$t['status']] ?? 'secondary' ?>">
-                            <?= e($statusLabels[$t['status']] ?? $t['status']) ?>
-                        </span>
+                        <?= ticketStatusBadgeHtml($t['status']) ?>
                     </td>
                     <?php endif; ?>
                     <?php if (in_array('priority', $visibleColumns)): ?>

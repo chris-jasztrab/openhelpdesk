@@ -30,15 +30,13 @@
                                 <td style="padding:4px 0; width:100px; color:#64748b; vertical-align:top;">New Status</td>
                                 <td style="padding:4px 0;">
                                     <?php
-                                    $statusColors = [
-                                        'resolved' => ['bg' => '#dcfce7', 'fg' => '#166534'],
-                                        'closed'   => ['bg' => '#f1f5f9', 'fg' => '#475569'],
-                                    ];
-                                    $sc = $statusColors[$newStatus] ?? ['bg' => '#dbeafe', 'fg' => '#1e40af'];
-                                    $statusLabels = ['resolved' => 'Resolved', 'closed' => 'Closed'];
-                                    $statusLabel = $statusLabels[$newStatus] ?? ucfirst(str_replace('_', ' ', $newStatus));
+                                    // Email-client-safe: use the configured hex color + auto-contrast text.
+                                    // Email rendering can't rely on CSS classes, so we inline everything.
+                                    $sc_bg = ticketStatusColor($newStatus);
+                                    $sc_fg = ticketStatusTextColor($sc_bg);
+                                    $statusLabel = ticketStatusLabel($newStatus);
                                     ?>
-                                    <span style="display:inline-block; padding:2px 10px; border-radius:12px; background:<?= $sc['bg'] ?>; color:<?= $sc['fg'] ?>; font-size:12px; font-weight:600;">
+                                    <span style="display:inline-block; padding:2px 10px; border-radius:12px; background:<?= $sc_bg ?>; color:<?= $sc_fg ?>; font-size:12px; font-weight:600;">
                                         <?= htmlspecialchars($statusLabel, ENT_QUOTES, 'UTF-8') ?>
                                     </span>
                                 </td>

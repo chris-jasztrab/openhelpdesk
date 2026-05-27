@@ -190,11 +190,12 @@ class Sla
             return 0; // SLA disabled site-wide
         }
 
+        $openIn = ticketStatusSqlIn(ticketOpenBucketSlugs(), 'status');
         $stmt = $db->query(
             "SELECT id, created_at, first_response_due_at, resolution_due_at,
                     first_responded_at, sla_state, sla_paused_at
              FROM tickets
-             WHERE status IN ('open', 'in_progress', 'pending')
+             WHERE $openIn
                AND (first_response_due_at IS NOT NULL OR resolution_due_at IS NOT NULL)"
         );
 

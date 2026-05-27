@@ -14,15 +14,7 @@ $action = $isEdit
     ? "/admin/settings/automations/{$editing['id']}/edit"
     : '/admin/settings/automations/create';
 
-$statusOptions = [
-    'open'                   => 'Open',
-    'in_progress'            => 'In Progress',
-    'pending'                => 'Pending',
-    'waiting_on_customer'    => 'Waiting on Customer',
-    'waiting_on_third_party' => 'Waiting on Third Party',
-    'resolved'               => 'Resolved',
-    'closed'                 => 'Closed',
-];
+$statusOptions = ticketStatusLabelMap();
 
 // Build JSON maps for JavaScript to populate value dropdowns
 $fieldOptions = [

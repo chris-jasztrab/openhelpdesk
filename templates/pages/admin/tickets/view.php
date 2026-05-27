@@ -7,8 +7,7 @@ $breadcrumbs  = [
     ['label' => 'Tickets', 'url' => '/admin/tickets'],
     ['label' => '#' . $ticket['id']],
 ];
-$statusColors = ['open' => 'primary', 'in_progress' => 'warning', 'pending' => 'info', 'waiting_on_customer' => 'warning', 'waiting_on_third_party' => 'dark', 'resolved' => 'success', 'closed' => 'secondary'];
-$statusLabels = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 'Pending', 'waiting_on_customer' => 'Waiting on Customer', 'waiting_on_third_party' => 'Waiting on Third Party', 'resolved' => 'Resolved', 'closed' => 'Closed'];
+$statusLabels = ticketStatusLabelMap();
 $actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-person-check text-primary', 'status_changed' => 'bi-arrow-repeat text-warning', 'priority_changed' => 'bi-flag text-danger', 'comment' => 'bi-chat-dots text-info', 'internal_note' => 'bi-lock text-secondary', 'sla_set' => 'bi-stopwatch text-primary', 'sla_paused' => 'bi-pause-circle text-warning', 'sla_resumed' => 'bi-play-circle text-success', 'merged' => 'bi-arrow-right-circle text-secondary', 'split' => 'bi-scissors text-warning', 'edited' => 'bi-pencil text-secondary', 'stale_notification_sent' => 'bi-hourglass-split text-warning', 'ai_classified' => 'bi-robot text-info', 'ai_group_routed' => 'bi-signpost-split text-info', 'ai_group_routing_skipped' => 'bi-signpost text-muted', 'ai_duplicate_warned' => 'bi-files text-warning'];
 $actionLabels = ['created' => 'Created', 'assigned' => 'Assigned', 'status_changed' => 'Status Changed', 'priority_changed' => 'Priority Changed', 'comment' => 'Comment', 'internal_note' => 'Internal Note', 'sla_set' => 'SLA Set', 'sla_paused' => 'SLA Paused', 'sla_resumed' => 'SLA Resumed', 'merged' => 'Merged', 'split' => 'Split', 'edited' => 'Edited by Requester', 'stale_notification_sent' => 'Stale Reminder Sent', 'ai_classified' => 'AI Classified', 'ai_group_routed' => 'AI Routed', 'ai_group_routing_skipped' => 'AI Routing Skipped', 'ai_duplicate_warned' => 'AI Duplicate Warning'];
 $slaStateColors = ['on_track' => 'success', 'warning' => 'warning', 'breached' => 'danger'];
@@ -88,9 +87,7 @@ if ($solutionTimelineId > 0) {
     <div>
         <h2 class="fw-bold mb-1"><?= e($ticket['subject']) ?></h2>
         <div class="d-flex flex-wrap gap-2 align-items-center">
-            <span class="badge bg-<?= $statusColors[$ticket['status']] ?? 'secondary' ?> fs-6">
-                <?= e($statusLabels[$ticket['status']] ?? $ticket['status']) ?>
-            </span>
+            <?= ticketStatusBadgeHtml($ticket['status'], 'fs-6') ?>
             <?php if ($ticket['merged_into_ticket_id']): ?>
             <span class="badge bg-secondary fs-6"><i class="bi bi-arrow-right-circle me-1"></i>Merged</span>
             <?php endif; ?>
@@ -492,9 +489,7 @@ if ($solutionTimelineId > 0) {
                 <dl class="mb-0">
                     <dt class="text-muted small">Status</dt>
                     <dd>
-                        <span class="badge bg-<?= $statusColors[$ticket['status']] ?? 'secondary' ?>">
-                            <?= e($statusLabels[$ticket['status']] ?? $ticket['status']) ?>
-                        </span>
+                        <?= ticketStatusBadgeHtml($ticket['status']) ?>
                     </dd>
 
                     <dt class="text-muted small">Priority</dt>

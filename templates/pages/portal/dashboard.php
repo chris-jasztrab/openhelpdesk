@@ -5,8 +5,7 @@ $sidebarItems = portalSidebar('dashboard');
 $breadcrumbs  = [
     ['label' => label('portal.nav.help', 'Help')],
 ];
-$statusColors = ['open' => 'primary', 'in_progress' => 'warning', 'pending' => 'info', 'waiting_on_customer' => 'warning', 'waiting_on_third_party' => 'dark', 'resolved' => 'success', 'closed' => 'secondary'];
-$statusLabels = [
+$portalLabelOverrides = [
     'open'                   => label('portal.status.open', 'Submitted'),
     'in_progress'            => label('portal.status.in_progress', "We're working on it"),
     'pending'                => label('portal.status.pending', "We're waiting on someone else"),
@@ -15,6 +14,11 @@ $statusLabels = [
     'resolved'               => label('portal.status.resolved', 'Done'),
     'closed'                 => label('portal.status.closed', 'Closed'),
 ];
+$statusLabels = [];
+foreach (ticketActiveStatuses() as $__s) {
+    $statusLabels[$__s['slug']] = $portalLabelOverrides[$__s['slug']] ?? $__s['label'];
+}
+unset($__s);
 ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
@@ -59,7 +63,7 @@ $statusLabels = [
                         </a>
                     </td>
                     <td>
-                        <span class="badge bg-<?= $statusColors[$t['status']] ?? 'secondary' ?>">
+                        <span class="badge" style="<?= ticketStatusBadgeStyle($t['status']) ?>">
                             <?= e($statusLabels[$t['status']] ?? $t['status']) ?>
                         </span>
                     </td>

@@ -11,7 +11,7 @@ $router->get('/portal/tickets', function () {
     $db = Database::connect();
 
     // Read filter params
-    $fStatus   = trim($_GET['status'] ?? 'open');
+    $fStatus   = trim($_GET['status'] ?? ticketDefaultNewStatusSlug());
     $fPriority = trim($_GET['priority'] ?? '');
     $fSearch   = trim($_GET['q'] ?? '');
     $fScope    = trim($_GET['scope'] ?? 'mine'); // 'mine' or 'location'
@@ -377,7 +377,7 @@ $router->post('/portal/tickets/create', function () {
     $stmt->execute([
         $subject, $description,
         $browserInfo ?: null, $osInfo ?: null,
-        Auth::id(), $typeId, $locationId, 'open', $priorityId, $assignedTo, $groupId,
+        Auth::id(), $typeId, $locationId, ticketDefaultNewStatusSlug(), $priorityId, $assignedTo, $groupId,
     ]);
     $ticketId = (int) $db->lastInsertId();
 
@@ -770,14 +770,15 @@ $router->post('/portal/tickets/{id}/close', function (array $p) {
         redirect('/portal/tickets');
     }
 
-    if ($ticket['status'] === 'closed') {
+    $closedSlug = ticketDefaultClosedStatusSlug();
+    if ($ticket['status'] === $closedSlug) {
         flash('info', 'Ticket is already closed.');
         redirect("/portal/tickets/{$id}");
     }
 
     $oldStatus = $ticket['status'];
     $db->prepare('UPDATE tickets SET status = ?, updated_at = NOW() WHERE id = ?')
-       ->execute(['closed', $id]);
+       ->execute([$closedSlug, $id]);
 
     // Internal audit trail entry — visible to admins/agents only
     $db->prepare(
@@ -806,7 +807,7 @@ $router->get('/portal/tickets/{id}/edit', function (array $p) {
         redirect('/portal/tickets');
     }
 
-    if ($ticket['status'] === 'closed') {
+    if ($ticket['status'] === ticketDefaultClosedStatusSlug()) {
         flash('error', 'Closed tickets cannot be edited.');
         redirect("/portal/tickets/{$id}");
     }
@@ -832,7 +833,7 @@ $router->post('/portal/tickets/{id}/edit', function (array $p) {
         redirect('/portal/tickets');
     }
 
-    if ($ticket['status'] === 'closed') {
+    if ($ticket['status'] === ticketDefaultClosedStatusSlug()) {
         flash('error', 'Closed tickets cannot be edited.');
         redirect("/portal/tickets/{$id}");
     }

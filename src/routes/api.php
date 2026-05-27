@@ -482,11 +482,14 @@ $router->get('/api/v1/dashboard', function () {
         }
     }
 
-    $s = $db->prepare("SELECT COUNT(*) FROM tickets WHERE assigned_to IS NULL AND status IN ('open','in_progress','pending')" . $groupRestriction);
+    $openIn  = ticketStatusSqlIn(ticketOpenBucketSlugs(), 'status');
+    $openInT = ticketStatusSqlIn(ticketOpenBucketSlugs(), 't.status');
+
+    $s = $db->prepare("SELECT COUNT(*) FROM tickets WHERE assigned_to IS NULL AND $openIn" . $groupRestriction);
     $s->execute($groupParams);
     $unassigned = (int) $s->fetchColumn();
 
-    $s = $db->prepare("SELECT COUNT(*) FROM tickets WHERE assigned_to = ? AND status IN ('open','in_progress','pending')" . $groupRestriction);
+    $s = $db->prepare("SELECT COUNT(*) FROM tickets WHERE assigned_to = ? AND $openIn" . $groupRestriction);
     $s->execute(array_merge([$agentId], $groupParams));
     $myTickets = (int) $s->fetchColumn();
 
@@ -494,8 +497,8 @@ $router->get('/api/v1/dashboard', function () {
     $s->execute($groupParams);
     $pending = (int) $s->fetchColumn();
 
-    $s = $db->prepare("SELECT COUNT(*) FROM tickets WHERE status = 'resolved' AND DATE(updated_at) = CURDATE()" . $groupRestriction);
-    $s->execute($groupParams);
+    $s = $db->prepare("SELECT COUNT(*) FROM tickets WHERE status = ? AND DATE(updated_at) = CURDATE()" . $groupRestriction);
+    $s->execute(array_merge([ticketDefaultResolvedStatusSlug()], $groupParams));
     $resolvedToday = (int) $s->fetchColumn();
 
     $s = $db->prepare(
@@ -507,7 +510,7 @@ $router->get('/api/v1/dashboard', function () {
          LEFT JOIN ticket_priorities tp ON t.priority_id = tp.id
          LEFT JOIN users c ON t.created_by  = c.id
          LEFT JOIN users a ON t.assigned_to = a.id
-         WHERE t.status IN ('open','in_progress','pending')" . $groupRestriction . "
+         WHERE $openInT" . $groupRestriction . "
          ORDER BY t.created_at DESC
          LIMIT 10"
     );
@@ -552,8 +555,7 @@ $router->get('/api/v1/tickets', function () {
     $user = _apiAuth();
     $db   = Database::connect();
 
-    $validStatuses = ['open', 'in_progress', 'pending', 'waiting_on_customer',
-                      'waiting_on_third_party', 'resolved', 'closed'];
+    $validStatuses = ticketActiveStatusSlugs();
 
     $where  = ['t.merged_into_ticket_id IS NULL'];
     $params = [];
@@ -936,10 +938,10 @@ $router->post('/api/v1/tickets/{id}/update', function (array $p) {
     $input   = _apiInput();
     $changes = [];
 
-    $validStatuses    = ['open', 'in_progress', 'pending', 'waiting_on_customer',
-                         'waiting_on_third_party', 'resolved', 'closed'];
-    $slaStatusPause   = ['pending', 'waiting_on_customer', 'waiting_on_third_party'];
-    $slaStatusResume  = ['open', 'in_progress'];
+    $validStatuses    = ticketActiveStatusSlugs();
+    $slaStatusPause   = ticketSlaPausingSlugs();
+    // "Resume" set = open-bucket slugs that don't pause SLA.
+    $slaStatusResume  = array_values(array_diff(ticketOpenBucketSlugs(), $slaStatusPause));
 
     // ── Status ────────────────────────────────────────────────────────────────
     if (array_key_exists('status', $input)) {
@@ -1202,10 +1204,9 @@ $router->post('/api/v1/tickets/{id}/replies', function (array $p) {
     }
 
     // Optional: change status after reply (agent/admin only)
-    $validStatuses   = ['open', 'in_progress', 'pending', 'waiting_on_customer',
-                        'waiting_on_third_party', 'resolved', 'closed'];
-    $slaStatusPause  = ['pending', 'waiting_on_customer', 'waiting_on_third_party'];
-    $slaStatusResume = ['open', 'in_progress'];
+    $validStatuses   = ticketActiveStatusSlugs();
+    $slaStatusPause  = ticketSlaPausingSlugs();
+    $slaStatusResume = array_values(array_diff(ticketOpenBucketSlugs(), $slaStatusPause));
 
     if (in_array($user['role'], ['admin', 'agent', 'power_user'], true)) {
         $statusAfter = $input['status_after'] ?? '';

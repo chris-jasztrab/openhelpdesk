@@ -21,15 +21,7 @@ foreach ($templates as $tpl) {
     ];
 }
 
-$statusOptions = [
-    'open'                   => 'Open',
-    'in_progress'            => 'In Progress',
-    'pending'                => 'Pending',
-    'waiting_on_customer'    => 'Waiting on Customer',
-    'waiting_on_third_party' => 'Waiting on Third Party',
-    'resolved'               => 'Resolved',
-    'closed'                 => 'Closed',
-];
+$statusOptions = ticketStatusLabelMap();
 ?>
 <link rel="stylesheet" href="https://cdn.ckeditor.com/ckeditor5/43.3.1/ckeditor5.css">
 <script type="importmap">

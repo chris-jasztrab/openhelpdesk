@@ -372,11 +372,12 @@ $router->post('/admin/settings/ai/backfill', function () {
     set_time_limit(0);
 
     $db = Database::connect();
+    $openInT = ticketStatusSqlIn(ticketOpenBucketSlugs(), 't.status');
     $stmt = $db->prepare(
         "SELECT t.id FROM tickets t
          LEFT JOIN ticket_types tt ON tt.id = t.type_id
          WHERE t.ai_classification_id IS NULL
-           AND t.status IN ('open','in_progress','pending')
+           AND $openInT
            AND COALESCE(tt.is_confidential, 0) = 0
          ORDER BY t.id DESC
          LIMIT {$limit}"
@@ -844,7 +845,7 @@ $router->get('/admin/users/{id}', function (array $p) {
         $where[] = "t.status IN ($placeholders)";
         $params  = array_merge($params, $userTicketFilters['status']);
     } else {
-        $where[] = "t.status NOT IN ('resolved', 'closed')";
+        $where[] = ticketStatusSqlIn(ticketClosedBucketSlugs(), 't.status', true);
     }
 
     if (!empty($userTicketFilters['priority'])) {
@@ -4003,9 +4004,8 @@ $router->post('/admin/tickets/create', function () {
         $onBehalf    = null; // discard if self or not permitted
     }
 
-    $validStatuses = ['open','in_progress','pending','waiting_on_customer','waiting_on_third_party','resolved','closed'];
-    if (!in_array($status, $validStatuses, true)) {
-        $status = 'open';
+    if (!in_array($status, ticketActiveStatusSlugs(), true)) {
+        $status = ticketDefaultNewStatusSlug();
     }
 
     if ($subject === '' || $desc === '') {
@@ -5094,8 +5094,7 @@ $router->post('/admin/tickets/{id}/comment', function (array $p) {
 
     // Optional: change ticket status after posting
     $statusAfter  = trim($_POST['status_after'] ?? '');
-    $validStatuses = ['open', 'in_progress', 'pending', 'waiting_on_customer', 'waiting_on_third_party', 'resolved', 'closed'];
-    if ($statusAfter !== '' && in_array($statusAfter, $validStatuses, true)) {
+    if ($statusAfter !== '' && in_array($statusAfter, ticketActiveStatusSlugs(), true)) {
         $csStmt = $db->prepare('SELECT status FROM tickets WHERE id = ?');
         $csStmt->execute([$id]);
         $currentTicket = $csStmt->fetch();
@@ -5105,21 +5104,20 @@ $router->post('/admin/tickets/{id}/comment', function (array $p) {
             $db->prepare(
                 'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
             )->execute([$id, Auth::id(), 'status_changed', "Status changed from {$oldStatus} to {$statusAfter}"]);
-            $csatTrigger = getSetting('csat_trigger_status', 'resolved');
+            $csatTrigger = getSetting('csat_trigger_status', ticketDefaultResolvedStatusSlug());
             if ($statusAfter === $csatTrigger) {
                 sendCsatSurvey($db, $id);
             }
-            $pausingStatuses = ['pending', 'waiting_on_customer', 'waiting_on_third_party'];
+            $pausingStatuses = ticketSlaPausingSlugs();
             if (in_array($statusAfter, $pausingStatuses, true)) {
                 Sla::pause($db, $id);
             } elseif (in_array($oldStatus, $pausingStatuses, true)) {
                 Sla::resume($db, $id);
             }
-            if (in_array($statusAfter, ['resolved', 'closed'], true)) {
+            if (in_array($statusAfter, ticketClosedBucketSlugs(), true)) {
                 notifyRequesterStatusChanged($db, $id, $statusAfter);
             }
-            $statusLabelsMap = ['open' => 'Open', 'in_progress' => 'In Progress', 'pending' => 'Pending', 'waiting_on_customer' => 'Waiting on Customer', 'waiting_on_third_party' => 'Waiting on Third Party', 'resolved' => 'Resolved', 'closed' => 'Closed'];
-            $base .= ' Status set to ' . ($statusLabelsMap[$statusAfter] ?? $statusAfter) . '.';
+            $base .= ' Status set to ' . ticketStatusLabel($statusAfter) . '.';
         }
     }
 
@@ -5152,8 +5150,7 @@ $router->post('/admin/tickets/{id}/update', function (array $p) {
 
     // Status change
     $newStatus = $_POST['status'] ?? '';
-    $validStatuses = ['open', 'in_progress', 'pending', 'waiting_on_customer', 'waiting_on_third_party', 'resolved', 'closed'];
-    if ($newStatus !== '' && in_array($newStatus, $validStatuses, true) && $newStatus !== $ticket['status']) {
+    if ($newStatus !== '' && in_array($newStatus, ticketActiveStatusSlugs(), true) && $newStatus !== $ticket['status']) {
         $oldStatus = $ticket['status'];
         $db->prepare('UPDATE tickets SET status = ? WHERE id = ?')->execute([$newStatus, $id]);
         $db->prepare(
@@ -5161,12 +5158,12 @@ $router->post('/admin/tickets/{id}/update', function (array $p) {
         )->execute([$id, Auth::id(), 'status_changed', "Status changed from {$oldStatus} to {$newStatus}"]);
         $changes[] = 'status';
 
-        if (in_array($newStatus, ['resolved', 'closed'], true)) {
+        if (in_array($newStatus, ticketClosedBucketSlugs(), true)) {
             notifyRequesterStatusChanged($db, $id, $newStatus);
         }
 
         // SLA: pause on waiting statuses, resume when leaving them
-        $pausingStatuses = ['pending', 'waiting_on_customer', 'waiting_on_third_party'];
+        $pausingStatuses = ticketSlaPausingSlugs();
         if (in_array($newStatus, $pausingStatuses, true)) {
             Sla::pause($db, $id);
         } elseif (in_array($oldStatus, $pausingStatuses, true)) {
@@ -7295,7 +7292,7 @@ $router->get('/admin/settings/import/preview', function () {
                     'description'    => $get('description'),
                     'email'          => $email,
                     'submitter_name' => $get('full_name'),
-                    'status'         => $statusMap[$statusRaw] ?? 'open',
+                    'status'         => $statusMap[$statusRaw] ?? ticketDefaultNewStatusSlug(),
                     'priority'       => $get('priority'),
                     'agent'          => $get('agent'),
                     'group'          => $get('group'),
@@ -8692,13 +8689,12 @@ $router->post('/admin/settings/automations/{id}/run', function (array $p) {
                     break;
 
                 case 'set_status':
-                    $validStatuses = ['open', 'in_progress', 'pending', 'waiting_on_customer', 'waiting_on_third_party', 'resolved', 'closed'];
-                    if (!in_array($val, $validStatuses, true)) {
+                    if (!in_array($val, ticketActiveStatusSlugs(), true)) {
                         break;
                     }
                     $oldStatus = $ticket['status'];
                     $db->prepare('UPDATE tickets SET status = ? WHERE id = ?')->execute([$val, $ticket['id']]);
-                    $pausingStatuses = ['pending', 'waiting_on_customer', 'waiting_on_third_party'];
+                    $pausingStatuses = ticketSlaPausingSlugs();
                     if (in_array($val, $pausingStatuses, true)) {
                         Sla::pause($db, $ticket['id']);
                     } elseif (in_array($oldStatus, $pausingStatuses, true)) {
@@ -9160,15 +9156,18 @@ $router->get('/admin/reports', function () {
     [$from, $to] = reportDateRange();
     $toEnd = $to . ' 23:59:59';
 
+    $closedIn    = ticketStatusSqlIn(ticketClosedBucketSlugs(), 'status');
+    $notClosedIn = ticketStatusSqlIn(ticketClosedBucketSlugs(), 'status', true);
+
     $stmt = $db->prepare('SELECT COUNT(*) FROM tickets WHERE created_at BETWEEN ? AND ?');
     $stmt->execute([$from, $toEnd]);
     $ticketsCreated = (int) $stmt->fetchColumn();
 
-    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets WHERE status IN ('resolved','closed') AND created_at BETWEEN ? AND ?");
+    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets WHERE $closedIn AND created_at BETWEEN ? AND ?");
     $stmt->execute([$from, $toEnd]);
     $ticketsResolved = (int) $stmt->fetchColumn();
 
-    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets WHERE status NOT IN ('resolved','closed')");
+    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets WHERE $notClosedIn");
     $stmt->execute();
     $unresolvedCount = (int) $stmt->fetchColumn();
 
@@ -9200,7 +9199,7 @@ $router->get('/admin/reports', function () {
     $slaBreached = (int) $stmt->fetchColumn();
     $slaCompliance = $slaTotal > 0 ? round(($slaTotal - $slaBreached) / $slaTotal * 100) : 100;
 
-    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets WHERE assigned_to IS NULL AND status NOT IN ('resolved','closed')");
+    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets WHERE assigned_to IS NULL AND $notClosedIn");
     $stmt->execute();
     $unassignedCount = (int) $stmt->fetchColumn();
 
@@ -9218,16 +9217,19 @@ $router->get('/admin/reports/agent-performance', function () {
     [$from, $to] = reportDateRange();
     $toEnd = $to . ' 23:59:59';
 
+    $closedInT    = ticketStatusSqlIn(ticketClosedBucketSlugs(), 't.status');
+    $notClosedInT = ticketStatusSqlIn(ticketClosedBucketSlugs(), 't.status', true);
+
     $stmt = $db->prepare(
         "SELECT
             u.id AS agent_id,
             CONCAT(u.first_name, ' ', u.last_name) AS agent_name,
             COUNT(t.id) AS assigned,
-            SUM(CASE WHEN t.status IN ('resolved','closed') THEN 1 ELSE 0 END) AS resolved,
-            SUM(CASE WHEN t.status NOT IN ('resolved','closed') THEN 1 ELSE 0 END) AS open_count,
+            SUM(CASE WHEN $closedInT THEN 1 ELSE 0 END) AS resolved,
+            SUM(CASE WHEN $notClosedInT THEN 1 ELSE 0 END) AS open_count,
             AVG(CASE WHEN t.first_responded_at IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, t.created_at, t.first_responded_at) END) AS avg_first_response_min,
             AVG(
-                CASE WHEN t.status IN ('resolved','closed') THEN
+                CASE WHEN $closedInT THEN
                     (SELECT TIMESTAMPDIFF(MINUTE, t.created_at, tl.created_at)
                      FROM ticket_timeline tl
                      WHERE tl.ticket_id = t.id AND tl.action = 'status_changed' AND tl.details LIKE '%→ Resolved%'
@@ -9451,13 +9453,13 @@ $router->get('/admin/reports/unresolved', function () {
     $perPage = (isset($_GET['per_page']) && in_array((int) $_GET['per_page'], $allowedPerPage, true))
         ? (int) $_GET['per_page'] : 25;
     $statusFilter = isset($_GET['status']) ? trim((string) $_GET['status']) : '';
-    if ($statusFilter === 'resolved' || $statusFilter === 'closed') $statusFilter = '';
+    if (in_array($statusFilter, ticketClosedBucketSlugs(), true)) $statusFilter = '';
     $ageFilter = (isset($_GET['age']) && $_GET['age'] !== '' && in_array((int) $_GET['age'], [0, 1, 2, 3, 4], true))
         ? (int) $_GET['age'] : null;
     $isAjax = !empty($_GET['ajax']);
 
     // ── Filter WHERE for the table query ───────────────────────────
-    $where  = "t.status NOT IN ('resolved','closed')";
+    $where  = ticketStatusSqlIn(ticketClosedBucketSlugs(), 't.status', true);
     $params = [];
     if ($statusFilter !== '') {
         $where .= " AND t.status = ?";
@@ -9529,7 +9531,7 @@ $router->get('/admin/reports/unresolved', function () {
             SUM(CASE WHEN TIMESTAMPDIFF(HOUR, created_at, NOW()) >= 168 AND TIMESTAMPDIFF(HOUR, created_at, NOW()) < 336 THEN 1 ELSE 0 END) AS age_3,
             SUM(CASE WHEN TIMESTAMPDIFF(HOUR, created_at, NOW()) >= 336 THEN 1 ELSE 0 END) AS age_4
          FROM tickets
-         WHERE status NOT IN ('resolved','closed')"
+         WHERE " . ticketStatusSqlIn(ticketClosedBucketSlugs(), 'status', true)
     )->fetch();
 
     $totalUnresolved = (int) $agg['total_unresolved'];
@@ -9544,7 +9546,7 @@ $router->get('/admin/reports/unresolved', function () {
     $byStatus = $db->query(
         "SELECT status, COUNT(*) AS count
          FROM tickets
-         WHERE status NOT IN ('resolved','closed')
+         WHERE " . ticketStatusSqlIn(ticketClosedBucketSlugs(), 'status', true) . "
          GROUP BY status
          ORDER BY count DESC"
     )->fetchAll();
@@ -9693,8 +9695,8 @@ $router->get('/admin/reports/lifecycle', function () {
         }
     }
 
-    // Build statusDurations array
-    $statusOrder = ['open', 'in_progress', 'pending', 'resolved', 'closed'];
+    // Build statusDurations array — iterate every configured status in display order.
+    $statusOrder = array_map(static fn(array $s) => $s['slug'], ticketStatuses());
     $statusDurations = [];
     foreach ($statusOrder as $status) {
         $times = $statusTimes[$status] ?? [];
@@ -9759,14 +9761,16 @@ $router->get('/admin/reports/location', function () {
     [$from, $to] = reportDateRange();
     $toEnd = $to . ' 23:59:59';
 
+    $closedInT    = ticketStatusSqlIn(ticketClosedBucketSlugs(), 't.status');
+    $notClosedInT = ticketStatusSqlIn(ticketClosedBucketSlugs(), 't.status', true);
     $stmt = $db->prepare(
         "SELECT
             COALESCE(l.name, 'No Location') AS location_name,
             COUNT(t.id) AS total,
-            SUM(CASE WHEN t.status NOT IN ('resolved','closed') THEN 1 ELSE 0 END) AS open_count,
-            SUM(CASE WHEN t.status IN ('resolved','closed') THEN 1 ELSE 0 END) AS resolved,
+            SUM(CASE WHEN $notClosedInT THEN 1 ELSE 0 END) AS open_count,
+            SUM(CASE WHEN $closedInT THEN 1 ELSE 0 END) AS resolved,
             AVG(
-                CASE WHEN t.status IN ('resolved','closed') THEN
+                CASE WHEN $closedInT THEN
                     (SELECT TIMESTAMPDIFF(MINUTE, t.created_at, tl.created_at)
                      FROM ticket_timeline tl
                      WHERE tl.ticket_id = t.id AND tl.action = 'status_changed' AND tl.details LIKE '%→ Resolved%'
@@ -9940,7 +9944,7 @@ $router->get('/admin/settings/csat', function () {
     Auth::requireRole('admin');
     $settings = [
         'csat_enabled'               => getSetting('csat_enabled', '0'),
-        'csat_trigger_status'        => getSetting('csat_trigger_status', 'resolved'),
+        'csat_trigger_status'        => getSetting('csat_trigger_status', ticketDefaultResolvedStatusSlug()),
         'csat_mode'                  => getSetting('csat_mode', 'internal'),
         'csat_external_url'          => getSetting('csat_external_url', ''),
         'csat_external_dashboard_url'=> getSetting('csat_external_dashboard_url', ''),
@@ -9958,15 +9962,19 @@ $router->post('/admin/settings/csat', function () {
 
     $before = [
         'csat_enabled'               => getSetting('csat_enabled', '0'),
-        'csat_trigger_status'        => getSetting('csat_trigger_status', 'resolved'),
+        'csat_trigger_status'        => getSetting('csat_trigger_status', ticketDefaultResolvedStatusSlug()),
         'csat_mode'                  => getSetting('csat_mode', 'internal'),
         'csat_external_url'          => getSetting('csat_external_url', ''),
         'csat_external_dashboard_url'=> getSetting('csat_external_dashboard_url', ''),
         'csat_show_reopen'           => getSetting('csat_show_reopen', '1'),
     ];
     $enabled = isset($_POST['csat_enabled']) ? '1' : '0';
-    $trigger = in_array($_POST['csat_trigger_status'] ?? '', ['resolved', 'closed'], true)
-        ? $_POST['csat_trigger_status'] : 'resolved';
+    // CSAT can fire when a ticket enters either of the two "closed-bucket"
+    // semantic states. Comparing against the two default flags rather than
+    // literal 'resolved'/'closed' lets admins rename the underlying slugs.
+    $csatChoices = array_filter([ticketDefaultResolvedStatusSlug(), ticketDefaultClosedStatusSlug()]);
+    $trigger = in_array($_POST['csat_trigger_status'] ?? '', $csatChoices, true)
+        ? $_POST['csat_trigger_status'] : ticketDefaultResolvedStatusSlug();
     $mode = ($_POST['csat_mode'] ?? '') === 'external' ? 'external' : 'internal';
     $extUrl = trim($_POST['csat_external_url'] ?? '');
     $extDash = trim($_POST['csat_external_dashboard_url'] ?? '');
@@ -10133,6 +10141,12 @@ $router->get('/admin/reports/workload', function () {
     Auth::requireRole('admin', 'power_user');
     $db = Database::connect();
 
+    // Workload report breaks out specific status counts. The four breakouts
+    // (open / in_progress / pending / waiting-*) are pinned to the literal
+    // legacy slugs — they show 0 if those slugs have been renamed or removed.
+    // The "non-closed" bucket filter still works on whatever statuses live
+    // in the closed bucket today.
+    $notClosedInT = ticketStatusSqlIn(ticketClosedBucketSlugs(), 't.status', true);
     $stmt = $db->query(
         "SELECT COALESCE(CONCAT(u.first_name,' ',u.last_name),'Unassigned') AS agent_name,
                 u.id AS agent_id,
@@ -10144,7 +10158,7 @@ $router->get('/admin/reports/workload', function () {
                 SUM(CASE WHEN t.status IN ('waiting_on_customer','waiting_on_third_party') THEN 1 ELSE 0 END) AS waiting_count
          FROM tickets t
          LEFT JOIN users u ON t.assigned_to = u.id
-         WHERE t.status NOT IN ('resolved','closed')
+         WHERE $notClosedInT
          GROUP BY u.id, u.first_name, u.last_name
          ORDER BY open_total DESC"
     );
@@ -10244,7 +10258,7 @@ $router->get('/admin/reports/fcr', function () {
                  (SELECT COUNT(*) FROM ticket_timeline tl
                   WHERE tl.ticket_id = t.id AND tl.action = 'reply_sent') AS reply_count
              FROM tickets t
-             WHERE t.status IN ('resolved','closed')
+             WHERE " . ticketStatusSqlIn(ticketClosedBucketSlugs(), 't.status') . "
                AND t.created_at BETWEEN ? AND ?
          ) sub"
     );
@@ -10268,7 +10282,7 @@ $router->get('/admin/reports/fcr', function () {
                  (SELECT COUNT(*) FROM ticket_timeline tl
                   WHERE tl.ticket_id = t.id AND tl.action = 'reply_sent') AS reply_count
              FROM tickets t
-             WHERE t.status IN ('resolved','closed')
+             WHERE " . ticketStatusSqlIn(ticketClosedBucketSlugs(), 't.status') . "
                AND t.created_at BETWEEN ? AND ?
          ) sub
          LEFT JOIN users u ON sub.assigned_to = u.id
@@ -10294,7 +10308,7 @@ $router->get('/admin/reports/fcr', function () {
                  (SELECT COUNT(*) FROM ticket_timeline tl
                   WHERE tl.ticket_id = t.id AND tl.action = 'reply_sent') AS reply_count
              FROM tickets t
-             WHERE t.status IN ('resolved','closed')
+             WHERE " . ticketStatusSqlIn(ticketClosedBucketSlugs(), 't.status') . "
                AND t.created_at BETWEEN ? AND ?
          ) sub
          LEFT JOIN ticket_types tt ON sub.type_id = tt.id
@@ -10320,7 +10334,7 @@ $router->get('/admin/reports/fcr', function () {
                  (SELECT COUNT(*) FROM ticket_timeline tl
                   WHERE tl.ticket_id = t.id AND tl.action = 'reply_sent') AS reply_count
              FROM tickets t
-             WHERE t.status IN ('resolved','closed')
+             WHERE " . ticketStatusSqlIn(ticketClosedBucketSlugs(), 't.status') . "
                AND t.created_at BETWEEN ? AND ?
          ) sub
          GROUP BY week_key

@@ -240,7 +240,7 @@ $router->get('/api/tickets/{id}/escalate/preview', function (array $p) {
         http_response_code(403); echo json_encode(['error' => 'Forbidden']); exit;
     }
 
-    if (in_array($ticket['status'], ['resolved', 'closed'], true) || $ticket['merged_into_ticket_id']) {
+    if (in_array($ticket['status'], ticketClosedBucketSlugs(), true) || $ticket['merged_into_ticket_id']) {
         echo json_encode(['eligible' => false, 'reason' => 'This ticket is closed or merged and cannot be escalated.']);
         exit;
     }
@@ -299,7 +299,7 @@ $router->post('/api/tickets/{id}/escalate', function (array $p) {
         http_response_code(403); echo json_encode(['error' => 'Forbidden']); exit;
     }
 
-    if (in_array($ticket['status'], ['resolved', 'closed'], true) || $ticket['merged_into_ticket_id']) {
+    if (in_array($ticket['status'], ticketClosedBucketSlugs(), true) || $ticket['merged_into_ticket_id']) {
         http_response_code(422);
         echo json_encode(['error' => 'This ticket is closed or merged and cannot be escalated.']);
         exit;
@@ -2096,11 +2096,17 @@ $router->get('/portal', function () {
     $db = Database::connect();
     $userId = Auth::id();
 
-    $openCount = $db->prepare("SELECT COUNT(*) FROM tickets WHERE created_by = ? AND status IN ('open','in_progress')");
+    // "Active" = open-bucket statuses that don't pause SLA. Pending/waiting
+    // statuses are intentionally excluded from this tile.
+    $activeSlugs = array_values(array_diff(ticketOpenBucketSlugs(), ticketSlaPausingSlugs()));
+    $openCount = $db->prepare("SELECT COUNT(*) FROM tickets WHERE created_by = ? AND " . ticketStatusSqlIn($activeSlugs, 'status'));
     $openCount->execute([$userId]);
     $openCount = (int) $openCount->fetchColumn();
 
-    $resolvedCount = $db->prepare("SELECT COUNT(*) FROM tickets WHERE created_by = ? AND status IN ('resolved','closed')");
+    $closedIn    = ticketStatusSqlIn(ticketClosedBucketSlugs(), 'status');
+    $notClosedIn = ticketStatusSqlIn(ticketClosedBucketSlugs(), 't.status', true);
+
+    $resolvedCount = $db->prepare("SELECT COUNT(*) FROM tickets WHERE created_by = ? AND $closedIn");
     $resolvedCount->execute([$userId]);
     $resolvedCount = (int) $resolvedCount->fetchColumn();
 
@@ -2112,7 +2118,7 @@ $router->get('/portal', function () {
          LEFT JOIN ticket_priorities tp ON t.priority_id = tp.id
          LEFT JOIN ticket_types tt     ON t.type_id     = tt.id
          LEFT JOIN users a             ON t.assigned_to  = a.id
-         WHERE t.created_by = ? AND t.status NOT IN ('resolved','closed')
+         WHERE t.created_by = ? AND $notClosedIn
          ORDER BY t.created_at DESC LIMIT 5"
     );
     $recentTickets->execute([$userId]);
@@ -2474,11 +2480,14 @@ $router->get('/agent', function () {
         }
     }
 
-    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets WHERE assigned_to IS NULL AND status IN ('open','in_progress','pending')" . $groupRestriction);
+    $openIn   = ticketStatusSqlIn(ticketOpenBucketSlugs(), 'status');
+    $openInT  = ticketStatusSqlIn(ticketOpenBucketSlugs(), 't.status');
+
+    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets WHERE assigned_to IS NULL AND $openIn" . $groupRestriction);
     $stmt->execute($groupParams);
     $unassigned = (int) $stmt->fetchColumn();
 
-    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets WHERE assigned_to = ? AND status IN ('open','in_progress','pending')" . $groupRestriction);
+    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets WHERE assigned_to = ? AND $openIn" . $groupRestriction);
     $stmt->execute(array_merge([$agentId], $groupParams));
     $myTickets = (int) $stmt->fetchColumn();
 
@@ -2486,11 +2495,11 @@ $router->get('/agent', function () {
     $stmt->execute($groupParams);
     $pending = (int) $stmt->fetchColumn();
 
-    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets WHERE status = 'resolved' AND DATE(updated_at) = CURDATE()" . $groupRestriction);
-    $stmt->execute($groupParams);
+    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets WHERE status = ? AND DATE(updated_at) = CURDATE()" . $groupRestriction);
+    $stmt->execute(array_merge([ticketDefaultResolvedStatusSlug()], $groupParams));
     $resolvedToday = (int) $stmt->fetchColumn();
 
-    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets WHERE assigned_to = ? AND escalation_level > 0 AND status IN ('open','in_progress','pending')" . $groupRestriction);
+    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets WHERE assigned_to = ? AND escalation_level > 0 AND $openIn" . $groupRestriction);
     $stmt->execute(array_merge([$agentId], $groupParams));
     $escalatedToMe = (int) $stmt->fetchColumn();
 
@@ -2511,7 +2520,7 @@ $router->get('/agent', function () {
          LEFT JOIN locations l          ON t.location_id = l.id
          LEFT JOIN users c ON t.created_by = c.id
          LEFT JOIN users a ON t.assigned_to = a.id
-         WHERE t.status IN ('open','in_progress','pending')" . $trRestriction . "
+         WHERE $openInT" . $trRestriction . "
          ORDER BY t.created_at DESC
          LIMIT 10"
     );
@@ -2580,7 +2589,7 @@ $router->get('/admin', function () {
     $db = Database::connect();
 
     $totalTickets = (int) $db->query("SELECT COUNT(*) FROM tickets")->fetchColumn();
-    $openTickets = (int) $db->query("SELECT COUNT(*) FROM tickets WHERE status IN ('open','in_progress','pending')")->fetchColumn();
+    $openTickets = (int) $db->query("SELECT COUNT(*) FROM tickets WHERE " . ticketStatusSqlIn(ticketOpenBucketSlugs(), 'status'))->fetchColumn();
     $totalUsers = (int) $db->query("SELECT COUNT(*) FROM users")->fetchColumn();
     $totalAgents = (int) $db->query("SELECT COUNT(*) FROM users WHERE role IN ('agent','admin','power_user')")->fetchColumn();
 
