@@ -160,7 +160,9 @@ unset($_SESSION['_old_input']);
                             <button type="button" class="btn btn-sm btn-outline-danger" title="Delete"
                                     data-bs-toggle="modal" data-bs-target="#deleteStatusModal"
                                     data-id="<?= (int) $s['id'] ?>"
-                                    data-label="<?= e($s['label']) ?>">
+                                    data-slug="<?= e($s['slug']) ?>"
+                                    data-label="<?= e($s['label']) ?>"
+                                    data-bucket="<?= e($s['bucket']) ?>">
                                 <i class="bi bi-trash"></i>
                             </button>
                             <?php endif; ?>
@@ -304,28 +306,57 @@ unset($_SESSION['_old_input']);
 <div class="modal fade" id="deleteStatusModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title fw-bold"><i class="bi bi-trash me-2 text-danger"></i>Delete Status</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <p class="mb-0">
-                    Delete status <strong id="deleteStatusName"></strong>?
-                    This cannot be undone. If any tickets currently have this status the delete will be blocked.
-                </p>
-            </div>
-            <div class="modal-footer">
-                <form method="POST" id="deleteStatusForm" action="" class="m-0">
-                    <?= csrfField() ?>
+            <form method="POST" id="deleteStatusForm" action="" class="m-0">
+                <?= csrfField() ?>
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-trash me-2 text-danger"></i>Delete Status</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Delete status <strong id="deleteStatusName"></strong>? This cannot be undone.</p>
+                    <div id="deleteReassignSection" style="display:none;" class="mt-3">
+                        <div class="alert alert-warning py-2 small mb-2">
+                            <i class="bi bi-exclamation-triangle me-1"></i>
+                            <span id="deleteTicketCount">0</span> ticket(s) currently use this status.
+                            They'll be reassigned before the status is removed.
+                        </div>
+                        <label for="deleteReassignTo" class="form-label fw-semibold">Reassign tickets to:</label>
+                        <select class="form-select" id="deleteReassignTo" name="reassign_to">
+                            <!-- Filled by JS to active statuses minus the one being deleted, same bucket preferred -->
+                        </select>
+                        <div class="form-text">Active statuses only. The same-bucket option is recommended.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-danger px-4">
                         <i class="bi bi-trash me-1"></i>Delete
                     </button>
-                </form>
-            </div>
+                </div>
+            </form>
         </div>
     </div>
 </div>
+
+<?php
+// Build a JS-side lookup of (slug → {label, bucket}) for active statuses
+// so the delete modal can populate its reassign dropdown without another
+// round-trip. Tickets-per-slug count is also passed so the modal knows
+// whether to show the reassign UI.
+$activeForJs = [];
+foreach (ticketActiveStatuses() as $__s) {
+    $activeForJs[] = ['slug' => $__s['slug'], 'label' => $__s['label'], 'bucket' => $__s['bucket']];
+}
+$ticketCountsBySlug = [];
+$pdo = \Database::connect();
+foreach ($pdo->query("SELECT status, COUNT(*) AS n FROM tickets GROUP BY status")->fetchAll(\PDO::FETCH_ASSOC) as $__r) {
+    $ticketCountsBySlug[$__r['status']] = (int) $__r['n'];
+}
+?>
+<script>
+window.ticketStatusActive       = <?= json_encode($activeForJs, JSON_UNESCAPED_SLASHES) ?>;
+window.ticketStatusTicketCounts = <?= json_encode($ticketCountsBySlug, JSON_UNESCAPED_SLASHES) ?>;
+</script>
 
 <script>
 (function () {
@@ -351,10 +382,44 @@ unset($_SESSION['_old_input']);
 
     var deleteModal = document.getElementById('deleteStatusModal');
     deleteModal.addEventListener('show.bs.modal', function (e) {
-        var btn = e.relatedTarget;
+        var btn  = e.relatedTarget;
+        var slug = btn.dataset.slug || '';
         document.getElementById('deleteStatusName').textContent = btn.dataset.label || '';
         document.getElementById('deleteStatusForm').action =
             '/admin/settings/ticket-statuses/' + btn.dataset.id + '/delete';
+
+        // Populate reassign dropdown if this status has tickets pointing at it.
+        var counts  = window.ticketStatusTicketCounts || {};
+        var n       = counts[slug] || 0;
+        var section = document.getElementById('deleteReassignSection');
+        var select  = document.getElementById('deleteReassignTo');
+        select.innerHTML = '';
+        if (n > 0) {
+            section.style.display = 'block';
+            document.getElementById('deleteTicketCount').textContent = String(n);
+            var thisBucket = btn.dataset.bucket || '';
+            var same = [], other = [];
+            (window.ticketStatusActive || []).forEach(function (s) {
+                if (s.slug === slug) return;            // can't reassign to itself
+                (s.bucket === thisBucket ? same : other).push(s);
+            });
+            same.forEach(function (s) {
+                var opt = document.createElement('option');
+                opt.value = s.slug;
+                opt.textContent = s.label + ' (' + s.bucket + ')';
+                select.appendChild(opt);
+            });
+            other.forEach(function (s) {
+                var opt = document.createElement('option');
+                opt.value = s.slug;
+                opt.textContent = s.label + ' (' + s.bucket + ')';
+                select.appendChild(opt);
+            });
+            select.required = true;
+        } else {
+            section.style.display = 'none';
+            select.required = false;
+        }
     });
 
     // Auto-suggest a slug from the label when the user types in Add modal

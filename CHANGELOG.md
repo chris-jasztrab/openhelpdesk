@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.61.1 &mdash; 2026-05-27
+
+### Added
+- **Phase 5 guardrails for the ticket-status admin page &mdash; destructive actions now have safety checks, and the delete modal lets admins reassign tickets in-place before removing a status.** Five new categories of protection: (1) **default-flag holders** cannot be deleted or deactivated until another status is promoted to that role &mdash; this protects the resolved/closed email triggers and the default-status-for-new-tickets pick. (2) **Last-active-in-bucket** is enforced on both delete and deactivate &mdash; you can't leave the «open» or «closed» bucket with zero active statuses (which would break new-ticket creation and dashboard counters). (3) **Reference checks** scan automations + escalation_rules JSON conditions/actions for `field=status value=<slug>` and `action=set_status value=<slug>` shapes (plus the `csat_trigger_status` setting), and surface the affected rule names in the block message so admins know exactly what to fix. (4) **Default-target bucket validation** &mdash; "Make default for resolved" / "for closed" now require a closed-bucket status; "for new tickets" requires open-bucket. Inactive statuses can't be promoted to a default. (5) **Reassign-then-delete flow** &mdash; when a status has tickets pointing at it, the delete modal now shows a "Reassign tickets to:" dropdown (active statuses, same-bucket options first) and the backend runs `UPDATE tickets SET status = target` then `DELETE` in a single transaction. New helper `ticketStatusReferences($slug)` in [src/helpers.php](src/helpers.php) returns a structured manifest of every place a slug is referenced &mdash; reused by the delete handler and the test suite. Also hardened `buildTicketFilterQuery()` to silently drop unknown status slugs from the input array, so saved filters referencing a since-removed status quietly degrade to "no filter" instead of producing empty result sets. 9 new tests added to [tests/Feature/Admin/TicketStatusesTest.php](tests/Feature/Admin/TicketStatusesTest.php): default-flag-holder protection, reassign-then-delete happy path, inactive-target rejection, deactivate guards, default-bucket validation, saved-filter slug filtering, automation-reference detection, and the end-to-end "automation blocks delete" path. Full suite stays at 399 passing / 1 pre-existing failure.
+
+---
+
 ## 2.61.0 &mdash; 2026-05-27
 
 ### Added

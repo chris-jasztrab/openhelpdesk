@@ -4575,6 +4575,14 @@ function buildTicketFilterQuery(array $filters): array
     $fDateTo   = trim($filters['date_to'] ?? '');
     $fWatched  = !empty($filters['watched']);
 
+    // Defensive: silently drop status values that no longer exist in the
+    // lookup table. Saved filters from before a status was removed would
+    // otherwise hit `status IN (...stale_slug...)` and quietly return zero
+    // rows; the user never knew their filter was broken. Filtering at the
+    // helper level means every ticket-list page benefits.
+    if (!empty($fStatus)) {
+        $fStatus = array_values(array_intersect($fStatus, ticketStatusSlugs()));
+    }
     if (!empty($fStatus)) {
         $placeholders = implode(',', array_fill(0, count($fStatus), '?'));
         $where[]  = 't.status IN (' . $placeholders . ')';
@@ -5656,6 +5664,102 @@ function ticketStatusMeta(string $slug): ?array
 function ticketStatusCacheRefresh(): void
 {
     _ticketStatusCache(true);
+}
+
+/**
+ * Find every place a status slug is referenced, so the admin settings UI can
+ * block destructive actions (delete / deactivate) on still-referenced rows.
+ *
+ * Returns an array keyed by reference kind:
+ *   [
+ *     'tickets'         => int,                                  // count of rows
+ *     'automations'     => [['id'=>int,'name'=>string], ...],    // names for the error UI
+ *     'escalation_rules'=> [['id'=>int,'name'=>string], ...],
+ *     'csat_trigger'    => bool,                                 // csat_trigger_status setting points here
+ *     'is_default_new'      => bool,
+ *     'is_default_resolved' => bool,
+ *     'is_default_closed'   => bool,
+ *   ]
+ *
+ * Automations and escalation_rules store their conditions/actions as JSON
+ * strings in longtext columns, so we walk the parsed structure rather than
+ * relying on LIKE — that's both correct (no false positives from substrings
+ * inside other field names) and resilient to future schema additions.
+ */
+function ticketStatusReferences(string $slug): array
+{
+    $db = Database::connect();
+
+    $refs = [
+        'tickets'              => 0,
+        'automations'          => [],
+        'escalation_rules'     => [],
+        'csat_trigger'         => false,
+        'is_default_new'       => false,
+        'is_default_resolved'  => false,
+        'is_default_closed'    => false,
+    ];
+
+    // 1. Tickets currently holding this slug
+    $s = $db->prepare('SELECT COUNT(*) FROM tickets WHERE status = ?');
+    $s->execute([$slug]);
+    $refs['tickets'] = (int) $s->fetchColumn();
+
+    // 2. Default flags on the row itself
+    $s = $db->prepare(
+        'SELECT is_default_new, is_default_resolved, is_default_closed
+         FROM ticket_statuses WHERE slug = ?'
+    );
+    $s->execute([$slug]);
+    if ($row = $s->fetch(PDO::FETCH_ASSOC)) {
+        $refs['is_default_new']      = (int) $row['is_default_new']      === 1;
+        $refs['is_default_resolved'] = (int) $row['is_default_resolved'] === 1;
+        $refs['is_default_closed']   = (int) $row['is_default_closed']   === 1;
+    }
+
+    // 3. CSAT trigger setting
+    if (getSetting('csat_trigger_status', '') === $slug) {
+        $refs['csat_trigger'] = true;
+    }
+
+    // 4. Automations — walk conditions + actions JSON looking for status refs
+    foreach (['automations', 'escalation_rules'] as $table) {
+        $rows = $db->query("SELECT id, name, conditions, actions FROM `{$table}`")->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($rows as $r) {
+            $conds   = json_decode((string) $r['conditions'], true) ?: [];
+            $actions = json_decode((string) $r['actions'],    true) ?: [];
+            if (_statusAppearsInRules($conds, $slug) || _statusAppearsInRules($actions, $slug)) {
+                $refs[$table][] = ['id' => (int) $r['id'], 'name' => (string) $r['name']];
+            }
+        }
+    }
+
+    return $refs;
+}
+
+/**
+ * Internal: does a parsed conditions/actions array reference the given slug
+ * as a status value? Match shapes:
+ *   [{"field":"status","value":"<slug>"}, ...]   (conditions)
+ *   [{"action":"set_status","value":"<slug>"}, ...]   (actions)
+ */
+function _statusAppearsInRules(array $rules, string $slug): bool
+{
+    foreach ($rules as $rule) {
+        if (!is_array($rule)) {
+            continue;
+        }
+        $value = (string) ($rule['value'] ?? '');
+        if ($value !== $slug) {
+            continue;
+        }
+        $isStatusCondition = ($rule['field']  ?? '') === 'status';
+        $isStatusAction    = ($rule['action'] ?? '') === 'set_status';
+        if ($isStatusCondition || $isStatusAction) {
+            return true;
+        }
+    }
+    return false;
 }
 
 /**

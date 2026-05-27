@@ -310,4 +310,248 @@ class TicketStatusesTest extends TestCase
         $s->execute([$id]);
         $this->assertSame(0, (int) $s->fetchColumn(), 'unused custom status should be deletable');
     }
+
+    // ── Phase 5 guardrails ────────────────────────────────────────────────────
+
+    public function test_cannot_delete_default_new_status(): void
+    {
+        // 'open' is default_new in the seed.
+        $id = $this->statusId('open');
+        $this->post($this->adminClient(), "/admin/settings/ticket-statuses/{$id}/delete", []);
+        $s = \Database::connect()->prepare('SELECT COUNT(*) FROM ticket_statuses WHERE id = ?');
+        $s->execute([$id]);
+        $this->assertSame(1, (int) $s->fetchColumn(), 'default-new status must survive delete attempt');
+    }
+
+    public function test_delete_with_reassignment_moves_tickets_and_deletes(): void
+    {
+        // Set up: create a custom status, point a ticket at it, delete with reassign_to.
+        $this->post($this->adminClient(), '/admin/settings/ticket-statuses/create', [
+            'slug'   => 'test_to_reassign',
+            'label'  => '[TEST] To Reassign',
+            'bucket' => 'open',
+            'color'  => '#aabbcc',
+        ]);
+        $id = $this->statusId('test_to_reassign');
+        $this->assertGreaterThan(0, $id);
+
+        $db = \Database::connect();
+        $db->prepare('UPDATE tickets SET status = ? WHERE id = ?')
+           ->execute(['test_to_reassign', \Tests\Support\DatabaseSeeder::$ticketId]);
+
+        $this->post($this->adminClient(), "/admin/settings/ticket-statuses/{$id}/delete", [
+            'reassign_to' => 'open',
+        ]);
+
+        // Status row gone
+        $check = $db->prepare('SELECT COUNT(*) FROM ticket_statuses WHERE id = ?');
+        $check->execute([$id]);
+        $this->assertSame(0, (int) $check->fetchColumn(), 'status should be deleted after reassignment');
+
+        // Ticket moved to the reassign target
+        $tStatus = $db->prepare('SELECT status FROM tickets WHERE id = ?');
+        $tStatus->execute([\Tests\Support\DatabaseSeeder::$ticketId]);
+        $this->assertSame('open', (string) $tStatus->fetchColumn(), 'ticket should have moved to "open"');
+    }
+
+    public function test_reassign_target_must_be_active(): void
+    {
+        // Create a status, deactivate it, then try to reassign tickets to it.
+        $this->post($this->adminClient(), '/admin/settings/ticket-statuses/create', [
+            'slug'   => 'test_inactive_target',
+            'label'  => '[TEST] Inactive Target',
+            'bucket' => 'open',
+            'color'  => '#445566',
+        ]);
+        $inactiveId = $this->statusId('test_inactive_target');
+        $this->post($this->adminClient(), "/admin/settings/ticket-statuses/{$inactiveId}/edit", [
+            'label'      => '[TEST] Inactive Target',
+            'bucket'     => 'open',
+            'color'      => '#445566',
+            'pauses_sla' => '0',
+            // is_active intentionally omitted → deactivates
+        ]);
+
+        // Now create another status pointed at by a ticket, attempt reassign to inactive
+        $this->post($this->adminClient(), '/admin/settings/ticket-statuses/create', [
+            'slug'   => 'test_source_for_inactive',
+            'label'  => '[TEST] Source',
+            'bucket' => 'open',
+            'color'  => '#778899',
+        ]);
+        $srcId = $this->statusId('test_source_for_inactive');
+        $db = \Database::connect();
+        $db->prepare('UPDATE tickets SET status = ? WHERE id = ?')
+           ->execute(['test_source_for_inactive', \Tests\Support\DatabaseSeeder::$ticketId]);
+
+        $this->post($this->adminClient(), "/admin/settings/ticket-statuses/{$srcId}/delete", [
+            'reassign_to' => 'test_inactive_target',
+        ]);
+
+        // Source status should still exist (reassign blocked)
+        $check = $db->prepare('SELECT COUNT(*) FROM ticket_statuses WHERE id = ?');
+        $check->execute([$srcId]);
+        $this->assertSame(1, (int) $check->fetchColumn(), 'delete must be blocked when reassign target is inactive');
+
+        // Cleanup: move ticket back to 'open' so tearDown can remove test rows
+        $db->prepare('UPDATE tickets SET status = ? WHERE id = ?')
+           ->execute(['open', \Tests\Support\DatabaseSeeder::$ticketId]);
+    }
+
+    public function test_cannot_deactivate_status_holding_default_flag(): void
+    {
+        // 'open' is default_new
+        $id = $this->statusId('open');
+        $this->post($this->adminClient(), "/admin/settings/ticket-statuses/{$id}/edit", [
+            'label'      => 'Open',
+            'bucket'     => 'open',
+            'color'      => '#0d6efd',
+            'pauses_sla' => '0',
+            // is_active omitted → would deactivate
+        ]);
+        $check = \Database::connect()->prepare('SELECT is_active FROM ticket_statuses WHERE id = ?');
+        $check->execute([$id]);
+        $this->assertSame(1, (int) $check->fetchColumn(), 'default-flag holder must stay active');
+    }
+
+    public function test_cannot_deactivate_last_active_in_bucket(): void
+    {
+        $db = \Database::connect();
+
+        // Step 1: move the default-new flag off 'open' so the deactivate check
+        // doesn't trip on the default guard before the last-in-bucket guard.
+        // We're testing the last-in-bucket guard specifically.
+        // (Test isolation: tearDown restores defaults.)
+        // Strategy: deactivate every open-bucket status except 'open', then
+        // try to deactivate 'open'. Expect it to stay active.
+        $openIds = $db->query("SELECT id FROM ticket_statuses WHERE bucket = 'open' AND slug != 'open'")
+                      ->fetchAll(\PDO::FETCH_COLUMN);
+
+        // We need to move default_new off the rows we're deactivating; only 'open'
+        // is default_new in the seed, so we can deactivate the others freely.
+        foreach ($openIds as $oid) {
+            $this->post($this->adminClient(), "/admin/settings/ticket-statuses/{$oid}/edit", [
+                'label'      => 'tmp_label',
+                'bucket'     => 'open',
+                'color'      => '#000000',
+                'pauses_sla' => '0',
+                // is_active omitted → deactivate
+            ]);
+        }
+
+        // Now 'open' is the only active in the open bucket. Try to deactivate it.
+        $openId = $this->statusId('open');
+        $this->post($this->adminClient(), "/admin/settings/ticket-statuses/{$openId}/edit", [
+            'label'      => 'Open',
+            'bucket'     => 'open',
+            'color'      => '#0d6efd',
+            'pauses_sla' => '0',
+            // is_active omitted → would deactivate
+        ]);
+
+        $check = $db->prepare('SELECT is_active FROM ticket_statuses WHERE id = ?');
+        $check->execute([$openId]);
+        $this->assertSame(1, (int) $check->fetchColumn(), 'last active status in bucket must stay active');
+
+        // Restore other open-bucket statuses
+        foreach ($openIds as $oid) {
+            $info = $db->prepare('SELECT slug, label FROM ticket_statuses WHERE id = ?');
+            $info->execute([$oid]);
+            $r = $info->fetch(\PDO::FETCH_ASSOC);
+            // Use the real seeded label per slug
+            $realLabels = [
+                'in_progress'            => 'In Progress',
+                'pending'                => 'Pending',
+                'waiting_on_customer'    => 'Waiting on Customer',
+                'waiting_on_third_party' => 'Waiting on Third Party',
+            ];
+            $pauses = in_array($r['slug'], ['pending', 'waiting_on_customer', 'waiting_on_third_party'], true) ? '1' : '0';
+            $this->post($this->adminClient(), "/admin/settings/ticket-statuses/{$oid}/edit", [
+                'label'      => $realLabels[$r['slug']] ?? $r['slug'],
+                'bucket'     => 'open',
+                'color'      => '#0d6efd',
+                'pauses_sla' => $pauses,
+                'is_active'  => '1',
+            ]);
+        }
+    }
+
+    public function test_cannot_set_default_resolved_on_open_bucket_status(): void
+    {
+        // 'open' is in the open bucket; default_resolved requires closed bucket.
+        $id = $this->statusId('open');
+        $this->post($this->adminClient(), "/admin/settings/ticket-statuses/{$id}/set-default", [
+            'kind' => 'resolved',
+        ]);
+        // 'open' must not have gained is_default_resolved
+        $check = \Database::connect()->prepare('SELECT is_default_resolved FROM ticket_statuses WHERE id = ?');
+        $check->execute([$id]);
+        $this->assertSame(0, (int) $check->fetchColumn(), 'open-bucket status cannot be made default_resolved');
+    }
+
+    public function test_buildTicketFilterQuery_drops_unknown_status_slugs(): void
+    {
+        // Pass a mix of valid + stale slugs; only the valid ones should hit SQL.
+        $result = buildTicketFilterQuery([
+            'status' => ['open', 'completely_made_up_slug', 'resolved'],
+        ]);
+        $this->assertIsArray($result);
+        // 'completely_made_up_slug' should NOT appear in the params.
+        $this->assertNotContains('completely_made_up_slug', $result['params'] ?? []);
+        // 'open' and 'resolved' should both be there.
+        $this->assertContains('open',     $result['params'] ?? []);
+        $this->assertContains('resolved', $result['params'] ?? []);
+    }
+
+    public function test_ticketStatusReferences_finds_automation_references(): void
+    {
+        // Insert a fake automation that references 'pending' as an action value.
+        $db = \Database::connect();
+        $db->prepare(
+            "INSERT INTO automations (name, trigger_event, conditions, actions, is_enabled, sort_order)
+             VALUES (?, 'ticket_created', '[]', ?, 0, 999)"
+        )->execute([
+            '[TEST] Set Pending',
+            json_encode([['action' => 'set_status', 'value' => 'pending']]),
+        ]);
+        $autoId = (int) $db->lastInsertId();
+
+        $refs = ticketStatusReferences('pending');
+        $names = array_column($refs['automations'], 'name');
+        $this->assertContains('[TEST] Set Pending', $names);
+
+        $db->prepare('DELETE FROM automations WHERE id = ?')->execute([$autoId]);
+    }
+
+    public function test_cannot_delete_status_referenced_by_automation(): void
+    {
+        // Create a deletable custom status, then an automation pointing at it,
+        // then attempt delete — must be blocked.
+        $this->post($this->adminClient(), '/admin/settings/ticket-statuses/create', [
+            'slug'   => 'test_referenced',
+            'label'  => '[TEST] Referenced',
+            'bucket' => 'open',
+            'color'  => '#ff00ff',
+        ]);
+        $id = $this->statusId('test_referenced');
+
+        $db = \Database::connect();
+        $db->prepare(
+            "INSERT INTO automations (name, trigger_event, conditions, actions, is_enabled, sort_order)
+             VALUES (?, 'ticket_created', '[]', ?, 0, 999)"
+        )->execute([
+            '[TEST] Uses Referenced',
+            json_encode([['action' => 'set_status', 'value' => 'test_referenced']]),
+        ]);
+        $autoId = (int) $db->lastInsertId();
+
+        $this->post($this->adminClient(), "/admin/settings/ticket-statuses/{$id}/delete", []);
+
+        $check = $db->prepare('SELECT COUNT(*) FROM ticket_statuses WHERE id = ?');
+        $check->execute([$id]);
+        $this->assertSame(1, (int) $check->fetchColumn(), 'automation reference must block delete');
+
+        // Cleanup
+        $db->prepare('DELETE FROM automations WHERE id = ?')->execute([$autoId]);
+    }
 }

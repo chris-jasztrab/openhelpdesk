@@ -9993,6 +9993,33 @@ $router->post('/admin/settings/ticket-statuses/{id}/edit', function (array $p) {
         redirect('/admin/settings/ticket-statuses');
     }
 
+    // Deactivation guards: refuse if (a) it would leave the bucket with
+    // no active statuses, or (b) the row still holds a default flag.
+    $wasActive = (int) $row['is_active'] === 1;
+    if ($wasActive && $active === 0) {
+        // Default-flag check: bucket of the original row (not the submitted
+        // one — we're protecting the existing semantic).
+        $defaultBlocks = [];
+        if ((int) $row['is_default_new'])      $defaultBlocks[] = 'new tickets';
+        if ((int) $row['is_default_resolved']) $defaultBlocks[] = 'resolved emails';
+        if ((int) $row['is_default_closed'])   $defaultBlocks[] = 'closed emails';
+        if (!empty($defaultBlocks)) {
+            flash('error', "Cannot deactivate \"{$row['label']}\" — it's the default for " . implode(' + ', $defaultBlocks)
+                . '. Promote another status to that role first.');
+            redirect('/admin/settings/ticket-statuses');
+        }
+
+        // Last-active-in-bucket check.
+        $bucketActive = $db->prepare(
+            'SELECT COUNT(*) FROM ticket_statuses WHERE bucket = ? AND is_active = 1 AND id != ?'
+        );
+        $bucketActive->execute([$row['bucket'], $id]);
+        if ((int) $bucketActive->fetchColumn() === 0) {
+            flash('error', "Cannot deactivate \"{$row['label']}\" — it's the only active status in the «{$row['bucket']}» bucket. Add or activate another status in that bucket first.");
+            redirect('/admin/settings/ticket-statuses');
+        }
+    }
+
     // Slug is intentionally not read from the request — it's immutable
     // after create so the SQL semantics in the codebase stay stable.
     $db->prepare(
@@ -10030,17 +10057,33 @@ $router->post('/admin/settings/ticket-statuses/{id}/set-default', function (arra
     }
     $kind = (string) ($_POST['kind'] ?? '');
     $columnMap = [
-        'new'      => 'is_default_new',
-        'resolved' => 'is_default_resolved',
-        'closed'   => 'is_default_closed',
+        'new'      => ['is_default_new',      'open',   'new tickets'],
+        'resolved' => ['is_default_resolved', 'closed', 'resolved emails + CSAT'],
+        'closed'   => ['is_default_closed',   'closed', 'closed emails'],
     ];
     if (!isset($columnMap[$kind])) {
         flash('error', 'Unknown default kind.');
         redirect('/admin/settings/ticket-statuses');
     }
-    $col = $columnMap[$kind];
+    [$col, $requiredBucket, $kindLabel] = $columnMap[$kind];
 
-    $db = Database::connect();
+    $db   = Database::connect();
+    $stmt = $db->prepare('SELECT slug, label, bucket, is_active FROM ticket_statuses WHERE id = ?');
+    $stmt->execute([$id]);
+    $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+    if (!$row) {
+        flash('error', 'Status not found.');
+        redirect('/admin/settings/ticket-statuses');
+    }
+    if ((int) $row['is_active'] !== 1) {
+        flash('error', "\"{$row['label']}\" is inactive — activate it before making it the default.");
+        redirect('/admin/settings/ticket-statuses');
+    }
+    if ($row['bucket'] !== $requiredBucket) {
+        flash('error', "Default for {$kindLabel} must be a status in the «{$requiredBucket}» bucket. \"{$row['label']}\" is in «{$row['bucket']}».");
+        redirect('/admin/settings/ticket-statuses');
+    }
+
     $db->beginTransaction();
     try {
         $db->exec("UPDATE ticket_statuses SET {$col} = 0");
@@ -10048,7 +10091,7 @@ $router->post('/admin/settings/ticket-statuses/{id}/set-default', function (arra
         $db->commit();
         ticketStatusCacheRefresh();
         logAudit('status.default_changed', $id, 'ticket_status', "kind={$kind}");
-        flash('success', 'Default updated.');
+        flash('success', "Default for {$kindLabel} is now \"{$row['label']}\".");
     } catch (\PDOException $e) {
         $db->rollBack();
         flash('error', 'Could not update default: ' . $e->getMessage());
@@ -10073,21 +10116,96 @@ $router->post('/admin/settings/ticket-statuses/{id}/delete', function (array $p)
         redirect('/admin/settings/ticket-statuses');
     }
 
-    // Phase-4 baseline guards (Phase 5 adds last-in-bucket + default-reassign
-    // + automation-reference checks).
     if ((int) $row['is_system'] === 1) {
         flash('error', "\"{$row['label']}\" is a built-in status and cannot be deleted. Deactivate it instead.");
         redirect('/admin/settings/ticket-statuses');
     }
 
-    $count = $db->prepare('SELECT COUNT(*) FROM tickets WHERE status = ?');
-    $count->execute([$row['slug']]);
-    $usedBy = (int) $count->fetchColumn();
-    if ($usedBy > 0) {
-        flash('error', "Cannot delete \"{$row['label']}\" — {$usedBy} ticket(s) still have this status. Reassign them first.");
+    $refs = ticketStatusReferences((string) $row['slug']);
+
+    // 1. Default-flag holder must be reassigned via Set Default first.
+    $defaultBlocks = [];
+    if ($refs['is_default_new'])      $defaultBlocks[] = 'new tickets';
+    if ($refs['is_default_resolved']) $defaultBlocks[] = 'resolved emails';
+    if ($refs['is_default_closed'])   $defaultBlocks[] = 'closed emails';
+    if (!empty($defaultBlocks)) {
+        flash('error', "Cannot delete \"{$row['label']}\" — it's the default for " . implode(' + ', $defaultBlocks)
+            . '. Promote another status to that role first.');
         redirect('/admin/settings/ticket-statuses');
     }
 
+    // 2. Automation / escalation references must be cleared first.
+    $ruleBlocks = [];
+    if (!empty($refs['automations'])) {
+        $names = array_slice(array_column($refs['automations'], 'name'), 0, 3);
+        $ruleBlocks[] = count($refs['automations']) . ' automation(s): ' . implode(', ', $names)
+            . (count($refs['automations']) > 3 ? ', …' : '');
+    }
+    if (!empty($refs['escalation_rules'])) {
+        $names = array_slice(array_column($refs['escalation_rules'], 'name'), 0, 3);
+        $ruleBlocks[] = count($refs['escalation_rules']) . ' escalation rule(s): ' . implode(', ', $names)
+            . (count($refs['escalation_rules']) > 3 ? ', …' : '');
+    }
+    if ($refs['csat_trigger']) {
+        $ruleBlocks[] = 'the CSAT trigger setting';
+    }
+    if (!empty($ruleBlocks)) {
+        flash('error', "Cannot delete \"{$row['label']}\" — referenced by " . implode('; ', $ruleBlocks)
+            . '. Edit those rules or settings to point at a different status first.');
+        redirect('/admin/settings/ticket-statuses');
+    }
+
+    // 3. Last-active-in-bucket protection. If this row is the only active
+    // status in its bucket, deleting it would leave the bucket empty and
+    // break dropdowns / new ticket creation.
+    $bucketActive = $db->prepare(
+        'SELECT COUNT(*) FROM ticket_statuses WHERE bucket = ? AND is_active = 1 AND id != ?'
+    );
+    $bucketActive->execute([$row['bucket'], $id]);
+    if ((int) $bucketActive->fetchColumn() === 0) {
+        flash('error', "Cannot delete \"{$row['label']}\" — it's the only active status in the «{$row['bucket']}» bucket. Add or activate another status in that bucket first.");
+        redirect('/admin/settings/ticket-statuses');
+    }
+
+    // 4. If tickets currently hold this slug, optionally reassign them to
+    // a chosen target before deleting. If no target is given, block.
+    if ($refs['tickets'] > 0) {
+        $reassignTo = trim((string) ($_POST['reassign_to'] ?? ''));
+        if ($reassignTo === '') {
+            flash('error', "Cannot delete \"{$row['label']}\" — {$refs['tickets']} ticket(s) still have this status. Choose a status to reassign them to.");
+            redirect('/admin/settings/ticket-statuses');
+        }
+        if ($reassignTo === $row['slug']) {
+            flash('error', 'Reassign target must differ from the status being deleted.');
+            redirect('/admin/settings/ticket-statuses');
+        }
+        if (!in_array($reassignTo, ticketActiveStatusSlugs(), true)) {
+            flash('error', "Reassign target \"{$reassignTo}\" is not an active status.");
+            redirect('/admin/settings/ticket-statuses');
+        }
+        try {
+            $db->beginTransaction();
+            $db->prepare('UPDATE tickets SET status = ? WHERE status = ?')
+               ->execute([$reassignTo, $row['slug']]);
+            $db->prepare('DELETE FROM ticket_statuses WHERE id = ?')->execute([$id]);
+            $db->commit();
+        } catch (\PDOException $e) {
+            $db->rollBack();
+            flash('error', 'Could not reassign + delete: ' . $e->getMessage());
+            redirect('/admin/settings/ticket-statuses');
+        }
+        logAudit(
+            'status.deleted',
+            $id,
+            'ticket_status',
+            "slug={$row['slug']}; label={$row['label']}; reassigned {$refs['tickets']} ticket(s) to {$reassignTo}"
+        );
+        ticketStatusCacheRefresh();
+        flash('success', "Status \"{$row['label']}\" deleted. {$refs['tickets']} ticket(s) reassigned to \"" . ticketStatusLabel($reassignTo) . '".');
+        redirect('/admin/settings/ticket-statuses');
+    }
+
+    // 5. No tickets, no refs — safe to delete outright.
     $db->prepare('DELETE FROM ticket_statuses WHERE id = ?')->execute([$id]);
     logAudit('status.deleted', $id, 'ticket_status', "slug={$row['slug']}; label={$row['label']}");
     ticketStatusCacheRefresh();
