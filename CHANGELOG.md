@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.60.1 &mdash; 2026-05-27
+
+### Added
+- **Phase 2 of configurable ticket statuses &mdash; helper functions that read from the `ticket_statuses` lookup table.** Still infrastructure: nothing in the app yet calls these (Phase 3 will swap out the hardcoded slug arrays and `IN(...)` SQL clauses). New helpers live at the bottom of [src/helpers.php](src/helpers.php) and share a single request-scoped static cache so the cost is one query per request, however many call sites read. Functions added: `ticketStatuses()` (all rows), `ticketActiveStatuses()` (is_active=1 only), `ticketStatusSlugs()` / `ticketActiveStatusSlugs()`, `ticketOpenBucketSlugs()` and `ticketClosedBucketSlugs()` (for the two semantic SQL filters), `ticketSlaPausingSlugs()` (for SLA pause logic), `ticketDefaultNewStatusSlug()` / `ticketDefaultResolvedStatusSlug()` / `ticketDefaultClosedStatusSlug()` (for new-ticket assignment + the resolved/closed email template triggers), and `ticketStatusLabel()` / `ticketStatusColor()` / `ticketStatusMeta()` for templates. Label and color helpers fall back gracefully for orphan slugs (humanized slug, neutral gray) so a ticket whose status was deactivated still renders a readable badge instead of a blank or a 500. The previous hardcoded `ticketStatusLabel()` helper (a 7-arm `match` statement, never called from anywhere outside its own file) was removed in favor of the lookup-driven version. New `tests/Feature/TicketStatusHelpersTest.php` (16 tests / 44 assertions) covers the seeded values, the orphan fallback paths, and verifies the request-scoped cache actually caches.
+
+---
+
 ## 2.60.0 &mdash; 2026-05-27
 
 ### Added

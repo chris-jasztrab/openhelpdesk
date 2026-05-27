@@ -5182,23 +5182,6 @@ function staleThresholdHoursForType(PDO $db, ?int $typeId): int
 }
 
 /**
- * Pretty label for a ticket status (matches the UI badges).
- */
-function ticketStatusLabel(string $status): string
-{
-    return match ($status) {
-        'open'                   => 'Open',
-        'in_progress'            => 'In Progress',
-        'pending'                => 'Pending',
-        'waiting_on_customer'    => 'Waiting on Customer',
-        'waiting_on_third_party' => 'Waiting on Third Party',
-        'resolved'               => 'Resolved',
-        'closed'                 => 'Closed',
-        default                  => ucfirst(str_replace('_', ' ', $status)),
-    };
-}
-
-/**
  * Email the assigned agent (or all members of the assigned group) that a
  * ticket has gone stale. Respects global + per-user notification prefs.
  */
@@ -5464,3 +5447,204 @@ function sanitizeBannerHtml(string $html): string
     $html = preg_replace('#javascript:#i', '', $html) ?? '';
     return $html;
 }
+
+/* ── Ticket status helpers ───────────────────────────────────────────────────
+ *
+ * All ticket statuses now come from the `ticket_statuses` lookup table
+ * (see migration 041_ticket_statuses.php). These helpers read once per
+ * request and cache the result in a static, so callers can use them as
+ * cheaply as a constant lookup.
+ *
+ * Naming convention:
+ *   - "ActiveSlugs"  → only is_active=1 (use for accepting new writes / dropdowns)
+ *   - "BucketSlugs"  → all states, active and inactive (use for SQL filters that
+ *                      need to bucket historical rows whose slug may have been
+ *                      deactivated since)
+ *   - Label/color/meta helpers also accept inactive slugs so historical tickets
+ *     still render their badge.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Internal: fetch all status rows, indexed by slug, ordered by sort_order.
+ * Cached for the request. Pass $refresh=true after writing to the table
+ * within the same request to re-query (the admin settings save handler uses
+ * this so its own POST-then-redirect cycle reflects fresh data if it ever
+ * needs to read back within the same script).
+ *
+ * Returns [] if the table is missing (paranoid guard for code paths that
+ * somehow run before migration 041 applies).
+ */
+function _ticketStatusCache(bool $refresh = false): array
+{
+    static $cache = null;
+    if ($cache !== null && !$refresh) {
+        return $cache;
+    }
+    try {
+        $rows = Database::connect()
+            ->query(
+                "SELECT slug, label, bucket, pauses_sla, sort_order, color,
+                        is_default_new, is_default_resolved, is_default_closed,
+                        is_system, is_active
+                 FROM ticket_statuses
+                 ORDER BY sort_order, id"
+            )
+            ->fetchAll(PDO::FETCH_ASSOC);
+    } catch (\Throwable $e) {
+        return $cache = [];
+    }
+    $cache = [];
+    foreach ($rows as $r) {
+        $cache[$r['slug']] = [
+            'slug'                => (string) $r['slug'],
+            'label'               => (string) $r['label'],
+            'bucket'              => (string) $r['bucket'],
+            'pauses_sla'          => (int) $r['pauses_sla'] === 1,
+            'sort_order'          => (int) $r['sort_order'],
+            'color'               => (string) $r['color'],
+            'is_default_new'      => (int) $r['is_default_new'] === 1,
+            'is_default_resolved' => (int) $r['is_default_resolved'] === 1,
+            'is_default_closed'   => (int) $r['is_default_closed'] === 1,
+            'is_system'           => (int) $r['is_system'] === 1,
+            'is_active'           => (int) $r['is_active'] === 1,
+        ];
+    }
+    return $cache;
+}
+
+/** All status rows (active + inactive), ordered by sort_order. */
+function ticketStatuses(): array
+{
+    return array_values(_ticketStatusCache());
+}
+
+/** Active status rows only, ordered. Use for dropdowns and admin pickers. */
+function ticketActiveStatuses(): array
+{
+    return array_values(array_filter(
+        _ticketStatusCache(),
+        static fn(array $s) => $s['is_active']
+    ));
+}
+
+/** All slugs (active + inactive). Use for "does this slug exist?" checks. */
+function ticketStatusSlugs(): array
+{
+    return array_keys(_ticketStatusCache());
+}
+
+/** Active slugs only. Use for validating incoming status writes. */
+function ticketActiveStatusSlugs(): array
+{
+    return array_map(static fn(array $s) => $s['slug'], ticketActiveStatuses());
+}
+
+/**
+ * Slugs in the "open" bucket — replaces the hardcoded
+ * `IN ('open','in_progress','pending')` filters scattered through the codebase.
+ * Includes inactive rows so historical tickets keep counting.
+ */
+function ticketOpenBucketSlugs(): array
+{
+    return array_values(array_map(
+        static fn(array $s) => $s['slug'],
+        array_filter(_ticketStatusCache(), static fn(array $s) => $s['bucket'] === 'open')
+    ));
+}
+
+/**
+ * Slugs in the "closed" bucket — replaces hardcoded `IN ('resolved','closed')`
+ * and `NOT IN ('resolved','closed')` filters.
+ */
+function ticketClosedBucketSlugs(): array
+{
+    return array_values(array_map(
+        static fn(array $s) => $s['slug'],
+        array_filter(_ticketStatusCache(), static fn(array $s) => $s['bucket'] === 'closed')
+    ));
+}
+
+/** Slugs that pause SLA timers — replaces the inline $pausingStatuses arrays. */
+function ticketSlaPausingSlugs(): array
+{
+    return array_values(array_map(
+        static fn(array $s) => $s['slug'],
+        array_filter(_ticketStatusCache(), static fn(array $s) => $s['pauses_sla'])
+    ));
+}
+
+/**
+ * Slug assigned to new tickets. Replaces hardcoded `'open'` fallbacks.
+ * Always returns a slug; falls back to the original 'open' if the flag was
+ * somehow cleared (defensive — guardrails prevent this in normal use).
+ */
+function ticketDefaultNewStatusSlug(): string
+{
+    foreach (_ticketStatusCache() as $s) {
+        if ($s['is_default_new']) {
+            return $s['slug'];
+        }
+    }
+    return 'open';
+}
+
+/** Slug that fires the "ticket resolved" email template. */
+function ticketDefaultResolvedStatusSlug(): string
+{
+    foreach (_ticketStatusCache() as $s) {
+        if ($s['is_default_resolved']) {
+            return $s['slug'];
+        }
+    }
+    return 'resolved';
+}
+
+/** Slug that fires the "ticket closed" email template. */
+function ticketDefaultClosedStatusSlug(): string
+{
+    foreach (_ticketStatusCache() as $s) {
+        if ($s['is_default_closed']) {
+            return $s['slug'];
+        }
+    }
+    return 'closed';
+}
+
+/**
+ * Friendly label for a status slug. Falls back to a humanized version of the
+ * slug if the row doesn't exist (so an orphan `tickets.status` value still
+ * renders something readable instead of "" or a 500).
+ */
+function ticketStatusLabel(string $slug): string
+{
+    $row = _ticketStatusCache()[$slug] ?? null;
+    if ($row !== null) {
+        return $row['label'];
+    }
+    return ucwords(str_replace('_', ' ', $slug));
+}
+
+/** Hex color for a status slug. Falls back to a neutral gray for orphans. */
+function ticketStatusColor(string $slug): string
+{
+    return _ticketStatusCache()[$slug]['color'] ?? '#6c757d';
+}
+
+/**
+ * Full row for a slug (or null). Use when a template needs more than just the
+ * label/color — e.g., the bucket or pauses_sla flag.
+ */
+function ticketStatusMeta(string $slug): ?array
+{
+    return _ticketStatusCache()[$slug] ?? null;
+}
+
+/**
+ * Re-query the lookup table from disk and replace the request-scoped cache.
+ * Call after writing to ticket_statuses inside the same request.
+ */
+function ticketStatusCacheRefresh(): void
+{
+    _ticketStatusCache(true);
+}
+
