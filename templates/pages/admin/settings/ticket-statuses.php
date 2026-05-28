@@ -446,19 +446,6 @@ window.ticketStatusTicketCounts = <?= json_encode($ticketCountsBySlug, JSON_UNES
     document.getElementById('addStatusModal').addEventListener('hidden.bs.modal', function () {
         slugTouched = false;
     });
-
-    // Submit-button double-click guard. Once any form on this page is
-    // submitted, disable its submit buttons so an over-eager second click
-    // doesn't fire a duplicate POST against an already-changed row.
-    document.querySelectorAll('form').forEach(function (form) {
-        form.addEventListener('submit', function () {
-            Array.from(form.querySelectorAll('button[type="submit"]')).forEach(function (btn) {
-                btn.disabled = true;
-                btn.dataset.originalHtml = btn.innerHTML;
-                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Working…';
-            });
-        });
-    });
 })();
 </script>
 

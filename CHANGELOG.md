@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.61.3 &mdash; 2026-05-28
+
+### Fixed
+- **Form submissions on the ticket-status admin page were silently cancelled by the double-click guard added in 2.61.2.** Setting `disabled = true` on the submit button during the `submit` event handler can cause some browsers (Firefox in particular) to abort the form submission &mdash; the click triggered the submit event, the handler disabled the submitter, and the browser then refused to send the POST because its submitter was disabled. Delete, deactivate (the new inline toggle), and Set Default all failed silently as a result &mdash; the click looked like it did nothing. Removed the entire submit-disable handler; the silent row-not-found redirect added in 2.61.2 already covers the original concern (accidental double-submit). Also added `Cache-Control: no-store` headers to the GET ticket-statuses route so the browser never serves a stale post-redirect view (a 304 here would mask a successful reorder/edit and look like the change was lost).
+
+---
+
 ## 2.61.2 &mdash; 2026-05-27
 
 ### Fixed

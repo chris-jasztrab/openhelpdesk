@@ -9904,7 +9904,11 @@ $router->post('/admin/settings/tags', function () {
 
 $router->get('/admin/settings/ticket-statuses', function () {
     Auth::requireRole('admin');
-    // Force a fresh read in case we just edited and the cache was primed.
+    // Defensive: never let the browser serve a cached copy after a write.
+    // Drag-reorder + POST-redirect-GET cycles return to this page expecting
+    // to see fresh data; a 304 here would mask successful saves.
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
     ticketStatusCacheRefresh();
     $statuses = ticketStatuses();   // includes inactive rows for the admin view
     render('admin/settings/ticket-statuses', compact('statuses'));
