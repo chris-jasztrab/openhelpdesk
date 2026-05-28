@@ -89,7 +89,7 @@
                     <a class="nav-link position-relative <?= $notifCount > 0 ? 'ld-bell-active' : '' ?>" href="/notifications" aria-label="<?= e($notifLabel) ?>">
                         <i class="bi bi-bell fs-5" aria-hidden="true"></i>
                         <span class="position-absolute start-100 translate-middle-x badge rounded-pill bg-danger <?= $notifCount > 0 ? '' : 'd-none' ?>"
-                              id="ld-notif-badge" style="font-size:.65rem; top:.35rem;" aria-hidden="true">
+                              id="ld-notif-badge" style="font-size:.55rem; top:.35rem; padding:.15em .35em; line-height:1;" aria-hidden="true">
                             <?= $notifCount > 99 ? '99+' : $notifCount ?>
                         </span>
                     </a>

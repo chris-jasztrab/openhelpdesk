@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.62.4 &mdash; 2026-05-28
+
+### Fixed
+- **Notification bell badge is no longer almost as big as the bell itself.** 2.62.3 fixed the clipping but left the badge at Bootstrap's default size, which rendered nearly as tall as the `fs-5` bell icon next to it. Tightened the badge in [templates/partials/navbar.php](templates/partials/navbar.php) with `font-size:.55rem`, `padding:.15em .35em`, and `line-height:1` so the count sits as a compact pill in the upper-right of the bell instead of competing with it.
+
+---
+
 ## 2.62.3 &mdash; 2026-05-28
 
 ### Fixed
