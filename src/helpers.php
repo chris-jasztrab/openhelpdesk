@@ -5501,7 +5501,7 @@ function _ticketStatusCache(bool $refresh = false): array
     try {
         $rows = Database::connect()
             ->query(
-                "SELECT slug, label, bucket, pauses_sla, sort_order, color,
+                "SELECT id, slug, label, bucket, pauses_sla, sort_order, color,
                         is_default_new, is_default_resolved, is_default_closed,
                         is_system, is_active
                  FROM ticket_statuses
@@ -5514,6 +5514,7 @@ function _ticketStatusCache(bool $refresh = false): array
     $cache = [];
     foreach ($rows as $r) {
         $cache[$r['slug']] = [
+            'id'                  => (int) $r['id'],
             'slug'                => (string) $r['slug'],
             'label'               => (string) $r['label'],
             'bucket'              => (string) $r['bucket'],

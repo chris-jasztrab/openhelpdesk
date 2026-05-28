@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.61.4 &mdash; 2026-05-28
+
+### Fixed
+- **Every row on the ticket-status admin page rendered with `data-id="0"`, so edit / delete / toggle-active / Set Default / drag-reorder all silently no-op'd.** The real root cause of the symptoms that 2.61.2 and 2.61.3 were chasing &mdash; the previous patches addressed real-but-secondary issues (missing reorder feedback, an over-eager submit-disable handler), but the underlying bug was in `_ticketStatusCache()` in [src/helpers.php](src/helpers.php): the `SELECT` omitted the `id` column, and the per-row array it built didn't include `id` either. The admin template renders `<tr data-id="<?= (int) $s['id'] ?>">` and the same value into every inline form's action URL &mdash; with the key missing, `(int) null` produced `0` for every row. The route handlers ran `WHERE id = 0`, found nothing, and (thanks to the 2.61.2 silent-no-row redirect) bounced cleanly back to the list without an error flash, which made it look exactly like the click did nothing. Drag-reorder posted `[0,0,0,...]` and updated zero rows. Create worked because it has no ID in the URL &mdash; consistent with the symptom report. Fix: added `id` to the SELECT and to the cache row shape. Also strengthened `test_ticketStatuses_rows_have_expected_keys` to assert `id` is present and is a positive int, so this regression can't sneak back in. Full suite: 401 passing / 1 pre-existing failure.
+
+---
+
 ## 2.61.3 &mdash; 2026-05-28
 
 ### Fixed

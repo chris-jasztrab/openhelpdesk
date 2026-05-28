@@ -33,14 +33,19 @@ class TicketStatusHelpersTest extends TestCase
     public function test_ticketStatuses_rows_have_expected_keys(): void
     {
         $row = ticketStatuses()[0];
+        // `id` is load-bearing: the admin settings page renders it into
+        // `data-id`/form action URLs, so dropping it silently breaks every
+        // edit/delete/toggle/reorder POST (they target /0/...).
         $expected = [
-            'slug', 'label', 'bucket', 'pauses_sla', 'sort_order', 'color',
+            'id', 'slug', 'label', 'bucket', 'pauses_sla', 'sort_order', 'color',
             'is_default_new', 'is_default_resolved', 'is_default_closed',
             'is_system', 'is_active',
         ];
         foreach ($expected as $k) {
             $this->assertArrayHasKey($k, $row, "row should have key «{$k}»");
         }
+        $this->assertIsInt($row['id']);
+        $this->assertGreaterThan(0, $row['id']);
     }
 
     public function test_ticketActiveStatuses_returns_only_active(): void
