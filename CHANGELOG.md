@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.62.2 &mdash; 2026-05-28
+
+### Fixed
+- **Clicking a name in the @mention dropdown actually inserts it now.** With 2.62.1 the dropdown showed up again but clicking a result threw `CKEditorError: Cannot read properties of undefined (reading 'is')` deep inside `Position._createAt`. Root cause: `selectMention()` was calling `writer.insertText(text, writer.createSelection(range))` — but CKEditor 5's `writer.insertText` signature is `(text, attributesOrPosition, offset)`, **not** `(text, selection)`. When a `Selection` was passed in the second arg, CKEditor's overload resolution treated it as a position-like target, then handed `undefined` down to `Position._createAt`, which crashed on `node.is(...)`. This path had never been exercised before because the earlier `getMentionInfo()` bug (fixed in 2.62.1) meant the dropdown never showed, so nobody ever clicked an entry. Rewritten with unambiguous calls: build the `@query` range from `info.parent` + `info.start`/`info.endOffset`, `writer.remove(range)` it, then `writer.insertText(text, writer.createPositionAt(info.parent, info.start))` and `writer.setSelection(...)` the caret to land after the inserted mention. Also added `editor.editing.view.focus()` after the change so focus returns cleanly to the editor when the click was on the dropdown. Same fix in both [templates/pages/admin/tickets/view.php](templates/pages/admin/tickets/view.php) and [templates/pages/agent/tickets/view.php](templates/pages/agent/tickets/view.php).
+
+---
+
 ## 2.62.1 &mdash; 2026-05-28
 
 ### Fixed

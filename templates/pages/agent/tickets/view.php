@@ -1737,18 +1737,21 @@ ClassicEditor.create(document.querySelector('#replyEditor'), {
         var text = '@' + u.first_name + ' ' + u.last_name + ' ';
         var info = getMentionInfo();
         editor.model.change(function(writer) {
-            var sel = editor.model.document.selection;
-            var pos = sel.getFirstPosition();
-            if (!pos) return;
             if (info && info.parent) {
+                // Remove the typed "@query" then insert the full mention at the same spot.
+                // We can't pass a Selection to writer.insertText — only Position or attrs.
                 var startPos = writer.createPositionAt(info.parent, info.start);
-                var range = writer.createRange(startPos, pos);
-                writer.insertText(text, writer.createSelection(range));
+                var endPos = writer.createPositionAt(info.parent, info.endOffset);
+                writer.remove(writer.createRange(startPos, endPos));
+                writer.insertText(text, writer.createPositionAt(info.parent, info.start));
+                writer.setSelection(writer.createPositionAt(info.parent, info.start + text.length));
             } else {
-                writer.insertText(text, pos);
+                var pos = editor.model.document.selection.getFirstPosition();
+                if (pos) writer.insertText(text, pos);
             }
         });
         closeDrop();
+        editor.editing.view.focus();
     }
 
     function closeDrop() {
