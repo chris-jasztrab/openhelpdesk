@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.62.5 &mdash; 2026-05-28
+
+### Fixed
+- **Notification badge sits closer to the bell without overlapping it.** The badge was anchored at `start-100 translate-middle-x`, which centred it on the nav-link's right edge and left an awkward gap from the bell glyph. Dropped the Bootstrap positioning utilities and pinned the badge with `right:.15rem` in [templates/partials/navbar.php](templates/partials/navbar.php) so the count snugs into the upper-right of the bell with a hairline gap.
+
+---
+
 ## 2.62.4 &mdash; 2026-05-28
 
 ### Fixed

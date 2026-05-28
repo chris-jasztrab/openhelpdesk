@@ -88,8 +88,8 @@
                     <?php $notifLabel = $notifCount === 0 ? 'Notifications, none unread' : 'Notifications, ' . ($notifCount > 99 ? '99+' : $notifCount) . ' unread'; ?>
                     <a class="nav-link position-relative <?= $notifCount > 0 ? 'ld-bell-active' : '' ?>" href="/notifications" aria-label="<?= e($notifLabel) ?>">
                         <i class="bi bi-bell fs-5" aria-hidden="true"></i>
-                        <span class="position-absolute start-100 translate-middle-x badge rounded-pill bg-danger <?= $notifCount > 0 ? '' : 'd-none' ?>"
-                              id="ld-notif-badge" style="font-size:.55rem; top:.35rem; padding:.15em .35em; line-height:1;" aria-hidden="true">
+                        <span class="position-absolute badge rounded-pill bg-danger <?= $notifCount > 0 ? '' : 'd-none' ?>"
+                              id="ld-notif-badge" style="font-size:.55rem; top:.35rem; right:.15rem; padding:.15em .35em; line-height:1;" aria-hidden="true">
                             <?= $notifCount > 99 ? '99+' : $notifCount ?>
                         </span>
                     </a>
