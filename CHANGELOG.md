@@ -11,6 +11,14 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.62.3 &mdash; 2026-05-28
+
+### Fixed
+- **Notifications page no longer shows raw HTML like `<p>@fake agent did you get this?</p>`.** The mention preview was double-handling the body: the message column stores the WYSIWYG HTML the agent typed, and [templates/pages/notifications.php](templates/pages/notifications.php) was just running it through `e()`, which faithfully escaped the angle brackets so the tags rendered as literal text. Switched to `e(trim(html_entity_decode(strip_tags($n['message']), ENT_QUOTES, 'UTF-8')))` so we strip the markup down to plain text first, decode any entities CKEditor wrote (`&nbsp;`, `&amp;`, etc.), and *then* re-escape for safe display — short, readable preview with no tags leaking through.
+- **Notification bell badge no longer gets sliced off at the top of the navbar.** The badge in [templates/partials/navbar.php](templates/partials/navbar.php) used Bootstrap's `top-0 start-100 translate-middle` pattern, which anchors the badge center at the top-right corner of the nav-link and then pulls it up by half its own height — so the upper half of the "1" rendered above the navbar's top edge and got clipped. Replaced with `start-100 translate-middle-x` plus an inline `top:.35rem;`, which keeps the horizontal overlap on the bell but seats the badge fully inside the green bar.
+
+---
+
 ## 2.62.2 &mdash; 2026-05-28
 
 ### Fixed

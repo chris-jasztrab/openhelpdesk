@@ -53,7 +53,7 @@ $breadcrumbs  = [
                             <?php endif; ?>
                         </div>
                     </div>
-                    <div class="mt-1 text-muted small" style="white-space:pre-wrap;"><?= e($n['message']) ?></div>
+                    <div class="mt-1 text-muted small" style="white-space:pre-wrap;"><?= e(trim(html_entity_decode(strip_tags($n['message']), ENT_QUOTES, 'UTF-8'))) ?></div>
                 </div>
             </div>
         </div>
