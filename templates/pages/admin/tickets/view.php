@@ -1682,12 +1682,20 @@ ClassicEditor.create(document.querySelector('#replyEditor'), {
     function getMentionInfo() {
         var sel = editor.model.document.selection;
         var pos = sel.getFirstPosition();
-        if (!pos || !pos.textNode) return null;
-        var text = pos.textNode.data.substring(0, pos.offset);
+        if (!pos) return null;
+        // pos.textNode is null when the cursor sits at the end of a text node,
+        // which is exactly where it lands after typing a character. Fall back
+        // to nodeBefore so we can still read what the user just typed.
+        var textNode = pos.textNode || pos.nodeBefore;
+        if (!textNode || !textNode.is || !textNode.is('$text')) return null;
+        var textNodeStart = textNode.startOffset;
+        var endInText = pos.offset - textNodeStart;
+        if (endInText < 0 || endInText > textNode.data.length) return null;
+        var text = textNode.data.substring(0, endInText);
         for (var i = text.length - 1; i >= 0; i--) {
             if (text[i] === '@') {
                 if (i === 0 || /\s/.test(text[i - 1])) {
-                    return { start: i, query: text.substring(i + 1), textNode: pos.textNode, endOffset: pos.offset };
+                    return { start: textNodeStart + i, query: text.substring(i + 1), parent: textNode.parent, endOffset: pos.offset };
                 }
                 return null;
             }
@@ -1728,8 +1736,8 @@ ClassicEditor.create(document.querySelector('#replyEditor'), {
             var sel = editor.model.document.selection;
             var pos = sel.getFirstPosition();
             if (!pos) return;
-            if (info && info.textNode) {
-                var startPos = writer.createPositionAt(info.textNode, info.start);
+            if (info && info.parent) {
+                var startPos = writer.createPositionAt(info.parent, info.start);
                 var range = writer.createRange(startPos, pos);
                 writer.insertText(text, writer.createSelection(range));
             } else {

@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.62.1 &mdash; 2026-05-28
+
+### Fixed
+- **@mention autocomplete works again on the admin and agent ticket reply editors.** When the reply textarea was replaced with a CKEditor 5 WYSIWYG in v2.34.x (commit `188c91d`), the `getMentionInfo()` helper that watches the editor for `@` was wired to `position.textNode` — which CKEditor 5 documents as returning `null` whenever the caret sits at the **end** of a text node. After typing any character, the caret *is* at the end of the text node it just extended, so `textNode` was `null` on every keystroke, the function bailed out before fetching, and no dropdown ever appeared. The feature was silently broken on every ticket reply composer ([/admin/tickets/{id}](http://localhost:8000/admin/tickets/1) and [/agent/tickets/{id}](http://localhost:8000/agent/tickets/1)) from March 2026 onward — typing `@j` produced absolutely nothing, with no network request to `/api/mention-search` and no console error. Fix: fall back to `pos.nodeBefore` (the text node the caret just left) when `pos.textNode` is null, compute the typed text using `textNode.startOffset` so we read the right slice regardless of where the text node sits in its parent, and use the parent element + absolute parent offset when replacing the typed `@query` with the chosen full-name mention — so `writer.createPositionAt(parent, offset)` resolves correctly whether the text node is freshly created, mid-paragraph, or co-existing with siblings. Both [templates/pages/admin/tickets/view.php](templates/pages/admin/tickets/view.php) and [templates/pages/agent/tickets/view.php](templates/pages/agent/tickets/view.php) carry parallel copies of the autocomplete (per the standing rule that admin/agent ticket templates are mirrors), so the same fix landed in both.
+
+---
+
 ## 2.62.0 &mdash; 2026-05-28
 
 ### Added
