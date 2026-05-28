@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.62.6 &mdash; 2026-05-28
+
+### Changed
+- **Video walkthrough working files no longer show up in `git status`.** The screenshots, audio, and rendered video clips under `docs/screenshots/agent-walkthrough/` are scratch assets for the in-progress product walkthrough, not source we want to commit. Added `/docs/screenshots/agent-walkthrough/` to [.gitignore](.gitignore) so the PNGs and the `annotated/`, `audio/`, `v2/`, `video/` subdirs stay local.
+
+---
+
 ## 2.62.5 &mdash; 2026-05-28
 
 ### Fixed

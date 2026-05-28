@@ -32,3 +32,6 @@ test-results*.txt
 # Keep this out of the public repo.
 /scripts/deploy.py
 scripts/generate_schema_diagram.py
+
+# Video walkthrough working files (screenshots, audio, video edits).
+/docs/screenshots/agent-walkthrough/
