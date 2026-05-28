@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.62.0 &mdash; 2026-05-28
+
+### Added
+- **New report: Group Coverage.** Lives at [/admin/reports/group-coverage](http://localhost:8000/admin/reports/group-coverage) and answers "which group covers each ticket type, and who's on the hook for it?" — one card per ticket type, showing the type's default group (the value set in **Admin &rarr; Ticket Types &rarr; Edit &rarr; Default Group**, i.e. `ticket_types.group_id`) and a one-row-per-member table beneath listing every user in that group, their email, role, and whether they hold the group's **Manager** flag (from `group_user_map.is_manager`). Types with no default group set are surfaced with a "No default group assigned" badge so misconfigurations don't hide; groups with no members render a "this group has no members" hint that links straight to the group's edit page. The group name in each card header links to **Admin &rarr; Groups &rarr; Edit** for one-click jump-to-fix. A **Print** button strips chrome (sidebar, top nav, breadcrumb, buttons) via a `@media print` block so the report photocopies cleanly for staff handouts. People deliberately appear more than once when the same group covers multiple types or when they belong to multiple groups across types — that repetition is the point of the report, since it shows the actual coverage as configured. The route is gated to `admin` and `power_user` (same as every other report at `/admin/reports/*`), and a new card is added to the **Reports &amp; Analytics** index ([/admin/reports](http://localhost:8000/admin/reports)) under "Detailed Reports" with a `bi-diagram-3` icon.
+
+---
+
 ## 2.61.5 &mdash; 2026-05-28
 
 ### Docs

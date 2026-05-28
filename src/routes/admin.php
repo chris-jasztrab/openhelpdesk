@@ -10736,6 +10736,36 @@ $router->get('/admin/reports/fcr', function () {
 });
 
 /* ==================================================================
+ * ADMIN – Report: Group Coverage (ticket type → group → members)
+ * ================================================================== */
+
+$router->get('/admin/reports/group-coverage', function () {
+    Auth::requireRole('admin', 'power_user');
+    $db = Database::connect();
+
+    $rows = $db->query(
+        "SELECT
+            tt.id                                  AS type_id,
+            tt.name                                AS type_name,
+            tt.color                               AS type_color,
+            g.id                                   AS group_id,
+            g.name                                 AS group_name,
+            u.id                                   AS user_id,
+            CONCAT(u.first_name, ' ', u.last_name) AS member_name,
+            u.email                                AS member_email,
+            u.role                                 AS user_role,
+            gum.is_manager                         AS is_manager
+         FROM ticket_types tt
+         LEFT JOIN `groups` g         ON g.id = tt.group_id
+         LEFT JOIN group_user_map gum ON gum.group_id = g.id
+         LEFT JOIN users u            ON u.id = gum.user_id
+         ORDER BY tt.sort_order, tt.name, u.last_name, u.first_name"
+    )->fetchAll();
+
+    render('admin/reports/group-coverage', compact('rows'));
+});
+
+/* ==================================================================
  * ADMIN – Report: Custom Report Builder
  * ================================================================== */
 
