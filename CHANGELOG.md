@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.61.5 &mdash; 2026-05-28
+
+### Docs
+- **Help documentation now covers configurable ticket statuses end-to-end.** The Tickets help page previously described the seven hardcoded statuses as if they were immutable; now the "Ticket Statuses" card explicitly notes they are fully configurable, links to [/admin/settings/ticket-statuses](http://localhost:8000/admin/settings/ticket-statuses), and lists the seven seeded statuses as the starting point rather than the law. New subsections walk through each lever an admin can pull (bucket, pauses SLA, colour, active toggle), document the three default-status slots (default for new, default for resolved, default for closed) and the bucket rules each one must satisfy, explain that slugs are permanent after create while labels/colours/everything else are editable, cover drag-reorder, and enumerate every guardrail the settings page enforces (built-in rows can't be deleted, default-flag holders can't be deleted or deactivated until promoted out, last-active-in-bucket protection, automation/escalation/CSAT reference checks, and the reassign-tickets-to dropdown that the delete modal surfaces when in-flight tickets hold the slug being deleted). A new anchor `#ticket-statuses` lets other pages link straight to the section. The agent <em>Working Tickets</em> doc was also de-hardcoded &mdash; references to "Send &amp; Set as ..." and to the Status dropdown now note that the menu reflects whatever statuses admins have configured, with the seven seeded statuses listed as defaults rather than as the only options; the SLA-pause note now points at the per-status "Pauses SLA" flag rather than naming Waiting on Customer / Waiting on Third Party as hard-coded pausers. The Tickets help page also dropped its hardcoded "Send &amp; set status" option list for the same reason. The docs search index gained ten new entries covering "configure ticket statuses", "bucket", "pauses SLA", default-slot promotion, slug immutability, deactivation, reassign-on-delete, built-in row protection, and the broader guardrails &mdash; so admins searching for any piece of this feature land on the right anchor.
+
+---
+
 ## 2.61.4 &mdash; 2026-05-28
 
 ### Fixed

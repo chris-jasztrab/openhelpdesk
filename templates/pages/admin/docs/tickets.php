@@ -55,27 +55,50 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 </div>
 </div>
 
-<div class="card border-0 shadow-sm mb-4">
+<div class="card border-0 shadow-sm mb-4" id="ticket-statuses">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-arrow-repeat text-primary me-2"></i>Ticket Statuses</h5>
-<p class="text-muted mb-2">Each ticket moves through a lifecycle managed by statuses:</p>
+<p class="text-muted mb-2">Each ticket moves through a lifecycle managed by statuses. Statuses are <strong>fully configurable</strong> &mdash; add, remove, rename, recolour, and reorder them from <a href="/admin/settings/ticket-statuses"><strong>Settings &rarr; Ticket Statuses</strong></a>. The seven statuses installed by default are:</p>
 <div class="table-responsive">
 <table class="table table-sm mb-0">
     <thead class="table-light"><tr><th>Status</th><th>Meaning</th></tr></thead>
     <tbody>
-        <tr><td><span class="badge bg-warning text-dark">Open</span></td><td class="text-muted">Newly submitted; awaiting agent action.</td></tr>
+        <tr><td><span class="badge bg-warning text-dark">Open</span></td><td class="text-muted">Newly submitted; awaiting agent action. The default status for new tickets.</td></tr>
         <tr><td><span class="badge bg-primary">In Progress</span></td><td class="text-muted">An agent is actively working on the ticket.</td></tr>
         <tr><td><span class="badge bg-info text-dark">Pending</span></td><td class="text-muted">Waiting on a response from the requester or a third party.</td></tr>
         <tr><td><span class="badge" style="background:#7c3aed;">Waiting on Customer</span></td><td class="text-muted">A reply has been sent; waiting for the requester to respond. SLA timer pauses. Can trigger automated reminder emails via Escalation Rules.</td></tr>
         <tr><td><span class="badge" style="background:#0369a1;">Waiting on Third Party</span></td><td class="text-muted">Work is blocked pending an external vendor or team. SLA timer pauses while in this state.</td></tr>
-        <tr><td><span class="badge bg-success">Resolved</span></td><td class="text-muted">The issue has been addressed. The requester is notified.</td></tr>
+        <tr><td><span class="badge bg-success">Resolved</span></td><td class="text-muted">The issue has been addressed. The requester is notified, and (if CSAT is enabled) a satisfaction survey is sent.</td></tr>
         <tr><td><span class="badge bg-secondary">Closed</span></td><td class="text-muted">Fully closed. No further action expected.</td></tr>
     </tbody>
 </table>
 </div>
-<div class="alert alert-info small mt-3 mb-0"><i class="bi bi-info-circle me-2"></i>
-    When a ticket moves to <strong>Waiting on Customer</strong> or <strong>Waiting on Third Party</strong>, the SLA timer automatically pauses and resumes when the status changes to any other active status.
-</div>
+<h6 class="fw-semibold mt-4 mb-2">Configuring statuses</h6>
+<p class="text-muted mb-2">On the <a href="/admin/settings/ticket-statuses">Ticket Statuses</a> page each status has four levers admins can pull:</p>
+<ul class="text-muted mb-2">
+    <li><strong>Bucket</strong> &mdash; <em>Open</em> or <em>Closed</em>. Drives business logic across the app: <em>open</em>-bucket statuses count toward "open" dashboard tiles and SLA tracking; <em>closed</em>-bucket statuses are treated as done and unlock the resolved/closed email + CSAT flows when used as a default for those kinds.</li>
+    <li><strong>Pauses SLA</strong> &mdash; a per-status toggle. Any status with this on pauses the SLA timer (default policy: <em>Pending</em>, <em>Waiting on Customer</em>, <em>Waiting on Third Party</em>). The timer resumes the moment a ticket moves to a status that does not pause SLA.</li>
+    <li><strong>Colour</strong> &mdash; the badge colour everywhere the status appears (lists, dashboards, emails). Text contrast picks itself.</li>
+    <li><strong>Active</strong> &mdash; click the green checkmark in the Active column to hide a status from every dropdown without losing the historical tickets that still hold it. Existing tickets keep their stored status either way.</li>
+</ul>
+<p class="text-muted mb-2"><strong>Defaults.</strong> Three slots determine which status is used in three system-driven flows:</p>
+<ul class="text-muted mb-2">
+    <li><strong>Default for new tickets</strong> &mdash; what every newly-submitted ticket lands on. Must be in the <em>open</em> bucket.</li>
+    <li><strong>Default for resolved</strong> &mdash; the status that triggers the "ticket resolved" email + CSAT survey. Must be in the <em>closed</em> bucket.</li>
+    <li><strong>Default for closed</strong> &mdash; the status that triggers the "ticket closed" email. Must be in the <em>closed</em> bucket.</li>
+</ul>
+<p class="text-muted mb-2">To change a default, open the <i class="bi bi-gear"></i> <em>set</em> menu in the Defaults column on the target row and pick the slot to claim. The previous holder is cleared in the same transaction so the slot is always occupied.</p>
+<p class="text-muted mb-2"><strong>Adding a custom status.</strong> Click <strong>Add Status</strong> in the top-right. Supply a label, a slug (lowercase letters / digits / underscores &mdash; auto-suggested from the label), a bucket, and a colour. <strong>Slugs are permanent</strong> after create &mdash; existing tickets, automations, and integrations reference the slug, so changing it later would break things. Labels, colours, and everything else are editable any time.</p>
+<p class="text-muted mb-2"><strong>Reordering.</strong> Drag the grip handle <i class="bi bi-grip-vertical"></i> on any row to set the order &mdash; the new order drives every status dropdown across the app and saves immediately.</p>
+<h6 class="fw-semibold mt-4 mb-2">Guardrails</h6>
+<p class="text-muted mb-2">The settings page refuses destructive changes that would break the rest of the app:</p>
+<ul class="text-muted mb-0">
+    <li>Built-in statuses (the seven seeded above) can be relabeled, recoloured, or deactivated but <strong>not deleted</strong>.</li>
+    <li>A status holding any of the three default slots cannot be deleted or deactivated until another status is promoted to that slot.</li>
+    <li>The last active status in a bucket cannot be deactivated or deleted &mdash; that would leave the bucket empty and break new-ticket creation and dashboard counters.</li>
+    <li>Statuses referenced by an automation, escalation rule, or the CSAT trigger setting cannot be deleted until those references are edited to point elsewhere. The error message lists exactly which rules block the delete.</li>
+    <li>If tickets currently hold a status you're trying to delete, the delete modal shows a <strong>Reassign tickets to:</strong> dropdown so you can move them to a different active status in the same transaction before the row is removed.</li>
+</ul>
 </div>
 </div>
 
@@ -96,7 +119,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
     <li><strong>Forward</strong> — opens the reply panel to forward ticket details to another party.</li>
     <li><strong>Add Note</strong> — opens the reply panel in internal-note mode (highlighted background). The note is visible only to agents and admins and is never sent to the requester.</li>
 </ul>
-<p class="text-muted mb-2">The <strong>Send</strong> button has a dropdown arrow on the right. Clicking the arrow lets you <strong>Send &amp; set status</strong> in a single action — for example, "Send &amp; Set as Resolved" closes the ticket immediately when the reply is posted. Available status options: Resolved, Closed, Pending, Waiting on Customer, Waiting on Third Party.</p>
+<p class="text-muted mb-2">The <strong>Send</strong> button has a dropdown arrow on the right. Clicking the arrow lets you <strong>Send &amp; set status</strong> in a single action — for example, "Send &amp; Set as Resolved" closes the ticket immediately when the reply is posted. The dropdown lists every active status other than the ticket's current one, so the menu always reflects whatever statuses you've configured in <a href="/admin/settings/ticket-statuses">Settings &rarr; Ticket Statuses</a>.</p>
 <p class="text-muted mb-0">Both replies and notes support file attachments. Attachments are stored in <code>storage/attachments/</code> and served securely through the application.</p>
 </div>
 </div>

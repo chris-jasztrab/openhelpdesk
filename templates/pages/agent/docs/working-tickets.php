@@ -39,14 +39,8 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/agent/help'], ['label' => 'Worki
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-send-check text-primary me-2"></i>Send &amp; Set Status</h5>
-<p class="text-muted mb-2">The <strong>Send</strong> button has a dropdown arrow on its right side. Click the arrow to choose a status to apply at the same time as sending:</p>
-<ul class="text-muted mb-3">
-    <li><strong>Send &amp; Resolve</strong> — sends the reply and sets the ticket to Resolved in one step.</li>
-    <li><strong>Send &amp; Close</strong></li>
-    <li><strong>Send &amp; Set as Pending</strong></li>
-    <li><strong>Send &amp; Set as Waiting on Customer</strong></li>
-    <li><strong>Send &amp; Set as Waiting on Third Party</strong></li>
-</ul>
+<p class="text-muted mb-2">The <strong>Send</strong> button has a dropdown arrow on its right side. Click the arrow to choose a status to apply at the same time as sending. The dropdown lists every active status other than the ticket's current one, so the menu always reflects the statuses your admins have configured.</p>
+<p class="text-muted mb-3">On a fresh install the choices are <strong>Send &amp; Resolve</strong>, <strong>Send &amp; Close</strong>, <strong>Send &amp; Set as Pending</strong>, <strong>Send &amp; Set as Waiting on Customer</strong>, and <strong>Send &amp; Set as Waiting on Third Party</strong> &mdash; but admins can add, rename, or hide any of these from <em>Settings &rarr; Ticket Statuses</em>.</p>
 <div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
     Using <strong>Send &amp; Set Status</strong> is the fastest way to close out a ticket — you reply and change the status without a second click.
 </div>
@@ -66,7 +60,7 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/agent/help'], ['label' => 'Worki
 <h5 class="fw-semibold mb-3"><i class="bi bi-sliders text-primary me-2"></i>Updating Ticket Fields</h5>
 <p class="text-muted mb-2">Use the <strong>Update Ticket</strong> panel in the right column to change:</p>
 <ul class="text-muted mb-3">
-    <li><strong>Status</strong> — Open, In Progress, Pending, Waiting on Customer, Waiting on Third Party, Resolved, Closed.</li>
+    <li><strong>Status</strong> — pick any active status. The list reflects whatever your admins have configured in <em>Settings &rarr; Ticket Statuses</em>; out of the box it offers Open, In Progress, Pending, Waiting on Customer, Waiting on Third Party, Resolved, and Closed.</li>
     <li><strong>Priority</strong> — changes the urgency and may change the SLA deadline.</li>
     <li><strong>Assigned To</strong> — assign to yourself or another agent. If the ticket has a group set, only that group's members are shown.</li>
     <li><strong>Group</strong> — move the ticket to a different team group.</li>
@@ -132,7 +126,7 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/agent/help'], ['label' => 'Worki
     <li><strong>First Response Due</strong> — deadline for the first public reply. Met as soon as an agent posts a public reply.</li>
     <li><strong>Resolution Due</strong> — deadline by which the ticket must be resolved.</li>
     <li>Timers turn <strong class="text-warning">amber</strong> when within 20% of the deadline and <strong class="text-danger">red</strong> when the deadline has passed (breached).</li>
-    <li>The SLA timer automatically <strong>pauses</strong> when the ticket is set to <em>Waiting on Customer</em> or <em>Waiting on Third Party</em>, and resumes when the status changes back to an active state.</li>
+    <li>The SLA timer automatically <strong>pauses</strong> while the ticket is on any status flagged "Pauses SLA" in <em>Settings &rarr; Ticket Statuses</em> (out of the box: <em>Pending</em>, <em>Waiting on Customer</em>, <em>Waiting on Third Party</em>) and resumes the moment it moves to a status that does not pause SLA.</li>
 </ul>
 </div>
 </div>
