@@ -498,6 +498,72 @@ $router->post('/api/tickets/{id}/set-group', function (array $p) {
 });
 
 /* ------------------------------------------------------------------
+ * Quick status change from the ticket list (JSON API)
+ * Mirrors the side effects of /agent/tickets/{id}/update so the list
+ * inline dropdown behaves identically to the ticket detail page.
+ * ------------------------------------------------------------------ */
+$router->post('/api/tickets/{id}/set-status', function (array $p) {
+    Auth::requireAuth();
+    if (!in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)) {
+        http_response_code(403); echo json_encode(['error' => 'Forbidden']); exit;
+    }
+    if (!verifyCsrf($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '')) {
+        http_response_code(403); echo json_encode(['error' => 'Invalid CSRF token']); exit;
+    }
+    header('Content-Type: application/json');
+
+    $ticketId  = (int) $p['id'];
+    $input     = json_decode(file_get_contents('php://input'), true);
+    $newStatus = isset($input['status']) ? (string) $input['status'] : '';
+
+    if ($newStatus === '' || !in_array($newStatus, ticketActiveStatusSlugs(), true)) {
+        http_response_code(422); echo json_encode(['error' => 'Invalid status value']); exit;
+    }
+
+    $db = Database::connect();
+    _apiRequireTicketAccess($db, $ticketId);
+    $stmt = $db->prepare('SELECT id, status FROM tickets WHERE id = ?');
+    $stmt->execute([$ticketId]);
+    $ticket = $stmt->fetch();
+    if (!$ticket) { http_response_code(404); echo json_encode(['error' => 'Ticket not found']); exit; }
+
+    if ($newStatus !== $ticket['status']) {
+        $oldStatus = $ticket['status'];
+        $db->prepare('UPDATE tickets SET status = ? WHERE id = ?')->execute([$newStatus, $ticketId]);
+        $db->prepare(
+            'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
+        )->execute([$ticketId, Auth::id(), 'status_changed', "Status changed from {$oldStatus} to {$newStatus}"]);
+
+        if (in_array($newStatus, ticketClosedBucketSlugs(), true)) {
+            notifyRequesterStatusChanged($db, $ticketId, $newStatus);
+        }
+
+        // CSAT survey trigger
+        $csatTrigger = getSetting('csat_trigger_status', ticketDefaultResolvedStatusSlug());
+        if ($newStatus === $csatTrigger) {
+            sendCsatSurvey($db, $ticketId);
+        }
+
+        // SLA pause/resume
+        $pausingStatuses = ticketSlaPausingSlugs();
+        if (in_array($newStatus, $pausingStatuses, true)) {
+            Sla::pause($db, $ticketId);
+        } elseif (in_array($oldStatus, $pausingStatuses, true)) {
+            Sla::resume($db, $ticketId);
+        }
+
+        runAutomations($db, $ticketId, 'ticket_updated');
+    }
+
+    echo json_encode([
+        'success'     => true,
+        'status'      => $newStatus,
+        'status_html' => ticketStatusBadgeHtml($newStatus),
+    ]);
+    exit;
+});
+
+/* ------------------------------------------------------------------
  * User Search for CC (JSON API)
  * ------------------------------------------------------------------ */
 $router->get('/api/user-search', function () {

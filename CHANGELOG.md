@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.63.0 &mdash; 2026-05-29
+
+### Added
+- **Change a ticket's status inline from the ticket list.** The status badge on the agent and admin ticket lists is now a quick-change dropdown — click it to pick a new status without opening the ticket, exactly like the existing agent/group/type quick-change controls. The change is saved over a new `POST /api/tickets/{id}/set-status` endpoint that mirrors the ticket-detail status logic (timeline entry, requester notification for closed-bucket statuses, CSAT survey trigger, SLA pause/resume, and `ticket_updated` automations). Only active statuses are offered, and the badge updates in place. Added in both the agent and admin lists ([agent/tickets/index.php](templates/pages/agent/tickets/index.php), [admin/tickets/index.php](templates/pages/admin/tickets/index.php)) with the endpoint in [routes.php](src/routes.php).
+
+---
+
 ## 2.62.8 &mdash; 2026-05-29
 
 ### Fixed

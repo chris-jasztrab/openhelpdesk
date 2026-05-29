@@ -444,8 +444,11 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                             <?php endif; ?>
                         </td>
                         <?php if (in_array('status', $visibleColumns)): ?>
-                        <td style="white-space:nowrap;">
-                            <?= ticketStatusBadgeHtml($t['status']) ?>
+                        <td style="white-space:nowrap;cursor:default;" onclick="event.stopPropagation()">
+                            <span class="d-inline-flex align-items-center gap-1 quick-status-wrap" data-ticket-id="<?= (int)$t['id'] ?>" style="cursor:pointer;">
+                                <span class="quick-status-badge"><?= ticketStatusBadgeHtml($t['status']) ?></span>
+                                <button class="btn btn-link btn-sm p-0 border-0 text-muted quick-status-btn" type="button" title="Change status" style="line-height:1;"><i class="bi bi-chevron-down" style="font-size:0.65rem;"></i></button>
+                            </span>
                             <?php if ($t['merged_into_ticket_id']): ?>
                             <a href="/admin/tickets/<?= (int) $t['merged_into_ticket_id'] ?>" class="badge bg-secondary text-decoration-none ms-1" title="Merged into #<?= (int) $t['merged_into_ticket_id'] ?>">
                                 <i class="bi bi-arrow-right-circle"></i> Merged
@@ -795,6 +798,7 @@ document.getElementById('deleteFilterModal').addEventListener('show.bs.modal', f
         var quickGroups = <?= json_encode(array_values(array_map(fn($g) => ['id' => (int)$g['id'], 'name' => $g['name']], $groups))) ?>;
         var quickGroupAgents = <?= json_encode(array_map(fn($agents) => array_values($agents), $groupAgents)) ?>;
         var quickAllAgents = <?= json_encode(array_values(array_map(fn($a) => ['id' => (int)$a['id'], 'name' => $a['name']], $allAgentsForAssign))) ?>;
+        var quickStatuses = <?= json_encode(array_values(array_map(fn($s) => ['slug' => $s['slug'], 'label' => $s['label'], 'color' => $s['color'] ?: '#6c757d', 'text_color' => ticketStatusTextColor($s['color'] ?: '#6c757d')], ticketActiveStatuses()))) ?>;
         var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
         var activeMenu = null;
         var activeBtn  = null;
@@ -848,6 +852,10 @@ document.getElementById('deleteFilterModal').addEventListener('show.bs.modal', f
                         html += '<li><a class="dropdown-item quick-menu-item" href="#" data-kind="group" data-val="' + esc(g.id) + '" data-ticket-id="' + esc(ticketId) + '">' + esc(g.name) + '</a></li>';
                     });
                 }
+            } else if (kind === 'status') {
+                quickStatuses.forEach(function (st) {
+                    html += '<li><a class="dropdown-item quick-menu-item" href="#" data-kind="status" data-val="' + esc(st.slug) + '" data-ticket-id="' + esc(ticketId) + '"><span class="badge" style="background-color:' + esc(st.color) + ';color:' + esc(st.text_color) + ';">' + esc(st.label) + '</span></a></li>';
+                });
             }
             html += '</ul>';
             var div = document.createElement('div');
@@ -872,6 +880,7 @@ document.getElementById('deleteFilterModal').addEventListener('show.bs.modal', f
         document.querySelectorAll('.quick-assign-btn').forEach(function (b) { bindBtn(b, 'agent'); });
         document.querySelectorAll('.quick-type-btn').forEach(function (b) { bindBtn(b, 'type'); });
         document.querySelectorAll('.quick-group-btn').forEach(function (b) { bindBtn(b, 'group'); });
+        document.querySelectorAll('.quick-status-btn').forEach(function (b) { bindBtn(b, 'status'); });
 
         document.querySelectorAll('.quick-assign-wrap').forEach(function (wrap) {
             wrap.addEventListener('click', function (e) {
@@ -892,6 +901,13 @@ document.getElementById('deleteFilterModal').addEventListener('show.bs.modal', f
                 if (e.target.closest('.quick-type-btn')) return;
                 var btn = wrap.querySelector('.quick-type-btn');
                 if (btn) { e.stopPropagation(); if (activeBtn === btn) { closeMenu(); } else { openMenu(btn, 'type'); } }
+            });
+        });
+        document.querySelectorAll('.quick-status-wrap').forEach(function (wrap) {
+            wrap.addEventListener('click', function (e) {
+                if (e.target.closest('.quick-status-btn')) return;
+                var btn = wrap.querySelector('.quick-status-btn');
+                if (btn) { e.stopPropagation(); if (activeBtn === btn) { closeMenu(); } else { openMenu(btn, 'status'); } }
             });
         });
 
@@ -954,10 +970,21 @@ document.getElementById('deleteFilterModal').addEventListener('show.bs.modal', f
                             resizeColumns();
                         }
                     }).catch(function () {});
+                } else if (kind === 'status') {
+                    var statusWrap = document.querySelector('.quick-status-wrap[data-ticket-id="' + ticketId + '"]');
+                    if (!statusWrap) return;
+                    var statusBadge = statusWrap.querySelector('.quick-status-badge');
+                    fetch('/api/tickets/' + ticketId + '/set-status', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
+                        body: JSON.stringify({status: val})
+                    }).then(function (r) { return r.json(); }).then(function (data) {
+                        if (data.success && data.status_html) { statusBadge.innerHTML = data.status_html; resizeColumns(); }
+                    }).catch(function () {});
                 }
                 return;
             }
-            if (!e.target.closest('.quick-assign-wrap') && !e.target.closest('.quick-type-wrap') && !e.target.closest('.quick-group-wrap') && !(activeMenu && activeMenu.contains(e.target))) {
+            if (!e.target.closest('.quick-assign-wrap') && !e.target.closest('.quick-type-wrap') && !e.target.closest('.quick-group-wrap') && !e.target.closest('.quick-status-wrap') && !(activeMenu && activeMenu.contains(e.target))) {
                 closeMenu();
             }
         });
