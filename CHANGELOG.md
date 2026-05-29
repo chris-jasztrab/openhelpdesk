@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.65.5 &mdash; 2026-05-29
+
+### Fixed
+- **Changing the Group in a ticket's update panel now re-filters the Assigned To list immediately — no save-and-reload required.** Previously the **Assigned To** dropdown was populated server-side from the ticket's group (admin) or ticket-type group (agent) and never updated when you picked a different **Group** in the same panel, so assigning to a member of the newly chosen group meant saving the group change first, waiting for the reload, then editing the assignee. Both ticket-view handlers now pass a group&rarr;members map ([admin.php](src/routes/admin.php), [agent.php](src/routes/agent.php)) and both view templates ([admin/tickets/view.php](templates/pages/admin/tickets/view.php), [agent/tickets/view.php](templates/pages/agent/tickets/view.php)) rebuild the Assigned To options the moment the Group changes — showing all staff when Group is None, preserving the current assignee if they belong to the new group, and resetting to Unassigned otherwise.
+
+---
+
 ## 2.65.4 &mdash; 2026-05-29
 
 ### Documentation

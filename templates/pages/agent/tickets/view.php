@@ -1479,6 +1479,34 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
         if (el) el.addEventListener('change', check);
     });
 })();
+
+/* ── Re-filter Assigned To when the Group changes (no save needed) ── */
+(function () {
+    var byGroup  = <?= json_encode($assignableByGroup ?? []) ?>;
+    var groupSel = document.getElementById('group_id');
+    var assignSel = document.getElementById('assigned_to');
+    if (!groupSel || !assignSel) return;
+    groupSel.addEventListener('change', function () {
+        var list = byGroup[this.value || '0'] || byGroup['0'] || [];
+        var current = assignSel.value;
+        var keep = false;
+        assignSel.innerHTML = '';
+        var unassigned = document.createElement('option');
+        unassigned.value = '';
+        unassigned.textContent = 'Unassigned';
+        assignSel.appendChild(unassigned);
+        list.forEach(function (a) {
+            var o = document.createElement('option');
+            o.value = a.id;
+            o.textContent = a.name;
+            if (String(a.id) === current) { o.selected = true; keep = true; }
+            assignSel.appendChild(o);
+        });
+        if (!keep) assignSel.value = '';
+        // Recompute the Update button's enabled state.
+        assignSel.dispatchEvent(new Event('change'));
+    });
+})();
 </script>
 
 <script>

@@ -4404,6 +4404,22 @@ $router->get('/admin/tickets/{id}', function (array $p) {
         $agents = $db->query("SELECT id, first_name, last_name FROM users WHERE " . staffRoleSqlIn('role') . " ORDER BY first_name")->fetchAll();
     }
 
+    // Group → members map so the Assigned To dropdown can re-filter live when
+    // the Group field is changed in the update panel (no save needed). Key '0'
+    // holds all staff, used when the group is set to None.
+    $assignableByGroup = ['0' => array_map(static function ($a) {
+        return ['id' => (int) $a['id'], 'name' => trim($a['first_name'] . ' ' . $a['last_name'])];
+    }, $db->query("SELECT id, first_name, last_name FROM users WHERE " . staffRoleSqlIn('role') . " ORDER BY first_name, last_name")->fetchAll())];
+    foreach ($db->query(
+        "SELECT gum.group_id AS gid, u.id, CONCAT(u.first_name, ' ', u.last_name) AS name
+         FROM group_user_map gum
+         JOIN users u ON gum.user_id = u.id
+         WHERE " . staffRoleSqlIn('u.role') . "
+         ORDER BY u.first_name, u.last_name"
+    )->fetchAll() as $gaRow) {
+        $assignableByGroup[(string) (int) $gaRow['gid']][] = ['id' => (int) $gaRow['id'], 'name' => $gaRow['name']];
+    }
+
     // Priorities for update dropdown
     $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
 
@@ -4549,6 +4565,7 @@ $router->get('/admin/tickets/{id}', function (array $p) {
 
     render('admin/tickets/view', [
         'ticket' => $ticket, 'timeline' => $timeline, 'agents' => $agents,
+        'assignableByGroup' => $assignableByGroup,
         'priorities' => $priorities, 'ticketTypes' => $ticketTypes,
         'attachments' => $attachments, 'ccUsers' => $ccUsers, 'groups' => $groups,
         'customFields' => $customFields, 'fieldValues' => $fieldValues,
