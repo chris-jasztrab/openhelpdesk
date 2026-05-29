@@ -115,15 +115,79 @@ class Auth
     {
         self::requireAuth();
         if (!in_array(self::role(), $roles, true)) {
-            http_response_code(403);
-            echo '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">';
-            echo '<title>403 Forbidden</title>';
-            echo '<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">';
-            echo '</head><body class="d-flex align-items-center justify-content-center" style="min-height:100vh;background:#f1f5f9">';
-            echo '<div class="text-center"><h1 class="display-1 fw-bold text-danger">403</h1>';
-            echo '<p class="lead text-muted">You do not have permission to access this page.</p>';
-            echo '<a href="/" class="btn btn-primary">Go Home</a></div></body></html>';
-            exit;
+            self::forbid();
         }
+    }
+
+    /* ------------------------------------------------------------------
+     * Granular permissions (migration 042)
+     *
+     * Roles are resolved by slug through the helpers in src/helpers.php
+     * (roleCan / roleIsAdmin / roleIsStaff), which read the cached
+     * roles + role_permissions map. Admin roles bypass every permission
+     * check, so re-gating admin-only routes with requirePermission() can
+     * never lock an admin out — it only ever widens access to custom roles.
+     * ------------------------------------------------------------------ */
+
+    /** True if the current user's role grants $perm (admins always true). */
+    public static function can(string $perm): bool
+    {
+        return roleCan(self::role(), $perm);
+    }
+
+    /** True if the current user holds a full-access admin role. */
+    public static function isAdmin(): bool
+    {
+        return roleIsAdmin(self::role());
+    }
+
+    /** True if the current user holds a staff (agent-interface) role. */
+    public static function isStaff(): bool
+    {
+        return roleIsStaff(self::role());
+    }
+
+    /** Require auth + at least one of the given permissions, else 403. */
+    public static function requirePermission(string ...$perms): void
+    {
+        self::requireAuth();
+        foreach ($perms as $perm) {
+            if (self::can($perm)) {
+                return;
+            }
+        }
+        self::forbid();
+    }
+
+    /** Require auth + a full-access admin role, else 403. */
+    public static function requireAdmin(): void
+    {
+        self::requireAuth();
+        if (!self::isAdmin()) {
+            self::forbid();
+        }
+    }
+
+    /** Require auth + any staff role, else 403. */
+    public static function requireStaff(): void
+    {
+        self::requireAuth();
+        if (!self::isStaff()) {
+            self::forbid();
+        }
+    }
+
+    /** Emit the shared 403 page and stop. */
+    private static function forbid(): never
+    {
+        http_response_code(403);
+        echo '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">';
+        echo '<title>403 Forbidden</title>';
+        echo '<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">';
+        echo '</head><body class="d-flex align-items-center justify-content-center" style="min-height:100vh;background:#f1f5f9">';
+        echo '<div class="text-center"><h1 class="display-1 fw-bold text-danger">403</h1>';
+        echo '<p class="lead text-muted">You do not have permission to access this page.</p>';
+        echo '<a href="/" class="btn btn-primary">Go Home</a></div></body></html>';
+        exit;
     }
 }

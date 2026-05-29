@@ -3,9 +3,9 @@ $layout              = 'app';
 $pageTitle           = 'SLA Compliance – Reports';
 $scheduleReportType  = 'sla';
 $scheduleReportTitle = 'SLA Compliance';
-$sidebarItems = Auth::role() === 'power_user' ? powerUserSidebar('reports') : adminSidebar('reports');
+$sidebarItems = Auth::isAdmin() ? adminSidebar('reports') : staffSidebar('reports');
 $breadcrumbs  = [
-    Auth::role() === 'power_user' ? ['label' => 'Agent', 'url' => '/agent'] : ['label' => 'Admin', 'url' => '/admin'],
+    Auth::isAdmin() ? ['label' => 'Admin', 'url' => '/admin'] : ['label' => 'Agent', 'url' => '/agent'],
     ['label' => 'Reports', 'url' => '/admin/reports'],
     ['label' => 'SLA Compliance'],
 ];

@@ -2,7 +2,7 @@
 $layout       = 'app';
 $pageTitle    = 'Manage My Team';
 $breadcrumbs  = [['label' => 'Manage My Team']];
-$sidebarItems = Auth::role() === 'admin'
+$sidebarItems = Auth::isAdmin()
     ? adminSidebar('')
     : (Auth::role() === 'power_user' ? powerUserSidebar('') : agentSidebar(''));
 ?>
@@ -11,7 +11,7 @@ $sidebarItems = Auth::role() === 'admin'
     <p class="text-muted mb-0">Maintain the skills your team holds without filing a ticket with IT — assign existing skills to your members, and (optionally) curate skills owned by your group.</p>
 </div>
 
-<?php if (Auth::role() === 'admin'): ?>
+<?php if (Auth::isAdmin()): ?>
 <div class="alert alert-info small mb-4">
     <i class="bi bi-info-circle me-2"></i>You're seeing every group because you're an admin. Group managers see only the groups they were delegated.
 </div>

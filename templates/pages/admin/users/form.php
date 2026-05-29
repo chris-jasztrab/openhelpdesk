@@ -59,7 +59,7 @@ $action = $isEdit ? "/admin/users/{$editing['id']}/edit" : '/admin/users/create'
                     <select class="form-select" id="role" name="role" required>
                         <?php
                         $currentRole = old('role', $editing['role'] ?? 'user');
-                        foreach (['admin' => 'Admin', 'agent' => 'Agent', 'power_user' => 'Power User', 'user' => 'End User'] as $val => $label):
+                        foreach (roleChoices() as $val => $label):
                         ?>
                         <option value="<?= $val ?>" <?= $currentRole === $val ? 'selected' : '' ?>><?= $label ?></option>
                         <?php endforeach; ?>

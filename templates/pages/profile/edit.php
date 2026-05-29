@@ -69,7 +69,7 @@ $breadcrumbs = [
                 </div>
             </div>
 
-            <?php if ($user['role'] === 'admin'): ?>
+            <?php if (roleIsAdmin($user['role'])): ?>
             <!-- System Timeline Notes (admin only) -->
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-transparent fw-semibold">

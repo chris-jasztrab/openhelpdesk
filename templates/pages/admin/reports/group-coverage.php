@@ -1,9 +1,9 @@
 <?php
 $layout       = 'app';
 $pageTitle    = 'Group Coverage – Reports';
-$sidebarItems = Auth::role() === 'power_user' ? powerUserSidebar('reports') : adminSidebar('reports');
+$sidebarItems = Auth::isAdmin() ? adminSidebar('reports') : staffSidebar('reports');
 $breadcrumbs  = [
-    Auth::role() === 'power_user' ? ['label' => 'Agent', 'url' => '/agent'] : ['label' => 'Admin', 'url' => '/admin'],
+    Auth::isAdmin() ? ['label' => 'Admin', 'url' => '/admin'] : ['label' => 'Agent', 'url' => '/agent'],
     ['label' => 'Reports', 'url' => '/admin/reports'],
     ['label' => 'Group Coverage'],
 ];
@@ -130,7 +130,7 @@ $roleBadge = static function (string $role): string {
                             <td><a href="mailto:<?= e($m['email']) ?>" class="text-decoration-none"><?= e($m['email']) ?></a></td>
                             <td class="text-center">
                                 <span class="badge bg-<?= $roleBadge($m['role']) ?> bg-opacity-10 text-<?= $roleBadge($m['role']) ?>">
-                                    <?= e(ucfirst(str_replace('_', ' ', $m['role']))) ?>
+                                    <?= e(roleLabel($m['role'])) ?>
                                 </span>
                             </td>
                             <td class="text-center">

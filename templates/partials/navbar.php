@@ -18,14 +18,14 @@
         <div class="collapse navbar-collapse" id="navbarNav">
             <?php if (Auth::check()): ?>
             <ul class="navbar-nav me-auto">
-                <?php if (Auth::role() === 'admin'): ?>
+                <?php if (Auth::isAdmin()): ?>
                 <li class="nav-item">
                     <a class="nav-link <?= isActive('/admin') ? 'active' : '' ?>" href="/admin" <?= isActive('/admin') ? 'aria-current="page"' : '' ?>>
                         <i class="bi bi-shield-lock me-1" aria-hidden="true"></i>Admin
                     </a>
                 </li>
                 <?php endif; ?>
-                <?php if (in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)): ?>
+                <?php if (Auth::isStaff()): ?>
                 <li class="nav-item">
                     <a class="nav-link <?= isActive('/agent') ? 'active' : '' ?>" href="/agent" <?= isActive('/agent') ? 'aria-current="page"' : '' ?>>
                         <i class="bi bi-headset me-1" aria-hidden="true"></i>Agent Panel
@@ -33,10 +33,9 @@
                 </li>
                 <?php endif; ?>
                 <?php
-                $_role = Auth::role();
-                if ($_role === 'admin') {
+                if (Auth::isAdmin()) {
                     $_helpUrl = '/admin/docs';
-                } elseif (in_array($_role, ['agent', 'power_user'], true)) {
+                } elseif (Auth::isStaff()) {
                     $_helpUrl = '/agent/help';
                 } else {
                     $_helpUrl = '/portal';
@@ -51,7 +50,7 @@
 
             <!-- Global Search -->
             <div class="position-relative mx-3 flex-grow-1 d-none d-lg-block" style="max-width:420px;" id="ld-search-wrap"
-                 data-role="<?= e(Auth::role() ?? 'user') ?>" role="search">
+                 data-role="<?= e(Auth::isAdmin() ? 'admin' : (Auth::isStaff() ? 'agent' : 'user')) ?>" role="search">
                 <label for="ld-search-input" class="visually-hidden">Search tickets, contacts, and knowledge base</label>
                 <div class="input-group input-group-sm">
                     <span class="input-group-text border-0 text-white text-opacity-50" style="background:rgba(255,255,255,.1);" aria-hidden="true">
@@ -68,7 +67,7 @@
                     <div class="d-flex border-bottom px-3 pt-2 gap-1" id="ld-search-tabs" role="tablist" aria-label="Search filters">
                         <button type="button" class="btn btn-sm px-2 py-1 ld-search-tab active" data-type="all" role="tab" aria-selected="true">Everything</button>
                         <button type="button" class="btn btn-sm px-2 py-1 ld-search-tab" data-type="tickets" role="tab" aria-selected="false">Tickets</button>
-                        <?php if (in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)): ?>
+                        <?php if (Auth::isStaff()): ?>
                         <button type="button" class="btn btn-sm px-2 py-1 ld-search-tab" data-type="contacts" role="tab" aria-selected="false">Contacts</button>
                         <?php endif; ?>
                         <button type="button" class="btn btn-sm px-2 py-1 ld-search-tab" data-type="kb" role="tab" aria-selected="false">Knowledge Base Articles</button>
@@ -82,7 +81,7 @@
             <ul class="navbar-nav">
                 <?php
                 $notifCount = notificationCount();
-                if (in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)):
+                if (Auth::isStaff()):
                 ?>
                 <li class="nav-item" id="ld-notif-bell" data-count="<?= $notifCount ?>">
                     <?php $notifLabel = $notifCount === 0 ? 'Notifications, none unread' : 'Notifications, ' . ($notifCount > 99 ? '99+' : $notifCount) . ' unread'; ?>
@@ -108,22 +107,22 @@
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end">
                         <li><span class="dropdown-item-text text-muted small"><?= e(Auth::user()['email'] ?? '') ?></span></li>
-                        <li><span class="dropdown-item-text"><span class="badge bg-primary"><?= e(ucfirst(Auth::role() ?? '')) ?></span></span></li>
+                        <li><span class="dropdown-item-text"><span class="badge bg-primary"><?= e(roleLabel(Auth::role())) ?></span></span></li>
                         <li><hr class="dropdown-divider"></li>
-                        <?php if (Auth::role() === 'admin'): ?>
+                        <?php if (Auth::isAdmin()): ?>
                         <li><a class="dropdown-item" href="/admin?tour=1"><i class="bi bi-play-circle me-2" aria-hidden="true"></i>Restart Tour</a></li>
                         <?php endif; ?>
-                        <?php if (in_array(Auth::role(), ['agent', 'power_user'], true)): ?>
+                        <?php if (Auth::isStaff() && !Auth::isAdmin()): ?>
                         <li><a class="dropdown-item" href="/agent?tour=1"><i class="bi bi-play-circle me-2" aria-hidden="true"></i>Restart Tour</a></li>
                         <?php endif; ?>
-                        <?php if (Auth::role() === 'user'): ?>
+                        <?php if (!Auth::isStaff()): ?>
                         <li><a class="dropdown-item" href="/portal?tour=1"><i class="bi bi-play-circle me-2" aria-hidden="true"></i>Restart Tour</a></li>
                         <?php endif; ?>
                         <?php
                         // "Manage My Team" appears for admins (always) and any user
                         // who is flagged as a manager on at least one group.
                         $_showManagerLink = false;
-                        if (Auth::role() === 'admin') {
+                        if (Auth::isAdmin()) {
                             $_showManagerLink = true;
                         } elseif (Auth::id()) {
                             try {

@@ -86,11 +86,27 @@ function _apiAuth(): array
 }
 
 /**
- * Require the user to be an agent or admin; exits 403 otherwise.
+ * Role helpers for token-authenticated API callers. These resolve the user's
+ * role slug through the same cached roles map the web Auth class uses, so
+ * custom permission levels created by an admin are honoured here too (a bare
+ * string compare against ['admin','agent','power_user'] would 403 them).
+ */
+function _apiIsStaff(array $user): bool
+{
+    return roleIsStaff($user['role'] ?? null);
+}
+
+function _apiIsAdmin(array $user): bool
+{
+    return roleIsAdmin($user['role'] ?? null);
+}
+
+/**
+ * Require the user to be staff (agent interface); exits 403 otherwise.
  */
 function _apiRequireAgent(array $user): void
 {
-    if (!in_array($user['role'], ['admin', 'agent', 'power_user'], true)) {
+    if (!_apiIsStaff($user)) {
         _apiJson(['error' => 'Forbidden — agents and admins only'], 403);
     }
 }
@@ -116,7 +132,10 @@ function _apiInput(): array
  */
 function _apiGroupRestriction(PDO $db, array $user): array
 {
-    if (!in_array($user['role'], ['agent', 'power_user'], true)) {
+    // Only non-admin staff are group-restricted. Admins and portal users get
+    // no restriction here (portal callers are scoped to their own tickets
+    // elsewhere); custom staff roles are restricted exactly like agents.
+    if (!_apiIsStaff($user) || _apiIsAdmin($user)) {
         return ['', []];
     }
     $gs = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
@@ -144,18 +163,19 @@ function _apiGroupRestriction(PDO $db, array $user): array
  */
 function _apiEnforceTicketAccess(PDO $db, array $user, array $ticket): void
 {
-    if ($user['role'] === 'admin') {
+    if (_apiIsAdmin($user)) {
         return; // unrestricted
     }
 
-    if ($user['role'] === 'user') {
+    if (!_apiIsStaff($user)) {
+        // Portal (non-staff) callers may only touch tickets they created.
         if ((int) $ticket['created_by'] !== (int) $user['id']) {
             _apiJson(['error' => 'Forbidden'], 403);
         }
         return;
     }
 
-    // Agent: enforce group-based visibility
+    // Staff (non-admin): enforce group-based visibility
     $gs = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
     $gs->execute([$user['id']]);
     $agentGroups = array_map('intval', $gs->fetchAll(PDO::FETCH_COLUMN));
@@ -471,7 +491,7 @@ $router->get('/api/v1/dashboard', function () {
     // Replicate the group-based visibility logic from the web dashboard
     $groupRestriction = '';
     $groupParams      = [];
-    if (in_array($user['role'], ['agent', 'power_user'], true)) {
+    if ((_apiIsStaff($user) && !_apiIsAdmin($user))) {
         $gs = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
         $gs->execute([$agentId]);
         $agentGroupIds = array_map('intval', $gs->fetchAll(PDO::FETCH_COLUMN));
@@ -561,7 +581,7 @@ $router->get('/api/v1/tickets', function () {
     $params = [];
 
     // Visibility
-    if ($user['role'] === 'user') {
+    if (!_apiIsStaff($user)) {
         $where[]  = 't.created_by = ?';
         $params[] = (int) $user['id'];
     } else {
@@ -727,7 +747,7 @@ $router->post('/api/v1/tickets', function () {
     $dueDate    = null;
 
     // Fields only agents/admins may set
-    if (in_array($user['role'], ['admin', 'agent', 'power_user'], true)) {
+    if (_apiIsStaff($user)) {
         $groupId    = isset($input['group_id'])    && $input['group_id']    !== null ? (int) $input['group_id']    : null;
         $assignedTo = isset($input['assigned_to']) && $input['assigned_to'] !== null ? (int) $input['assigned_to'] : null;
         if (isset($input['due_date']) && $input['due_date'] !== null && $input['due_date'] !== '') {
@@ -1090,7 +1110,7 @@ $router->get('/api/v1/tickets/{id}/timeline', function (array $p) {
 
     // Users always see public entries; agents/admins may request internal ones
     $internalFilter = '';
-    if ($user['role'] === 'user' || ($_GET['include_internal'] ?? '0') !== '1') {
+    if (!_apiIsStaff($user) || ($_GET['include_internal'] ?? '0') !== '1') {
         $internalFilter = ' AND tl.is_internal = 0';
     }
 
@@ -1178,7 +1198,7 @@ $router->post('/api/v1/tickets/{id}/replies', function (array $p) {
 
     // Internal notes are agent/admin only
     $isInternal = false;
-    if (in_array($user['role'], ['admin', 'agent', 'power_user'], true)) {
+    if (_apiIsStaff($user)) {
         $isInternal = !empty($input['is_internal']);
     }
 
@@ -1208,7 +1228,7 @@ $router->post('/api/v1/tickets/{id}/replies', function (array $p) {
     $slaStatusPause  = ticketSlaPausingSlugs();
     $slaStatusResume = array_values(array_diff(ticketOpenBucketSlugs(), $slaStatusPause));
 
-    if (in_array($user['role'], ['admin', 'agent', 'power_user'], true)) {
+    if (_apiIsStaff($user)) {
         $statusAfter = $input['status_after'] ?? '';
         if ($statusAfter !== '' && in_array($statusAfter, $validStatuses, true)
             && $statusAfter !== $ticket['status']
@@ -1266,7 +1286,7 @@ $router->get('/api/v1/kb/categories', function () {
     $user = _apiAuth();
     $db   = Database::connect();
 
-    $publicFilter = $user['role'] === 'user' ? ' WHERE c.is_public = 1' : '';
+    $publicFilter = !_apiIsStaff($user) ? ' WHERE c.is_public = 1' : '';
     $cats = $db->query(
         "SELECT c.id, c.name, c.slug, c.description, c.is_public, c.sort_order
            FROM kb_categories c
@@ -1308,7 +1328,7 @@ $router->get('/api/v1/kb/articles', function () {
     $where  = ["a.status = 'published'"];
     $params = [];
 
-    if ($user['role'] === 'user') {
+    if (!_apiIsStaff($user)) {
         $where[] = 'c.is_public = 1';
     }
     if (isset($_GET['folder_id']) && $_GET['folder_id'] !== '') {
@@ -1390,7 +1410,7 @@ $router->get('/api/v1/kb/articles/{id}', function (array $p) {
     if (!$article) {
         _apiJson(['error' => 'Article not found'], 404);
     }
-    if ($user['role'] === 'user' && !$article['is_public']) {
+    if (!_apiIsStaff($user) && !$article['is_public']) {
         _apiJson(['error' => 'Forbidden'], 403);
     }
 
@@ -1565,11 +1585,11 @@ $router->get('/api/v1/meta', function () {
 
     // Agent list only exposed to agents/admins
     $agents = [];
-    if (in_array($user['role'], ['admin', 'agent', 'power_user'], true)) {
+    if (_apiIsStaff($user)) {
         $agents = $db->query(
             "SELECT id, first_name, last_name, email, role, avatar
                FROM users
-              WHERE role IN ('admin','agent','power_user')
+              WHERE " . staffRoleSqlIn('role') . "
               ORDER BY first_name, last_name"
         )->fetchAll(PDO::FETCH_ASSOC);
     }

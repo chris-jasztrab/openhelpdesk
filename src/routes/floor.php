@@ -27,7 +27,7 @@ declare(strict_types=1);
  * ================================================================== */
 
 $router->get('/agent/floor', function () {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     $db      = Database::connect();
     $agentId = (int) Auth::id();
 
@@ -39,7 +39,7 @@ $router->get('/agent/floor', function () {
     $params = [];
 
     // Group restriction — same rule as /agent/tickets.
-    if (in_array(Auth::role(), ['agent', 'power_user'], true)) {
+    if ((Auth::isStaff() && !Auth::isAdmin())) {
         $gStmt = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
         $gStmt->execute([$agentId]);
         $myGroups = array_map('intval', $gStmt->fetchAll(PDO::FETCH_COLUMN));
@@ -82,7 +82,7 @@ $router->get('/agent/floor', function () {
     // Tab counts (all / mine / unassigned within group restriction)
     $countWhere  = [ticketStatusSqlIn(ticketOpenBucketSlugs(), 't.status')];
     $countParams = [];
-    if (in_array(Auth::role(), ['agent', 'power_user'], true) && !empty($myGroups)) {
+    if ((Auth::isStaff() && !Auth::isAdmin()) && !empty($myGroups)) {
         $countWhere[]  = 't.group_id IN (' . implode(',', array_fill(0, count($myGroups), '?')) . ')';
         $countParams   = array_merge($countParams, $myGroups);
     }
@@ -115,7 +115,7 @@ $router->get('/agent/floor', function () {
 });
 
 $router->post('/agent/floor/quick-create', function () {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     header('Content-Type: application/json');
 
     if (!verifyCsrf($_SERVER['HTTP_X_CSRF_TOKEN'] ?? ($_POST['_token'] ?? ''))) {
@@ -205,7 +205,7 @@ $router->post('/agent/floor/quick-create', function () {
 });
 
 $router->get('/agent/floor/tickets/{id}', function (array $p) {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     $db = Database::connect();
     $id = (int) $p['id'];
 
@@ -261,7 +261,7 @@ $router->get('/agent/floor/tickets/{id}', function (array $p) {
 });
 
 $router->post('/agent/floor/tickets/{id}/action', function (array $p) {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');

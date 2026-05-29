@@ -365,6 +365,16 @@ CREATE TABLE IF NOT EXISTS `password_resets` (
   KEY `idx_password_resets_user` (`user_id`,`created_at`),
   CONSTRAINT `fk_password_resets_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS `permissions` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `perm_key` varchar(64) NOT NULL,
+  `label` varchar(128) NOT NULL,
+  `category` varchar(64) NOT NULL DEFAULT 'General',
+  `description` varchar(255) NOT NULL DEFAULT '',
+  `sort_order` int(10) unsigned NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_permissions_key` (`perm_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE IF NOT EXISTS `recurring_tickets` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `name` varchar(255) NOT NULL,
@@ -413,6 +423,27 @@ CREATE TABLE IF NOT EXISTS `recurring_tickets` (
   CONSTRAINT `fk_recurring_requester` FOREIGN KEY (`requester_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_recurring_type` FOREIGN KEY (`type_id`) REFERENCES `ticket_types` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_recurring_updated_by` FOREIGN KEY (`updated_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS `role_permissions` (
+  `role_id` int(10) unsigned NOT NULL,
+  `perm_key` varchar(64) NOT NULL,
+  PRIMARY KEY (`role_id`,`perm_key`),
+  CONSTRAINT `fk_role_permissions_role` FOREIGN KEY (`role_id`) REFERENCES `roles` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS `roles` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `slug` varchar(64) NOT NULL,
+  `name` varchar(64) NOT NULL,
+  `description` varchar(255) NOT NULL DEFAULT '',
+  `is_system` tinyint(1) NOT NULL DEFAULT 0,
+  `is_admin` tinyint(1) NOT NULL DEFAULT 0,
+  `is_staff` tinyint(1) NOT NULL DEFAULT 0,
+  `landing` enum('admin','agent','portal') NOT NULL DEFAULT 'portal',
+  `sort_order` int(10) unsigned NOT NULL DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_roles_slug` (`slug`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE IF NOT EXISTS `saved_filters` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
@@ -779,7 +810,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `last_name` varchar(255) NOT NULL,
   `email` varchar(255) NOT NULL,
   `password` varchar(255) NOT NULL,
-  `role` enum('admin','agent','power_user','user') NOT NULL DEFAULT 'user',
+  `role` varchar(64) NOT NULL DEFAULT 'user',
   `avatar` varchar(255) DEFAULT NULL,
   `azure_oid` varchar(128) DEFAULT NULL,
   `work_phone` varchar(50) DEFAULT NULL,
@@ -810,6 +841,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   UNIQUE KEY `email` (`email`),
   UNIQUE KEY `uq_azure_oid` (`azure_oid`),
   KEY `location_id` (`location_id`),
+  KEY `idx_users_role` (`role`),
   CONSTRAINT `users_ibfk_1` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

@@ -17,7 +17,7 @@ declare(strict_types=1);
  */
 function _agentRequireTicketAccess(PDO $db, array $ticket): void
 {
-    if (!in_array(Auth::role(), ['agent', 'power_user'], true)) {
+    if (!(Auth::isStaff() && !Auth::isAdmin())) {
         return; // admins: confidential access handled by re-auth flow in the route
     }
 
@@ -64,7 +64,7 @@ function _agentRequireTicketAccess(PDO $db, array $ticket): void
 $validHelpPages = ['dashboard', 'ticket-list', 'working-tickets', 'floor', 'canned-responses'];
 
 $router->get('/agent/help', function () {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     render('agent/docs/index', [
         'sidebarItems' => agentSidebar('help'),
         'layout'       => 'app',
@@ -74,7 +74,7 @@ $router->get('/agent/help', function () {
 });
 
 $router->get('/agent/help/{page}', function (array $p) use ($validHelpPages) {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     $page = $p['page'] ?? '';
     if (!in_array($page, $validHelpPages, true)) {
         redirect('/agent/help');
@@ -102,7 +102,7 @@ $router->get('/agent/help/{page}', function (array $p) use ($validHelpPages) {
  * ================================================================== */
 
 $router->get('/agent/tickets', function () {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     $db = Database::connect();
 
     // Compute default filter URL for client-side persistence logic
@@ -220,7 +220,7 @@ $router->get('/agent/tickets', function () {
     // Group-based visibility: agents who belong to groups can only see those groups' tickets.
     // Agents in no groups, and all admins, see all tickets (except confidential restrictions).
     $agentGroupIds = [];
-    if (in_array(Auth::role(), ['agent', 'power_user'], true)) {
+    if ((Auth::isStaff() && !Auth::isAdmin())) {
         $gStmt = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
         $gStmt->execute([Auth::id()]);
         $agentGroupIds = array_map('intval', $gStmt->fetchAll(PDO::FETCH_COLUMN));
@@ -246,7 +246,7 @@ $router->get('/agent/tickets', function () {
     // Preload confidential ticket type info for admin redaction in the template
     $confidentialTypeIds = [];
     $adminGroupIds       = [];
-    if (Auth::role() === 'admin') {
+    if (Auth::isAdmin()) {
         $confStmt = $db->query('SELECT id, group_id FROM ticket_types WHERE is_confidential = 1 AND group_id IS NOT NULL');
         foreach ($confStmt->fetchAll() as $ct) {
             $confidentialTypeIds[] = (int) $ct['id'];
@@ -327,14 +327,14 @@ $router->get('/agent/tickets', function () {
     $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
     $types      = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
     $locations  = $db->query('SELECT * FROM locations ORDER BY name')->fetchAll();
-    $agents     = $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin','power_user') ORDER BY first_name")->fetchAll();
+    $agents     = $db->query("SELECT id, first_name, last_name FROM users WHERE " . staffRoleSqlIn('role') . " ORDER BY first_name")->fetchAll();
 
     // Build group → agents map for quick-assign dropdowns
     $gaRows = $db->query(
         "SELECT gum.group_id, u.id, CONCAT(u.first_name, ' ', u.last_name) AS name
          FROM group_user_map gum
          JOIN users u ON gum.user_id = u.id
-         WHERE u.role IN ('agent','admin','power_user')
+         WHERE " . staffRoleSqlIn('u.role') . "
          ORDER BY u.first_name, u.last_name"
     )->fetchAll();
     $groupAgents = [];
@@ -342,7 +342,7 @@ $router->get('/agent/tickets', function () {
         $groupAgents[(int) $row['group_id']][] = ['id' => (int) $row['id'], 'name' => $row['name']];
     }
     $allAgentsForAssign = $db->query(
-        "SELECT id, CONCAT(first_name, ' ', last_name) AS name FROM users WHERE role IN ('agent','admin','power_user') ORDER BY first_name, last_name"
+        "SELECT id, CONCAT(first_name, ' ', last_name) AS name FROM users WHERE " . staffRoleSqlIn('role') . " ORDER BY first_name, last_name"
     )->fetchAll();
 
     if (!empty($agentGroupIds)) {
@@ -407,7 +407,7 @@ $router->get('/agent/tickets', function () {
 /* ── Column Preferences (Agent) ───────────────────────────────────── */
 
 $router->post('/agent/tickets/columns', function () {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/agent/tickets');
@@ -424,7 +424,7 @@ $router->post('/agent/tickets/columns', function () {
 /* ── Saved Filters (Agent) ────────────────────────────────────────── */
 
 $router->post('/agent/tickets/filters/save', function () {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/agent/tickets');
@@ -457,7 +457,7 @@ $router->post('/agent/tickets/filters/save', function () {
 });
 
 $router->post('/agent/tickets/filters/{id}/delete', function (array $p) {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/agent/tickets');
@@ -479,7 +479,7 @@ $router->post('/agent/tickets/filters/{id}/delete', function (array $p) {
 });
 
 $router->post('/agent/tickets/filters/{id}/toggle-share', function (array $p) {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/agent/tickets');
@@ -503,7 +503,7 @@ $router->post('/agent/tickets/filters/{id}/toggle-share', function (array $p) {
 });
 
 $router->post('/agent/tickets/filters/{id}/toggle-default', function (array $p) {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/agent/tickets');
@@ -538,7 +538,7 @@ $router->post('/agent/tickets/filters/{id}/toggle-default', function (array $p) 
  * ================================================================== */
 
 $router->get('/agent/tickets/search', function () {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     $db      = Database::connect();
     $q       = trim($_GET['q'] ?? '');
     $exclude = (int) ($_GET['exclude'] ?? 0);
@@ -578,7 +578,7 @@ $router->get('/agent/tickets/search', function () {
     $results = $stmt->fetchAll();
 
     // Redact confidential ticket subjects for users not in the type's group
-    if (Auth::role() === 'admin') {
+    if (Auth::isAdmin()) {
         $confStmt = $db->query('SELECT id, group_id FROM ticket_types WHERE is_confidential = 1 AND group_id IS NOT NULL');
         $confTypes = [];
         foreach ($confStmt->fetchAll() as $ct) {
@@ -612,7 +612,7 @@ $router->get('/agent/tickets/search', function () {
 });
 
 $router->get('/agent/tickets/dup-preview', function () {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     header('Content-Type: application/json');
     $tid = (int) ($_GET['id'] ?? 0);
     $row = getDupPreviewTicket((int) Auth::id(), $tid, true);
@@ -626,7 +626,7 @@ $router->get('/agent/tickets/dup-preview', function () {
 });
 
 $router->post('/agent/tickets/check-duplicates', function () {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     header('Content-Type: application/json');
 
     if (!verifyCsrf($_SERVER['HTTP_X_CSRF_TOKEN'] ?? ($_POST['_token'] ?? ''))) {
@@ -658,7 +658,7 @@ $router->post('/agent/tickets/check-duplicates', function () {
 });
 
 $router->get('/agent/tickets/create', function () {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     $db         = Database::connect();
     $types      = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
     $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
@@ -666,7 +666,7 @@ $router->get('/agent/tickets/create', function () {
     $groups     = $db->query('SELECT * FROM `groups` ORDER BY sort_order, name')->fetchAll();
     $agents     = $db->query(
         "SELECT id, first_name, last_name, email FROM users
-         WHERE role IN ('admin','agent','power_user') ORDER BY first_name, last_name"
+         WHERE " . staffRoleSqlIn('role') . " ORDER BY first_name, last_name"
     )->fetchAll();
     $templates  = $db->query('SELECT * FROM ticket_templates ORDER BY name')->fetchAll();
 
@@ -719,7 +719,7 @@ $router->get('/agent/tickets/create', function () {
 });
 
 $router->post('/agent/tickets/bulk', function () {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/agent/tickets');
@@ -738,7 +738,7 @@ $router->post('/agent/tickets/bulk', function () {
     $db           = Database::connect();
 
     // Filter out confidential tickets the user cannot access
-    if (Auth::role() === 'admin') {
+    if (Auth::isAdmin()) {
         $gs = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
         $gs->execute([Auth::id()]);
         $myGroups = array_map('intval', $gs->fetchAll(PDO::FETCH_COLUMN));
@@ -882,7 +882,7 @@ $router->post('/agent/tickets/bulk', function () {
 });
 
 $router->get('/agent/tickets/{id}', function (array $p) {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     $db = Database::connect();
 
     $stmt = $db->prepare(
@@ -955,13 +955,13 @@ $router->get('/agent/tickets/{id}', function (array $p) {
             "SELECT u.id, u.first_name, u.last_name
              FROM users u
              INNER JOIN group_user_map gum ON u.id = gum.user_id
-             WHERE gum.group_id = ? AND u.role IN ('agent','admin','power_user')
+             WHERE gum.group_id = ? AND " . staffRoleSqlIn('u.role') . "
              ORDER BY u.first_name"
         );
         $agentStmt->execute([$ticket['type_group_id']]);
         $agents = $agentStmt->fetchAll();
     } else {
-        $agents = $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin','power_user') ORDER BY first_name")->fetchAll();
+        $agents = $db->query("SELECT id, first_name, last_name FROM users WHERE " . staffRoleSqlIn('role') . " ORDER BY first_name")->fetchAll();
     }
 
     // Priorities for update dropdown
@@ -1098,7 +1098,7 @@ $router->get('/agent/tickets/{id}', function (array $p) {
  * ================================================================== */
 
 $router->post('/agent/tickets/{id}/confidential-auth', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requireAdmin();
     $ticketId = (int) $p['id'];
 
     if (!verifyCsrf($_POST['_token'] ?? '')) {
@@ -1152,7 +1152,7 @@ $router->post('/agent/tickets/{id}/confidential-auth', function (array $p) {
  * ================================================================== */
 
 $router->post('/agent/tickets/{id}/watch', function (array $p) {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         redirect("/agent/tickets/{$id}");
@@ -1189,7 +1189,7 @@ $router->post('/agent/tickets/{id}/watch', function (array $p) {
  * ================================================================== */
 
 $router->post('/agent/tickets/{id}/solution', function (array $p) {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -1245,7 +1245,7 @@ $router->post('/agent/tickets/{id}/solution', function (array $p) {
  * ================================================================== */
 
 $router->post('/agent/tickets/{id}/merge', function (array $p) {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     $sourceId = (int) $p['id'];
 
     if (!verifyCsrf($_POST['_token'] ?? '')) {
@@ -1343,7 +1343,7 @@ $router->post('/agent/tickets/{id}/merge', function (array $p) {
  * ================================================================== */
 
 $router->get('/agent/tickets/{id}/split', function (array $p) {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     $db = Database::connect();
 
     $stmt = $db->prepare(
@@ -1375,7 +1375,7 @@ $router->get('/agent/tickets/{id}/split', function (array $p) {
     $commentsStmt->execute([$ticket['id']]);
     $comments = $commentsStmt->fetchAll();
 
-    $agents     = $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin','power_user') ORDER BY first_name")->fetchAll();
+    $agents     = $db->query("SELECT id, first_name, last_name FROM users WHERE " . staffRoleSqlIn('role') . " ORDER BY first_name")->fetchAll();
     $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
     $types      = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
     $groups     = $db->query('SELECT * FROM `groups` ORDER BY sort_order, name')->fetchAll();
@@ -1384,7 +1384,7 @@ $router->get('/agent/tickets/{id}/split', function (array $p) {
 });
 
 $router->post('/agent/tickets/{id}/split', function (array $p) {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     $sourceId = (int) $p['id'];
 
     if (!verifyCsrf($_POST['_token'] ?? '')) {
@@ -1492,7 +1492,7 @@ $router->post('/agent/tickets/{id}/split', function (array $p) {
  * ================================================================== */
 
 $router->post('/agent/tickets/{id}/fields', function (array $p) {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -1545,7 +1545,7 @@ $router->post('/agent/tickets/{id}/fields', function (array $p) {
  * ================================================================== */
 
 $router->post('/agent/tickets/{id}/comment', function (array $p) {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -1654,7 +1654,7 @@ $router->post('/agent/tickets/{id}/comment', function (array $p) {
  * ================================================================== */
 
 $router->post('/agent/tickets/{id}/update', function (array $p) {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -1824,7 +1824,7 @@ $router->post('/agent/tickets/{id}/update', function (array $p) {
  * ================================================================== */
 
 $router->get('/agent/attachments/{id}/download', function (array $p) {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     $db = Database::connect();
 
     $stmt = $db->prepare(
@@ -1871,7 +1871,7 @@ $_agentKbVars = [
 ];
 
 $router->get('/agent/kb', function () use ($_agentKbVars) {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     $categories = Database::connect()->query(
         'SELECT c.*, COUNT(DISTINCT f.id) AS folder_count
          FROM kb_categories c
@@ -1883,7 +1883,7 @@ $router->get('/agent/kb', function () use ($_agentKbVars) {
 });
 
 $router->get('/agent/kb/search', function () {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     $q = trim($_GET['q'] ?? '');
     if ($q === '') {
         header('Content-Type: application/json');
@@ -1908,7 +1908,7 @@ $router->get('/agent/kb/search', function () {
 });
 
 $router->get('/agent/kb/articles/{slug}', function (array $p) use ($_agentKbVars) {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     $db   = Database::connect();
     $stmt = $db->prepare(
         "SELECT a.*, f.name AS folder_name, f.slug AS folder_slug,
@@ -1949,7 +1949,7 @@ $router->get('/agent/kb/articles/{slug}', function (array $p) use ($_agentKbVars
 });
 
 $router->post('/agent/kb/articles/{slug}/feedback', function (array $p) {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     header('Content-Type: application/json');
 
     $rating = (int)($_POST['rating'] ?? 0);
@@ -1994,7 +1994,7 @@ $router->post('/agent/kb/articles/{slug}/feedback', function (array $p) {
 });
 
 $router->get('/agent/kb/{slug}/{folder_slug}', function (array $p) use ($_agentKbVars) {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     $db = Database::connect();
 
     $catStmt = $db->prepare('SELECT * FROM kb_categories WHERE slug = ?');
@@ -2026,7 +2026,7 @@ $router->get('/agent/kb/{slug}/{folder_slug}', function (array $p) use ($_agentK
 });
 
 $router->get('/agent/kb/{slug}', function (array $p) use ($_agentKbVars) {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     $db = Database::connect();
 
     $catStmt = $db->prepare('SELECT * FROM kb_categories WHERE slug = ?');
@@ -2056,7 +2056,7 @@ $router->get('/agent/kb/{slug}', function (array $p) use ($_agentKbVars) {
  * ================================================================== */
 
 $router->get('/agent/canned-responses/json', function () {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     $db  = Database::connect();
     $uid = Auth::id();
 
@@ -2081,7 +2081,7 @@ $router->get('/agent/canned-responses/json', function () {
  * ================================================================== */
 
 $router->get('/agent/canned-responses', function () {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     $db = Database::connect();
     $personal = $db->prepare(
         'SELECT * FROM canned_responses WHERE user_id = ? ORDER BY sort_order, title'
@@ -2097,12 +2097,12 @@ $router->get('/agent/canned-responses', function () {
 });
 
 $router->get('/agent/canned-responses/create', function () {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     render('agent/canned-responses/form', ['editing' => null]);
 });
 
 $router->post('/agent/canned-responses/create', function () {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/agent/canned-responses/create');
@@ -2123,7 +2123,7 @@ $router->post('/agent/canned-responses/create', function () {
 });
 
 $router->get('/agent/canned-responses/{id}/edit', function (array $p) {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     $db = Database::connect();
     $stmt = $db->prepare('SELECT * FROM canned_responses WHERE id = ? AND user_id = ?');
     $stmt->execute([(int) $p['id'], Auth::id()]);
@@ -2136,7 +2136,7 @@ $router->get('/agent/canned-responses/{id}/edit', function (array $p) {
 });
 
 $router->post('/agent/canned-responses/{id}/edit', function (array $p) {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -2158,7 +2158,7 @@ $router->post('/agent/canned-responses/{id}/edit', function (array $p) {
 });
 
 $router->post('/agent/canned-responses/{id}/delete', function (array $p) {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/agent/canned-responses');
@@ -2215,7 +2215,7 @@ function _agentValidateBannerInput(): array
 }
 
 $router->get('/agent/banners', function () {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     $db = Database::connect();
     $banners = $db->query(
         'SELECT b.*, l.name AS location_name,
@@ -2231,7 +2231,7 @@ $router->get('/agent/banners', function () {
 });
 
 $router->get('/agent/banners/create', function () {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     $locations = Database::connect()
         ->query('SELECT id, name FROM locations ORDER BY name')
         ->fetchAll();
@@ -2239,7 +2239,7 @@ $router->get('/agent/banners/create', function () {
 });
 
 $router->post('/agent/banners/create', function () {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/agent/banners/create');
@@ -2263,7 +2263,7 @@ $router->post('/agent/banners/create', function () {
 });
 
 $router->get('/agent/banners/{id}/edit', function (array $p) {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     $db = Database::connect();
     $stmt = $db->prepare('SELECT * FROM status_banners WHERE id = ?');
     $stmt->execute([(int) $p['id']]);
@@ -2277,7 +2277,7 @@ $router->get('/agent/banners/{id}/edit', function (array $p) {
 });
 
 $router->post('/agent/banners/{id}/edit', function (array $p) {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -2304,7 +2304,7 @@ $router->post('/agent/banners/{id}/edit', function (array $p) {
 });
 
 $router->post('/agent/banners/{id}/clear', function (array $p) {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/agent/banners');
@@ -2321,7 +2321,7 @@ $router->post('/agent/banners/{id}/clear', function (array $p) {
 });
 
 $router->post('/agent/banners/{id}/reactivate', function (array $p) {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/agent/banners');
@@ -2334,7 +2334,7 @@ $router->post('/agent/banners/{id}/reactivate', function (array $p) {
 });
 
 $router->post('/agent/banners/{id}/delete', function (array $p) {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/agent/banners');

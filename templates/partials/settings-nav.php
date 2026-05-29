@@ -33,6 +33,8 @@ $settingsNavGroups = [
          'keywords' => 'team queue assignee department'],
         ['label' => 'Agent Skills',           'url' => '/admin/skills',     'icon' => 'bi-mortarboard',
          'keywords' => 'skill expertise routing assignment competency'],
+        ['label' => 'Permission Levels',      'url' => '/admin/roles',      'icon' => 'bi-shield-lock',
+         'keywords' => 'role permission level access agent admin power user custom capability rbac'],
     ],
     'Security' => [
         ['label' => 'SSO / Microsoft 365', 'url' => '/admin/settings/sso', 'icon' => 'bi-shield-lock',
@@ -81,6 +83,53 @@ $settingsNavGroups = [
          'keywords' => 'reset wipe purge delete-all destructive maintenance'],
     ],
 ];
+// Hide nav items the current role can't open (admins see everything). The
+// URL→permission map mirrors the route gates; longest-prefix wins.
+$settingsNavPerm = static function (string $url): string {
+    $map = [
+        '/admin/settings/sla'               => 'sla.manage',
+        '/admin/settings/csat'              => 'csat.manage',
+        '/admin/settings/ai'                => 'ai.manage',
+        '/admin/settings/automations'       => 'automations.manage',
+        '/admin/settings/escalation-paths'  => 'automations.manage',
+        '/admin/settings/escalations'       => 'automations.manage',
+        '/admin/settings/stale-tickets'     => 'automations.manage',
+        '/admin/settings/scheduled-reports' => 'automations.manage',
+        '/admin/settings/cron-jobs'         => 'automations.manage',
+        '/admin/settings/ticket-statuses'   => 'workflows.manage',
+        '/admin/settings/import-users'      => 'users.manage',
+        '/admin/settings/import-kb'         => 'import.manage',
+        '/admin/settings/import'            => 'import.manage',
+        '/admin/settings/backup'            => 'import.manage',
+        '/admin/settings/danger-zone'       => '@admin',
+        '/admin/roles'                      => '@admin',
+        '/admin/settings'                   => 'settings.manage',
+        '/admin/locations'                  => 'locations.manage',
+        '/admin/priorities'                 => 'priorities.manage',
+        '/admin/types'                      => 'workflows.manage',
+        '/admin/groups'                     => 'groups.manage',
+        '/admin/skills'                     => 'skills.manage',
+    ];
+    $best = 'settings.manage';
+    $bestLen = -1;
+    foreach ($map as $prefix => $perm) {
+        if (($url === $prefix || str_starts_with($url, $prefix . '/') || str_starts_with($url, $prefix . '-'))
+            && strlen($prefix) > $bestLen) {
+            $best = $perm;
+            $bestLen = strlen($prefix);
+        }
+    }
+    return $best;
+};
+foreach ($settingsNavGroups as $grpKey => $grpItems) {
+    $settingsNavGroups[$grpKey] = array_values(array_filter($grpItems, static function (array $it) use ($settingsNavPerm) {
+        $perm = $settingsNavPerm($it['url']);
+        return $perm === '@admin' ? Auth::isAdmin() : Auth::can($perm);
+    }));
+    if (empty($settingsNavGroups[$grpKey])) {
+        unset($settingsNavGroups[$grpKey]);
+    }
+}
 $currentPath          = currentPath();
 $settingsSearchIndex  = require ROOT_DIR . '/config/settings_index.php';
 

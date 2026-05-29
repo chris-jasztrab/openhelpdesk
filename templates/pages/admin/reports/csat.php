@@ -3,9 +3,9 @@ $layout              = 'app';
 $pageTitle           = 'Satisfaction Report';
 $scheduleReportType  = 'csat';
 $scheduleReportTitle = 'CSAT / Satisfaction';
-$sidebarItems        = adminSidebar('reports');
+$sidebarItems        = Auth::isAdmin() ? adminSidebar('reports') : staffSidebar('reports');
 $breadcrumbs  = [
-    Auth::role() === 'power_user' ? ['label' => 'Agent', 'url' => '/agent'] : ['label' => 'Admin', 'url' => '/admin'],
+    Auth::isAdmin() ? ['label' => 'Admin', 'url' => '/admin'] : ['label' => 'Agent', 'url' => '/agent'],
     ['label' => 'Reports', 'url' => '/admin/reports'],
     ['label' => 'Satisfaction'],
 ];

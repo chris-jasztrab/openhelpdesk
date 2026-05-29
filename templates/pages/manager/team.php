@@ -5,7 +5,7 @@ $breadcrumbs  = [
     ['label' => 'Manage My Team', 'url' => '/manager'],
     ['label' => $group['name'] ?? 'Group'],
 ];
-$sidebarItems = Auth::role() === 'admin'
+$sidebarItems = Auth::isAdmin()
     ? adminSidebar('')
     : (Auth::role() === 'power_user' ? powerUserSidebar('') : agentSidebar(''));
 

@@ -292,7 +292,7 @@ $ticketId = (int) $ticket['id'];
         // it just follows the profile preference. The notes are never deleted,
         // only hidden. Hiding system notes already covers AI notes (a subset),
         // so the AI-only filter is the fallback when system notes are shown.
-        if (Auth::role() === 'admin') {
+        if (Auth::isAdmin()) {
             if (!systemNotesVisible()) {
                 $timeline = array_values(array_filter($timeline, fn($tl) =>
                     !($tl['is_internal'] && trim($tl['user_name'] ?? '') === '')

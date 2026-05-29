@@ -3,9 +3,9 @@ $layout              = 'app';
 $pageTitle           = 'Response Times – Reports';
 $scheduleReportType  = 'response_times';
 $scheduleReportTitle = 'Response Times';
-$sidebarItems = Auth::role() === 'power_user' ? powerUserSidebar('reports') : adminSidebar('reports');
+$sidebarItems = Auth::isAdmin() ? adminSidebar('reports') : staffSidebar('reports');
 $breadcrumbs  = [
-    Auth::role() === 'power_user' ? ['label' => 'Agent', 'url' => '/agent'] : ['label' => 'Admin', 'url' => '/admin'],
+    Auth::isAdmin() ? ['label' => 'Admin', 'url' => '/admin'] : ['label' => 'Agent', 'url' => '/agent'],
     ['label' => 'Reports', 'url' => '/admin/reports'],
     ['label' => 'Response Times'],
 ];

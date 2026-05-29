@@ -9,7 +9,7 @@
     <?php require ROOT_DIR . '/templates/partials/pwa-head.php'; ?>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-    <?php if (Auth::check() && in_array(Auth::role(), ['agent', 'power_user', 'user'], true)): ?>
+    <?php if (Auth::check() && !Auth::isAdmin()): ?>
     <link href="https://cdn.jsdelivr.net/npm/driver.js@1.3.4/dist/driver.css" rel="stylesheet">
     <?php endif; ?>
     <style>
@@ -338,7 +338,7 @@
     <a class="skip-link" href="#main-content">Skip to main content</a>
     <?php if (empty($embedMode)) require ROOT_DIR . '/templates/partials/navbar.php'; ?>
 
-    <?php if (Auth::role() === 'admin' && getSetting('show_onboarding', '0') === '1'): ?>
+    <?php if (Auth::isAdmin() && getSetting('show_onboarding', '0') === '1'): ?>
     <a href="/admin?tour=1" id="ld-tour-resume" title="Continue setup tour">
         <span class="ld-tour-pulse-wrap"></span>
         <span id="ld-tour-resume-label">Setup Tour</span>
@@ -390,18 +390,18 @@
 
         <?php require ROOT_DIR . '/templates/partials/flash.php'; ?>
         <?php if (Auth::check() && empty($embedMode)) require ROOT_DIR . '/templates/partials/status-banner.php'; ?>
-        <?php if (Auth::check() && Auth::role() === 'admin') require ROOT_DIR . '/templates/partials/secret-expiry-modal.php'; ?>
+        <?php if (Auth::check() && Auth::isAdmin()) require ROOT_DIR . '/templates/partials/secret-expiry-modal.php'; ?>
         <?= $content ?>
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function(el){new bootstrap.Tooltip(el)});</script>
     <?php if (empty($embedMode)) require ROOT_DIR . '/templates/partials/pwa-install.php'; ?>
-    <?php if (Auth::check() && in_array(Auth::role(), ['agent', 'power_user'], true)): ?>
+    <?php if (Auth::check() && Auth::isStaff() && !Auth::isAdmin()): ?>
     <script src="https://cdn.jsdelivr.net/npm/driver.js@1.3.4/dist/driver.js.iife.js"></script>
     <?php require ROOT_DIR . '/templates/partials/agent-tour.php'; ?>
     <?php endif; ?>
-    <?php if (Auth::check() && Auth::role() === 'user'): ?>
+    <?php if (Auth::check() && !Auth::isStaff()): ?>
     <script src="https://cdn.jsdelivr.net/npm/driver.js@1.3.4/dist/driver.js.iife.js"></script>
     <?php require ROOT_DIR . '/templates/partials/portal-tour.php'; ?>
     <?php endif; ?>

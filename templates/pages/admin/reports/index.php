@@ -1,9 +1,9 @@
 <?php
 $layout       = 'app';
 $pageTitle    = 'Reports';
-$sidebarItems = Auth::role() === 'power_user' ? powerUserSidebar('reports') : adminSidebar('reports');
+$sidebarItems = Auth::isAdmin() ? adminSidebar('reports') : staffSidebar('reports');
 $breadcrumbs  = [
-    Auth::role() === 'power_user' ? ['label' => 'Agent', 'url' => '/agent'] : ['label' => 'Admin', 'url' => '/admin'],
+    Auth::isAdmin() ? ['label' => 'Admin', 'url' => '/admin'] : ['label' => 'Agent', 'url' => '/agent'],
     ['label' => 'Reports'],
 ];
 ?>
@@ -12,7 +12,7 @@ $breadcrumbs  = [
         <h2 class="fw-bold mb-1">Reports &amp; Analytics</h2>
         <p class="text-muted mb-0">Overview of key metrics for the current period</p>
     </div>
-    <?php if (Auth::role() === 'admin'): ?>
+    <?php if (Auth::isAdmin()): ?>
     <a href="/admin/settings/scheduled-reports" class="btn btn-outline-secondary btn-sm">
         <i class="bi bi-envelope-paper me-1"></i>Scheduled Reports
     </a>

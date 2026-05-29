@@ -19,7 +19,7 @@ $_banners = getActiveBanners();
 if (empty($_banners)) {
     return;
 }
-$_isAgent = in_array(Auth::role(), ['agent', 'admin', 'power_user'], true);
+$_isAgent = Auth::isStaff();
 
 $_severityClass = [
     'info'     => 'alert-info',

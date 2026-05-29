@@ -23,7 +23,7 @@ $breadcrumbs  = [
         </div>
     </div>
     <div class="d-flex gap-2">
-        <?php if (Auth::check() && in_array(Auth::role(), ['admin', 'agent'], true)): ?>
+        <?php if (Auth::check() && Auth::isStaff()): ?>
             <a href="/admin/kb/articles/<?= (int) $article['id'] ?>/edit" class="btn btn-outline-primary btn-sm">
                 <i class="bi bi-pencil me-1"></i>Edit Article
             </a>

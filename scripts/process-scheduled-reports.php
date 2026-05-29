@@ -121,7 +121,7 @@ foreach ($reports as $report) {
                             SUM(CASE WHEN t.status IN ('resolved','closed') THEN 1 ELSE 0 END) AS resolved
                      FROM users u
                      LEFT JOIN tickets t ON t.assigned_to = u.id AND t.created_at BETWEEN ? AND ?
-                     WHERE u.role IN ('admin','agent','power_user')
+                     WHERE " . staffRoleSqlIn('u.role') . "
                      GROUP BY u.id, u.first_name, u.last_name
                      ORDER BY resolved DESC
                      LIMIT 5"
@@ -291,7 +291,7 @@ foreach ($reports as $report) {
                      FROM users u
                      LEFT JOIN tickets t ON t.assigned_to = u.id
                          AND t.status NOT IN ('resolved','closed')
-                     WHERE u.role IN ('admin','agent','power_user')
+                     WHERE " . staffRoleSqlIn('u.role') . "
                      GROUP BY u.id, u.first_name, u.last_name
                      ORDER BY open_count DESC"
                 );

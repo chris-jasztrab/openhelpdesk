@@ -7,7 +7,7 @@ declare(strict_types=1);
  * ================================================================== */
 
 $router->get('/admin/settings/sso', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
     $logFile    = ROOT_DIR . '/storage/logs/sso-debug.log';
     $ssoLog     = is_readable($logFile) ? file_get_contents($logFile) : null;
     render('admin/settings/sso', [
@@ -22,7 +22,7 @@ $router->get('/admin/settings/sso', function () {
 });
 
 $router->post('/admin/settings/sso', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         redirect('/admin/settings/sso');
     }
@@ -88,12 +88,12 @@ $router->post('/admin/settings/sso', function () {
 });
 
 $router->get('/admin/settings/sso/help', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
     render('admin/settings/sso-help');
 });
 
 $router->post('/admin/settings/sso/clear-log', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         redirect('/admin/settings/sso');
     }
@@ -115,7 +115,7 @@ $router->post('/admin/settings/sso/clear-log', function () {
  * ================================================================== */
 
 $router->get('/admin/settings/ai', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('ai.manage');
 
     $anthropicCache = json_decode((string) getSetting('ai_anthropic_models_cache', '[]'), true) ?: [];
     $openaiCache    = json_decode((string) getSetting('ai_openai_models_cache',    '[]'), true) ?: [];
@@ -152,7 +152,7 @@ $router->get('/admin/settings/ai', function () {
 });
 
 $router->post('/admin/settings/ai', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('ai.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/ai');
@@ -208,7 +208,7 @@ $router->post('/admin/settings/ai', function () {
 });
 
 $router->post('/admin/settings/ai/refresh-models', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('ai.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/ai');
@@ -256,7 +256,7 @@ $router->post('/admin/settings/ai/refresh-models', function () {
  * a fresh ai_classifications row (history is preserved).
  */
 $router->post('/admin/tickets/{id}/classify', function (array $p) {
-    Auth::requireRole('admin', 'agent', 'power_user');
+    Auth::requireStaff();
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/tickets/' . (int) $p['id']);
@@ -283,7 +283,7 @@ $router->post('/admin/tickets/{id}/classify', function (array $p) {
  * said vs. what the human decided) for reporting.
  */
 $router->post('/admin/tickets/{id}/classification/override', function (array $p) {
-    Auth::requireRole('admin', 'agent', 'power_user');
+    Auth::requireStaff();
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/tickets/' . (int) $p['id']);
@@ -354,7 +354,7 @@ $router->post('/admin/tickets/{id}/classification/override', function (array $p)
 });
 
 $router->post('/admin/settings/ai/backfill', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('ai.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/ai');
@@ -405,7 +405,7 @@ $router->post('/admin/settings/ai/backfill', function () {
  * the saved-key Test Connection button comes back with a generic error.
  */
 $router->get('/admin/settings/ai/debug', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('ai.manage');
     render('admin/settings/ai-debug', [
         'savedAnthropicKey'   => getSetting('ai_anthropic_api_key', '') !== '',
         'savedAnthropicModel' => (string) getSetting('ai_anthropic_model', 'claude-haiku-4-5'),
@@ -416,7 +416,7 @@ $router->get('/admin/settings/ai/debug', function () {
 });
 
 $router->post('/admin/settings/ai/debug', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('ai.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/ai/debug');
@@ -543,7 +543,7 @@ $router->post('/admin/settings/ai/debug', function () {
 });
 
 $router->post('/admin/settings/ai/test', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('ai.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/ai');
@@ -571,7 +571,7 @@ $router->post('/admin/settings/ai/test', function () {
  * ================================================================== */
 
 $router->post('/admin/onboarding/dismiss', function () {
-    Auth::requireRole('admin');
+    Auth::requireAdmin();
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         redirect('/admin');
     }
@@ -589,7 +589,7 @@ $validDocPages = [
 ];
 
 $router->get('/admin/docs', function () {
-    Auth::requireRole('admin');
+    Auth::requireAdmin();
     render('admin/docs/index', [
         'sidebarItems' => adminSidebar('docs'),
         'layout'       => 'app',
@@ -599,7 +599,7 @@ $router->get('/admin/docs', function () {
 });
 
 $router->get('/admin/docs/{page}', function (array $p) use ($validDocPages) {
-    Auth::requireRole('admin');
+    Auth::requireAdmin();
     $page = $p['page'] ?? '';
     if (!in_array($page, $validDocPages, true)) {
         redirect('/admin/docs');
@@ -637,7 +637,7 @@ $router->get('/admin/docs/{page}', function (array $p) use ($validDocPages) {
  * ================================================================== */
 
 $router->get('/admin/users/online', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('users.manage');
     $db = Database::connect();
 
     // Single source of truth for the online window. Anyone whose last_seen is
@@ -671,7 +671,7 @@ $router->get('/admin/users/online', function () {
 });
 
 $router->get('/admin/users', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('users.manage');
     $db   = Database::connect();
 
     if (isset($_GET['reset'])) {
@@ -686,8 +686,7 @@ $router->get('/admin/users', function () {
     $where  = [];
     $params = [];
 
-    $validRoles = ['admin', 'agent', 'power_user', 'user'];
-    $roles = array_values(array_filter($roleFilter, fn($r) => in_array($r, $validRoles, true)));
+    $roles = array_values(array_filter($roleFilter, fn($r) => roleExists($r)));
     if (!empty($roles)) {
         $placeholders = implode(',', array_fill(0, count($roles), '?'));
         $where[]  = "u.role IN ($placeholders)";
@@ -749,13 +748,13 @@ $router->get('/admin/users', function () {
 });
 
 $router->get('/admin/users/create', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('users.manage');
     $locations = Database::connect()->query('SELECT * FROM locations ORDER BY name')->fetchAll();
     render('admin/users/form', ['locations' => $locations, 'editing' => null]);
 });
 
 $router->post('/admin/users/create', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('users.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/users/create');
@@ -766,7 +765,7 @@ $router->post('/admin/users/create', function () {
     $email           = trim($_POST['email'] ?? '');
     $password        = $_POST['password'] ?? '';
     $roleRaw         = $_POST['role'] ?? 'user';
-    $role            = in_array($roleRaw, ['admin', 'agent', 'power_user', 'user'], true) ? $roleRaw : 'user';
+    $role            = roleExists($roleRaw) ? $roleRaw : 'user';
     $phone           = trim($_POST['work_phone'] ?? '');
     $locId           = !empty($_POST['location_id']) ? (int) $_POST['location_id'] : null;
     $canViewLocTix   = !empty($_POST['can_view_location_tickets']) ? 1 : 0;
@@ -801,7 +800,7 @@ $router->post('/admin/users/create', function () {
 });
 
 $router->get('/admin/users/{id}', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('users.manage');
     $db  = Database::connect();
     $uid = (int) $p['id'];
 
@@ -829,7 +828,7 @@ $router->get('/admin/users/{id}', function (array $p) {
     // Options for filter panel
     $ticketPriorities = $db->query('SELECT id, name, color FROM ticket_priorities ORDER BY sort_order, name')->fetchAll();
     $ticketTypes      = $db->query('SELECT id, name FROM ticket_types ORDER BY name')->fetchAll();
-    $ticketAgents     = $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('admin','agent','power_user') ORDER BY first_name, last_name")->fetchAll();
+    $ticketAgents     = $db->query("SELECT id, first_name, last_name FROM users WHERE " . staffRoleSqlIn('role') . " ORDER BY first_name, last_name")->fetchAll();
 
     // Build dynamic ticket query for this user
     $where  = ['t.created_by = ?'];
@@ -914,7 +913,7 @@ $router->get('/admin/users/{id}', function (array $p) {
 });
 
 $router->get('/admin/users/{id}/edit', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('users.manage');
     $db   = Database::connect();
     $user = $db->prepare('SELECT * FROM users WHERE id = ?');
     $user->execute([(int) $p['id']]);
@@ -925,7 +924,7 @@ $router->get('/admin/users/{id}/edit', function (array $p) {
     }
     $locations  = $db->query('SELECT * FROM locations ORDER BY name')->fetchAll();
     $userGroups = [];
-    if (in_array($editing['role'], ['agent', 'admin', 'power_user'])) {
+    if (roleIsStaff($editing['role'])) {
         $gStmt = $db->prepare(
             'SELECT g.id, g.name FROM `groups` g
              JOIN group_user_map gum ON gum.group_id = g.id
@@ -938,7 +937,7 @@ $router->get('/admin/users/{id}/edit', function (array $p) {
 });
 
 $router->post('/admin/users/{id}/edit', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('users.manage');
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -998,7 +997,7 @@ $router->post('/admin/users/{id}/edit', function (array $p) {
 });
 
 $router->post('/admin/users/{id}/delete', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('users.manage');
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -1113,7 +1112,7 @@ $router->post('/admin/users/{id}/delete', function (array $p) {
 });
 
 $router->post('/admin/users/{id}/reset-2fa', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('users.manage');
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -1134,7 +1133,7 @@ $router->post('/admin/users/{id}/reset-2fa', function (array $p) {
  * ================================================================== */
 
 $router->get('/admin/users/merge', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('users.manage');
     $suggestDeleteId = (int) ($_GET['suggest_delete'] ?? 0);
     $suggestUser     = null;
     if ($suggestDeleteId > 0) {
@@ -1146,7 +1145,7 @@ $router->get('/admin/users/merge', function () {
 });
 
 $router->post('/admin/users/merge', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('users.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/users/merge');
@@ -1309,7 +1308,7 @@ $router->post('/admin/users/merge', function () {
  * ================================================================== */
 
 $router->get('/admin/locations', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('locations.manage');
     $locations = Database::connect()->query('SELECT * FROM locations ORDER BY name')->fetchAll();
     render('admin/locations/index', [
         'locations'  => $locations,
@@ -1320,7 +1319,7 @@ $router->get('/admin/locations', function () {
 });
 
 $router->post('/admin/locations/timezone-settings', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('locations.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/locations');
@@ -1345,7 +1344,7 @@ $router->post('/admin/locations/timezone-settings', function () {
 });
 
 $router->get('/admin/locations/create', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('locations.manage');
     render('admin/locations/form', [
         'editing'   => null,
         'tzMode'    => getSetting('location_timezone_mode', 'shared'),
@@ -1355,7 +1354,7 @@ $router->get('/admin/locations/create', function () {
 });
 
 $router->post('/admin/locations/create', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('locations.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/locations/create');
@@ -1379,7 +1378,7 @@ $router->post('/admin/locations/create', function () {
 });
 
 $router->get('/admin/locations/{id}/edit', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('locations.manage');
     $stmt = Database::connect()->prepare('SELECT * FROM locations WHERE id = ?');
     $stmt->execute([(int) $p['id']]);
     $editing = $stmt->fetch();
@@ -1396,7 +1395,7 @@ $router->get('/admin/locations/{id}/edit', function (array $p) {
 });
 
 $router->post('/admin/locations/{id}/edit', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('locations.manage');
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -1429,7 +1428,7 @@ $router->post('/admin/locations/{id}/edit', function (array $p) {
 });
 
 $router->get('/admin/locations/{id}/delete-confirm', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('locations.manage');
     $db  = Database::connect();
     $id  = (int) $p['id'];
 
@@ -1465,7 +1464,7 @@ $router->get('/admin/locations/{id}/delete-confirm', function (array $p) {
 });
 
 $router->post('/admin/locations/{id}/delete', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('locations.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/locations');
@@ -1521,23 +1520,23 @@ $router->post('/admin/locations/{id}/delete', function (array $p) {
  * ================================================================== */
 
 $router->get('/admin/priorities', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('priorities.manage');
     $priorities = Database::connect()->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
     render('admin/priorities/index', ['priorities' => $priorities]);
 });
 
 $router->post('/admin/priorities/reorder', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('priorities.manage');
     handleSortableReorder('ticket_priorities');
 });
 
 $router->get('/admin/priorities/create', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('priorities.manage');
     render('admin/priorities/form', ['editing' => null]);
 });
 
 $router->post('/admin/priorities/create', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('priorities.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/priorities/create');
@@ -1560,7 +1559,7 @@ $router->post('/admin/priorities/create', function () {
 });
 
 $router->get('/admin/priorities/{id}/edit', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('priorities.manage');
     $stmt = Database::connect()->prepare('SELECT * FROM ticket_priorities WHERE id = ?');
     $stmt->execute([(int) $p['id']]);
     $editing = $stmt->fetch();
@@ -1572,7 +1571,7 @@ $router->get('/admin/priorities/{id}/edit', function (array $p) {
 });
 
 $router->post('/admin/priorities/{id}/edit', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('priorities.manage');
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -1604,7 +1603,7 @@ $router->post('/admin/priorities/{id}/edit', function (array $p) {
 });
 
 $router->post('/admin/priorities/{id}/delete', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('priorities.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/priorities');
@@ -1625,18 +1624,18 @@ $router->post('/admin/priorities/{id}/delete', function (array $p) {
  * ================================================================== */
 
 $router->get('/admin/types', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('workflows.manage');
     $types = Database::connect()->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
     render('admin/types/index', ['types' => $types]);
 });
 
 $router->post('/admin/types/reorder', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('workflows.manage');
     handleSortableReorder('ticket_types');
 });
 
 $router->get('/admin/types/matrix', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('workflows.manage');
     $types = Database::connect()->query(
         'SELECT tt.*, g.name AS group_name
          FROM ticket_types tt
@@ -1647,7 +1646,7 @@ $router->get('/admin/types/matrix', function () {
 });
 
 $router->get('/admin/types/create', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('workflows.manage');
     $db     = Database::connect();
     $groups = $db->query('SELECT id, name FROM `groups` ORDER BY sort_order, name')->fetchAll();
     $skills = $db->query('SELECT id, name FROM agent_skills ORDER BY sort_order, name')->fetchAll();
@@ -1655,7 +1654,7 @@ $router->get('/admin/types/create', function () {
 });
 
 $router->post('/admin/types/create', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('workflows.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/types/create');
@@ -1706,7 +1705,7 @@ $router->post('/admin/types/create', function () {
 });
 
 $router->get('/admin/types/{id}/edit', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('workflows.manage');
     $db = Database::connect();
     $stmt = $db->prepare('SELECT * FROM ticket_types WHERE id = ?');
     $stmt->execute([(int) $p['id']]);
@@ -1724,7 +1723,7 @@ $router->get('/admin/types/{id}/edit', function (array $p) {
 });
 
 $router->post('/admin/types/{id}/edit', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('workflows.manage');
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -1867,7 +1866,7 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
 });
 
 $router->get('/admin/types/{id}/delete-confirm', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('workflows.manage');
     $db  = Database::connect();
     $id  = (int) $p['id'];
 
@@ -1903,7 +1902,7 @@ $router->get('/admin/types/{id}/delete-confirm', function (array $p) {
 });
 
 $router->post('/admin/types/{id}/delete', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('workflows.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/types');
@@ -2035,7 +2034,7 @@ $router->post('/admin/types/{id}/delete', function (array $p) {
  * ================================================================== */
 
 $router->get('/admin/settings/canned-responses', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
     $db = Database::connect();
     $responses = $db->query(
         'SELECT * FROM canned_responses WHERE user_id IS NULL ORDER BY sort_order, title'
@@ -2044,17 +2043,17 @@ $router->get('/admin/settings/canned-responses', function () {
 });
 
 $router->post('/admin/settings/canned-responses/reorder', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
     handleSortableReorder('canned_responses');
 });
 
 $router->get('/admin/settings/canned-responses/create', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
     render('admin/settings/canned-responses/form', ['editing' => null]);
 });
 
 $router->post('/admin/settings/canned-responses/create', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/canned-responses/create');
@@ -2078,7 +2077,7 @@ $router->post('/admin/settings/canned-responses/create', function () {
 });
 
 $router->get('/admin/settings/canned-responses/{id}/edit', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
     $db = Database::connect();
     $stmt = $db->prepare('SELECT * FROM canned_responses WHERE id = ? AND user_id IS NULL');
     $stmt->execute([(int) $p['id']]);
@@ -2091,7 +2090,7 @@ $router->get('/admin/settings/canned-responses/{id}/edit', function (array $p) {
 });
 
 $router->post('/admin/settings/canned-responses/{id}/edit', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -2124,7 +2123,7 @@ $router->post('/admin/settings/canned-responses/{id}/edit', function (array $p) 
 });
 
 $router->post('/admin/settings/canned-responses/{id}/delete', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/canned-responses');
@@ -2147,7 +2146,7 @@ $router->post('/admin/settings/canned-responses/{id}/delete', function (array $p
  * ================================================================== */
 
 $router->get('/admin/groups', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('groups.manage');
     $groups = Database::connect()->query(
         'SELECT g.*, COUNT(gum.user_id) AS member_count
          FROM `groups` g
@@ -2159,20 +2158,20 @@ $router->get('/admin/groups', function () {
 });
 
 $router->post('/admin/groups/reorder', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('groups.manage');
     handleSortableReorder('groups');
 });
 
 $router->get('/admin/groups/create', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('groups.manage');
     $users = Database::connect()->query(
-        "SELECT id, first_name, last_name, role FROM users WHERE role IN ('agent','admin','power_user') ORDER BY first_name, last_name"
+        "SELECT id, first_name, last_name, role FROM users WHERE " . staffRoleSqlIn('role') . " ORDER BY first_name, last_name"
     )->fetchAll();
     render('admin/groups/form', ['editing' => null, 'users' => $users, 'memberIds' => [], 'managerIds' => []]);
 });
 
 $router->post('/admin/groups/create', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('groups.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/groups/create');
@@ -2234,7 +2233,7 @@ $router->post('/admin/groups/create', function () {
 });
 
 $router->get('/admin/groups/{id}/edit', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('groups.manage');
     $db   = Database::connect();
     $stmt = $db->prepare('SELECT * FROM `groups` WHERE id = ?');
     $stmt->execute([(int) $p['id']]);
@@ -2245,7 +2244,7 @@ $router->get('/admin/groups/{id}/edit', function (array $p) {
     }
 
     $users = $db->query(
-        "SELECT id, first_name, last_name, role FROM users WHERE role IN ('agent','admin','power_user') ORDER BY first_name, last_name"
+        "SELECT id, first_name, last_name, role FROM users WHERE " . staffRoleSqlIn('role') . " ORDER BY first_name, last_name"
     )->fetchAll();
 
     $memberStmt = $db->prepare('SELECT user_id, is_manager FROM group_user_map WHERE group_id = ?');
@@ -2264,7 +2263,7 @@ $router->get('/admin/groups/{id}/edit', function (array $p) {
 });
 
 $router->post('/admin/groups/{id}/edit', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('groups.manage');
     $id = (int) $p['id'];
 
     // Log CSRF failures on confidential groups too — this could indicate an attack
@@ -2489,7 +2488,7 @@ $router->post('/admin/groups/{id}/edit', function (array $p) {
 });
 
 $router->post('/admin/groups/{id}/delete', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('groups.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/groups');
@@ -2594,7 +2593,7 @@ function _skillFormUserGroups(PDO $db): array
         "SELECT gum.user_id, gum.group_id
            FROM group_user_map gum
            JOIN users u ON u.id = gum.user_id
-          WHERE u.role IN ('agent','admin','power_user')"
+          WHERE " . staffRoleSqlIn('u.role') . ""
     )->fetchAll();
     $map = [];
     foreach ($rows as $r) {
@@ -2604,7 +2603,7 @@ function _skillFormUserGroups(PDO $db): array
 }
 
 $router->get('/admin/skills', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('skills.manage');
     $db = Database::connect();
     $skills = $db->query(
         "SELECT s.*,
@@ -2621,15 +2620,15 @@ $router->get('/admin/skills', function () {
 });
 
 $router->post('/admin/skills/reorder', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('skills.manage');
     handleSortableReorder('agent_skills');
 });
 
 $router->get('/admin/skills/create', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('skills.manage');
     $db = Database::connect();
     $users = $db->query(
-        "SELECT id, first_name, last_name, role FROM users WHERE role IN ('agent','admin','power_user') ORDER BY first_name, last_name"
+        "SELECT id, first_name, last_name, role FROM users WHERE " . staffRoleSqlIn('role') . " ORDER BY first_name, last_name"
     )->fetchAll();
     $groups = $db->query("SELECT id, name FROM `groups` ORDER BY sort_order, name")->fetchAll();
     $userGroups = _skillFormUserGroups($db);
@@ -2637,7 +2636,7 @@ $router->get('/admin/skills/create', function () {
 });
 
 $router->post('/admin/skills/create', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('skills.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/skills/create');
@@ -2679,7 +2678,7 @@ $router->post('/admin/skills/create', function () {
 });
 
 $router->get('/admin/skills/{id}/edit', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('skills.manage');
     $db = Database::connect();
     $stmt = $db->prepare('SELECT * FROM agent_skills WHERE id = ?');
     $stmt->execute([(int) $p['id']]);
@@ -2689,7 +2688,7 @@ $router->get('/admin/skills/{id}/edit', function (array $p) {
         redirect('/admin/skills');
     }
     $users = $db->query(
-        "SELECT id, first_name, last_name, role FROM users WHERE role IN ('agent','admin','power_user') ORDER BY first_name, last_name"
+        "SELECT id, first_name, last_name, role FROM users WHERE " . staffRoleSqlIn('role') . " ORDER BY first_name, last_name"
     )->fetchAll();
     $mStmt = $db->prepare('SELECT user_id FROM user_skill_map WHERE skill_id = ?');
     $mStmt->execute([(int) $p['id']]);
@@ -2700,7 +2699,7 @@ $router->get('/admin/skills/{id}/edit', function (array $p) {
 });
 
 $router->post('/admin/skills/{id}/edit', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('skills.manage');
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -2747,7 +2746,7 @@ $router->post('/admin/skills/{id}/edit', function (array $p) {
 });
 
 $router->post('/admin/skills/{id}/delete', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('skills.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/skills');
@@ -2775,7 +2774,7 @@ $router->post('/admin/skills/{id}/delete', function (array $p) {
  * ------------------------------------------------------------------ */
 
 $router->get('/admin/skills/suggest', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('skills.manage');
 
     if (getSetting('ai_enabled', '0') !== '1') {
         flash('error', 'AI is not enabled. Configure it in Settings → AI Classification before using skill suggestions.');
@@ -2848,7 +2847,7 @@ $router->get('/admin/skills/suggest', function () {
 });
 
 $router->post('/admin/skills/suggest', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('skills.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/skills');
@@ -2916,7 +2915,7 @@ $router->post('/admin/skills/suggest', function () {
  * ================================================================== */
 
 $router->get('/admin/ticket-templates', function () {
-    Auth::requireRole('admin', 'agent', 'power_user');
+    Auth::requirePermission('ticket_templates.manage');
     $db = Database::connect();
     $templates = $db->query(
         "SELECT t.*,
@@ -2933,7 +2932,7 @@ $router->get('/admin/ticket-templates', function () {
 });
 
 $router->get('/admin/ticket-templates/create', function () {
-    Auth::requireRole('admin', 'agent', 'power_user');
+    Auth::requirePermission('ticket_templates.manage');
     $db         = Database::connect();
     $types      = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
     $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
@@ -2941,7 +2940,7 @@ $router->get('/admin/ticket-templates/create', function () {
 });
 
 $router->post('/admin/ticket-templates/create', function () {
-    Auth::requireRole('admin', 'agent', 'power_user');
+    Auth::requirePermission('ticket_templates.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/ticket-templates/create');
@@ -2978,7 +2977,7 @@ $router->post('/admin/ticket-templates/create', function () {
 });
 
 $router->get('/admin/ticket-templates/{id}/edit', function (array $p) {
-    Auth::requireRole('admin', 'agent', 'power_user');
+    Auth::requirePermission('ticket_templates.manage');
     $db   = Database::connect();
     $tpl  = $db->prepare('SELECT * FROM ticket_templates WHERE id = ?');
     $tpl->execute([(int) $p['id']]);
@@ -2988,7 +2987,7 @@ $router->get('/admin/ticket-templates/{id}/edit', function (array $p) {
         redirect('/admin/ticket-templates');
     }
     // Only creator or admin may edit
-    if (Auth::role() !== 'admin' && $editing['created_by'] !== Auth::id()) {
+    if (!Auth::isAdmin() && $editing['created_by'] !== Auth::id()) {
         flash('error', 'You can only edit your own templates.');
         redirect('/admin/ticket-templates');
     }
@@ -2998,7 +2997,7 @@ $router->get('/admin/ticket-templates/{id}/edit', function (array $p) {
 });
 
 $router->post('/admin/ticket-templates/{id}/edit', function (array $p) {
-    Auth::requireRole('admin', 'agent', 'power_user');
+    Auth::requirePermission('ticket_templates.manage');
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -3008,7 +3007,7 @@ $router->post('/admin/ticket-templates/{id}/edit', function (array $p) {
     $tpl = $db->prepare('SELECT * FROM ticket_templates WHERE id = ?');
     $tpl->execute([$id]);
     $existing = $tpl->fetch();
-    if (!$existing || (Auth::role() !== 'admin' && $existing['created_by'] !== Auth::id())) {
+    if (!$existing || (!Auth::isAdmin() && $existing['created_by'] !== Auth::id())) {
         flash('error', 'Not found or insufficient permissions.');
         redirect('/admin/ticket-templates');
     }
@@ -3042,7 +3041,7 @@ $router->post('/admin/ticket-templates/{id}/edit', function (array $p) {
 });
 
 $router->post('/admin/ticket-templates/{id}/delete', function (array $p) {
-    Auth::requireRole('admin', 'agent', 'power_user');
+    Auth::requirePermission('ticket_templates.manage');
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -3052,7 +3051,7 @@ $router->post('/admin/ticket-templates/{id}/delete', function (array $p) {
     $tpl = $db->prepare('SELECT created_by, name FROM ticket_templates WHERE id = ?');
     $tpl->execute([$id]);
     $existing = $tpl->fetch();
-    if (!$existing || (Auth::role() !== 'admin' && $existing['created_by'] !== Auth::id())) {
+    if (!$existing || (!Auth::isAdmin() && $existing['created_by'] !== Auth::id())) {
         flash('error', 'Not found or insufficient permissions.');
         redirect('/admin/ticket-templates');
     }
@@ -3115,7 +3114,7 @@ function _recurringPostToRow(): array
 }
 
 $router->get('/admin/recurring-tickets', function () {
-    Auth::requireRole('admin', 'agent', 'power_user');
+    Auth::requirePermission('recurring_tickets.manage');
     $db = Database::connect();
     $rows = $db->query(
         "SELECT r.*,
@@ -3138,7 +3137,7 @@ $router->get('/admin/recurring-tickets', function () {
 });
 
 $router->get('/admin/recurring-tickets/create', function () {
-    Auth::requireRole('admin', 'agent', 'power_user');
+    Auth::requirePermission('recurring_tickets.manage');
     $db         = Database::connect();
     $types      = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
     $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
@@ -3146,7 +3145,7 @@ $router->get('/admin/recurring-tickets/create', function () {
     $groups     = $db->query('SELECT * FROM `groups` ORDER BY sort_order, name')->fetchAll();
     $agents     = $db->query(
         "SELECT id, first_name, last_name FROM users
-         WHERE role IN ('admin','agent','power_user') ORDER BY first_name, last_name"
+         WHERE " . staffRoleSqlIn('role') . " ORDER BY first_name, last_name"
     )->fetchAll();
     $allUsers   = $db->query(
         "SELECT id, first_name, last_name, email FROM users ORDER BY first_name, last_name"
@@ -3162,7 +3161,7 @@ $router->get('/admin/recurring-tickets/create', function () {
 });
 
 $router->post('/admin/recurring-tickets/create', function () {
-    Auth::requireRole('admin', 'agent', 'power_user');
+    Auth::requirePermission('recurring_tickets.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/recurring-tickets/create');
@@ -3213,7 +3212,7 @@ $router->post('/admin/recurring-tickets/create', function () {
 });
 
 $router->get('/admin/recurring-tickets/{id}/edit', function (array $p) {
-    Auth::requireRole('admin', 'agent', 'power_user');
+    Auth::requirePermission('recurring_tickets.manage');
     $db = Database::connect();
     $stmt = $db->prepare('SELECT * FROM recurring_tickets WHERE id = ?');
     $stmt->execute([(int) $p['id']]);
@@ -3228,7 +3227,7 @@ $router->get('/admin/recurring-tickets/{id}/edit', function (array $p) {
     $groups     = $db->query('SELECT * FROM `groups` ORDER BY sort_order, name')->fetchAll();
     $agents     = $db->query(
         "SELECT id, first_name, last_name FROM users
-         WHERE role IN ('admin','agent','power_user') ORDER BY first_name, last_name"
+         WHERE " . staffRoleSqlIn('role') . " ORDER BY first_name, last_name"
     )->fetchAll();
     $allUsers   = $db->query(
         "SELECT id, first_name, last_name, email FROM users ORDER BY first_name, last_name"
@@ -3245,7 +3244,7 @@ $router->get('/admin/recurring-tickets/{id}/edit', function (array $p) {
 });
 
 $router->post('/admin/recurring-tickets/{id}/edit', function (array $p) {
-    Auth::requireRole('admin', 'agent', 'power_user');
+    Auth::requirePermission('recurring_tickets.manage');
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -3328,7 +3327,7 @@ $router->post('/admin/recurring-tickets/{id}/edit', function (array $p) {
 });
 
 $router->post('/admin/recurring-tickets/{id}/toggle', function (array $p) {
-    Auth::requireRole('admin', 'agent', 'power_user');
+    Auth::requirePermission('recurring_tickets.manage');
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -3351,7 +3350,7 @@ $router->post('/admin/recurring-tickets/{id}/toggle', function (array $p) {
 });
 
 $router->post('/admin/recurring-tickets/{id}/run-now', function (array $p) {
-    Auth::requireRole('admin', 'agent', 'power_user');
+    Auth::requirePermission('recurring_tickets.manage');
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -3391,7 +3390,7 @@ $router->post('/admin/recurring-tickets/{id}/run-now', function (array $p) {
 });
 
 $router->post('/admin/recurring-tickets/{id}/delete', function (array $p) {
-    Auth::requireRole('admin', 'agent', 'power_user');
+    Auth::requirePermission('recurring_tickets.manage');
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -3412,7 +3411,7 @@ $router->post('/admin/recurring-tickets/{id}/delete', function (array $p) {
  * ================================================================== */
 
 $router->get('/admin/tickets', function () {
-    Auth::requireRole('admin');
+    Auth::requireAdmin();
     $db = Database::connect();
 
     // Compute default filter URL for client-side persistence logic
@@ -3505,7 +3504,7 @@ $router->get('/admin/tickets', function () {
     $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
     $types      = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
     $locations  = $db->query('SELECT * FROM locations ORDER BY name')->fetchAll();
-    $agents     = $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin','power_user') ORDER BY first_name")->fetchAll();
+    $agents     = $db->query("SELECT id, first_name, last_name FROM users WHERE " . staffRoleSqlIn('role') . " ORDER BY first_name")->fetchAll();
     $groups     = $db->query('SELECT * FROM `groups` ORDER BY sort_order, name')->fetchAll();
 
     // Build group → agents map for quick-assign dropdowns
@@ -3513,7 +3512,7 @@ $router->get('/admin/tickets', function () {
         "SELECT gum.group_id, u.id, CONCAT(u.first_name, ' ', u.last_name) AS name
          FROM group_user_map gum
          JOIN users u ON gum.user_id = u.id
-         WHERE u.role IN ('agent','admin','power_user')
+         WHERE " . staffRoleSqlIn('u.role') . "
          ORDER BY u.first_name, u.last_name"
     )->fetchAll();
     $groupAgents = [];
@@ -3521,7 +3520,7 @@ $router->get('/admin/tickets', function () {
         $groupAgents[(int) $row['group_id']][] = ['id' => (int) $row['id'], 'name' => $row['name']];
     }
     $allAgentsForAssign = $db->query(
-        "SELECT id, CONCAT(first_name, ' ', last_name) AS name FROM users WHERE role IN ('agent','admin','power_user') ORDER BY first_name, last_name"
+        "SELECT id, CONCAT(first_name, ' ', last_name) AS name FROM users WHERE " . staffRoleSqlIn('role') . " ORDER BY first_name, last_name"
     )->fetchAll();
 
     // Load saved filters (own + shared)
@@ -3576,7 +3575,7 @@ $router->get('/admin/tickets', function () {
 /* ── Export Tickets (CSV) ─────────────────────────────────────────── */
 
 $router->get('/admin/tickets/export', function () {
-    Auth::requireRole('admin');
+    Auth::requireAdmin();
     $db = Database::connect();
 
     // Build filters from query params
@@ -3707,7 +3706,7 @@ $router->get('/admin/tickets/export', function () {
 /* ── Column Preferences (Admin) ───────────────────────────────────── */
 
 $router->post('/admin/tickets/columns', function () {
-    Auth::requireRole('admin');
+    Auth::requireAdmin();
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/tickets');
@@ -3724,7 +3723,7 @@ $router->post('/admin/tickets/columns', function () {
 /* ── Saved Filters (Admin) ────────────────────────────────────────── */
 
 $router->post('/admin/tickets/filters/save', function () {
-    Auth::requireRole('admin');
+    Auth::requireAdmin();
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/tickets');
@@ -3757,7 +3756,7 @@ $router->post('/admin/tickets/filters/save', function () {
 });
 
 $router->post('/admin/tickets/filters/{id}/delete', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requireAdmin();
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/tickets');
@@ -3779,7 +3778,7 @@ $router->post('/admin/tickets/filters/{id}/delete', function (array $p) {
 });
 
 $router->post('/admin/tickets/filters/{id}/toggle-share', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requireAdmin();
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/tickets');
@@ -3803,7 +3802,7 @@ $router->post('/admin/tickets/filters/{id}/toggle-share', function (array $p) {
 });
 
 $router->post('/admin/tickets/filters/{id}/toggle-default', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requireAdmin();
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/tickets');
@@ -3838,7 +3837,7 @@ $router->post('/admin/tickets/filters/{id}/toggle-default', function (array $p) 
  * ================================================================== */
 
 $router->get('/admin/tickets/search', function () {
-    Auth::requireRole('admin');
+    Auth::requireAdmin();
     $db      = Database::connect();
     $q       = trim($_GET['q'] ?? '');
     $exclude = (int) ($_GET['exclude'] ?? 0);
@@ -3910,7 +3909,7 @@ $router->get('/admin/tickets/search', function () {
 });
 
 $router->get('/admin/tickets/create', function () {
-    Auth::requireRole('admin', 'agent', 'power_user');
+    Auth::requireStaff();
     $db         = Database::connect();
     $types      = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
     $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
@@ -3918,7 +3917,7 @@ $router->get('/admin/tickets/create', function () {
     $groups     = $db->query('SELECT * FROM `groups` ORDER BY sort_order, name')->fetchAll();
     $agents     = $db->query(
         "SELECT id, first_name, last_name, email FROM users
-         WHERE role IN ('admin','agent','power_user') ORDER BY first_name, last_name"
+         WHERE " . staffRoleSqlIn('role') . " ORDER BY first_name, last_name"
     )->fetchAll();
     $templates  = $db->query(
         'SELECT * FROM ticket_templates ORDER BY name'
@@ -3973,7 +3972,7 @@ $router->get('/admin/tickets/create', function () {
 });
 
 $router->post('/admin/tickets/create', function () {
-    Auth::requireRole('admin', 'agent', 'power_user');
+    Auth::requireStaff();
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/tickets/create');
@@ -3994,7 +3993,7 @@ $router->post('/admin/tickets/create', function () {
     // requester and `submitted_by` records who actually clicked submit so the
     // audit trail isn't lost. Self-submission keeps `submitted_by` NULL.
     $onBehalf    = !empty($_POST['on_behalf_of_id']) ? (int) $_POST['on_behalf_of_id'] : null;
-    $canDelegate = in_array(Auth::role(), ['admin', 'agent', 'power_user'], true);
+    $canDelegate = Auth::isStaff();
     if ($onBehalf && $canDelegate && $onBehalf !== Auth::id()) {
         $createdBy   = $onBehalf;
         $submittedBy = Auth::id();
@@ -4011,7 +4010,7 @@ $router->post('/admin/tickets/create', function () {
     if ($subject === '' || $desc === '') {
         flashInput($_POST);
         flash('error', 'Subject and description are required.');
-        $redirectBase = in_array(Auth::role(), ['agent', 'power_user'], true) ? '/agent' : '/admin';
+        $redirectBase = (Auth::isStaff() && !Auth::isAdmin()) ? '/agent' : '/admin';
         redirect("{$redirectBase}/tickets/create");
     }
 
@@ -4138,12 +4137,12 @@ $router->post('/admin/tickets/create', function () {
     }
 
     flash('success', 'Ticket #' . $ticketId . ' created.');
-    $redirectBase = in_array(Auth::role(), ['agent', 'power_user'], true) ? '/agent' : '/admin';
+    $redirectBase = (Auth::isStaff() && !Auth::isAdmin()) ? '/agent' : '/admin';
     redirect("{$redirectBase}/tickets/{$ticketId}");
 });
 
 $router->post('/admin/tickets/bulk', function () {
-    Auth::requireRole('admin', 'agent', 'power_user');
+    Auth::requireStaff();
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/tickets');
@@ -4162,7 +4161,7 @@ $router->post('/admin/tickets/bulk', function () {
     $db          = Database::connect();
 
     // Filter out confidential tickets the user cannot access
-    if (Auth::role() === 'admin') {
+    if (Auth::isAdmin()) {
         $gs = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
         $gs->execute([Auth::id()]);
         $myGroups = array_map('intval', $gs->fetchAll(PDO::FETCH_COLUMN));
@@ -4299,7 +4298,7 @@ $router->post('/admin/tickets/bulk', function () {
             redirect("/admin/tickets/{$targetId}");
 
         case 'delete':
-            Auth::requireRole('admin');
+            Auth::requireAdmin();
             $files = $db->prepare("SELECT stored_name FROM ticket_attachments WHERE ticket_id IN ({$placeholders})");
             $files->execute($ticketIds);
             foreach ($files->fetchAll() as $f) {
@@ -4324,7 +4323,7 @@ $router->post('/admin/tickets/bulk', function () {
 });
 
 $router->get('/admin/tickets/{id}', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requireAdmin();
     $db = Database::connect();
 
     $stmt = $db->prepare(
@@ -4396,13 +4395,13 @@ $router->get('/admin/tickets/{id}', function (array $p) {
             "SELECT u.id, u.first_name, u.last_name
              FROM users u
              INNER JOIN group_user_map gum ON u.id = gum.user_id
-             WHERE gum.group_id = ? AND u.role IN ('agent','admin','power_user')
+             WHERE gum.group_id = ? AND " . staffRoleSqlIn('u.role') . "
              ORDER BY u.first_name"
         );
         $agentStmt->execute([$ticket['group_id']]);
         $agents = $agentStmt->fetchAll();
     } else {
-        $agents = $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin','power_user') ORDER BY first_name")->fetchAll();
+        $agents = $db->query("SELECT id, first_name, last_name FROM users WHERE " . staffRoleSqlIn('role') . " ORDER BY first_name")->fetchAll();
     }
 
     // Priorities for update dropdown
@@ -4565,7 +4564,7 @@ $router->get('/admin/tickets/{id}', function (array $p) {
  * ================================================================== */
 
 $router->post('/admin/tickets/{id}/confidential-auth', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requireAdmin();
     $ticketId = (int) $p['id'];
 
     if (!verifyCsrf($_POST['_token'] ?? '')) {
@@ -4614,7 +4613,7 @@ $router->post('/admin/tickets/{id}/confidential-auth', function (array $p) {
  * ================================================================== */
 
 $router->post('/admin/tickets/{id}/watch', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requireAdmin();
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         redirect("/admin/tickets/{$id}");
@@ -4645,7 +4644,7 @@ $router->post('/admin/tickets/{id}/watch', function (array $p) {
  * ================================================================== */
 
 $router->post('/admin/tickets/{id}/solution', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requireAdmin();
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -4699,7 +4698,7 @@ $router->post('/admin/tickets/{id}/solution', function (array $p) {
  * ================================================================== */
 
 $router->post('/admin/tickets/{id}/merge', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requireAdmin();
     $sourceId = (int) $p['id'];
 
     if (!verifyCsrf($_POST['_token'] ?? '')) {
@@ -4820,7 +4819,7 @@ $router->post('/admin/tickets/{id}/merge', function (array $p) {
  * ================================================================== */
 
 $router->get('/admin/tickets/{id}/split', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requireAdmin();
     $db = Database::connect();
 
     $stmt = $db->prepare(
@@ -4850,7 +4849,7 @@ $router->get('/admin/tickets/{id}/split', function (array $p) {
     $commentsStmt->execute([$ticket['id']]);
     $comments = $commentsStmt->fetchAll();
 
-    $agents     = $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin','power_user') ORDER BY first_name")->fetchAll();
+    $agents     = $db->query("SELECT id, first_name, last_name FROM users WHERE " . staffRoleSqlIn('role') . " ORDER BY first_name")->fetchAll();
     $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
     $types      = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
     $groups     = $db->query('SELECT * FROM `groups` ORDER BY sort_order, name')->fetchAll();
@@ -4859,7 +4858,7 @@ $router->get('/admin/tickets/{id}/split', function (array $p) {
 });
 
 $router->post('/admin/tickets/{id}/split', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requireAdmin();
     $sourceId = (int) $p['id'];
 
     if (!verifyCsrf($_POST['_token'] ?? '')) {
@@ -4963,7 +4962,7 @@ $router->post('/admin/tickets/{id}/split', function (array $p) {
  * ================================================================== */
 
 $router->post('/admin/tickets/{id}/fields', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requireAdmin();
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -5020,7 +5019,7 @@ $router->post('/admin/tickets/{id}/fields', function (array $p) {
  * ================================================================== */
 
 $router->post('/admin/tickets/{id}/comment', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requireAdmin();
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -5130,7 +5129,7 @@ $router->post('/admin/tickets/{id}/comment', function (array $p) {
  * ================================================================== */
 
 $router->post('/admin/tickets/{id}/update', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requireAdmin();
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -5295,7 +5294,7 @@ $router->post('/admin/tickets/{id}/update', function (array $p) {
  * ADMIN – Delete All Tickets
  * ================================================================== */
 $router->post('/admin/tickets/delete-all', function () {
-    Auth::requireRole('admin');
+    Auth::requireAdmin();
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/tickets');
@@ -5326,7 +5325,7 @@ $router->post('/admin/tickets/delete-all', function () {
  * ================================================================== */
 
 $router->get('/admin/attachments/{id}/download', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requireAdmin();
     $db = Database::connect();
 
     $stmt = $db->prepare('SELECT * FROM ticket_attachments WHERE id = ?');
@@ -5356,23 +5355,23 @@ $router->get('/admin/attachments/{id}/download', function (array $p) {
  * ================================================================== */
 
 $router->get('/admin/kb/categories', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('kb.structure.manage');
     $categories = Database::connect()->query('SELECT * FROM kb_categories ORDER BY sort_order, name')->fetchAll();
     render('admin/kb/categories/index', ['categories' => $categories]);
 });
 
 $router->post('/admin/kb/categories/reorder', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('kb.structure.manage');
     handleSortableReorder('kb_categories');
 });
 
 $router->get('/admin/kb/categories/create', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('kb.structure.manage');
     render('admin/kb/categories/form', ['editing' => null]);
 });
 
 $router->post('/admin/kb/categories/create', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('kb.structure.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/kb/categories/create');
@@ -5403,7 +5402,7 @@ $router->post('/admin/kb/categories/create', function () {
 });
 
 $router->get('/admin/kb/categories/{id}/edit', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('kb.structure.manage');
     $stmt = Database::connect()->prepare('SELECT * FROM kb_categories WHERE id = ?');
     $stmt->execute([(int) $p['id']]);
     $editing = $stmt->fetch();
@@ -5415,7 +5414,7 @@ $router->get('/admin/kb/categories/{id}/edit', function (array $p) {
 });
 
 $router->post('/admin/kb/categories/{id}/edit', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('kb.structure.manage');
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -5454,7 +5453,7 @@ $router->post('/admin/kb/categories/{id}/edit', function (array $p) {
 });
 
 $router->post('/admin/kb/categories/{id}/delete', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('kb.structure.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/kb/categories');
@@ -5475,7 +5474,7 @@ $router->post('/admin/kb/categories/{id}/delete', function (array $p) {
  * ================================================================== */
 
 $router->get('/admin/kb/folders', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('kb.structure.manage');
     $folders = Database::connect()->query(
         'SELECT f.*, c.name AS category_name
          FROM kb_folders f
@@ -5486,18 +5485,18 @@ $router->get('/admin/kb/folders', function () {
 });
 
 $router->post('/admin/kb/folders/reorder', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('kb.structure.manage');
     handleSortableReorder('kb_folders');
 });
 
 $router->get('/admin/kb/folders/create', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('kb.structure.manage');
     $categories = Database::connect()->query('SELECT * FROM kb_categories ORDER BY sort_order, name')->fetchAll();
     render('admin/kb/folders/form', ['editing' => null, 'categories' => $categories]);
 });
 
 $router->post('/admin/kb/folders/create', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('kb.structure.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/kb/folders/create');
@@ -5527,7 +5526,7 @@ $router->post('/admin/kb/folders/create', function () {
 });
 
 $router->get('/admin/kb/folders/{id}/edit', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('kb.structure.manage');
     $db   = Database::connect();
     $stmt = $db->prepare('SELECT * FROM kb_folders WHERE id = ?');
     $stmt->execute([(int) $p['id']]);
@@ -5541,7 +5540,7 @@ $router->get('/admin/kb/folders/{id}/edit', function (array $p) {
 });
 
 $router->post('/admin/kb/folders/{id}/edit', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('kb.structure.manage');
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -5580,7 +5579,7 @@ $router->post('/admin/kb/folders/{id}/edit', function (array $p) {
 });
 
 $router->post('/admin/kb/folders/{id}/delete', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('kb.structure.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/kb/folders');
@@ -5601,7 +5600,7 @@ $router->post('/admin/kb/folders/{id}/delete', function (array $p) {
  * ================================================================== */
 
 $router->get('/admin/kb/articles', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('kb.articles.manage');
     $db = Database::connect();
     $authorId = isset($_GET['author']) ? (int) $_GET['author'] : 0;
     $sql = "SELECT a.*, f.name AS folder_name, c.name AS category_name,
@@ -5625,7 +5624,7 @@ $router->get('/admin/kb/articles', function () {
 });
 
 $router->get('/admin/kb/articles/create', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('kb.articles.manage');
     $folders = Database::connect()->query(
         'SELECT f.id, f.name, c.name AS category_name
          FROM kb_folders f
@@ -5636,7 +5635,7 @@ $router->get('/admin/kb/articles/create', function () {
 });
 
 $router->post('/admin/kb/articles/create', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('kb.articles.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/kb/articles/create');
@@ -5676,14 +5675,14 @@ $router->post('/admin/kb/articles/create', function () {
 });
 
 $router->get('/admin/kb/articles/{id}/edit', function (array $p) {
-    Auth::requireRole('admin', 'agent', 'power_user');
+    Auth::requireStaff();
     $db   = Database::connect();
     $stmt = $db->prepare('SELECT * FROM kb_articles WHERE id = ?');
     $stmt->execute([(int) $p['id']]);
     $editing = $stmt->fetch();
     if (!$editing) {
         flash('error', 'Article not found.');
-        redirect(Auth::role() === 'admin' ? '/admin/kb/articles' : '/agent/kb');
+        redirect(Auth::isAdmin() ? '/admin/kb/articles' : '/agent/kb');
     }
     $folders = $db->query(
         'SELECT f.id, f.name, c.name AS category_name
@@ -5695,7 +5694,7 @@ $router->get('/admin/kb/articles/{id}/edit', function (array $p) {
 });
 
 $router->post('/admin/kb/articles/{id}/edit', function (array $p) {
-    Auth::requireRole('admin', 'agent', 'power_user');
+    Auth::requireStaff();
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -5759,11 +5758,11 @@ $router->post('/admin/kb/articles/{id}/edit', function (array $p) {
         ['title' => $title, 'folder_id' => $folderId, 'status' => $status]
     );
     flash('success', 'Article updated.');
-    redirect(Auth::role() === 'admin' ? '/admin/kb/articles' : '/agent/kb');
+    redirect(Auth::isAdmin() ? '/admin/kb/articles' : '/agent/kb');
 });
 
 $router->post('/admin/kb/articles/{id}/delete', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('kb.articles.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/kb/articles');
@@ -5780,7 +5779,7 @@ $router->post('/admin/kb/articles/{id}/delete', function (array $p) {
 });
 
 $router->get('/admin/kb/articles/{id}/preview', function (array $p) {
-    Auth::requireRole('admin', 'agent', 'power_user');
+    Auth::requireStaff();
     $db   = Database::connect();
     $stmt = $db->prepare(
         'SELECT a.*, f.name AS folder_name, f.slug AS folder_slug,
@@ -5805,7 +5804,7 @@ $router->get('/admin/kb/articles/{id}/preview', function (array $p) {
  * ================================================================== */
 
 $router->get('/admin/kb/articles/{id}/history', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('kb.articles.manage');
     $db      = Database::connect();
     $id      = (int) $p['id'];
     $stmt    = $db->prepare('SELECT * FROM kb_articles WHERE id = ?');
@@ -5828,7 +5827,7 @@ $router->get('/admin/kb/articles/{id}/history', function (array $p) {
 });
 
 $router->get('/admin/kb/articles/{id}/history/{rid}', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('kb.articles.manage');
     $db      = Database::connect();
     $id      = (int) $p['id'];
     $rid     = (int) $p['rid'];
@@ -5903,7 +5902,7 @@ $router->get('/admin/kb/articles/{id}/history/{rid}', function (array $p) {
  * ================================================================== */
 
 $router->get('/admin/kb/export', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('kb.articles.manage');
     $db = Database::connect();
 
     $stmt = $db->query(
@@ -5940,7 +5939,7 @@ $router->get('/admin/kb/export', function () {
 });
 
 $router->get('/admin/kb/import', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('import.manage');
     render('admin/kb/import', [
         'layout'       => 'app',
         'pageTitle'    => 'Import Knowledge Base',
@@ -5954,7 +5953,7 @@ $router->get('/admin/kb/import', function () {
 });
 
 $router->post('/admin/kb/import/preview', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('import.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/kb/import');
@@ -6069,7 +6068,7 @@ $router->post('/admin/kb/import/preview', function () {
 });
 
 $router->post('/admin/kb/import/confirm', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('import.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/kb/import');
@@ -6215,7 +6214,7 @@ $router->post('/admin/kb/import/confirm', function () {
  * ================================================================== */
 
 $router->get('/admin/settings', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
     $keys = [
         'smtp_host', 'smtp_port', 'smtp_encryption', 'smtp_username', 'smtp_password',
         'mail_from_address', 'mail_from_name', 'smtp_debug',
@@ -6248,7 +6247,7 @@ $router->get('/admin/settings', function () {
 });
 
 $router->post('/admin/settings/email', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings');
@@ -6298,7 +6297,7 @@ $router->post('/admin/settings/email', function () {
 });
 
 $router->post('/admin/settings/graph', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings');
@@ -6363,7 +6362,7 @@ $router->post('/admin/settings/graph', function () {
 });
 
 $router->post('/admin/settings/ticket-routing', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings');
@@ -6390,7 +6389,7 @@ $router->post('/admin/settings/ticket-routing', function () {
 });
 
 $router->post('/admin/settings/email-to-ticket', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings');
@@ -6419,12 +6418,12 @@ $router->post('/admin/settings/email-to-ticket', function () {
 });
 
 $router->get('/admin/settings/email-reply-help', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
     render('admin/settings/email-reply-help', []);
 });
 
 $router->post('/admin/settings/run-reply-processor', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings');
@@ -6447,7 +6446,7 @@ $router->post('/admin/settings/run-reply-processor', function () {
 });
 
 $router->post('/admin/settings/test-email', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings');
@@ -6483,7 +6482,7 @@ $router->post('/admin/settings/test-email', function () {
  * ================================================================== */
 
 $router->get('/admin/settings/email-templates', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
 
     $keys = [
         'email_subject_ticket_created',   'email_intro_ticket_created',   'email_button_ticket_created',
@@ -6515,7 +6514,7 @@ $router->get('/admin/settings/email-templates', function () {
 });
 
 $router->post('/admin/settings/email-templates', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/email-templates');
@@ -6575,7 +6574,7 @@ $router->post('/admin/settings/email-templates', function () {
  * ================================================================== */
 
 $router->get('/admin/settings/email-notifications', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
 
     $keys = [
         'agent_new_ticket', 'agent_assigned_group', 'agent_assigned_agent',
@@ -6596,7 +6595,7 @@ $router->get('/admin/settings/email-notifications', function () {
 });
 
 $router->post('/admin/settings/email-notifications', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/email-notifications');
@@ -6631,7 +6630,7 @@ $router->post('/admin/settings/email-notifications', function () {
  * ================================================================== */
 
 $router->get('/admin/settings/business-hours', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
     $timezone = getSetting('business_hours_timezone');
     $json = getSetting('business_hours_schedule');
     $schedule = $json !== '' ? (json_decode($json, true) ?: []) : [];
@@ -6639,7 +6638,7 @@ $router->get('/admin/settings/business-hours', function () {
 });
 
 $router->post('/admin/settings/business-hours', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/business-hours');
@@ -6680,14 +6679,14 @@ $router->post('/admin/settings/business-hours', function () {
  * ================================================================== */
 
 $router->get('/admin/settings/holidays', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
     $db = Database::connect();
     $holidays = $db->query('SELECT * FROM holidays ORDER BY holiday_date ASC')->fetchAll();
     render('admin/settings/holidays', ['holidays' => $holidays]);
 });
 
 $router->post('/admin/settings/holidays', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/holidays');
@@ -6733,7 +6732,7 @@ $router->post('/admin/settings/holidays', function () {
 });
 
 $router->post('/admin/settings/holidays/delete', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/holidays');
@@ -6758,7 +6757,7 @@ $router->post('/admin/settings/holidays/delete', function () {
 });
 
 $router->post('/admin/settings/holidays/toggle', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/holidays');
@@ -6782,7 +6781,7 @@ $router->post('/admin/settings/holidays/toggle', function () {
 });
 
 $router->post('/admin/settings/holidays/auto-populate', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/holidays');
@@ -6843,7 +6842,7 @@ $router->post('/admin/settings/holidays/auto-populate', function () {
  * ================================================================== */
 
 $router->get('/admin/settings/sla-policies', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('sla.manage');
     $db = Database::connect();
     $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
     $types = $db->query('SELECT * FROM ticket_types ORDER BY name')->fetchAll();
@@ -6861,7 +6860,7 @@ $router->get('/admin/settings/sla-policies', function () {
 });
 
 $router->post('/admin/settings/sla-policies', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('sla.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/sla-policies');
@@ -6904,7 +6903,7 @@ $router->post('/admin/settings/sla-policies', function () {
 });
 
 $router->post('/admin/settings/sla-recalculate', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('sla.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/sla-policies');
@@ -6917,7 +6916,7 @@ $router->post('/admin/settings/sla-recalculate', function () {
 });
 
 $router->post('/admin/settings/sla-toggle', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('sla.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/sla-policies');
@@ -6937,7 +6936,7 @@ $router->post('/admin/settings/sla-toggle', function () {
  * ================================================================== */
 
 $router->get('/admin/settings/import', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('import.manage');
     $skippedFile = $_SESSION['import_skipped_file'] ?? null;
     render('admin/settings/import', [
         'hasSkippedDownload' => $skippedFile !== null && file_exists($skippedFile),
@@ -6945,7 +6944,7 @@ $router->get('/admin/settings/import', function () {
 });
 
 $router->get('/admin/settings/import/download-skipped', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('import.manage');
     $filePath = $_SESSION['import_skipped_file'] ?? '';
     if ($filePath === '' || !file_exists($filePath)) {
         flash('error', 'Skipped rows file not found or already downloaded.');
@@ -6961,7 +6960,7 @@ $router->get('/admin/settings/import/download-skipped', function () {
 });
 
 $router->post('/admin/settings/import/preview', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('import.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/import');
@@ -7072,7 +7071,7 @@ $router->post('/admin/settings/import/preview', function () {
 });
 
 $router->get('/admin/settings/import/map', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('import.manage');
     if (empty($_SESSION['import_headers'])) {
         flash('error', 'No import data found. Please upload a CSV file first.');
         redirect('/admin/settings/import');
@@ -7143,7 +7142,7 @@ $router->get('/admin/settings/import/map', function () {
 });
 
 $router->post('/admin/settings/import/map', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('import.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/import');
@@ -7246,7 +7245,7 @@ $router->post('/admin/settings/import/map', function () {
 });
 
 $router->get('/admin/settings/import/preview', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('import.manage');
     $summary = $_SESSION['import_summary'] ?? null;
     if (!$summary || empty($_SESSION['import_file'])) {
         flash('error', 'No import data found. Please start the import again.');
@@ -7316,7 +7315,7 @@ $router->get('/admin/settings/import/preview', function () {
 });
 
 $router->post('/admin/settings/import/confirm', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('import.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/import');
@@ -7647,12 +7646,12 @@ $router->post('/admin/settings/import/confirm', function () {
  * ================================================================== */
 
 $router->get('/admin/settings/import-users', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('users.manage');
     render('admin/settings/import-users');
 });
 
 $router->post('/admin/settings/import-users/preview', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('users.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/import-users');
@@ -7705,7 +7704,7 @@ $router->post('/admin/settings/import-users/preview', function () {
 });
 
 $router->get('/admin/settings/import-users/map', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('users.manage');
     $raw = $_SESSION['user_import_raw'] ?? null;
     if (!$raw) {
         flash('error', 'No import data found. Please upload a CSV file first.');
@@ -7757,7 +7756,7 @@ $router->get('/admin/settings/import-users/map', function () {
 });
 
 $router->post('/admin/settings/import-users/map', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('users.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/import-users');
@@ -7787,7 +7786,6 @@ $router->post('/admin/settings/import-users/map', function () {
         $existingLocations[strtolower($l['name'])] = $l['id'];
     }
 
-    $validRoles = ['user', 'agent', 'power_user', 'admin'];
     $rows = [];
     $duplicateEmails  = [];
     $newLocationNames = [];
@@ -7817,7 +7815,7 @@ $router->post('/admin/settings/import-users/map', function () {
         }
 
         $roleRaw = strtolower($get('role'));
-        $role    = in_array($roleRaw, $validRoles, true) ? $roleRaw : 'user';
+        $role    = roleExists($roleRaw) ? $roleRaw : 'user';
 
         $location = $get('location');
         if ($location !== '' && !isset($existingLocations[strtolower($location)])) {
@@ -7855,7 +7853,7 @@ $router->post('/admin/settings/import-users/map', function () {
 });
 
 $router->get('/admin/settings/import-users/preview', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('users.manage');
     $rows    = $_SESSION['user_import_data']    ?? null;
     $summary = $_SESSION['user_import_summary'] ?? null;
     if (!$rows || !$summary) {
@@ -7869,7 +7867,7 @@ $router->get('/admin/settings/import-users/preview', function () {
 });
 
 $router->post('/admin/settings/import-users/confirm', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('users.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/import-users');
@@ -7965,12 +7963,12 @@ $router->post('/admin/settings/import-users/confirm', function () {
  * ================================================================== */
 
 $router->get('/admin/settings/import-kb', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('import.manage');
     render('admin/settings/import-kb');
 });
 
 $router->post('/admin/settings/import-kb/preview', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('import.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/import-kb');
@@ -8065,7 +8063,7 @@ $router->post('/admin/settings/import-kb/preview', function () {
 });
 
 $router->post('/admin/settings/import-kb/confirm', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('import.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/import-kb');
@@ -8165,7 +8163,7 @@ $router->post('/admin/settings/import-kb/confirm', function () {
  * ================================================================== */
 
 $router->get('/admin/settings/branding', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
     render('admin/settings/branding', [
         'appName'             => getSetting('branding_app_name', 'OpenHelpDesk'),
         'primaryColor'        => getSetting('branding_primary_color', '#4f46e5'),
@@ -8182,7 +8180,7 @@ $router->get('/admin/settings/branding', function () {
 });
 
 $router->post('/admin/settings/branding', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
     verifyCsrf($_POST['_token'] ?? '');
 
     $appName              = trim($_POST['app_name'] ?? 'OpenHelpDesk');
@@ -8298,12 +8296,12 @@ $router->post('/admin/settings/branding', function () {
  * ================================================================== */
 
 $router->get('/admin/settings/labels', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
     render('admin/settings/labels');
 });
 
 $router->get('/admin/settings/labels/download', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
     $defaultFile = ROOT_DIR . '/config/labels.default.json';
     $defaults    = is_file($defaultFile)
         ? (json_decode(file_get_contents($defaultFile), true) ?: [])
@@ -8325,7 +8323,7 @@ $router->get('/admin/settings/labels/download', function () {
 });
 
 $router->post('/admin/settings/labels/upload', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/labels');
@@ -8393,7 +8391,7 @@ $router->post('/admin/settings/labels/upload', function () {
 });
 
 $router->post('/admin/settings/labels/reset', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/labels');
@@ -8408,7 +8406,7 @@ $router->post('/admin/settings/labels/reset', function () {
  * ================================================================== */
 
 $router->get('/admin/settings/cron-jobs', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('automations.manage');
     render('admin/settings/cron-jobs');
 });
 
@@ -8417,7 +8415,7 @@ $router->get('/admin/settings/cron-jobs', function () {
  * ================================================================== */
 
 $router->get('/admin/settings/automations', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('automations.manage');
     $db = Database::connect();
     $automations = $db->query('SELECT * FROM automations ORDER BY sort_order, id')->fetchAll();
     $refData     = loadAutomationRefData($db);
@@ -8425,19 +8423,19 @@ $router->get('/admin/settings/automations', function () {
 });
 
 $router->post('/admin/settings/automations/reorder', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('automations.manage');
     handleSortableReorder('automations');
 });
 
 $router->get('/admin/settings/automations/create', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('automations.manage');
     $db = Database::connect();
     $refData = loadAutomationRefData($db);
     render('admin/automations/form', $refData);
 });
 
 $router->post('/admin/settings/automations/create', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('automations.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/automations/create');
@@ -8485,7 +8483,7 @@ $router->post('/admin/settings/automations/create', function () {
 });
 
 $router->get('/admin/settings/automations/{id}/edit', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('automations.manage');
     $db   = Database::connect();
     $stmt = $db->prepare('SELECT * FROM automations WHERE id = ?');
     $stmt->execute([(int) $p['id']]);
@@ -8503,7 +8501,7 @@ $router->get('/admin/settings/automations/{id}/edit', function (array $p) {
 });
 
 $router->post('/admin/settings/automations/{id}/edit', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('automations.manage');
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -8564,7 +8562,7 @@ $router->post('/admin/settings/automations/{id}/edit', function (array $p) {
 });
 
 $router->post('/admin/settings/automations/{id}/delete', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('automations.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/automations');
@@ -8581,7 +8579,7 @@ $router->post('/admin/settings/automations/{id}/delete', function (array $p) {
 });
 
 $router->post('/admin/settings/automations/{id}/toggle', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('automations.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/automations');
@@ -8607,7 +8605,7 @@ $router->post('/admin/settings/automations/{id}/toggle', function (array $p) {
 });
 
 $router->post('/admin/settings/automations/{id}/run', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('automations.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/automations');
@@ -8772,7 +8770,7 @@ function loadAutomationRefData(PDO $db): array
         'priorities' => $db->query('SELECT id, name FROM ticket_priorities ORDER BY sort_order')->fetchAll(),
         'locations'  => $db->query('SELECT id, name FROM locations ORDER BY name')->fetchAll(),
         'groups'     => $db->query('SELECT id, name FROM groups ORDER BY name')->fetchAll(),
-        'agents'     => $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin','power_user') ORDER BY first_name")->fetchAll(),
+        'agents'     => $db->query("SELECT id, first_name, last_name FROM users WHERE " . staffRoleSqlIn('role') . " ORDER BY first_name")->fetchAll(),
         'allUsers'   => $db->query("SELECT id, first_name, last_name, email FROM users ORDER BY first_name")->fetchAll(),
     ];
 }
@@ -8837,26 +8835,26 @@ function buildAutomationActions(array $post): array
  * ================================================================== */
 
 $router->get('/admin/settings/escalations', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('automations.manage');
     $db = Database::connect();
     $rules = $db->query('SELECT * FROM escalation_rules ORDER BY sort_order, id')->fetchAll();
     render('admin/settings/escalations/index', ['rules' => $rules]);
 });
 
 $router->post('/admin/settings/escalations/reorder', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('automations.manage');
     handleSortableReorder('escalation_rules');
 });
 
 $router->get('/admin/settings/escalations/create', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('automations.manage');
     $db      = Database::connect();
     $refData = loadEscalationRefData($db);
     render('admin/settings/escalations/form', $refData);
 });
 
 $router->post('/admin/settings/escalations/create', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('automations.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/escalations');
@@ -8897,7 +8895,7 @@ $router->post('/admin/settings/escalations/create', function () {
 });
 
 $router->get('/admin/settings/escalations/{id}/edit', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('automations.manage');
     $db = Database::connect();
     $stmt = $db->prepare('SELECT * FROM escalation_rules WHERE id = ?');
     $stmt->execute([(int) $p['id']]);
@@ -8914,7 +8912,7 @@ $router->get('/admin/settings/escalations/{id}/edit', function (array $p) {
 });
 
 $router->post('/admin/settings/escalations/{id}/edit', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('automations.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/escalations');
@@ -8966,7 +8964,7 @@ $router->post('/admin/settings/escalations/{id}/edit', function (array $p) {
 });
 
 $router->post('/admin/settings/escalations/{id}/toggle', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('automations.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/escalations');
@@ -8987,7 +8985,7 @@ $router->post('/admin/settings/escalations/{id}/toggle', function (array $p) {
 });
 
 $router->post('/admin/settings/escalations/{id}/delete', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('automations.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/escalations');
@@ -9004,7 +9002,7 @@ $router->post('/admin/settings/escalations/{id}/delete', function (array $p) {
 });
 
 $router->post('/admin/settings/escalations/run-now', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('automations.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/escalations');
@@ -9030,7 +9028,7 @@ function loadEscalationRefData(PDO $db): array
     return [
         'priorities' => $db->query('SELECT id, name FROM ticket_priorities ORDER BY sort_order')->fetchAll(),
         'groups'     => $db->query('SELECT id, name FROM groups ORDER BY name')->fetchAll(),
-        'agents'     => $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin','power_user') ORDER BY first_name")->fetchAll(),
+        'agents'     => $db->query("SELECT id, first_name, last_name FROM users WHERE " . staffRoleSqlIn('role') . " ORDER BY first_name")->fetchAll(),
         'allUsers'   => $db->query("SELECT id, first_name, last_name, email FROM users ORDER BY first_name")->fetchAll(),
     ];
 }
@@ -9081,14 +9079,14 @@ function buildEscalationActions(array $post): array
  * ADMIN – Settings: Danger Zone
  * ================================================================== */
 $router->get('/admin/settings/danger-zone', function () {
-    Auth::requireRole('admin');
+    Auth::requireAdmin();
     $db = Database::connect();
     $ticketCount = (int) $db->query('SELECT COUNT(*) FROM tickets')->fetchColumn();
     render('admin/settings/danger-zone', ['ticketCount' => $ticketCount]);
 });
 
 $router->post('/admin/settings/danger-zone/reset', function () {
-    Auth::requireRole('admin');
+    Auth::requireAdmin();
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/danger-zone');
@@ -9151,7 +9149,7 @@ function reportDateRange(): array
 /* ── Reports Overview ─────────────────────────────────────────────── */
 
 $router->get('/admin/reports', function () {
-    Auth::requireRole('admin', 'power_user');
+    Auth::requirePermission('reports.view');
     $db = Database::connect();
     [$from, $to] = reportDateRange();
     $toEnd = $to . ' 23:59:59';
@@ -9212,7 +9210,7 @@ $router->get('/admin/reports', function () {
 /* ── Agent Performance ────────────────────────────────────────────── */
 
 $router->get('/admin/reports/agent-performance', function () {
-    Auth::requireRole('admin', 'power_user');
+    Auth::requirePermission('reports.view');
     $db = Database::connect();
     [$from, $to] = reportDateRange();
     $toEnd = $to . ' 23:59:59';
@@ -9240,7 +9238,7 @@ $router->get('/admin/reports/agent-performance', function () {
             SUM(CASE WHEN t.sla_state = 'breached' THEN 1 ELSE 0 END) AS sla_breached
          FROM users u
          LEFT JOIN tickets t ON t.assigned_to = u.id AND t.created_at BETWEEN ? AND ?
-         WHERE u.role IN ('admin','agent','power_user')
+         WHERE " . staffRoleSqlIn('u.role') . "
          GROUP BY u.id, u.first_name, u.last_name
          ORDER BY resolved DESC"
     );
@@ -9262,7 +9260,7 @@ $router->get('/admin/reports/agent-performance', function () {
 /* ── Response Times ───────────────────────────────────────────────── */
 
 $router->get('/admin/reports/response-times', function () {
-    Auth::requireRole('admin', 'power_user');
+    Auth::requirePermission('reports.view');
     $db = Database::connect();
     [$from, $to] = reportDateRange();
     $toEnd = $to . ' 23:59:59';
@@ -9357,7 +9355,7 @@ $router->get('/admin/reports/response-times', function () {
 /* ── SLA Compliance ───────────────────────────────────────────────── */
 
 $router->get('/admin/reports/sla', function () {
-    Auth::requireRole('admin', 'power_user');
+    Auth::requirePermission('reports.view');
     $db = Database::connect();
     [$from, $to] = reportDateRange();
     $toEnd = $to . ' 23:59:59';
@@ -9445,7 +9443,7 @@ $router->get('/admin/reports/sla', function () {
 /* ── Unresolved Tickets ───────────────────────────────────────────── */
 
 $router->get('/admin/reports/unresolved', function () {
-    Auth::requireRole('admin', 'power_user');
+    Auth::requirePermission('reports.view');
     $db = Database::connect();
 
     // ── Inputs (drilldown filters + pagination) ────────────────────
@@ -9561,7 +9559,7 @@ $router->get('/admin/reports/unresolved', function () {
 /* ── Ticket Volume ────────────────────────────────────────────────── */
 
 $router->get('/admin/reports/ticket-volume', function () {
-    Auth::requireRole('admin', 'power_user');
+    Auth::requirePermission('reports.view');
     $db = Database::connect();
     [$from, $to] = reportDateRange();
     $toEnd = $to . ' 23:59:59';
@@ -9627,7 +9625,7 @@ $router->get('/admin/reports/ticket-volume', function () {
 /* ── Ticket Lifecycle ─────────────────────────────────────────────── */
 
 $router->get('/admin/reports/lifecycle', function () {
-    Auth::requireRole('admin', 'power_user');
+    Auth::requirePermission('reports.view');
     $db = Database::connect();
     [$from, $to] = reportDateRange();
     $toEnd = $to . ' 23:59:59';
@@ -9756,7 +9754,7 @@ $router->get('/admin/reports/lifecycle', function () {
 /* ── Location Report ──────────────────────────────────────────────── */
 
 $router->get('/admin/reports/location', function () {
-    Auth::requireRole('admin', 'power_user');
+    Auth::requirePermission('reports.view');
     $db = Database::connect();
     [$from, $to] = reportDateRange();
     $toEnd = $to . ' 23:59:59';
@@ -9804,7 +9802,7 @@ $router->get('/admin/reports/location', function () {
 /* ── CSAT Satisfaction Report ─────────────────────────────────────── */
 
 $router->get('/admin/reports/csat', function () {
-    Auth::requireRole('admin', 'power_user');
+    Auth::requirePermission('reports.view');
     $db = Database::connect();
     [$from, $to] = reportDateRange();
     $toEnd = $to . ' 23:59:59';
@@ -9864,7 +9862,7 @@ $router->get('/admin/reports/csat', function () {
  * ================================================================== */
 
 $router->get('/admin/settings/tags', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
     $settings = [
         'tags_enabled' => getSetting('tags_enabled', '1'),
     ];
@@ -9872,7 +9870,7 @@ $router->get('/admin/settings/tags', function () {
 });
 
 $router->post('/admin/settings/tags', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/tags');
@@ -9903,7 +9901,7 @@ $router->post('/admin/settings/tags', function () {
  * ================================================================== */
 
 $router->get('/admin/settings/ticket-statuses', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('workflows.manage');
     // Defensive: never let the browser serve a cached copy after a write.
     // Drag-reorder + POST-redirect-GET cycles return to this page expecting
     // to see fresh data; a 304 here would mask successful saves.
@@ -9915,13 +9913,13 @@ $router->get('/admin/settings/ticket-statuses', function () {
 });
 
 $router->post('/admin/settings/ticket-statuses/reorder', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('workflows.manage');
     handleSortableReorder('ticket_statuses');
     ticketStatusCacheRefresh();
 });
 
 $router->post('/admin/settings/ticket-statuses/create', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('workflows.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/ticket-statuses');
@@ -9971,7 +9969,7 @@ $router->post('/admin/settings/ticket-statuses/create', function () {
 });
 
 $router->post('/admin/settings/ticket-statuses/{id}/edit', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('workflows.manage');
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -10053,7 +10051,7 @@ $router->post('/admin/settings/ticket-statuses/{id}/edit', function (array $p) {
 });
 
 $router->post('/admin/settings/ticket-statuses/{id}/toggle-active', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('workflows.manage');
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -10104,7 +10102,7 @@ $router->post('/admin/settings/ticket-statuses/{id}/toggle-active', function (ar
 });
 
 $router->post('/admin/settings/ticket-statuses/{id}/set-default', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('workflows.manage');
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -10155,7 +10153,7 @@ $router->post('/admin/settings/ticket-statuses/{id}/set-default', function (arra
 });
 
 $router->post('/admin/settings/ticket-statuses/{id}/delete', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('workflows.manage');
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -10281,7 +10279,7 @@ $router->post('/admin/settings/ticket-statuses/{id}/delete', function (array $p)
  * ================================================================== */
 
 $router->get('/admin/settings/organization', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
     $settings = [
         'organization_type' => getSetting('organization_type', 'other'),
     ];
@@ -10290,7 +10288,7 @@ $router->get('/admin/settings/organization', function () {
 });
 
 $router->post('/admin/settings/organization', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('settings.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/organization');
@@ -10325,7 +10323,7 @@ $router->post('/admin/settings/organization', function () {
  * ================================================================== */
 
 $router->get('/admin/settings/csat', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('csat.manage');
     $settings = [
         'csat_enabled'               => getSetting('csat_enabled', '0'),
         'csat_trigger_status'        => getSetting('csat_trigger_status', ticketDefaultResolvedStatusSlug()),
@@ -10338,7 +10336,7 @@ $router->get('/admin/settings/csat', function () {
 });
 
 $router->post('/admin/settings/csat', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('csat.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/csat');
@@ -10408,7 +10406,7 @@ $router->post('/admin/settings/csat', function () {
 });
 
 $router->post('/admin/settings/csat/test', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('csat.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/csat');
@@ -10522,7 +10520,7 @@ $router->post('/admin/settings/csat/test', function () {
  * ================================================================== */
 
 $router->get('/admin/reports/workload', function () {
-    Auth::requireRole('admin', 'power_user');
+    Auth::requirePermission('reports.view');
     $db = Database::connect();
 
     // Workload report breaks out specific status counts. The four breakouts
@@ -10557,7 +10555,7 @@ $router->get('/admin/reports/workload', function () {
  * ================================================================== */
 
 $router->get('/admin/reports/trends', function () {
-    Auth::requireRole('admin', 'power_user');
+    Auth::requirePermission('reports.view');
     $db      = Database::connect();
     [$from, $to] = reportDateRange();
     $toEnd   = $to . ' 23:59:59';
@@ -10628,7 +10626,7 @@ $router->get('/admin/reports/trends', function () {
  * ================================================================== */
 
 $router->get('/admin/reports/fcr', function () {
-    Auth::requireRole('admin', 'power_user');
+    Auth::requirePermission('reports.view');
     $db = Database::connect();
     [$from, $to] = reportDateRange();
     $toEnd = $to . ' 23:59:59';
@@ -10740,7 +10738,7 @@ $router->get('/admin/reports/fcr', function () {
  * ================================================================== */
 
 $router->get('/admin/reports/group-coverage', function () {
-    Auth::requireRole('admin', 'power_user');
+    Auth::requirePermission('reports.view');
     $db = Database::connect();
 
     $rows = $db->query(
@@ -10770,7 +10768,7 @@ $router->get('/admin/reports/group-coverage', function () {
  * ================================================================== */
 
 $router->get('/admin/reports/custom', function () {
-    Auth::requireRole('admin', 'power_user');
+    Auth::requirePermission('reports.view');
     $db = Database::connect();
     [$from, $to] = reportDateRange();
     $toEnd = $to . ' 23:59:59';
@@ -10860,20 +10858,20 @@ $router->get('/admin/reports/custom', function () {
  * ================================================================== */
 
 $router->get('/admin/settings/scheduled-reports', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('automations.manage');
     $db      = Database::connect();
     $reports = $db->query('SELECT * FROM scheduled_reports ORDER BY name')->fetchAll();
     render('admin/settings/scheduled-reports', compact('reports'));
 });
 
 $router->get('/admin/settings/scheduled-reports/create', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('automations.manage');
     $report = null;
     render('admin/settings/scheduled-reports-form', compact('report'));
 });
 
 $router->post('/admin/settings/scheduled-reports/create', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('automations.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/scheduled-reports');
@@ -10914,7 +10912,7 @@ $router->post('/admin/settings/scheduled-reports/create', function () {
 });
 
 $router->get('/admin/settings/scheduled-reports/{id}/edit', function (array $vars) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('automations.manage');
     $db     = Database::connect();
     $stmt   = $db->prepare('SELECT * FROM scheduled_reports WHERE id = ?');
     $stmt->execute([(int)$vars['id']]);
@@ -10924,7 +10922,7 @@ $router->get('/admin/settings/scheduled-reports/{id}/edit', function (array $var
 });
 
 $router->post('/admin/settings/scheduled-reports/{id}/edit', function (array $vars) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('automations.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/scheduled-reports');
@@ -10970,7 +10968,7 @@ $router->post('/admin/settings/scheduled-reports/{id}/edit', function (array $va
 });
 
 $router->post('/admin/settings/scheduled-reports/{id}/delete', function (array $vars) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('automations.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/scheduled-reports');
@@ -10987,7 +10985,7 @@ $router->post('/admin/settings/scheduled-reports/{id}/delete', function (array $
 });
 
 $router->post('/admin/settings/scheduled-reports/{id}/toggle', function (array $vars) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('automations.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/scheduled-reports');
@@ -11015,7 +11013,7 @@ $router->post('/admin/settings/scheduled-reports/{id}/toggle', function (array $
 
 // Builder page — pick a ticket type from the left rail, edit its form.
 $router->get('/admin/workflows/ticket-fields', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('workflows.manage');
     $db = Database::connect();
 
     $ticketTypes = $db->query('SELECT id, name, color FROM ticket_types ORDER BY sort_order, name')->fetchAll();
@@ -11102,7 +11100,7 @@ $router->get('/admin/workflows/ticket-fields', function () {
 
 // Reorder all rows for one type. Body: { order: [{kind, key}, ...] }
 $router->post('/admin/forms/{typeId}/layout/save', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('workflows.manage');
     header('Content-Type: application/json');
     $typeId = (int) $p['typeId'];
     $body   = json_decode(file_get_contents('php://input'), true);
@@ -11126,7 +11124,7 @@ $router->post('/admin/forms/{typeId}/layout/save', function (array $p) {
 
 // Toggle visibility for a single row. Body: { kind, key, visibility }
 $router->post('/admin/forms/{typeId}/layout/visibility', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('workflows.manage');
     header('Content-Type: application/json');
     $typeId = (int) $p['typeId'];
     $body   = json_decode(file_get_contents('php://input'), true);
@@ -11155,7 +11153,7 @@ $router->post('/admin/forms/{typeId}/layout/visibility', function (array $p) {
 // Update label override for a single row. Body: { kind, key, label_override }
 // Empty string clears the override (falls back to the field's default label).
 $router->post('/admin/forms/{typeId}/layout/label', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('workflows.manage');
     header('Content-Type: application/json');
     $typeId = (int) $p['typeId'];
     $body   = json_decode(file_get_contents('php://input'), true);
@@ -11179,7 +11177,7 @@ $router->post('/admin/forms/{typeId}/layout/label', function (array $p) {
 
 // Add an existing custom field to this type's form. Body: { field_id }
 $router->post('/admin/forms/{typeId}/layout/add-existing', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('workflows.manage');
     header('Content-Type: application/json');
     $typeId  = (int) $p['typeId'];
     $body    = json_decode(file_get_contents('php://input'), true);
@@ -11211,7 +11209,7 @@ $router->post('/admin/forms/{typeId}/layout/add-existing', function (array $p) {
 // Remove a row from a type's layout (does NOT delete the field definition).
 // Body: { kind, key }
 $router->post('/admin/forms/{typeId}/layout/remove', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('workflows.manage');
     header('Content-Type: application/json');
     $typeId = (int) $p['typeId'];
     $body   = json_decode(file_get_contents('php://input'), true);
@@ -11239,7 +11237,7 @@ $router->post('/admin/forms/{typeId}/layout/remove', function (array $p) {
 // Create a new custom field AND add it to this type's layout.
 // Body: { field_type, label, share_with_types?: [int, ...] }
 $router->post('/admin/forms/{typeId}/field/create', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('workflows.manage');
     header('Content-Type: application/json');
     $typeId = (int) $p['typeId'];
     $body   = json_decode(file_get_contents('php://input'), true);
@@ -11311,7 +11309,7 @@ $router->post('/admin/forms/{typeId}/field/create', function (array $p) {
 // Update field definition + options + share-with-types.
 // Body: { label, placeholder?, config?, options?, share_with_types?: [int, ...] }
 $router->post('/admin/forms/field/{id}/update', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('workflows.manage');
     header('Content-Type: application/json');
     $id   = (int) $p['id'];
     $body = json_decode(file_get_contents('php://input'), true);
@@ -11419,7 +11417,7 @@ $router->post('/admin/forms/field/{id}/update', function (array $p) {
 
 // Soft-delete a custom field (FK CASCADE removes its layout rows everywhere).
 $router->post('/admin/forms/field/{id}/delete', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('workflows.manage');
     header('Content-Type: application/json');
     $id = (int) $p['id'];
     $db = Database::connect();
@@ -11445,7 +11443,7 @@ $router->post('/admin/forms/field/{id}/delete', function (array $p) {
 
 // Get the full config + option tree for a custom field (used by the edit modal).
 $router->get('/admin/forms/field/{id}/details', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('workflows.manage');
     header('Content-Type: application/json');
     $id = (int) $p['id'];
     $db = Database::connect();
@@ -11477,7 +11475,7 @@ $router->get('/admin/forms/field/{id}/details', function (array $p) {
 
 // Image upload (unchanged structure, new URL)
 $router->post('/admin/forms/field/{id}/upload-image', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('workflows.manage');
     header('Content-Type: application/json');
     $id = (int) $p['id'];
     $db = Database::connect();
@@ -11527,7 +11525,7 @@ $router->post('/admin/forms/field/{id}/upload-image', function (array $p) {
 // Update a system-field default label (the sys_field_label_* setting).
 // Body: { field, label }
 $router->post('/admin/forms/system-label', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('workflows.manage');
     header('Content-Type: application/json');
     $body  = json_decode(file_get_contents('php://input'), true);
     $field = (string) ($body['field'] ?? '');
@@ -11549,7 +11547,7 @@ $router->post('/admin/forms/system-label', function () {
  * ================================================================== */
 
 $router->get('/admin/settings/backup', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('import.manage');
     $backupDir = ROOT_DIR . '/storage/backups/';
     @mkdir($backupDir, 0755, true);
 
@@ -11570,7 +11568,7 @@ $router->get('/admin/settings/backup', function () {
 });
 
 $router->post('/admin/settings/backup/create', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('import.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/backup');
@@ -11673,7 +11671,7 @@ $router->post('/admin/settings/backup/create', function () {
 });
 
 $router->get('/admin/settings/backup/download', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('import.manage');
     $filename = $_GET['file'] ?? '';
     if (!preg_match('/^localdesk_backup_\d{8}_\d{6}\.zip$/', $filename)) {
         flash('error', 'Invalid backup filename.');
@@ -11696,7 +11694,7 @@ $router->get('/admin/settings/backup/download', function () {
 });
 
 $router->post('/admin/settings/backup/delete', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('import.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/backup');
@@ -11747,7 +11745,7 @@ const _AUDIT_LOG_TIMELINE_ALLOWLIST = [
 ];
 
 $router->get('/admin/audit-log', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('audit.view');
     $db = Database::connect();
 
     // Filters
@@ -11921,7 +11919,7 @@ $router->get('/admin/audit-log', function () {
  * action of pruning is itself permanently visible.
  */
 $router->post('/admin/audit-log/prune', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('audit.view');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/audit-log');
@@ -11983,7 +11981,7 @@ function handleAvatarUpload(): ?string
  * ================================================================== */
 
 $router->get('/admin/settings/escalation-paths', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('automations.manage');
     $db = Database::connect();
 
     $types = $db->query(
@@ -11997,7 +11995,7 @@ $router->get('/admin/settings/escalation-paths', function () {
 });
 
 $router->get('/admin/settings/escalation-paths/{typeId}', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('automations.manage');
     $typeId = (int) $p['typeId'];
     $db = Database::connect();
 
@@ -12024,7 +12022,7 @@ $router->get('/admin/settings/escalation-paths/{typeId}', function (array $p) {
     $agents = $db->query(
         "SELECT id, CONCAT(first_name, ' ', last_name) AS name, email, role
          FROM users
-         WHERE role IN ('agent','admin','power_user')
+         WHERE " . staffRoleSqlIn('role') . "
          ORDER BY first_name, last_name"
     )->fetchAll();
 
@@ -12036,7 +12034,7 @@ $router->get('/admin/settings/escalation-paths/{typeId}', function (array $p) {
 });
 
 $router->post('/admin/settings/escalation-paths/{typeId}', function (array $p) {
-    Auth::requireRole('admin');
+    Auth::requirePermission('automations.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/escalation-paths');
@@ -12085,8 +12083,8 @@ $router->post('/admin/settings/escalation-paths/{typeId}', function (array $p) {
                 flash('error', 'One of the selected users was not found.');
                 redirect('/admin/settings/escalation-paths/' . $typeId);
             }
-            if (!in_array($u['role'], ['agent', 'admin', 'power_user'], true)) {
-                flash('error', $u['name'] . ' is not an agent. Only agents, power users, and admins can be escalation targets. Change their role first in User Management.');
+            if (!roleIsStaff($u['role'])) {
+                flash('error', $u['name'] . ' is not a staff member. Only staff roles can be escalation targets. Change their role first in User Management.');
                 redirect('/admin/settings/escalation-paths/' . $typeId);
             }
         }
@@ -12120,7 +12118,7 @@ $router->post('/admin/settings/escalation-paths/{typeId}', function (array $p) {
  * ================================================================== */
 
 $router->get('/admin/settings/stale-tickets', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('automations.manage');
     $db = Database::connect();
 
     $settings = [
@@ -12138,7 +12136,7 @@ $router->get('/admin/settings/stale-tickets', function () {
 });
 
 $router->post('/admin/settings/stale-tickets', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('automations.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/stale-tickets');
@@ -12177,7 +12175,7 @@ $router->post('/admin/settings/stale-tickets', function () {
 });
 
 $router->post('/admin/settings/stale-tickets/run-now', function () {
-    Auth::requireRole('admin');
+    Auth::requirePermission('automations.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/stale-tickets');
@@ -12193,4 +12191,189 @@ $router->post('/admin/settings/stale-tickets/run-now', function () {
         'time'  => date('Y-m-d H:i:s'),
     ];
     redirect('/admin/settings/stale-tickets');
+});
+
+/* ==================================================================
+ * ADMIN – Permission Levels (custom roles + granular permissions)
+ *
+ * Admins can create their own staff permission levels and toggle which
+ * capabilities each grants (the matrix maps to the same perm keys the
+ * route gates check via Auth::requirePermission()). The four built-in
+ * roles are protected from deletion; the admin role's matrix is locked
+ * (it bypasses every check). Managing roles is admin-only and is NOT a
+ * grantable permission — otherwise a role could escalate its own
+ * privileges. Custom roles are staff-side (is_staff=1, lands on /agent).
+ * ================================================================== */
+
+/** Validate + persist the posted permission grants for a role. */
+function _roleSaveGrants(PDO $db, int $roleId, array $postedKeys): void
+{
+    $valid = array_values(array_intersect($postedKeys, rolePermissionKeys()));
+    $db->prepare('DELETE FROM role_permissions WHERE role_id = ?')->execute([$roleId]);
+    if ($valid) {
+        $ins = $db->prepare('INSERT IGNORE INTO role_permissions (role_id, perm_key) VALUES (?, ?)');
+        foreach ($valid as $key) {
+            $ins->execute([$roleId, $key]);
+        }
+    }
+}
+
+$router->get('/admin/roles', function () {
+    Auth::requireAdmin();
+    $roles = Database::connect()->query(
+        "SELECT r.*,
+                (SELECT COUNT(*) FROM users u            WHERE u.role    = r.slug) AS user_count,
+                (SELECT COUNT(*) FROM role_permissions rp WHERE rp.role_id = r.id)  AS perm_count
+         FROM roles r ORDER BY r.sort_order, r.id"
+    )->fetchAll();
+    render('admin/roles/index', ['roles' => $roles]);
+});
+
+$router->get('/admin/roles/create', function () {
+    Auth::requireAdmin();
+    render('admin/roles/form', [
+        'editing'     => null,
+        'permissions' => rolePermissionCatalog(),
+        'grantedKeys' => [],
+    ]);
+});
+
+$router->post('/admin/roles/create', function () {
+    Auth::requireAdmin();
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/roles/create');
+    }
+
+    $name = trim($_POST['name'] ?? '');
+    $desc = trim($_POST['description'] ?? '');
+    if ($name === '' || mb_strlen($name) > 64) {
+        flashInput($_POST);
+        flash('error', 'A display name (1–64 characters) is required.');
+        redirect('/admin/roles/create');
+    }
+
+    // Derive a stable slug from the name; this is the value stored in
+    // users.role and used everywhere, so it is scrubbed to [a-z0-9_].
+    $slug = trim(strtolower(preg_replace('/[^a-z0-9]+/i', '_', $name)), '_');
+    if ($slug === '' || strlen($slug) > 64) {
+        flashInput($_POST);
+        flash('error', 'Please use a name with at least one letter or number.');
+        redirect('/admin/roles/create');
+    }
+
+    $db  = Database::connect();
+    $chk = $db->prepare('SELECT 1 FROM roles WHERE slug = ?');
+    $chk->execute([$slug]);
+    if ($chk->fetchColumn()) {
+        flashInput($_POST);
+        flash('error', 'A permission level with a similar name already exists.');
+        redirect('/admin/roles/create');
+    }
+
+    $maxOrder = (int) $db->query('SELECT COALESCE(MAX(sort_order), 0) FROM roles')->fetchColumn();
+    $db->prepare(
+        "INSERT INTO roles (slug, name, description, is_system, is_admin, is_staff, landing, sort_order)
+         VALUES (?, ?, ?, 0, 0, 1, 'agent', ?)"
+    )->execute([$slug, $name, $desc, $maxOrder + 10]);
+    $roleId = (int) $db->lastInsertId();
+
+    $posted = isset($_POST['perms']) && is_array($_POST['perms']) ? $_POST['perms'] : [];
+    _roleSaveGrants($db, $roleId, $posted);
+
+    logAudit('role.created', $roleId, 'role', 'slug=' . $slug . '; perms=' . count($posted));
+    flash('success', 'Permission level “' . $name . '” created.');
+    redirect('/admin/roles');
+});
+
+$router->get('/admin/roles/{id}/edit', function (array $p) {
+    Auth::requireAdmin();
+    $db   = Database::connect();
+    $stmt = $db->prepare('SELECT * FROM roles WHERE id = ?');
+    $stmt->execute([(int) $p['id']]);
+    $editing = $stmt->fetch();
+    if (!$editing) {
+        flash('error', 'Permission level not found.');
+        redirect('/admin/roles');
+    }
+    $g = $db->prepare('SELECT perm_key FROM role_permissions WHERE role_id = ?');
+    $g->execute([$editing['id']]);
+    render('admin/roles/form', [
+        'editing'     => $editing,
+        'permissions' => rolePermissionCatalog(),
+        'grantedKeys' => $g->fetchAll(PDO::FETCH_COLUMN),
+    ]);
+});
+
+$router->post('/admin/roles/{id}/edit', function (array $p) {
+    Auth::requireAdmin();
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/roles/' . $id . '/edit');
+    }
+
+    $db   = Database::connect();
+    $stmt = $db->prepare('SELECT * FROM roles WHERE id = ?');
+    $stmt->execute([$id]);
+    $role = $stmt->fetch();
+    if (!$role) {
+        flash('error', 'Permission level not found.');
+        redirect('/admin/roles');
+    }
+
+    $name = trim($_POST['name'] ?? '');
+    $desc = trim($_POST['description'] ?? '');
+    if ($name === '' || mb_strlen($name) > 64) {
+        flashInput($_POST);
+        flash('error', 'A display name (1–64 characters) is required.');
+        redirect('/admin/roles/' . $id . '/edit');
+    }
+
+    $db->prepare('UPDATE roles SET name = ?, description = ? WHERE id = ?')->execute([$name, $desc, $id]);
+
+    // The admin role bypasses every permission check, so its matrix is locked
+    // and ignored on save. Every other role (built-in or custom) is editable.
+    if (!$role['is_admin']) {
+        $posted = isset($_POST['perms']) && is_array($_POST['perms']) ? $_POST['perms'] : [];
+        _roleSaveGrants($db, $id, $posted);
+    }
+
+    logAudit('role.updated', $id, 'role', 'slug=' . $role['slug']);
+    flash('success', 'Permission level updated.');
+    redirect('/admin/roles');
+});
+
+$router->post('/admin/roles/{id}/delete', function (array $p) {
+    Auth::requireAdmin();
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/roles');
+    }
+
+    $db   = Database::connect();
+    $stmt = $db->prepare('SELECT * FROM roles WHERE id = ?');
+    $stmt->execute([$id]);
+    $role = $stmt->fetch();
+    if (!$role) {
+        flash('error', 'Permission level not found.');
+        redirect('/admin/roles');
+    }
+    if (!empty($role['is_system'])) {
+        flash('error', 'Built-in permission levels cannot be deleted.');
+        redirect('/admin/roles');
+    }
+
+    $uc = $db->prepare('SELECT COUNT(*) FROM users WHERE role = ?');
+    $uc->execute([$role['slug']]);
+    if ((int) $uc->fetchColumn() > 0) {
+        flash('error', 'This permission level is still assigned to users — reassign them before deleting it.');
+        redirect('/admin/roles');
+    }
+
+    $db->prepare('DELETE FROM roles WHERE id = ?')->execute([$id]); // role_permissions cascade
+    logAudit('role.deleted', $id, 'role', 'slug=' . $role['slug']);
+    flash('success', 'Permission level deleted.');
+    redirect('/admin/roles');
 });

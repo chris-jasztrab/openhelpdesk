@@ -83,7 +83,7 @@ function _apiRequireTicketAccess(PDO $db, int $ticketId): void
  * ------------------------------------------------------------------ */
 $router->post('/api/tickets/{id}/tags', function (array $p) {
     Auth::requireAuth();
-    if (!in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)) {
+    if (!Auth::isStaff()) {
         http_response_code(403);
         echo json_encode(['error' => 'Forbidden']);
         exit;
@@ -157,7 +157,7 @@ $router->post('/api/tickets/{id}/tags', function (array $p) {
  * ------------------------------------------------------------------ */
 $router->post('/api/tickets/{id}/assign', function (array $p) {
     Auth::requireAuth();
-    if (!in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)) {
+    if (!Auth::isStaff()) {
         http_response_code(403);
         echo json_encode(['error' => 'Forbidden']);
         exit;
@@ -234,7 +234,7 @@ $router->get('/api/tickets/{id}/escalate/preview', function (array $p) {
     $ticket = $stmt->fetch();
     if (!$ticket) { http_response_code(404); echo json_encode(['error' => 'Ticket not found']); exit; }
 
-    if (in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)) {
+    if (Auth::isStaff()) {
         _apiRequireTicketAccess($db, $ticketId);
     } elseif ((int) $ticket['created_by'] !== (int) Auth::id()) {
         http_response_code(403); echo json_encode(['error' => 'Forbidden']); exit;
@@ -293,7 +293,7 @@ $router->post('/api/tickets/{id}/escalate', function (array $p) {
     $ticket = $stmt->fetch();
     if (!$ticket) { http_response_code(404); echo json_encode(['error' => 'Ticket not found']); exit; }
 
-    if (in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)) {
+    if (Auth::isStaff()) {
         _apiRequireTicketAccess($db, $ticketId);
     } elseif ((int) $ticket['created_by'] !== (int) Auth::id()) {
         http_response_code(403); echo json_encode(['error' => 'Forbidden']); exit;
@@ -388,7 +388,7 @@ $router->post('/api/tickets/{id}/escalate', function (array $p) {
  * ------------------------------------------------------------------ */
 $router->post('/api/tickets/{id}/set-type', function (array $p) {
     Auth::requireAuth();
-    if (!in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)) {
+    if (!Auth::isStaff()) {
         http_response_code(403); echo json_encode(['error' => 'Forbidden']); exit;
     }
     if (!verifyCsrf($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '')) {
@@ -439,7 +439,7 @@ $router->post('/api/tickets/{id}/set-type', function (array $p) {
  * ------------------------------------------------------------------ */
 $router->post('/api/tickets/{id}/set-group', function (array $p) {
     Auth::requireAuth();
-    if (!in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)) {
+    if (!Auth::isStaff()) {
         http_response_code(403); echo json_encode(['error' => 'Forbidden']); exit;
     }
     if (!verifyCsrf($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '')) {
@@ -485,12 +485,12 @@ $router->post('/api/tickets/{id}/set-group', function (array $p) {
     if ($groupId) {
         $as = $db->prepare("SELECT u.id, CONCAT(u.first_name,' ',u.last_name) AS name
                              FROM users u JOIN group_user_map gum ON u.id = gum.user_id
-                             WHERE gum.group_id = ? AND u.role IN ('agent','admin','power_user')
+                             WHERE gum.group_id = ? AND " . staffRoleSqlIn('u.role') . "
                              ORDER BY u.first_name, u.last_name");
         $as->execute([$groupId]);
     } else {
         $as = $db->query("SELECT id, CONCAT(first_name,' ',last_name) AS name FROM users
-                          WHERE role IN ('agent','admin','power_user') ORDER BY first_name, last_name");
+                          WHERE " . staffRoleSqlIn('role') . " ORDER BY first_name, last_name");
     }
     $agents = array_map(fn($r) => ['id' => (int)$r['id'], 'name' => $r['name']], $as->fetchAll());
     echo json_encode(['success' => true, 'group_name' => $groupName, 'agents' => $agents]);
@@ -504,7 +504,7 @@ $router->post('/api/tickets/{id}/set-group', function (array $p) {
  * ------------------------------------------------------------------ */
 $router->post('/api/tickets/{id}/set-status', function (array $p) {
     Auth::requireAuth();
-    if (!in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)) {
+    if (!Auth::isStaff()) {
         http_response_code(403); echo json_encode(['error' => 'Forbidden']); exit;
     }
     if (!verifyCsrf($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '')) {
@@ -569,7 +569,7 @@ $router->post('/api/tickets/{id}/set-status', function (array $p) {
  * ------------------------------------------------------------------ */
 $router->post('/api/tickets/{id}/set-priority', function (array $p) {
     Auth::requireAuth();
-    if (!in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)) {
+    if (!Auth::isStaff()) {
         http_response_code(403); echo json_encode(['error' => 'Forbidden']); exit;
     }
     if (!verifyCsrf($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '')) {
@@ -635,7 +635,7 @@ $router->post('/api/tickets/{id}/set-priority', function (array $p) {
  * ------------------------------------------------------------------ */
 $router->get('/api/user-search', function () {
     Auth::requireAuth();
-    if (!in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)) {
+    if (!Auth::isStaff()) {
         http_response_code(403);
         echo json_encode([]);
         exit;
@@ -668,7 +668,7 @@ $router->get('/api/user-search', function () {
  * ------------------------------------------------------------------ */
 $router->get('/api/cc-search', function () {
     Auth::requireAuth();
-    if (!in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)) {
+    if (!Auth::isStaff()) {
         http_response_code(403);
         echo json_encode([]);
         exit;
@@ -701,7 +701,7 @@ $router->get('/api/cc-search', function () {
  * ------------------------------------------------------------------ */
 $router->post('/api/tickets/{id}/cc', function (array $p) {
     Auth::requireAuth();
-    if (!in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)) {
+    if (!Auth::isStaff()) {
         http_response_code(403);
         echo json_encode(['error' => 'Forbidden']);
         exit;
@@ -764,7 +764,7 @@ $router->post('/api/tickets/{id}/cc', function (array $p) {
  * ------------------------------------------------------------------ */
 $router->get('/api/mention-search', function () {
     Auth::requireAuth();
-    if (!in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)) {
+    if (!Auth::isStaff()) {
         http_response_code(403);
         echo json_encode([]);
         exit;
@@ -782,7 +782,7 @@ $router->get('/api/mention-search', function () {
     $stmt = $db->prepare(
         "SELECT id, first_name, last_name, role
          FROM users
-         WHERE role IN ('agent','admin','power_user')
+         WHERE " . staffRoleSqlIn('role') . "
            AND (first_name LIKE ? OR last_name LIKE ? OR CONCAT(first_name, ' ', last_name) LIKE ?)
          ORDER BY first_name
          LIMIT 8"
@@ -799,7 +799,7 @@ $router->get('/api/mention-search', function () {
 // Register / refresh presence (ping every 20s)
 $router->post('/api/tickets/{id}/presence', function (array $p) {
     Auth::requireAuth();
-    if (!in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)) {
+    if (!Auth::isStaff()) {
         http_response_code(403);
         header('Content-Type: application/json');
         echo json_encode(['error' => 'Forbidden']);
@@ -825,7 +825,7 @@ $router->post('/api/tickets/{id}/presence', function (array $p) {
 // Get other active viewers of a ticket
 $router->get('/api/tickets/{id}/presence', function (array $p) {
     Auth::requireAuth();
-    if (!in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)) {
+    if (!Auth::isStaff()) {
         http_response_code(403);
         header('Content-Type: application/json');
         echo json_encode(['error' => 'Forbidden']);
@@ -999,7 +999,7 @@ $router->get('/search', function () {
     }
 
     // --- Contacts (admin/agent only) ---
-    if (($type === 'all' || $type === 'contacts') && in_array($role, ['admin', 'agent', 'power_user'], true)) {
+    if (($type === 'all' || $type === 'contacts') && roleIsStaff($role)) {
         $stmt = $db->prepare(
             "SELECT id, first_name, last_name, email, role
              FROM users
@@ -1039,7 +1039,7 @@ $router->get('/', function () {
         // Location prompt: redirect to picker when needed
         $locationPrompt = getSetting('sso_location_prompt', 'sso_only');
         if (!empty($_SESSION['sso_needs_location']) ||
-            ($locationPrompt === 'all' && Auth::role() !== 'admin')) {
+            ($locationPrompt === 'all' && !Auth::isAdmin())) {
             $uid = Auth::id();
             $row = Database::connect()
                 ->prepare('SELECT location_id FROM users WHERE id = ?');
@@ -1050,12 +1050,8 @@ $router->get('/', function () {
             }
             unset($_SESSION['sso_needs_location']);
         }
-        match (Auth::role()) {
-            'admin'      => redirect('/admin'),
-            'agent'      => redirect('/agent'),
-            'power_user' => redirect('/agent'),
-            default      => redirect('/portal'),
-        };
+        // Send each role to its configured landing area (admin/agent/portal).
+        redirect(roleLandingPath(Auth::role()));
     }
     render('home');
 });
@@ -1820,7 +1816,7 @@ $router->post('/profile', function () {
 
     // Save AI / system note timeline preferences. The toggles only render for
     // admins, so a non-admin POST must not be allowed to clear these settings.
-    if (Auth::role() === 'admin') {
+    if (Auth::isAdmin()) {
         setSetting('ai_notes_visible:' . $userId, isset($_POST['ai_notes_visible']) ? '1' : '0');
         setSetting('system_notes_visible:' . $userId, isset($_POST['system_notes_visible']) ? '1' : '0');
     }
@@ -1964,7 +1960,7 @@ $router->post('/profile/password', function () {
  * ------------------------------------------------------------------ */
 $router->get('/profile/2fa/setup', function () {
     Auth::requireAuth();
-    if (!in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)) {
+    if (!Auth::isStaff()) {
         redirect('/profile');
     }
 
@@ -1992,7 +1988,7 @@ $router->get('/profile/2fa/setup', function () {
 
 $router->post('/profile/2fa/setup', function () {
     Auth::requireAuth();
-    if (!in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)) {
+    if (!Auth::isStaff()) {
         redirect('/profile');
     }
     if (!verifyCsrf($_POST['_token'] ?? '')) {
@@ -2024,7 +2020,7 @@ $router->post('/profile/2fa/setup', function () {
 
 $router->post('/profile/2fa/disable', function () {
     Auth::requireAuth();
-    if (!in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)) {
+    if (!Auth::isStaff()) {
         redirect('/profile');
     }
     if (!verifyCsrf($_POST['_token'] ?? '')) {
@@ -2521,16 +2517,12 @@ $router->get('/notifications', function () {
     $stmt->execute([Auth::id()]);
     $notifications = $stmt->fetchAll();
 
-    // Determine which area to render in based on role
-    $role = Auth::role();
-    if ($role === 'admin') {
+    // Determine which area to render in based on permissions.
+    if (Auth::isAdmin()) {
         $sidebarFn = 'adminSidebar';
         $areaPrefix = '/admin';
-    } elseif ($role === 'agent') {
-        $sidebarFn = 'agentSidebar';
-        $areaPrefix = '/agent';
-    } elseif ($role === 'power_user') {
-        $sidebarFn = 'powerUserSidebar';
+    } elseif (Auth::isStaff()) {
+        $sidebarFn = 'staffSidebar';
         $areaPrefix = '/agent';
     } else {
         $sidebarFn = 'portalSidebar';
@@ -2580,7 +2572,7 @@ $router->post('/notifications/read-all', function () {
  * Agent area
  * ------------------------------------------------------------------ */
 $router->post('/agent/tour/dismiss', function () {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         http_response_code(403);
         header('Content-Type: application/json');
@@ -2595,14 +2587,14 @@ $router->post('/agent/tour/dismiss', function () {
 });
 
 $router->get('/agent', function () {
-    Auth::requireRole('agent', 'admin', 'power_user');
+    Auth::requireStaff();
     $db      = Database::connect();
     $agentId = Auth::id();
 
     // Group-based visibility: agents in groups only see those groups' tickets.
     $groupRestriction = '';
     $groupParams      = [];
-    if (in_array(Auth::role(), ['agent', 'power_user'], true)) {
+    if ((Auth::isStaff() && !Auth::isAdmin())) {
         $gStmt = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
         $gStmt->execute([$agentId]);
         $agentGroupIds = array_map('intval', $gStmt->fetchAll(PDO::FETCH_COLUMN));
@@ -2666,7 +2658,7 @@ $router->get('/agent', function () {
         "SELECT gum.group_id, u.id, CONCAT(u.first_name, ' ', u.last_name) AS name
          FROM group_user_map gum
          JOIN users u ON gum.user_id = u.id
-         WHERE u.role IN ('agent','admin','power_user')
+         WHERE " . staffRoleSqlIn('u.role') . "
          ORDER BY u.first_name, u.last_name"
     )->fetchAll();
     $dashGroupAgents = [];
@@ -2674,7 +2666,7 @@ $router->get('/agent', function () {
         $dashGroupAgents[(int) $row['group_id']][] = ['id' => (int) $row['id'], 'name' => $row['name']];
     }
     $dashAllAgents = $db->query(
-        "SELECT id, CONCAT(first_name, ' ', last_name) AS name FROM users WHERE role IN ('agent','admin','power_user') ORDER BY first_name, last_name"
+        "SELECT id, CONCAT(first_name, ' ', last_name) AS name FROM users WHERE " . staffRoleSqlIn('role') . " ORDER BY first_name, last_name"
     )->fetchAll();
     if (!empty($agentGroupIds)) {
         $ph2 = implode(',', array_fill(0, count($agentGroupIds), '?'));
@@ -2688,7 +2680,7 @@ $router->get('/agent', function () {
 
     // Determine whether to auto-show the agent tour
     $autoShowTour = false;
-    if (in_array(Auth::role(), ['agent', 'power_user'], true)) {
+    if ((Auth::isStaff() && !Auth::isAdmin())) {
         $tourStmt = $db->prepare('SELECT show_agent_tour FROM users WHERE id = ?');
         $tourStmt->execute([$agentId]);
         $autoShowTour = (bool) $tourStmt->fetchColumn() || isset($_GET['tour']);
@@ -2718,13 +2710,13 @@ require ROOT_DIR . '/src/routes/agent.php';
  * Admin area
  * ------------------------------------------------------------------ */
 $router->get('/admin', function () {
-    Auth::requireRole('admin');
+    Auth::requireAdmin();
     $db = Database::connect();
 
     $totalTickets = (int) $db->query("SELECT COUNT(*) FROM tickets")->fetchColumn();
     $openTickets = (int) $db->query("SELECT COUNT(*) FROM tickets WHERE " . ticketStatusSqlIn(ticketOpenBucketSlugs(), 'status'))->fetchColumn();
     $totalUsers = (int) $db->query("SELECT COUNT(*) FROM users")->fetchColumn();
-    $totalAgents = (int) $db->query("SELECT COUNT(*) FROM users WHERE role IN ('agent','admin','power_user')")->fetchColumn();
+    $totalAgents = (int) $db->query("SELECT COUNT(*) FROM users WHERE " . staffRoleSqlIn('role') . "")->fetchColumn();
 
     // Recent tickets (last 10 by most-recent activity). Hide tickets whose
     // type is confidential + group-scoped unless the current admin is a

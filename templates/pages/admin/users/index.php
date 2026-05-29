@@ -51,7 +51,7 @@ $hasFilters = !empty($filterParams);
             <div class="mb-3">
                 <label class="form-label small fw-semibold mb-1">Role</label>
                 <div class="filter-checklist">
-                    <?php foreach (['admin' => 'Admin', 'agent' => 'Agent', 'power_user' => 'Power User', 'user' => 'End User'] as $val => $lbl): ?>
+                    <?php foreach (roleChoices() as $val => $lbl): ?>
                     <label class="filter-check-item">
                         <input type="checkbox" name="role[]" value="<?= $val ?>" <?= in_array($val, $roleFilter, true) ? 'checked' : '' ?>>
                         <span><?= e($lbl) ?></span>
@@ -127,7 +127,7 @@ $hasFilters = !empty($filterParams);
                             $badgeColors = ['admin' => 'danger', 'agent' => 'primary', 'power_user' => 'info', 'user' => 'secondary'];
                             $bc = $badgeColors[$u['role']] ?? 'secondary';
                             ?>
-                            <span class="badge bg-<?= $bc ?>"><?= e(ucfirst($u['role'])) ?></span>
+                            <span class="badge bg-<?= $bc ?>"><?= e(roleLabel($u['role'])) ?></span>
                         </td>
                         <td><?= e($u['work_phone'] ?? '—') ?></td>
                         <td><?= e($u['location_name'] ?? '—') ?></td>

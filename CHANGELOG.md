@@ -11,6 +11,22 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.65.0 &mdash; 2026-05-29
+
+### Added
+- **Custom permission levels with granular permissions.** Admins can now create their own staff permission levels beyond the built-in Admin / Agent / Power User / End User, and grant each level exactly the capabilities it needs — create & delete KB articles, run reports, manage ticket forms & types, automations, SLA policies, users, groups, and every admin settings area. Manage them under **Admin → Settings → Permission Levels** ([admin/roles/index.php](templates/pages/admin/roles/index.php), [admin/roles/form.php](templates/pages/admin/roles/form.php)), backed by new `/admin/roles` CRUD routes in [admin.php](src/routes/admin.php). Each level is a row in the new `roles` table; capabilities are rows in `permissions` granted via `role_permissions` (migration [042_roles_permissions.php](database/migrations/042_roles_permissions.php)).
+
+### Changed
+- **Role checks are now permission-based throughout.** Introduced `Auth::can()`, `Auth::isAdmin()`, `Auth::isStaff()`, `Auth::requirePermission()`, `Auth::requireAdmin()` and `Auth::requireStaff()` ([Auth.php](src/Auth.php)), resolved per-request from a cached roles→permissions map ([helpers.php](src/helpers.php)). Every route gate, navigation item, sidebar, and the REST API ([api.php](src/routes/api.php)) was migrated from hardcoded role strings (`requireRole('admin')`, `in_array(Auth::role(), [...])`, `WHERE role IN (...)`) to these helpers. The four built-in roles are seeded to reproduce their previous behaviour **exactly** — Admin keeps full access, Power User keeps reports, Agents keep ticket/template/KB-edit access — so nothing changes for existing installs until you create or customise a level.
+- The staff sidebar is now permission-driven: it shows each admin-area shortcut (Reports, Users, Settings, …) only when the role is granted the matching capability, so custom levels see exactly what they can open.
+- The user create/edit form, user-list role filter, and user CSV import now source their role options from the `roles` table instead of a hardcoded list, so custom levels are assignable everywhere ([users/form.php](templates/pages/admin/users/form.php)).
+
+### Notes
+- Admins always have unrestricted access (the Admin level bypasses every permission check). Built-in levels can't be deleted; a level still assigned to users can't be deleted until those users are reassigned. Managing permission levels is admin-only and is intentionally **not** a grantable capability, so a level can never escalate its own privileges. Custom levels are staff-side (they sign in to the agent interface).
+- `users.role` changed from an `ENUM` to `VARCHAR(64)` to hold custom level slugs; existing values are preserved. Fresh installs get the new tables and seed data via the updated [schema.sql](database/schema.sql) and installer.
+
+---
+
 ## 2.64.0 &mdash; 2026-05-29
 
 ### Added

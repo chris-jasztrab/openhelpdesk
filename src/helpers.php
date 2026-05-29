@@ -515,7 +515,7 @@ function notificationCount(): int
  */
 function processAtMentions(PDO $db, string $message, int $ticketId, int $timelineId, int $mentionedBy): void
 {
-    $agents = $db->query("SELECT id, first_name, last_name FROM users WHERE role IN ('agent','admin','power_user')")->fetchAll();
+    $agents = $db->query("SELECT id, first_name, last_name FROM users WHERE " . staffRoleSqlIn('role') . "")->fetchAll();
     foreach ($agents as $agent) {
         $fullName = $agent['first_name'] . ' ' . $agent['last_name'];
         if (stripos($message, '@' . $fullName) !== false && (int) $agent['id'] !== $mentionedBy) {
@@ -902,7 +902,7 @@ function _autoAssignGroupMembers(PDO $db, int $groupId): array
         "SELECT u.id
          FROM group_user_map gum
          JOIN users u ON gum.user_id = u.id
-         WHERE gum.group_id = ? AND u.role IN ('agent','admin','power_user')
+         WHERE gum.group_id = ? AND " . staffRoleSqlIn('u.role') . "
          ORDER BY u.id"
     );
     $stmt->execute([$groupId]);
@@ -1899,7 +1899,7 @@ function userManagedGroupIds(int $userId): array
  */
 function canManageGroupSkills(int $userId, int $groupId): bool
 {
-    if (Auth::role() === 'admin') {
+    if (Auth::isAdmin()) {
         return true;
     }
     $stmt = Database::connect()->prepare(
@@ -1919,7 +1919,7 @@ function canManageGroupSkills(int $userId, int $groupId): bool
  */
 function canEditSkill(int $userId, int $skillId): bool
 {
-    if (Auth::role() === 'admin') {
+    if (Auth::isAdmin()) {
         return true;
     }
     $stmt = Database::connect()->prepare('SELECT group_id FROM agent_skills WHERE id = ?');
@@ -2758,7 +2758,7 @@ function notifyWatchers(PDO $db, int $ticketId, string $message, string $authorN
         "SELECT u.id, u.first_name, u.last_name, u.email, u.role
          FROM ticket_watchers tw
          JOIN users u ON tw.user_id = u.id
-         WHERE tw.ticket_id = ? AND u.role IN ('agent','admin','power_user')"
+         WHERE tw.ticket_id = ? AND " . staffRoleSqlIn('u.role') . ""
     );
     $stmt->execute([$ticketId]);
 
@@ -2767,7 +2767,7 @@ function notifyWatchers(PDO $db, int $ticketId, string $message, string $authorN
         if ($uid === $currentId || $uid === $creatorId) continue;
         if (in_array($uid, $ccIdList, true)) continue;
 
-        $prefix    = $user['role'] === 'admin' ? '/admin' : '/agent';
+        $prefix    = roleIsAdmin($user['role']) ? '/admin' : '/agent';
         $ticketUrl = appUrl() . $prefix . '/tickets/' . $ticketId;
 
         $tpl = getEmailTpl('ticket-updated', [
@@ -3616,7 +3616,7 @@ function runEscalationRule(\PDO $db, array $rule, array $ticket): void
 
                 // Ensure the recipient can actually open the ticket from the email link,
                 // even if they're outside the ticket's group. Mirrors manual-escalation behaviour.
-                if (in_array($targetUser['role'], ['admin', 'agent', 'power_user'], true)) {
+                if (roleIsStaff($targetUser['role'])) {
                     $db->prepare('INSERT IGNORE INTO ticket_watchers (ticket_id, user_id) VALUES (?, ?)')
                        ->execute([$ticketId, $targetUserId]);
                 }
@@ -4136,7 +4136,7 @@ function sweepStalePresence(int $windowSeconds = 120): void
  */
 function requiresConfidentialReAuth(PDO $db, array $ticket): bool
 {
-    if (Auth::role() !== 'admin') {
+    if (!Auth::isAdmin()) {
         return false;
     }
     if (empty($ticket['type_id'])) {
@@ -4166,7 +4166,7 @@ function requiresConfidentialReAuth(PDO $db, array $ticket): bool
  */
 function isTicketRedactedForUser(array $ticket, array $confidentialTypeIds, array $userGroupIds): bool
 {
-    if (Auth::role() !== 'admin') {
+    if (!Auth::isAdmin()) {
         return false;
     }
     if (empty($ticket['type_id']) || !in_array((int) $ticket['type_id'], $confidentialTypeIds, true)) {
@@ -4214,12 +4214,7 @@ function notifyConfidentialAccess(PDO $db, int $ticketId): void
     $appUrl     = env('APP_URL', 'http://localhost:8000');
 
     foreach ($members as $user) {
-        $rolePrefix = match ($user['role']) {
-            'admin'      => '/admin',
-            'power_user' => '/agent',
-            'agent'      => '/agent',
-            default      => '/portal',
-        };
+        $rolePrefix = roleLandingPath($user['role']);
         $ticketUrl = $appUrl . $rolePrefix . '/tickets/' . $ticketId;
 
         $tpl = getEmailTpl('confidential-ticket-accessed', [
@@ -4331,12 +4326,7 @@ function notifyConfidentialGroupMembership(PDO $db, int $groupId, array $addedUs
     ]);
 
     foreach ($members as $user) {
-        $rolePrefix = match ($user['role']) {
-            'admin'      => '/admin',
-            'power_user' => '/agent',
-            'agent'      => '/agent',
-            default      => '/portal',
-        };
+        $rolePrefix = roleLandingPath($user['role']);
         $groupUrl = $appUrl . $rolePrefix . '/groups/' . $groupId . '/edit';
 
         $emailHtml = renderEmail('confidential-group-membership-alert', [
@@ -4511,31 +4501,60 @@ function portalSidebar(string $active = ''): array
     ]);
 }
 
-function agentSidebar(string $active = ''): array
+/**
+ * Sidebar for any non-admin staff role. Builds the common agent base, then
+ * appends an admin-area link for each granted permission, so a custom role
+ * sees exactly the areas it can open (no dead links). Permission-driven so it
+ * reproduces the built-ins exactly: an Agent (no admin perms) gets the base
+ * list; a Power User (reports.view) gets the base list + Reports. Admins use
+ * adminSidebar() instead.
+ */
+function staffSidebar(string $active = ''): array
 {
-    return array_map(fn($item) => array_merge($item, ['active' => $item['key'] === $active]), [
+    $items = [
         ['icon' => 'bi-speedometer2',     'label' => label('agent.nav.dashboard'),      'url' => '/agent',                  'key' => 'dashboard'],
         ['icon' => 'bi-ticket-detailed',  'label' => label('agent.nav.tickets'),        'url' => '/agent/tickets',          'key' => 'tickets'],
         ['icon' => 'bi-grid-1x2',         'label' => 'Floor mode',                      'url' => '/agent/floor',            'key' => 'floor'],
         ['icon' => 'bi-book',             'label' => label('agent.nav.knowledge_base'), 'url' => '/agent/kb',               'key' => 'kb'],
         ['icon' => 'bi-chat-square-text', 'label' => 'Canned Responses',                'url' => '/agent/canned-responses', 'key' => 'canned-responses'],
         ['icon' => 'bi-megaphone',        'label' => 'Status Banners',                  'url' => '/agent/banners',          'key' => 'banners'],
-        ['icon' => 'bi-question-circle',  'label' => 'Help',                            'url' => '/agent/help',             'key' => 'help'],
-    ]);
+    ];
+
+    // Admin-area shortcuts, each shown only when the role is granted its
+    // permission. Order mirrors the admin sidebar for familiarity.
+    $adminLinks = [
+        ['perm' => 'users.manage',     'icon' => 'bi-people',      'label' => label('nav.users'),     'url' => '/admin/users',                   'key' => 'users'],
+        ['perm' => 'reports.view',     'icon' => 'bi-bar-chart',   'label' => label('nav.reports'),   'url' => '/admin/reports',                 'key' => 'reports'],
+        ['perm' => 'workflows.manage', 'icon' => 'bi-diagram-3',   'label' => label('nav.workflows'), 'url' => '/admin/workflows/ticket-fields', 'key' => 'workflows'],
+        ['perm' => 'groups.manage',    'icon' => 'bi-people-fill', 'label' => 'Groups',               'url' => '/admin/groups',                  'key' => 'groups'],
+        ['perm' => 'skills.manage',    'icon' => 'bi-mortarboard', 'label' => 'Agent Skills',         'url' => '/admin/skills',                  'key' => 'skills'],
+        ['perm' => 'locations.manage', 'icon' => 'bi-geo-alt',     'label' => label('location.plural'), 'url' => '/admin/locations',             'key' => 'locations'],
+        ['perm' => 'priorities.manage','icon' => 'bi-flag',        'label' => 'Priorities',           'url' => '/admin/priorities',              'key' => 'priorities'],
+        ['perm' => 'audit.view',       'icon' => 'bi-shield-check','label' => label('nav.audit_log'), 'url' => '/admin/audit-log',               'key' => 'audit-log'],
+        ['perm' => 'settings.manage',  'icon' => 'bi-sliders',     'label' => label('nav.settings'),  'url' => '/admin/settings',                'key' => 'settings'],
+    ];
+    foreach ($adminLinks as $link) {
+        if (Auth::can($link['perm'])) {
+            unset($link['perm']);
+            $items[] = $link;
+        }
+    }
+
+    $items[] = ['icon' => 'bi-question-circle', 'label' => 'Help', 'url' => '/agent/help', 'key' => 'help'];
+
+    return array_map(fn($item) => array_merge($item, ['active' => $item['key'] === $active]), $items);
+}
+
+// Back-compat aliases — both historical staff sidebars now resolve through the
+// permission-aware builder, so existing call sites stay correct for custom roles.
+function agentSidebar(string $active = ''): array
+{
+    return staffSidebar($active);
 }
 
 function powerUserSidebar(string $active = ''): array
 {
-    return array_map(fn($item) => array_merge($item, ['active' => $item['key'] === $active]), [
-        ['icon' => 'bi-speedometer2',     'label' => label('agent.nav.dashboard'),      'url' => '/agent',                  'key' => 'dashboard'],
-        ['icon' => 'bi-ticket-detailed',  'label' => label('agent.nav.tickets'),        'url' => '/agent/tickets',          'key' => 'tickets'],
-        ['icon' => 'bi-grid-1x2',         'label' => 'Floor mode',                      'url' => '/agent/floor',            'key' => 'floor'],
-        ['icon' => 'bi-book',             'label' => label('agent.nav.knowledge_base'), 'url' => '/agent/kb',               'key' => 'kb'],
-        ['icon' => 'bi-chat-square-text', 'label' => 'Canned Responses',                'url' => '/agent/canned-responses', 'key' => 'canned-responses'],
-        ['icon' => 'bi-megaphone',        'label' => 'Status Banners',                  'url' => '/agent/banners',          'key' => 'banners'],
-        ['icon' => 'bi-bar-chart',        'label' => label('nav.reports'),              'url' => '/admin/reports',          'key' => 'reports'],
-        ['icon' => 'bi-question-circle',  'label' => 'Help',                            'url' => '/agent/help',             'key' => 'help'],
-    ]);
+    return staffSidebar($active);
 }
 
 function sortUrl(string $col, string $currentSort, string $currentDir, array $baseParams, string $basePath): string
@@ -5407,7 +5426,7 @@ function getActiveBanners(): array
     $params = [];
 
     // Portal users only see global banners or ones at their location.
-    if (!in_array($role, ['agent', 'admin', 'power_user'], true)) {
+    if (!roleIsStaff($role)) {
         $userLoc = (int) ($_SESSION['user']['location_id'] ?? 0);
         if (!$userLoc) {
             // Hydrate location_id lazily — older sessions may not have it.
@@ -5481,6 +5500,201 @@ function sanitizeBannerHtml(string $html): string
  *   - Label/color/meta helpers also accept inactive slugs so historical tickets
  *     still render their badge.
  * ──────────────────────────────────────────────────────────────────────────── */
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Roles & granular permissions (migration 042)
+ *
+ * Roles live in the `roles` table; each role grants a set of permission keys
+ * via `role_permissions`. These resolvers are keyed by role *slug* (the value
+ * stored in users.role) so both the session-based Auth class and the
+ * token-based REST API (`_apiIsStaff` etc.) can share one source of truth.
+ *
+ * The whole map is loaded once per request and memoised — at helpdesk scale
+ * that single indexed query is negligible, and resolving fresh each request
+ * means an admin's permission change takes effect on the user's next request
+ * (no stale-until-logout window from snapshotting perms into the session).
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Internal: load every role with its granted permission keys, indexed by slug.
+ * Cached for the request. Returns [] if the tables are missing (paranoid guard
+ * for code paths that somehow run before migration 042 applies — callers then
+ * fail closed: no perms, not staff, not admin).
+ */
+function _rolesCache(bool $refresh = false): array
+{
+    static $cache = null;
+    if ($cache !== null && !$refresh) {
+        return $cache;
+    }
+    try {
+        $db    = Database::connect();
+        $roles = $db->query(
+            "SELECT id, slug, name, is_admin, is_staff, landing
+             FROM roles ORDER BY sort_order, id"
+        )->fetchAll(PDO::FETCH_ASSOC);
+        $perms = $db->query(
+            "SELECT role_id, perm_key FROM role_permissions"
+        )->fetchAll(PDO::FETCH_ASSOC);
+    } catch (\Throwable $e) {
+        return $cache = [];
+    }
+    $cache  = [];
+    $idToSlug = [];
+    foreach ($roles as $r) {
+        $cache[$r['slug']] = [
+            'id'       => (int) $r['id'],
+            'slug'     => (string) $r['slug'],
+            'name'     => (string) $r['name'],
+            'is_admin' => (int) $r['is_admin'] === 1,
+            'is_staff' => (int) $r['is_staff'] === 1,
+            'landing'  => (string) $r['landing'],
+            'perms'    => [],
+        ];
+        $idToSlug[(int) $r['id']] = $r['slug'];
+    }
+    foreach ($perms as $p) {
+        $slug = $idToSlug[(int) $p['role_id']] ?? null;
+        if ($slug !== null) {
+            $cache[$slug]['perms'][(string) $p['perm_key']] = true;
+        }
+    }
+    return $cache;
+}
+
+/** The full role record for a slug, or null if the role is unknown/deleted. */
+function roleRecord(?string $slug): ?array
+{
+    if ($slug === null || $slug === '') {
+        return null;
+    }
+    return _rolesCache()[$slug] ?? null;
+}
+
+/**
+ * Does this role slug grant a permission? Admin roles (is_admin) grant
+ * everything; an unknown/deleted slug grants nothing (fail closed).
+ */
+function roleCan(?string $slug, string $perm): bool
+{
+    $r = roleRecord($slug);
+    if ($r === null) {
+        return false;
+    }
+    return $r['is_admin'] || isset($r['perms'][$perm]);
+}
+
+/** Is this role a full-access admin role? */
+function roleIsAdmin(?string $slug): bool
+{
+    $r = roleRecord($slug);
+    return $r !== null && $r['is_admin'];
+}
+
+/** Is this role a staff (agent-interface) role? */
+function roleIsStaff(?string $slug): bool
+{
+    $r = roleRecord($slug);
+    return $r !== null && $r['is_staff'];
+}
+
+/** Where the home route ('/') should send this role. Unknown → portal. */
+function roleLandingPath(?string $slug): string
+{
+    $r = roleRecord($slug);
+    return match ($r['landing'] ?? 'portal') {
+        'admin' => '/admin',
+        'agent' => '/agent',
+        default => '/portal',
+    };
+}
+
+/** The permission catalog grouped by category, for the role-edit matrix UI. */
+function rolePermissionCatalog(): array
+{
+    try {
+        $rows = Database::connect()->query(
+            "SELECT perm_key, label, category, description FROM permissions ORDER BY sort_order, id"
+        )->fetchAll(PDO::FETCH_ASSOC);
+    } catch (\Throwable $e) {
+        return [];
+    }
+    $byCategory = [];
+    foreach ($rows as $r) {
+        $byCategory[$r['category']][] = $r;
+    }
+    return $byCategory;
+}
+
+/** Flat list of every valid permission key — used to validate posted grants. */
+function rolePermissionKeys(): array
+{
+    try {
+        return Database::connect()
+            ->query('SELECT perm_key FROM permissions')
+            ->fetchAll(PDO::FETCH_COLUMN);
+    } catch (\Throwable $e) {
+        return [];
+    }
+}
+
+/** Human-readable name for a role slug (falls back to a prettified slug). */
+function roleLabel(?string $slug): string
+{
+    $r = roleRecord($slug);
+    if ($r !== null) {
+        return $r['name'];
+    }
+    return ucwords(str_replace('_', ' ', (string) $slug));
+}
+
+/** Ordered [slug => display name] of every role — for user-form dropdowns. */
+function roleChoices(): array
+{
+    $out = [];
+    foreach (_rolesCache() as $slug => $r) {
+        $out[$slug] = $r['name'];
+    }
+    return $out;
+}
+
+/** Does a role slug exist? Used to validate role values on user writes. */
+function roleExists(?string $slug): bool
+{
+    return roleRecord($slug) !== null;
+}
+
+/**
+ * Slugs of every staff role (is_staff=1). Replaces the hardcoded
+ * ['agent','admin','power_user'] lists scattered through the app. Falls back to
+ * the three built-in staff slugs if the table can't be read.
+ */
+function staffRoleSlugs(): array
+{
+    $out = [];
+    foreach (_rolesCache() as $slug => $r) {
+        if ($r['is_staff']) {
+            $out[] = $slug;
+        }
+    }
+    return $out ?: ['admin', 'agent', 'power_user'];
+}
+
+/**
+ * A safe SQL `IN (...)` predicate of quoted staff-role slugs for a column, e.g.
+ *   staffRoleSqlIn('u.role')  →  "u.role IN ('admin','agent','power_user')"
+ *
+ * Slugs originate only from the roles table (never user input) and are scrubbed
+ * to the slug charset here, so inlining them is injection-safe and avoids
+ * threading variadic placeholders through the ~40 existing "staff" queries.
+ */
+function staffRoleSqlIn(string $column): string
+{
+    $quoted = array_map(static function (string $s): string {
+        return "'" . preg_replace('/[^a-z0-9_]/i', '', $s) . "'";
+    }, staffRoleSlugs());
+    return $column . ' IN (' . implode(',', $quoted) . ')';
+}
 
 /**
  * Internal: fetch all status rows, indexed by slug, ordered by sort_order.

@@ -8,7 +8,7 @@ $breadcrumbs  = [
     ['label' => 'Skills',          'url' => '/manager/groups/' . (int) $group['id'] . '/skills'],
     ['label' => $isEdit ? 'Edit' : 'Add'],
 ];
-$sidebarItems = Auth::role() === 'admin'
+$sidebarItems = Auth::isAdmin()
     ? adminSidebar('')
     : (Auth::role() === 'power_user' ? powerUserSidebar('') : agentSidebar(''));
 $action = $isEdit

@@ -24,7 +24,7 @@ function _managerGate(): array
     Auth::requireAuth();
     $userId = (int) Auth::id();
     $managed = userManagedGroupIds($userId);
-    if (Auth::role() !== 'admin' && empty($managed)) {
+    if (!Auth::isAdmin() && empty($managed)) {
         http_response_code(403);
         echo '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">';
         echo '<title>403 Forbidden</title>';
@@ -45,7 +45,7 @@ function _managerGate(): array
 function _managerVisibleGroups(): array
 {
     $db = Database::connect();
-    if (Auth::role() === 'admin') {
+    if (Auth::isAdmin()) {
         return $db->query(
             "SELECT g.id, g.name, g.description,
                     (SELECT COUNT(*) FROM group_user_map gum WHERE gum.group_id = g.id) AS member_count,
@@ -103,7 +103,7 @@ $router->get('/manager/groups/{id}/team', function (array $p) {
         "SELECT u.id, u.first_name, u.last_name, u.email, u.role
          FROM group_user_map gum
          JOIN users u ON gum.user_id = u.id
-         WHERE gum.group_id = ? AND u.role IN ('agent','admin','power_user')
+         WHERE gum.group_id = ? AND " . staffRoleSqlIn('u.role') . "
          ORDER BY u.first_name, u.last_name"
     );
     $mStmt->execute([$groupId]);
@@ -174,7 +174,7 @@ $router->post('/manager/groups/{id}/team', function (array $p) {
     // Re-derive allowed members (must be in this group and an agent-tier role)
     $mStmt = $db->prepare(
         "SELECT u.id FROM group_user_map gum JOIN users u ON gum.user_id = u.id
-         WHERE gum.group_id = ? AND u.role IN ('agent','admin','power_user')"
+         WHERE gum.group_id = ? AND " . staffRoleSqlIn('u.role') . ""
     );
     $mStmt->execute([$groupId]);
     $allowedMemberIds = array_map('intval', $mStmt->fetchAll(PDO::FETCH_COLUMN));

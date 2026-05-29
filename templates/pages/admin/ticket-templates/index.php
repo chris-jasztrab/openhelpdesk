@@ -1,12 +1,9 @@
 <?php
-$role         = Auth::role();
-$isAgentView  = in_array($role, ['agent', 'power_user'], true);
+$isAgentView  = !Auth::isAdmin();
 $ticketsUrl   = $isAgentView ? '/agent/tickets' : '/admin/tickets';
 $layout       = 'app';
 $pageTitle    = 'Ticket Templates';
-$sidebarItems = $role === 'power_user'
-    ? powerUserSidebar('tickets')
-    : ($isAgentView ? agentSidebar('tickets') : adminSidebar('tickets'));
+$sidebarItems = Auth::isAdmin() ? adminSidebar('tickets') : staffSidebar('tickets');
 $breadcrumbs  = $isAgentView ? [
     ['label' => 'Agent',     'url' => '/agent'],
     ['label' => 'Tickets',   'url' => '/agent/tickets'],
@@ -77,7 +74,7 @@ $breadcrumbs  = $isAgentView ? [
                         <td class="text-muted small"><?= e($tpl['creator_name'] ?? '—') ?></td>
                         <td>
                             <?php
-                            $canEdit = (Auth::role() === 'admin' || (int)$tpl['created_by'] === Auth::id());
+                            $canEdit = (Auth::isAdmin() || (int)$tpl['created_by'] === Auth::id());
                             ?>
                             <div class="d-flex gap-1">
                                 <?php if ($canEdit): ?>

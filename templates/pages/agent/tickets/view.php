@@ -246,7 +246,7 @@ if ($solutionTimelineId > 0) {
         // automated system notes, from the timeline. The notes still render
         // into the DOM — CSS classes on the list hide them — so the sliders
         // toggle them without a reload. AI notes are a subset of system notes.
-        $isAdmin        = Auth::role() === 'admin';
+        $isAdmin        = Auth::isAdmin();
         $aiNotesOn      = !$isAdmin || aiNotesVisible();
         $systemNotesOn  = !$isAdmin || systemNotesVisible();
         $hasAiNotes     = false;
@@ -303,7 +303,7 @@ if ($solutionTimelineId > 0) {
                         $isSystem   = $entry['is_internal'] && !$entry['user_name'];
                         $isAi       = $isSystem && str_starts_with((string) $entry['action'], 'ai_');
                         // Admins see AI/system notes; non-admins still don't.
-                        if ($isSystem && Auth::role() !== 'admin') continue;
+                        if ($isSystem && !Auth::isAdmin()) continue;
                         $isSolution = $solutionTimelineId > 0 && (int) $entry['id'] === $solutionTimelineId;
                         // Never let the marked solution be hidden inside the
                         // older-updates collapser — it's the whole point of the
@@ -710,7 +710,7 @@ if ($solutionTimelineId > 0) {
                         <?php endif; ?>
                     </dd>
 
-                    <?php if ($user['role'] === 'admin'): ?>
+                    <?php if (roleIsAdmin($user['role'])): ?>
                     <hr>
                     <dt class="text-muted small">Browser</dt>
                     <dd class="small"><?= e($ticket['browser_info'] ?? 'Unknown') ?></dd>
