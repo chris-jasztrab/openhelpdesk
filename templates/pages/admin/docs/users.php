@@ -14,25 +14,66 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-person-badge text-primary me-2"></i>Roles Overview</h5>
-<p class="text-muted mb-2">Every account in OpenHelpDesk has one of three roles:</p>
+<p class="text-muted mb-2">Every account in OpenHelpDesk has a <strong>permission level</strong>. Four levels are built in and ship with every install; admins can also create their own (see <a href="#permission-levels">Permission Levels</a> below). The built-in levels are:</p>
 <div class="table-responsive">
 <table class="table table-sm mb-0">
-    <thead class="table-light"><tr><th>Role</th><th>Access</th></tr></thead>
+    <thead class="table-light"><tr><th>Level</th><th>Access</th></tr></thead>
     <tbody>
         <tr>
             <td><span class="badge bg-danger">Admin</span></td>
-            <td class="text-muted">Full access to everything — all tickets, all settings, all users, reporting, and system configuration.</td>
+            <td class="text-muted">Full, unrestricted access to everything — all tickets, all settings, all users, reporting, and system configuration. Bypasses every permission check.</td>
+        </tr>
+        <tr>
+            <td><span class="badge" style="background:#7c3aed;">Power User</span></td>
+            <td class="text-muted">Everything an Agent can do, plus access to the <a href="/admin/reports">Reports</a> area. No access to other admin settings unless individually granted.</td>
         </tr>
         <tr>
             <td><span class="badge bg-primary">Agent</span></td>
-            <td class="text-muted">Can view and work on tickets, leave replies and internal notes, update status/priority/assignment. Cannot access admin settings or user management.</td>
+            <td class="text-muted">Can view and work on tickets, leave replies and internal notes, update status/priority/assignment, and edit KB articles. Cannot access admin settings or user management.</td>
         </tr>
         <tr>
-            <td><span class="badge bg-secondary">User</span></td>
-            <td class="text-muted">End user — can only access the portal to submit and track their own tickets. Cannot log in to the admin interface.</td>
+            <td><span class="badge bg-secondary">End User</span></td>
+            <td class="text-muted">Can only access the portal to submit and track their own tickets. Cannot log in to the staff interface.</td>
         </tr>
     </tbody>
 </table>
+</div>
+<div class="alert alert-info small mt-3 mb-0"><i class="bi bi-info-circle me-2"></i>
+    The four built-in levels reproduce the behaviour of the old fixed roles exactly, so nothing changes on existing installs until you create or customise a level. Admin, Agent, and Power User are <strong>staff</strong> levels (they sign in to the agent interface); End User is portal-only.
+</div>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4" id="permission-levels">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-sliders text-primary me-2"></i>Permission Levels &amp; Granular Permissions</h5>
+<p class="text-muted mb-2">Beyond the four built-in levels, admins can create <strong>custom permission levels</strong> and grant each one exactly the capabilities it needs — no more, no less. Manage them at <a href="/admin/roles"><strong>Admin → Settings → Permission Levels</strong></a>.</p>
+
+<h6 class="fw-semibold mt-3 mb-2">Creating a level</h6>
+<ol class="text-muted mb-3">
+    <li>Go to <a href="/admin/roles"><strong>Admin → Settings → Permission Levels</strong></a> and click <strong>Add Permission Level</strong>.</li>
+    <li>Give it a name (e.g. "Reporting Lead", "KB Editor", "Team Supervisor").</li>
+    <li>Tick the individual capabilities the level should hold (see the grid below).</li>
+    <li>Save. The level becomes assignable everywhere a role can be chosen — the user create/edit form, the user-list filter, and CSV import.</li>
+</ol>
+
+<h6 class="fw-semibold mt-3 mb-2">Grantable capabilities</h6>
+<p class="text-muted mb-2">Each capability unlocks one admin area for the level. A level that holds a capability sees a working sidebar link to that area and nothing it can't open — there are no dead "403" links. Capabilities include:</p>
+<ul class="text-muted mb-3">
+    <li><strong>Reports</strong> — open the Reports area (what makes a Power User a Power User).</li>
+    <li><strong>Knowledge Base</strong> — create &amp; delete KB articles; manage KB categories &amp; folders.</li>
+    <li><strong>Users &amp; Groups</strong> — manage user accounts and groups.</li>
+    <li><strong>Ticket configuration</strong> — ticket forms &amp; types, ticket templates, recurring tickets.</li>
+    <li><strong>Workflow</strong> — automations, SLA policies, CSAT surveys, AI classification.</li>
+    <li><strong>Data</strong> — import tickets/users/articles from CSV.</li>
+    <li><strong>Settings</strong> — the general admin settings areas.</li>
+</ul>
+
+<div class="alert alert-warning small mb-2"><i class="bi bi-shield-lock me-2"></i>
+    <strong>No self-escalation.</strong> Managing permission levels is intentionally admin-only and is <em>not</em> itself a grantable capability — a custom level can never grant itself (or another level) more power. Admins always have unrestricted access regardless of any level configuration.
+</div>
+<div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
+    Built-in levels can't be deleted. A custom level that is still assigned to one or more users can't be deleted until those users are reassigned to another level.
 </div>
 </div>
 </div>
@@ -43,7 +84,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <p class="text-muted mb-2">Admins can create accounts for any role from <a href="/admin/users/create"><strong>Admin → Users → Create User</strong></a>.</p>
 <ol class="text-muted mb-0">
     <li>Enter the user's first name, last name, and email address.</li>
-    <li>Select the appropriate role (User, Agent, or Admin).</li>
+    <li>Select the appropriate permission level — any built-in level (End User, Agent, Power User, Admin) or a <a href="#permission-levels">custom level</a> you've created.</li>
     <li>Optionally assign a location.</li>
     <li>A temporary password is set; the user receives a welcome email (if SMTP is configured) with login instructions.</li>
 </ol>

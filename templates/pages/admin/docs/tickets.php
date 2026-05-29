@@ -143,8 +143,10 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-lightning text-primary me-2"></i>Inline Ticket List Actions</h5>
-<p class="text-muted mb-2">Agents and admins can update key ticket fields directly from the ticket list without opening the ticket. Each row shows chevron icons (<i class="bi bi-chevron-down"></i>) in the <strong>Agent</strong>, <strong>Type</strong>, and <strong>Group</strong> columns. Hovering a cell reveals the chevron; clicking it opens a small dropdown to change that field immediately.</p>
+<p class="text-muted mb-2">Agents and admins can update key ticket fields directly from the ticket list without opening the ticket. Hovering a cell in one of these columns reveals a chevron (<i class="bi bi-chevron-down"></i>); clicking it opens a small dropdown to change that field immediately, and the badge or cell updates in place.</p>
 <ul class="text-muted mb-3">
+    <li><strong>Status column</strong> — click the status badge to set a new status. Only <em>active</em> statuses are offered, and the change runs the same logic as the ticket detail view: timeline entry, requester notification for closed-bucket statuses, CSAT survey trigger, SLA pause/resume, and <code>ticket_updated</code> automations.</li>
+    <li><strong>Priority column</strong> — click the priority badge to pick a new priority or clear it. Mirrors the ticket-detail priority logic — timeline entry, SLA recalculation, and <code>ticket_updated</code> automations.</li>
     <li><strong>Agent column</strong> — quick-assign to any agent (filtered to the ticket's group if one is set).</li>
     <li><strong>Type column</strong> — change the ticket type in one click. The whole cell is clickable, not just the chevron.</li>
     <li><strong>Group column</strong> — reassign to a different group.</li>

@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.65.4 &mdash; 2026-05-29
+
+### Documentation
+- **In-app help now covers permission levels and the new inline status/priority controls.** The **Users &amp; Agents** doc ([users.php](templates/pages/admin/docs/users.php)) had a "Roles Overview" that still described only the three old fixed roles; it now lists all four built-in levels (Admin, Power User, Agent, End User) and gains a **Permission Levels &amp; Granular Permissions** section documenting custom levels, the grantable capabilities, and the no-self-escalation rule (shipped in 2.65.0). The **Tickets** doc ([tickets.php](templates/pages/admin/docs/tickets.php)) and the agent **Ticket List** doc ([ticket-list.php](templates/pages/agent/docs/ticket-list.php)) now document the inline **Status** and **Priority** quick-change badges added in 2.63.0/2.64.0 — including the side effects each fires (timeline entry, requester notification, CSAT, SLA pause/resume/recalculation, `ticket_updated` automations) — alongside the existing Agent/Type/Group inline actions.
+
+---
+
 ## 2.65.3 &mdash; 2026-05-29
 
 ### Fixed

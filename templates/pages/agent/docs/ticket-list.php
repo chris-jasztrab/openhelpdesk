@@ -19,8 +19,8 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/agent/help'], ['label' => 'Ticke
 <table class="table table-sm mb-0">
     <thead class="table-light"><tr><th>Column</th><th>Description</th></tr></thead>
     <tbody class="text-muted">
-        <tr><td><strong>Status</strong></td><td>Colour-coded badge: Open, In Progress, Pending, Waiting on Customer, Waiting on Third Party, Resolved, Closed.</td></tr>
-        <tr><td><strong>Priority</strong></td><td>Ticket priority with its custom colour.</td></tr>
+        <tr><td><strong>Status</strong></td><td>Colour-coded badge: Open, In Progress, Pending, Waiting on Customer, Waiting on Third Party, Resolved, Closed. Click the badge to change the status inline.</td></tr>
+        <tr><td><strong>Priority</strong></td><td>Ticket priority with its custom colour. Click the badge to change the priority inline.</td></tr>
         <tr><td><strong>Type</strong></td><td>Ticket type. Hover the cell and click the chevron to change inline.</td></tr>
         <tr><td><strong>Agent</strong></td><td>Assigned agent (or Unassigned). Hover and click the chevron to quick-assign inline.</td></tr>
         <tr><td><strong>Group</strong></td><td>Assigned group. Hover and click the chevron to change inline.</td></tr>
@@ -38,8 +38,10 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/agent/help'], ['label' => 'Ticke
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-lightning text-primary me-2"></i>Inline Actions</h5>
-<p class="text-muted mb-2">You can update key fields directly from the ticket list without opening the ticket. Hover any cell in the <strong>Agent</strong>, <strong>Type</strong>, or <strong>Group</strong> column to see a chevron <i class="bi bi-chevron-down"></i>. Click it to open a dropdown and make the change immediately.</p>
+<p class="text-muted mb-2">You can update key fields directly from the ticket list without opening the ticket. Click a <strong>Status</strong> or <strong>Priority</strong> badge, or hover a cell in the <strong>Agent</strong>, <strong>Type</strong>, or <strong>Group</strong> column to reveal a chevron <i class="bi bi-chevron-down"></i> — then pick from the dropdown to make the change immediately.</p>
 <ul class="text-muted mb-0">
+    <li><strong>Status column</strong> — sets a new status (active statuses only). Records a timeline entry, notifies the requester when the status is in the closed bucket, triggers CSAT, and pauses or resumes the SLA timer — exactly like changing it on the ticket itself.</li>
+    <li><strong>Priority column</strong> — sets a new priority or clears it, recalculating the SLA.</li>
     <li><strong>Agent column</strong> — assigns or reassigns the ticket. If the ticket has a group set, only that group's members are shown.</li>
     <li><strong>Type column</strong> — changes the ticket type.</li>
     <li><strong>Group column</strong> — moves the ticket to a different group.</li>
