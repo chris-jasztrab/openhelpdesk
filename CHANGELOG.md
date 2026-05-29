@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.64.0 &mdash; 2026-05-29
+
+### Added
+- **Change a ticket's priority inline from the ticket list.** The priority badge on the agent and admin ticket lists is now a quick-change dropdown — click it to pick a new priority (or clear it) without opening the ticket, matching the new inline status control and the existing agent/group/type ones. The change is saved over a new `POST /api/tickets/{id}/set-priority` endpoint that mirrors the ticket-detail priority logic (timeline entry, SLA recalculation via `Sla::onPriorityChanged`, and `ticket_updated` automations). The badge updates in place. Added in both the agent and admin lists ([agent/tickets/index.php](templates/pages/agent/tickets/index.php), [admin/tickets/index.php](templates/pages/admin/tickets/index.php)) with the endpoint in [routes.php](src/routes.php).
+
+---
+
 ## 2.63.0 &mdash; 2026-05-29
 
 ### Added

@@ -564,6 +564,73 @@ $router->post('/api/tickets/{id}/set-status', function (array $p) {
 });
 
 /* ------------------------------------------------------------------
+ * Quick priority change from the ticket list (JSON API)
+ * Mirrors the priority side effects of /agent/tickets/{id}/update.
+ * ------------------------------------------------------------------ */
+$router->post('/api/tickets/{id}/set-priority', function (array $p) {
+    Auth::requireAuth();
+    if (!in_array(Auth::role(), ['admin', 'agent', 'power_user'], true)) {
+        http_response_code(403); echo json_encode(['error' => 'Forbidden']); exit;
+    }
+    if (!verifyCsrf($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '')) {
+        http_response_code(403); echo json_encode(['error' => 'Invalid CSRF token']); exit;
+    }
+    header('Content-Type: application/json');
+
+    $ticketId   = (int) $p['id'];
+    $input      = json_decode(file_get_contents('php://input'), true);
+    $priorityId = isset($input['priority_id']) && $input['priority_id'] !== null && $input['priority_id'] !== ''
+                  ? (int) $input['priority_id'] : null;
+
+    $db = Database::connect();
+    _apiRequireTicketAccess($db, $ticketId);
+    $stmt = $db->prepare('SELECT id, priority_id, type_id FROM tickets WHERE id = ?');
+    $stmt->execute([$ticketId]);
+    $ticket = $stmt->fetch();
+    if (!$ticket) { http_response_code(404); echo json_encode(['error' => 'Ticket not found']); exit; }
+
+    // Validate the priority exists (when one is given) and fetch its name/color.
+    $priorityName  = null;
+    $priorityColor = null;
+    if ($priorityId !== null) {
+        $ps = $db->prepare('SELECT name, color FROM ticket_priorities WHERE id = ?');
+        $ps->execute([$priorityId]);
+        $prow = $ps->fetch();
+        if (!$prow) { http_response_code(422); echo json_encode(['error' => 'Invalid priority']); exit; }
+        $priorityName  = $prow['name'];
+        $priorityColor = $prow['color'];
+    }
+
+    $oldPriority = $ticket['priority_id'] ? (int) $ticket['priority_id'] : null;
+    if ($priorityId !== $oldPriority) {
+        $db->prepare('UPDATE tickets SET priority_id = ? WHERE id = ?')->execute([$priorityId, $ticketId]);
+
+        $oldName = 'None';
+        if ($oldPriority) {
+            $s = $db->prepare('SELECT name FROM ticket_priorities WHERE id = ?');
+            $s->execute([$oldPriority]);
+            $oldName = $s->fetchColumn() ?: 'None';
+        }
+        $db->prepare(
+            'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
+        )->execute([$ticketId, Auth::id(), 'priority_changed', 'Priority changed from ' . $oldName . ' to ' . ($priorityName ?? 'None')]);
+
+        if ($priorityId) {
+            Sla::onPriorityChanged($db, $ticketId, $priorityId, $ticket['type_id'] ? (int) $ticket['type_id'] : null);
+        }
+
+        runAutomations($db, $ticketId, 'ticket_updated');
+    }
+
+    echo json_encode([
+        'success'        => true,
+        'priority_name'  => $priorityName,
+        'priority_color' => $priorityColor,
+    ]);
+    exit;
+});
+
+/* ------------------------------------------------------------------
  * User Search for CC (JSON API)
  * ------------------------------------------------------------------ */
 $router->get('/api/user-search', function () {

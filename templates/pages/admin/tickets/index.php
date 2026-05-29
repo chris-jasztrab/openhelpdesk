@@ -457,14 +457,11 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                         </td>
                         <?php endif; ?>
                         <?php if (in_array('priority', $visibleColumns)): ?>
-                        <td style="white-space:nowrap;">
-                            <?php if ($t['priority_name']): ?>
-                            <span class="badge" style="background:<?= e($t['priority_color']) ?>;">
-                                <?= e($t['priority_name']) ?>
+                        <td style="white-space:nowrap;cursor:default;" onclick="event.stopPropagation()">
+                            <span class="d-inline-flex align-items-center gap-1 quick-priority-wrap" data-ticket-id="<?= (int)$t['id'] ?>" style="cursor:pointer;">
+                                <span class="quick-priority-badge"><?php if ($t['priority_name']): ?><span class="badge" style="background:<?= e($t['priority_color']) ?>;"><?= e($t['priority_name']) ?></span><?php else: ?><span class="text-muted">—</span><?php endif; ?></span>
+                                <button class="btn btn-link btn-sm p-0 border-0 text-muted quick-priority-btn" type="button" title="Change priority" style="line-height:1;"><i class="bi bi-chevron-down" style="font-size:0.65rem;"></i></button>
                             </span>
-                            <?php else: ?>
-                            <span class="text-muted">—</span>
-                            <?php endif; ?>
                         </td>
                         <?php endif; ?>
                         <?php if (in_array('type', $visibleColumns)): ?>
@@ -799,6 +796,7 @@ document.getElementById('deleteFilterModal').addEventListener('show.bs.modal', f
         var quickGroupAgents = <?= json_encode(array_map(fn($agents) => array_values($agents), $groupAgents)) ?>;
         var quickAllAgents = <?= json_encode(array_values(array_map(fn($a) => ['id' => (int)$a['id'], 'name' => $a['name']], $allAgentsForAssign))) ?>;
         var quickStatuses = <?= json_encode(array_values(array_map(fn($s) => ['slug' => $s['slug'], 'label' => $s['label'], 'color' => $s['color'] ?: '#6c757d', 'text_color' => ticketStatusTextColor($s['color'] ?: '#6c757d')], ticketActiveStatuses()))) ?>;
+        var quickPriorities = <?= json_encode(array_values(array_map(fn($pr) => ['id' => (int)$pr['id'], 'name' => $pr['name'], 'color' => $pr['color'] ?: '#6c757d'], $priorities))) ?>;
         var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
         var activeMenu = null;
         var activeBtn  = null;
@@ -856,6 +854,14 @@ document.getElementById('deleteFilterModal').addEventListener('show.bs.modal', f
                 quickStatuses.forEach(function (st) {
                     html += '<li><a class="dropdown-item quick-menu-item" href="#" data-kind="status" data-val="' + esc(st.slug) + '" data-ticket-id="' + esc(ticketId) + '"><span class="badge" style="background-color:' + esc(st.color) + ';color:' + esc(st.text_color) + ';">' + esc(st.label) + '</span></a></li>';
                 });
+            } else if (kind === 'priority') {
+                html += '<li><a class="dropdown-item quick-menu-item" href="#" data-kind="priority" data-val="" data-ticket-id="' + esc(ticketId) + '"><span class="text-muted">None</span></a></li>';
+                if (quickPriorities.length) {
+                    html += '<li><hr class="dropdown-divider"></li>';
+                    quickPriorities.forEach(function (pr) {
+                        html += '<li><a class="dropdown-item quick-menu-item" href="#" data-kind="priority" data-val="' + esc(pr.id) + '" data-ticket-id="' + esc(ticketId) + '"><span class="badge" style="background:' + esc(pr.color) + ';">' + esc(pr.name) + '</span></a></li>';
+                    });
+                }
             }
             html += '</ul>';
             var div = document.createElement('div');
@@ -881,6 +887,7 @@ document.getElementById('deleteFilterModal').addEventListener('show.bs.modal', f
         document.querySelectorAll('.quick-type-btn').forEach(function (b) { bindBtn(b, 'type'); });
         document.querySelectorAll('.quick-group-btn').forEach(function (b) { bindBtn(b, 'group'); });
         document.querySelectorAll('.quick-status-btn').forEach(function (b) { bindBtn(b, 'status'); });
+        document.querySelectorAll('.quick-priority-btn').forEach(function (b) { bindBtn(b, 'priority'); });
 
         document.querySelectorAll('.quick-assign-wrap').forEach(function (wrap) {
             wrap.addEventListener('click', function (e) {
@@ -908,6 +915,13 @@ document.getElementById('deleteFilterModal').addEventListener('show.bs.modal', f
                 if (e.target.closest('.quick-status-btn')) return;
                 var btn = wrap.querySelector('.quick-status-btn');
                 if (btn) { e.stopPropagation(); if (activeBtn === btn) { closeMenu(); } else { openMenu(btn, 'status'); } }
+            });
+        });
+        document.querySelectorAll('.quick-priority-wrap').forEach(function (wrap) {
+            wrap.addEventListener('click', function (e) {
+                if (e.target.closest('.quick-priority-btn')) return;
+                var btn = wrap.querySelector('.quick-priority-btn');
+                if (btn) { e.stopPropagation(); if (activeBtn === btn) { closeMenu(); } else { openMenu(btn, 'priority'); } }
             });
         });
 
@@ -981,10 +995,28 @@ document.getElementById('deleteFilterModal').addEventListener('show.bs.modal', f
                     }).then(function (r) { return r.json(); }).then(function (data) {
                         if (data.success && data.status_html) { statusBadge.innerHTML = data.status_html; resizeColumns(); }
                     }).catch(function () {});
+                } else if (kind === 'priority') {
+                    var priorityWrap = document.querySelector('.quick-priority-wrap[data-ticket-id="' + ticketId + '"]');
+                    if (!priorityWrap) return;
+                    var priorityBadge = priorityWrap.querySelector('.quick-priority-badge');
+                    fetch('/api/tickets/' + ticketId + '/set-priority', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
+                        body: JSON.stringify({priority_id: val === '' ? null : parseInt(val, 10)})
+                    }).then(function (r) { return r.json(); }).then(function (data) {
+                        if (data.success) {
+                            if (data.priority_name) {
+                                priorityBadge.innerHTML = '<span class="badge" style="background:' + esc(data.priority_color || '#6c757d') + ';">' + esc(data.priority_name) + '</span>';
+                            } else {
+                                priorityBadge.innerHTML = '<span class="text-muted">—</span>';
+                            }
+                            resizeColumns();
+                        }
+                    }).catch(function () {});
                 }
                 return;
             }
-            if (!e.target.closest('.quick-assign-wrap') && !e.target.closest('.quick-type-wrap') && !e.target.closest('.quick-group-wrap') && !e.target.closest('.quick-status-wrap') && !(activeMenu && activeMenu.contains(e.target))) {
+            if (!e.target.closest('.quick-assign-wrap') && !e.target.closest('.quick-type-wrap') && !e.target.closest('.quick-group-wrap') && !e.target.closest('.quick-status-wrap') && !e.target.closest('.quick-priority-wrap') && !(activeMenu && activeMenu.contains(e.target))) {
                 closeMenu();
             }
         });
