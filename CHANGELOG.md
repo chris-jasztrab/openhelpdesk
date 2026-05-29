@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.62.7 &mdash; 2026-05-29
+
+### Fixed
+- **@mention autocomplete now opens right below the caret instead of floating below the whole reply box.** The dropdown was `position:absolute` with no coordinates, so it dropped to its static flow position under the entire CKEditor. It now anchors to the live caret position via CKEditor's DOM converter each time it opens. Fixed in both the agent and admin ticket views ([agent/tickets/view.php](templates/pages/agent/tickets/view.php), [admin/tickets/view.php](templates/pages/admin/tickets/view.php)).
+
+---
+
 ## 2.62.6 &mdash; 2026-05-28
 
 ### Changed

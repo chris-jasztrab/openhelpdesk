@@ -1708,6 +1708,22 @@ ClassicEditor.create(document.querySelector('#replyEditor'), {
         return null;
     }
 
+    // Anchor the dropdown to the caret inside CKEditor instead of letting it
+    // fall to its static position below the whole editor.
+    function positionDrop() {
+        try {
+            var range = editor.editing.view.document.selection.getFirstRange();
+            if (!range) return;
+            var domRange = editor.editing.view.domConverter.viewRangeToDom(range);
+            if (!domRange) return;
+            var rect = domRange.getBoundingClientRect();
+            var parent = dropdown.offsetParent || document.body;
+            var pRect = parent.getBoundingClientRect();
+            dropdown.style.left = (rect.left - pRect.left) + 'px';
+            dropdown.style.top  = (rect.bottom - pRect.top + 4) + 'px';
+        } catch (e) { /* leave default position on any conversion failure */ }
+    }
+
     function renderDrop(results) {
         items = results;
         activeIndex = -1;
@@ -1723,6 +1739,7 @@ ClassicEditor.create(document.querySelector('#replyEditor'), {
         });
         dropdown.innerHTML = html;
         dropdown.style.display = 'block';
+        positionDrop();
         dropdown.querySelectorAll('.mention-item').forEach(function(el) {
             el.addEventListener('mousedown', function(ev) {
                 ev.preventDefault();
