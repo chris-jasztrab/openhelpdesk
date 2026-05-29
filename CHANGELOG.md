@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.65.1 &mdash; 2026-05-29
+
+### Fixed
+- **Granting a staff level "Create & delete KB articles" (or "Manage KB categories & folders") now adds a working sidebar link.** The 2.65.0 permission-driven staff sidebar honoured every admin-area capability except the two Knowledge Base ones, so a custom level granted KB management had the backend access but no way to reach the management UI — it looked like the permission did nothing. `staffSidebar()` now surfaces **Manage KB Articles** (`/admin/kb/articles`) for `kb.articles.manage` and **KB Categories & Folders** (`/admin/kb/categories`) for `kb.structure.manage` ([helpers.php](src/helpers.php)).
+
+---
+
 ## 2.65.0 &mdash; 2026-05-29
 
 ### Added

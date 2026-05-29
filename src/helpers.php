@@ -4523,7 +4523,9 @@ function staffSidebar(string $active = ''): array
     // Admin-area shortcuts, each shown only when the role is granted its
     // permission. Order mirrors the admin sidebar for familiarity.
     $adminLinks = [
-        ['perm' => 'users.manage',     'icon' => 'bi-people',      'label' => label('nav.users'),     'url' => '/admin/users',                   'key' => 'users'],
+        ['perm' => 'users.manage',         'icon' => 'bi-people',      'label' => label('nav.users'),     'url' => '/admin/users',                   'key' => 'users'],
+        ['perm' => 'kb.articles.manage',   'icon' => 'bi-journal-text', 'label' => 'Manage KB Articles',  'url' => '/admin/kb/articles',             'key' => 'kb-articles'],
+        ['perm' => 'kb.structure.manage',  'icon' => 'bi-folder',      'label' => 'KB Categories & Folders', 'url' => '/admin/kb/categories',       'key' => 'kb-structure'],
         ['perm' => 'reports.view',     'icon' => 'bi-bar-chart',   'label' => label('nav.reports'),   'url' => '/admin/reports',                 'key' => 'reports'],
         ['perm' => 'workflows.manage', 'icon' => 'bi-diagram-3',   'label' => label('nav.workflows'), 'url' => '/admin/workflows/ticket-fields', 'key' => 'workflows'],
         ['perm' => 'groups.manage',    'icon' => 'bi-people-fill', 'label' => 'Groups',               'url' => '/admin/groups',                  'key' => 'groups'],
