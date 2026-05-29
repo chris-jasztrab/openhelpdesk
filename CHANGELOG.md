@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.62.8 &mdash; 2026-05-29
+
+### Fixed
+- **@mention autocomplete now flips above the caret when there's no room below it.** Near the bottom of a long reply (or when the caret sits low in the viewport) the dropdown opened downward and ran off-screen. It now measures the available space and anchors above the caret instead when placing below would overflow the viewport. Fixed in both the agent and admin ticket views ([agent/tickets/view.php](templates/pages/agent/tickets/view.php), [admin/tickets/view.php](templates/pages/admin/tickets/view.php)).
+
+---
+
 ## 2.62.7 &mdash; 2026-05-29
 
 ### Fixed

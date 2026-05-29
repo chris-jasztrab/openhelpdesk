@@ -1716,7 +1716,14 @@ ClassicEditor.create(document.querySelector('#replyEditor'), {
             var parent = dropdown.offsetParent || document.body;
             var pRect = parent.getBoundingClientRect();
             dropdown.style.left = (rect.left - pRect.left) + 'px';
-            dropdown.style.top  = (rect.bottom - pRect.top + 4) + 'px';
+            // Flip above the caret when there isn't room below it in the viewport.
+            var dropH = dropdown.offsetHeight;
+            var roomBelow = window.innerHeight - rect.bottom;
+            if (roomBelow < dropH + 8 && rect.top > roomBelow) {
+                dropdown.style.top = (rect.top - pRect.top - dropH - 4) + 'px';
+            } else {
+                dropdown.style.top = (rect.bottom - pRect.top + 4) + 'px';
+            }
         } catch (e) { /* leave default position on any conversion failure */ }
     }
 
