@@ -1,9 +1,9 @@
 <?php
 $layout       = 'app';
 $pageTitle    = 'Revision Diff';
-$sidebarItems = adminSidebar('kb');
+$sidebarItems = Auth::isAdmin() ? adminSidebar('kb') : staffSidebar('kb-articles');
 $breadcrumbs  = [
-    ['label' => 'Admin',          'url' => '/admin'],
+    Auth::isAdmin() ? ['label' => 'Admin', 'url' => '/admin'] : ['label' => 'Agent', 'url' => '/agent'],
     ['label' => 'Knowledge Base'],
     ['label' => 'Articles',       'url' => '/admin/kb/articles'],
     ['label' => e($article['title']), 'url' => '/admin/kb/articles/' . $article['id'] . '/edit'],

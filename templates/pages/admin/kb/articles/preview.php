@@ -1,9 +1,9 @@
 <?php
 $layout       = 'app';
 $pageTitle    = 'Preview: ' . $article['title'];
-$sidebarItems = adminSidebar('kb');
+$sidebarItems = Auth::isAdmin() ? adminSidebar('kb') : staffSidebar('kb-articles');
 $breadcrumbs  = [
-    ['label' => 'Admin', 'url' => '/admin'],
+    Auth::isAdmin() ? ['label' => 'Admin', 'url' => '/admin'] : ['label' => 'Agent', 'url' => '/agent'],
     ['label' => 'KB Articles', 'url' => '/admin/kb/articles'],
     ['label' => 'Preview'],
 ];

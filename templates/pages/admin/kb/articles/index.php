@@ -1,9 +1,9 @@
 <?php
 $layout       = 'app';
 $pageTitle    = 'KB Articles';
-$sidebarItems = adminSidebar('kb');
+$sidebarItems = Auth::isAdmin() ? adminSidebar('kb') : staffSidebar('kb-articles');
 $breadcrumbs  = [
-    ['label' => 'Admin', 'url' => '/admin'],
+    Auth::isAdmin() ? ['label' => 'Admin', 'url' => '/admin'] : ['label' => 'Agent', 'url' => '/agent'],
     ['label' => 'Knowledge Base'],
     ['label' => 'Articles'],
 ];
@@ -17,18 +17,22 @@ $breadcrumbs  = [
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="fw-bold mb-0">KB Articles</h2>
     <div class="d-flex gap-2">
+        <?php if (Auth::can('kb.structure.manage')): ?>
         <a href="/admin/kb/categories" class="btn btn-outline-secondary">
             <i class="bi bi-collection me-1"></i>Categories
         </a>
         <a href="/admin/kb/folders" class="btn btn-outline-secondary">
             <i class="bi bi-folder me-1"></i>Folders
         </a>
+        <?php endif; ?>
         <a href="/admin/kb/export" class="btn btn-outline-secondary">
             <i class="bi bi-download me-1"></i>Export CSV
         </a>
+        <?php if (Auth::can('import.manage')): ?>
         <a href="/admin/settings/import-kb" class="btn btn-outline-secondary">
             <i class="bi bi-upload me-1"></i>Import CSV
         </a>
+        <?php endif; ?>
         <a href="/admin/kb/articles/create" class="btn text-white" style="background:var(--ld-primary);">
             <i class="bi bi-plus-lg me-1"></i>Add Article
         </a>

@@ -1,9 +1,9 @@
 <?php
 $layout       = 'app';
 $pageTitle    = 'KB Categories';
-$sidebarItems = adminSidebar('kb');
+$sidebarItems = Auth::isAdmin() ? adminSidebar('kb') : staffSidebar('kb-structure');
 $breadcrumbs  = [
-    ['label' => 'Admin', 'url' => '/admin'],
+    Auth::isAdmin() ? ['label' => 'Admin', 'url' => '/admin'] : ['label' => 'Agent', 'url' => '/agent'],
     ['label' => 'Knowledge Base'],
     ['label' => 'Categories'],
 ];
@@ -14,9 +14,11 @@ $breadcrumbs  = [
         <a href="/admin/kb/folders" class="btn btn-outline-secondary">
             <i class="bi bi-folder me-1"></i>Folders
         </a>
+        <?php if (Auth::can('kb.articles.manage')): ?>
         <a href="/admin/kb/articles" class="btn btn-outline-secondary">
             <i class="bi bi-file-text me-1"></i>Articles
         </a>
+        <?php endif; ?>
         <a href="/admin/kb/categories/create" class="btn text-white" style="background:var(--ld-primary);">
             <i class="bi bi-plus-lg me-1"></i>Add Category
         </a>

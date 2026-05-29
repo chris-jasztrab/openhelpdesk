@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.65.2 &mdash; 2026-05-29
+
+### Fixed
+- **KB management pages no longer trap granted staff with admin-only 403 links.** When a non-admin staff level opened the KB management UI (`/admin/kb/articles`, `/admin/kb/categories`, `/admin/kb/folders` and their forms/history/diff/preview), the page rendered the full **admin** sidebar and breadcrumb — Settings, Workflows, Audit log, etc. — every one a 403 for that role. These pages now render the permission-filtered **staff** sidebar and an `Agent` breadcrumb for non-admins (mirroring how the Reports pages already handle Power Users), and the in-page cross-links (Categories/Folders, Import CSV) are shown only when the viewer holds the matching capability (`kb.structure.manage` / `import.manage`). Admins are unaffected. ([admin/kb/](templates/pages/admin/kb/))
+
+---
+
 ## 2.65.1 &mdash; 2026-05-29
 
 ### Fixed

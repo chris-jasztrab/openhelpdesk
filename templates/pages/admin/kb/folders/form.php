@@ -2,9 +2,9 @@
 $isEdit       = !empty($editing);
 $layout       = 'app';
 $pageTitle    = $isEdit ? 'Edit Folder' : 'Add Folder';
-$sidebarItems = adminSidebar('kb');
+$sidebarItems = Auth::isAdmin() ? adminSidebar('kb') : staffSidebar('kb-structure');
 $breadcrumbs  = [
-    ['label' => 'Admin', 'url' => '/admin'],
+    Auth::isAdmin() ? ['label' => 'Admin', 'url' => '/admin'] : ['label' => 'Agent', 'url' => '/agent'],
     ['label' => 'KB Folders', 'url' => '/admin/kb/folders'],
     ['label' => $isEdit ? 'Edit' : 'Add'],
 ];

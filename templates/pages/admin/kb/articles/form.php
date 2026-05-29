@@ -2,9 +2,9 @@
 $isEdit       = !empty($editing);
 $layout       = 'app';
 $pageTitle    = $isEdit ? 'Edit Article' : 'Add Article';
-$sidebarItems = adminSidebar('kb');
+$sidebarItems = Auth::isAdmin() ? adminSidebar('kb') : staffSidebar('kb-articles');
 $breadcrumbs  = [
-    ['label' => 'Admin', 'url' => '/admin'],
+    Auth::isAdmin() ? ['label' => 'Admin', 'url' => '/admin'] : ['label' => 'Agent', 'url' => '/agent'],
     ['label' => 'KB Articles', 'url' => '/admin/kb/articles'],
     ['label' => $isEdit ? 'Edit' : 'Add'],
 ];
