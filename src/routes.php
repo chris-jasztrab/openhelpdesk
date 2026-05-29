@@ -2710,7 +2710,13 @@ require ROOT_DIR . '/src/routes/agent.php';
  * Admin area
  * ------------------------------------------------------------------ */
 $router->get('/admin', function () {
-    Auth::requireAdmin();
+    // Staff who hold an admin-area permission but aren't full admins land here
+    // via the "Admin" breadcrumb on shared admin pages. Send them to their own
+    // dashboard instead of a dead-end 403.
+    Auth::requireStaff();
+    if (!Auth::isAdmin()) {
+        redirect('/agent');
+    }
     $db = Database::connect();
 
     $totalTickets = (int) $db->query("SELECT COUNT(*) FROM tickets")->fetchColumn();

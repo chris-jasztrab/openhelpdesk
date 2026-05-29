@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.65.3 &mdash; 2026-05-29
+
+### Fixed
+- **Every grantable permission now works end-to-end for custom staff levels — no admin-shell 403 traps.** 2.65.1/2.65.2 fixed the Knowledge Base case; this completes the same fix across *all* admin areas. Three structural changes: (1) `adminSidebar()` now returns the viewer's permission-filtered **staff** sidebar for any non-admin, so a granted staff level reaching any `/admin/*` page sees only the areas it can open instead of the full admin menu (whose links 403) — this covers all 117 admin templates at once ([helpers.php](src/helpers.php)). (2) The `/admin` dashboard route now redirects non-admin staff to `/agent` instead of returning 403, so the "Admin" breadcrumb on shared pages is no longer a dead end ([routes.php](src/routes.php)). (3) The staff sidebar gained direct entry links for the remaining grantable areas — Ticket Templates, Recurring Tickets, SLA Policies, Automations, CSAT Surveys, AI Classification and Import Data — each shown only when its capability is granted, so levels that hold these (but not full `settings.manage`) can actually navigate to them. Verified by granting each of the 17 capabilities in isolation and confirming its area renders the staff shell with no admin links leaking and no 403.
+
+---
+
 ## 2.65.2 &mdash; 2026-05-29
 
 ### Fixed

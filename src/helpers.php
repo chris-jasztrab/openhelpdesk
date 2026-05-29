@@ -4476,6 +4476,13 @@ function notifyConfidentialEntityDeleted(PDO $db, string $targetType, string $ta
 
 function adminSidebar(string $active = ''): array
 {
+    // Admin-area pages are reachable by any custom staff level that holds the
+    // page's specific permission (each route gates with Auth::requirePermission).
+    // Such a non-admin must see THEIR permission-filtered sidebar — never the
+    // full admin menu, whose links would 403. Admins get the full menu below.
+    if (!Auth::isAdmin()) {
+        return staffSidebar($active);
+    }
     return array_map(fn($item) => array_merge($item, ['active' => $item['key'] === $active]), [
         ['icon' => 'bi-speedometer2',    'label' => label('nav.dashboard'),     'url' => '/admin',            'key' => 'dashboard'],
         ['icon' => 'bi-ticket-detailed', 'label' => label('nav.tickets'),       'url' => '/admin/tickets',    'key' => 'tickets'],
@@ -4523,17 +4530,24 @@ function staffSidebar(string $active = ''): array
     // Admin-area shortcuts, each shown only when the role is granted its
     // permission. Order mirrors the admin sidebar for familiarity.
     $adminLinks = [
-        ['perm' => 'users.manage',         'icon' => 'bi-people',      'label' => label('nav.users'),     'url' => '/admin/users',                   'key' => 'users'],
-        ['perm' => 'kb.articles.manage',   'icon' => 'bi-journal-text', 'label' => 'Manage KB Articles',  'url' => '/admin/kb/articles',             'key' => 'kb-articles'],
-        ['perm' => 'kb.structure.manage',  'icon' => 'bi-folder',      'label' => 'KB Categories & Folders', 'url' => '/admin/kb/categories',       'key' => 'kb-structure'],
-        ['perm' => 'reports.view',     'icon' => 'bi-bar-chart',   'label' => label('nav.reports'),   'url' => '/admin/reports',                 'key' => 'reports'],
-        ['perm' => 'workflows.manage', 'icon' => 'bi-diagram-3',   'label' => label('nav.workflows'), 'url' => '/admin/workflows/ticket-fields', 'key' => 'workflows'],
-        ['perm' => 'groups.manage',    'icon' => 'bi-people-fill', 'label' => 'Groups',               'url' => '/admin/groups',                  'key' => 'groups'],
-        ['perm' => 'skills.manage',    'icon' => 'bi-mortarboard', 'label' => 'Agent Skills',         'url' => '/admin/skills',                  'key' => 'skills'],
-        ['perm' => 'locations.manage', 'icon' => 'bi-geo-alt',     'label' => label('location.plural'), 'url' => '/admin/locations',             'key' => 'locations'],
-        ['perm' => 'priorities.manage','icon' => 'bi-flag',        'label' => 'Priorities',           'url' => '/admin/priorities',              'key' => 'priorities'],
-        ['perm' => 'audit.view',       'icon' => 'bi-shield-check','label' => label('nav.audit_log'), 'url' => '/admin/audit-log',               'key' => 'audit-log'],
-        ['perm' => 'settings.manage',  'icon' => 'bi-sliders',     'label' => label('nav.settings'),  'url' => '/admin/settings',                'key' => 'settings'],
+        ['perm' => 'users.manage',           'icon' => 'bi-people',        'label' => label('nav.users'),        'url' => '/admin/users',                   'key' => 'users'],
+        ['perm' => 'kb.articles.manage',     'icon' => 'bi-journal-text',  'label' => 'Manage KB Articles',      'url' => '/admin/kb/articles',             'key' => 'kb-articles'],
+        ['perm' => 'kb.structure.manage',    'icon' => 'bi-folder',        'label' => 'KB Categories & Folders', 'url' => '/admin/kb/categories',           'key' => 'kb-structure'],
+        ['perm' => 'ticket_templates.manage','icon' => 'bi-file-earmark-text', 'label' => 'Ticket Templates',    'url' => '/admin/ticket-templates',        'key' => 'ticket-templates'],
+        ['perm' => 'recurring_tickets.manage','icon' => 'bi-arrow-clockwise', 'label' => 'Recurring Tickets',    'url' => '/admin/recurring-tickets',       'key' => 'recurring-tickets'],
+        ['perm' => 'workflows.manage',       'icon' => 'bi-diagram-3',     'label' => label('nav.workflows'),    'url' => '/admin/workflows/ticket-fields', 'key' => 'workflows'],
+        ['perm' => 'groups.manage',          'icon' => 'bi-people-fill',   'label' => 'Groups',                  'url' => '/admin/groups',                  'key' => 'groups'],
+        ['perm' => 'skills.manage',          'icon' => 'bi-mortarboard',   'label' => 'Agent Skills',            'url' => '/admin/skills',                  'key' => 'skills'],
+        ['perm' => 'locations.manage',       'icon' => 'bi-geo-alt',       'label' => label('location.plural'),  'url' => '/admin/locations',               'key' => 'locations'],
+        ['perm' => 'priorities.manage',      'icon' => 'bi-flag',          'label' => 'Priorities',              'url' => '/admin/priorities',              'key' => 'priorities'],
+        ['perm' => 'sla.manage',             'icon' => 'bi-stopwatch',     'label' => 'SLA Policies',            'url' => '/admin/settings/sla-policies',   'key' => 'sla'],
+        ['perm' => 'automations.manage',     'icon' => 'bi-lightning',     'label' => 'Automations',             'url' => '/admin/settings/automations',    'key' => 'automations'],
+        ['perm' => 'csat.manage',            'icon' => 'bi-star',          'label' => 'CSAT Surveys',            'url' => '/admin/settings/csat',           'key' => 'csat'],
+        ['perm' => 'ai.manage',              'icon' => 'bi-cpu',           'label' => 'AI Classification',       'url' => '/admin/settings/ai',             'key' => 'ai'],
+        ['perm' => 'import.manage',          'icon' => 'bi-cloud-upload',  'label' => 'Import Data',             'url' => '/admin/settings/import',         'key' => 'import'],
+        ['perm' => 'reports.view',           'icon' => 'bi-bar-chart',     'label' => label('nav.reports'),      'url' => '/admin/reports',                 'key' => 'reports'],
+        ['perm' => 'audit.view',             'icon' => 'bi-shield-check',  'label' => label('nav.audit_log'),    'url' => '/admin/audit-log',               'key' => 'audit-log'],
+        ['perm' => 'settings.manage',        'icon' => 'bi-sliders',       'label' => label('nav.settings'),     'url' => '/admin/settings',                'key' => 'settings'],
     ];
     foreach ($adminLinks as $link) {
         if (Auth::can($link['perm'])) {
