@@ -9,6 +9,11 @@ $breadcrumbs = [
     ['label' => $isEdit ? 'Edit' : 'Add'],
 ];
 $action = $isEdit ? "/admin/users/{$editing['id']}/edit" : '/admin/users/create';
+// A non-admin editor may not change the permission level, email or password of
+// a user who outranks them. The server enforces this too — these flags only
+// keep the form honest.
+$targetOutranksEditor = $isEdit && !Auth::isAdmin()
+    && !roleAssignableBy(Auth::role(), $editing['role'] ?? 'user');
 ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="fw-bold mb-0"><?= $isEdit ? 'Edit User' : 'Add User' ?></h2>
@@ -41,7 +46,11 @@ $action = $isEdit ? "/admin/users/{$editing['id']}/edit" : '/admin/users/create'
                 <div class="col-md-6">
                     <label for="email" class="form-label fw-semibold">Email <span class="text-danger">*</span></label>
                     <input type="email" class="form-control" id="email" name="email"
-                           value="<?= e(old('email', $editing['email'] ?? '')) ?>" required>
+                           value="<?= e(old('email', $editing['email'] ?? '')) ?>" required
+                           <?= $targetOutranksEditor ? 'readonly' : '' ?>>
+                    <?php if ($targetOutranksEditor): ?>
+                        <div class="form-text">Only an admin can change this user's email.</div>
+                    <?php endif; ?>
                 </div>
 
                 <!-- Password -->
@@ -50,7 +59,10 @@ $action = $isEdit ? "/admin/users/{$editing['id']}/edit" : '/admin/users/create'
                         Password <?= $isEdit ? '<span class="text-muted fw-normal">(leave blank to keep current)</span>' : '<span class="text-danger">*</span>' ?>
                     </label>
                     <input type="password" class="form-control" id="password" name="password"
-                           <?= $isEdit ? '' : 'required' ?>>
+                           <?= $isEdit ? '' : 'required' ?> <?= $targetOutranksEditor ? 'disabled' : '' ?>>
+                    <?php if ($targetOutranksEditor): ?>
+                        <div class="form-text">Only an admin can reset this user's password.</div>
+                    <?php endif; ?>
                 </div>
 
                 <!-- Role -->
@@ -61,10 +73,8 @@ $action = $isEdit ? "/admin/users/{$editing['id']}/edit" : '/admin/users/create'
                     // Non-admins may only assign levels at or below their own, and
                     // may not change the level of a user who already outranks them.
                     $roleChoicesForActor = Auth::isAdmin() ? roleChoices() : assignableRoleChoices(Auth::role());
-                    $roleLocked = $isEdit && !Auth::isAdmin()
-                        && !roleAssignableBy(Auth::role(), $editing['role'] ?? 'user');
                     ?>
-                    <?php if ($roleLocked): ?>
+                    <?php if ($targetOutranksEditor): ?>
                         <input type="hidden" name="role" value="<?= e($editing['role']) ?>">
                         <select class="form-select" id="role" disabled>
                             <option selected><?= e(roleLabel($editing['role'])) ?></option>

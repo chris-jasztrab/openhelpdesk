@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.66.2 &mdash; 2026-06-01
+
+### Security
+- **A lower-level user can no longer reset the email or password of a user who outranks them (account-takeover guard).** Following 2.66.1, a non-admin with `users.manage` still could not change a higher-level user's *role*, but could change that user's **email or password** — an account-takeover path. The user-edit handler ([admin.php](src/routes/admin.php)) now keeps the email and password unchanged whenever the edited user outranks the editor (the role being un-assignable by the editor), regardless of what is posted; admins and editors at/above the target's level are unaffected. The edit form ([form.php](templates/pages/admin/users/form.php)) makes the email read-only and disables the password field in that case. Verified with Playwright: a forged POST trying to hijack an admin's email + password leaves both unchanged in the database, while normal edits of an equal-or-lower user still apply.
+
+---
+
 ## 2.66.1 &mdash; 2026-06-01
 
 ### Security

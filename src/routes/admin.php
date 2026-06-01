@@ -969,24 +969,37 @@ $router->post('/admin/users/{id}/edit', function (array $p) {
 
     $db = Database::connect();
 
-    // Look up the user being edited up-front for the privilege guard below.
-    $targetStmt = $db->prepare('SELECT role FROM users WHERE id = ?');
+    // Look up the user being edited up-front for the privilege guards below.
+    $targetStmt = $db->prepare('SELECT role, email FROM users WHERE id = ?');
     $targetStmt->execute([$id]);
-    $currentRole = $targetStmt->fetchColumn();
-    if ($currentRole === false) {
+    $target = $targetStmt->fetch();
+    if (!$target) {
         flash('error', 'User not found.');
         redirect('/admin/users');
     }
+    $currentRole = $target['role'];
+
+    // Does the edited user outrank the (non-admin) editor? If so the editor may
+    // not touch their level, email or password — only an admin, or someone at or
+    // above the target's level, may. Admins are never outranked.
+    $targetOutranksActor = !roleAssignableBy(Auth::role(), $currentRole);
 
     // Privilege guard: a non-admin may not change a role unless BOTH the level
     // being assigned AND the user's existing level are at or below their own —
     // so they can neither escalate a user (or themselves) above their level nor
     // alter a user who already outranks them. Admins are unrestricted.
     if ($role !== $currentRole
-        && (!roleAssignableBy(Auth::role(), $role) || !roleAssignableBy(Auth::role(), $currentRole))) {
+        && (!roleAssignableBy(Auth::role(), $role) || $targetOutranksActor)) {
         flashInput($_POST);
         flash('error', 'You can only assign permission levels at or below your own.');
         redirect("/admin/users/{$id}/edit");
+    }
+
+    // A lower-level editor may not reset a higher-level user's email or password
+    // (account-takeover guard) — keep both unchanged regardless of what was sent.
+    if ($targetOutranksActor) {
+        $email = $target['email'];
+        unset($_POST['password']);
     }
 
     // Handle avatar
