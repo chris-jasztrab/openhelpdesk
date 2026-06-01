@@ -36,7 +36,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-plus-circle text-primary me-2"></i>Creating a Rule</h5>
 <ol class="text-muted mb-0">
-    <li>Go to <a href="/admin/automations"><strong>Admin → Automations</strong></a>.</li>
+    <li>Go to <a href="/admin/settings/automations"><strong>Admin → Settings → Automations</strong></a>.</li>
     <li>Click <strong>Add Rule</strong>.</li>
     <li>Give the rule a descriptive name.</li>
     <li>Choose the <strong>trigger</strong> event.</li>
@@ -168,7 +168,7 @@ For step-by-step diagrams of every strategy, the master flow that runs on every 
         </tr>
         <tr>
             <td><strong>First Available</strong></td>
-            <td>Pick a group member who currently has the app open in a browser — i.e. their heartbeat has fired in the last ~2 minutes (least-loaded among them). Background tabs and minimized windows still count, since the heartbeat keeps running and the window is wide enough to absorb the browser's background-timer throttling. The live list is at <a href="/admin/users/online">Admin → Users → Who's Online</a>. Good for shift / follow-the-sun coverage. Falls back when nobody is online.</td>
+            <td>Pick a group member who currently has the app open in a browser — i.e. their heartbeat has fired in the last ~2 minutes (least-loaded among them). Background tabs and minimized windows still count, since the heartbeat keeps running and the window is wide enough to absorb the browser's background-timer throttling. The live list is at <a href="/admin/users/online">Admin → Settings → Users &amp; Access → Users → Who's Online</a>. Good for shift / follow-the-sun coverage. Falls back when nobody is online.</td>
         </tr>
         <tr>
             <td><strong>AI Skill-Based</strong> <span class="badge bg-primary ms-1">new</span></td>
@@ -199,7 +199,7 @@ For step-by-step diagrams of every strategy, the master flow that runs on every 
 <ul class="text-muted mb-3">
     <li><strong>Agent Skills</strong> are managed at <a href="/admin/skills"><strong>Admin → Settings → Agent Skills</strong></a>. Each skill has a name, description, and a <strong>scope</strong> — Global (admin-curated) or owned by a specific group. <a href="/admin/docs/users#group-managers">Group managers</a> can edit skills their group owns and assign them to teammates without admin involvement.</li>
     <li><strong>Required skills per ticket type</strong> are configured on the <a href="/admin/types">Ticket Types</a> form. A ticket type can require zero, one, or several skills — Skill-Based assignment matches members who hold them <em>all</em>.</li>
-    <li><strong>Online presence</strong> drives First Available — anyone with the app open in a browser tab heartbeats every 30s, and anyone whose last heartbeat was within the last ~2 minutes is treated as online. The heartbeat keeps running while the tab is hidden / window is minimized (browsers throttle the timer in the background, which is exactly why the online window is 120s rather than 60s). There's no manual "available" toggle anymore (was removed in 2.21.0); just close the tab when you're off duty. Live list at <a href="/admin/users/online">Admin → Users → Who's Online</a>.</li>
+    <li><strong>Online presence</strong> drives First Available — anyone with the app open in a browser tab heartbeats every 30s, and anyone whose last heartbeat was within the last ~2 minutes is treated as online. The heartbeat keeps running while the tab is hidden / window is minimized (browsers throttle the timer in the background, which is exactly why the online window is 120s rather than 60s). There's no manual "available" toggle anymore (was removed in 2.21.0); just close the tab when you're off duty. Live list at <a href="/admin/users/online">Admin → Settings → Users &amp; Access → Users → Who's Online</a>.</li>
 </ul>
 <div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
     Auto-assignment only fires when the ticket already has a group. Portal-created tickets inherit the group from <a href="/admin/types">Ticket Types → Default Group</a>, so make sure types you want auto-routed have a default group set.

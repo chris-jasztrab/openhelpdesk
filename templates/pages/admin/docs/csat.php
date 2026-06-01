@@ -12,7 +12,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <p class="text-muted mb-4">Automatically email a rating request when a ticket is resolved or closed. You can use the built-in 1&ndash;5 star page or link recipients to an external survey tool (HappyOrNot, SurveyGizmo, Jotform, Typeform, etc.).</p>
 
 <div class="alert alert-info small mb-4"><i class="bi bi-info-circle me-2"></i>
-    Configure everything described here at <a href="/admin/settings/csat"><strong>Admin &rarr; Settings &rarr; CSAT Surveys</strong></a>. View collected results at <a href="/admin/reports/csat"><strong>Admin &rarr; Reports &rarr; Satisfaction</strong></a>.
+    Configure everything described here at <a href="/admin/settings/csat"><strong>Admin &rarr; Settings &rarr; CSAT Surveys</strong></a>. View collected results at <a href="/admin/reports/csat"><strong>Admin &rarr; Settings &rarr; Reports &rarr; Satisfaction</strong></a>.
 </div>
 
 <div class="card border-0 shadow-sm mb-4">
@@ -113,7 +113,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card border-0 shadow-sm mb-4" id="reports">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-bar-chart text-primary me-2"></i>Where the results show up</h5>
-<p class="text-muted mb-2">The <a href="/admin/reports/csat"><strong>Reports &rarr; Satisfaction</strong></a> page is the same in both modes, but it shows different things:</p>
+<p class="text-muted mb-2">The <a href="/admin/reports/csat"><strong>Settings &rarr; Reports &rarr; Satisfaction</strong></a> page is the same in both modes, but it shows different things:</p>
 <ul class="text-muted mb-3">
     <li><strong>Built-in mode</strong> &mdash; full picture: surveys sent, responses, response rate, average rating, star distribution, and a table of every comment (linked to its ticket).</li>
     <li><strong>External mode</strong> &mdash; only the <em>Surveys Sent</em> count is meaningful (responses, average rating, etc. will show as 0 because ratings live in the external system). A blue banner appears at the top of the report explaining this.</li>

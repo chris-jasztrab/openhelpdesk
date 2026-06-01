@@ -105,7 +105,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-flag text-primary me-2"></i>Priorities</h5>
-<p class="text-muted mb-2">Priorities determine urgency and drive SLA timers. Default priorities are created during installation (Low, Medium, High, Critical). You can rename, recolour and adjust them at <a href="/admin/priorities"><strong>Admin → Priorities</strong></a>.</p>
+<p class="text-muted mb-2">Priorities determine urgency and drive SLA timers. Default priorities are created during installation (Low, Medium, High, Critical). You can rename, recolour and adjust them at <a href="/admin/priorities"><strong>Admin → Settings → Priorities</strong></a>.</p>
 <p class="text-muted mb-0">Each priority can be linked to an SLA policy so that response and resolution deadlines are automatically applied when a ticket is created.</p>
 </div>
 </div>
@@ -285,7 +285,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-file-earmark-text text-primary me-2"></i>Ticket Templates</h5>
-<p class="text-muted mb-2">Templates let you pre-fill a ticket's subject, description, type, and priority to speed up common requests. Managed at <a href="/admin/ticket-templates"><strong>Admin → Ticket Templates</strong></a>.</p>
+<p class="text-muted mb-2">Templates let you pre-fill a ticket's subject, description, type, and priority to speed up common requests. Managed at <a href="/admin/ticket-templates"><strong>Admin → Settings → Ticket Templates</strong></a>.</p>
 <ul class="text-muted mb-3">
     <li>Admins can create, edit, and delete any template. Agents can manage their own templates.</li>
     <li>Mark a template as <strong>Shared</strong> to make it available on the portal ticket creation form — users see a "Start from a Template" picker.</li>
@@ -300,7 +300,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-ui-checks-grid text-primary me-2"></i>What the Form Builder is for</h5>
-<p class="text-muted mb-2">The <strong>Form Builder</strong> at <a href="/admin/workflows/ticket-fields"><strong>Admin → Settings → Custom Fields</strong></a> controls everything that appears on the <em>New Ticket</em> form — both on the public portal and inside the admin/agent "Create Ticket" view. Anything you change here takes effect immediately for the next person who opens the form. There is no "publish" step.</p>
+<p class="text-muted mb-2">The <strong>Form Builder</strong> at <a href="/admin/workflows/ticket-fields"><strong>Admin → Settings → Ticket Forms</strong></a> controls everything that appears on the <em>New Ticket</em> form — both on the public portal and inside the admin/agent "Create Ticket" view. Anything you change here takes effect immediately for the next person who opens the form. There is no "publish" step.</p>
 <p class="text-muted mb-2"><strong>Every ticket type has its own form.</strong> The page is laid out as a left rail of ticket types and a canvas:</p>
 <ul class="text-muted mb-3">
     <li><strong>Type rail (left)</strong> — pick the ticket type whose form you want to edit. The canvas swaps to that type's layout.</li>

@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.66.7 &mdash; 2026-06-01
+
+### Documentation
+- **Swept every help-doc navigation breadcrumb for the Settings reorganization, and told agents where their tools went.** Following 2.66.6, the remaining docs that still pointed at old top-level locations were corrected to their <em>Settings → …</em> paths: Automations and the Who's Online list ([automations.php](templates/pages/admin/docs/automations.php)), the AI routing Groups step ([ai.php](templates/pages/admin/docs/ai.php)), the CSAT results report ([csat.php](templates/pages/admin/docs/csat.php)), SLA Policies &amp; Priorities ([sla.php](templates/pages/admin/docs/sla.php)), and Priorities, Ticket Templates &amp; the Form Builder ("Ticket Forms") ([tickets.php](templates/pages/admin/docs/tickets.php)). The **Agent Help** landing ([index.php](templates/pages/agent/docs/index.php)) gains a "Where to find your tools" callout explaining that management features their level grants (Ticket Templates, KB articles, Recurring Tickets, Reports, …) now live behind the <strong>Settings</strong> icon in the sidebar, which only ever shows the areas they can open.
+
+---
+
 ## 2.66.6 &mdash; 2026-06-01
 
 ### Documentation

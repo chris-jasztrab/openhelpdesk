@@ -9,6 +9,13 @@ $breadcrumbs  = [['label' => 'Help']];
     <p class="text-muted mb-0">Guides for everything you can do as an agent in OpenHelpDesk.</p>
 </div>
 
+<div class="alert alert-info d-flex gap-2 align-items-start" role="note">
+    <i class="bi bi-sliders fs-5 mt-1"></i>
+    <div>
+        <strong>Where to find your tools.</strong> The left sidebar keeps your day-to-day work &mdash; <strong>Dashboard</strong>, <strong>Tickets</strong>, <strong>Floor mode</strong>, <strong>Knowledge Base</strong>, and <strong>Canned Responses</strong>. Anything else your permission level lets you manage &mdash; such as <strong>Ticket Templates</strong>, <strong>Knowledge Base articles</strong>, <strong>Recurring Tickets</strong>, or <strong>Reports</strong> &mdash; now lives behind the <strong><i class="bi bi-sliders"></i> Settings</strong> icon at the bottom of the sidebar. Opening it shows a Settings page whose left-hand menu lists <em>only</em> the areas you're allowed to use, so you'll never hit a "no access" page. If your level has no management features, the Settings icon simply won't appear.
+    </div>
+</div>
+
 <div class="mb-4">
     <div class="input-group input-group-lg" style="max-width:540px;">
         <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
@@ -87,6 +94,7 @@ $breadcrumbs  = [['label' => 'Help']];
         ["Full ticket details floor close X return", "/agent/help/floor", "Floor Mode"],
         ["Resize columns drag header edge grip ticket list", "/agent/help/ticket-list", "Ticket List & Filters"],
         ["Column width remembered per page browser localStorage", "/agent/help/ticket-list", "Ticket List & Filters"],
+        ["Settings icon gear sidebar templates knowledge base recurring tickets reports permissions where to find tools", "/agent/help", "Finding Your Tools"],
     ];
     var input = document.getElementById("helpSearch");
     var box = document.getElementById("helpSearchResults");
