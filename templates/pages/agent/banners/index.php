@@ -1,9 +1,9 @@
 <?php
 $layout       = 'app';
 $pageTitle    = 'Status Banners';
-$sidebarItems = Auth::role() === 'power_user' ? powerUserSidebar('banners') : agentSidebar('banners');
+$sidebarItems = adminSidebar('settings');
 $breadcrumbs  = [
-    ['label' => 'Agent', 'url' => '/agent'],
+    ['label' => 'Settings', 'url' => '/admin/settings'],
     ['label' => 'Status Banners'],
 ];
 

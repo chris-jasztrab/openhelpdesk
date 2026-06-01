@@ -6,9 +6,9 @@ $action  = $isEdit
 
 $layout       = 'app';
 $pageTitle    = $isEdit ? 'Edit Status Banner' : 'New Status Banner';
-$sidebarItems = Auth::role() === 'power_user' ? powerUserSidebar('banners') : agentSidebar('banners');
+$sidebarItems = adminSidebar('settings');
 $breadcrumbs  = [
-    ['label' => 'Agent', 'url' => '/agent'],
+    ['label' => 'Settings', 'url' => '/admin/settings'],
     ['label' => 'Status Banners', 'url' => '/agent/banners'],
     ['label' => $isEdit ? 'Edit' : 'New'],
 ];

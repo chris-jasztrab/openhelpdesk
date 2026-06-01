@@ -4475,22 +4475,16 @@ function notifyConfidentialEntityDeleted(PDO $db, string $targetType, string $ta
 /* ── Sidebar helpers ──────────────────────────────────────────── */
 
 /**
- * True if the viewer can open at least one Settings-area feature. Admins always
- * can; other staff qualify when they hold any grantable permission (every key
- * maps to a settings-nav item). Drives the single "Settings" sidebar link for
- * non-admins and the GET /admin/settings landing gate.
+ * True if the viewer can open at least one Settings-area feature. Every staff
+ * member qualifies: admins see everything, and Status Banners — gated only by
+ * Auth::requireStaff — now lives in the Settings area, so even a permission-less
+ * staff role has one item there. Non-staff (portal) users never qualify. Drives
+ * the single "Settings" sidebar link and the GET /admin/settings landing gate;
+ * the settings-nav itself still hides every item the role can't open.
  */
 function canAccessSettingsArea(): bool
 {
-    if (Auth::isAdmin()) {
-        return true;
-    }
-    foreach (rolePermissionKeys() as $perm) {
-        if (Auth::can($perm)) {
-            return true;
-        }
-    }
-    return false;
+    return Auth::isAdmin() || Auth::isStaff();
 }
 
 function adminSidebar(string $active = ''): array
@@ -4539,10 +4533,11 @@ function staffSidebar(string $active = ''): array
         ['icon' => 'bi-ticket-detailed',  'label' => label('agent.nav.tickets'),        'url' => '/agent/tickets',          'key' => 'tickets'],
         ['icon' => 'bi-grid-1x2',         'label' => 'Floor mode',                      'url' => '/agent/floor',            'key' => 'floor', 'touchOnly' => true],
         ['icon' => 'bi-book',             'label' => label('agent.nav.knowledge_base'), 'url' => '/agent/kb',               'key' => 'kb'],
-        ['icon' => 'bi-megaphone',        'label' => 'Status Banners',                  'url' => '/agent/banners',          'key' => 'banners'],
     ];
     // Canned Responses (personal reply snippets) now lives on the profile page
     // for every staff member — see templates/pages/profile/edit.php.
+    // Status Banners moved to the Settings area (Operations group) — it's open
+    // to all staff, so canAccessSettingsArea() now admits every staff role.
 
     if (canAccessSettingsArea()) {
         $items[] = ['icon' => 'bi-sliders', 'label' => label('nav.settings'), 'url' => '/admin/settings', 'key' => 'settings'];

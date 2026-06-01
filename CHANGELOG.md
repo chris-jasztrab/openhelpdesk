@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.66.10 &mdash; 2026-06-01
+
+### Changed
+- **Status Banners moved from the sidebar rail to the Settings page.** The <i class="bi bi-megaphone"></i> <strong>Status Banners</strong> rail icon is gone; the feature now lives under a new <strong>Operations</strong> group in the Settings left-nav ([settings-nav.php](templates/partials/settings-nav.php), [helpers.php](src/helpers.php)). Because posting incident banners is open to <em>every</em> staff member (gated only by <code>Auth::requireStaff</code>), the Settings nav item is shown to all staff via a new <code>@staff</code> gate, and <code>canAccessSettingsArea()</code> now admits any staff role — so no one who could post banners before loses access, and admins (who never had the rail icon) gain a link. The banner pages now breadcrumb under <em>Settings</em> ([index](templates/pages/agent/banners/index.php), [form](templates/pages/agent/banners/form.php)).
+
+---
+
 ## 2.66.9 &mdash; 2026-06-01
 
 ### Changed

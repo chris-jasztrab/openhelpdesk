@@ -1,5 +1,9 @@
 <?php
 $settingsNavGroups = [
+    'Operations' => [
+        ['label' => 'Status Banners', 'url' => '/agent/banners', 'icon' => 'bi-megaphone',
+         'keywords' => 'status banner incident notice outage alert announcement broadcast maintenance downtime wifi network down'],
+    ],
     'Email' => [
         ['label' => 'Email / SMTP',        'url' => '/admin/settings',                      'icon' => 'bi-envelope',       'exact' => true,
          'keywords' => 'smtp mail outgoing graph inbound reply-to azure office365 m365'],
@@ -109,6 +113,7 @@ $settingsNavGroups = [
 // URL→permission map mirrors the route gates; longest-prefix wins.
 $settingsNavPerm = static function (string $url): string {
     $map = [
+        '/agent/banners'                    => '@staff',
         '/admin/settings/sla'               => 'sla.manage',
         '/admin/settings/csat'              => 'csat.manage',
         '/admin/settings/ai'                => 'ai.manage',
@@ -155,7 +160,9 @@ $settingsNavPerm = static function (string $url): string {
 foreach ($settingsNavGroups as $grpKey => $grpItems) {
     $settingsNavGroups[$grpKey] = array_values(array_filter($grpItems, static function (array $it) use ($settingsNavPerm) {
         $perm = $settingsNavPerm($it['url']);
-        return $perm === '@admin' ? Auth::isAdmin() : Auth::can($perm);
+        if ($perm === '@admin') return Auth::isAdmin();
+        if ($perm === '@staff') return Auth::isStaff();
+        return Auth::can($perm);
     }));
     if (empty($settingsNavGroups[$grpKey])) {
         unset($settingsNavGroups[$grpKey]);
