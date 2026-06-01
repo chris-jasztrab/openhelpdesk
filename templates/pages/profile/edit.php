@@ -302,6 +302,24 @@ $breadcrumbs = [
             </div>
         </div>
         <?php endif; ?>
+
+        <?php if (Auth::isStaff()): ?>
+        <!-- Canned Responses (staff) — moved here from the sidebar -->
+        <div class="card border-0 shadow-sm mt-4">
+            <div class="card-header bg-transparent fw-semibold">
+                <i class="bi bi-chat-square-text me-1"></i>Canned Responses
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">
+                    Create and manage your personal reply snippets &mdash; pre-written responses you can
+                    drop into a ticket reply in one click. Shared team responses are available here too.
+                </p>
+                <a href="/agent/canned-responses" class="btn text-white" style="background:var(--ld-primary);">
+                    <i class="bi bi-chat-square-text me-1"></i>Manage Canned Responses
+                </a>
+            </div>
+        </div>
+        <?php endif; ?>
     </div>
 </div>
 

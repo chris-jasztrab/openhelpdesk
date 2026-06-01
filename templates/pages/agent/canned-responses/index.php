@@ -3,7 +3,7 @@ $layout       = 'app';
 $pageTitle    = 'Canned Responses';
 $sidebarItems = agentSidebar('canned-responses');
 $breadcrumbs  = [
-    ['label' => 'Agent', 'url' => '/agent'],
+    ['label' => 'My Profile', 'url' => '/profile'],
     ['label' => 'Canned Responses'],
 ];
 ?>

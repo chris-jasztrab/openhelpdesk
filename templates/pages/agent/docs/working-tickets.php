@@ -51,7 +51,7 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/agent/help'], ['label' => 'Worki
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-chat-square-text text-primary me-2"></i>Canned Responses</h5>
 <p class="text-muted mb-2">While the reply composer is open, click <strong>Canned Response</strong> to pick a saved reply template. The template content is inserted at the cursor position and tokens (e.g. <code>{{customer_first_name}}</code>) are replaced with the actual values for this ticket.</p>
-<p class="text-muted mb-0">You can create and manage your own canned responses under <a href="/agent/canned-responses"><strong>Canned Responses</strong></a> in the sidebar.</p>
+<p class="text-muted mb-0">You can create and manage your own canned responses from your <a href="/agent/canned-responses"><strong>profile page</strong></a> (top-right avatar menu &rarr; <strong>My Profile</strong> &rarr; <strong>Manage Canned Responses</strong>).</p>
 </div>
 </div>
 

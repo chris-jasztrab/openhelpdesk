@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.66.8 &mdash; 2026-06-01
+
+### Changed
+- **Personal Canned Responses moved from the sidebar to the profile page.** The per-staff Canned Responses manager (your own reply snippets, plus the team's shared ones) was a dedicated sidebar icon; it's now a <strong>Manage Canned Responses</strong> card on <strong>My Profile</strong>, shown to every staff member ([profile/edit.php](templates/pages/profile/edit.php), [helpers.php](src/helpers.php)). This also gives admins — whose sidebar never carried the icon — a direct way to manage their personal responses. The manager pages now breadcrumb under <em>My Profile</em> ([index](templates/pages/agent/canned-responses/index.php), [form](templates/pages/agent/canned-responses/form.php)). Admin-managed <em>global</em> canned responses are unchanged (still at Settings &rarr; Customization &rarr; Canned Responses). Docs and the agent onboarding tour were updated to point at the profile page ([agent-tour.php](templates/partials/agent-tour.php), [canned-responses.php](templates/pages/agent/docs/canned-responses.php), [working-tickets.php](templates/pages/agent/docs/working-tickets.php), [agent help landing](templates/pages/agent/docs/index.php)).
+
+---
+
 ## 2.66.7 &mdash; 2026-06-01
 
 ### Documentation

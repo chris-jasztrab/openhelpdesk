@@ -87,8 +87,9 @@ $_agentTourCanTemplates = Auth::can('ticket_templates.manage') ? 'true' : 'false
             popover: {
                 title:       'Navigation',
                 description: 'Use the left sidebar to move between <strong>Dashboard</strong>, <strong>Tickets</strong>, ' +
-                             '<strong>Knowledge Base</strong>, and <strong>Canned Responses</strong> (pre-written reply snippets). ' +
-                             'Hover over an icon to see its label.',
+                             'the <strong>Knowledge Base</strong>, and more. Hover over an icon to see its label.<br><br>' +
+                             'Your <strong>Canned Responses</strong> (pre-written reply snippets) now live on your ' +
+                             '<strong>profile page</strong> — open it from your name in the top-right corner.',
                 side:  'right',
                 align: 'center'
             }

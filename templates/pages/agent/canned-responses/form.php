@@ -8,7 +8,7 @@ $layout       = 'app';
 $pageTitle    = $isEdit ? 'Edit Canned Response' : 'New Canned Response';
 $sidebarItems = agentSidebar('canned-responses');
 $breadcrumbs  = [
-    ['label' => 'Agent', 'url' => '/agent'],
+    ['label' => 'My Profile', 'url' => '/profile'],
     ['label' => 'Canned Responses', 'url' => '/agent/canned-responses'],
     ['label' => $isEdit ? 'Edit' : 'New'],
 ];

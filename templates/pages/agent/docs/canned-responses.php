@@ -26,7 +26,7 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/agent/help'], ['label' => 'Canne
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-plus-circle text-primary me-2"></i>Creating a Canned Response</h5>
 <ol class="text-muted mb-3">
-    <li>Go to <a href="/agent/canned-responses"><strong>Canned Responses</strong></a> in the sidebar.</li>
+    <li>Open <strong>My Profile</strong> from your name in the top-right corner, then click <a href="/agent/canned-responses"><strong>Manage Canned Responses</strong></a>.</li>
     <li>Click <strong>New Response</strong>.</li>
     <li>Enter a <strong>Title</strong> — this is the name you search for when inserting the response.</li>
     <li>Write the <strong>Body</strong> — use the token bar to insert dynamic placeholders (see below).</li>
