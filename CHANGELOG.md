@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.66.9 &mdash; 2026-06-01
+
+### Changed
+- **Floor mode icon now only appears on touch devices.** The <strong>Floor mode</strong> rail icon (agent and portal sidebars) is hidden on devices whose primary pointer is a mouse — desktops and Windows touchscreen laptops — and shown only on tablets/kiosks/phones, where it's actually meant to be used. Detection is pure CSS via the <code>(hover: hover) and (pointer: fine)</code> media query against a new <code>touch-only</code> nav class; no JS and no flash of a visible-then-hidden icon ([helpers.php](src/helpers.php), [app.php](templates/layouts/app.php)).
+
+---
+
 ## 2.66.8 &mdash; 2026-06-01
 
 ### Changed

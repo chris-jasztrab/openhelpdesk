@@ -79,6 +79,13 @@
             border-left-color: var(--ld-primary);
         }
 
+        /* Touch-only rail items (e.g. Floor mode) — hide on devices whose
+           primary pointer is a mouse (desktops + Windows touch laptops).
+           Tablets/kiosks have a coarse pointer with no hover, so they keep it. */
+        @media (hover: hover) and (pointer: fine) {
+            .sidebar .nav-link.touch-only { display: none; }
+        }
+
         /* Main content */
         .main-content {
             margin-left: var(--ld-sidebar-width);
@@ -359,7 +366,7 @@
     <aside class="sidebar">
         <nav class="nav flex-column" aria-label="Section navigation">
             <?php foreach ($sidebarItems as $item): ?>
-            <a class="nav-link <?= ($item['active'] ?? false) ? 'active' : '' ?>"
+            <a class="nav-link <?= ($item['active'] ?? false) ? 'active' : '' ?> <?= ($item['touchOnly'] ?? false) ? 'touch-only' : '' ?>"
                href="<?= e($item['url']) ?>"
                aria-label="<?= e($item['label']) ?>"
                <?= ($item['active'] ?? false) ? 'aria-current="page"' : '' ?>
