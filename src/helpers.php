@@ -5672,6 +5672,47 @@ function roleExists(?string $slug): bool
 }
 
 /**
+ * May a user holding $actorSlug assign $targetSlug to someone? Admins may assign
+ * any level; everyone else only a level whose capabilities are a subset of their
+ * own — so a non-admin with users.manage can never grant a permission they don't
+ * themselves hold, and never the admin level. Closes privilege escalation via
+ * the user editor. A role is always assignable by itself (equal set) and 'user'
+ * (empty set) is assignable by anyone staff.
+ */
+function roleAssignableBy(?string $actorSlug, ?string $targetSlug): bool
+{
+    $actor = roleRecord($actorSlug);
+    if ($actor === null) {
+        return false;
+    }
+    if ($actor['is_admin']) {
+        return true;
+    }
+    $target = roleRecord($targetSlug);
+    if ($target === null || $target['is_admin']) {
+        return false;
+    }
+    foreach (array_keys($target['perms'] ?? []) as $perm) {
+        if (!isset($actor['perms'][$perm])) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/** [slug => name] of the roles $actorSlug may assign — for user-form dropdowns. */
+function assignableRoleChoices(?string $actorSlug): array
+{
+    $out = [];
+    foreach (roleChoices() as $slug => $name) {
+        if (roleAssignableBy($actorSlug, $slug)) {
+            $out[$slug] = $name;
+        }
+    }
+    return $out;
+}
+
+/**
  * Slugs of every staff role (is_staff=1). Replaces the hardcoded
  * ['agent','admin','power_user'] lists scattered through the app. Falls back to
  * the three built-in staff slugs if the table can't be read.

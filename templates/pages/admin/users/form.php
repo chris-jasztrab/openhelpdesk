@@ -56,14 +56,27 @@ $action = $isEdit ? "/admin/users/{$editing['id']}/edit" : '/admin/users/create'
                 <!-- Role -->
                 <div class="col-md-4">
                     <label for="role" class="form-label fw-semibold">Permission Level <span class="text-danger">*</span></label>
-                    <select class="form-select" id="role" name="role" required>
-                        <?php
-                        $currentRole = old('role', $editing['role'] ?? 'user');
-                        foreach (roleChoices() as $val => $label):
-                        ?>
-                        <option value="<?= $val ?>" <?= $currentRole === $val ? 'selected' : '' ?>><?= $label ?></option>
-                        <?php endforeach; ?>
-                    </select>
+                    <?php
+                    $currentRole = old('role', $editing['role'] ?? 'user');
+                    // Non-admins may only assign levels at or below their own, and
+                    // may not change the level of a user who already outranks them.
+                    $roleChoicesForActor = Auth::isAdmin() ? roleChoices() : assignableRoleChoices(Auth::role());
+                    $roleLocked = $isEdit && !Auth::isAdmin()
+                        && !roleAssignableBy(Auth::role(), $editing['role'] ?? 'user');
+                    ?>
+                    <?php if ($roleLocked): ?>
+                        <input type="hidden" name="role" value="<?= e($editing['role']) ?>">
+                        <select class="form-select" id="role" disabled>
+                            <option selected><?= e(roleLabel($editing['role'])) ?></option>
+                        </select>
+                        <div class="form-text">This level is above your own, so you can't change it.</div>
+                    <?php else: ?>
+                        <select class="form-select" id="role" name="role" required>
+                            <?php foreach ($roleChoicesForActor as $val => $label): ?>
+                            <option value="<?= $val ?>" <?= $currentRole === $val ? 'selected' : '' ?>><?= e($label) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    <?php endif; ?>
                 </div>
 
                 <!-- Work Phone -->

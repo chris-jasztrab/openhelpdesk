@@ -776,6 +776,14 @@ $router->post('/admin/users/create', function () {
         redirect('/admin/users/create');
     }
 
+    // Privilege guard: a non-admin may only create a user at a permission level
+    // at or below their own (capabilities ⊆ theirs, never admin).
+    if (!roleAssignableBy(Auth::role(), $role)) {
+        flashInput($_POST);
+        flash('error', 'You can only assign permission levels at or below your own.');
+        redirect('/admin/users/create');
+    }
+
     // Avatar upload
     $avatar = handleAvatarUpload();
 
@@ -948,7 +956,7 @@ $router->post('/admin/users/{id}/edit', function (array $p) {
     $ln            = trim($_POST['last_name'] ?? '');
     $email         = trim($_POST['email'] ?? '');
     $roleRaw       = $_POST['role'] ?? 'user';
-    $role          = in_array($roleRaw, ['admin', 'agent', 'power_user', 'user'], true) ? $roleRaw : 'user';
+    $role          = roleExists($roleRaw) ? $roleRaw : 'user';
     $phone         = trim($_POST['work_phone'] ?? '');
     $locId         = !empty($_POST['location_id']) ? (int) $_POST['location_id'] : null;
     $canViewLocTix = !empty($_POST['can_view_location_tickets']) ? 1 : 0;
@@ -960,6 +968,26 @@ $router->post('/admin/users/{id}/edit', function (array $p) {
     }
 
     $db = Database::connect();
+
+    // Look up the user being edited up-front for the privilege guard below.
+    $targetStmt = $db->prepare('SELECT role FROM users WHERE id = ?');
+    $targetStmt->execute([$id]);
+    $currentRole = $targetStmt->fetchColumn();
+    if ($currentRole === false) {
+        flash('error', 'User not found.');
+        redirect('/admin/users');
+    }
+
+    // Privilege guard: a non-admin may not change a role unless BOTH the level
+    // being assigned AND the user's existing level are at or below their own —
+    // so they can neither escalate a user (or themselves) above their level nor
+    // alter a user who already outranks them. Admins are unrestricted.
+    if ($role !== $currentRole
+        && (!roleAssignableBy(Auth::role(), $role) || !roleAssignableBy(Auth::role(), $currentRole))) {
+        flashInput($_POST);
+        flash('error', 'You can only assign permission levels at or below your own.');
+        redirect("/admin/users/{$id}/edit");
+    }
 
     // Handle avatar
     $avatar = handleAvatarUpload();
@@ -7844,6 +7872,11 @@ $router->post('/admin/settings/import-users/map', function () {
 
         $roleRaw = strtolower($get('role'));
         $role    = roleExists($roleRaw) ? $roleRaw : 'user';
+        // Privilege guard: a non-admin importer can't mint users above their own
+        // level — clamp any such row down to a plain end user.
+        if (!roleAssignableBy(Auth::role(), $role)) {
+            $role = 'user';
+        }
 
         $location = $get('location');
         if ($location !== '' && !isset($existingLocations[strtolower($location)])) {

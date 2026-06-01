@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.66.1 &mdash; 2026-06-01
+
+### Security
+- **Closed a privilege-escalation hole in the user editor: a non-admin with `users.manage` could set any user (including themselves) to Admin.** The create, edit and CSV-import paths validated the submitted role only with `roleExists()` (edit used a stale hardcoded list that also silently dropped custom levels), so any existing role slug — `admin` included — was accepted. Now a non-admin may only assign a level whose capabilities are a **subset of their own**, and never `admin`; admins remain unrestricted. New `roleAssignableBy()` / `assignableRoleChoices()` helpers ([helpers.php](src/helpers.php)) enforce this on [user create/edit and import](src/routes/admin.php), and the user form ([form.php](templates/pages/admin/users/form.php)) now lists only assignable levels — locking the field entirely when the edited user already outranks the editor (so a non-admin can neither escalate a user nor alter someone above their own level). Verified with Playwright: forged POSTs attempting to escalate, create-as-admin, or demote a higher-level user are all rejected, while legitimate same-or-lower assignments and full admin control still work.
+
+---
+
 ## 2.66.0 &mdash; 2026-06-01
 
 ### Changed
