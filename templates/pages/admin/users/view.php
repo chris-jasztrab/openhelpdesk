@@ -11,6 +11,10 @@ $breadcrumbs  = [
 $badgeColors = ['admin' => 'danger', 'agent' => 'primary', 'power_user' => 'info', 'user' => 'secondary'];
 $bc = $badgeColors[$profileUser['role']] ?? 'secondary';
 
+// A non-admin may not delete a user who outranks them (the route enforces this
+// too); hide the Delete control in that case.
+$canDeleteProfileUser = roleAssignableBy(Auth::role(), $profileUser['role']);
+
 // Status labels/colors defined inline in ticket section below
 ?>
 
@@ -76,9 +80,11 @@ $bc = $badgeColors[$profileUser['role']] ?? 'secondary';
                    class="btn btn-outline-secondary">
                     <i class="bi bi-arrow-left-right me-1"></i>Merge Into Another
                 </a>
+                <?php if ($canDeleteProfileUser): ?>
                 <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteUserModal">
                     <i class="bi bi-trash me-1"></i>Delete User
                 </button>
+                <?php endif; ?>
                 <?php endif; ?>
                 <button type="button" class="btn btn-outline-secondary" onclick="history.back()">
                     <i class="bi bi-arrow-left me-1"></i>Back

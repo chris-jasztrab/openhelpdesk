@@ -137,7 +137,7 @@ $hasFilters = !empty($filterParams);
                                 <a href="/admin/users/<?= $u['id'] ?>/edit" class="btn btn-sm btn-outline-primary" title="Edit">
                                     <i class="bi bi-pencil"></i>
                                 </a>
-                                <?php if ($u['id'] !== Auth::id()): ?>
+                                <?php if ($u['id'] !== Auth::id() && roleAssignableBy(Auth::role(), $u['role'])): ?>
                                 <a href="/admin/users/<?= $u['id'] ?>?delete=1"
                                    class="btn btn-sm btn-outline-danger" title="Delete"
                                    onclick="event.stopPropagation()">

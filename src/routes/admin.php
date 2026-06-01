@@ -1050,6 +1050,20 @@ $router->post('/admin/users/{id}/delete', function (array $p) {
     }
     $db = Database::connect();
 
+    // Privilege guard: a non-admin may not delete a user who outranks them
+    // (same rule as the editor — admins are unrestricted).
+    $targetRole = $db->prepare('SELECT role FROM users WHERE id = ?');
+    $targetRole->execute([$id]);
+    $targetRole = $targetRole->fetchColumn();
+    if ($targetRole === false) {
+        flash('error', 'User not found.');
+        redirect('/admin/users');
+    }
+    if (!roleAssignableBy(Auth::role(), $targetRole)) {
+        flash('error', 'You cannot delete a user whose permission level is above your own.');
+        redirect('/admin/users');
+    }
+
     $transferTo = !empty($_POST['transfer_to']) ? (int) $_POST['transfer_to'] : null;
     $deleteData = ($_POST['delete_data'] ?? '0') === '1';
 

@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.66.3 &mdash; 2026-06-01
+
+### Security
+- **A lower-level user can no longer delete a user who outranks them.** Completing the user-editor privilege guards (2.66.1/2.66.2), the delete route ([admin.php](src/routes/admin.php)) now rejects a deletion when the target user's level is not assignable by the actor (i.e. the target outranks them); admins and editors at/above the target's level are unaffected. The Delete control is hidden on the user profile ([view.php](templates/pages/admin/users/view.php)) and in the user list ([index.php](templates/pages/admin/users/index.php)) for such users. Verified with Playwright: a forged delete POST against an admin leaves the admin in place, while deleting an equal-or-lower user still works.
+
+---
+
 ## 2.66.2 &mdash; 2026-06-01
 
 ### Security
