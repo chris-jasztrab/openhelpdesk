@@ -2,10 +2,9 @@
 $layout       = 'app';
 $pageTitle    = 'Settings';
 $sidebarItems = adminSidebar('settings');
-$breadcrumbs  = [
-    ['label' => 'Admin', 'url' => '/admin'],
-    ['label' => 'Settings'],
-];
+$breadcrumbs  = Auth::isAdmin()
+    ? [['label' => 'Admin', 'url' => '/admin'], ['label' => 'Settings']]
+    : [['label' => 'Settings']];
 ?>
 <div class="mb-4">
     <h2 class="fw-bold mb-0">Settings</h2>

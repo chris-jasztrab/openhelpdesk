@@ -4474,6 +4474,25 @@ function notifyConfidentialEntityDeleted(PDO $db, string $targetType, string $ta
 
 /* ── Sidebar helpers ──────────────────────────────────────────── */
 
+/**
+ * True if the viewer can open at least one Settings-area feature. Admins always
+ * can; other staff qualify when they hold any grantable permission (every key
+ * maps to a settings-nav item). Drives the single "Settings" sidebar link for
+ * non-admins and the GET /admin/settings landing gate.
+ */
+function canAccessSettingsArea(): bool
+{
+    if (Auth::isAdmin()) {
+        return true;
+    }
+    foreach (rolePermissionKeys() as $perm) {
+        if (Auth::can($perm)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 function adminSidebar(string $active = ''): array
 {
     // Admin-area pages are reachable by any custom staff level that holds the
@@ -4483,16 +4502,13 @@ function adminSidebar(string $active = ''): array
     if (!Auth::isAdmin()) {
         return staffSidebar($active);
     }
+    // Only standard day-to-day actions live on the rail; every management /
+    // configuration area (Users, Ticket Forms, KB management, Recurring Tickets,
+    // Audit Log, Reports, …) is reached through the Settings page's left nav.
     return array_map(fn($item) => array_merge($item, ['active' => $item['key'] === $active]), [
         ['icon' => 'bi-speedometer2',    'label' => label('nav.dashboard'),     'url' => '/admin',            'key' => 'dashboard'],
         ['icon' => 'bi-ticket-detailed', 'label' => label('nav.tickets'),       'url' => '/admin/tickets',    'key' => 'tickets'],
-        ['icon' => 'bi-arrow-clockwise', 'label' => 'Recurring Tickets',        'url' => '/admin/recurring-tickets', 'key' => 'recurring-tickets'],
-        ['icon' => 'bi-people',          'label' => label('nav.users'),         'url' => '/admin/users',      'key' => 'users'],
-        ['icon' => 'bi-book',            'label' => label('nav.knowledge_base'), 'url' => '/admin/kb/categories', 'key' => 'kb'],
-        ['icon' => 'bi-diagram-3',       'label' => label('nav.workflows'),     'url' => '/admin/workflows/ticket-fields', 'key' => 'workflows'],
         ['icon' => 'bi-sliders',         'label' => label('nav.settings'),      'url' => '/admin/settings',   'key' => 'settings'],
-        ['icon' => 'bi-bar-chart',       'label' => label('nav.reports'),       'url' => '/admin/reports',    'key' => 'reports'],
-        ['icon' => 'bi-shield-check',    'label' => label('nav.audit_log'),     'url' => '/admin/audit-log',  'key' => 'audit-log'],
         ['icon' => 'bi-question-circle', 'label' => label('nav.docs'),          'url' => '/admin/docs',       'key' => 'docs'],
     ]);
 }
@@ -4509,12 +4525,12 @@ function portalSidebar(string $active = ''): array
 }
 
 /**
- * Sidebar for any non-admin staff role. Builds the common agent base, then
- * appends an admin-area link for each granted permission, so a custom role
- * sees exactly the areas it can open (no dead links). Permission-driven so it
- * reproduces the built-ins exactly: an Agent (no admin perms) gets the base
- * list; a Power User (reports.view) gets the base list + Reports. Admins use
- * adminSidebar() instead.
+ * Sidebar for any non-admin staff role. Standard day-to-day actions plus a
+ * single "Settings" link (shown when the role holds any grantable permission).
+ * Every admin-area feature a role might be granted now lives on the Settings
+ * page, whose own permission-filtered left nav reveals exactly what the role
+ * can open — so the rail no longer grows one icon per granted permission.
+ * Admins use adminSidebar() instead.
  */
 function staffSidebar(string $active = ''): array
 {
@@ -4527,33 +4543,8 @@ function staffSidebar(string $active = ''): array
         ['icon' => 'bi-megaphone',        'label' => 'Status Banners',                  'url' => '/agent/banners',          'key' => 'banners'],
     ];
 
-    // Admin-area shortcuts, each shown only when the role is granted its
-    // permission. Order mirrors the admin sidebar for familiarity.
-    $adminLinks = [
-        ['perm' => 'users.manage',           'icon' => 'bi-people',        'label' => label('nav.users'),        'url' => '/admin/users',                   'key' => 'users'],
-        ['perm' => 'kb.articles.manage',     'icon' => 'bi-journal-text',  'label' => 'Manage KB Articles',      'url' => '/admin/kb/articles',             'key' => 'kb-articles'],
-        ['perm' => 'kb.structure.manage',    'icon' => 'bi-folder',        'label' => 'KB Categories & Folders', 'url' => '/admin/kb/categories',           'key' => 'kb-structure'],
-        ['perm' => 'ticket_templates.manage','icon' => 'bi-file-earmark-text', 'label' => 'Ticket Templates',    'url' => '/admin/ticket-templates',        'key' => 'ticket-templates'],
-        ['perm' => 'recurring_tickets.manage','icon' => 'bi-arrow-clockwise', 'label' => 'Recurring Tickets',    'url' => '/admin/recurring-tickets',       'key' => 'recurring-tickets'],
-        ['perm' => 'workflows.manage',       'icon' => 'bi-diagram-3',     'label' => label('nav.workflows'),    'url' => '/admin/workflows/ticket-fields', 'key' => 'workflows'],
-        ['perm' => 'groups.manage',          'icon' => 'bi-people-fill',   'label' => 'Groups',                  'url' => '/admin/groups',                  'key' => 'groups'],
-        ['perm' => 'skills.manage',          'icon' => 'bi-mortarboard',   'label' => 'Agent Skills',            'url' => '/admin/skills',                  'key' => 'skills'],
-        ['perm' => 'locations.manage',       'icon' => 'bi-geo-alt',       'label' => label('location.plural'),  'url' => '/admin/locations',               'key' => 'locations'],
-        ['perm' => 'priorities.manage',      'icon' => 'bi-flag',          'label' => 'Priorities',              'url' => '/admin/priorities',              'key' => 'priorities'],
-        ['perm' => 'sla.manage',             'icon' => 'bi-stopwatch',     'label' => 'SLA Policies',            'url' => '/admin/settings/sla-policies',   'key' => 'sla'],
-        ['perm' => 'automations.manage',     'icon' => 'bi-lightning',     'label' => 'Automations',             'url' => '/admin/settings/automations',    'key' => 'automations'],
-        ['perm' => 'csat.manage',            'icon' => 'bi-star',          'label' => 'CSAT Surveys',            'url' => '/admin/settings/csat',           'key' => 'csat'],
-        ['perm' => 'ai.manage',              'icon' => 'bi-cpu',           'label' => 'AI Classification',       'url' => '/admin/settings/ai',             'key' => 'ai'],
-        ['perm' => 'import.manage',          'icon' => 'bi-cloud-upload',  'label' => 'Import Data',             'url' => '/admin/settings/import',         'key' => 'import'],
-        ['perm' => 'reports.view',           'icon' => 'bi-bar-chart',     'label' => label('nav.reports'),      'url' => '/admin/reports',                 'key' => 'reports'],
-        ['perm' => 'audit.view',             'icon' => 'bi-shield-check',  'label' => label('nav.audit_log'),    'url' => '/admin/audit-log',               'key' => 'audit-log'],
-        ['perm' => 'settings.manage',        'icon' => 'bi-sliders',       'label' => label('nav.settings'),     'url' => '/admin/settings',                'key' => 'settings'],
-    ];
-    foreach ($adminLinks as $link) {
-        if (Auth::can($link['perm'])) {
-            unset($link['perm']);
-            $items[] = $link;
-        }
+    if (canAccessSettingsArea()) {
+        $items[] = ['icon' => 'bi-sliders', 'label' => label('nav.settings'), 'url' => '/admin/settings', 'key' => 'settings'];
     }
 
     $items[] = ['icon' => 'bi-question-circle', 'label' => 'Help', 'url' => '/agent/help', 'key' => 'help'];

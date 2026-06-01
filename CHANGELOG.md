@@ -11,6 +11,17 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.66.0 &mdash; 2026-06-01
+
+### Changed
+- **The left sidebar no longer grows one icon per granted permission — management areas now live on the Settings page.** Granting permissions to a staff level used to append a link to the rail for each capability, so a level with many permissions could push icons off-screen. Standard day-to-day actions stay on the rail; everything else is reached through the Settings page's permission-filtered left nav. Specifically:
+  - **Admin sidebar** ([helpers.php](src/helpers.php)) trimmed to Dashboard, Tickets, Settings, Docs. **Users, Ticket Forms, Knowledge Base management, Recurring Tickets, Audit Log and Reports** moved off the rail into the Settings nav.
+  - **Non-admin staff sidebar** now shows a **single "Settings" link** (when the level holds any grantable permission) instead of one link per permission. The Settings page's own left nav reveals exactly the areas the level can open — same permission gating as before, just relocated.
+  - **Settings left-nav** ([settings-nav.php](templates/partials/settings-nav.php)) gained **Users & Access** (Users, Permission Levels), **Knowledge Base** (Manage Articles, Categories & Folders) and **Reports** groups, plus **Ticket Forms** (Organization), **Ticket Templates** (Customization), **Recurring Tickets** (Automation) and **Audit Log** (System). Every grantable permission now maps to a nav item so no granted capability is ever unreachable.
+  - **Non-admins can now open `/admin/settings`** ([admin.php](src/routes/admin.php)): any staff holding a settings-area permission lands on a nav-only [landing page](templates/pages/admin/settings/landing.php); the full email/SMTP index remains gated to `settings.manage`. New `canAccessSettingsArea()` helper drives both the sidebar link and the landing gate.
+
+---
+
 ## 2.65.5 &mdash; 2026-05-29
 
 ### Fixed

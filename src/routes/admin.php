@@ -6231,7 +6231,18 @@ $router->post('/admin/kb/import/confirm', function () {
  * ================================================================== */
 
 $router->get('/admin/settings', function () {
-    Auth::requirePermission('settings.manage');
+    // Any staff who can open at least one Settings-area feature may land here;
+    // the settings left-nav then shows only their permitted items. The full
+    // email/SMTP index below is for settings.manage holders only — everyone
+    // else (e.g. a custom level with just users.manage) gets a nav-only landing.
+    Auth::requireStaff();
+    if (!canAccessSettingsArea()) {
+        Auth::requirePermission('settings.manage'); // holds nothing → standard 403
+    }
+    if (!Auth::can('settings.manage')) {
+        render('admin/settings/landing', []);
+        return;
+    }
     $keys = [
         'smtp_host', 'smtp_port', 'smtp_encryption', 'smtp_username', 'smtp_password',
         'mail_from_address', 'mail_from_name', 'smtp_debug',
