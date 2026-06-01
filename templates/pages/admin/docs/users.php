@@ -25,7 +25,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
         </tr>
         <tr>
             <td><span class="badge" style="background:#7c3aed;">Power User</span></td>
-            <td class="text-muted">Everything an Agent can do, plus access to the <a href="/admin/reports">Reports</a> area. No access to other admin settings unless individually granted.</td>
+            <td class="text-muted">Everything an Agent can do, plus access to the <a href="/admin/reports">Reports</a> area (under <strong>Settings → Reports</strong>). No access to other admin settings unless individually granted.</td>
         </tr>
         <tr>
             <td><span class="badge bg-primary">Agent</span></td>
@@ -47,18 +47,18 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card border-0 shadow-sm mb-4" id="permission-levels">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-sliders text-primary me-2"></i>Permission Levels &amp; Granular Permissions</h5>
-<p class="text-muted mb-2">Beyond the four built-in levels, admins can create <strong>custom permission levels</strong> and grant each one exactly the capabilities it needs — no more, no less. Manage them at <a href="/admin/roles"><strong>Admin → Settings → Permission Levels</strong></a>.</p>
+<p class="text-muted mb-2">Beyond the four built-in levels, admins can create <strong>custom permission levels</strong> and grant each one exactly the capabilities it needs — no more, no less. Manage them at <a href="/admin/roles"><strong>Admin → Settings → Users &amp; Access → Permission Levels</strong></a>.</p>
 
 <h6 class="fw-semibold mt-3 mb-2">Creating a level</h6>
 <ol class="text-muted mb-3">
-    <li>Go to <a href="/admin/roles"><strong>Admin → Settings → Permission Levels</strong></a> and click <strong>Add Permission Level</strong>.</li>
+    <li>Go to <a href="/admin/roles"><strong>Admin → Settings → Users &amp; Access → Permission Levels</strong></a> and click <strong>Add Permission Level</strong>.</li>
     <li>Give it a name (e.g. "Reporting Lead", "KB Editor", "Team Supervisor").</li>
     <li>Tick the individual capabilities the level should hold (see the grid below).</li>
     <li>Save. The level becomes assignable everywhere a role can be chosen — the user create/edit form, the user-list filter, and CSV import.</li>
 </ol>
 
 <h6 class="fw-semibold mt-3 mb-2">Grantable capabilities</h6>
-<p class="text-muted mb-2">Each capability unlocks one admin area for the level. A level that holds a capability sees a working sidebar link to that area and nothing it can't open — there are no dead "403" links. Capabilities include:</p>
+<p class="text-muted mb-2">Each capability unlocks one management area for the level. Management areas live on the <strong>Settings</strong> page: a non-admin staff member sees a single <strong>Settings</strong> link in the sidebar, and the Settings page's left-hand menu shows only the areas their level can actually open — nothing it can't, so there are no dead "403" links. Capabilities include:</p>
 <ul class="text-muted mb-3">
     <li><strong>Reports</strong> — open the Reports area (what makes a Power User a Power User).</li>
     <li><strong>Knowledge Base</strong> — create &amp; delete KB articles; manage KB categories &amp; folders.</li>
@@ -78,10 +78,24 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 </div>
 </div>
 
+<div class="card border-0 shadow-sm mb-4" id="user-management-limits">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-shield-lock text-warning me-2"></i>What a Level Can Change About Other Users</h5>
+<p class="text-muted mb-2">The <strong>Manage users</strong> capability lets a non-admin level create, edit and delete user accounts — but never in a way that lets it gain, or hand someone else, more power than it already holds. These guards are enforced on the server (the create/edit/delete actions and CSV import), not just hidden in the UI:</p>
+<ul class="text-muted mb-2">
+    <li><strong>Can't assign a level above its own.</strong> A non-admin can only set a user to a level whose capabilities are a <em>subset</em> of its own, and never to <strong>Admin</strong>. The permission-level dropdown only lists the levels they're allowed to assign.</li>
+    <li><strong>Can't touch a user who outranks them.</strong> If the user being edited holds a level the editor couldn't assign (i.e. that user outranks them), the editor cannot change that user's permission level, <strong>email</strong>, or <strong>password</strong> — those fields are locked — and cannot <strong>delete</strong> that user. The Delete control is hidden for such users.</li>
+</ul>
+<div class="alert alert-warning small mb-0"><i class="bi bi-shield-lock me-2"></i>
+    Admins are never restricted by these rules. The guards only apply to non-admin levels that have been granted <strong>Manage users</strong>, and they prevent privilege escalation and account takeover (e.g. an agent resetting an admin's password or promoting themselves).
+</div>
+</div>
+</div>
+
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-person-plus text-primary me-2"></i>Creating Accounts</h5>
-<p class="text-muted mb-2">Admins can create accounts for any role from <a href="/admin/users/create"><strong>Admin → Users → Create User</strong></a>.</p>
+<p class="text-muted mb-2">Admins can create accounts for any role from <a href="/admin/users/create"><strong>Admin → Settings → Users &amp; Access → Users → Create User</strong></a>.</p>
 <ol class="text-muted mb-0">
     <li>Enter the user's first name, last name, and email address.</li>
     <li>Select the appropriate permission level — any built-in level (End User, Agent, Power User, Admin) or a <a href="#permission-levels">custom level</a> you've created.</li>
@@ -104,12 +118,15 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-pencil text-primary me-2"></i>Editing Users</h5>
-<p class="text-muted mb-2">From <a href="/admin/users"><strong>Admin → Users</strong></a>, click on any user to edit their details:</p>
+<p class="text-muted mb-2">From <a href="/admin/users"><strong>Admin → Settings → Users &amp; Access → Users</strong></a>, click on any user to edit their details:</p>
 <ul class="text-muted mb-0">
     <li>Update name, email, role or location.</li>
     <li>Reset their password (sends a reset email, or set directly if SMTP is not configured).</li>
     <li>Deactivate an account to prevent login without deleting history.</li>
 </ul>
+<div class="alert alert-info small mt-3 mb-0"><i class="bi bi-info-circle me-2"></i>
+    Non-admin staff with <strong>Manage users</strong> can only edit users at or below their own permission level, and can only assign levels at or below their own — see <a href="#user-management-limits">What a Level Can Change About Other Users</a>.
+</div>
 </div>
 </div>
 
@@ -136,7 +153,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 </ul>
 <p class="text-muted mb-2">To enable the flag:</p>
 <ol class="text-muted mb-0">
-    <li>Go to <a href="/admin/users"><strong>Admin → Users</strong></a> and open the user's account.</li>
+    <li>Go to <a href="/admin/users"><strong>Admin → Settings → Users &amp; Access → Users</strong></a> and open the user's account.</li>
     <li>Ensure the user has an <strong>Assigned Location</strong> set.</li>
     <li>Enable the <strong>Location Ticket Visibility</strong> toggle and save.</li>
 </ol>
@@ -244,7 +261,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-circle-fill text-success me-2"></i>Online Presence</h5>
-<p class="text-muted mb-2">Every authenticated user's browser pings <code>/api/presence</code> every 30 seconds for the lifetime of the tab. Anyone whose last ping was within ~2 minutes is considered <strong>online</strong> and is shown live at <a href="/admin/users/online"><strong>Admin → Users → Who's Online</strong></a>. The same data feeds the <a href="/admin/docs/automations#group-auto-assign">First Available</a> auto-assignment strategy.</p>
+<p class="text-muted mb-2">Every authenticated user's browser pings <code>/api/presence</code> every 30 seconds for the lifetime of the tab. Anyone whose last ping was within ~2 minutes is considered <strong>online</strong> and is shown live at <a href="/admin/users/online"><strong>Admin → Settings → Users &amp; Access → Users → Who's Online</strong></a>. The same data feeds the <a href="/admin/docs/automations#group-auto-assign">First Available</a> auto-assignment strategy.</p>
 <ul class="text-muted mb-0">
     <li>There is no manual "I'm available" toggle anymore (removed in 2.21.0). To stop receiving First Available auto-assignments, close the browser tab — sendBeacon clears the row immediately.</li>
     <li>Direct manual assignment is never blocked by online status — a colleague can assign you a ticket whether you're online or not.</li>
@@ -375,7 +392,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 </ol>
 <p class="text-muted mb-2">This works for any account that has a password — portal users, agents, and admins alike. Accounts that sign in only through <a href="/admin/docs/sso">Microsoft 365 SSO</a> have no password to reset, which is expected.</p>
 <div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
-    The request form gives the same "if an account exists, we've sent a link" confirmation whether or not the email matches a real account, so it can't be used to discover which addresses have accounts. Requests are rate-limited per email address. Both the request and the completed reset are recorded in the <a href="#audit-log">audit log</a>. Admins can still reset a user's password directly from <a href="/admin/users">Admin → Users</a>.
+    The request form gives the same "if an account exists, we've sent a link" confirmation whether or not the email matches a real account, so it can't be used to discover which addresses have accounts. Requests are rate-limited per email address. Both the request and the completed reset are recorded in the <a href="#audit-log">audit log</a>. Admins can still reset a user's password directly from <a href="/admin/users">Admin → Settings → Users &amp; Access → Users</a>.
 </div>
 </div>
 </div>
@@ -435,6 +452,9 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="alert alert-warning small mb-0"><i class="bi bi-exclamation-triangle-fill me-2"></i>
     Deletion cannot be undone. Use the transfer option if you need to preserve ticket history.
 </div>
+<div class="alert alert-info small mt-3 mb-0"><i class="bi bi-info-circle me-2"></i>
+    Non-admin staff with <strong>Manage users</strong> cannot delete a user whose permission level is above their own — the Delete control is hidden for those accounts. See <a href="#user-management-limits">What a Level Can Change About Other Users</a>.
+</div>
 </div>
 </div>
 
@@ -449,7 +469,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card border-0 shadow-sm mb-4" id="audit-log">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-journal-text text-primary me-2"></i>Audit Log</h5>
-<p class="text-muted mb-2">Every significant action is recorded in the audit log at <a href="/admin/audit-log"><strong>Admin → Audit Log</strong></a>. Each entry shows the actor (who did it), the action, the target record, an IP address where one was captured, and a timestamp.</p>
+<p class="text-muted mb-2">Every significant action is recorded in the audit log at <a href="/admin/audit-log"><strong>Admin → Settings → System → Audit Log</strong></a>. Each entry shows the actor (who did it), the action, the target record, an IP address where one was captured, and a timestamp.</p>
 
 <h6 class="fw-semibold mt-3 mb-2">What gets logged</h6>
 <p class="text-muted mb-2">Coverage is broad — essentially every create, update, and delete across the admin surface, scaled to the actor's privilege. Highlights:</p>

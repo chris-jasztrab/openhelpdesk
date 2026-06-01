@@ -13,6 +13,14 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-compass text-primary me-2"></i>Finding Your Way Around</h5>
+<p class="text-muted mb-2">The left sidebar holds only day-to-day actions — <strong>Dashboard</strong>, <strong>Tickets</strong>, <strong>Settings</strong>, and <strong>Docs</strong>. Everything you configure or manage lives on the <strong>Settings</strong> page, whose left-hand menu groups each area: <em>Email</em>, <em>Scheduling</em>, <em>Users &amp; Access</em> (users, permission levels), <em>Organization</em> (locations, ticket types &amp; forms, groups, skills…), <em>Knowledge Base</em>, <em>Customization</em>, <em>Automation</em>, <em>Reports</em>, <em>Data</em>, and <em>System</em> (audit log, danger zone).</p>
+<p class="text-muted mb-0">Non-admin staff see a single <strong>Settings</strong> link too, but their Settings menu shows only the areas their <a href="/admin/docs/users#permission-levels">permission level</a> can open — so the sidebar never fills up with one icon per granted permission. Use the search box at the top of the Settings menu to jump straight to any setting.</p>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-1-circle-fill text-primary me-2"></i>Configure Email (SMTP)</h5>
 <p class="text-muted mb-2">OpenHelpDesk sends notifications when tickets are created, updated or merged. Without SMTP configured, no emails will be sent.</p>
 <ol class="text-muted mb-3">
@@ -41,7 +49,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <h5 class="fw-semibold mb-3"><i class="bi bi-3-circle-fill text-primary me-2"></i>Create Agent Accounts</h5>
 <p class="text-muted mb-2">Agents are the staff members who handle tickets. Admins can also manage tickets.</p>
 <ol class="text-muted mb-0">
-    <li>Go to <a href="/admin/users/create"><strong>Admin → Users → Create User</strong></a>.</li>
+    <li>Go to <a href="/admin/users/create"><strong>Admin → Settings → Users &amp; Access → Users → Create User</strong></a>.</li>
     <li>Set the role to <strong>Agent</strong>.</li>
     <li>Optionally assign them a location.</li>
     <li>The agent receives a welcome email if SMTP is configured.</li>

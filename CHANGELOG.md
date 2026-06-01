@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.66.6 &mdash; 2026-06-01
+
+### Documentation
+- **In-app help updated for the Settings reorganization and the new user-management guards.** The **Getting Started** doc ([getting-started.php](templates/pages/admin/docs/getting-started.php)) gains a "Finding Your Way Around" section explaining the trimmed sidebar and the Settings-page menu groups. The **Users &amp; Agents** doc ([users.php](templates/pages/admin/docs/users.php)) now documents that management areas live on the Settings page (non-admins get a single Settings link), updates the navigation breadcrumbs for Users, Permission Levels, Who's Online and the Audit Log to their new <em>Settings → …</em> locations, and adds a "What a Level Can Change About Other Users" section covering the privilege guards from 2.66.1–2.66.3 (can't assign above your own level; can't change the role, email or password of, or delete, a user who outranks you). The **Knowledge Base** ([kb.php](templates/pages/admin/docs/kb.php)) and **Tickets** ([tickets.php](templates/pages/admin/docs/tickets.php)) docs get the updated <em>Settings → …</em> breadcrumbs, and the Tickets doc now describes the live Assigned-To re-filtering when the Group is changed in the Update Ticket panel (2.65.5).
+
+---
+
 ## 2.66.5 &mdash; 2026-06-01
 
 ### Fixed

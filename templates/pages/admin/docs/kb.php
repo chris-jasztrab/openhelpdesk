@@ -24,7 +24,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <h5 class="fw-semibold mb-3"><i class="bi bi-folder-plus text-primary me-2"></i>Creating Categories</h5>
 <p class="text-muted mb-2">Categories organise your articles into logical groups (e.g. "Getting Started", "Account Management", "Troubleshooting").</p>
 <ol class="text-muted mb-3">
-    <li>Go to <a href="/admin/kb/categories"><strong>Admin → Knowledge Base → Categories</strong></a>.</li>
+    <li>Go to <a href="/admin/kb/categories"><strong>Admin → Settings → Knowledge Base → Categories &amp; Folders</strong></a>.</li>
     <li>Click <strong>Add Category</strong>.</li>
     <li>Enter a name and an optional description.</li>
     <li>Optionally check <strong>Make Public</strong> to allow anyone to browse the category without logging in (see <em>Public Knowledge Base</em> below).</li>
@@ -40,7 +40,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-file-earmark-plus text-primary me-2"></i>Creating Articles</h5>
 <ol class="text-muted mb-0">
-    <li>Go to <a href="/admin/kb"><strong>Admin → Knowledge Base</strong></a>.</li>
+    <li>Go to <a href="/admin/kb/articles"><strong>Admin → Settings → Knowledge Base → Manage Articles</strong></a>.</li>
     <li>Click <strong>New Article</strong>.</li>
     <li>Enter a <strong>title</strong> — this becomes the article heading and the URL slug.</li>
     <li>Select a <strong>category</strong>.</li>
@@ -54,7 +54,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-pencil text-primary me-2"></i>Editing &amp; Publishing Articles</h5>
-<p class="text-muted mb-2">From <a href="/admin/kb"><strong>Admin → Knowledge Base</strong></a>, click any article title to edit it. You can:</p>
+<p class="text-muted mb-2">From <a href="/admin/kb/articles"><strong>Admin → Settings → Knowledge Base → Manage Articles</strong></a>, click any article title to edit it. You can:</p>
 <ul class="text-muted mb-0">
     <li>Update the content at any time — changes take effect immediately for published articles.</li>
     <li>Toggle an article between <strong>Draft</strong> and <strong>Published</strong> using the status selector.</li>
@@ -67,7 +67,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-upload text-primary me-2"></i>Importing Articles from CSV</h5>
-<p class="text-muted mb-2">Bulk-import articles from a CSV file at <a href="/admin/kb/import"><strong>Admin → Knowledge Base → Import</strong></a>. The CSV must have at minimum a <strong>title</strong> and <strong>body</strong> column.</p>
+<p class="text-muted mb-2">Bulk-import articles from a CSV file at <a href="/admin/settings/import-kb"><strong>Admin → Settings → Data → Import KB</strong></a>. The CSV must have at minimum a <strong>title</strong> and <strong>body</strong> column.</p>
 <p class="text-muted mb-2">Optional columns:</p>
 <ul class="text-muted mb-3">
     <li><strong>category</strong> — category name; creates the category if it does not exist.</li>
@@ -92,7 +92,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <p class="text-muted mb-2">Categories and their articles can be made publicly accessible at <strong><a href="/kb">/kb</a></strong> — no login required. This is useful for sharing common how-to guides with visitors or new staff before they have an account.</p>
 <p class="text-muted mb-2">To make a category public:</p>
 <ol class="text-muted mb-3">
-    <li>Go to <a href="/admin/kb/categories"><strong>Admin → Knowledge Base → Categories</strong></a>.</li>
+    <li>Go to <a href="/admin/kb/categories"><strong>Admin → Settings → Knowledge Base → Categories &amp; Folders</strong></a>.</li>
     <li>Edit the category and check <strong>Make Public</strong>.</li>
     <li>Click <strong>Save</strong>. The category and all its published articles will immediately appear on the public <code>/kb</code> page.</li>
 </ol>
@@ -120,7 +120,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <h5 class="fw-semibold mb-3"><i class="bi bi-clock-history text-primary me-2"></i>Article Version History</h5>
 <p class="text-muted mb-2">Every time an article is saved, a revision is automatically created and stored. Admins can view the complete revision history for any article and restore any prior version.</p>
 <ol class="text-muted mb-3">
-    <li>Go to <a href="/admin/kb/articles"><strong>Admin → Knowledge Base → Articles</strong></a>.</li>
+    <li>Go to <a href="/admin/kb/articles"><strong>Admin → Settings → Knowledge Base → Manage Articles</strong></a>.</li>
     <li>Click the <strong>History</strong> (clock) button on any article row.</li>
     <li>The revision list shows the date, editor, and a preview of each saved version.</li>
     <li>Click <strong>Restore</strong> on any revision to revert the article body to that version. A new revision is created so the current content is not lost.</li>

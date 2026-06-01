@@ -47,7 +47,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
     <li>Picking yourself is treated the same as leaving the picker blank — no spurious "filed on behalf" hint.</li>
 </ul>
 
-<p class="text-muted mb-2"><strong>The requester must already have a user account.</strong> If the caller is new, create their account first at <a href="/admin/users/create"><strong>Admin → Users → Add User</strong></a>, then come back to file the ticket.</p>
+<p class="text-muted mb-2"><strong>The requester must already have a user account.</strong> If the caller is new, create their account first at <a href="/admin/users/create"><strong>Admin → Settings → Users &amp; Access → Users → Add User</strong></a>, then come back to file the ticket.</p>
 
 <div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
     The submitter pill is only visible to agents and admins. End users in the portal see the ticket as theirs, with no reference to who filed it for them.
@@ -135,7 +135,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
     <li>Via automations (see the <a href="/admin/docs/automations">Automations</a> doc).</li>
 </ul>
 <div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
-    When a ticket is assigned to a <strong>Group</strong>, the agent picker (both in the ticket view and the quick-assign dropdown) is automatically filtered to show only members of that group. To assign outside the group, first clear the Group field or change it.
+    When a ticket is assigned to a <strong>Group</strong>, the agent picker (both in the ticket view and the quick-assign dropdown) is automatically filtered to show only members of that group. In the ticket's <strong>Update Ticket</strong> panel this now happens <strong>live</strong> — change the <strong>Group</strong> dropdown and the <strong>Assigned To</strong> list immediately re-filters to that group's members (no need to save the group change first); pick <em>None</em> to choose from all staff. The current assignee is kept selected if they belong to the newly chosen group, otherwise it resets to Unassigned.
 </div>
 </div>
 </div>
