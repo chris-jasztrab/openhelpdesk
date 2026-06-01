@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.66.5 &mdash; 2026-06-01
+
+### Fixed
+- **The agent onboarding tour no longer walks agents into a 403.** The tour ([agent-tour.php](templates/partials/agent-tour.php)) navigated every taker to `/admin/ticket-templates` (from the "no tickets yet" branch and the end of the in-ticket section), but that page requires `ticket_templates.manage` — so an agent or custom level without it landed on a Forbidden page mid-tour. The tour is now permission-aware: it only routes to Templates when the viewer holds `ticket_templates.manage`, and for everyone else the page-agnostic wrap-up steps (Email Notifications & Email Commands) are appended to the final ticket section so the tour still finishes cleanly with no 403 and no lost content. Verified with Playwright by driving the full tour as a level lacking the permission — it completes across dashboard → tickets → ticket → wrap-up without ever hitting `/admin/ticket-templates`.
+
+---
+
 ## 2.66.4 &mdash; 2026-06-01
 
 ### Fixed

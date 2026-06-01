@@ -11,12 +11,16 @@
  */
 $_agentTourCsrf     = csrfToken();
 $_agentTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
+// The Templates section lives at /admin/ticket-templates, which requires
+// ticket_templates.manage. Don't route a tour-taker who lacks it into a 403.
+$_agentTourCanTemplates = Auth::can('ticket_templates.manage') ? 'true' : 'false';
 ?>
 <script>
 (function () {
     'use strict';
 
-    var autoShow    = <?= $_agentTourAutoShow ?>;
+    var autoShow           = <?= $_agentTourAutoShow ?>;
+    var canManageTemplates = <?= $_agentTourCanTemplates ?>;
     var path        = window.location.pathname;
     var storedPage  = localStorage.getItem('ld_agent_tour_page');
     var isNavigating = false;
@@ -163,15 +167,20 @@ $_agentTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
                 title:       'Let\'s Open a Ticket',
                 description: 'Now let\'s look inside a ticket to see how to work with it.',
                 onNextClick: function () {
-                    isNavigating = true;
                     var firstLink = document.querySelector('tbody tr a[href^="/agent/tickets/"]');
                     if (firstLink) {
+                        isNavigating = true;
                         localStorage.setItem('ld_agent_tour_page', 'ticket');
                         window.location.href = firstLink.href;
-                    } else {
+                    } else if (canManageTemplates) {
                         // No tickets yet — skip straight to templates
+                        isNavigating = true;
                         localStorage.setItem('ld_agent_tour_page', 'templates');
                         window.location.href = '/admin/ticket-templates';
+                    } else {
+                        // No tickets and no template access — finish with the
+                        // page-agnostic closing steps appended to this section.
+                        driverObj.moveNext();
                     }
                 }
             }
@@ -283,15 +292,22 @@ $_agentTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
                 side:  'bottom',
                 align: 'end',
                 onNextClick: function () {
-                    isNavigating = true;
-                    localStorage.setItem('ld_agent_tour_page', 'templates');
-                    window.location.href = '/admin/ticket-templates';
+                    if (canManageTemplates) {
+                        isNavigating = true;
+                        localStorage.setItem('ld_agent_tour_page', 'templates');
+                        window.location.href = '/admin/ticket-templates';
+                    } else {
+                        // Can't open Templates — advance to the closing steps
+                        // appended to this section instead of navigating.
+                        driverObj.moveNext();
+                    }
                 }
             }
         }
     ];
 
-    var templatesSteps = [
+    // The three template-management steps only make sense on the Templates page.
+    var templateIntroSteps = [
         {
             popover: {
                 title:       'Ticket Templates',
@@ -320,7 +336,13 @@ $_agentTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
                 side:  'top',
                 align: 'start'
             }
-        },
+        }
+    ];
+
+    // Page-agnostic wrap-up steps. They normally close out the Templates
+    // section, but are appended to the last ticket section instead for agents
+    // who can't open Templates — so everyone still sees the email tips.
+    var closingSteps = [
         {
             popover: {
                 title:       '📧 Email Notifications',
@@ -343,6 +365,16 @@ $_agentTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
             }
         }
     ];
+
+    // Full Templates-page section = the template steps plus the wrap-up.
+    var templatesSteps = templateIntroSteps.concat(closingSteps);
+
+    // When Templates is unreachable, the ticket sections become the tour's end,
+    // so the wrap-up steps ride along on whichever one the agent finishes on.
+    if (!canManageTemplates) {
+        ticketsSteps = ticketsSteps.concat(closingSteps);
+        ticketSteps  = ticketSteps.concat(closingSteps);
+    }
 
     // ── Choose steps for this page ──────────────────────────────────
 
