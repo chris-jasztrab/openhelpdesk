@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.66.4 &mdash; 2026-06-01
+
+### Fixed
+- **The "Templates" button on the ticket list no longer 403s for staff who lack the permission.** The button on the agent ([index.php](templates/pages/agent/tickets/index.php)) and admin ([index.php](templates/pages/admin/tickets/index.php)) ticket lists linked to `/admin/ticket-templates` unconditionally, but that route requires `ticket_templates.manage`. Any agent or custom level without that permission saw the button and hit a 403 on click. The button is now gated on `Auth::can('ticket_templates.manage')` (admins always pass), so it only appears for staff who can actually open the page; the route itself stays gated.
+
+---
+
 ## 2.66.3 &mdash; 2026-06-01
 
 ### Security

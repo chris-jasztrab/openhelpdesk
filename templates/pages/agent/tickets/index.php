@@ -84,9 +84,11 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                 </form>
             </div>
         </div>
+        <?php if (Auth::can('ticket_templates.manage')): ?>
         <a id="tour-templates-link" href="/admin/ticket-templates" class="btn btn-sm btn-outline-secondary">
             <i class="bi bi-collection me-1"></i>Templates
         </a>
+        <?php endif; ?>
         <a id="tour-new-ticket-btn" href="/agent/tickets/create" class="btn btn-sm text-white" style="background:var(--ld-primary);">
             <i class="bi bi-plus-lg me-1"></i>New Ticket
         </a>
