@@ -5473,19 +5473,127 @@ function getActiveBanners(): array
 }
 
 /**
- * Strip the obvious script-injection vectors from CKEditor output before
- * we render it back to portal users. CKEditor itself never produces
- * <script> or on*= attributes, but the route accepts raw POST so this
- * is the defence-in-depth line.
+ * Sanitize banner body HTML (CKEditor output) before it is echoed raw into
+ * every authenticated page — staff *and* portal patrons see banners, so this
+ * is a hard stored-XSS boundary, not just defence-in-depth.
+ *
+ * Allowlist-by-construction via DOMDocument: we parse the markup, keep only a
+ * small set of formatting tags, and on those keep only a tiny set of
+ * attributes — so *every* event handler (on*) is dropped regardless of
+ * quoting/casing/whitespace, and unknown tags are unwrapped (text preserved)
+ * while script/style/iframe/svg-style tags are discarded outright. Links may
+ * only carry http/https/mailto (or relative) URLs; javascript:/data: are
+ * rejected structurally, so the old regex's reassembly bypass can't happen.
+ * Unparseable input yields '' rather than passing raw HTML through.
  */
 function sanitizeBannerHtml(string $html): string
 {
-    $html = preg_replace('#<script\b[^>]*>.*?</script\s*>#is', '', $html) ?? '';
-    $html = preg_replace('#<style\b[^>]*>.*?</style\s*>#is', '', $html) ?? '';
-    $html = preg_replace('#\son[a-z]+\s*=\s*"[^"]*"#i', '', $html) ?? '';
-    $html = preg_replace("#\son[a-z]+\s*=\s*'[^']*'#i", '', $html) ?? '';
-    $html = preg_replace('#javascript:#i', '', $html) ?? '';
-    return $html;
+    $html = trim($html);
+    if ($html === '') {
+        return '';
+    }
+
+    // tag => allowed attributes. Everything not listed here is stripped.
+    $allowed = [
+        'p' => [], 'br' => [], 'strong' => [], 'b' => [], 'em' => [], 'i' => [],
+        'u' => [], 's' => [], 'span' => [], 'div' => [], 'ul' => [], 'ol' => [],
+        'li' => [], 'h3' => [], 'h4' => [], 'h5' => [], 'h6' => [], 'blockquote' => [],
+        'code' => [], 'pre' => [],
+        'a' => ['href', 'title', 'target', 'rel'],
+    ];
+    // Tags whose entire subtree is discarded (content is never safe / wanted).
+    $drop = array_flip([
+        'script', 'style', 'iframe', 'object', 'embed', 'svg', 'math', 'template',
+        'noscript', 'form', 'input', 'button', 'textarea', 'select', 'option',
+        'link', 'meta', 'base', 'frame', 'frameset', 'applet', 'audio', 'video', 'source',
+    ]);
+    $okSchemes = ['http', 'https', 'mailto'];
+
+    $dom = new DOMDocument();
+    $prev = libxml_use_internal_errors(true);
+    // Wrap in a marked div + force UTF-8 so multibyte text survives intact.
+    $ok = $dom->loadHTML(
+        '<meta http-equiv="Content-Type" content="text/html; charset=utf-8"><div id="__ld_root__">' . $html . '</div>',
+        LIBXML_NOERROR | LIBXML_NOWARNING
+    );
+    libxml_clear_errors();
+    libxml_use_internal_errors($prev);
+    if (!$ok) {
+        return '';
+    }
+
+    $xp   = new DOMXPath($dom);
+    $root = $xp->query('//*[@id="__ld_root__"]')->item(0);
+    if (!$root instanceof DOMElement) {
+        return '';
+    }
+
+    $clean = function (DOMNode $node) use (&$clean, $allowed, $drop, $okSchemes): void {
+        // Snapshot children first: we mutate the live NodeList as we go.
+        foreach (iterator_to_array($node->childNodes) as $child) {
+            if ($child instanceof DOMText) {
+                continue; // text is serialized with entity-encoding — safe
+            }
+            if (!$child instanceof DOMElement) {
+                $node->removeChild($child); // comments, PIs, CDATA → gone
+                continue;
+            }
+
+            $tag = strtolower($child->localName ?? $child->nodeName);
+
+            if (isset($drop[$tag])) {
+                $node->removeChild($child);
+                continue;
+            }
+
+            if (!isset($allowed[$tag])) {
+                // Unknown-but-benign tag: clean its subtree, then unwrap it so
+                // any legitimate text content is preserved.
+                $clean($child);
+                while ($child->firstChild) {
+                    $node->insertBefore($child->firstChild, $child);
+                }
+                $node->removeChild($child);
+                continue;
+            }
+
+            // Allowed tag: drop every attribute not on its own allowlist. This
+            // is what kills on*= handlers (quoted, unquoted, or weirdly spaced).
+            $allowAttrs = $allowed[$tag];
+            foreach (iterator_to_array($child->attributes) as $attr) {
+                $an = strtolower($attr->nodeName);
+                if (!in_array($an, $allowAttrs, true)) {
+                    $child->removeAttribute($attr->nodeName);
+                    continue;
+                }
+                if ($an === 'href') {
+                    // Decode entities, strip control/whitespace chars, then
+                    // enforce the scheme allowlist (relative URLs are fine).
+                    $val = html_entity_decode((string) $attr->nodeValue, ENT_QUOTES | ENT_HTML5);
+                    $val = preg_replace('/[\x00-\x20]+/', '', $val) ?? '';
+                    if (preg_match('#^([a-z][a-z0-9+.\-]*):#i', $val, $m)
+                        && !in_array(strtolower($m[1]), $okSchemes, true)) {
+                        $child->removeAttribute('href');
+                    }
+                }
+            }
+            // Any link that opens a new tab must not leak window.opener.
+            if ($tag === 'a' && $child->hasAttribute('target')) {
+                $child->setAttribute('target', '_blank');
+                $child->setAttribute('rel', 'noopener noreferrer nofollow');
+            }
+
+            $clean($child); // recurse into the kept element
+        }
+    };
+
+    $clean($root);
+
+    $out = '';
+    foreach (iterator_to_array($root->childNodes) as $c) {
+        $out .= $dom->saveHTML($c);
+    }
+    return trim($out);
 }
 
 /* ── Ticket status helpers ───────────────────────────────────────────────────

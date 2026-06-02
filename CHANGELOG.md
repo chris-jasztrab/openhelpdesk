@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.66.11 &mdash; 2026-06-02
+
+### Security
+- **Fixed a stored XSS in status banners.** The old <code>sanitizeBannerHtml()</code> was a regex blocklist that only stripped quoted <code>on*=</code> handlers and well-formed <code>&lt;script&gt;</code> tags, so unquoted event handlers (<code>&lt;img src=x onerror=…&gt;</code>), <code>&lt;svg onload&gt;</code>, unclosed <code>&lt;script&gt;</code>, <code>&lt;iframe srcdoc&gt;</code>, and a <code>javascript:</code> reassembly trick all slipped through — letting any staff member (banners are gated only by <code>Auth::requireStaff</code>) inject script that ran in every viewer's browser, including admins and portal patrons. Replaced it with an allowlist-by-construction DOMDocument sanitizer: only a small set of formatting tags survive, every attribute outside a per-tag allowlist is dropped (killing all event handlers regardless of quoting), and links are restricted to <code>http</code>/<code>https</code>/<code>mailto</code>/relative URLs ([helpers.php](src/helpers.php)). Verified against a 14-payload bypass battery (all neutralized) with legitimate bold/link/list formatting preserved.
+
+---
+
 ## 2.66.10 &mdash; 2026-06-01
 
 ### Changed
