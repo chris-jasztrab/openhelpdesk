@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.67.1 &mdash; 2026-06-02
+
+### Changed
+- **The Notifications page now updates live — no refresh needed.** It polls a new session-authed <code>GET /notifications/feed</code> endpoint every 15 seconds and swaps in new notifications in place (only when the content actually changed, so an idle page doesn't flicker or lose scroll position). Polling pauses while the browser tab is hidden and catches up the moment it regains focus. <strong>Mark read</strong> and <strong>Mark All Read</strong> now fire as AJAX (the POST routes return JSON for <code>X-Requested-With</code> requests) and refresh the list without a page load; both still work as plain form posts when JavaScript is off. The list markup moved to a shared partial ([notifications-list.php](templates/partials/notifications-list.php)) rendered by both the page and the feed endpoint, so the two never diverge ([notifications.php](templates/pages/notifications.php), [routes.php](src/routes.php), [helpers.php](src/helpers.php)).
+
+---
+
 ## 2.67.0 &mdash; 2026-06-02
 
 ### Added

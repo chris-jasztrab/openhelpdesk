@@ -510,6 +510,45 @@ function notificationCount(): int
 }
 
 /**
+ * Fetch a user's notification feed rows for both the full page and the AJAX
+ * polling endpoint, so the two never diverge. LEFT JOINs the actor + timeline
+ * (only mentions/comments carry them) and prefers the denormalized body,
+ * falling back to the linked timeline note for legacy mention rows.
+ */
+function notificationsFeedRows(PDO $db, int $userId, int $limit = 50): array
+{
+    $stmt = $db->prepare(
+        "SELECT n.*, t.subject AS ticket_subject,
+                CONCAT(m.first_name, ' ', m.last_name) AS mentioned_by_name,
+                COALESCE(NULLIF(n.body, ''), tl.details) AS message
+         FROM notifications n
+         JOIN tickets t          ON n.ticket_id    = t.id
+         LEFT JOIN users m       ON n.mentioned_by = m.id
+         LEFT JOIN ticket_timeline tl ON n.timeline_id = tl.id
+         WHERE n.user_id = ?
+         ORDER BY n.created_at DESC
+         LIMIT " . (int) $limit
+    );
+    $stmt->execute([$userId]);
+    return $stmt->fetchAll();
+}
+
+/**
+ * The ticket-link URL prefix for the current user's area, used by the
+ * notifications feed to point at the role-appropriate ticket view.
+ */
+function notificationsAreaPrefix(): string
+{
+    if (Auth::isAdmin()) {
+        return '/admin';
+    }
+    if (Auth::isStaff()) {
+        return '/agent';
+    }
+    return '/portal';
+}
+
+/**
  * Create a single in-app notification on the recipient's notifications feed.
  *
  * This is the generic entry point behind every notification type (mentions,

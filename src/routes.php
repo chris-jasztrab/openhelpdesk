@@ -2502,42 +2502,21 @@ require ROOT_DIR . '/src/routes/portal.php';
 $router->get('/notifications', function () {
     Auth::requireAuth();
     $db = Database::connect();
-    // LEFT JOIN the actor + timeline: only mention/comment notifications carry
-    // those, so system-generated rows (assignments, SLA, status changes) have
-    // NULL mentioned_by / timeline_id. The display message prefers the
-    // denormalized `body`, falling back to the linked timeline note (legacy
-    // mention rows created before migration 043 have no body).
-    $stmt = $db->prepare(
-        "SELECT n.*, t.subject AS ticket_subject,
-                CONCAT(m.first_name, ' ', m.last_name) AS mentioned_by_name,
-                COALESCE(NULLIF(n.body, ''), tl.details) AS message
-         FROM notifications n
-         JOIN tickets t          ON n.ticket_id    = t.id
-         LEFT JOIN users m       ON n.mentioned_by = m.id
-         LEFT JOIN ticket_timeline tl ON n.timeline_id = tl.id
-         WHERE n.user_id = ?
-         ORDER BY n.created_at DESC
-         LIMIT 50"
-    );
-    $stmt->execute([Auth::id()]);
-    $notifications = $stmt->fetchAll();
+    $notifications = notificationsFeedRows($db, (int) Auth::id());
 
     // Determine which area to render in based on permissions.
     if (Auth::isAdmin()) {
         $sidebarFn = 'adminSidebar';
-        $areaPrefix = '/admin';
     } elseif (Auth::isStaff()) {
         $sidebarFn = 'staffSidebar';
-        $areaPrefix = '/agent';
     } else {
         $sidebarFn = 'portalSidebar';
-        $areaPrefix = '/portal';
     }
 
     render('notifications', [
         'notifications' => $notifications,
         'sidebarFn'     => $sidebarFn,
-        'areaPrefix'    => $areaPrefix,
+        'areaPrefix'    => notificationsAreaPrefix(),
     ]);
 });
 
@@ -2548,27 +2527,75 @@ $router->get('/notifications/count', function () {
     exit;
 });
 
+/**
+ * AJAX feed for the notifications page — returns the rendered list partial
+ * plus the unread count, so the page can poll and refresh in place without a
+ * full reload. Renders the same partial the page uses (single source of truth).
+ */
+$router->get('/notifications/feed', function () {
+    Auth::requireAuth();
+    $db = Database::connect();
+    $notifications = notificationsFeedRows($db, (int) Auth::id());
+    $areaPrefix    = notificationsAreaPrefix();
+
+    ob_start();
+    require ROOT_DIR . '/templates/partials/notifications-list.php';
+    $html = ob_get_clean();
+
+    header('Content-Type: application/json');
+    echo json_encode([
+        'html'      => $html,
+        'has_items' => !empty($notifications),
+        'unread'    => notificationCount(),
+    ]);
+    exit;
+});
+
 $router->post('/notifications/{id}/read', function (array $p) {
     Auth::requireAuth();
+    $isAjax = ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest';
     if (!verifyCsrf($_POST['_token'] ?? '')) {
+        if ($isAjax) {
+            http_response_code(403);
+            header('Content-Type: application/json');
+            echo json_encode(['ok' => false, 'error' => 'Invalid request.']);
+            exit;
+        }
         flash('error', 'Invalid request.');
         redirect('/notifications');
     }
     $db = Database::connect();
     $db->prepare('UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?')
         ->execute([(int) $p['id'], Auth::id()]);
+    if ($isAjax) {
+        header('Content-Type: application/json');
+        echo json_encode(['ok' => true]);
+        exit;
+    }
     redirect('/notifications');
 });
 
 $router->post('/notifications/read-all', function () {
     Auth::requireAuth();
+    $isAjax = ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest';
     if (!verifyCsrf($_POST['_token'] ?? '')) {
+        if ($isAjax) {
+            http_response_code(403);
+            header('Content-Type: application/json');
+            echo json_encode(['ok' => false, 'error' => 'Invalid request.']);
+            exit;
+        }
         flash('error', 'Invalid request.');
         redirect('/notifications');
     }
     $db = Database::connect();
     $db->prepare('UPDATE notifications SET is_read = 1 WHERE user_id = ?')
         ->execute([Auth::id()]);
+    if ($isAjax) {
+        header('Content-Type: application/json');
+        echo json_encode(['ok' => true]);
+        exit;
+    }
     flash('success', 'All notifications marked as read.');
     redirect('/notifications');
 });
