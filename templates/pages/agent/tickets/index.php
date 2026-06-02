@@ -11,6 +11,45 @@ $slaStateColors = ['on_track' => 'success', 'warning' => 'warning', 'breached' =
 $hasFilters = array_filter($filters, fn($v) => is_array($v) ? !empty($v) : $v !== '');
 $sortParams = array_filter($filters, fn($v) => is_array($v) ? !empty($v) : $v !== '');
 if ($perPage !== 25) $sortParams['per_page'] = $perPage;
+
+// Applied-filter pills: build label + a "remove this one filter" URL for each active filter.
+$arrayFilterKeys = ['status', 'priority', 'type', 'location', 'agent', 'group'];
+$boolFilterKeys  = ['watched', 'resolved_today', 'escalated_to_me'];
+$buildRemoveUrl = function (string $removeKey, $removeVal = null) use ($filters, $perPage, $arrayFilterKeys, $boolFilterKeys) {
+    $params = [];
+    foreach ($arrayFilterKeys as $k) {
+        $vals = array_map('strval', (array) ($filters[$k] ?? []));
+        if ($k === $removeKey && $removeVal !== null) {
+            $vals = array_values(array_filter($vals, fn($v) => $v !== (string) $removeVal));
+        }
+        if (!empty($vals)) $params[$k] = $vals;
+    }
+    if ($removeKey !== 'q' && ($filters['q'] ?? '') !== '') $params['q'] = $filters['q'];
+    foreach ($boolFilterKeys as $k) {
+        if ($k !== $removeKey && !empty($filters[$k])) $params[$k] = 1;
+    }
+    if ($perPage !== 25) $params['per_page'] = $perPage;
+    $qs = http_build_query($params);
+    return '/agent/tickets' . ($qs ? '?' . $qs : '');
+};
+$prioMap = []; foreach ($priorities as $p) $prioMap[(string) $p['id']] = $p['name'];
+$typeMap = []; foreach ($types as $tp) $typeMap[(string) $tp['id']] = $tp['name'];
+$locMap  = []; foreach ($locations as $l) $locMap[(string) $l['id']] = $l['name'];
+$agentMap = ['mine' => 'My Tickets', 'unassigned' => 'Unassigned'];
+foreach ($agents as $a) $agentMap[(string) $a['id']] = trim($a['first_name'] . ' ' . $a['last_name']);
+$groupMap = ['none' => 'No Group'];
+foreach ($groups as $g) $groupMap[(string) $g['id']] = $g['name'];
+$appliedPills = [];
+foreach ((array) ($filters['status'] ?? []) as $v)   $appliedPills[] = ['label' => 'Status: '   . ($statusLabels[$v] ?? $v), 'url' => $buildRemoveUrl('status', $v)];
+foreach ((array) ($filters['priority'] ?? []) as $v) $appliedPills[] = ['label' => 'Priority: ' . ($prioMap[(string) $v] ?? $v), 'url' => $buildRemoveUrl('priority', $v)];
+foreach ((array) ($filters['type'] ?? []) as $v)     $appliedPills[] = ['label' => 'Type: '     . ($typeMap[(string) $v] ?? $v), 'url' => $buildRemoveUrl('type', $v)];
+foreach ((array) ($filters['location'] ?? []) as $v) $appliedPills[] = ['label' => label('location.singular') . ': ' . ($locMap[(string) $v] ?? $v), 'url' => $buildRemoveUrl('location', $v)];
+foreach ((array) ($filters['agent'] ?? []) as $v)    $appliedPills[] = ['label' => 'Agent: '    . ($agentMap[(string) $v] ?? $v), 'url' => $buildRemoveUrl('agent', $v)];
+foreach ((array) ($filters['group'] ?? []) as $v)    $appliedPills[] = ['label' => 'Group: '    . ($groupMap[(string) $v] ?? $v), 'url' => $buildRemoveUrl('group', $v)];
+if (($filters['q'] ?? '') !== '')          $appliedPills[] = ['label' => 'Search: "' . $filters['q'] . '"', 'url' => $buildRemoveUrl('q')];
+if (!empty($filters['watched']))           $appliedPills[] = ['label' => 'My Watched Tickets', 'url' => $buildRemoveUrl('watched')];
+if (!empty($filters['resolved_today']))    $appliedPills[] = ['label' => 'Resolved Today', 'url' => $buildRemoveUrl('resolved_today')];
+if (!empty($filters['escalated_to_me']))   $appliedPills[] = ['label' => 'Escalated to Me', 'url' => $buildRemoveUrl('escalated_to_me')];
 $allColumns = ticketColumnDefinitions();
 if (!slaEnabled()) { unset($allColumns['sla']); }
 $colCount = 3 + count($visibleColumns); // checkbox + id + subject + visible toggleable columns
@@ -113,6 +152,24 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
         <button type="button" class="btn-close" onclick="filterPanelClose()" aria-label="Close"></button>
     </div>
     <div class="filter-panel-body">
+        <!-- Applied Filters -->
+        <?php if ($appliedPills): ?>
+        <div class="mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="small fw-semibold"><i class="bi bi-funnel-fill me-1"></i>Applied Filters</span>
+                <a href="/agent/tickets?reset=1" class="small text-decoration-none">Clear All</a>
+            </div>
+            <div class="applied-filters">
+                <?php foreach ($appliedPills as $pill): ?>
+                <span class="applied-filter-pill">
+                    <span class="pill-label"><?= e($pill['label']) ?></span>
+                    <a href="<?= e($pill['url']) ?>" class="pill-remove" title="Remove filter" aria-label="Remove filter <?= e($pill['label']) ?>"><i class="bi bi-x-lg"></i></a>
+                </span>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <hr class="my-3">
+        <?php endif; ?>
         <!-- Saved Filters -->
         <div class="small fw-semibold mb-2"><i class="bi bi-bookmark me-1"></i>Saved Filters</div>
         <?php if (empty($savedFilters)): ?>
@@ -198,7 +255,7 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
         </button>
         <?php endif; ?>
         <hr class="my-3">
-        <form method="GET" action="/agent/tickets">
+        <form method="GET" action="/agent/tickets" id="filterForm">
             <?php if ($perPage !== 25): ?><input type="hidden" name="per_page" value="<?= $perPage ?>"><?php endif; ?>
             <div class="mb-3">
                 <label class="form-label small fw-semibold mb-1">Search</label>
@@ -624,6 +681,16 @@ sessionStorage.setItem('agentTicketListUrl', window.location.href);
     };
     window.filterPanelClose = filterPanelClose;
     if (sessionStorage.getItem('agentFilterPanelOpen') === '1') filterPanelOpen();
+
+    // Auto-apply filters the moment a checkbox or date is changed (search still uses Enter/Apply)
+    var _filterForm = document.getElementById('filterForm');
+    if (_filterForm) {
+        _filterForm.addEventListener('change', function (e) {
+            if (e.target.matches('input[type="checkbox"], input[type="date"]')) {
+                _filterForm.submit();
+            }
+        });
+    }
 
     // ── Bulk selection ────────────────────────────────────────────────────────
     var selectedIds = new Set();

@@ -3498,6 +3498,18 @@ $router->get('/admin/tickets', function () {
         'watched'   => !empty($_GET['watched']) ? '1' : '',
     ];
 
+    // Resolve requester ids → names so applied-filter pills read correctly
+    $requesterNames = [];
+    if (!empty($filters['requester'])) {
+        $rIds = array_values(array_filter(array_map('intval', $filters['requester'])));
+        if ($rIds) {
+            $ph = implode(',', array_fill(0, count($rIds), '?'));
+            $rStmt = $db->prepare("SELECT id, CONCAT(first_name, ' ', last_name) AS name FROM users WHERE id IN ($ph)");
+            $rStmt->execute($rIds);
+            foreach ($rStmt->fetchAll() as $r) $requesterNames[(string) $r['id']] = $r['name'];
+        }
+    }
+
     $filterResult = buildTicketFilterQuery($filters);
     $whereClause  = $filterResult['where'];
     $params       = $filterResult['params'];
@@ -3612,6 +3624,7 @@ $router->get('/admin/tickets', function () {
         'groupAgents'          => $groupAgents,
         'allAgentsForAssign'   => $allAgentsForAssign,
         'filters'              => $filters,
+        'requesterNames'       => $requesterNames,
         'savedFilters'         => $savedFilters,
         'page'                 => $page,
         'perPage'              => $perPage,

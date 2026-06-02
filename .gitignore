@@ -35,3 +35,4 @@ scripts/generate_schema_diagram.py
 
 # Video walkthrough working files (screenshots, audio, video edits).
 /docs/screenshots/agent-walkthrough/
+.playwright-mcp/

@@ -269,6 +269,41 @@
         [data-bs-theme="dark"] .filter-checklist { border-color: #495057; }
         [data-bs-theme="dark"] .filter-check-item:hover { background: #2c3034; }
 
+        /* Applied-filter pills at the top of the filter panel */
+        .applied-filters { display: flex; flex-wrap: wrap; gap: .4rem; }
+        .applied-filter-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: .4rem;
+            padding: .2rem .25rem .2rem .6rem;
+            font-size: .75rem;
+            line-height: 1.2;
+            background: #f1f5f9;
+            border: 1px solid #dee2e6;
+            border-radius: 999px;
+            color: #1f2937;
+            max-width: 100%;
+        }
+        .applied-filter-pill .pill-label {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .applied-filter-pill .pill-remove {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.05rem;
+            height: 1.05rem;
+            border-radius: 50%;
+            color: #64748b;
+            text-decoration: none;
+            flex-shrink: 0;
+        }
+        .applied-filter-pill .pill-remove:hover { background: #e2e8f0; color: #1f2937; }
+        [data-bs-theme="dark"] .applied-filter-pill { background: #2c3034; border-color: #495057; color: #e9ecef; }
+        [data-bs-theme="dark"] .applied-filter-pill .pill-remove:hover { background: #495057; color: #fff; }
+
         /* Tour resume pill */
         #ld-tour-resume {
             position: fixed;

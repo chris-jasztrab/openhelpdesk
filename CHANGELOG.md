@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.69.0 &mdash; 2026-06-02
+
+### Added
+- **Applied filters now appear as removable pills at the top of the ticket filter panel, and filters apply instantly.** With a long list of filter groups it was hard to see at a glance which filters were actually in use — you had to scroll the whole panel. Now every active filter (status, priority, type, location, agent, group, requester, search term, date range, watched, etc.) shows as a labelled pill — e.g. <em>Status: Open</em>, <em>Requester: Andrea Gaspar</em>, <em>From: 2026-01-01</em> — at the top of the panel, each with an &times; button that removes just that one filter. Ticking a checkbox or picking a date now applies the filter immediately (no need to click Apply — that button now just submits a typed search), so the pill list updates as you click. A <strong>Clear All</strong> link clears them in one click. Applied to both the agent and admin ticket lists ([agent/tickets/index.php](templates/pages/agent/tickets/index.php), [admin/tickets/index.php](templates/pages/admin/tickets/index.php), [admin.php](src/routes/admin.php), [app.php](templates/layouts/app.php)).
+
+---
+
 ## 2.68.0 &mdash; 2026-06-02
 
 ### Added
