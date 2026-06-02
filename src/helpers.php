@@ -510,6 +510,81 @@ function notificationCount(): int
 }
 
 /**
+ * Create a single in-app notification on the recipient's notifications feed.
+ *
+ * This is the generic entry point behind every notification type (mentions,
+ * assignments, ticket/status updates, SLA warnings & breaches, new tickets,
+ * customer replies, notes). The `notifications` table was generalized in
+ * migration 043 — `type` names the kind, `body` is a denormalized headline so
+ * the feed renders without needing a `ticket_timeline` row, and both
+ * `timeline_id` and `mentioned_by` (the acting user, if any) are optional.
+ *
+ * Self-notifications (recipient === actor) are skipped. Failures are swallowed
+ * with an error_log entry: an in-app notification is never important enough to
+ * break the ticket action that triggered it.
+ */
+function createNotification(
+    PDO $db,
+    int $userId,
+    int $ticketId,
+    string $type,
+    ?string $body = null,
+    ?int $actorId = null,
+    ?int $timelineId = null
+): void {
+    if ($userId <= 0 || $ticketId <= 0) {
+        return;
+    }
+    if ($actorId !== null && $userId === $actorId) {
+        return; // never notify someone of their own action
+    }
+
+    // Trim a denormalized excerpt down to a sane length for the feed line.
+    if ($body !== null) {
+        $body = trim(html_entity_decode(strip_tags($body), ENT_QUOTES, 'UTF-8'));
+        if (function_exists('mb_substr')) {
+            $body = mb_substr($body, 0, 280);
+        } else {
+            $body = substr($body, 0, 280);
+        }
+        if ($body === '') {
+            $body = null;
+        }
+    }
+
+    try {
+        $db->prepare(
+            'INSERT INTO notifications (user_id, ticket_id, type, timeline_id, mentioned_by, body)
+             VALUES (?, ?, ?, ?, ?, ?)'
+        )->execute([$userId, $ticketId, $type, $timelineId, $actorId, $body]);
+    } catch (\Throwable $e) {
+        error_log('createNotification failed: ' . $e->getMessage());
+    }
+}
+
+/**
+ * Per-type display metadata for the notifications feed: Bootstrap icon class,
+ * a Bootstrap text-color class for the icon, and the verb shown next to the
+ * actor / ticket subject. Unknown types fall back to a neutral bell.
+ *
+ * @return array{icon:string,color:string,label:string}
+ */
+function notificationMeta(string $type): array
+{
+    static $map = [
+        'mention'        => ['icon' => 'bi-at',                 'color' => 'text-primary', 'label' => 'mentioned you in'],
+        'assignment'     => ['icon' => 'bi-person-check',       'color' => 'text-success', 'label' => 'assigned to you:'],
+        'ticket_update'  => ['icon' => 'bi-arrow-repeat',       'color' => 'text-info',    'label' => 'updated'],
+        'sla_warning'    => ['icon' => 'bi-clock-history',      'color' => 'text-warning', 'label' => 'SLA deadline approaching on'],
+        'sla_breach'     => ['icon' => 'bi-exclamation-triangle','color' => 'text-danger', 'label' => 'SLA breached on'],
+        'new_ticket'     => ['icon' => 'bi-plus-circle',        'color' => 'text-primary', 'label' => 'new ticket:'],
+        'customer_reply' => ['icon' => 'bi-chat-left-text',     'color' => 'text-info',    'label' => 'customer replied on'],
+        'note_added'     => ['icon' => 'bi-sticky',             'color' => 'text-secondary','label' => 'added a note on'],
+    ];
+    return $map[$type] ?? ['icon' => 'bi-bell', 'color' => 'text-muted', 'label' => 'updated'];
+}
+
+/**
  * Parse @mentions from a message and create notifications.
  * Matches "@FirstName LastName" against agents/admins in the database.
  */
@@ -519,9 +594,49 @@ function processAtMentions(PDO $db, string $message, int $ticketId, int $timelin
     foreach ($agents as $agent) {
         $fullName = $agent['first_name'] . ' ' . $agent['last_name'];
         if (stripos($message, '@' . $fullName) !== false && (int) $agent['id'] !== $mentionedBy) {
-            $db->prepare('INSERT INTO notifications (user_id, ticket_id, timeline_id, mentioned_by) VALUES (?, ?, ?, ?)')
-                ->execute([$agent['id'], $ticketId, $timelineId, $mentionedBy]);
+            // body left NULL — the feed falls back to the linked timeline note.
+            createNotification($db, (int) $agent['id'], $ticketId, 'mention', null, $mentionedBy, $timelineId);
         }
+    }
+}
+
+/**
+ * In-app notify the assigned agent + staff watchers when a ticket's status
+ * changes. There is no email helper for agent-facing status changes (only the
+ * requester gets resolved/closed mail), so this fans out the in-app
+ * "Ticket Updates" notification directly. Called from every status-change site.
+ */
+function notifyAgentStatusChanged(PDO $db, int $ticketId, string $oldStatus, string $newStatus, int $actorId): void
+{
+    if ($oldStatus === $newStatus) {
+        return;
+    }
+    $oldLabel = function_exists('ticketStatusLabel') ? ticketStatusLabel($oldStatus) : $oldStatus;
+    $newLabel = function_exists('ticketStatusLabel') ? ticketStatusLabel($newStatus) : $newStatus;
+    $body = "Status changed from {$oldLabel} to {$newLabel}";
+
+    // Recipients: the assigned agent plus any staff watchers. Dedupe by id.
+    $recipients = [];
+
+    $aStmt = $db->prepare('SELECT assigned_to FROM tickets WHERE id = ?');
+    $aStmt->execute([$ticketId]);
+    $assignedTo = (int) ($aStmt->fetchColumn() ?: 0);
+    if ($assignedTo > 0) {
+        $recipients[$assignedTo] = true;
+    }
+
+    $wStmt = $db->prepare(
+        "SELECT u.id FROM ticket_watchers tw
+         JOIN users u ON u.id = tw.user_id
+         WHERE tw.ticket_id = ? AND " . staffRoleSqlIn('u.role')
+    );
+    $wStmt->execute([$ticketId]);
+    foreach ($wStmt->fetchAll(PDO::FETCH_COLUMN) as $wid) {
+        $recipients[(int) $wid] = true;
+    }
+
+    foreach (array_keys($recipients) as $uid) {
+        createNotification($db, (int) $uid, $ticketId, 'ticket_update', $body, $actorId);
     }
 }
 
@@ -2692,6 +2807,8 @@ function notifyCcUsers(PDO $db, int $ticketId, string $message, string $authorNa
     foreach ($cc->fetchAll() as $user) {
         $uid = (int) $user['id'];
         if ($uid === $currentId || $uid === $creatorId) continue;
+        // In-app "Ticket Update" for CC'd users — independent of email opt-out.
+        createNotification($db, $uid, $ticketId, 'ticket_update', $message, $currentId);
         if (!(bool)($user['notify_ticket_cc'] ?? 1)) continue; // opted out
 
         // Build the correct URL based on role
@@ -2766,6 +2883,9 @@ function notifyWatchers(PDO $db, int $ticketId, string $message, string $authorN
         $uid = (int) $user['id'];
         if ($uid === $currentId || $uid === $creatorId) continue;
         if (in_array($uid, $ccIdList, true)) continue;
+
+        // In-app "Ticket Update" for watchers on a new public comment.
+        createNotification($db, $uid, $ticketId, 'ticket_update', $message, $currentId);
 
         $prefix    = roleIsAdmin($user['role']) ? '/admin' : '/agent';
         $ticketUrl = appUrl() . $prefix . '/tickets/' . $ticketId;
@@ -2871,6 +2991,15 @@ function notifyGroupMembers(PDO $db, int $ticketId): void
     $appUrl = env('APP_URL', 'http://localhost:8000');
 
     foreach ($members as $user) {
+        // In-app "New Ticket" alert for group members — independent of email opt-out.
+        createNotification(
+            $db,
+            (int) $user['id'],
+            $ticketId,
+            'new_ticket',
+            $ticket['subject'],
+            (int) $ticket['created_by']
+        );
         if (!(bool) ($user['notify_group_new_ticket'] ?? 1)) {
             continue;
         }
@@ -2924,6 +3053,10 @@ function notifyGroupMembers(PDO $db, int $ticketId): void
  */
 function notifyAssignedAgent(PDO $db, int $ticketId, int $agentId): void
 {
+    // In-app "New Assignment" feed notification — fires regardless of the
+    // agent's email preferences (createNotification self-skips self-assignment).
+    createNotification($db, $agentId, $ticketId, 'assignment', null, Auth::id());
+
     if (!emailNotifyEnabled('agent_assigned_agent')) {
         return;
     }
@@ -3062,6 +3195,8 @@ function notifyAssignedGroup(PDO $db, int $ticketId, int $groupId): void
         if ((int) $member['id'] === Auth::id()) {
             continue; // skip the person making the change
         }
+        // In-app "New Assignment" for the group — independent of email opt-out.
+        createNotification($db, (int) $member['id'], $ticketId, 'assignment', null, Auth::id());
         if (!(bool) ($member['notify_assigned_to_group'] ?? 1)) {
             continue;
         }
@@ -3127,6 +3262,10 @@ function notifyAgentRequesterReplied(PDO $db, int $ticketId, string $message): v
     );
     $stmt->execute([$ticketId]);
     $row = $stmt->fetch();
+    if ($row) {
+        // In-app "Customer Reply" for the assigned agent — independent of email opt-out.
+        createNotification($db, (int) $row['agent_id'], $ticketId, 'customer_reply', $message);
+    }
     if (!$row || !(bool) ($row['notify_requester_replied'] ?? 1)) {
         return;
     }
@@ -3193,6 +3332,8 @@ function notifyAgentNoteAdded(PDO $db, int $ticketId, string $message): void
     if (!$row || (int) $row['assigned_to'] === Auth::id()) {
         return; // not assigned or self
     }
+    // In-app "Note Added" for the assigned agent — independent of email opt-out.
+    createNotification($db, (int) $row['agent_id'], $ticketId, 'note_added', $message, Auth::id());
     if (!(bool) ($row['notify_note_added'] ?? 1)) {
         return;
     }
@@ -3633,14 +3774,8 @@ function runEscalationRule(\PDO $db, array $rule, array $ticket): void
                    ->execute([$ticketId, 'escalation_notification', $noteText]);
                 $tlId = (int) $db->lastInsertId();
 
-                // In-app notification (requires a valid mentioned_by user; use first admin as system sender)
-                $s = $db->prepare("SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1");
-                $s->execute();
-                $systemSenderId = (int) $s->fetchColumn();
-                if ($systemSenderId > 0) {
-                    $db->prepare('INSERT INTO notifications (user_id, ticket_id, timeline_id, mentioned_by) VALUES (?, ?, ?, ?)')
-                       ->execute([$targetUserId, $ticketId, $tlId, $systemSenderId]);
-                }
+                // In-app SLA/escalation notification (no human actor; system-generated).
+                createNotification($db, $targetUserId, $ticketId, 'sla_breach', $noteText, null, $tlId);
 
                 // Email notification
                 $rolePrefix = match ($targetUser['role']) {

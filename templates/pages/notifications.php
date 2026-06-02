@@ -27,16 +27,25 @@ $breadcrumbs  = [
     <?php else: ?>
     <div class="list-group list-group-flush">
         <?php foreach ($notifications as $n): ?>
+        <?php
+            $type = $n['type'] ?? 'mention';
+            $meta = notificationMeta($type);
+            // The actor is only present for human-driven types (mention/comment).
+            $actor = trim((string) ($n['mentioned_by_name'] ?? ''));
+            $hasActor = $actor !== '' && $actor !== ' ';
+        ?>
         <div class="list-group-item px-4 py-3 <?= $n['is_read'] ? '' : 'bg-light' ?>">
             <div class="d-flex gap-3 align-items-start">
                 <div class="pt-1">
-                    <i class="bi bi-at fs-4 <?= $n['is_read'] ? 'text-muted' : 'text-primary' ?>"></i>
+                    <i class="bi <?= e($meta['icon']) ?> fs-4 <?= $n['is_read'] ? 'text-muted' : e($meta['color']) ?>"></i>
                 </div>
                 <div class="flex-grow-1">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
-                            <span class="fw-semibold"><?= e($n['mentioned_by_name']) ?></span>
-                            <span class="text-muted">mentioned you in</span>
+                            <?php if ($hasActor): ?>
+                            <span class="fw-semibold"><?= e($actor) ?></span>
+                            <?php endif; ?>
+                            <span class="text-muted"><?= e($meta['label']) ?></span>
                             <a href="<?= e($areaPrefix) ?>/tickets/<?= $n['ticket_id'] ?>" class="text-decoration-none fw-semibold">
                                 <?= e($n['ticket_subject']) ?>
                             </a>
@@ -53,7 +62,10 @@ $breadcrumbs  = [
                             <?php endif; ?>
                         </div>
                     </div>
-                    <div class="mt-1 text-muted small" style="white-space:pre-wrap;"><?= e(trim(html_entity_decode(strip_tags($n['message']), ENT_QUOTES, 'UTF-8'))) ?></div>
+                    <?php $excerpt = trim(html_entity_decode(strip_tags((string) ($n['message'] ?? '')), ENT_QUOTES, 'UTF-8')); ?>
+                    <?php if ($excerpt !== ''): ?>
+                    <div class="mt-1 text-muted small" style="white-space:pre-wrap;"><?= e($excerpt) ?></div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>

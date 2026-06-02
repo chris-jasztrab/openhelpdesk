@@ -302,6 +302,7 @@ $router->post('/agent/floor/tickets/{id}/action', function (array $p) {
             $db->prepare(
                 'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
             )->execute([$id, $userId, 'status_changed', "Status changed from {$oldStatus} to {$newStatus} (floor)"]);
+            notifyAgentStatusChanged($db, $id, $oldStatus, $newStatus, $userId);
 
             $pausing = ticketSlaPausingSlugs();
             if (in_array($newStatus, $pausing, true)) {
@@ -556,6 +557,7 @@ $router->post('/portal/floor/tickets/{id}/action', function (array $p) {
         $db->prepare(
             'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 1)'
         )->execute([$id, $uid, 'status_changed', "Requester closed ticket (was: {$oldStatus})"]);
+        notifyAgentStatusChanged($db, $id, $oldStatus, 'closed', $uid);
         flash('success', 'Your request has been closed.');
     } else {
         flash('error', 'Unknown action.');

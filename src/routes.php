@@ -2502,14 +2502,19 @@ require ROOT_DIR . '/src/routes/portal.php';
 $router->get('/notifications', function () {
     Auth::requireAuth();
     $db = Database::connect();
+    // LEFT JOIN the actor + timeline: only mention/comment notifications carry
+    // those, so system-generated rows (assignments, SLA, status changes) have
+    // NULL mentioned_by / timeline_id. The display message prefers the
+    // denormalized `body`, falling back to the linked timeline note (legacy
+    // mention rows created before migration 043 have no body).
     $stmt = $db->prepare(
         "SELECT n.*, t.subject AS ticket_subject,
                 CONCAT(m.first_name, ' ', m.last_name) AS mentioned_by_name,
-                tl.details AS message
+                COALESCE(NULLIF(n.body, ''), tl.details) AS message
          FROM notifications n
-         JOIN tickets t          ON n.ticket_id   = t.id
-         JOIN users m            ON n.mentioned_by = m.id
-         JOIN ticket_timeline tl ON n.timeline_id  = tl.id
+         JOIN tickets t          ON n.ticket_id    = t.id
+         LEFT JOIN users m       ON n.mentioned_by = m.id
+         LEFT JOIN ticket_timeline tl ON n.timeline_id = tl.id
          WHERE n.user_id = ?
          ORDER BY n.created_at DESC
          LIMIT 50"

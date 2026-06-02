@@ -976,6 +976,7 @@ $router->post('/api/v1/tickets/{id}/update', function (array $p) {
                 'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal)
                  VALUES (?, ?, ?, ?, 0)'
             )->execute([$ticketId, $userId, 'status_changed', "Status changed from {$oldStatus} to {$newStatus}"]);
+            notifyAgentStatusChanged($db, $ticketId, $oldStatus, $newStatus, $userId);
             $changes[] = 'status';
 
             // CSAT survey trigger
@@ -1239,6 +1240,7 @@ $router->post('/api/v1/tickets/{id}/replies', function (array $p) {
                 'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal)
                  VALUES (?, ?, ?, ?, 0)'
             )->execute([$ticketId, $userId, 'status_changed', "Status changed from {$oldStatus} to {$statusAfter}"]);
+            notifyAgentStatusChanged($db, $ticketId, $oldStatus, $statusAfter, $userId);
             if ($statusAfter === getSetting('csat_trigger_status', 'resolved')) {
                 sendCsatSurvey($db, $ticketId);
             }

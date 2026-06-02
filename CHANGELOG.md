@@ -11,6 +11,24 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.67.0 &mdash; 2026-06-02
+
+### Added
+- **The notifications feed now carries every agent-facing alert, not just @mentions.** Previously the <i class="bi bi-bell"></i> Notifications page only listed rows where someone typed <code>@First Last</code> in a note; everything else (assignments, replies, SLA risk) lived only in email. The feed now surfaces seven types, each with its own icon and phrasing:
+  - **Mentions** — @mentioned in a public or internal note (unchanged).
+  - **New Assignments** — a ticket assigned directly to you or to a group you belong to.
+  - **Ticket Updates** — status changes on tickets you're assigned to or watching, plus new public replies on tickets you watch or are CC'd on.
+  - **SLA Warnings** — first-response/resolution deadline approaching (fires from the SLA cron when a ticket crosses into the <code>warning</code> state).
+  - **SLA Breaches** — deadline passed, plus escalation-rule alerts.
+  - **New Tickets** — a ticket created into a group you're notified for.
+  - **Customer Replies** / **Notes** — the requester replied, or an internal note was added, on a ticket assigned to you.
+
+### Changed
+- **Generalized the <code>notifications</code> table (migration 043).** Added a <code>type</code> column and a denormalized <code>body</code> headline, and relaxed the previously-required <code>timeline_id</code> / <code>mentioned_by</code> columns to nullable so system-generated alerts (SLA, status changes) no longer need a fake "sender." Existing @mention rows are untouched (<code>type = 'mention'</code>, body falls back to the linked note). New <code>createNotification()</code> / <code>notificationMeta()</code> helpers centralize writes and per-type display ([helpers.php](src/helpers.php)).
+- In-app notifications are written from the existing recipient-fan-out helpers (<code>notifyAssignedAgent</code>, <code>notifyWatchers</code>, etc.), so they reuse the same recipient resolution as email and ignore per-user **email** opt-outs — muting an email no longer hides the on-page alert. They remain gated by the site-wide email-category toggles. Assignments, watcher updates, status changes, and SLA alerts fire regardless of those toggles.
+
+---
+
 ## 2.66.11 &mdash; 2026-06-02
 
 ### Security

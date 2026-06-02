@@ -784,6 +784,7 @@ $router->post('/portal/tickets/{id}/close', function (array $p) {
     $db->prepare(
         'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 1)'
     )->execute([$id, $uid, 'status_changed', "Requester closed ticket (was: {$oldStatus})"]);
+    notifyAgentStatusChanged($db, $id, $oldStatus, $closedSlug, $uid);
 
     flash('success', 'Your ticket has been closed.');
     redirect("/portal/tickets/{$id}");

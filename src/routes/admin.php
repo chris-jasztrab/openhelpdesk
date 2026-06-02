@@ -5175,6 +5175,7 @@ $router->post('/admin/tickets/{id}/comment', function (array $p) {
             $db->prepare(
                 'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
             )->execute([$id, Auth::id(), 'status_changed', "Status changed from {$oldStatus} to {$statusAfter}"]);
+            notifyAgentStatusChanged($db, $id, $oldStatus, $statusAfter, Auth::id());
             $csatTrigger = getSetting('csat_trigger_status', ticketDefaultResolvedStatusSlug());
             if ($statusAfter === $csatTrigger) {
                 sendCsatSurvey($db, $id);
@@ -5227,6 +5228,7 @@ $router->post('/admin/tickets/{id}/update', function (array $p) {
         $db->prepare(
             'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
         )->execute([$id, Auth::id(), 'status_changed', "Status changed from {$oldStatus} to {$newStatus}"]);
+        notifyAgentStatusChanged($db, $id, $oldStatus, $newStatus, Auth::id());
         $changes[] = 'status';
 
         if (in_array($newStatus, ticketClosedBucketSlugs(), true)) {

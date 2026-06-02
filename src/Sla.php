@@ -192,7 +192,7 @@ class Sla
 
         $openIn = ticketStatusSqlIn(ticketOpenBucketSlugs(), 'status');
         $stmt = $db->query(
-            "SELECT id, created_at, first_response_due_at, resolution_due_at,
+            "SELECT id, subject, assigned_to, created_at, first_response_due_at, resolution_due_at,
                     first_responded_at, sla_state, sla_paused_at
              FROM tickets
              WHERE $openIn
@@ -207,6 +207,30 @@ class Sla
             if ($newState !== null && $newState !== ($ticket['sla_state'] ?? '')) {
                 $updateStmt->execute([$newState, $ticket['id']]);
                 $updated++;
+
+                // On the transition *into* warning/breached, drop an in-app
+                // notification for the assigned agent so SLA risk surfaces on
+                // their notifications feed (not just the dashboard colour).
+                $assignedTo = (int) ($ticket['assigned_to'] ?? 0);
+                if ($assignedTo > 0 && function_exists('createNotification')) {
+                    if ($newState === 'warning') {
+                        createNotification(
+                            $db,
+                            $assignedTo,
+                            (int) $ticket['id'],
+                            'sla_warning',
+                            'SLA deadline approaching for "' . ($ticket['subject'] ?? ('Ticket #' . $ticket['id'])) . '"'
+                        );
+                    } elseif ($newState === 'breached') {
+                        createNotification(
+                            $db,
+                            $assignedTo,
+                            (int) $ticket['id'],
+                            'sla_breach',
+                            'SLA breached on "' . ($ticket['subject'] ?? ('Ticket #' . $ticket['id'])) . '"'
+                        );
+                    }
+                }
             }
         }
 
