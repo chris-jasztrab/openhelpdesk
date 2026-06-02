@@ -52,7 +52,7 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/agent/help'], ['label' => 'Ticke
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-funnel text-primary me-2"></i>Filtering Tickets</h5>
-<p class="text-muted mb-2">Click the <strong>Filters</strong> button to open the filter panel on the right. The panel state is remembered as you navigate. Available filters:</p>
+<p class="text-muted mb-2">Click the <strong>Filters</strong> button to open the filter panel on the right. The panel state is remembered as you navigate. Ticking a checkbox or picking a date <strong>applies the filter immediately</strong> &mdash; the list refreshes on click, with no need to press Apply. (The <strong>Search</strong> box is the exception: type your text and press Enter or click Apply, so the list doesn&rsquo;t reload on every keystroke.) Available filters:</p>
 <div class="table-responsive mb-0">
 <table class="table table-sm mb-0">
     <thead class="table-light"><tr><th>Filter</th><th>Options</th></tr></thead>
@@ -69,6 +69,17 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/agent/help'], ['label' => 'Ticke
     </tbody>
 </table>
 </div>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-funnel-fill text-primary me-2"></i>Applied Filters</h5>
+<p class="text-muted mb-2">Every filter you have active shows as a labelled pill at the top of the filter panel &mdash; for example <span class="badge rounded-pill bg-light text-dark border">Status: Open</span> or <span class="badge rounded-pill bg-light text-dark border">Priority: High</span> &mdash; so you can see what&rsquo;s applied at a glance without scrolling the whole list.</p>
+<ul class="text-muted mb-0">
+    <li>Click the <strong>&times;</strong> on any pill to remove just that one filter; the list refreshes immediately.</li>
+    <li>Click <strong>Clear All</strong> next to the pills to remove every filter at once.</li>
+</ul>
 </div>
 </div>
 

@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.69.1 &mdash; 2026-06-02
+
+### Documentation
+- **Documented the applied-filter pills and instant-apply behaviour in the help docs.** The agent <em>Ticket List &amp; Filters</em> page gains an <em>Applied Filters</em> section, and the admin <em>Tickets</em> guide's filter panel section now explains that ticking a box or picking a date applies immediately and that active filters show as removable pills ([agent/docs/ticket-list.php](templates/pages/agent/docs/ticket-list.php), [admin/docs/tickets.php](templates/pages/admin/docs/tickets.php)).
+
+---
+
 ## 2.69.0 &mdash; 2026-06-02
 
 ### Added
