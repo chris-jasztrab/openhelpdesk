@@ -2660,7 +2660,25 @@ $router->get('/agent', function () {
     $stmt->execute(array_merge([$agentId], $groupParams));
     $escalatedToMe = (int) $stmt->fetchColumn();
 
-    // Recent tickets (open/in_progress/pending, newest first)
+    // Sorting (mirror the ticket-list sort options)
+    $sortableColumns = [
+        'id'         => 't.id',
+        'subject'    => 't.subject',
+        'status'     => 't.status',
+        'priority'   => 'tp.sort_order',
+        'type'       => 'tt.name',
+        'agent'      => 'a.first_name',
+        'creator'    => 'c.first_name',
+        'group'      => 'g.name',
+        'location'   => 'l.name',
+        'created_at' => 't.created_at',
+        'due_date'   => 't.due_date',
+    ];
+    $sort     = isset($sortableColumns[$_GET['sort'] ?? '']) ? $_GET['sort'] : 'created_at';
+    $dir      = strtolower($_GET['dir'] ?? 'desc') === 'asc' ? 'ASC' : 'DESC';
+    $orderCol = $sortableColumns[$sort];
+
+    // Recent tickets (open/in_progress/pending)
     $trRestriction = $groupRestriction ? str_replace('AND group_id', 'AND t.group_id', $groupRestriction) : '';
     $stmt = $db->prepare(
         "SELECT t.id, t.subject, t.status, t.created_at, t.group_id, t.sla_state, t.due_date,
@@ -2678,7 +2696,7 @@ $router->get('/agent', function () {
          LEFT JOIN users c ON t.created_by = c.id
          LEFT JOIN users a ON t.assigned_to = a.id
          WHERE $openInT" . $trRestriction . "
-         ORDER BY t.created_at DESC
+         ORDER BY {$orderCol} {$dir}
          LIMIT 10"
     );
     $stmt->execute($groupParams);
@@ -2727,6 +2745,8 @@ $router->get('/agent', function () {
         'resolvedToday'      => $resolvedToday,
         'escalatedToMe'      => $escalatedToMe,
         'recentTickets'      => $recent,
+        'sort'               => $sort,
+        'dir'                => strtolower($dir),
         'autoShowTour'       => $autoShowTour,
         'types'              => $dashTypes,
         'groups'             => $dashGroups,

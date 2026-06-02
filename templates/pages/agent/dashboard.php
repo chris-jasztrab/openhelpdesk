@@ -10,6 +10,8 @@ $statusLabels   = ticketStatusLabelMap();
 $slaStateColors = ['on_track' => 'success', 'warning' => 'warning', 'breached' => 'danger'];
 $allColumns     = ticketColumnDefinitions();
 if (!slaEnabled()) { unset($allColumns['sla']); }
+$sort = $sort ?? 'created_at';
+$dir  = $dir ?? 'desc';
 ?>
 <div class=" mb-4">
     <div>
@@ -134,18 +136,18 @@ if (!slaEnabled()) { unset($allColumns['sla']); }
         <table class="table table-hover align-middle mb-0">
             <thead class="table-light">
                 <tr>
-                    <th style="width:60px">#</th>
-                    <th>Subject</th>
-                    <?php if (in_array('status', $visibleColumns)): ?><th>Status</th><?php endif; ?>
-                    <?php if (in_array('priority', $visibleColumns)): ?><th>Priority</th><?php endif; ?>
-                    <?php if (in_array('type', $visibleColumns)): ?><th>Type</th><?php endif; ?>
-                    <?php if (in_array('agent', $visibleColumns)): ?><th style="text-align:right;">Assigned To</th><?php endif; ?>
-                    <?php if (in_array('group', $visibleColumns)): ?><th>Group</th><?php endif; ?>
-                    <?php if (in_array('creator', $visibleColumns)): ?><th>Created By</th><?php endif; ?>
-                    <?php if (in_array('location', $visibleColumns)): ?><th>Location</th><?php endif; ?>
+                    <th style="width:60px"><a href="<?= sortUrl('id', $sort, $dir, [], '/agent') ?>" class="text-decoration-none text-dark"># <?= sortIcon('id', $sort, $dir) ?></a></th>
+                    <th><a href="<?= sortUrl('subject', $sort, $dir, [], '/agent') ?>" class="text-decoration-none text-dark">Subject <?= sortIcon('subject', $sort, $dir) ?></a></th>
+                    <?php if (in_array('status', $visibleColumns)): ?><th><a href="<?= sortUrl('status', $sort, $dir, [], '/agent') ?>" class="text-decoration-none text-dark">Status <?= sortIcon('status', $sort, $dir) ?></a></th><?php endif; ?>
+                    <?php if (in_array('priority', $visibleColumns)): ?><th><a href="<?= sortUrl('priority', $sort, $dir, [], '/agent') ?>" class="text-decoration-none text-dark">Priority <?= sortIcon('priority', $sort, $dir) ?></a></th><?php endif; ?>
+                    <?php if (in_array('type', $visibleColumns)): ?><th><a href="<?= sortUrl('type', $sort, $dir, [], '/agent') ?>" class="text-decoration-none text-dark">Type <?= sortIcon('type', $sort, $dir) ?></a></th><?php endif; ?>
+                    <?php if (in_array('agent', $visibleColumns)): ?><th style="text-align:right;"><a href="<?= sortUrl('agent', $sort, $dir, [], '/agent') ?>" class="text-decoration-none text-dark">Assigned To <?= sortIcon('agent', $sort, $dir) ?></a></th><?php endif; ?>
+                    <?php if (in_array('group', $visibleColumns)): ?><th><a href="<?= sortUrl('group', $sort, $dir, [], '/agent') ?>" class="text-decoration-none text-dark">Group <?= sortIcon('group', $sort, $dir) ?></a></th><?php endif; ?>
+                    <?php if (in_array('creator', $visibleColumns)): ?><th><a href="<?= sortUrl('creator', $sort, $dir, [], '/agent') ?>" class="text-decoration-none text-dark">Created By <?= sortIcon('creator', $sort, $dir) ?></a></th><?php endif; ?>
+                    <?php if (in_array('location', $visibleColumns)): ?><th><a href="<?= sortUrl('location', $sort, $dir, [], '/agent') ?>" class="text-decoration-none text-dark">Location <?= sortIcon('location', $sort, $dir) ?></a></th><?php endif; ?>
                     <?php if (in_array('sla', $visibleColumns)): ?><th>SLA</th><?php endif; ?>
-                    <?php if (in_array('created_at', $visibleColumns)): ?><th>Created</th><?php endif; ?>
-                    <?php if (in_array('due_date', $visibleColumns)): ?><th>Due</th><?php endif; ?>
+                    <?php if (in_array('created_at', $visibleColumns)): ?><th><a href="<?= sortUrl('created_at', $sort, $dir, [], '/agent') ?>" class="text-decoration-none text-dark">Created <?= sortIcon('created_at', $sort, $dir) ?></a></th><?php endif; ?>
+                    <?php if (in_array('due_date', $visibleColumns)): ?><th><a href="<?= sortUrl('due_date', $sort, $dir, [], '/agent') ?>" class="text-decoration-none text-dark">Due <?= sortIcon('due_date', $sort, $dir) ?></a></th><?php endif; ?>
                     <?php if (in_array('confidential', $visibleColumns)): ?><th style="text-align:center;">Confidential</th><?php endif; ?>
                 </tr>
             </thead>

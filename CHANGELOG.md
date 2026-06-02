@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.68.0 &mdash; 2026-06-02
+
+### Added
+- **The Recent Tickets table on the agent dashboard is now sortable by column, matching the ticket list.** Click any of the <strong>#</strong>, <strong>Subject</strong>, <strong>Status</strong>, <strong>Priority</strong>, <strong>Type</strong>, <strong>Assigned To</strong>, <strong>Group</strong>, <strong>Created By</strong>, <strong>Location</strong>, <strong>Created</strong>, or <strong>Due</strong> headers to sort (click again to reverse direction); the active column shows an arrow. SLA and Confidential remain non-sortable, the same as the admin and agent ticket lists. The dashboard query now applies the chosen sort before its 10-row limit and defaults to newest-first as before ([dashboard.php](templates/pages/agent/dashboard.php), [routes.php](src/routes.php)).
+
+---
+
 ## 2.67.1 &mdash; 2026-06-02
 
 ### Changed
