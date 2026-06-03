@@ -27,7 +27,8 @@
         right: 3px;
         width: 2px;
         border-radius: 1px;
-        background: transparent;
+        /* Faint always-on hint so users can see where to grab to resize. */
+        background: rgba(0, 0, 0, .12);
         transition: background-color .12s ease;
     }
     .ld-col-grip:hover::after,

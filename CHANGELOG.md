@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.70.1 &mdash; 2026-06-03
+
+### Changed
+- **Resizable table columns now show a faint divider hint.** Every resizable column header draws a subtle vertical line at its right edge so users can see exactly where to grab to drag-resize; the line brightens to the primary colour on hover. Previously the grab handle was invisible until hovered ([templates/partials/table-resize.php](templates/partials/table-resize.php)).
+
+---
+
 ## 2.70.0 &mdash; 2026-06-03
 
 ### Changed
