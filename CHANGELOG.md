@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.69.2 &mdash; 2026-06-03
+
+### Documentation
+- **Added a third-party software inventory for the open-source release.** New [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) lists every open-source dependency (CDN front-end libraries, Composer runtime + dev packages) with versions and licenses, generated from `composer.lock` and the app's CDN references. The README's License section now links to it and flags that CKEditor 5 is served under GPL-2.0-or-later unless a commercial license is held ([THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md), [README.md](README.md)).
+
 ## 2.69.1 &mdash; 2026-06-02
 
 ### Documentation

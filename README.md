@@ -504,6 +504,16 @@ Agents and admins can also control tickets via hashtag commands in email replies
 
 Open source and free to the world under the [MIT License](LICENSE) — use it, modify it, ship it, no strings attached.
 
+### Third-Party Software
+
+OpenHelpDesk stands on a number of open-source projects. A full inventory with
+versions and licenses is in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+
+> **Note:** the rich-text editor (CKEditor 5) is served from the CKEditor CDN
+> under GPL-2.0-or-later unless you hold a commercial CKEditor license. If GPL
+> terms don't suit your deployment, obtain a commercial license or swap the
+> editor. All other dependencies are MIT, BSD, or LGPL.
+
 ## Credits & Donations
 
 OpenHelpDesk was vibe coded by Chris Jasztrab at the Waterloo Public Library.
