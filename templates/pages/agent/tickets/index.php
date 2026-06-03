@@ -435,7 +435,7 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                 <tr>
                     <th style="width:36px;"><input type="checkbox" id="selectAll" class="form-check-input" title="Select all"></th>
                     <th style="width:72px;min-width:72px;"><a href="<?= sortUrl('id', $sort, $dir, $sortParams, '/agent/tickets') ?>" class="text-decoration-none text-dark"># <?= sortIcon('id', $sort, $dir) ?></a></th>
-                    <th class="subject-col" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><a href="<?= sortUrl('subject', $sort, $dir, $sortParams, '/agent/tickets') ?>" class="text-decoration-none text-dark">Subject <?= sortIcon('subject', $sort, $dir) ?></a></th>
+                    <th class="subject-col" data-flex-col style="min-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><a href="<?= sortUrl('subject', $sort, $dir, $sortParams, '/agent/tickets') ?>" class="text-decoration-none text-dark">Subject <?= sortIcon('subject', $sort, $dir) ?></a></th>
                     <?php if (in_array('status', $visibleColumns)): ?>
                     <th style="white-space:nowrap;"><a href="<?= sortUrl('status', $sort, $dir, $sortParams, '/agent/tickets') ?>" class="text-decoration-none text-dark">Status <?= sortIcon('status', $sort, $dir) ?></a></th>
                     <?php endif; ?>
@@ -488,7 +488,7 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                                    <?= $isRedacted ? 'data-confidential="1"' : '' ?>>
                         </td>
                         <td class="text-muted fw-bold" style="white-space:nowrap;"><?= $t['id'] ?></td>
-                        <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                        <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<?= $isRedacted ? 'Confidential' : e($t['subject']) ?>">
                             <?php if ($isRedacted): ?>
                             <span class="text-muted fst-italic">
                                 <i class="bi bi-shield-lock me-1"></i>[Confidential]

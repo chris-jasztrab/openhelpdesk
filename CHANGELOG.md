@@ -11,6 +11,14 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.72.0 &mdash; 2026-06-03
+
+### Changed
+- **The ticket list now fits its container instead of forcing horizontal scroll.** The Subject column is the elastic column: the table fills the available width at 100% and Subject absorbs the slack, truncating with an ellipsis when the text is too long rather than pushing the table wide. Widening another column steals room from Subject (no scroll); you can still drag Subject itself wider to see more, at which point the list scrolls. When there are too many columns to fit at all, Subject pins to a readable minimum and stays visible rather than collapsing ([templates/partials/table-resize.php](templates/partials/table-resize.php), [templates/pages/agent/tickets/index.php](templates/pages/agent/tickets/index.php), [templates/pages/admin/tickets/index.php](templates/pages/admin/tickets/index.php)).
+- **Hover a truncated subject to see the whole thing.** Each subject cell now carries a `title` tooltip with the full subject (confidential rows show only "Confidential"). The Subject header itself never wraps ([templates/pages/agent/tickets/index.php](templates/pages/agent/tickets/index.php), [templates/pages/admin/tickets/index.php](templates/pages/admin/tickets/index.php)).
+
+---
+
 ## 2.71.0 &mdash; 2026-06-03
 
 ### Changed

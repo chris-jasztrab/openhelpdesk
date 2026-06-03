@@ -114,11 +114,25 @@
         return Math.max(contentMinWidth(th), cssMin);
     }
 
+    // Index of the column marked data-flex-col (the one that absorbs slack and
+    // truncates — e.g. the ticket Subject), or -1 if the table has none. When a
+    // table has a flex column it runs in "fit mode": the table fills its
+    // container at 100% width instead of growing to the sum of its columns, so
+    // it never forces horizontal scroll on load.
+    function flexColIndex(cells) {
+        for (var i = 0; i < cells.length; i++) {
+            if (cells[i].hasAttribute("data-flex-col")) return i;
+        }
+        return -1;
+    }
+
     // Re-sum the header widths and re-pin the table. Exposed for pages that
     // re-fit columns after an inline edit (the ticket-list quick-change cells).
+    // In fit mode the table stays at 100% so the flex column keeps absorbing.
     function syncTableWidth(table) {
         var cells = headerCells(table);
         if (!cells) return;
+        if (flexColIndex(cells) >= 0) { table.style.width = "100%"; return; }
         var total = 0;
         for (var i = 0; i < cells.length; i++) total += cells[i].offsetWidth;
         table.style.width = total + "px";
@@ -140,24 +154,36 @@
         wrap.appendChild(table);
     }
 
-    function addGrip(table, cells, index, key, floor) {
+    function addGrip(table, cells, index, key, floors, flexIndex) {
         var th = cells[index];
         th.classList.add("ld-resize-th");
-        var minW = Math.max(MIN_WIDTH, floor || 0);
+        var minW = Math.max(MIN_WIDTH, floors[index] || 0);
+
+        var fitMode   = flexIndex >= 0;
+        var isFlex    = index === flexIndex;
+        var flexCell  = fitMode ? cells[flexIndex] : null;
+        var flexFloor = fitMode ? Math.max(MIN_WIDTH, floors[flexIndex] || 0) : 0;
 
         var grip = document.createElement("span");
         grip.className = "ld-col-grip";
         grip.setAttribute("aria-hidden", "true");
         th.appendChild(grip);
 
-        var startX, startWidth, startTableWidth, moved;
+        var startX, startWidth, startTableWidth, startFlexWidth, moved;
 
         grip.addEventListener("pointerdown", function (e) {
             e.preventDefault();
             e.stopPropagation();
             startX          = e.clientX;
+            // Resizing a normal column while the table is elastic (100%) steals
+            // space from the flex column; keep it unpinned so it absorbs. In
+            // crowded/px mode we leave things as-is and just grow the table.
+            if (fitMode && !isFlex && table.style.width === "100%") {
+                flexCell.style.width = "";
+            }
             startWidth      = th.offsetWidth;
             startTableWidth = table.offsetWidth;
+            startFlexWidth  = flexCell ? flexCell.offsetWidth : 0;
             moved           = false;
             grip.classList.add("ld-grip-active");
             document.body.classList.add("ld-col-resizing");
@@ -167,9 +193,22 @@
         grip.addEventListener("pointermove", function (e) {
             if (startX === undefined) return;
             moved = true;
-            var width = Math.max(minW, startWidth + (e.clientX - startX));
-            th.style.width    = width + "px";
-            table.style.width = (startTableWidth + (width - startWidth)) + "px";
+            var dx = e.clientX - startX;
+            if (fitMode && !isFlex && startFlexWidth > flexFloor) {
+                // Steal from / give back to the flex column; the table stays at
+                // 100% so widening this column never adds horizontal scroll —
+                // it just narrows the Subject (which truncates with an ellipsis).
+                var maxW  = startWidth + (startFlexWidth - flexFloor);
+                var width = Math.min(Math.max(minW, startWidth + dx), Math.max(minW, maxW));
+                th.style.width = width + "px";
+            } else {
+                // The flex column itself, or a column whose neighbour is already
+                // at its floor: grow the table (horizontal scroll is acceptable
+                // here because the user explicitly dragged to see more).
+                var w = Math.max(minW, startWidth + dx);
+                th.style.width    = w + "px";
+                table.style.width = (startTableWidth + (w - startWidth)) + "px";
+            }
         });
 
         function finish() {
@@ -216,26 +255,50 @@
             ? stored.w
             : natural;
 
-        applyWidths(table, cells, widths);
+        var flexIndex = flexColIndex(cells);
+        if (flexIndex >= 0) {
+            // Fit mode: pin every column except the flex one, and keep the table
+            // at 100% so the flex column soaks up the leftover width and the
+            // table fills its container without forcing horizontal scroll.
+            for (var p = 0; p < cells.length; p++) {
+                cells[p].style.width = (p === flexIndex) ? "" : (widths[p] + "px");
+            }
+            table.style.width = "100%";
+        } else {
+            applyWidths(table, cells, widths);
+        }
         table.style.tableLayout = "fixed";
         ensureScrollParent(table);
 
         // Floor every column at its header word width (+ the # column's CSS
         // min-width). Repair any saved-too-narrow column up to its floor on
         // load, so headers/numbers that were previously dragged into clipping
-        // come back whole.
+        // come back whole. The flex column stays elastic — never pinned.
         var floors  = [];
         var widened = false;
         for (var f = 0; f < cells.length; f++) {
             floors.push(columnFloor(cells[f]));
-            if (cells[f].offsetWidth < floors[f]) {
+            if (f !== flexIndex && cells[f].offsetWidth < floors[f]) {
                 cells[f].style.width = floors[f] + "px";
                 widened = true;
             }
         }
-        if (widened) syncTableWidth(table);
 
-        for (var g = 0; g < cells.length; g++) addGrip(table, cells, g, key, floors[g]);
+        // Crowded fit mode: if the pinned columns leave the flex column below
+        // its floor (it would otherwise collapse to nothing), pin it to the
+        // floor and let the table grow. Horizontal scroll is unavoidable with
+        // this many columns, but Subject stays visible and truncates instead of
+        // vanishing.
+        if (flexIndex >= 0 && cells[flexIndex].offsetWidth < floors[flexIndex]) {
+            cells[flexIndex].style.width = floors[flexIndex] + "px";
+            var sum = 0;
+            for (var s = 0; s < cells.length; s++) sum += cells[s].offsetWidth;
+            table.style.width = sum + "px";
+        } else if (widened) {
+            syncTableWidth(table);
+        }
+
+        for (var g = 0; g < cells.length; g++) addGrip(table, cells, g, key, floors, flexIndex);
     }
 
     function init() {
