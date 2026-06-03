@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.69.3 &mdash; 2026-06-03
+
+### Documentation
+- **Clarified the CKEditor 5 licensing note.** Reworded the README and [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) to reflect that CKEditor 5 is loaded from the CDN at runtime and not bundled, so distributing this MIT-licensed project conveys no GPL code; the swap-or-commercial options are now framed as optional rather than required ([README.md](README.md), [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)).
+
 ## 2.69.2 &mdash; 2026-06-03
 
 ### Documentation

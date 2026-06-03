@@ -508,11 +508,14 @@ Open source and free to the world under the [MIT License](LICENSE) — use it, m
 
 OpenHelpDesk stands on a number of open-source projects. A full inventory with
 versions and licenses is in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+All bundled dependencies are MIT, BSD, or LGPL.
 
-> **Note:** the rich-text editor (CKEditor 5) is served from the CKEditor CDN
-> under GPL-2.0-or-later unless you hold a commercial CKEditor license. If GPL
-> terms don't suit your deployment, obtain a commercial license or swap the
-> editor. All other dependencies are MIT, BSD, or LGPL.
+> **Note on CKEditor 5:** the rich-text editor is served from the CKEditor CDN
+> under GPL-2.0-or-later (or a commercial license). It is **not bundled** in
+> this repository — the browser loads it from `cdn.ckeditor.com` at runtime —
+> so cloning this MIT-licensed project distributes no GPL code. If you prefer to
+> avoid the GPL dependency entirely, you can self-host a commercial build or
+> swap in a permissively-licensed editor (e.g. Quill, TipTap, Trix).
 
 ## Credits & Donations
 

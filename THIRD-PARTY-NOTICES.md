@@ -6,11 +6,12 @@ It incorporates and depends on the open-source projects listed below. Each
 remains the property of its respective authors and is governed by its own
 license. This file is provided for attribution and license-compliance purposes.
 
-> **⚠️ Action required before public distribution — CKEditor 5.**
-> CKEditor 5 is loaded from the CKEditor CDN under **GPL-2.0-or-later** unless
-> you hold a commercial license. GPL terms differ materially from this project's
-> MIT license. Before publishing, either (a) confirm GPL is acceptable for your
-> use, (b) obtain a CKEditor commercial license, or (c) replace the editor.
+> **Note on CKEditor 5.** CKEditor 5 is loaded from the CKEditor CDN under
+> **GPL-2.0-or-later** (or a commercial license). It is **not bundled** in this
+> repository — the browser fetches it from `cdn.ckeditor.com` at runtime — so
+> distributing this MIT-licensed project does not convey any GPL-licensed code.
+> If you prefer to avoid the GPL dependency entirely, self-host a commercial
+> build or swap in a permissively-licensed editor (e.g. Quill, TipTap, Trix).
 > See the [CKEditor licensing page](https://ckeditor.com/legal/ckeditor-oss-license/).
 
 ---
