@@ -11,6 +11,15 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.71.0 &mdash; 2026-06-03
+
+### Changed
+- **Ticket-list columns can no longer be crushed until their header clips.** Resizable columns now have a per-column floor equal to the wider of the header's one-line width and any CSS `min-width`, so dragging can never shrink Status, Priority, or any header until its word wraps or its last letters get cut off. The floor is also applied on load, so a column that was previously dragged too narrow (and saved that way) repairs itself the next time the list is opened ([templates/partials/table-resize.php](templates/partials/table-resize.php)).
+- **The ticket # column now has a minimum width sized for the number.** Its `#` header is narrower than the ticket numbers below it, so the column carries a `min-width` that keeps multi-digit IDs on one line instead of clipping into the Subject column ([templates/pages/agent/tickets/index.php](templates/pages/agent/tickets/index.php), [templates/pages/admin/tickets/index.php](templates/pages/admin/tickets/index.php)).
+- **The Confidential column is now hidden by default for everyone.** It was already off by default for users who had never touched the Columns picker; migration 045 strips `confidential` out of every saved column preference so existing users who had it baked in no longer see it either. It remains opt-in via the Columns picker ([migration 045](database/migrations/045_hide_confidential_column_by_default.php)).
+
+---
+
 ## 2.70.1 &mdash; 2026-06-03
 
 ### Changed

@@ -92,6 +92,28 @@
         table.style.width = total + "px";
     }
 
+    // The narrowest a header may be pinned: its own content on one line, so a
+    // column can never be crushed until the header word(s) clip or wrap. We
+    // measure by briefly pinching the cell to 1px under the fixed layout and
+    // reading scrollWidth (= left-padding + content); scrollWidth drops the
+    // right padding when content overflows, so we add it back plus a hair.
+    function contentMinWidth(th) {
+        var cs    = getComputedStyle(th);
+        var saved = th.style.width;
+        th.style.width = "1px";
+        var w = th.scrollWidth;
+        th.style.width = saved;
+        return Math.ceil(w + (parseFloat(cs.paddingRight) || 0) + 2);
+    }
+
+    // The floor a column may be resized to: the wider of its header's
+    // one-line width and any CSS min-width (e.g. the ticket # column, whose
+    // numbers are wider than its "#" header).
+    function columnFloor(th) {
+        var cssMin = parseFloat(getComputedStyle(th).minWidth) || 0;
+        return Math.max(contentMinWidth(th), cssMin);
+    }
+
     // Re-sum the header widths and re-pin the table. Exposed for pages that
     // re-fit columns after an inline edit (the ticket-list quick-change cells).
     function syncTableWidth(table) {
@@ -118,9 +140,10 @@
         wrap.appendChild(table);
     }
 
-    function addGrip(table, cells, index, key) {
+    function addGrip(table, cells, index, key, floor) {
         var th = cells[index];
         th.classList.add("ld-resize-th");
+        var minW = Math.max(MIN_WIDTH, floor || 0);
 
         var grip = document.createElement("span");
         grip.className = "ld-col-grip";
@@ -144,7 +167,7 @@
         grip.addEventListener("pointermove", function (e) {
             if (startX === undefined) return;
             moved = true;
-            var width = Math.max(MIN_WIDTH, startWidth + (e.clientX - startX));
+            var width = Math.max(minW, startWidth + (e.clientX - startX));
             th.style.width    = width + "px";
             table.style.width = (startTableWidth + (width - startWidth)) + "px";
         });
@@ -197,7 +220,22 @@
         table.style.tableLayout = "fixed";
         ensureScrollParent(table);
 
-        for (var g = 0; g < cells.length; g++) addGrip(table, cells, g, key);
+        // Floor every column at its header word width (+ the # column's CSS
+        // min-width). Repair any saved-too-narrow column up to its floor on
+        // load, so headers/numbers that were previously dragged into clipping
+        // come back whole.
+        var floors  = [];
+        var widened = false;
+        for (var f = 0; f < cells.length; f++) {
+            floors.push(columnFloor(cells[f]));
+            if (cells[f].offsetWidth < floors[f]) {
+                cells[f].style.width = floors[f] + "px";
+                widened = true;
+            }
+        }
+        if (widened) syncTableWidth(table);
+
+        for (var g = 0; g < cells.length; g++) addGrip(table, cells, g, key, floors[g]);
     }
 
     function init() {
