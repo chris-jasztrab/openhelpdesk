@@ -3,58 +3,86 @@
 declare(strict_types=1);
 
 /**
- * Enforce group-based visibility for individual agent ticket routes.
+ * Enforce ticket-level visibility for individual agent ticket routes.
  *
  * Rules (mirrors _apiEnforceTicketAccess in api.php):
- *   admin  → unrestricted
- *   agent  → if the agent belongs to one or more groups, only tickets
- *             whose group_id is in that set are accessible; tickets
- *             with group_id = NULL are visible to all agents.
- *             Agents with no group assignment are unrestricted.
+ *   admin  → unrestricted (confidential access is gated by the re-auth flow in
+ *            the detail route, and audited).
+ *   confidential ticket type → ONLY the type's confidential-group members or the
+ *            ticket creator. `tickets.view_all`, assignment and watching do NOT
+ *            grant access.
+ *   non-confidential → holders of `tickets.view_all`; or, if the agent belongs to
+ *            one or more groups, tickets in those groups plus group-less tickets;
+ *            or the creator/assignee/watcher of the ticket. A staff user with no
+ *            group and no view_all sees only tickets they created / are assigned /
+ *            watch (fail closed).
  *
- * $ticket must contain group_id (int|null).
+ * Only $ticket['id'] is trusted; the authoritative group/type/creator are
+ * re-fetched so a caller that SELECTed a narrow column set can't bypass a check.
  * Redirects to /agent/tickets with an error flash if access is denied.
  */
 function _agentRequireTicketAccess(PDO $db, array $ticket): void
 {
-    if (!(Auth::isStaff() && !Auth::isAdmin())) {
-        return; // admins: confidential access handled by re-auth flow in the route
+    if (Auth::isAdmin()) {
+        return; // admins: confidential access handled by the re-auth flow in the route
+    }
+    if (!Auth::isStaff()) {
+        return; // non-staff never reach agent routes (requireStaff upstream)
     }
 
-    $ticketId = isset($ticket['id']) ? (int) $ticket['id'] : null;
+    $ticketId = isset($ticket['id']) ? (int) $ticket['id'] : 0;
     $userId   = (int) Auth::id();
+    if ($ticketId <= 0) {
+        return;
+    }
 
-    $gs = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
-    $gs->execute([$userId]);
-    $agentGroups = array_map('intval', $gs->fetchAll(PDO::FETCH_COLUMN));
+    // Authoritative re-fetch: never trust whatever columns the caller happened to
+    // SELECT — several pass only id + group_id, which would skip confidential checks.
+    $meta = $db->prepare(
+        'SELECT t.group_id, t.created_by, tt.is_confidential, tt.group_id AS conf_group_id
+         FROM tickets t
+         LEFT JOIN ticket_types tt ON t.type_id = tt.id
+         WHERE t.id = ?'
+    );
+    $meta->execute([$ticketId]);
+    $row = $meta->fetch();
+    if (!$row) {
+        return; // ticket vanished; the caller handles not-found
+    }
 
-    if (empty($agentGroups)) {
-        // Agent not in any group — block confidential tickets they are not authorised for
-        if (!empty($ticket['type_id'])) {
-            $cStmt = $db->prepare('SELECT is_confidential, group_id FROM ticket_types WHERE id = ?');
-            $cStmt->execute([$ticket['type_id']]);
-            $cType = $cStmt->fetch();
-            if ($cType && $cType['is_confidential'] && $cType['group_id']) {
-                $inGroup = $db->prepare('SELECT 1 FROM group_user_map WHERE group_id = ? AND user_id = ?');
-                $inGroup->execute([$cType['group_id'], $userId]);
-                if (!$inGroup->fetchColumn() && !ticketAccessExempt($db, $userId, $ticketId)) {
-                    flash('error', 'You do not have access to this ticket.');
-                    redirect('/agent/tickets');
-                }
-            }
+    $deny = static function (): void {
+        flash('error', 'You do not have access to this ticket.');
+        redirect('/agent/tickets');
+    };
+
+    $userGroups = userGroupIds($db, $userId);
+
+    // Confidential tickets: confidential-group members or the creator ONLY.
+    if ((int) ($row['is_confidential'] ?? 0) === 1) {
+        $confGroupId = $row['conf_group_id'] !== null ? (int) $row['conf_group_id'] : null;
+        $isMember    = $confGroupId !== null && in_array($confGroupId, $userGroups, true);
+        $isCreator   = (int) $row['created_by'] === $userId;
+        if (!$isMember && !$isCreator) {
+            $deny();
         }
         return;
     }
 
-    if ($ticket['group_id'] === null) {
-        return; // unassigned ticket: visible to all agents
+    // Non-confidential tickets.
+    if (Auth::can('tickets.view_all')) {
+        return;
     }
-
-    if (!in_array((int) $ticket['group_id'], $agentGroups, true)
-        && !ticketAccessExempt($db, $userId, $ticketId)) {
-        flash('error', 'You do not have access to this ticket.');
-        redirect('/agent/tickets');
+    $gid = $row['group_id'] !== null ? (int) $row['group_id'] : null;
+    if (!empty($userGroups) && ($gid === null || in_array($gid, $userGroups, true))) {
+        return; // group-less (claimable) ticket, or one of the user's groups
     }
+    if ((int) $row['created_by'] === $userId) {
+        return; // own ticket
+    }
+    if (ticketAccessExempt($db, $userId, $ticketId)) {
+        return; // current assignee or watcher
+    }
+    $deny();
 }
 
 /* ==================================================================
@@ -217,31 +245,18 @@ $router->get('/agent/tickets', function () {
         $params[] = Auth::id();
     }
 
-    // Group-based visibility: agents who belong to groups can only see those groups' tickets.
-    // Agents in no groups, and all admins, see all tickets (except confidential restrictions).
+    // Fail-closed ticket visibility (one source of truth in ticketStaffVisibilitySql):
+    // non-admin staff see their groups' tickets plus anything view_all / assignment
+    // grants, and never a confidential type outside their confidential group. Admins
+    // are unrestricted here; confidential rows are redacted in the template below.
+    // $agentGroupIds is still used for the "all visible" count and group dropdown.
     $agentGroupIds = [];
-    if ((Auth::isStaff() && !Auth::isAdmin())) {
-        $gStmt = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
-        $gStmt->execute([Auth::id()]);
-        $agentGroupIds = array_map('intval', $gStmt->fetchAll(PDO::FETCH_COLUMN));
-
-        if (!empty($agentGroupIds)) {
-            $placeholders = implode(',', array_fill(0, count($agentGroupIds), '?'));
-            $where[]      = 't.group_id IN (' . $placeholders . ')';
-            $params       = array_merge($params, $agentGroupIds);
-        } else {
-            // Agent has no group restrictions but must still not see confidential tickets
-            // they are not authorised for
-            $where[] = "NOT EXISTS (
-                SELECT 1 FROM ticket_types ct
-                WHERE ct.id = t.type_id
-                  AND ct.is_confidential = 1
-                  AND ct.group_id IS NOT NULL
-                  AND ct.group_id NOT IN (SELECT group_id FROM group_user_map WHERE user_id = ?)
-            )";
-            $params[] = Auth::id();
-        }
+    if (Auth::isStaff() && !Auth::isAdmin()) {
+        $agentGroupIds = userGroupIds($db, (int) Auth::id());
     }
+    $vis      = ticketStaffVisibilitySql($db, (int) Auth::id(), Auth::role(), 't');
+    $where[]  = $vis['sql'];
+    $params   = array_merge($params, $vis['params']);
 
     // Preload confidential ticket type info for admin redaction in the template
     $confidentialTypeIds = [];
@@ -282,14 +297,10 @@ $router->get('/agent/tickets', function () {
     $countStmt->execute($params);
     $totalTickets = (int) $countStmt->fetchColumn();
 
-    // Count all visible tickets (no user filters, just group restriction)
-    if (!empty($agentGroupIds)) {
-        $allPlaceholders = implode(',', array_fill(0, count($agentGroupIds), '?'));
-        $allStmt = $db->prepare('SELECT COUNT(*) FROM tickets t WHERE t.group_id IN (' . $allPlaceholders . ')');
-        $allStmt->execute($agentGroupIds);
-    } else {
-        $allStmt = $db->query('SELECT COUNT(*) FROM tickets');
-    }
+    // Count all visible tickets (no user filters, just the visibility predicate)
+    $visAll  = ticketStaffVisibilitySql($db, (int) Auth::id(), Auth::role(), 't');
+    $allStmt = $db->prepare('SELECT COUNT(*) FROM tickets t WHERE ' . $visAll['sql']);
+    $allStmt->execute($visAll['params']);
     $allTickets = (int) $allStmt->fetchColumn();
 
     // Sorting
@@ -563,7 +574,27 @@ $router->get('/agent/tickets/search', function () {
     if ($exclude > 0) {
         $where .= ' AND t.id != ?';
         $params[] = $exclude;
+
+        // If the source ticket is confidential, only same-type tickets are valid
+        // merge candidates — confidential content must never cross ticket types.
+        $srcType = $db->prepare(
+            'SELECT t.type_id, COALESCE(tt.is_confidential, 0) AS conf
+             FROM tickets t LEFT JOIN ticket_types tt ON t.type_id = tt.id WHERE t.id = ?'
+        );
+        $srcType->execute([$exclude]);
+        $srcRow = $srcType->fetch();
+        if ($srcRow && (int) $srcRow['conf'] === 1) {
+            $where   .= ' AND t.type_id = ?';
+            $params[] = (int) $srcRow['type_id'];
+        }
     }
+
+    // Never surface tickets the searcher isn't allowed to see (e.g. confidential
+    // types outside their group, or other groups' tickets). Admins: unrestricted,
+    // with confidential subjects redacted below.
+    $vis    = ticketStaffVisibilitySql($db, (int) Auth::id(), Auth::role(), 't');
+    $where .= ' AND ' . $vis['sql'];
+    $params = array_merge($params, $vis['params']);
 
     $stmt = $db->prepare(
         "SELECT t.id, t.subject, t.status,
@@ -811,6 +842,29 @@ $router->post('/agent/tickets/bulk', function () {
             $targetTicket = $tgt->fetch();
             if (!$targetTicket) {
                 flash('error', 'Primary ticket not found or already merged.');
+                redirect('/agent/tickets');
+            }
+            // Confidential guard: if any ticket in the merge set is a confidential
+            // type, every ticket must share that exact type so confidential content
+            // can never flow into a ticket of a different (visible) type.
+            $mergeIds = array_merge([$targetId], $ticketIds);
+            $mph      = implode(',', array_fill(0, count($mergeIds), '?'));
+            $typeRows = $db->prepare(
+                "SELECT DISTINCT t.type_id, COALESCE(tt.is_confidential, 0) AS conf
+                 FROM tickets t LEFT JOIN ticket_types tt ON t.type_id = tt.id
+                 WHERE t.id IN ({$mph})"
+            );
+            $typeRows->execute($mergeIds);
+            $anyConfidential = false;
+            $typeSet         = [];
+            foreach ($typeRows->fetchAll() as $tr) {
+                if ((int) $tr['conf'] === 1) {
+                    $anyConfidential = true;
+                }
+                $typeSet[(string) $tr['type_id']] = true;
+            }
+            if ($anyConfidential && count($typeSet) > 1) {
+                flash('error', 'Confidential tickets can only be merged with tickets of the same type.');
                 redirect('/agent/tickets');
             }
             $actor  = Auth::fullName();
@@ -1063,7 +1117,9 @@ $router->get('/agent/tickets/{id}', function (array $p) {
         )
     ));
 
-    // Is the current user watching this ticket?
+    // Is the current user watching this ticket? Confidential tickets never carry
+    // watchers, so the watch control is hidden for them in the template.
+    $isConfidential = ticketIsConfidential($db, (int) $ticket['id']);
     $watchStmt = $db->prepare('SELECT 1 FROM ticket_watchers WHERE ticket_id = ? AND user_id = ?');
     $watchStmt->execute([$ticket['id'], Auth::id()]);
     $isWatching = (bool) $watchStmt->fetchColumn();
@@ -1106,7 +1162,7 @@ $router->get('/agent/tickets/{id}', function (array $p) {
     // that returns to /agent/floor/tickets/{id}. Picked up below in view.php.
     $fromFloor = ($_GET['from'] ?? '') === 'floor';
 
-    render('agent/tickets/view', ['ticket' => $ticket, 'timeline' => $timeline, 'agents' => $agents, 'assignableByGroup' => $assignableByGroup, 'priorities' => $priorities, 'ticketTypes' => $ticketTypes, 'attachments' => $attachments, 'ccUsers' => $ccUsers, 'groups' => $groups, 'customFields' => $customFields, 'fieldValues' => $fieldValues, 'fieldOptions' => $fieldOptions, 'isWatching' => $isWatching, 'escalationHistory' => $escalationHistory, 'hasEscalationPath' => $hasEscalationPath, 'nextEscalationStep' => $nextEscalationStep, 'fromFloor' => $fromFloor, 'embedMode' => $fromFloor]);
+    render('agent/tickets/view', ['ticket' => $ticket, 'timeline' => $timeline, 'agents' => $agents, 'assignableByGroup' => $assignableByGroup, 'priorities' => $priorities, 'ticketTypes' => $ticketTypes, 'attachments' => $attachments, 'ccUsers' => $ccUsers, 'groups' => $groups, 'customFields' => $customFields, 'fieldValues' => $fieldValues, 'fieldOptions' => $fieldOptions, 'isWatching' => $isWatching, 'isConfidential' => $isConfidential, 'escalationHistory' => $escalationHistory, 'hasEscalationPath' => $hasEscalationPath, 'nextEscalationStep' => $nextEscalationStep, 'fromFloor' => $fromFloor, 'embedMode' => $fromFloor]);
 });
 
 /* ==================================================================
@@ -1181,6 +1237,11 @@ $router->post('/agent/tickets/{id}/watch', function (array $p) {
         redirect('/agent/tickets');
     }
     _agentRequireTicketAccess($db, $watchTicket);
+    // Confidential tickets never carry watchers — one fewer accidental-leak path.
+    if (ticketIsConfidential($db, $id)) {
+        flash('error', 'Confidential tickets cannot be watched.');
+        redirect("/agent/tickets/{$id}");
+    }
     $existing = $db->prepare('SELECT 1 FROM ticket_watchers WHERE ticket_id = ? AND user_id = ?');
     $existing->execute([$id, Auth::id()]);
     if ($existing->fetchColumn()) {
@@ -1302,6 +1363,15 @@ $router->post('/agent/tickets/{id}/merge', function (array $p) {
     if (requiresConfidentialReAuth($db, $sourceTicket) || requiresConfidentialReAuth($db, $targetTicket)) {
         flash('error', 'Cannot merge confidential tickets without proper access. Please view each ticket first.');
         redirect("/agent/tickets/{$sourceId}");
+    }
+
+    // Confidential tickets may only merge with a ticket of the SAME type, so
+    // confidential content can never flow into a differently-typed ticket.
+    if (ticketIsConfidential($db, $sourceId) || ticketIsConfidential($db, $targetId)) {
+        if ((int) ($sourceTicket['type_id'] ?? 0) !== (int) ($targetTicket['type_id'] ?? 0)) {
+            flash('error', 'Confidential tickets can only be merged with tickets of the same type.');
+            redirect("/agent/tickets/{$sourceId}");
+        }
     }
 
     $db->beginTransaction();

@@ -291,6 +291,7 @@ function handleInstall(): void
             ('kb.articles.manage',       'Create & delete KB articles',      'Knowledge Base', 'Create, delete and view history of knowledge base articles. (All staff can already edit existing articles.)', 20),
             ('kb.structure.manage',      'Manage KB categories & folders',   'Knowledge Base', 'Add, rename, reorder and delete KB categories and folders.',    30),
             ('ticket_templates.manage',  'Manage ticket templates',          'Tickets',        'Create, edit and delete reusable ticket templates.',            40),
+            ('tickets.view_all',         'View all tickets',                 'Tickets',        'See tickets across every group, even groups the user does not belong to. Never includes confidential ticket types.', 45),
             ('recurring_tickets.manage', 'Manage recurring tickets',         'Tickets',        'Create, edit and run scheduled recurring tickets.',             50),
             ('workflows.manage',         'Manage ticket types & forms',      'Tickets',        'Edit ticket types, custom form fields and ticket statuses.',    60),
             ('priorities.manage',        'Manage priorities',                'Tickets',        'Add, rename, recolor and reorder ticket priorities.',           70),
@@ -313,7 +314,10 @@ function handleInstall(): void
                 UNION ALL SELECT 'recurring_tickets.manage'
             ) p WHERE r.slug IN ('agent','power_user')");
         $pdo->exec("INSERT IGNORE INTO role_permissions (role_id, perm_key)
-            SELECT id, 'reports.view' FROM roles WHERE slug = 'power_user'");
+            SELECT id, p.perm_key FROM roles, (
+                SELECT 'reports.view' AS perm_key
+                UNION ALL SELECT 'tickets.view_all'
+            ) p WHERE roles.slug = 'power_user'");
         $messages[] = ['ok', 'Built-in permission levels seeded.'];
 
         // 5. Create admin user

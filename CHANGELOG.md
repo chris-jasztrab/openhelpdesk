@@ -11,6 +11,17 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.70.0 &mdash; 2026-06-03
+
+### Changed
+- **Ticket visibility is now fail-closed.** Staff see only the tickets in their own group(s) unless they hold the new `tickets.view_all` permission; the previous behaviour where a groupless staff account implicitly saw every ticket has been removed. The new permission grants visibility across all groups **except** confidential ticket types. Admins continue to bypass all permission checks. To preserve current access for intentional power users, migration 044 grants `tickets.view_all` to the built-in `power_user` role on deploy ([migration 044](database/migrations/044_tickets_view_all_permission.php), [src/helpers.php](src/helpers.php)).
+
+### Security
+- **Confidential tickets are locked down to the creator and the confidential group.** Watchers are no longer permitted on confidential tickets, and migration 044 purges any pre-existing watcher rows on confidential-type tickets to close an accidental-leak path.
+
+### Added
+- **`tickets.view_all` permission** appears in the role permission matrix (Admin → Roles) so it can be granted to or revoked from any role.
+
 ## 2.69.3 &mdash; 2026-06-03
 
 ### Documentation

@@ -133,6 +133,7 @@ if ($solutionTimelineId > 0) {
         </div>
     </div>
     <div class="d-flex gap-2" id="tour-ticket-actions">
+        <?php if (empty($isConfidential)): ?>
         <form method="POST" action="/agent/tickets/<?= (int) $ticket['id'] ?>/watch">
             <?= csrfField() ?>
             <button type="submit" id="tour-watch-btn" class="btn <?= $isWatching ? 'btn-primary' : 'btn-outline-secondary' ?>"
@@ -140,6 +141,7 @@ if ($solutionTimelineId > 0) {
                 <i class="bi <?= $isWatching ? 'bi-eye-fill' : 'bi-eye' ?> me-1"></i><?= $isWatching ? 'Watching' : 'Watch' ?>
             </button>
         </form>
+        <?php endif; ?>
         <?php if (!$ticket['merged_into_ticket_id']): ?>
         <?php if ($hasEscalationPath): ?>
         <?php

@@ -106,4 +106,22 @@ $granted = array_flip($grantedKeys ?? []);
     </div>
 </form>
 
+<script>
+(function () {
+    const form = document.querySelector('form[action="<?= e($action) ?>"]');
+    if (!form) return;
+    const box = form.querySelector('input[name="perms[]"][value="tickets.view_all"]');
+    if (!box) return;
+    const initiallyGranted = <?= isset($granted['tickets.view_all']) ? 'true' : 'false' ?>;
+    form.addEventListener('submit', function (e) {
+        if (box.disabled) return; // admin roles: perms not editable here
+        if (box.checked && !initiallyGranted) {
+            if (!confirm('“View all tickets” lets every user with this role see tickets across ALL groups (confidential tickets excluded). Grant it to this role?')) {
+                e.preventDefault();
+            }
+        }
+    });
+})();
+</script>
+
 <?php require ROOT_DIR . '/templates/partials/settings-nav-end.php'; ?>

@@ -157,9 +157,12 @@ $targetOutranksEditor = $isEdit && !Auth::isAdmin()
                         <?php endforeach; ?>
                     </div>
                     <div class="form-text">This <?= $editing['role'] === 'admin' ? 'admin' : 'agent' ?> belongs to the groups shown above. Group membership controls which tickets they can see. Manage membership from <a href="/admin/groups">Admin → Settings → Groups</a>.</div>
+                <?php elseif (roleIsAdmin($editing['role'] ?? null) || roleCan($editing['role'] ?? null, 'tickets.view_all')): ?>
+                    <div class="text-muted small">Not a member of any groups — but this permission level can see <strong>all tickets</strong>.</div>
+                    <div class="form-text">Assign this user to groups from <a href="/admin/groups">Admin → Settings → Groups</a> to scope what they see.</div>
                 <?php else: ?>
-                    <div class="text-muted small">Not a member of any groups — can see all tickets.</div>
-                    <div class="form-text">Assign this <?= $editing['role'] === 'admin' ? 'admin' : 'agent' ?> to groups from <a href="/admin/groups">Admin → Settings → Groups</a>.</div>
+                    <div class="text-danger small"><i class="bi bi-exclamation-triangle-fill me-1"></i>Not a member of any groups — this user currently <strong>cannot see any tickets</strong>.</div>
+                    <div class="form-text">Add them to groups from <a href="/admin/groups">Admin → Settings → Groups</a>, or give them a permission level with the “View all tickets” permission.</div>
                 <?php endif; ?>
             </div>
             <?php endif; ?>
@@ -175,3 +178,47 @@ $targetOutranksEditor = $isEdit && !Auth::isAdmin()
         </form>
     </div>
 </div>
+
+<?php
+// Per-role visibility capabilities, so the confirm dialogs below can warn the
+// editor about the security/usefulness implications of the chosen level.
+$roleCaps = [];
+foreach (array_keys($roleChoicesForActor) as $capSlug) {
+    $roleCaps[(string) $capSlug] = [
+        'seesAll' => roleIsAdmin($capSlug) || roleCan($capSlug, 'tickets.view_all'),
+        'isStaff' => roleIsStaff($capSlug),
+    ];
+}
+?>
+<script>
+(function () {
+    const caps       = <?= json_encode($roleCaps, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    const groupCount = <?= (int) count($userGroups ?? []) ?>;
+    const form = document.querySelector('form[action="<?= e($action) ?>"]');
+    if (!form) return;
+
+    form.addEventListener('submit', function (e) {
+        const roleSel = form.querySelector('#role');
+        const slug    = roleSel ? roleSel.value : null;
+        const cap     = slug && caps[slug] ? caps[slug] : null;
+        if (!cap) return;
+
+        // Warn when granting all-ticket visibility (a privacy-sensitive level).
+        if (cap.seesAll) {
+            if (!confirm('This permission level can see ALL tickets in the system, across every group (confidential tickets excluded). Continue?')) {
+                e.preventDefault();
+            }
+            return;
+        }
+
+        // Warn when creating an elevated user who can't actually see any tickets.
+        const locVis    = form.querySelector('#can_view_location_tickets');
+        const hasLocVis = locVis && locVis.checked;
+        if (cap.isStaff && groupCount === 0 && !hasLocVis) {
+            if (!confirm('This user has a staff permission level but belongs to no group and has no “view all” access. They will be able to log in but will not see any tickets. Continue?')) {
+                e.preventDefault();
+            }
+        }
+    });
+})();
+</script>

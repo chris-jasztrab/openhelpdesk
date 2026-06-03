@@ -27,55 +27,63 @@ require ROOT_DIR . '/src/routes/floor.php';
  * ------------------------------------------------------------------ */
 function _apiRequireTicketAccess(PDO $db, int $ticketId): void
 {
-    $role = Auth::role();
-    if ($role === 'admin') {
-        return; // admins: unrestricted
-    }
-
-    $userId = (int) Auth::id();
-
-    $gs = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
-    $gs->execute([$userId]);
-    $agentGroups = array_map('intval', $gs->fetchAll(PDO::FETCH_COLUMN));
-
-    $ts = $db->prepare('SELECT group_id, type_id FROM tickets WHERE id = ?');
-    $ts->execute([$ticketId]);
-    $ticket = $ts->fetch();
-    if (!$ticket) {
-        return; // ticket-not-found is handled by the caller
-    }
-
-    if (empty($agentGroups)) {
-        // Agent not in any group — block confidential tickets they're not authorised for
-        if (!empty($ticket['type_id'])) {
-            $cStmt = $db->prepare('SELECT is_confidential, group_id FROM ticket_types WHERE id = ?');
-            $cStmt->execute([$ticket['type_id']]);
-            $cType = $cStmt->fetch();
-            if ($cType && $cType['is_confidential'] && $cType['group_id']) {
-                $inGroup = $db->prepare('SELECT 1 FROM group_user_map WHERE group_id = ? AND user_id = ?');
-                $inGroup->execute([$cType['group_id'], $userId]);
-                if (!$inGroup->fetchColumn() && !ticketAccessExempt($db, $userId, $ticketId)) {
-                    http_response_code(403);
-                    header('Content-Type: application/json');
-                    echo json_encode(['error' => 'You do not have access to this ticket.']);
-                    exit;
-                }
-            }
-        }
-        return;
-    }
-
-    if ($ticket['group_id'] === null) {
-        return; // unassigned ticket: visible to all agents
-    }
-
-    if (!in_array((int) $ticket['group_id'], $agentGroups, true)
-        && !ticketAccessExempt($db, $userId, $ticketId)) {
+    $forbid = static function (): void {
         http_response_code(403);
         header('Content-Type: application/json');
         echo json_encode(['error' => 'You do not have access to this ticket.']);
         exit;
+    };
+
+    if (Auth::isAdmin()) {
+        return; // admins: unrestricted (confidential gated/audited on the detail page)
     }
+    if (!Auth::isStaff()) {
+        $forbid();
+    }
+
+    $userId = (int) Auth::id();
+
+    // Authoritative fetch of the fields the rules depend on.
+    $meta = $db->prepare(
+        'SELECT t.group_id, t.created_by, tt.is_confidential, tt.group_id AS conf_group_id
+         FROM tickets t
+         LEFT JOIN ticket_types tt ON t.type_id = tt.id
+         WHERE t.id = ?'
+    );
+    $meta->execute([$ticketId]);
+    $row = $meta->fetch();
+    if (!$row) {
+        return; // ticket-not-found is handled by the caller
+    }
+
+    $userGroups = userGroupIds($db, $userId);
+
+    // Confidential tickets: confidential-group members or the creator ONLY.
+    if ((int) ($row['is_confidential'] ?? 0) === 1) {
+        $confGroupId = $row['conf_group_id'] !== null ? (int) $row['conf_group_id'] : null;
+        $isMember    = $confGroupId !== null && in_array($confGroupId, $userGroups, true);
+        $isCreator   = (int) $row['created_by'] === $userId;
+        if (!$isMember && !$isCreator) {
+            $forbid();
+        }
+        return;
+    }
+
+    // Non-confidential tickets.
+    if (Auth::can('tickets.view_all')) {
+        return;
+    }
+    $gid = $row['group_id'] !== null ? (int) $row['group_id'] : null;
+    if (!empty($userGroups) && ($gid === null || in_array($gid, $userGroups, true))) {
+        return;
+    }
+    if ((int) $row['created_by'] === $userId) {
+        return;
+    }
+    if (ticketAccessExempt($db, $userId, $ticketId)) {
+        return;
+    }
+    $forbid();
 }
 
 /* ------------------------------------------------------------------
@@ -352,7 +360,9 @@ $router->post('/api/tickets/{id}/escalate', function (array $p) {
         )->execute([$ticketId, $fromUserId, $toUserId, $stepOrder, $reason !== '' ? $reason : null, $actorId]);
 
         // Keep the previous assignee in the loop as a watcher (visible backup).
-        if ($fromUserId && $fromUserId !== $toUserId) {
+        // Confidential tickets never carry watchers — access there is limited to
+        // the confidential group, so the previous assignee is not re-added.
+        if ($fromUserId && $fromUserId !== $toUserId && !ticketIsConfidential($db, (int) $ticketId)) {
             $db->prepare('INSERT IGNORE INTO ticket_watchers (ticket_id, user_id) VALUES (?, ?)')
                ->execute([$ticketId, $fromUserId]);
         }
@@ -2623,41 +2633,36 @@ $router->get('/agent', function () {
     $db      = Database::connect();
     $agentId = Auth::id();
 
-    // Group-based visibility: agents in groups only see those groups' tickets.
-    $groupRestriction = '';
-    $groupParams      = [];
-    if ((Auth::isStaff() && !Auth::isAdmin())) {
-        $gStmt = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
-        $gStmt->execute([$agentId]);
-        $agentGroupIds = array_map('intval', $gStmt->fetchAll(PDO::FETCH_COLUMN));
-        if (!empty($agentGroupIds)) {
-            $placeholders     = implode(',', array_fill(0, count($agentGroupIds), '?'));
-            $groupRestriction = " AND group_id IN ($placeholders)";
-            $groupParams      = $agentGroupIds;
-        }
+    // Fail-closed ticket visibility, shared with the ticket list. Non-admin staff
+    // see only their groups' tickets (+ view_all / assignment rules) and never a
+    // confidential type outside their confidential group. $agentGroupIds is still
+    // needed for the group dropdown further down.
+    $agentGroupIds = [];
+    if (Auth::isStaff() && !Auth::isAdmin()) {
+        $agentGroupIds = userGroupIds($db, $agentId);
     }
+    $vis = ticketStaffVisibilitySql($db, $agentId, Auth::role(), 't');
 
-    $openIn   = ticketStatusSqlIn(ticketOpenBucketSlugs(), 'status');
     $openInT  = ticketStatusSqlIn(ticketOpenBucketSlugs(), 't.status');
 
-    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets WHERE assigned_to IS NULL AND $openIn" . $groupRestriction);
-    $stmt->execute($groupParams);
+    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets t WHERE t.assigned_to IS NULL AND $openInT AND {$vis['sql']}");
+    $stmt->execute($vis['params']);
     $unassigned = (int) $stmt->fetchColumn();
 
-    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets WHERE assigned_to = ? AND $openIn" . $groupRestriction);
-    $stmt->execute(array_merge([$agentId], $groupParams));
+    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets t WHERE t.assigned_to = ? AND $openInT AND {$vis['sql']}");
+    $stmt->execute(array_merge([$agentId], $vis['params']));
     $myTickets = (int) $stmt->fetchColumn();
 
-    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets WHERE status = 'pending'" . $groupRestriction);
-    $stmt->execute($groupParams);
+    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets t WHERE t.status = 'pending' AND {$vis['sql']}");
+    $stmt->execute($vis['params']);
     $pending = (int) $stmt->fetchColumn();
 
-    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets WHERE status = ? AND DATE(updated_at) = CURDATE()" . $groupRestriction);
-    $stmt->execute(array_merge([ticketDefaultResolvedStatusSlug()], $groupParams));
+    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets t WHERE t.status = ? AND DATE(t.updated_at) = CURDATE() AND {$vis['sql']}");
+    $stmt->execute(array_merge([ticketDefaultResolvedStatusSlug()], $vis['params']));
     $resolvedToday = (int) $stmt->fetchColumn();
 
-    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets WHERE assigned_to = ? AND escalation_level > 0 AND $openIn" . $groupRestriction);
-    $stmt->execute(array_merge([$agentId], $groupParams));
+    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets t WHERE t.assigned_to = ? AND t.escalation_level > 0 AND $openInT AND {$vis['sql']}");
+    $stmt->execute(array_merge([$agentId], $vis['params']));
     $escalatedToMe = (int) $stmt->fetchColumn();
 
     // Sorting (mirror the ticket-list sort options)
@@ -2679,7 +2684,6 @@ $router->get('/agent', function () {
     $orderCol = $sortableColumns[$sort];
 
     // Recent tickets (open/in_progress/pending)
-    $trRestriction = $groupRestriction ? str_replace('AND group_id', 'AND t.group_id', $groupRestriction) : '';
     $stmt = $db->prepare(
         "SELECT t.id, t.subject, t.status, t.created_at, t.group_id, t.sla_state, t.due_date,
                 tp.name AS priority_name, tp.color AS priority_color,
@@ -2695,11 +2699,11 @@ $router->get('/agent', function () {
          LEFT JOIN locations l          ON t.location_id = l.id
          LEFT JOIN users c ON t.created_by = c.id
          LEFT JOIN users a ON t.assigned_to = a.id
-         WHERE $openInT" . $trRestriction . "
+         WHERE $openInT AND {$vis['sql']}
          ORDER BY {$orderCol} {$dir}
          LIMIT 10"
     );
-    $stmt->execute($groupParams);
+    $stmt->execute($vis['params']);
     $recent = $stmt->fetchAll();
 
     // Quick-assign / type / group dropdown data for dashboard

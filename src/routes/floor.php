@@ -38,17 +38,10 @@ $router->get('/agent/floor', function () {
     $where  = [ticketStatusSqlIn(ticketOpenBucketSlugs(), 't.status')];
     $params = [];
 
-    // Group restriction — same rule as /agent/tickets.
-    if ((Auth::isStaff() && !Auth::isAdmin())) {
-        $gStmt = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
-        $gStmt->execute([$agentId]);
-        $myGroups = array_map('intval', $gStmt->fetchAll(PDO::FETCH_COLUMN));
-        if (!empty($myGroups)) {
-            $placeholders = implode(',', array_fill(0, count($myGroups), '?'));
-            $where[]      = 't.group_id IN (' . $placeholders . ')';
-            $params       = array_merge($params, $myGroups);
-        }
-    }
+    // Fail-closed visibility — same predicate as /agent/tickets.
+    $vis      = ticketStaffVisibilitySql($db, $agentId, Auth::role(), 't');
+    $where[]  = $vis['sql'];
+    $params   = array_merge($params, $vis['params']);
 
     if ($view === 'mine') {
         $where[]  = 't.assigned_to = ?';
@@ -79,13 +72,9 @@ $router->get('/agent/floor', function () {
     $stmt->execute($params);
     $tickets = $stmt->fetchAll();
 
-    // Tab counts (all / mine / unassigned within group restriction)
-    $countWhere  = [ticketStatusSqlIn(ticketOpenBucketSlugs(), 't.status')];
-    $countParams = [];
-    if ((Auth::isStaff() && !Auth::isAdmin()) && !empty($myGroups)) {
-        $countWhere[]  = 't.group_id IN (' . implode(',', array_fill(0, count($myGroups), '?')) . ')';
-        $countParams   = array_merge($countParams, $myGroups);
-    }
+    // Tab counts (all / mine / unassigned within the same visibility predicate)
+    $countWhere  = [ticketStatusSqlIn(ticketOpenBucketSlugs(), 't.status'), $vis['sql']];
+    $countParams = $vis['params'];
     $baseSql   = 'SELECT COUNT(*) FROM tickets t WHERE ' . implode(' AND ', $countWhere);
     $cAll      = (int) (function () use ($db, $baseSql, $countParams) { $s = $db->prepare($baseSql); $s->execute($countParams); return $s->fetchColumn(); })();
     $sM        = $db->prepare($baseSql . ' AND t.assigned_to = ?');

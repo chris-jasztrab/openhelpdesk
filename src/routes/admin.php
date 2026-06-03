@@ -4570,7 +4570,9 @@ $router->get('/admin/tickets/{id}', function (array $p) {
         )
     ));
 
-    // Is the current user watching this ticket?
+    // Is the current user watching this ticket? Confidential tickets never carry
+    // watchers, so the watch control is hidden for them in the template.
+    $isConfidential = ticketIsConfidential($db, (int) $ticket['id']);
     $watchStmt = $db->prepare('SELECT 1 FROM ticket_watchers WHERE ticket_id = ? AND user_id = ?');
     $watchStmt->execute([$ticket['id'], Auth::id()]);
     $isWatching = (bool) $watchStmt->fetchColumn();
@@ -4638,6 +4640,7 @@ $router->get('/admin/tickets/{id}', function (array $p) {
         'attachments' => $attachments, 'ccUsers' => $ccUsers, 'groups' => $groups,
         'customFields' => $customFields, 'fieldValues' => $fieldValues,
         'fieldOptions' => $fieldOptions, 'isWatching' => $isWatching,
+        'isConfidential' => $isConfidential,
         'aiClassification' => $aiClassification, 'aiSkillsForOverride' => $aiSkillsForOverride,
         'aiGroupClassification' => $aiGroupClassification,
         'aiEnabled' => getSetting('ai_enabled', '0') === '1',
@@ -4708,6 +4711,11 @@ $router->post('/admin/tickets/{id}/watch', function (array $p) {
     $check->execute([$id]);
     if (!$check->fetch()) {
         redirect('/admin/tickets');
+    }
+    // Confidential tickets never carry watchers — one fewer accidental-leak path.
+    if (ticketIsConfidential($db, $id)) {
+        flash('error', 'Confidential tickets cannot be watched.');
+        redirect("/admin/tickets/{$id}");
     }
     $existing = $db->prepare('SELECT 1 FROM ticket_watchers WHERE ticket_id = ? AND user_id = ?');
     $existing->execute([$id, Auth::id()]);

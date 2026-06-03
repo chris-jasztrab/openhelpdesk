@@ -128,6 +128,11 @@ $hasFilters = !empty($filterParams);
                             $bc = $badgeColors[$u['role']] ?? 'secondary';
                             ?>
                             <span class="badge bg-<?= $bc ?>"><?= e(roleLabel($u['role'])) ?></span>
+                            <?php if (!roleIsAdmin($u['role']) && roleCan($u['role'], 'tickets.view_all')): ?>
+                            <span class="badge bg-warning text-dark" title="This permission level can see all tickets across every group (confidential excluded).">
+                                <i class="bi bi-eye-fill me-1"></i>Sees all tickets
+                            </span>
+                            <?php endif; ?>
                         </td>
                         <td><?= e($u['work_phone'] ?? '—') ?></td>
                         <td><?= e($u['location_name'] ?? '—') ?></td>

@@ -125,41 +125,20 @@ function _apiInput(): array
 }
 
 /**
- * Build a group-based ticket-visibility restriction for agents.
- * Returns [sql_fragment, params_array].
- * Admins receive an empty restriction (no filtering).
- * Agents not in any group also receive no restriction (can see everything).
- */
-function _apiGroupRestriction(PDO $db, array $user): array
-{
-    // Only non-admin staff are group-restricted. Admins and portal users get
-    // no restriction here (portal callers are scoped to their own tickets
-    // elsewhere); custom staff roles are restricted exactly like agents.
-    if (!_apiIsStaff($user) || _apiIsAdmin($user)) {
-        return ['', []];
-    }
-    $gs = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
-    $gs->execute([$user['id']]);
-    $groupIds = array_map('intval', $gs->fetchAll(PDO::FETCH_COLUMN));
-    if (empty($groupIds)) {
-        return ['', []];
-    }
-    $ph = implode(',', array_fill(0, count($groupIds), '?'));
-    return [" AND group_id IN ($ph)", $groupIds];
-}
-
-/**
  * Enforce per-ticket access control for all individual-ticket endpoints.
  *
- * Rules:
- *   - admin  → unrestricted
+ * Rules (mirrors _agentRequireTicketAccess):
+ *   - admin  → unrestricted (confidential gated/audited elsewhere)
  *   - user   → may only access tickets they created
- *   - agent  → if the agent belongs to one or more groups, only tickets
- *               whose group_id is in that set (or whose group_id is NULL)
- *               are accessible; agents with no group assignment are unrestricted
+ *   - confidential type → ONLY the type's confidential-group members or the
+ *               ticket creator (view_all / assignment / watching do NOT grant)
+ *   - non-confidential → view_all holders; group members (+ group-less tickets);
+ *               or the creator / assignee / watcher. A staff user with no group
+ *               and no view_all sees only their own / assigned / watched tickets.
  *
- * $ticket must contain at minimum: created_by (int), group_id (int|null).
- * Exits with HTTP 403 if access is denied.
+ * Only $ticket['id'] is trusted; group/type/creator are re-fetched so a caller
+ * that SELECTed a narrow column set can't bypass a check. Exits HTTP 403 if
+ * access is denied.
  */
 function _apiEnforceTicketAccess(PDO $db, array $user, array $ticket): void
 {
@@ -175,36 +154,55 @@ function _apiEnforceTicketAccess(PDO $db, array $user, array $ticket): void
         return;
     }
 
-    // Staff (non-admin): enforce group-based visibility
-    $gs = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
-    $gs->execute([$user['id']]);
-    $agentGroups = array_map('intval', $gs->fetchAll(PDO::FETCH_COLUMN));
+    $userId   = (int) $user['id'];
+    $ticketId = (int) ($ticket['id'] ?? 0);
 
-    // Agents not in any group — block confidential tickets they are not authorised for
-    if (empty($agentGroups)) {
-        if (!empty($ticket['type_id'])) {
-            $cStmt = $db->prepare('SELECT is_confidential, group_id FROM ticket_types WHERE id = ?');
-            $cStmt->execute([$ticket['type_id']]);
-            $cType = $cStmt->fetch();
-            if ($cType && $cType['is_confidential'] && $cType['group_id']) {
-                $inGroup = $db->prepare('SELECT 1 FROM group_user_map WHERE group_id = ? AND user_id = ?');
-                $inGroup->execute([$cType['group_id'], $user['id']]);
-                if (!$inGroup->fetchColumn()) {
-                    _apiJson(['error' => 'Forbidden'], 403);
-                }
-            }
+    // Authoritative re-fetch of the fields the rules depend on.
+    $groupId        = array_key_exists('group_id', $ticket) ? $ticket['group_id'] : null;
+    $createdBy      = (int) ($ticket['created_by'] ?? 0);
+    $isConfidential = false;
+    $confGroupId    = null;
+    if ($ticketId > 0) {
+        $meta = $db->prepare(
+            'SELECT t.group_id, t.created_by, tt.is_confidential, tt.group_id AS conf_group_id
+             FROM tickets t LEFT JOIN ticket_types tt ON t.type_id = tt.id WHERE t.id = ?'
+        );
+        $meta->execute([$ticketId]);
+        $row = $meta->fetch();
+        if ($row) {
+            $groupId        = $row['group_id'];
+            $createdBy      = (int) $row['created_by'];
+            $isConfidential = (int) ($row['is_confidential'] ?? 0) === 1;
+            $confGroupId    = $row['conf_group_id'] !== null ? (int) $row['conf_group_id'] : null;
+        }
+    }
+
+    $userGroups = userGroupIds($db, $userId);
+
+    // Confidential tickets: confidential-group members or the creator ONLY.
+    if ($isConfidential) {
+        $isMember = $confGroupId !== null && in_array($confGroupId, $userGroups, true);
+        if (!$isMember && $createdBy !== $userId) {
+            _apiJson(['error' => 'Forbidden'], 403);
         }
         return;
     }
 
-    // Tickets with no group assigned are visible to all agents
-    if ($ticket['group_id'] === null) {
+    // Non-confidential tickets.
+    if (roleCan($user['role'] ?? null, 'tickets.view_all')) {
         return;
     }
-
-    if (!in_array((int) $ticket['group_id'], $agentGroups, true)) {
-        _apiJson(['error' => 'Forbidden'], 403);
+    $gid = $groupId !== null ? (int) $groupId : null;
+    if (!empty($userGroups) && ($gid === null || in_array($gid, $userGroups, true))) {
+        return;
     }
+    if ($createdBy === $userId) {
+        return;
+    }
+    if (ticketAccessExempt($db, $userId, $ticketId)) {
+        return;
+    }
+    _apiJson(['error' => 'Forbidden'], 403);
 }
 
 /**
@@ -488,37 +486,26 @@ $router->get('/api/v1/dashboard', function () {
     $db      = Database::connect();
     $agentId = (int) $user['id'];
 
-    // Replicate the group-based visibility logic from the web dashboard
-    $groupRestriction = '';
-    $groupParams      = [];
-    if ((_apiIsStaff($user) && !_apiIsAdmin($user))) {
-        $gs = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
-        $gs->execute([$agentId]);
-        $agentGroupIds = array_map('intval', $gs->fetchAll(PDO::FETCH_COLUMN));
-        if (!empty($agentGroupIds)) {
-            $ph               = implode(',', array_fill(0, count($agentGroupIds), '?'));
-            $groupRestriction = " AND group_id IN ($ph)";
-            $groupParams      = $agentGroupIds;
-        }
-    }
+    // Fail-closed visibility — same predicate as the web dashboard, with the
+    // token user passed explicitly (no session Auth in the API context).
+    $vis = ticketStaffVisibilitySql($db, $agentId, $user['role'] ?? null, 't');
 
-    $openIn  = ticketStatusSqlIn(ticketOpenBucketSlugs(), 'status');
     $openInT = ticketStatusSqlIn(ticketOpenBucketSlugs(), 't.status');
 
-    $s = $db->prepare("SELECT COUNT(*) FROM tickets WHERE assigned_to IS NULL AND $openIn" . $groupRestriction);
-    $s->execute($groupParams);
+    $s = $db->prepare("SELECT COUNT(*) FROM tickets t WHERE t.assigned_to IS NULL AND $openInT AND {$vis['sql']}");
+    $s->execute($vis['params']);
     $unassigned = (int) $s->fetchColumn();
 
-    $s = $db->prepare("SELECT COUNT(*) FROM tickets WHERE assigned_to = ? AND $openIn" . $groupRestriction);
-    $s->execute(array_merge([$agentId], $groupParams));
+    $s = $db->prepare("SELECT COUNT(*) FROM tickets t WHERE t.assigned_to = ? AND $openInT AND {$vis['sql']}");
+    $s->execute(array_merge([$agentId], $vis['params']));
     $myTickets = (int) $s->fetchColumn();
 
-    $s = $db->prepare("SELECT COUNT(*) FROM tickets WHERE status = 'pending'" . $groupRestriction);
-    $s->execute($groupParams);
+    $s = $db->prepare("SELECT COUNT(*) FROM tickets t WHERE t.status = 'pending' AND {$vis['sql']}");
+    $s->execute($vis['params']);
     $pending = (int) $s->fetchColumn();
 
-    $s = $db->prepare("SELECT COUNT(*) FROM tickets WHERE status = ? AND DATE(updated_at) = CURDATE()" . $groupRestriction);
-    $s->execute(array_merge([ticketDefaultResolvedStatusSlug()], $groupParams));
+    $s = $db->prepare("SELECT COUNT(*) FROM tickets t WHERE t.status = ? AND DATE(t.updated_at) = CURDATE() AND {$vis['sql']}");
+    $s->execute(array_merge([ticketDefaultResolvedStatusSlug()], $vis['params']));
     $resolvedToday = (int) $s->fetchColumn();
 
     $s = $db->prepare(
@@ -530,11 +517,11 @@ $router->get('/api/v1/dashboard', function () {
          LEFT JOIN ticket_priorities tp ON t.priority_id = tp.id
          LEFT JOIN users c ON t.created_by  = c.id
          LEFT JOIN users a ON t.assigned_to = a.id
-         WHERE $openInT" . $groupRestriction . "
+         WHERE $openInT AND {$vis['sql']}
          ORDER BY t.created_at DESC
          LIMIT 10"
     );
-    $s->execute($groupParams);
+    $s->execute($vis['params']);
     $recent = $s->fetchAll(PDO::FETCH_ASSOC);
 
     _apiJson([
@@ -585,22 +572,11 @@ $router->get('/api/v1/tickets', function () {
         $where[]  = 't.created_by = ?';
         $params[] = (int) $user['id'];
     } else {
-        [$groupRestriction, $groupParams] = _apiGroupRestriction($db, $user);
-        if ($groupRestriction !== '') {
-            // Strip leading " AND " — we add it ourselves via implode
-            $where[] = substr($groupRestriction, 5);
-            $params  = array_merge($params, $groupParams);
-        }
-
-        // Exclude confidential tickets where the user is not in the type's group
-        $where[] = "NOT EXISTS (
-            SELECT 1 FROM ticket_types ct
-            WHERE ct.id = t.type_id
-              AND ct.is_confidential = 1
-              AND ct.group_id IS NOT NULL
-              AND ct.group_id NOT IN (SELECT group_id FROM group_user_map WHERE user_id = ?)
-        )";
-        $params[] = (int) $user['id'];
+        // Fail-closed staff visibility (group / view_all / assignment rules, with
+        // confidential types restricted to their confidential group or the creator).
+        $vis      = ticketStaffVisibilitySql($db, (int) $user['id'], $user['role'] ?? null, 't');
+        $where[]  = $vis['sql'];
+        $params   = array_merge($params, $vis['params']);
     }
 
     // Filter: status (comma-separated)

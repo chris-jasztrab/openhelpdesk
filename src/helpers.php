@@ -3795,8 +3795,10 @@ function runEscalationRule(\PDO $db, array $rule, array $ticket): void
                 if (!(bool)($targetUser['notify_escalation'] ?? 1)) break; // opted out
 
                 // Ensure the recipient can actually open the ticket from the email link,
-                // even if they're outside the ticket's group. Mirrors manual-escalation behaviour.
-                if (roleIsStaff($targetUser['role'])) {
+                // even if they're outside the ticket's group. Mirrors manual-escalation
+                // behaviour. Confidential tickets are exempt: access there is restricted
+                // to the confidential group, so we never auto-add an outside watcher.
+                if (roleIsStaff($targetUser['role']) && !ticketIsConfidential($db, (int) $ticketId)) {
                     $db->prepare('INSERT IGNORE INTO ticket_watchers (ticket_id, user_id) VALUES (?, ?)')
                        ->execute([$ticketId, $targetUserId]);
                 }
@@ -5374,6 +5376,117 @@ function ticketAccessExempt(PDO $db, int $userId, ?int $ticketId): bool
     $s = $db->prepare('SELECT 1 FROM ticket_watchers WHERE ticket_id = ? AND user_id = ?');
     $s->execute([$ticketId, $userId]);
     return (bool) $s->fetchColumn();
+}
+
+/**
+ * True if the ticket's type is flagged confidential. Used to gate watcher and
+ * merge behaviour (confidential tickets get neither watchers nor cross-type
+ * merges). Returns false for a missing ticket or a ticket with no type.
+ */
+function ticketIsConfidential(PDO $db, int $ticketId): bool
+{
+    if ($ticketId <= 0) {
+        return false;
+    }
+    $s = $db->prepare(
+        'SELECT COALESCE(tt.is_confidential, 0)
+         FROM tickets t
+         LEFT JOIN ticket_types tt ON t.type_id = tt.id
+         WHERE t.id = ?'
+    );
+    $s->execute([$ticketId]);
+    return (int) $s->fetchColumn() === 1;
+}
+
+/**
+ * The set of group IDs a user belongs to (ints). Request-cached per user.
+ */
+function userGroupIds(PDO $db, int $userId): array
+{
+    static $cache = [];
+    if (array_key_exists($userId, $cache)) {
+        return $cache[$userId];
+    }
+    $stmt = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
+    $stmt->execute([$userId]);
+    return $cache[$userId] = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+}
+
+/**
+ * Build the SQL predicate limiting which tickets the CURRENT staff user may see
+ * in a list/count query. Self-contained: it references only the tickets alias
+ * ($t) plus correlated subqueries on ticket_types / ticket_watchers, so it can
+ * be ANDed into any query shaped `FROM tickets $t ...`.
+ *
+ * Visibility rules (staff context, fail-closed):
+ *   - Confidential ticket types are visible ONLY to members of the type's
+ *     confidential group, or the ticket's creator. `tickets.view_all` does NOT
+ *     reveal confidential tickets.
+ *   - Non-confidential tickets are visible to holders of `tickets.view_all`, or
+ *     if the ticket is in one of the user's groups, or is group-less and the
+ *     user belongs to at least one group, or is assigned to / created by /
+ *     watched by them.
+ *   - A staff user with no group and no `tickets.view_all` sees only the tickets
+ *     they are assigned to / created / watch.
+ *
+ * Admins are unrestricted (returns `1=1`): they reach confidential tickets via
+ * the audited re-auth flow on the detail page, and lists redact confidential
+ * content in the template. Returns ['sql' => '(...)', 'params' => [...]].
+ *
+ * Pass the acting user explicitly ($userId + role slug) so this works for both
+ * the session web context (Auth::id()/Auth::role()) and token API callers.
+ */
+function ticketStaffVisibilitySql(PDO $db, int $userId, ?string $role, string $t = 't'): array
+{
+    if (roleIsAdmin($role)) {
+        return ['sql' => '1=1', 'params' => []];
+    }
+
+    $groups    = userGroupIds($db, $userId);
+    $hasGroups = !empty($groups);
+    $seeAll    = roleCan($role, 'tickets.view_all');
+    $groupPh   = $hasGroups ? implode(',', array_fill(0, count($groups), '?')) : '';
+
+    $isConfidential =
+        "EXISTS (SELECT 1 FROM ticket_types ct WHERE ct.id = {$t}.type_id AND ct.is_confidential = 1)";
+
+    $params = [];
+
+    // ── Confidential branch: confidential-group member OR creator only ───────
+    $confVis = [];
+    if ($hasGroups) {
+        $confVis[] = "EXISTS (SELECT 1 FROM ticket_types cm WHERE cm.id = {$t}.type_id "
+                   . "AND cm.is_confidential = 1 AND cm.group_id IS NOT NULL AND cm.group_id IN ($groupPh))";
+    }
+    $confVis[] = "{$t}.created_by = ?";
+    $confClause = "($isConfidential AND (" . implode(' OR ', $confVis) . '))';
+
+    // ── Non-confidential branch ──────────────────────────────────────────────
+    if ($seeAll) {
+        $nonConfClause = "(NOT $isConfidential)";
+    } else {
+        $nc = [];
+        if ($hasGroups) {
+            $nc[] = "{$t}.group_id IN ($groupPh)";
+            $nc[] = "{$t}.group_id IS NULL";
+        }
+        $nc[] = "{$t}.assigned_to = ?";
+        $nc[] = "{$t}.created_by = ?";
+        $nc[] = "{$t}.id IN (SELECT ticket_id FROM ticket_watchers WHERE user_id = ?)";
+        $nonConfClause = "(NOT $isConfidential AND (" . implode(' OR ', $nc) . '))';
+    }
+
+    // ── Assemble params in the same order the clauses appear in the SQL ──────
+    if ($hasGroups) { foreach ($groups as $g) { $params[] = $g; } } // confVis member
+    $params[] = $userId;                                            // confVis creator
+    if (!$seeAll) {
+        if ($hasGroups) { foreach ($groups as $g) { $params[] = $g; } } // nonConf group IN
+        $params[] = $userId; // nonConf assigned
+        $params[] = $userId; // nonConf created
+        $params[] = $userId; // nonConf watcher
+    }
+
+    return ['sql' => "($confClause OR $nonConfClause)", 'params' => $params];
 }
 
 /* ── Stale ticket notifications ─────────────────────────────────────── */
