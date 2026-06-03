@@ -15,12 +15,16 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ### Changed
 - **Ticket visibility is now fail-closed.** Staff see only the tickets in their own group(s) unless they hold the new `tickets.view_all` permission; the previous behaviour where a groupless staff account implicitly saw every ticket has been removed. The new permission grants visibility across all groups **except** confidential ticket types. Admins continue to bypass all permission checks. To preserve current access for intentional power users, migration 044 grants `tickets.view_all` to the built-in `power_user` role on deploy ([migration 044](database/migrations/044_tickets_view_all_permission.php), [src/helpers.php](src/helpers.php)).
+- **One shared visibility rule across every staff surface.** The agent dashboard tiles + Recent Tickets, the ticket list, Floor mode, the detail-page access guard, and the token API (`/api/v1/dashboard`, `/api/v1/tickets`, individual-ticket endpoints) all now resolve access through a single `ticketStaffVisibilitySql()` / `_…RequireTicketAccess()` implementation, so a ticket hidden in one place can't be reached from another. Per-ticket guards re-fetch the authoritative group/type/creator rather than trusting the caller's query ([src/routes.php](src/routes.php), [src/routes/agent.php](src/routes/agent.php), [src/routes/api.php](src/routes/api.php), [src/routes/floor.php](src/routes/floor.php)).
 
 ### Security
-- **Confidential tickets are locked down to the creator and the confidential group.** Watchers are no longer permitted on confidential tickets, and migration 044 purges any pre-existing watcher rows on confidential-type tickets to close an accidental-leak path.
+- **Confidential tickets are locked down to the creator and the confidential group.** No one else — not the assignee, not a watcher, not a `tickets.view_all` holder — can see a confidential ticket; only the person who opened it and members of the type's confidential group. Admins still reach them solely through the audited re-auth prompt on the detail page.
+- **Watchers are no longer permitted on confidential tickets.** The watch button is hidden on confidential tickets, the watch route rejects them, the auto-watch on manual/automation escalation skips them, and migration 044 purges any pre-existing watcher rows on confidential-type tickets — closing an accidental-leak path.
+- **Confidential tickets can only be merged with a ticket of the same type.** The merge action, the single-ticket merge, and the merge typeahead all refuse to mix a confidential ticket with a differently-typed one, so confidential content can't flow into a ticket others can see ([src/routes/agent.php](src/routes/agent.php)).
 
 ### Added
 - **`tickets.view_all` permission** appears in the role permission matrix (Admin → Roles) so it can be granted to or revoked from any role.
+- **Admin guardrails against accidental over-/under-sharing.** The Users list flags any account whose level can see all tickets with a "Sees all tickets" badge; the user form confirms before saving a level that sees every ticket, and warns when saving an elevated user who has no group and therefore can see nothing; and the role editor confirms before granting `tickets.view_all` ([templates/pages/admin/users/index.php](templates/pages/admin/users/index.php), [templates/pages/admin/users/form.php](templates/pages/admin/users/form.php), [templates/pages/admin/roles/form.php](templates/pages/admin/roles/form.php)).
 
 ## 2.69.3 &mdash; 2026-06-03
 

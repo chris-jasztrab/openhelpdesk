@@ -76,6 +76,13 @@ final class DatabaseSeeder
             self::$insertedTicketIds[] = self::$ticketId;
         }
 
+        // Ticket visibility is fail-closed and the test agent belongs to no group, so
+        // make them a watcher of the fixture ticket. Watching grants visibility and —
+        // unlike assigned_to / group_id — survives the partial-update tests that null
+        // those columns, so the agent can reliably open this ticket throughout the run.
+        $db->prepare('INSERT IGNORE INTO ticket_watchers (ticket_id, user_id) VALUES (?, ?)')
+           ->execute([self::$ticketId, self::$agentId]);
+
         // ── Template (shared so portal tests can see it) ───────────────────────
         $row = $db->prepare("SELECT id FROM ticket_templates WHERE name = '[TEST] Shared Template' AND created_by = ? LIMIT 1");
         $row->execute([self::$adminId]);
@@ -105,6 +112,7 @@ final class DatabaseSeeder
                 $db->prepare('DELETE FROM ticket_templates WHERE id = ?')->execute([$id]);
             }
             foreach (self::$insertedTicketIds as $id) {
+                $db->prepare('DELETE FROM ticket_watchers  WHERE ticket_id = ?')->execute([$id]);
                 $db->prepare('DELETE FROM ticket_timeline   WHERE ticket_id = ?')->execute([$id]);
                 $db->prepare('DELETE FROM tickets           WHERE id = ?')->execute([$id]);
             }
