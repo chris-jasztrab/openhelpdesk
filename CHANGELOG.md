@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.72.1 &mdash; 2026-06-03
+
+### Changed
+- **The agent dashboard's Recent Tickets table now behaves like the ticket lists.** It picked up the same column treatment: the `#` column has a minimum width sized for the number, every header stays on one line (no wrap/clip), and Subject is the elastic column — the table fills its card without horizontal scroll and Subject truncates with an ellipsis, with the full subject shown in a hover tooltip. Columns are resizable with the same per-column floors ([templates/pages/agent/dashboard.php](templates/pages/agent/dashboard.php)).
+
+---
+
 ## 2.72.0 &mdash; 2026-06-03
 
 ### Changed
