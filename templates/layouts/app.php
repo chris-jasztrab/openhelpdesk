@@ -140,6 +140,41 @@
         .ld-bell-ring .bi-bell { animation: ld-bell-ring .8s ease; transform-origin: top center; }
         .ld-bell-active .bi-bell { color: #fbbf24 !important; animation: ld-bell-glow 2s ease-in-out infinite; }
 
+        /* Easter egg: rapid-clicking the notification bell throws a tiny disco
+           party. Visual-only, self-dismisses, and fully suppressed under
+           prefers-reduced-motion. (Triggered from navbar.php.) */
+        @keyframes ld-bell-disco-wiggle {
+            0%, 100% { transform: rotate(0); }
+            25%      { transform: rotate(16deg); }
+            75%      { transform: rotate(-16deg); }
+        }
+        @keyframes ld-bell-disco-hue {
+            from { filter: hue-rotate(0deg)   drop-shadow(0 0 5px currentColor); }
+            to   { filter: hue-rotate(360deg) drop-shadow(0 0 9px currentColor); }
+        }
+        .ld-bell-disco .bi-bell {
+            color: #ff4fd8 !important;
+            transform-origin: top center;
+            animation: ld-bell-disco-wiggle .25s ease-in-out infinite,
+                       ld-bell-disco-hue 1.1s linear infinite;
+        }
+        @keyframes ld-bell-disco-float {
+            0%   { opacity: 0; transform: translate(0, 0) scale(.6) rotate(0deg); }
+            15%  { opacity: 1; }
+            100% { opacity: 0; transform: translate(var(--dx, 0), -64px) scale(1.1) rotate(var(--dr, 0deg)); }
+        }
+        .ld-disco-particle {
+            position: fixed;
+            z-index: 2000;
+            pointer-events: none;
+            font-size: 1rem;
+            will-change: transform, opacity;
+            animation: ld-bell-disco-float 1.4s ease-out forwards;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .ld-bell-disco .bi-bell { animation: none !important; }
+        }
+
         /* Global Search */
         #ld-search-input::placeholder { color: rgba(255,255,255,.75); }
         #ld-search-input:focus { background: rgba(255,255,255,.18) !important; }

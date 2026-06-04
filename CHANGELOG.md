@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.79.0 &mdash; 2026-06-04
+
+### Added
+- **A little hidden fun.** There's now a small, well-concealed easter egg tucked into the notification bell for the curious to stumble on. It's purely cosmetic &mdash; a brief, self-dismissing flourish that writes nothing to the database, touches no ticket data, and is fully suppressed for anyone with `prefers-reduced-motion` set. Intentional; please don't "fix" it ([templates/partials/navbar.php](templates/partials/navbar.php), [templates/layouts/app.php](templates/layouts/app.php)).
+
+---
+
 ## 2.78.1 &mdash; 2026-06-04
 
 ### Fixed

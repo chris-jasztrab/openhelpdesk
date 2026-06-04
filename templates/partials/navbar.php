@@ -196,6 +196,51 @@
                 .catch(function () {});
         }
         setInterval(poll, 15000);
+
+        // --- Easter egg: spam-click the bell for a brief disco party ---
+        // Only armed on the notifications page, where clicking the bell would
+        // otherwise just reload the page you're already on — so suppressing it
+        // costs nothing and adds zero latency to the bell anywhere else. Arrive
+        // from another page and the first click brings you here; seven fast
+        // clicks after that pop the confetti. Visual-only, never touches state.
+        if (link && location.pathname.replace(/\/+$/, '') === '/notifications') {
+            var discoHits = 0;
+            var discoLast = 0;
+
+            function discoParty() {
+                if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+                link.classList.add('ld-bell-disco');
+                var rect = link.getBoundingClientRect();
+                var cx = rect.left + rect.width / 2;
+                var cy = rect.top + rect.height / 2;
+                var emojis = ['🎉', '🪩', '✨', '🎈', '💃', '🕺', '⭐'];
+                for (var i = 0; i < 14; i++) {
+                    var p = document.createElement('span');
+                    p.className = 'ld-disco-particle';
+                    p.textContent = emojis[i % emojis.length];
+                    p.style.left = (cx - 8) + 'px';
+                    p.style.top  = (cy - 8) + 'px';
+                    p.style.setProperty('--dx', (Math.random() * 80 - 40).toFixed(0) + 'px');
+                    p.style.setProperty('--dr', (Math.random() * 180 - 90).toFixed(0) + 'deg');
+                    p.style.animationDelay = (Math.random() * 0.3).toFixed(2) + 's';
+                    document.body.appendChild(p);
+                    (function (el) { setTimeout(function () { el.remove(); }, 1800); })(p);
+                }
+                setTimeout(function () { link.classList.remove('ld-bell-disco'); }, 3200);
+            }
+
+            link.addEventListener('click', function (e) {
+                // We're already on /notifications — the click would only reload.
+                e.preventDefault();
+                var now = Date.now();
+                discoHits = (now - discoLast <= 1500) ? discoHits + 1 : 1;
+                discoLast = now;
+                if (discoHits >= 7) {
+                    discoHits = 0;
+                    discoParty();
+                }
+            });
+        }
     }
 
     // --- Global Search ---
