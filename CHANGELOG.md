@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.79.2 &mdash; 2026-06-04
+
+### Changed
+- **Inbox-view hover cards now trigger on the text itself, not the whole column cell.** The card only appears when you hover the actual subject text or the requester's name — hovering the empty space elsewhere in those columns no longer pops it up. The card anchors flush beneath the hovered text ([templates/partials/ticket-inbox.php](templates/partials/ticket-inbox.php)).
+
+---
+
 ## 2.79.1 &mdash; 2026-06-04
 
 ### Changed

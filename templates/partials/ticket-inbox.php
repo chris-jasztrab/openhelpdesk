@@ -191,16 +191,16 @@ $inboxBase = $inboxBase ?? '/agent/tickets';
         pop.style.visibility = '';
     }
 
-    // Pin the card under the hovered cell rather than chasing the cursor, so the
-    // user can move the mouse straight into it.
-    function anchor(cell) {
+    // Pin the card under the hovered text rather than chasing the cursor, so the
+    // user can move the mouse straight down into it.
+    function anchor(target) {
         var pad = 12;
-        var r = cell.getBoundingClientRect();
+        var r = target.getBoundingClientRect();
         var w = pop.offsetWidth, h = pop.offsetHeight;
         var x = r.left;
         if (x + w + pad > window.innerWidth) x = window.innerWidth - w - pad;
         if (x < pad) x = pad;
-        // Prefer directly below the cell (flush, so there's no gap to fall
+        // Prefer directly below the text (flush, so there's no gap to fall
         // through); flip above if it would overflow the bottom of the viewport.
         var y = r.bottom;
         if (y + h + pad > window.innerHeight) y = r.top - h;
@@ -230,18 +230,20 @@ $inboxBase = $inboxBase ?? '/agent/tickets';
     pop.addEventListener('mouseenter', function () { if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; } });
     pop.addEventListener('mouseleave', scheduleHide);
 
+    // Trigger on the actual text (the subject and the requester name), not the
+    // whole cell — hovering the empty part of a column shows nothing.
     table.querySelectorAll('tbody .ld-inbox-row').forEach(function (row) {
-        var subjectCell = row.querySelector('.ld-inbox-subject');
+        var subjectText = row.querySelector('.ld-inbox-subject-text');
         var subjectSrc  = row.querySelector('.ld-inbox-src');
-        if (subjectCell && subjectSrc) {
-            subjectCell.addEventListener('mouseenter', function () { requestShow(subjectSrc, subjectCell); });
-            subjectCell.addEventListener('mouseleave', function () { cancelShow(); scheduleHide(); });
+        if (subjectText && subjectSrc) {
+            subjectText.addEventListener('mouseenter', function () { requestShow(subjectSrc, subjectText); });
+            subjectText.addEventListener('mouseleave', function () { cancelShow(); scheduleHide(); });
         }
-        var fromCell  = row.querySelector('.ld-inbox-from');
+        var fromName  = row.querySelector('.ld-inbox-from-name');
         var personSrc = row.querySelector('.ld-inbox-src-person');
-        if (fromCell && personSrc) {
-            fromCell.addEventListener('mouseenter', function () { requestShow(personSrc, fromCell); });
-            fromCell.addEventListener('mouseleave', function () { cancelShow(); scheduleHide(); });
+        if (fromName && personSrc) {
+            fromName.addEventListener('mouseenter', function () { requestShow(personSrc, fromName); });
+            fromName.addEventListener('mouseleave', function () { cancelShow(); scheduleHide(); });
         }
     });
 })();
