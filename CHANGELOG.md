@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.79.1 &mdash; 2026-06-04
+
+### Changed
+- **The inbox-view hover cards now wait ~half a second before appearing.** Previously the ticket/person card popped up the instant the cursor touched a Subject or From name, so just skimming down the list flashed a card under every row. Now the cursor has to linger ~500ms before a card shows; a quick pass over a row shows nothing. Moving the cursor into a card that's already open still keeps it open ([templates/partials/ticket-inbox.php](templates/partials/ticket-inbox.php)).
+
+---
+
 ## 2.79.0 &mdash; 2026-06-04
 
 ### Added

@@ -171,7 +171,9 @@ $inboxBase = $inboxBase ?? '/agent/tickets';
         return Math.round(mo / 12) + ' year(s) ago';
     }
 
-    var hideTimer = null;
+    var hideTimer = null, showTimer = null;
+    var SHOW_DELAY = 500; // ms to linger before the card appears, so skimming the
+                          // list doesn't flash a card under every row.
 
     // Show a card (cloned from a hidden per-row source) anchored under the cell
     // the cursor is over: the Subject cell shows the ticket card, the From cell
@@ -212,6 +214,18 @@ $inboxBase = $inboxBase ?? '/agent/tickets';
         hideTimer = setTimeout(function () { pop.style.display = 'none'; }, 180);
     }
 
+    // Arm the show after a short linger. Note we do NOT cancel a pending hide
+    // here: if a card is already up and the cursor skims onto another row, that
+    // card hides on schedule rather than sticking — only moving the cursor into
+    // the card itself (pop mouseenter, below) keeps it open.
+    function requestShow(srcEl, cell) {
+        if (showTimer) clearTimeout(showTimer);
+        showTimer = setTimeout(function () { showTimer = null; show(srcEl, cell); }, SHOW_DELAY);
+    }
+    function cancelShow() {
+        if (showTimer) { clearTimeout(showTimer); showTimer = null; }
+    }
+
     // Keep the card open while the cursor is over it; close only when it leaves.
     pop.addEventListener('mouseenter', function () { if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; } });
     pop.addEventListener('mouseleave', scheduleHide);
@@ -220,14 +234,14 @@ $inboxBase = $inboxBase ?? '/agent/tickets';
         var subjectCell = row.querySelector('.ld-inbox-subject');
         var subjectSrc  = row.querySelector('.ld-inbox-src');
         if (subjectCell && subjectSrc) {
-            subjectCell.addEventListener('mouseenter', function () { show(subjectSrc, subjectCell); });
-            subjectCell.addEventListener('mouseleave', scheduleHide);
+            subjectCell.addEventListener('mouseenter', function () { requestShow(subjectSrc, subjectCell); });
+            subjectCell.addEventListener('mouseleave', function () { cancelShow(); scheduleHide(); });
         }
         var fromCell  = row.querySelector('.ld-inbox-from');
         var personSrc = row.querySelector('.ld-inbox-src-person');
         if (fromCell && personSrc) {
-            fromCell.addEventListener('mouseenter', function () { show(personSrc, fromCell); });
-            fromCell.addEventListener('mouseleave', scheduleHide);
+            fromCell.addEventListener('mouseenter', function () { requestShow(personSrc, fromCell); });
+            fromCell.addEventListener('mouseleave', function () { cancelShow(); scheduleHide(); });
         }
     });
 })();
