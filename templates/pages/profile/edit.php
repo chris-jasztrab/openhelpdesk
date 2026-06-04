@@ -19,8 +19,10 @@ $breadcrumbs = [
             </div>
         </div>
 
-        <!-- Main profile form: name, appearance, notifications (no password fields) -->
-        <form method="POST" action="/profile">
+        <!-- Main profile form: name, appearance, notifications (no password fields).
+             Every control auto-saves on change via /profile/setting — there is no
+             Save button here; only the password form below still submits. -->
+        <form id="profileAutoSave" method="POST" action="/profile" data-autosave-url="/profile/setting">
             <?= csrfField() ?>
 
             <!-- Name -->
@@ -249,9 +251,6 @@ $breadcrumbs = [
                 </div>
             </div>
 
-            <button type="submit" class="btn text-white px-4" style="background:var(--ld-primary);">
-                <i class="bi bi-check-lg me-1"></i>Save Changes
-            </button>
         </form>
 
         <!-- Separate form for password change to prevent autofill interference -->
@@ -387,4 +386,81 @@ $breadcrumbs = [
 document.getElementById('confirmDisable2fa').addEventListener('click', function () {
     document.getElementById('disableCode').closest('form').submit();
 });
+</script>
+
+<!-- Auto-save "saved" toast -->
+<div id="profileToast"
+     class="position-fixed bottom-0 end-0 m-4 px-3 py-2 rounded shadow-sm text-white"
+     style="z-index:1080;background:#198754;opacity:0;transform:translateY(.5rem);
+            transition:opacity .2s ease,transform .2s ease;pointer-events:none;">
+    <i class="bi bi-check-lg me-1"></i><span id="profileToastMsg">Saved</span>
+</div>
+
+<script>
+(function () {
+    const form = document.getElementById('profileAutoSave');
+    if (!form) return;
+
+    const url   = form.dataset.autosaveUrl;
+    const token = form.querySelector('input[name="_token"]').value;
+    const toast = document.getElementById('profileToast');
+    const toastMsg = document.getElementById('profileToastMsg');
+    let hideTimer;
+
+    function showToast(message, isError) {
+        toastMsg.textContent = message;
+        toast.style.background = isError ? '#dc3545' : '#198754';
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateY(0)';
+        clearTimeout(hideTimer);
+        hideTimer = setTimeout(function () {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateY(.5rem)';
+        }, 2000);
+    }
+
+    function saveField(field, value, onSuccess) {
+        const body = new URLSearchParams();
+        body.set('_token', token);
+        body.set('field', field);
+        body.set('value', value);
+
+        fetch(url, {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: body,
+        })
+            .then(function (r) { return r.json().catch(function () { return { ok: r.ok }; }); })
+            .then(function (data) {
+                if (data && data.ok) {
+                    if (onSuccess) onSuccess();
+                    showToast(data.message || 'Saved', false);
+                } else {
+                    showToast((data && data.message) || 'Could not save', true);
+                }
+            })
+            .catch(function () { showToast('Could not save', true); });
+    }
+
+    form.addEventListener('change', function (e) {
+        const el = e.target;
+        if (!el.name || el.name === '_token') return;
+
+        let value;
+        if (el.type === 'checkbox') {
+            value = el.checked ? '1' : '0';
+        } else {
+            // Radios fire change only on the newly-selected option, so el.value
+            // is already the chosen one.
+            value = el.value;
+        }
+
+        saveField(el.name, value, function () {
+            // Apply the theme live so light↔dark flips the page immediately.
+            if (el.name === 'theme') {
+                document.documentElement.setAttribute('data-bs-theme', value);
+            }
+        });
+    });
+})();
 </script>

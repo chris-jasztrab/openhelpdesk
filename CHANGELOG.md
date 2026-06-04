@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.78.0 &mdash; 2026-06-04
+
+### Changed
+- **Profile settings now save instantly &mdash; no more "Save Changes" button.** On **My Profile**, every setting (name, appearance, ticket-list view, timeline-note visibility, and all email-notification toggles) now persists the moment you change it and confirms with a brief "Saved" toast in the corner. Switching between **Light** and **Dark** mode applies to the page immediately. The only setting that still has a button is **Change Password**, which intentionally requires an explicit submit. A new AJAX endpoint `POST /profile/setting` saves one field at a time with a strict allow-list (notification columns and known settings only), so a setting name can never be used to write an arbitrary database column ([templates/pages/profile/edit.php](templates/pages/profile/edit.php), [src/routes.php](src/routes.php)).
+
+---
+
 ## 2.77.1 &mdash; 2026-06-04
 
 ### Documentation

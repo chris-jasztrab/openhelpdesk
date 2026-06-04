@@ -1888,6 +1888,100 @@ $router->post('/profile', function () {
 });
 
 /**
+ * AJAX endpoint that saves a single profile setting immediately, so the
+ * profile page no longer needs a "Save Changes" button for anything except
+ * the password form. Each control on the page POSTs `field` + `value` here on
+ * change and we persist just that one setting. Returns JSON.
+ */
+$router->post('/profile/setting', function () {
+    Auth::requireAuth();
+    header('Content-Type: application/json');
+
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'message' => 'Invalid request.']);
+        exit;
+    }
+
+    $field  = (string) ($_POST['field'] ?? '');
+    $value  = (string) ($_POST['value'] ?? '');
+    $db     = Database::connect();
+    $userId = (int) Auth::id();
+
+    // Notification preferences are boolean columns on the users table. Keep an
+    // explicit allow-list so `field` can never be used to write an arbitrary
+    // column name.
+    $notifyColumns = [
+        'notify_ticket_created', 'notify_ticket_updated', 'notify_ticket_cc',
+        'notify_ticket_merged', 'notify_escalation', 'notify_csat',
+        'notify_group_new_ticket', 'notify_assigned_to_me', 'notify_assigned_to_group',
+        'notify_requester_replied', 'notify_note_added', 'notify_ticket_solved',
+        'notify_ticket_closed', 'notify_ticket_assigned',
+    ];
+
+    if (in_array($field, ['first_name', 'last_name'], true)) {
+        $name = trim($value);
+        if ($name === '') {
+            http_response_code(422);
+            echo json_encode(['ok' => false, 'message' => 'Name cannot be empty.']);
+            exit;
+        }
+        $beforeStmt = $db->prepare('SELECT first_name, last_name FROM users WHERE id = ?');
+        $beforeStmt->execute([$userId]);
+        $before = $beforeStmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+
+        $db->prepare("UPDATE users SET {$field} = ? WHERE id = ?")->execute([$name, $userId]);
+        logAuditChange('user.profile_updated', $userId, 'user', $before, [$field => $name]);
+
+        // Keep the navbar/session name in sync.
+        $_SESSION['user'][$field] = $name;
+
+        echo json_encode(['ok' => true, 'message' => 'Saved']);
+        exit;
+    }
+
+    if ($field === 'theme') {
+        $theme = in_array($value, ['light', 'dark'], true) ? $value : 'light';
+        setSetting('ui_theme:' . $userId, $theme);
+        echo json_encode(['ok' => true, 'message' => 'Appearance saved']);
+        exit;
+    }
+
+    if ($field === 'ticket_view') {
+        if (!in_array((string) (Auth::user()['role'] ?? ''), ['agent', 'admin'], true)) {
+            http_response_code(403);
+            echo json_encode(['ok' => false, 'message' => 'Not allowed.']);
+            exit;
+        }
+        setUserTicketView($userId, $value !== '' ? $value : 'table');
+        echo json_encode(['ok' => true, 'message' => 'Saved']);
+        exit;
+    }
+
+    if (in_array($field, ['ai_notes_visible', 'system_notes_visible'], true)) {
+        if (!Auth::isAdmin()) {
+            http_response_code(403);
+            echo json_encode(['ok' => false, 'message' => 'Not allowed.']);
+            exit;
+        }
+        setSetting($field . ':' . $userId, $value === '1' ? '1' : '0');
+        echo json_encode(['ok' => true, 'message' => 'Saved']);
+        exit;
+    }
+
+    if (in_array($field, $notifyColumns, true)) {
+        $db->prepare("UPDATE users SET {$field} = ? WHERE id = ?")
+           ->execute([$value === '1' ? 1 : 0, $userId]);
+        echo json_encode(['ok' => true, 'message' => 'Saved']);
+        exit;
+    }
+
+    http_response_code(422);
+    echo json_encode(['ok' => false, 'message' => 'Unknown setting.']);
+    exit;
+});
+
+/**
  * AJAX endpoint for the AI-notes show/hide slider on ticket timelines.
  * Persists the same per-user `ai_notes_visible` setting the profile form
  * saves, so the slider and the profile toggle stay in sync.
