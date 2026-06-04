@@ -1454,6 +1454,16 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
             document.getElementById('replyForm').requestSubmit();
         });
     });
+
+    // Deep-link from the inbox-view hover card: /admin/tickets/123#reply|#forward|#note
+    function openFromHash() {
+        var h = (location.hash || '').replace('#', '');
+        if (h === 'reply' || h === 'forward' || h === 'note') openMode(h);
+    }
+    if ((location.hash || '').replace('#', '').match(/^(reply|forward|note)$/)) {
+        setTimeout(openFromHash, 150);
+    }
+    window.addEventListener('hashchange', openFromHash);
 })();
 
 /* ── Update Ticket Button – enable only when a field has changed ── */

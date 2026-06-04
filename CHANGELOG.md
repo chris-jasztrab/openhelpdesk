@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.75.0 &mdash; 2026-06-04
+
+### Changed
+- **The inbox-view hover card is now interactive and actionable.** The detail card no longer follows the cursor — it anchors in place under the hovered row so you can move the mouse into it, and it only closes once the pointer leaves the card itself (a short hover bridge keeps it open while you cross the gap). The card gained **Reply**, **Forward** and **Add Note** buttons that deep-link straight into the matching composer on the ticket page. To support this, the agent and admin ticket detail pages now open the right panel from a `#reply` / `#forward` / `#note` URL fragment (handled on load and on `hashchange`) ([templates/partials/ticket-inbox.php](templates/partials/ticket-inbox.php), [templates/pages/agent/tickets/view.php](templates/pages/agent/tickets/view.php), [templates/pages/admin/tickets/view.php](templates/pages/admin/tickets/view.php)).
+
+---
+
 ## 2.74.0 &mdash; 2026-06-04
 
 ### Added

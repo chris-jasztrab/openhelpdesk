@@ -27,17 +27,16 @@ $inboxBase = $inboxBase ?? '/agent/tickets';
     #ticketInbox .ld-inbox-subject-text { color: var(--bs-body-color); }
     #ticketInbox tr.ld-inbox-row:hover .ld-inbox-subject-text { text-decoration: underline; }
 
-    /* Floating hover detail card. */
+    /* Floating hover detail card. Interactive — the mouse can move into it. */
     #ldInboxPop {
         position: fixed; z-index: 1080; display: none;
-        width: 340px; max-width: calc(100vw - 24px);
+        width: 360px; max-width: calc(100vw - 24px);
         background: var(--bs-body-bg, #fff);
         color: var(--bs-body-color, #212529);
         border: 1px solid var(--bs-border-color, #dee2e6);
         border-radius: .5rem;
         box-shadow: 0 .5rem 1.5rem rgba(0, 0, 0, .18);
         padding: .85rem 1rem;
-        pointer-events: none;            /* purely informational — the row click opens the ticket */
     }
     #ldInboxPop .ld-pop-head { border-bottom: 1px solid var(--bs-border-color, #dee2e6); padding-bottom: .55rem; margin-bottom: .55rem; }
     #ldInboxPop .ld-pop-body { font-size: .85rem; }
@@ -46,6 +45,11 @@ $inboxBase = $inboxBase ?? '/agent/tickets';
         display: -webkit-box; -webkit-line-clamp: 4; line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
     }
     #ldInboxPop .ld-pop-foot { margin-top: .6rem; display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; }
+    #ldInboxPop .ld-pop-actions {
+        margin-top: .7rem; padding-top: .6rem; border-top: 1px solid var(--bs-border-color, #dee2e6);
+        display: flex; gap: .4rem;
+    }
+    #ldInboxPop .ld-pop-actions .btn { flex: 1; }
 </style>
 
 <div style="overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 260px);">
@@ -115,6 +119,11 @@ $inboxBase = $inboxBase ?? '/agent/tickets';
                                     <?php if ($t['type_name']): ?><span class="badge" style="background:<?= e($t['type_color'] ?: '#6c757d') ?>;"><?= e($t['type_name']) ?></span><?php endif; ?>
                                     <span class="text-muted small ms-auto"><i class="bi bi-person-check me-1"></i><?= e($t['agent_name'] ?: 'Unassigned') ?></span>
                                 </div>
+                                <div class="ld-pop-actions">
+                                    <a href="<?= $inboxBase ?>/<?= $t['id'] ?>#reply" class="btn btn-sm btn-primary"><i class="bi bi-reply me-1"></i>Reply</a>
+                                    <a href="<?= $inboxBase ?>/<?= $t['id'] ?>#forward" class="btn btn-sm btn-outline-secondary"><i class="bi bi-forward me-1"></i>Forward</a>
+                                    <a href="<?= $inboxBase ?>/<?= $t['id'] ?>#note" class="btn btn-sm btn-outline-secondary"><i class="bi bi-lock me-1"></i>Add Note</a>
+                                </div>
                             </div>
                         <?php endif; ?>
                     </td>
@@ -148,36 +157,54 @@ $inboxBase = $inboxBase ?? '/agent/tickets';
         return Math.round(mo / 12) + ' year(s) ago';
     }
 
-    function show(row, evt) {
+    var hideTimer = null;
+
+    function show(row) {
+        if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
         var src = row.querySelector('.ld-inbox-src');
         if (!src) return;
         pop.innerHTML = src.innerHTML;
         var rel = pop.querySelector('.ld-rel');
         if (rel) { rel.textContent = relTime(parseInt(rel.getAttribute('data-ts'), 10)) + ' '; }
+        // Render first (hidden) so we can measure, then anchor statically to the row.
+        pop.style.visibility = 'hidden';
         pop.style.display = 'block';
-        position(evt);
+        anchor(row);
+        pop.style.visibility = '';
     }
 
-    function position(evt) {
+    // Pin the card to the hovered row — under its Subject cell — rather than
+    // letting it chase the cursor, so the user can move the mouse into it.
+    function anchor(row) {
         var pad = 12;
+        var cell = row.querySelector('.ld-inbox-subject') || row;
+        var r = cell.getBoundingClientRect();
         var w = pop.offsetWidth, h = pop.offsetHeight;
-        var x = evt.clientX + 16;
-        var y = evt.clientY + 16;
-        if (x + w + pad > window.innerWidth)  x = evt.clientX - w - 16;
+        var x = r.left;
+        if (x + w + pad > window.innerWidth) x = window.innerWidth - w - pad;
         if (x < pad) x = pad;
-        if (y + h + pad > window.innerHeight) y = evt.clientY - h - 16;
+        // Prefer directly below the row (flush, so there's no gap to fall through);
+        // flip above if it would overflow the bottom of the viewport.
+        var y = row.getBoundingClientRect().bottom;
+        if (y + h + pad > window.innerHeight) y = row.getBoundingClientRect().top - h;
         if (y < pad) y = pad;
         pop.style.left = x + 'px';
         pop.style.top  = y + 'px';
     }
 
-    function hide() { pop.style.display = 'none'; }
+    function scheduleHide() {
+        if (hideTimer) clearTimeout(hideTimer);
+        hideTimer = setTimeout(function () { pop.style.display = 'none'; }, 180);
+    }
+
+    // Keep the card open while the cursor is over it; close only when it leaves.
+    pop.addEventListener('mouseenter', function () { if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; } });
+    pop.addEventListener('mouseleave', scheduleHide);
 
     table.querySelectorAll('tbody .ld-inbox-row').forEach(function (row) {
         if (!row.querySelector('.ld-inbox-src')) return; // redacted rows have no card
-        row.addEventListener('mouseenter', function (e) { show(row, e); });
-        row.addEventListener('mousemove', function (e) { if (pop.style.display === 'block') position(e); });
-        row.addEventListener('mouseleave', hide);
+        row.addEventListener('mouseenter', function () { show(row); });
+        row.addEventListener('mouseleave', scheduleHide);
     });
 })();
 </script>
