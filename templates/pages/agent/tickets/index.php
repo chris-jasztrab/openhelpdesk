@@ -429,6 +429,9 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
             <i class="bi bi-x-lg"></i>
         </button>
     </div>
+    <?php if (($ticketView ?? 'table') === 'inbox'): ?>
+    <?php $inboxBase = '/agent/tickets'; require ROOT_DIR . '/templates/partials/ticket-inbox.php'; ?>
+    <?php else: ?>
     <div style="overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 260px);">
         <table class="table table-hover align-middle mb-0" id="ticketTable" style="width:100%;visibility:hidden;">
             <thead class="table-light" style="position:sticky;top:0;z-index:5;box-shadow:0 1px 2px rgba(0,0,0,.06);">
@@ -608,6 +611,7 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
             </tbody>
         </table>
     </div>
+    <?php endif; ?>
 </div>
 
 <!-- Bulk Actions Form (submitted programmatically) -->

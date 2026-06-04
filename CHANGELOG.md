@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.74.0 &mdash; 2026-06-04
+
+### Added
+- **Inbox view for ticket lists — an email-style alternative to the table.** Staff can now switch their ticket lists from the classic resizable grid to a two-column "Inbox" layout that shows only who the ticket is **From** and the **Subject**, the way an email client does. Hovering any row pops up a detail card with the requester, when they submitted (relative + absolute time), a snippet of the message, and the ticket's status, priority, type and assignee. The choice is a per-user setting in **My Profile → Ticket List View** and applies to both the agent and admin ticket lists; bulk-select checkboxes and the bulk-action bar carry over to the inbox view, and the table view is unchanged ([templates/partials/ticket-inbox.php](templates/partials/ticket-inbox.php), [templates/pages/profile/edit.php](templates/pages/profile/edit.php), [templates/pages/agent/tickets/index.php](templates/pages/agent/tickets/index.php), [templates/pages/admin/tickets/index.php](templates/pages/admin/tickets/index.php), [src/helpers.php](src/helpers.php), [src/routes.php](src/routes.php)).
+
+---
+
 ## 2.73.0 &mdash; 2026-06-04
 
 ### Added

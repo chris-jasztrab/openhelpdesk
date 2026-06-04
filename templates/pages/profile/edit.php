@@ -69,6 +69,36 @@ $breadcrumbs = [
                 </div>
             </div>
 
+            <?php if (in_array($user['role'], ['agent', 'admin'], true)): ?>
+            <!-- Ticket List View (staff) -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-transparent fw-semibold">
+                    <i class="bi bi-layout-text-sidebar me-1"></i>Ticket List View
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">Choose how your ticket lists are laid out.</p>
+                    <div class="d-flex flex-column gap-2">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="ticket_view" id="ticketViewTable"
+                                   value="table" <?= ($ticketView ?? 'table') === 'table' ? 'checked' : '' ?>>
+                            <label class="form-check-label" for="ticketViewTable">
+                                <span class="fw-semibold"><i class="bi bi-table me-1"></i>Table</span>
+                                <span class="text-muted small d-block ms-4">The classic grid &mdash; sortable, resizable columns with inline status, priority and assignment controls.</span>
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="ticket_view" id="ticketViewInbox"
+                                   value="inbox" <?= ($ticketView ?? 'table') === 'inbox' ? 'checked' : '' ?>>
+                            <label class="form-check-label" for="ticketViewInbox">
+                                <span class="fw-semibold"><i class="bi bi-inbox me-1"></i>Inbox</span>
+                                <span class="text-muted small d-block ms-4">An email-style list showing just who the ticket is from and the subject. Hover a row for a card with the full details.</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+
             <?php if (roleIsAdmin($user['role'])): ?>
             <!-- System Timeline Notes (admin only) -->
             <div class="card border-0 shadow-sm mb-4">

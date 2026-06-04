@@ -1785,6 +1785,7 @@ $router->get('/profile', function () {
     render('profile/edit', [
         'profileUser'        => $user,
         'theme'              => $theme,
+        'ticketView'         => getUserTicketView((int) Auth::id()),
         'aiNotesVisible'     => aiNotesVisible(),
         'systemNotesVisible' => systemNotesVisible(),
     ]);
@@ -1831,6 +1832,9 @@ $router->post('/profile', function () {
     // Save theme preference
     $theme = in_array($_POST['theme'] ?? '', ['light', 'dark'], true) ? $_POST['theme'] : 'light';
     setSetting('ui_theme:' . $userId, $theme);
+
+    // Save ticket-list view preference (table vs. inbox)
+    setUserTicketView((int) $userId, $_POST['ticket_view'] ?? 'table');
 
     // Save AI / system note timeline preferences. The toggles only render for
     // admins, so a non-admin POST must not be allowed to clear these settings.

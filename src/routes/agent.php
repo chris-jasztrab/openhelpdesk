@@ -408,6 +408,7 @@ $router->get('/agent/tickets', function () {
         'sort'               => $sort,
         'dir'                => strtolower($dir),
         'visibleColumns'   => getUserColumns(Auth::id()),
+        'ticketView'         => getUserTicketView((int) Auth::id()),
         'groupRestricted'    => !empty($agentGroupIds),
         'defaultFilterUrl'   => $defaultFilterUrl,
         'confidentialTypeIds' => $confidentialTypeIds,

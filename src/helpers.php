@@ -2236,6 +2236,36 @@ function setUserColumns(int $userId, array $columns): void
     setSetting("ticket_columns:{$userId}", json_encode($columns));
 }
 
+/* ── Ticket list view-style preference ───────────────────────── */
+
+/**
+ * Available ticket-list layouts. 'table' is the classic resizable grid;
+ * 'inbox' is an email-style two-column (From / Subject) list with a hover
+ * detail card. Keyed by the value stored in `ticket_view:{userId}`.
+ */
+function ticketViewModes(): array
+{
+    return [
+        'table' => 'Table',
+        'inbox' => 'Inbox',
+    ];
+}
+
+/** A user's chosen ticket-list layout; defaults to the classic table. */
+function getUserTicketView(int $userId): string
+{
+    $view = getSetting("ticket_view:{$userId}", 'table');
+    return array_key_exists($view, ticketViewModes()) ? $view : 'table';
+}
+
+function setUserTicketView(int $userId, string $view): void
+{
+    if (!array_key_exists($view, ticketViewModes())) {
+        $view = 'table';
+    }
+    setSetting("ticket_view:{$userId}", $view);
+}
+
 /* ── Process helpers ─────────────────────────────────────────── */
 
 /**

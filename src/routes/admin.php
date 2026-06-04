@@ -3634,6 +3634,7 @@ $router->get('/admin/tickets', function () {
         'sort'                 => $sort,
         'dir'                  => strtolower($dir),
         'visibleColumns'       => getUserColumns(Auth::id()),
+        'ticketView'           => getUserTicketView((int) Auth::id()),
         'defaultFilterUrl'     => $defaultFilterUrl,
         'confidentialTypeIds'  => $confidentialTypeIds,
         'adminGroupIds'        => $adminGroupIds,
