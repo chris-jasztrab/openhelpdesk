@@ -86,7 +86,21 @@ $inboxBase = $inboxBase ?? '/agent/tickets';
                         <?php if ($isRedacted): ?>
                             <span class="fst-italic">—</span>
                         <?php else: ?>
-                            <?= e($t['creator_name'] ?: 'Unknown') ?>
+                            <span class="ld-inbox-from-name"><?= e($t['creator_name'] ?: 'Unknown') ?></span>
+                            <!-- Hidden source for the person hover card -->
+                            <div class="ld-inbox-src-person d-none">
+                                <div class="ld-pop-head">
+                                    <div class="fw-semibold"><i class="bi bi-person-circle me-1 text-muted"></i><?= e($t['creator_name'] ?: 'Unknown') ?></div>
+                                    <?php if (!empty($t['creator_email'])): ?>
+                                    <div class="small mt-1"><a href="mailto:<?= e($t['creator_email']) ?>" class="text-decoration-none"><i class="bi bi-envelope me-1"></i><?= e($t['creator_email']) ?></a></div>
+                                    <?php endif; ?>
+                                </div>
+                                <div class="ld-pop-actions">
+                                    <a href="<?= $inboxBase ?>/by-user/<?= (int) $t['created_by'] ?>" class="btn btn-sm btn-outline-primary w-100">
+                                        <i class="bi bi-card-list me-1"></i>Open tickets &amp; mentions
+                                    </a>
+                                </div>
+                            </div>
                         <?php endif; ?>
                     </td>
                     <td class="ld-inbox-subject">
@@ -159,34 +173,35 @@ $inboxBase = $inboxBase ?? '/agent/tickets';
 
     var hideTimer = null;
 
-    function show(row) {
+    // Show a card (cloned from a hidden per-row source) anchored under the cell
+    // the cursor is over: the Subject cell shows the ticket card, the From cell
+    // shows the person card.
+    function show(srcEl, cell) {
         if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
-        var src = row.querySelector('.ld-inbox-src');
-        if (!src) return;
-        pop.innerHTML = src.innerHTML;
+        if (!srcEl) return;
+        pop.innerHTML = srcEl.innerHTML;
         var rel = pop.querySelector('.ld-rel');
         if (rel) { rel.textContent = relTime(parseInt(rel.getAttribute('data-ts'), 10)) + ' '; }
-        // Render first (hidden) so we can measure, then anchor statically to the row.
+        // Render first (hidden) so we can measure, then anchor statically.
         pop.style.visibility = 'hidden';
         pop.style.display = 'block';
-        anchor(row);
+        anchor(cell);
         pop.style.visibility = '';
     }
 
-    // Pin the card to the hovered row — under its Subject cell — rather than
-    // letting it chase the cursor, so the user can move the mouse into it.
-    function anchor(row) {
+    // Pin the card under the hovered cell rather than chasing the cursor, so the
+    // user can move the mouse straight into it.
+    function anchor(cell) {
         var pad = 12;
-        var cell = row.querySelector('.ld-inbox-subject') || row;
         var r = cell.getBoundingClientRect();
         var w = pop.offsetWidth, h = pop.offsetHeight;
         var x = r.left;
         if (x + w + pad > window.innerWidth) x = window.innerWidth - w - pad;
         if (x < pad) x = pad;
-        // Prefer directly below the row (flush, so there's no gap to fall through);
-        // flip above if it would overflow the bottom of the viewport.
-        var y = row.getBoundingClientRect().bottom;
-        if (y + h + pad > window.innerHeight) y = row.getBoundingClientRect().top - h;
+        // Prefer directly below the cell (flush, so there's no gap to fall
+        // through); flip above if it would overflow the bottom of the viewport.
+        var y = r.bottom;
+        if (y + h + pad > window.innerHeight) y = r.top - h;
         if (y < pad) y = pad;
         pop.style.left = x + 'px';
         pop.style.top  = y + 'px';
@@ -202,9 +217,18 @@ $inboxBase = $inboxBase ?? '/agent/tickets';
     pop.addEventListener('mouseleave', scheduleHide);
 
     table.querySelectorAll('tbody .ld-inbox-row').forEach(function (row) {
-        if (!row.querySelector('.ld-inbox-src')) return; // redacted rows have no card
-        row.addEventListener('mouseenter', function () { show(row); });
-        row.addEventListener('mouseleave', scheduleHide);
+        var subjectCell = row.querySelector('.ld-inbox-subject');
+        var subjectSrc  = row.querySelector('.ld-inbox-src');
+        if (subjectCell && subjectSrc) {
+            subjectCell.addEventListener('mouseenter', function () { show(subjectSrc, subjectCell); });
+            subjectCell.addEventListener('mouseleave', scheduleHide);
+        }
+        var fromCell  = row.querySelector('.ld-inbox-from');
+        var personSrc = row.querySelector('.ld-inbox-src-person');
+        if (fromCell && personSrc) {
+            fromCell.addEventListener('mouseenter', function () { show(personSrc, fromCell); });
+            fromCell.addEventListener('mouseleave', scheduleHide);
+        }
     });
 })();
 </script>

@@ -2266,6 +2266,81 @@ function setUserTicketView(int $userId, string $view): void
     setSetting("ticket_view:{$userId}", $view);
 }
 
+/* ── "Tickets by user" page (from the inbox-view person card) ─── */
+
+/**
+ * Open tickets relevant to one user: tickets they created, plus open tickets
+ * where they were @mentioned (notifications.type = 'mention'). Scoped to what
+ * the viewing staff member is allowed to see. Rows match the ticket-list shape,
+ * newest first. A row is a "mention" (not their own ticket) precisely when its
+ * created_by is not the target user — the WHERE only admits created-or-mentioned.
+ */
+function userOpenTicketsForStaff(PDO $db, int $targetUserId, int $viewerId, ?string $viewerRole): array
+{
+    $vis  = ticketStaffVisibilitySql($db, $viewerId, $viewerRole, 't');
+    $open = ticketStatusSqlIn(ticketOpenBucketSlugs(), 't.status');
+    $sql = "SELECT t.*,
+                tp.name AS priority_name, tp.color AS priority_color,
+                tt.name AS type_name, tt.color AS type_color,
+                tt.is_confidential AS type_confidential, tt.group_id AS type_group_id,
+                CONCAT(a.first_name, ' ', a.last_name) AS agent_name
+            FROM tickets t
+            LEFT JOIN ticket_priorities tp ON t.priority_id = tp.id
+            LEFT JOIN ticket_types tt      ON t.type_id     = tt.id
+            LEFT JOIN users a              ON t.assigned_to  = a.id
+            WHERE {$open}
+              AND {$vis['sql']}
+              AND (t.created_by = ?
+                   OR t.id IN (SELECT ticket_id FROM notifications WHERE user_id = ? AND type = 'mention'))
+            ORDER BY t.created_at DESC";
+    $params = array_merge($vis['params'], [$targetUserId, $targetUserId]);
+    $stmt = $db->prepare($sql);
+    $stmt->execute($params);
+    return $stmt->fetchAll();
+}
+
+/**
+ * Render the "open tickets for this user" page. $base is the calling section's
+ * ticket base path ('/agent/tickets' or '/admin/tickets'); the route guard has
+ * already run. Mirrors the ticket lists' confidential-redaction context.
+ */
+function renderTicketsByUserPage(int $targetUserId, string $base): void
+{
+    $db   = Database::connect();
+    $stmt = $db->prepare('SELECT id, first_name, last_name, email FROM users WHERE id = ?');
+    $stmt->execute([$targetUserId]);
+    $targetUser = $stmt->fetch();
+    if (!$targetUser) {
+        flash('error', 'That user no longer exists.');
+        redirect($base);
+        return;
+    }
+
+    $tickets = userOpenTicketsForStaff($db, $targetUserId, (int) Auth::id(), Auth::role());
+
+    // Confidential-redaction context, same as the ticket lists build.
+    $confidentialTypeIds = array_map(
+        'intval',
+        $db->query('SELECT id FROM ticket_types WHERE is_confidential = 1 AND group_id IS NOT NULL')
+           ->fetchAll(PDO::FETCH_COLUMN)
+    );
+    $adminGroupIds = [];
+    if ($confidentialTypeIds) {
+        $gs = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
+        $gs->execute([(int) Auth::id()]);
+        $adminGroupIds = array_map('intval', $gs->fetchAll(PDO::FETCH_COLUMN));
+    }
+
+    render('staff/tickets-by-user', [
+        'targetUser'          => $targetUser,
+        'targetUserId'        => $targetUserId,
+        'tickets'             => $tickets,
+        'base'                => $base,
+        'confidentialTypeIds' => $confidentialTypeIds,
+        'adminGroupIds'       => $adminGroupIds,
+    ]);
+}
+
 /* ── Process helpers ─────────────────────────────────────────── */
 
 /**

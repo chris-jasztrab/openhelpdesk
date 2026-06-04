@@ -11,6 +11,16 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.76.0 &mdash; 2026-06-04
+
+### Added
+- **Inbox view: separate hover cards for the subject and the sender, plus a per-user open-tickets page.** Hovering the **Subject** still shows the ticket card (snippet + Reply/Forward/Add Note). Hovering the **From** name now shows a *person* card instead — their name, email (click to mail them), and an **Open tickets &amp; mentions** button. That button opens a new staff page listing every open ticket that user submitted, *plus* any open ticket where they were **@mentioned** — the mentioned ones are badged so it's obvious they're not the requester. The page is scoped to what the viewing staff member is allowed to see ([templates/pages/staff/tickets-by-user.php](templates/pages/staff/tickets-by-user.php), [templates/partials/ticket-inbox.php](templates/partials/ticket-inbox.php), [src/helpers.php](src/helpers.php), [src/routes/agent.php](src/routes/agent.php), [src/routes/admin.php](src/routes/admin.php)).
+
+### Changed
+- The inbox ticket card now appears only when hovering the Subject (previously it showed for the whole row), making room for the sender card on the From column.
+
+---
+
 ## 2.75.0 &mdash; 2026-06-04
 
 ### Changed

@@ -3520,6 +3520,7 @@ $router->get('/admin/tickets', function () {
                 tt.name AS type_name, tt.color AS type_color, tt.group_id AS type_group_id,
                 g.name  AS group_name,
                 CONCAT(c.first_name, ' ', c.last_name) AS creator_name,
+                c.email AS creator_email,
                 CONCAT(a.first_name, ' ', a.last_name) AS agent_name
          FROM tickets t
          LEFT JOIN ticket_priorities tp ON t.priority_id = tp.id
@@ -3770,6 +3771,13 @@ $router->get('/admin/tickets/export', function () {
 
     fclose($out);
     exit;
+});
+
+/* ── Open tickets for one user (from the inbox-view person card) ───── */
+
+$router->get('/admin/tickets/by-user/{userId}', function (array $p) {
+    Auth::requireAdmin();
+    renderTicketsByUserPage((int) $p['userId'], '/admin/tickets');
 });
 
 /* ── Column Preferences (Admin) ───────────────────────────────────── */

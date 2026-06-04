@@ -280,6 +280,7 @@ $router->get('/agent/tickets', function () {
                 tt.is_confidential AS type_confidential, tt.group_id AS type_group_id,
                 g.name  AS group_name,
                 CONCAT(c.first_name, ' ', c.last_name) AS creator_name,
+                c.email AS creator_email,
                 CONCAT(a.first_name, ' ', a.last_name) AS agent_name
          FROM tickets t
          LEFT JOIN ticket_priorities tp ON t.priority_id = tp.id
@@ -414,6 +415,13 @@ $router->get('/agent/tickets', function () {
         'confidentialTypeIds' => $confidentialTypeIds,
         'adminGroupIds'       => $adminGroupIds,
     ]);
+});
+
+/* ── Open tickets for one user (from the inbox-view person card) ───── */
+
+$router->get('/agent/tickets/by-user/{userId}', function (array $p) {
+    Auth::requireStaff();
+    renderTicketsByUserPage((int) $p['userId'], '/agent/tickets');
 });
 
 /* ── Column Preferences (Agent) ───────────────────────────────────── */
