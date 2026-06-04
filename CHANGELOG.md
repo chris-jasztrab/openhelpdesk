@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.78.1 &mdash; 2026-06-04
+
+### Fixed
+- **The ticket "Back" button now returns you to the screen you came from.** Opening a ticket from the **notifications** panel (or the dashboard, or anywhere else) and clicking **Back** previously dumped you on the ticket list instead of the screen you were on, because the button always pointed at the last-visited (and often stale) ticket-list URL. The Back button now remembers the actual referring page per-ticket &mdash; so it survives reloads and in-page replies &mdash; and only falls back to the ticket list when no referrer is known. The breadcrumb **Tickets** link still goes to the filtered ticket list, as before ([templates/pages/agent/tickets/view.php](templates/pages/agent/tickets/view.php), [templates/pages/admin/tickets/view.php](templates/pages/admin/tickets/view.php)).
+
+---
+
 ## 2.78.0 &mdash; 2026-06-04
 
 ### Changed

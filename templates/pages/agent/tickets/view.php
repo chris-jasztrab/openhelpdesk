@@ -1023,15 +1023,36 @@ if ($solutionTimelineId > 0) {
 
 <script>
 var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
-// Restore Back button and breadcrumb link to the previously visited ticket list URL (with filters)
+// Back button → the screen the user actually came from (notifications, dashboard,
+// ticket list, ...). The breadcrumb "Tickets" link always points at the filtered
+// ticket list so filters survive. Both fall back to /agent/tickets.
 (function() {
     var saved = sessionStorage.getItem('agentTicketListUrl');
-    if (!saved) return;
+
+    // Breadcrumb "Tickets" → the previously visited (filtered) ticket list.
+    if (saved) {
+        document.querySelectorAll('.breadcrumb-item a').forEach(function (a) {
+            if (a.getAttribute('href') === '/agent/tickets') a.href = saved;
+        });
+    }
+
     var backBtn = document.getElementById('backBtn');
-    if (backBtn) backBtn.href = saved;
-    document.querySelectorAll('.breadcrumb-item a').forEach(function (a) {
-        if (a.getAttribute('href') === '/agent/tickets') a.href = saved;
-    });
+    if (!backBtn) return;
+
+    // Remember the referring page per-ticket so it survives reloads and in-page
+    // POSTs (which make document.referrer the ticket itself).
+    var ticketPath = window.location.pathname;
+    var key = 'agentTicketBackUrl:' + ticketPath;
+    if (document.referrer) {
+        try {
+            var u = new URL(document.referrer);
+            if (u.origin === window.location.origin && u.pathname !== ticketPath) {
+                sessionStorage.setItem(key, u.pathname + u.search + u.hash);
+            }
+        } catch (e) {}
+    }
+    var back = sessionStorage.getItem(key) || saved;
+    if (back) backBtn.href = back;
 })();
 
 
