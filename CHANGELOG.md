@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.77.1 &mdash; 2026-06-04
+
+### Documentation
+- **Help docs now cover the three ticket-list layouts.** Added a *Choosing a List Layout* section to the agent help (Ticket List &amp; Filters) and a *Ticket List Layouts (Table / Inbox / Card)* section to the admin Tickets doc, documenting the **Table / Inbox / Card** views (set in **My Profile → Ticket List View**), the Inbox subject/sender hover cards with their Reply/Forward/Add Note deep-links, the per-user **Open tickets &amp; mentions** page, and the now-hidden-by-default Confidential column. Both help search indexes gained matching entries ([templates/pages/agent/docs/ticket-list.php](templates/pages/agent/docs/ticket-list.php), [templates/pages/agent/docs/index.php](templates/pages/agent/docs/index.php), [templates/pages/admin/docs/tickets.php](templates/pages/admin/docs/tickets.php), [templates/pages/admin/docs/index.php](templates/pages/admin/docs/index.php)).
+
+---
+
 ## 2.77.0 &mdash; 2026-06-04
 
 ### Added

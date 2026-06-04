@@ -13,6 +13,32 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/agent/help'], ['label' => 'Ticke
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-layout-text-sidebar text-primary me-2"></i>Choosing a List Layout</h5>
+<p class="text-muted mb-2">The ticket list comes in three layouts. Pick the one you like under <strong>My Profile &rarr; Ticket List View</strong> (top-right avatar menu &rarr; <strong>My Profile</strong>); your choice applies to every ticket list you open. Filtering, sorting, bulk-select checkboxes and the bulk-action bar work the same in all three.</p>
+<div class="table-responsive">
+<table class="table table-sm mb-0">
+    <thead class="table-light"><tr><th style="width:120px">Layout</th><th>What it looks like</th></tr></thead>
+    <tbody class="text-muted">
+        <tr><td><strong><i class="bi bi-table me-1"></i>Table</strong></td><td>The classic resizable grid with a configurable set of columns (see below). The default, and the only layout that shows every column at once.</td></tr>
+        <tr><td><strong><i class="bi bi-inbox me-1"></i>Inbox</strong></td><td>An email-style list showing just who the ticket is <strong>From</strong> and the <strong>Subject</strong>. Hovering the <strong>Subject</strong> pops up a detail card with the requester, when they submitted, a snippet of the message, and the status, priority, type and assignee &mdash; with <strong>Reply</strong>, <strong>Forward</strong> and <strong>Add Note</strong> buttons that deep-link straight into the matching composer on the ticket. The card anchors in place so you can move into it. Hovering the <strong>From</strong> name shows a <em>person</em> card instead &mdash; their name, email, and an <strong>Open tickets &amp; mentions</strong> button (see below).</td></tr>
+        <tr><td><strong><i class="bi bi-grid-1x2 me-1"></i>Card</strong></td><td>A roomier list where each ticket is a horizontal card: a colour-keyed requester avatar, a &ldquo;New&rdquo; flag for tickets still awaiting a first reply, the type badge and subject up top; the location/group, ticket age and SLA underneath; and priority, assignee and status down the right edge.</td></tr>
+    </tbody>
+</table>
+</div>
+<p class="text-muted small mb-0 mt-2">Confidential tickets stay redacted in every layout.</p>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-person-lines-fill text-primary me-2"></i>A User&rsquo;s Open Tickets &amp; Mentions</h5>
+<p class="text-muted mb-2">From the <em>sender</em> hover card in <strong>Inbox</strong> layout, click <strong>Open tickets &amp; mentions</strong> to open a page listing every open ticket that person submitted, <em>plus</em> any open ticket where they were <strong>@mentioned</strong>. The mentioned ones are badged so it&rsquo;s obvious they&rsquo;re not the requester.</p>
+<p class="text-muted mb-0">The list is scoped to what you&rsquo;re allowed to see &mdash; you&rsquo;ll never be shown a ticket your permissions or confidential-type rules would otherwise hide.</p>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-table text-primary me-2"></i>Ticket List Columns</h5>
 <p class="text-muted mb-2">The ticket list shows a configurable set of columns. Click the <strong><i class="bi bi-layout-three-columns"></i> Columns</strong> button at the top-right to open the column picker and toggle columns on or off. Your preferences are saved automatically.</p>
 <div class="table-responsive">

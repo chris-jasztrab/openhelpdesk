@@ -155,6 +155,24 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 </div>
 </div>
 
+<div class="card border-0 shadow-sm mb-4" id="list-layouts">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-layout-text-sidebar text-primary me-2"></i>Ticket List Layouts (Table / Inbox / Card)</h5>
+<p class="text-muted mb-2">Each staff member can choose how their ticket lists are laid out under <strong>My Profile &rarr; Ticket List View</strong>. The setting is per-user and applies to both the admin and agent ticket lists. Filtering, sorting, bulk-select and the bulk-action bar behave identically in all three.</p>
+<div class="table-responsive">
+<table class="table table-sm mb-0">
+    <thead class="table-light"><tr><th style="width:120px">Layout</th><th>What it looks like</th></tr></thead>
+    <tbody class="text-muted">
+        <tr><td><strong><i class="bi bi-table me-1"></i>Table</strong></td><td>The classic resizable grid with a configurable set of columns. The default. The <strong>Confidential</strong> column is hidden by default and can be re-enabled from the column picker.</td></tr>
+        <tr><td><strong><i class="bi bi-inbox me-1"></i>Inbox</strong></td><td>An email-style two-column list showing only <strong>From</strong> and <strong>Subject</strong>. Hovering the <strong>Subject</strong> opens a detail card (requester, submitted time, message snippet, status/priority/type/assignee) with <strong>Reply</strong>, <strong>Forward</strong> and <strong>Add Note</strong> buttons that deep-link into the ticket composer. Hovering the <strong>From</strong> name opens a person card with their email and an <strong>Open tickets &amp; mentions</strong> button.</td></tr>
+        <tr><td><strong><i class="bi bi-grid-1x2 me-1"></i>Card</strong></td><td>A roomier stacked layout where each ticket is a horizontal card &mdash; colour-keyed requester avatar, a &ldquo;New&rdquo; flag for tickets awaiting a first reply, type badge and subject, the location/group, age and SLA, and priority/assignee/status down the right edge.</td></tr>
+    </tbody>
+</table>
+</div>
+<p class="text-muted mb-0 mt-2"><strong>Open tickets &amp; mentions page.</strong> The sender card&rsquo;s <strong>Open tickets &amp; mentions</strong> button opens a per-user page listing every open ticket that person submitted plus any open ticket where they were <strong>@mentioned</strong> (mentions are badged). The page is scoped to what the viewing staff member is permitted to see, and confidential tickets stay redacted in every layout.</p>
+</div>
+</div>
+
 <div class="card border-0 shadow-sm mb-4" id="reordering-admin-lists">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-grip-vertical text-primary me-2"></i>Reordering &amp; Sorting Admin Lists</h5>
