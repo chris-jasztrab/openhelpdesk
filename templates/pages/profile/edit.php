@@ -94,6 +94,14 @@ $breadcrumbs = [
                                 <span class="text-muted small d-block ms-4">An email-style list showing just who the ticket is from and the subject. Hover a row for a card with the full details.</span>
                             </label>
                         </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="ticket_view" id="ticketViewCard"
+                                   value="card" <?= ($ticketView ?? 'table') === 'card' ? 'checked' : '' ?>>
+                            <label class="form-check-label" for="ticketViewCard">
+                                <span class="fw-semibold"><i class="bi bi-grid-1x2 me-1"></i>Card</span>
+                                <span class="text-muted small d-block ms-4">A roomier list where each ticket is a card — requester, group, age and SLA stacked together with priority, assignee and status.</span>
+                            </label>
+                        </div>
                     </div>
                 </div>
             </div>

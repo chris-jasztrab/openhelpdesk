@@ -2248,7 +2248,46 @@ function ticketViewModes(): array
     return [
         'table' => 'Table',
         'inbox' => 'Inbox',
+        'card'  => 'Card',
     ];
+}
+
+/**
+ * Human-friendly relative time, e.g. "3 hours ago" (past) or "in 7 days"
+ * (future). Accepts a unix timestamp or a date string. Empty input → ''.
+ */
+function humanRelativeTime($when): string
+{
+    if ($when === null || $when === '') {
+        return '';
+    }
+    $ts = is_numeric($when) ? (int) $when : strtotime((string) $when);
+    if (!$ts) {
+        return '';
+    }
+    $diff   = $ts - time();
+    $future = $diff > 0;
+    $s      = abs($diff);
+    foreach ([[31536000, 'year'], [2592000, 'month'], [604800, 'week'], [86400, 'day'], [3600, 'hour'], [60, 'minute']] as [$secs, $label]) {
+        if ($s >= $secs) {
+            $n   = (int) floor($s / $secs);
+            $txt = $n . ' ' . $label . ($n === 1 ? '' : 's');
+            return $future ? 'in ' . $txt : $txt . ' ago';
+        }
+    }
+    return $future ? 'in a few seconds' : 'just now';
+}
+
+/** Up-to-two-letter initials from a person's display name (e.g. "Kim Sachs" → "KS"). */
+function nameInitials(string $name): string
+{
+    $parts = preg_split('/\s+/', trim($name), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+    if (!$parts) {
+        return '?';
+    }
+    $first = mb_substr($parts[0], 0, 1);
+    $last  = count($parts) > 1 ? mb_substr($parts[count($parts) - 1], 0, 1) : '';
+    return mb_strtoupper($first . $last);
 }
 
 /** A user's chosen ticket-list layout; defaults to the classic table. */

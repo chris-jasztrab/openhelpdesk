@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.77.0 &mdash; 2026-06-04
+
+### Added
+- **Third ticket-list layout: Card view.** Alongside Table and Inbox, staff can now pick a **Card** layout in **My Profile → Ticket List View**. Each ticket becomes a roomy horizontal card that stacks the data the table spreads across columns: a colour-keyed requester avatar, a "New" flag for tickets still awaiting a first reply, the type badge and subject up top; the location/group, ticket age and SLA (e.g. "First response due in 7 days", or "overdue" in red) underneath; and priority, assignee (group / agent) and status down the right edge. Confidential tickets stay redacted and the bulk-select checkboxes carry over. Applies to both the agent and admin ticket lists ([templates/partials/ticket-cards.php](templates/partials/ticket-cards.php), [templates/pages/profile/edit.php](templates/pages/profile/edit.php), [templates/pages/agent/tickets/index.php](templates/pages/agent/tickets/index.php), [templates/pages/admin/tickets/index.php](templates/pages/admin/tickets/index.php), [src/helpers.php](src/helpers.php)).
+
+---
+
 ## 2.76.0 &mdash; 2026-06-04
 
 ### Added

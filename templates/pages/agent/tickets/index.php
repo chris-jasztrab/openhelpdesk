@@ -431,6 +431,8 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
     </div>
     <?php if (($ticketView ?? 'table') === 'inbox'): ?>
     <?php $inboxBase = '/agent/tickets'; require ROOT_DIR . '/templates/partials/ticket-inbox.php'; ?>
+    <?php elseif (($ticketView ?? 'table') === 'card'): ?>
+    <?php $cardBase = '/agent/tickets'; require ROOT_DIR . '/templates/partials/ticket-cards.php'; ?>
     <?php else: ?>
     <div style="overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 260px);">
         <table class="table table-hover align-middle mb-0" id="ticketTable" style="width:100%;visibility:hidden;">
