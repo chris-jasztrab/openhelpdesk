@@ -36,3 +36,8 @@ scripts/generate_schema_diagram.py
 # Video walkthrough working files (screenshots, audio, video edits).
 /docs/screenshots/agent-walkthrough/
 .playwright-mcp/
+
+# Local-only credits roll (easter egg) + its music bed. Keep off GitHub.
+# The route file is conditionally require()d, so its absence is harmless.
+/src/routes/credits.php
+/docs/screenshots/agent-walkthrough/audio/Frolic - Luciano Michelini.mp3

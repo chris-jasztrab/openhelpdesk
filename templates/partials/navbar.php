@@ -141,6 +141,9 @@
                         <li><a class="dropdown-item" href="/manager"><i class="bi bi-stars me-2" aria-hidden="true"></i>Manage My Team</a></li>
                         <?php endif; ?>
                         <li><a class="dropdown-item" href="/profile"><i class="bi bi-person-circle me-2" aria-hidden="true"></i>My Profile</a></li>
+                        <?php if (is_file(ROOT_DIR . '/src/routes/credits.php')): ?>
+                        <li><a class="dropdown-item" href="/credits"><i class="bi bi-film me-2" aria-hidden="true"></i>Credits</a></li>
+                        <?php endif; ?>
                         <li><a class="dropdown-item text-danger" href="/logout"><i class="bi bi-box-arrow-right me-2" aria-hidden="true"></i>Sign Out</a></li>
                         <li><hr class="dropdown-divider"></li>
                         <li><span class="dropdown-item-text text-muted" style="font-size:.7rem;">v<?= APP_VERSION ?></span></li>

@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.73.0 &mdash; 2026-06-04
+
+### Added
+- **Optional local-only "Credits" roll, hung off the profile menu.** When a local, gitignored credits route file is present, a fullscreen credits page scrolls a thank-you list of testers up the screen over a music bed, and a "Credits" item appears in the profile dropdown. The route file and its audio are intentionally kept out of the repository, so the route wiring and the menu link both no-op cleanly on a public checkout — they only activate where the local file exists ([src/routes.php](src/routes.php), [templates/partials/navbar.php](templates/partials/navbar.php), [.gitignore](.gitignore)).
+
+---
+
 ## 2.72.1 &mdash; 2026-06-03
 
 ### Changed

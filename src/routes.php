@@ -22,6 +22,14 @@ require ROOT_DIR . '/src/routes/pwa.php';
 require ROOT_DIR . '/src/routes/floor.php';
 
 /* ------------------------------------------------------------------
+ * Credits roll (local-only easter egg; kept out of the public repo).
+ * Only wired in when the gitignored route file is actually present.
+ * ------------------------------------------------------------------ */
+if (is_file(ROOT_DIR . '/src/routes/credits.php')) {
+    require ROOT_DIR . '/src/routes/credits.php';
+}
+
+/* ------------------------------------------------------------------
  * Shared: enforce ticket-level access for JSON API endpoints.
  * Mirrors _agentRequireTicketAccess() but returns JSON 403 instead of redirect.
  * ------------------------------------------------------------------ */
