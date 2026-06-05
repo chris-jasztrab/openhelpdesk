@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.81.0 &mdash; 2026-06-05
+
+### Performance
+- **Tickets (database):** added two indexes to the `tickets` table to keep the ticket list fast as ticket volume grows (migration `046`). `idx_tickets_created_at` covers the default, unfiltered list view (`ORDER BY created_at DESC LIMIT n`), which previously triggered a full table scan + filesort on every load for users with unrestricted visibility (e.g. admins). The composite `idx_tickets_status_created (status, created_at)` covers the status-filtered views and **supersedes** the single-column `idx_tickets_status` from migration `041`, which is dropped to avoid maintaining two overlapping indexes. Verified with `EXPLAIN`: the default view now reads only the rows it returns with no filesort.
+
 ## 2.80.0 &mdash; 2026-06-05
 
 ### Changed
