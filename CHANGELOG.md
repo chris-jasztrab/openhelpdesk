@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.80.0 &mdash; 2026-06-05
+
+### Changed
+- **Tickets (agent & admin):** the ticket-list layout (Table / Compact / Card) can now be switched right from the tickets page via a segmented icon toggle in the toolbar — no more digging into profile settings. Picking a layout saves the preference (via the existing `/profile/setting` endpoint) and reloads in place, preserving the current filters and sort. The old radio-button block has been removed from the profile page, and the switcher lives in a single shared partial (`templates/partials/ticket-view-switcher.php`) used by both the agent and admin views.
+
 ## 2.79.5 &mdash; 2026-06-05
 
 ### Changed

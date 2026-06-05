@@ -11,4 +11,4 @@
  *   MINOR — new backwards-compatible features
  *   PATCH — backwards-compatible bug fixes
  */
-define('APP_VERSION', '2.79.5');
+define('APP_VERSION', '2.80.0');
