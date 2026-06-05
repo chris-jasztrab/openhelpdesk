@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.79.3 &mdash; 2026-06-05
+
+### Changed
+- **The "Inbox" ticket-list view is now called "Compact."** Renamed the layout option in **My Profile → Ticket List View** and everywhere it's referenced in the help docs ([templates/pages/profile/edit.php](templates/pages/profile/edit.php), [src/helpers.php](src/helpers.php), [templates/pages/agent/docs/ticket-list.php](templates/pages/agent/docs/ticket-list.php), [templates/pages/admin/docs/tickets.php](templates/pages/admin/docs/tickets.php)). The stored preference value is unchanged, so existing users keep their layout with no migration.
+
+---
+
 ## 2.79.2 &mdash; 2026-06-04
 
 ### Changed

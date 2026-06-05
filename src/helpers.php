@@ -2240,14 +2240,16 @@ function setUserColumns(int $userId, array $columns): void
 
 /**
  * Available ticket-list layouts. 'table' is the classic resizable grid;
- * 'inbox' is an email-style two-column (From / Subject) list with a hover
- * detail card. Keyed by the value stored in `ticket_view:{userId}`.
+ * 'inbox' is the "Compact" email-style two-column (From / Subject) list with
+ * a hover detail card. The stored value stays 'inbox' for backwards
+ * compatibility; only the label was renamed to "Compact".
+ * Keyed by the value stored in `ticket_view:{userId}`.
  */
 function ticketViewModes(): array
 {
     return [
         'table' => 'Table',
-        'inbox' => 'Inbox',
+        'inbox' => 'Compact',
         'card'  => 'Card',
     ];
 }

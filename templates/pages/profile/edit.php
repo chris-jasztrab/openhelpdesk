@@ -92,7 +92,7 @@ $breadcrumbs = [
                             <input class="form-check-input" type="radio" name="ticket_view" id="ticketViewInbox"
                                    value="inbox" <?= ($ticketView ?? 'table') === 'inbox' ? 'checked' : '' ?>>
                             <label class="form-check-label" for="ticketViewInbox">
-                                <span class="fw-semibold"><i class="bi bi-inbox me-1"></i>Inbox</span>
+                                <span class="fw-semibold"><i class="bi bi-inbox me-1"></i>Compact</span>
                                 <span class="text-muted small d-block ms-4">An email-style list showing just who the ticket is from and the subject. Hover a row for a card with the full details.</span>
                             </label>
                         </div>
