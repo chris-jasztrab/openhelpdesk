@@ -836,6 +836,8 @@ if ($solutionTimelineId > 0) {
             <div class="card-body">
                 <form method="POST" action="/agent/tickets/<?= $ticket['id'] ?>/update">
                     <?= csrfField() ?>
+                    <?php /* Optimistic-lock token: the status this page rendered with. */ ?>
+                    <input type="hidden" name="expected_status" value="<?= e($ticket['status']) ?>">
 
                     <div class="mb-3">
                         <label for="status" class="form-label fw-semibold small">Status</label>
@@ -1373,6 +1375,32 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
     var knownViewerIds = new Set();
     var initialCheck   = true;
 
+    // Stale-view detection: the ticket's last-modified timestamp at page render.
+    // The presence poll returns the live value; if it advances past this, the
+    // ticket changed under us (another agent, an automation, an inbound email),
+    // so we surface a one-time, dismissible "refresh" banner. Agent edits here
+    // (status/priority/reply) POST and reload, which re-seeds this baseline, so
+    // this won't fire on the agent's own changes.
+    var loadedUpdatedAt = <?= json_encode($ticket['updated_at'] ?? null) ?>;
+    var staleShown = false;
+
+    function showStaleBanner() {
+        if (staleShown) return;
+        staleShown = true;
+        var bar = document.createElement('div');
+        bar.className = 'alert alert-warning alert-dismissible fade show m-0 rounded-0 text-center';
+        bar.setAttribute('role', 'alert');
+        bar.style.position = 'sticky';
+        bar.style.top = '0';
+        bar.style.zIndex = '1050';
+        bar.innerHTML =
+            '<i class="bi bi-exclamation-triangle me-2"></i>' +
+            'This ticket was updated since you opened it. ' +
+            '<a href="" class="alert-link">Refresh</a> to see the latest.' +
+            '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>';
+        document.body.prepend(bar);
+    }
+
     function escHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
     function getModal() {
@@ -1386,6 +1414,12 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
         fetch(pingUrl)
             .then(function(r) { return r.json(); })
             .then(function(data) {
+                // Stale-view check (timestamps are 'YYYY-MM-DD HH:MM:SS', so a
+                // lexical compare is a valid chronological compare).
+                if (data.updated_at && loadedUpdatedAt && data.updated_at > loadedUpdatedAt) {
+                    showStaleBanner();
+                }
+
                 var viewers = data.viewers || [];
                 var hasNew = initialCheck
                     ? viewers.length > 0

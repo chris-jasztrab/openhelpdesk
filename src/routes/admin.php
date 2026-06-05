@@ -5251,8 +5251,19 @@ $router->post('/admin/tickets/{id}/update', function (array $p) {
     $changes = [];
 
     // Status change
-    $newStatus = $_POST['status'] ?? '';
-    if ($newStatus !== '' && in_array($newStatus, ticketActiveStatusSlugs(), true) && $newStatus !== $ticket['status']) {
+    // Optimistic-lock guard (mirrors the agent update handler): the form carries
+    // the status the page rendered with (`expected_status`). If the ticket moved
+    // on since then, skip the status change rather than clobber it — the other
+    // field changes still apply. Optional: omitting the field = last-write-wins.
+    $expectedStatus = $_POST['expected_status'] ?? '';
+    $newStatus      = $_POST['status'] ?? '';
+    $statusConflict = $expectedStatus !== '' && $expectedStatus !== $ticket['status']
+                      && $newStatus !== '' && $newStatus !== $ticket['status'];
+    if ($statusConflict) {
+        flash('error', 'Status was not changed: it had already been updated to "'
+            . ticketStatusLabel($ticket['status']) . '" by someone else. Your other changes were saved.');
+    }
+    if (!$statusConflict && $newStatus !== '' && in_array($newStatus, ticketActiveStatusSlugs(), true) && $newStatus !== $ticket['status']) {
         $oldStatus = $ticket['status'];
         $db->prepare('UPDATE tickets SET status = ? WHERE id = ?')->execute([$newStatus, $id]);
         $db->prepare(

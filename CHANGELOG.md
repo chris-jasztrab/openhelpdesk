@@ -11,6 +11,15 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.82.0 &mdash; 2026-06-05
+
+### Changed
+- **Tickets (concurrency):** added stale-write protection so two agents working the same ticket no longer silently clobber each other's status changes. The detail-page Update form and the ticket-list inline status dropdown now carry the status they were rendered with; if the ticket's status changed in the meantime, the update is rejected instead of applied — the form flashes a notice (and still saves the other field changes), and the inline dropdown shows the new value plus an alert. The check is optional/backwards-compatible (callers that don't send the expected value keep last-write-wins). Applied to both the agent and admin ticket views.
+- **Tickets (concurrency):** the ticket detail page now shows a one-time, dismissible "This ticket was updated since you opened it — Refresh" banner when the ticket changes underneath you (another agent, an automation, or an inbound email). It reuses the existing presence poll, so it adds no new requests, and it won't fire on your own edits (those reload the page).
+
+### Performance
+- **Tickets (presence):** the concurrent-viewer poll (`GET /api/tickets/{id}/presence`) no longer writes on every request. It previously ran a `DELETE` of stale rows on every poll from every viewer (an unindexed full scan of `ticket_presence`); stale rows are now excluded at read time and the cleanup runs on roughly 1 in 50 polls. Added `idx_ticket_presence_last_seen` (migration `047`) so both the read filter and the occasional cleanup use a range scan, matching what `user_presence` already had.
+
 ## 2.81.0 &mdash; 2026-06-05
 
 ### Performance

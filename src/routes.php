@@ -545,6 +545,22 @@ $router->post('/api/tickets/{id}/set-status', function (array $p) {
     $ticket = $stmt->fetch();
     if (!$ticket) { http_response_code(404); echo json_encode(['error' => 'Ticket not found']); exit; }
 
+    // Optimistic-lock guard: if the client tells us the status it last saw and
+    // the ticket has since moved on (another agent changed it), reject rather
+    // than silently clobber. `expected_status` is optional — omitting it keeps
+    // the old last-write-wins behaviour for any caller that doesn't send it.
+    $expectedStatus = isset($input['expected_status']) ? (string) $input['expected_status'] : '';
+    if ($expectedStatus !== '' && $expectedStatus !== $ticket['status']) {
+        http_response_code(409);
+        echo json_encode([
+            'error'          => 'conflict',
+            'message'        => 'This ticket\'s status was changed by someone else. The list has been refreshed.',
+            'current_status' => $ticket['status'],
+            'status_html'    => ticketStatusBadgeHtml($ticket['status']),
+        ]);
+        exit;
+    }
+
     if ($newStatus !== $ticket['status']) {
         $oldStatus = $ticket['status'];
         $db->prepare('UPDATE tickets SET status = ? WHERE id = ?')->execute([$newStatus, $ticketId]);
@@ -851,20 +867,35 @@ $router->get('/api/tickets/{id}/presence', function (array $p) {
     }
     $db = Database::connect();
     _apiRequireTicketAccess($db, (int) $p['id']);
-    // Clean up stale records (older than 45 seconds)
-    $db->prepare(
-        'DELETE FROM ticket_presence WHERE last_seen < DATE_SUB(NOW(), INTERVAL 45 SECOND)'
-    )->execute();
-    // Return other current viewers (excluding self)
+
+    // Stale rows are excluded at read time (filter, not delete) so this hot poll
+    // path no longer writes on every request. Actual deletion is amortised: it
+    // runs on ~1 in 50 polls, which is plenty to keep the tiny table tidy.
+    if (random_int(1, 50) === 1) {
+        $db->prepare(
+            'DELETE FROM ticket_presence WHERE last_seen < DATE_SUB(NOW(), INTERVAL 45 SECOND)'
+        )->execute();
+    }
+
+    // Return other current viewers (excluding self), ignoring stale rows.
     $stmt = $db->prepare(
         'SELECT u.id, u.first_name, u.last_name, u.role
          FROM ticket_presence tp
          JOIN users u ON u.id = tp.user_id
-         WHERE tp.ticket_id = ? AND tp.user_id != ?'
+         WHERE tp.ticket_id = ?
+           AND tp.user_id != ?
+           AND tp.last_seen >= DATE_SUB(NOW(), INTERVAL 45 SECOND)'
     );
     $stmt->execute([(int) $p['id'], Auth::id()]);
+
+    // Piggyback the ticket's last-modified timestamp so the detail page can warn
+    // when the ticket changed under the agent (stale-view banner). Cheap PK lookup.
+    $uStmt = $db->prepare('SELECT updated_at FROM tickets WHERE id = ?');
+    $uStmt->execute([(int) $p['id']]);
+    $updatedAt = $uStmt->fetchColumn() ?: null;
+
     header('Content-Type: application/json');
-    echo json_encode(['viewers' => $stmt->fetchAll()]);
+    echo json_encode(['viewers' => $stmt->fetchAll(), 'updated_at' => $updatedAt]);
     exit;
 });
 

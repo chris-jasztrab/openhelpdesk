@@ -512,7 +512,7 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                         </td>
                         <?php if (in_array('status', $visibleColumns)): ?>
                         <td style="white-space:nowrap;cursor:default;" onclick="event.stopPropagation()">
-                            <span class="d-inline-flex align-items-center gap-1 quick-status-wrap" data-ticket-id="<?= (int)$t['id'] ?>" style="cursor:pointer;">
+                            <span class="d-inline-flex align-items-center gap-1 quick-status-wrap" data-ticket-id="<?= (int)$t['id'] ?>" data-current-status="<?= e($t['status']) ?>" style="cursor:pointer;">
                                 <span class="quick-status-badge"><?= ticketStatusBadgeHtml($t['status']) ?></span>
                                 <button class="btn btn-link btn-sm p-0 border-0 text-muted quick-status-btn" type="button" title="Change status" style="line-height:1;"><i class="bi bi-chevron-down" style="font-size:0.65rem;"></i></button>
                             </span>
@@ -1025,9 +1025,21 @@ sessionStorage.setItem('agentTicketListUrl', window.location.href);
                     fetch('/api/tickets/' + ticketId + '/set-status', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
-                        body: JSON.stringify({status: val})
-                    }).then(function (r) { return r.json(); }).then(function (data) {
-                        if (data.success && data.status_html) { statusBadge.innerHTML = data.status_html; resizeColumns(); }
+                        body: JSON.stringify({status: val, expected_status: statusWrap.dataset.currentStatus || ''})
+                    }).then(function (r) {
+                        return r.json().then(function (data) { return {ok: r.ok, code: r.status, data: data}; });
+                    }).then(function (res) {
+                        if (res.ok && res.data.status_html) {
+                            statusBadge.innerHTML = res.data.status_html;
+                            statusWrap.dataset.currentStatus = val;
+                            resizeColumns();
+                        } else if (res.code === 409 && res.data.status_html) {
+                            // Another agent changed it first: show their value, don't apply ours.
+                            statusBadge.innerHTML = res.data.status_html;
+                            statusWrap.dataset.currentStatus = res.data.current_status || '';
+                            resizeColumns();
+                            if (res.data.message) { alert(res.data.message); }
+                        }
                     }).catch(function () {});
                 } else if (kind === 'priority') {
                     var priorityWrap = document.querySelector('.quick-priority-wrap[data-ticket-id="' + ticketId + '"]');
