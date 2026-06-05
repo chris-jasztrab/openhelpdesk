@@ -11,6 +11,12 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.79.5 &mdash; 2026-06-05
+
+### Changed
+- **Tickets (agent & admin):** the **Columns** button is now hidden in the Card and Compact ticket views, where it had no effect (those layouts don't use the per-column toggles). It remains in the Table view. Chosen over greying it out, since a disabled control the user can't re-enable in place is more confusing than one that simply isn't shown.
+- **Agent tour:** tour steps whose spotlight target isn't on the page are now skipped, so the "Customise Columns" step no longer points at a missing button when an agent takes the tour in Card/Compact view.
+
 ## 2.79.4 &mdash; 2026-06-05
 
 ### Fixed

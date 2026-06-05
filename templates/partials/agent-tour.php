@@ -393,6 +393,14 @@ $_agentTourCanTemplates = Auth::can('ticket_templates.manage') ? 'true' : 'false
         localStorage.removeItem('ld_agent_tour_page');
     }
 
+    // Drop steps whose spotlight element isn't on the page (e.g. the Columns
+    // button is hidden in the Card/Compact ticket views). Element-less steps
+    // (centered popovers) are always kept.
+    steps = steps.filter(function (step) {
+        if (typeof step.element !== 'string') return true;
+        return document.querySelector(step.element) !== null;
+    });
+
     // ── Initialise Driver.js ────────────────────────────────────────
 
     var driverObj = window.driver.js.driver({

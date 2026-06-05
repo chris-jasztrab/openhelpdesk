@@ -101,6 +101,7 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
             <i class="bi bi-funnel me-1"></i>Filters
             <?php if ($hasFilters): ?><span class="badge bg-primary rounded-pill ms-1"><?= count($hasFilters) ?></span><?php endif; ?>
         </button>
+        <?php if (($ticketView ?? 'table') === 'table'): // Columns only apply to the table layout ?>
         <div class="dropdown">
             <button id="tour-columns-btn" class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
                 <i class="bi bi-layout-three-columns me-1"></i>Columns
@@ -123,6 +124,7 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                 </form>
             </div>
         </div>
+        <?php endif; ?>
         <?php if (Auth::can('ticket_templates.manage')): ?>
         <a id="tour-templates-link" href="/admin/ticket-templates" class="btn btn-sm btn-outline-secondary">
             <i class="bi bi-collection me-1"></i>Templates

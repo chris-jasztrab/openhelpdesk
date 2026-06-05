@@ -124,6 +124,7 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
             <i class="bi bi-funnel me-1"></i>Filters
             <?php if ($hasFilters): ?><span class="badge bg-primary rounded-pill ms-1"><?= count($hasFilters) ?></span><?php endif; ?>
         </button>
+        <?php if (($ticketView ?? 'table') === 'table'): // Columns only apply to the table layout ?>
         <div class="dropdown">
             <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
                 <i class="bi bi-layout-three-columns me-1"></i>Columns
@@ -146,6 +147,7 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                 </form>
             </div>
         </div>
+        <?php endif; ?>
         <?php $exportParams = array_filter($filters, fn($v) => $v !== ''); if (!empty($sort)) { $exportParams['sort'] = $sort; $exportParams['dir'] = $dir; } ?>
         <a href="/admin/tickets/export<?= !empty($exportParams) ? '?' . http_build_query($exportParams) : '' ?>" class="btn btn-sm btn-outline-secondary">
             <i class="bi bi-download me-1"></i>Export CSV
