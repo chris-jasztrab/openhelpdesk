@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.82.1 &mdash; 2026-06-05
+
+### Fixed
+- **Help docs (Ticket List & Filters):** corrected three inaccuracies against the actual UI. The bulk action bar appears at the **top** of the ticket list (not the bottom). The agent help page listed six bulk actions (Assign, Change Status, Change Priority, Change Group, Merge, Close) — but the agent bulk bar only offers **Assign, Close, Merge**; the status/priority/type/agent/group changes are per-row *inline* actions, not bulk ones, so that list was corrected and a pointer to Inline Actions added. The filter panel slides out from the **left**, not the right (fixed in both the agent and admin help docs).
+
 ## 2.82.0 &mdash; 2026-06-05
 
 ### Changed

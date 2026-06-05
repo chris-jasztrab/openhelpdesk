@@ -274,7 +274,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-check2-square text-primary me-2"></i>Bulk Actions</h5>
-<p class="text-muted mb-2">The ticket list includes a checkbox column to select multiple tickets at once. When one or more tickets are selected, a bulk action bar appears at the bottom of the screen.</p>
+<p class="text-muted mb-2">The ticket list includes a checkbox column to select multiple tickets at once. When one or more tickets are selected, a bulk action bar appears at the top of the ticket list.</p>
 <p class="text-muted mb-2">Available bulk actions:</p>
 <ul class="text-muted mb-0">
     <li><strong>Assign</strong> — open an agent picker and assign all selected tickets to one agent.</li>
@@ -288,7 +288,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-funnel text-primary me-2"></i>Filter Panel &amp; Saved Filters</h5>
-<p class="text-muted mb-2">Ticket list filters are in a slide-out panel on the right side of the screen. Click the <strong>Filters</strong> button to open it. The panel state (open or closed) is remembered across page navigations.</p>
+<p class="text-muted mb-2">Ticket list filters are in a slide-out panel on the left side of the screen. Click the <strong>Filters</strong> button to open it. The panel state (open or closed) is remembered across page navigations.</p>
 <p class="text-muted mb-2">Ticking a checkbox or picking a date <strong>applies the filter immediately</strong> &mdash; the list refreshes on click, with no need to press Apply. (The <strong>Search</strong> box is the exception: type your text and press Enter or click Apply.) Every active filter shows as a labelled pill at the top of the panel &mdash; e.g. <span class="badge rounded-pill bg-light text-dark border">Status: Open</span> or <span class="badge rounded-pill bg-light text-dark border">Requester: Jane Doe</span>. Click the <strong>&times;</strong> on a pill to remove just that filter, or <strong>Clear All</strong> to remove them all.</p>
 <p class="text-muted mb-2">You can save any combination of active filters as a named preset:</p>
 <ol class="text-muted mb-3">

@@ -78,7 +78,7 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/agent/help'], ['label' => 'Ticke
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-funnel text-primary me-2"></i>Filtering Tickets</h5>
-<p class="text-muted mb-2">Click the <strong>Filters</strong> button to open the filter panel on the right. The panel state is remembered as you navigate. Ticking a checkbox or picking a date <strong>applies the filter immediately</strong> &mdash; the list refreshes on click, with no need to press Apply. (The <strong>Search</strong> box is the exception: type your text and press Enter or click Apply, so the list doesn&rsquo;t reload on every keystroke.) Available filters:</p>
+<p class="text-muted mb-2">Click the <strong>Filters</strong> button to open the filter panel, which slides out from the left. The panel state is remembered as you navigate. Ticking a checkbox or picking a date <strong>applies the filter immediately</strong> &mdash; the list refreshes on click, with no need to press Apply. (The <strong>Search</strong> box is the exception: type your text and press Enter or click Apply, so the list doesn&rsquo;t reload on every keystroke.) Available filters:</p>
 <div class="table-responsive mb-0">
 <table class="table table-sm mb-0">
     <thead class="table-light"><tr><th>Filter</th><th>Options</th></tr></thead>
@@ -126,15 +126,13 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/agent/help'], ['label' => 'Ticke
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-check2-square text-primary me-2"></i>Bulk Actions</h5>
-<p class="text-muted mb-2">Use the checkbox column on the left to select multiple tickets at once. When one or more tickets are selected, a bulk action bar appears at the bottom of the screen.</p>
-<ul class="text-muted mb-0">
+<p class="text-muted mb-2">Use the checkbox column on the left to select multiple tickets at once. When one or more tickets are selected, a bulk action bar appears at the top of the ticket list, showing how many are selected and these actions:</p>
+<ul class="text-muted mb-2">
     <li><strong>Assign</strong> — assign all selected tickets to one agent.</li>
-    <li><strong>Change Status</strong> — set the same status on all selected tickets.</li>
-    <li><strong>Change Priority</strong> — set the same priority on all selected tickets.</li>
-    <li><strong>Change Group</strong> — move all selected tickets to a group.</li>
-    <li><strong>Merge</strong> — merge all selected tickets; the lowest-numbered ticket becomes the primary.</li>
     <li><strong>Close</strong> — set all selected tickets to Closed status.</li>
+    <li><strong>Merge</strong> — merge all selected tickets; the lowest-numbered ticket becomes the primary.</li>
 </ul>
+<p class="text-muted small mb-0">To change <strong>status</strong>, <strong>priority</strong>, <strong>type</strong>, <strong>agent</strong> or <strong>group</strong> on a single ticket without opening it, use the <strong>Inline Actions</strong> (above) on that ticket&rsquo;s row instead &mdash; those aren&rsquo;t bulk actions.</p>
 </div>
 </div>
 
