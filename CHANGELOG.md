@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.79.4 &mdash; 2026-06-05
+
+### Fixed
+- **Tickets (agent):** the Filters button no longer shows a "2" badge when no filters are applied. The `resolved_today` and `escalated_to_me` filter values were stored as PHP booleans, so the unset `false` value slipped past the template's `$v !== ''` count check. They now use the same `'1'`/`''` string convention as the `watched` filter.
+
 ## 2.79.3 &mdash; 2026-06-05
 
 ### Changed

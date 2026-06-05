@@ -156,8 +156,8 @@ $router->get('/agent/tickets', function () {
     $fGroup    = array_values(array_filter(array_map('trim', (array) ($_GET['group']    ?? []))));
     $fSearch      = trim($_GET['q'] ?? '');
     $fWatched     = !empty($_GET['watched']) ? '1' : '';
-    $fResolvedToday = !empty($_GET['resolved_today']);
-    $fEscalatedToMe = !empty($_GET['escalated_to_me']);
+    $fResolvedToday = !empty($_GET['resolved_today']) ? '1' : '';
+    $fEscalatedToMe = !empty($_GET['escalated_to_me']) ? '1' : '';
 
     $where  = [];
     $params = [];
