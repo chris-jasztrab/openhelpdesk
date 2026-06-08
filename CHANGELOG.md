@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.83.2 &mdash; 2026-06-08
+
+### Fixed
+- **Help docs (AI &rarr; Duplicate-Ticket Detection):** clarified that duplicate detection is **not** a customer-only feature — agents creating a ticket see the same warning popup. Added a note that the popup only appears when both the ticket type has **AI duplicate check** enabled *and* an AI provider/key is configured (and a near-duplicate is actually found); otherwise no popup shows for anyone, agent or portal.
+
 ## 2.83.1 &mdash; 2026-06-08
 
 ### Fixed

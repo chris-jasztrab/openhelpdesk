@@ -82,7 +82,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 </ul>
 
 <div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
-    The check is wired into all three create paths (portal, agent/admin form, and floor-mode quick-create) and <strong>soft-fails</strong>: if the provider times out or errors, the ticket is created normally — duplicate detection never blocks submission. When a submitter overrides the warning, an <code>ai_duplicate_warned</code> note is added to the new ticket's timeline (visible to admins) recording which tickets it was flagged against.
+    The check is wired into all three create paths (portal, agent/admin form, and floor-mode quick-create) — it is <strong>not</strong> a customer-only feature; agents creating a ticket see the same warning. The popup only appears when <strong>both</strong> conditions hold for the chosen ticket type: <strong>AI duplicate check</strong> is enabled on that type, <em>and</em> an AI provider/key is configured. If either is missing — or if a near-duplicate simply isn't found — no popup shows for anyone, agent or portal. The check also <strong>soft-fails</strong>: if the provider times out or errors, the ticket is created normally — duplicate detection never blocks submission. When a submitter overrides the warning, an <code>ai_duplicate_warned</code> note is added to the new ticket's timeline (visible to admins) recording which tickets it was flagged against.
 </div>
 </div>
 </div>
