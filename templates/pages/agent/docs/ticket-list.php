@@ -14,7 +14,7 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/agent/help'], ['label' => 'Ticke
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-layout-text-sidebar text-primary me-2"></i>Choosing a List Layout</h5>
-<p class="text-muted mb-2">The ticket list comes in three layouts. Pick the one you like under <strong>My Profile &rarr; Ticket List View</strong> (top-right avatar menu &rarr; <strong>My Profile</strong>); your choice applies to every ticket list you open. Filtering, sorting, bulk-select checkboxes and the bulk-action bar work the same in all three.</p>
+<p class="text-muted mb-2">The ticket list comes in three layouts. Pick the one you like with the <strong>Table / Compact / Card</strong> view switcher on the ticket-list toolbar; your choice is saved and applies to every ticket list you open. Filtering, sorting, bulk-select checkboxes and the bulk-action bar work the same in all three.</p>
 <div class="table-responsive">
 <table class="table table-sm mb-0">
     <thead class="table-light"><tr><th style="width:120px">Layout</th><th>What it looks like</th></tr></thead>

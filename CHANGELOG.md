@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.83.1 &mdash; 2026-06-08
+
+### Fixed
+- **Help docs (Ticket List Layouts):** corrected the instructions for choosing a list layout. Both the agent and admin help pages said the layout was picked at **My Profile &rarr; Ticket List View** — that setting doesn't exist. The layout is chosen with the **Table / Compact / Card** view switcher on the ticket-list toolbar (moved there in 2.80.0), and the choice persists per-user. Updated the wording in both help docs.
+
 ## 2.83.0 &mdash; 2026-06-08
 
 ### Added

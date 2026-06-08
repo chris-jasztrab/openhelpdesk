@@ -158,7 +158,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card border-0 shadow-sm mb-4" id="list-layouts">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-layout-text-sidebar text-primary me-2"></i>Ticket List Layouts (Table / Compact / Card)</h5>
-<p class="text-muted mb-2">Each staff member can choose how their ticket lists are laid out under <strong>My Profile &rarr; Ticket List View</strong>. The setting is per-user and applies to both the admin and agent ticket lists. Filtering, sorting, bulk-select and the bulk-action bar behave identically in all three.</p>
+<p class="text-muted mb-2">Each staff member can choose how their ticket lists are laid out with the <strong>Table / Compact / Card</strong> view switcher on the ticket-list toolbar. The choice is saved per-user and applies to both the admin and agent ticket lists. Filtering, sorting, bulk-select and the bulk-action bar behave identically in all three.</p>
 <div class="table-responsive">
 <table class="table table-sm mb-0">
     <thead class="table-light"><tr><th style="width:120px">Layout</th><th>What it looks like</th></tr></thead>
