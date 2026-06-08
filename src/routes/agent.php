@@ -775,6 +775,22 @@ $router->post('/agent/tickets/bulk', function () {
         redirect('/agent/tickets');
     }
 
+    // Each bulk action is gated by its own granular permission (migration 048).
+    // Admins bypass every check; staff need the matching grant on their role.
+    $bulkPerms = [
+        'assign'   => 'tickets.bulk_assign',
+        'close'    => 'tickets.bulk_close',
+        'merge'    => 'tickets.bulk_merge',
+        'status'   => 'tickets.bulk_status',
+        'priority' => 'tickets.bulk_priority',
+        'group'    => 'tickets.bulk_group',
+        'delete'   => 'tickets.bulk_delete',
+    ];
+    if (!isset($bulkPerms[$action]) || !Auth::can($bulkPerms[$action])) {
+        flash('error', 'You do not have permission to perform that bulk action.');
+        redirect('/agent/tickets');
+    }
+
     $db           = Database::connect();
 
     // Filter out confidential tickets the user cannot access
@@ -989,6 +1005,23 @@ $router->post('/agent/tickets/bulk', function () {
             );
             flash('success', "{$merged} ticket(s) merged into #{$targetId}.");
             redirect("/agent/tickets/{$targetId}");
+
+        case 'delete':
+            $files = $db->prepare("SELECT stored_name FROM ticket_attachments WHERE ticket_id IN ({$placeholders})");
+            $files->execute($ticketIds);
+            foreach ($files->fetchAll() as $f) {
+                $path = ATTACHMENT_STORAGE_PATH . $f['stored_name'];
+                if (file_exists($path)) unlink($path);
+            }
+            $db->prepare("DELETE FROM tickets WHERE id IN ({$placeholders})")->execute($ticketIds);
+            logAudit(
+                'ticket.bulk_deleted',
+                null,
+                'ticket',
+                'count=' . count($ticketIds) . '; ids=' . implode(',', $ticketIds)
+            );
+            flash('success', count($ticketIds) . ' ticket(s) deleted.');
+            break;
 
         default:
             flash('error', 'Unknown action.');

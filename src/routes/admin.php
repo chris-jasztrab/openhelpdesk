@@ -4235,6 +4235,22 @@ $router->post('/admin/tickets/bulk', function () {
         redirect('/admin/tickets');
     }
 
+    // Each bulk action is gated by its own granular permission (migration 048).
+    // Admins bypass every check; staff need the matching grant on their role.
+    $bulkPerms = [
+        'assign'   => 'tickets.bulk_assign',
+        'close'    => 'tickets.bulk_close',
+        'merge'    => 'tickets.bulk_merge',
+        'status'   => 'tickets.bulk_status',
+        'priority' => 'tickets.bulk_priority',
+        'group'    => 'tickets.bulk_group',
+        'delete'   => 'tickets.bulk_delete',
+    ];
+    if (!isset($bulkPerms[$action]) || !Auth::can($bulkPerms[$action])) {
+        flash('error', 'You do not have permission to perform that bulk action.');
+        redirect('/admin/tickets');
+    }
+
     $db          = Database::connect();
 
     // Filter out confidential tickets the user cannot access
@@ -4428,7 +4444,6 @@ $router->post('/admin/tickets/bulk', function () {
             redirect("/admin/tickets/{$targetId}");
 
         case 'delete':
-            Auth::requireAdmin();
             $files = $db->prepare("SELECT stored_name FROM ticket_attachments WHERE ticket_id IN ({$placeholders})");
             $files->execute($ticketIds);
             foreach ($files->fetchAll() as $f) {

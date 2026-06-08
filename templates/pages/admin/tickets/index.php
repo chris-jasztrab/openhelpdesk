@@ -426,27 +426,41 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
     <!-- Bulk Action Bar (shown when tickets are selected) -->
     <div id="bulkBar" style="display:none;background:#eef2ff;border-bottom:1px solid #d1d9f0;padding:.5rem .75rem;align-items:center;gap:.5rem;">
         <span id="bulkCount" class="text-muted small fw-semibold me-1">0 selected</span>
+        <?php if (Auth::can('tickets.bulk_assign')): ?>
         <button type="button" class="btn btn-sm btn-outline-secondary" onclick="bulkAction('assign')">
             <i class="bi bi-person-check me-1"></i>Assign
         </button>
+        <?php endif; ?>
+        <?php if (Auth::can('tickets.bulk_close')): ?>
         <button type="button" class="btn btn-sm btn-outline-secondary" onclick="bulkAction('close')">
             <i class="bi bi-check-circle me-1"></i>Close
         </button>
+        <?php endif; ?>
+        <?php if (Auth::can('tickets.bulk_merge')): ?>
         <button type="button" class="btn btn-sm btn-outline-secondary" onclick="bulkAction('merge')">
             <i class="bi bi-diagram-2 me-1"></i>Merge
         </button>
+        <?php endif; ?>
+        <?php if (Auth::can('tickets.bulk_status')): ?>
         <button type="button" class="btn btn-sm btn-outline-secondary" onclick="bulkAction('status')">
             <i class="bi bi-flag me-1"></i>Status
         </button>
+        <?php endif; ?>
+        <?php if (Auth::can('tickets.bulk_priority')): ?>
         <button type="button" class="btn btn-sm btn-outline-secondary" onclick="bulkAction('priority')">
             <i class="bi bi-exclamation-triangle me-1"></i>Priority
         </button>
+        <?php endif; ?>
+        <?php if (Auth::can('tickets.bulk_group')): ?>
         <button type="button" class="btn btn-sm btn-outline-secondary" onclick="bulkAction('group')">
             <i class="bi bi-people me-1"></i>Group
         </button>
+        <?php endif; ?>
+        <?php if (Auth::can('tickets.bulk_delete')): ?>
         <button type="button" class="btn btn-sm btn-outline-danger" onclick="bulkAction('delete')">
             <i class="bi bi-trash me-1"></i>Delete
         </button>
+        <?php endif; ?>
         <button type="button" class="btn btn-sm btn-link text-muted ms-auto p-0" onclick="clearSelection()" title="Clear selection">
             <i class="bi bi-x-lg"></i>
         </button>

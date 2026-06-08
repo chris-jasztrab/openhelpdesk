@@ -419,24 +419,41 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
     <!-- Bulk Action Bar (shown when tickets are selected) -->
     <div id="bulkBar" style="display:none;background:#eef2ff;border-bottom:1px solid #d1d9f0;padding:.5rem .75rem;align-items:center;gap:.5rem;">
         <span id="bulkCount" class="text-muted small fw-semibold me-1">0 selected</span>
+        <?php if (Auth::can('tickets.bulk_assign')): ?>
         <button type="button" class="btn btn-sm btn-outline-secondary" onclick="bulkAction('assign')">
             <i class="bi bi-person-check me-1"></i>Assign
         </button>
+        <?php endif; ?>
+        <?php if (Auth::can('tickets.bulk_close')): ?>
         <button type="button" class="btn btn-sm btn-outline-secondary" onclick="bulkAction('close')">
             <i class="bi bi-check-circle me-1"></i>Close
         </button>
+        <?php endif; ?>
+        <?php if (Auth::can('tickets.bulk_merge')): ?>
         <button type="button" class="btn btn-sm btn-outline-secondary" onclick="bulkAction('merge')">
             <i class="bi bi-diagram-2 me-1"></i>Merge
         </button>
+        <?php endif; ?>
+        <?php if (Auth::can('tickets.bulk_status')): ?>
         <button type="button" class="btn btn-sm btn-outline-secondary" onclick="bulkAction('status')">
             <i class="bi bi-flag me-1"></i>Status
         </button>
+        <?php endif; ?>
+        <?php if (Auth::can('tickets.bulk_priority')): ?>
         <button type="button" class="btn btn-sm btn-outline-secondary" onclick="bulkAction('priority')">
             <i class="bi bi-exclamation-triangle me-1"></i>Priority
         </button>
+        <?php endif; ?>
+        <?php if (Auth::can('tickets.bulk_group')): ?>
         <button type="button" class="btn btn-sm btn-outline-secondary" onclick="bulkAction('group')">
             <i class="bi bi-people me-1"></i>Group
         </button>
+        <?php endif; ?>
+        <?php if (Auth::can('tickets.bulk_delete')): ?>
+        <button type="button" class="btn btn-sm btn-outline-danger" onclick="bulkAction('delete')">
+            <i class="bi bi-trash me-1"></i>Delete
+        </button>
+        <?php endif; ?>
         <button type="button" class="btn btn-sm btn-link text-muted ms-auto p-0" onclick="clearSelection()" title="Clear selection">
             <i class="bi bi-x-lg"></i>
         </button>
@@ -754,6 +771,31 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
         </div>
     </div>
 </div>
+
+<?php if (Auth::can('tickets.bulk_delete')): ?>
+<!-- Bulk Delete Confirmation Modal -->
+<div class="modal fade" id="bulkDeleteModal" tabindex="-1" aria-labelledby="bulkDeleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="bulkDeleteModalLabel">
+                    <i class="bi bi-trash me-2 text-danger"></i>Delete Tickets
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0">Delete <strong id="bulkDeleteCount"></strong> ticket(s)? <span class="text-danger fw-semibold">This cannot be undone.</span></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger px-4" id="bulkDeleteConfirmBtn">
+                    <i class="bi bi-trash me-1"></i>Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 <script>
 sessionStorage.setItem('agentTicketListUrl', window.location.href);
 (function () {
@@ -842,6 +884,11 @@ sessionStorage.setItem('agentTicketListUrl', window.location.href);
                 first = false;
             });
             bootstrap.Modal.getOrCreateInstance(document.getElementById('bulkMergeModal')).show();
+            return;
+        }
+        if (action === 'delete') {
+            document.getElementById('bulkDeleteCount').textContent = selectedIds.size;
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('bulkDeleteModal')).show();
             return;
         }
         if (action === 'status') {
@@ -934,6 +981,14 @@ sessionStorage.setItem('agentTicketListUrl', window.location.href);
         sa.checked = false; sa.indeterminate = false;
         updateBulkBar();
     };
+
+    var bulkDeleteConfirmBtn = document.getElementById('bulkDeleteConfirmBtn');
+    if (bulkDeleteConfirmBtn) {
+        bulkDeleteConfirmBtn.addEventListener('click', function () {
+            bootstrap.Modal.getInstance(document.getElementById('bulkDeleteModal')).hide();
+            submitBulk('delete', null);
+        });
+    }
 })();
 
     // Measure natural column widths then switch to fixed layout so subject truncates

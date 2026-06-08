@@ -11,6 +11,15 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.84.0 &mdash; 2026-06-08
+
+### Added
+- **Permissions (bulk ticket actions):** every ticket-list bulk action is now its own grantable permission, so you can decide per role exactly which an agent may use. A new **Bulk Actions** section in **Settings &rarr; Permission Levels** offers seven toggles: bulk **assign**, **close**, **merge**, **change status**, **change priority**, **change group**, and **delete**. Agents now only see the bulk buttons their role is granted.
+- **Tickets (agent bulk delete):** agents can now be granted **bulk delete**, which previously did not exist for them at all. When granted, the **Delete** button appears in the agent ticket-list bulk bar (with the same confirm-first modal admins get) and permanently removes the selected tickets and their attachments, writing a `ticket.bulk_deleted` audit entry. It is off for every role by default and must be granted explicitly.
+
+### Changed
+- **Permissions (backwards-compatible upgrade):** the six non-destructive bulk permissions are auto-granted to every existing non-admin staff level on upgrade (migration 048), so nothing an agent can do today changes. Server-side handlers in both the agent and admin bulk routes now enforce the per-action permission, not just "is staff," closing the gap where any staff member could POST any bulk action.
+
 ## 2.83.2 &mdash; 2026-06-08
 
 ### Fixed

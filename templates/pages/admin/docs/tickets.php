@@ -283,8 +283,9 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
     <li><strong>Status</strong> — set all selected tickets to a chosen status.</li>
     <li><strong>Priority</strong> — set all selected tickets to a chosen priority (or none).</li>
     <li><strong>Group</strong> — assign all selected tickets to a chosen group (or none).</li>
-    <li><strong>Delete</strong> — permanently delete selected tickets (admin only).</li>
+    <li><strong>Delete</strong> — permanently delete selected tickets (asks for confirmation first; irreversible).</li>
 </ul>
+<p class="text-muted small mt-2 mb-0">Each of these actions is a separate permission under <strong>Settings &rarr; Permission Levels &rarr; Bulk Actions</strong>. Tick the ones a role may use; agents only see the buttons they&rsquo;re granted. The six non-destructive actions are on by default for existing staff levels, while <strong>Bulk delete</strong> starts off for everyone (admins always have it) so you can hand it out deliberately. You can now grant bulk delete to agents — it will appear on their ticket list once selected.</p>
 </div>
 </div>
 

@@ -134,7 +134,9 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/agent/help'], ['label' => 'Ticke
     <li><strong>Status</strong> — set all selected tickets to a chosen status.</li>
     <li><strong>Priority</strong> — set all selected tickets to a chosen priority (or none).</li>
     <li><strong>Group</strong> — assign all selected tickets to a chosen group (or none).</li>
+    <li><strong>Delete</strong> — permanently delete all selected tickets (asks you to confirm first). This is irreversible.</li>
 </ul>
+<p class="text-muted small mb-2">Each bulk action is controlled by a permission on your role. You&rsquo;ll only see the buttons your administrator has granted you, so your bar may show fewer actions than the full list above. <strong>Delete</strong> in particular is off by default and must be granted explicitly.</p>
 <p class="text-muted small mb-0">To change <strong>type</strong> or <strong>agent</strong> on a single ticket without opening it, use the <strong>Inline Actions</strong> (above) on that ticket&rsquo;s row instead.</p>
 </div>
 </div>
