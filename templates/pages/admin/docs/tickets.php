@@ -280,6 +280,9 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
     <li><strong>Assign</strong> — open an agent picker and assign all selected tickets to one agent.</li>
     <li><strong>Close</strong> — set all selected tickets to Closed status.</li>
     <li><strong>Merge</strong> — merge all selected tickets; the lowest-numbered ticket becomes the primary. The primary's priority is automatically escalated to the highest priority among all tickets being merged.</li>
+    <li><strong>Status</strong> — set all selected tickets to a chosen status.</li>
+    <li><strong>Priority</strong> — set all selected tickets to a chosen priority (or none).</li>
+    <li><strong>Group</strong> — assign all selected tickets to a chosen group (or none).</li>
     <li><strong>Delete</strong> — permanently delete selected tickets (admin only).</li>
 </ul>
 </div>

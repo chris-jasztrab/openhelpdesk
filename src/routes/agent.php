@@ -833,6 +833,59 @@ $router->post('/agent/tickets/bulk', function () {
             flash('success', count($ticketIds) . ' ticket(s) ' . $label . '.');
             break;
 
+        case 'status':
+            $newStatus = (string) ($_POST['status'] ?? '');
+            if ($newStatus === '' || !in_array($newStatus, ticketActiveStatusSlugs(), true)) {
+                flash('error', 'Invalid status.');
+                redirect('/agent/tickets');
+            }
+            $db->prepare("UPDATE tickets SET status = ? WHERE id IN ({$placeholders})")
+               ->execute(array_merge([$newStatus], $ticketIds));
+            logAudit(
+                'ticket.bulk_status_changed',
+                null,
+                'ticket',
+                'count=' . count($ticketIds) . '; status=' . $newStatus . '; ids=' . implode(',', $ticketIds)
+            );
+            flash('success', count($ticketIds) . ' ticket(s) updated.');
+            break;
+
+        case 'priority':
+            $priorityId = !empty($_POST['priority_id']) ? (int) $_POST['priority_id'] : null;
+            if ($priorityId !== null) {
+                $chk = $db->prepare('SELECT 1 FROM ticket_priorities WHERE id = ?');
+                $chk->execute([$priorityId]);
+                if (!$chk->fetchColumn()) { flash('error', 'Invalid priority.'); redirect('/agent/tickets'); }
+            }
+            $db->prepare("UPDATE tickets SET priority_id = ? WHERE id IN ({$placeholders})")
+               ->execute(array_merge([$priorityId], $ticketIds));
+            logAudit(
+                'ticket.bulk_priority_changed',
+                $priorityId,
+                'ticket',
+                'count=' . count($ticketIds) . '; priority_id=' . ($priorityId ?? 'none') . '; ids=' . implode(',', $ticketIds)
+            );
+            flash('success', count($ticketIds) . ' ticket(s) updated.');
+            break;
+
+        case 'group':
+            $groupId = !empty($_POST['group_id']) ? (int) $_POST['group_id'] : null;
+            if ($groupId !== null) {
+                $chk = $db->prepare('SELECT 1 FROM `groups` WHERE id = ?');
+                $chk->execute([$groupId]);
+                if (!$chk->fetchColumn()) { flash('error', 'Invalid group.'); redirect('/agent/tickets'); }
+            }
+            $db->prepare("UPDATE tickets SET group_id = ? WHERE id IN ({$placeholders})")
+               ->execute(array_merge([$groupId], $ticketIds));
+            logAudit(
+                'ticket.bulk_group_changed',
+                $groupId,
+                'ticket',
+                'count=' . count($ticketIds) . '; group_id=' . ($groupId ?? 'none') . '; ids=' . implode(',', $ticketIds)
+            );
+            flash('success', count($ticketIds) . ' ticket(s) updated.');
+            break;
+
         case 'merge':
             if (count($ticketIds) < 2) {
                 flash('error', 'Select at least 2 tickets to merge.');

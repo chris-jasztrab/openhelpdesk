@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.83.0 &mdash; 2026-06-08
+
+### Added
+- **Tickets (bulk actions):** the ticket-list bulk action bar can now change **Status**, **Priority**, and **Group** on the selected tickets, alongside the existing Assign, Close, and Merge (and admin-only Delete). Each opens a small modal to pick the target value and applies it to every selected ticket in one request. Added to both the agent and admin ticket views. Server-side handlers validate the chosen value, respect the existing confidential-ticket access filtering, and write an audit-log entry (`ticket.bulk_status_changed` / `bulk_priority_changed` / `bulk_group_changed`).
+
 ## 2.82.1 &mdash; 2026-06-05
 
 ### Fixed

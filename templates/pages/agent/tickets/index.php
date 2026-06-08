@@ -428,6 +428,15 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
         <button type="button" class="btn btn-sm btn-outline-secondary" onclick="bulkAction('merge')">
             <i class="bi bi-diagram-2 me-1"></i>Merge
         </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="bulkAction('status')">
+            <i class="bi bi-flag me-1"></i>Status
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="bulkAction('priority')">
+            <i class="bi bi-exclamation-triangle me-1"></i>Priority
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="bulkAction('group')">
+            <i class="bi bi-people me-1"></i>Group
+        </button>
         <button type="button" class="btn btn-sm btn-link text-muted ms-auto p-0" onclick="clearSelection()" title="Clear selection">
             <i class="bi bi-x-lg"></i>
         </button>
@@ -671,6 +680,80 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
         </div>
     </div>
 </div>
+
+<!-- Bulk Status Modal -->
+<div class="modal fade" id="bulkStatusModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title fw-bold">Change Status</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <label class="form-label small fw-semibold mb-1">Set status to</label>
+                <select id="bulkStatusSelect" class="form-select form-select-sm">
+                    <?php foreach (ticketActiveStatuses() as $s): ?>
+                    <option value="<?= e($s['slug']) ?>"><?= e($s['label']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-sm text-white" style="background:var(--ld-primary);" onclick="submitBulkStatus()">Apply</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Priority Modal -->
+<div class="modal fade" id="bulkPriorityModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title fw-bold">Change Priority</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <label class="form-label small fw-semibold mb-1">Set priority to</label>
+                <select id="bulkPrioritySelect" class="form-select form-select-sm">
+                    <option value="">None</option>
+                    <?php foreach ($priorities as $pr): ?>
+                    <option value="<?= (int) $pr['id'] ?>"><?= e($pr['name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-sm text-white" style="background:var(--ld-primary);" onclick="submitBulkPriority()">Apply</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Group Modal -->
+<div class="modal fade" id="bulkGroupModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title fw-bold">Change Group</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <label class="form-label small fw-semibold mb-1">Set group to</label>
+                <select id="bulkGroupSelect" class="form-select form-select-sm">
+                    <option value="">None</option>
+                    <?php foreach ($groups as $g): ?>
+                    <option value="<?= (int) $g['id'] ?>"><?= e($g['name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-sm text-white" style="background:var(--ld-primary);" onclick="submitBulkGroup()">Apply</button>
+            </div>
+        </div>
+    </div>
+</div>
 <script>
 sessionStorage.setItem('agentTicketListUrl', window.location.href);
 (function () {
@@ -761,7 +844,40 @@ sessionStorage.setItem('agentTicketListUrl', window.location.href);
             bootstrap.Modal.getOrCreateInstance(document.getElementById('bulkMergeModal')).show();
             return;
         }
+        if (action === 'status') {
+            new bootstrap.Modal(document.getElementById('bulkStatusModal')).show();
+            return;
+        }
+        if (action === 'priority') {
+            new bootstrap.Modal(document.getElementById('bulkPriorityModal')).show();
+            return;
+        }
+        if (action === 'group') {
+            new bootstrap.Modal(document.getElementById('bulkGroupModal')).show();
+            return;
+        }
         submitBulk(action, null);
+    };
+
+    window.submitBulkStatus = function () {
+        var v = document.getElementById('bulkStatusSelect').value;
+        var modal = bootstrap.Modal.getInstance(document.getElementById('bulkStatusModal'));
+        if (modal) modal.hide();
+        submitBulk('status', null, undefined, { status: v });
+    };
+
+    window.submitBulkPriority = function () {
+        var v = document.getElementById('bulkPrioritySelect').value;
+        var modal = bootstrap.Modal.getInstance(document.getElementById('bulkPriorityModal'));
+        if (modal) modal.hide();
+        submitBulk('priority', null, undefined, { priority_id: v });
+    };
+
+    window.submitBulkGroup = function () {
+        var v = document.getElementById('bulkGroupSelect').value;
+        var modal = bootstrap.Modal.getInstance(document.getElementById('bulkGroupModal'));
+        if (modal) modal.hide();
+        submitBulk('group', null, undefined, { group_id: v });
     };
 
     window.submitBulkMerge = function () {
@@ -779,15 +895,23 @@ sessionStorage.setItem('agentTicketListUrl', window.location.href);
         submitBulk('assign', agentId);
     };
 
-    function submitBulk(action, agentId, primaryId) {
+    function submitBulk(action, agentId, primaryId, extras) {
         var form = document.getElementById('bulkForm');
         document.getElementById('bulkActionInput').value = action;
-        form.querySelectorAll('input[name="ticket_ids[]"]').forEach(function (el) { el.remove(); });
+        form.querySelectorAll('input[name="ticket_ids[]"], input[data-bulk-extra]').forEach(function (el) { el.remove(); });
         selectedIds.forEach(function (id) {
             var inp = document.createElement('input');
             inp.type = 'hidden'; inp.name = 'ticket_ids[]'; inp.value = id;
             form.appendChild(inp);
         });
+        if (extras) {
+            Object.keys(extras).forEach(function (k) {
+                var inp = document.createElement('input');
+                inp.type = 'hidden'; inp.name = k; inp.value = extras[k];
+                inp.setAttribute('data-bulk-extra', '1');
+                form.appendChild(inp);
+            });
+        }
         var pi = form.querySelector('input[name="primary_ticket_id"]');
         if (primaryId !== undefined && primaryId !== null) {
             if (!pi) { pi = document.createElement('input'); pi.type = 'hidden'; pi.name = 'primary_ticket_id'; form.appendChild(pi); }

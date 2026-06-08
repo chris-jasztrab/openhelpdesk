@@ -131,8 +131,11 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/agent/help'], ['label' => 'Ticke
     <li><strong>Assign</strong> — assign all selected tickets to one agent.</li>
     <li><strong>Close</strong> — set all selected tickets to Closed status.</li>
     <li><strong>Merge</strong> — merge all selected tickets; the lowest-numbered ticket becomes the primary.</li>
+    <li><strong>Status</strong> — set all selected tickets to a chosen status.</li>
+    <li><strong>Priority</strong> — set all selected tickets to a chosen priority (or none).</li>
+    <li><strong>Group</strong> — assign all selected tickets to a chosen group (or none).</li>
 </ul>
-<p class="text-muted small mb-0">To change <strong>status</strong>, <strong>priority</strong>, <strong>type</strong>, <strong>agent</strong> or <strong>group</strong> on a single ticket without opening it, use the <strong>Inline Actions</strong> (above) on that ticket&rsquo;s row instead &mdash; those aren&rsquo;t bulk actions.</p>
+<p class="text-muted small mb-0">To change <strong>type</strong> or <strong>agent</strong> on a single ticket without opening it, use the <strong>Inline Actions</strong> (above) on that ticket&rsquo;s row instead.</p>
 </div>
 </div>
 
