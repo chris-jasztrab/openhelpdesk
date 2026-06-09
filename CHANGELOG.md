@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.85.1 &mdash; 2026-06-09
+
+### Fixed
+- **Tickets (reply editor scroll):** clicking **Reply**, **Forward**, or **Add Note** on a ticket now scrolls the whole reply panel into view, through the **Send Reply** button. Previously the page scrolled only far enough to reveal the top of the panel, leaving most of the CKEditor and the send button hidden below the fold. The scroll now waits for the editor to reflow to full height and aligns the panel's bottom edge into view. Fixed on both the agent and admin ticket pages.
+
 ## 2.85.0 &mdash; 2026-06-09
 
 ### Changed

@@ -33,6 +33,7 @@ if ($solutionTimelineId > 0) {
 {"imports":{"ckeditor5":"https://cdn.ckeditor.com/ckeditor5/43.3.1/ckeditor5.js","ckeditor5/":"https://cdn.ckeditor.com/ckeditor5/43.3.1/"}}
 </script>
 <style>
+#replyBox { scroll-margin-bottom: 1.5rem; }
 #replyEditor ~ .ck-editor .ck-editor__editable_inline { min-height: 150px !important; }
 .ck.ck-toolbar { border-radius: .375rem .375rem 0 0 !important; border-color: #dee2e6 !important; }
 .ck.ck-editor__editable { border-radius: 0 0 .375rem .375rem !important; border-color: #dee2e6 !important; }
@@ -1484,8 +1485,18 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
         statusAfterEl.value  = '';
         box.style.display    = '';
         if (window._replyEditor) window._replyEditor.ui.update();
-        box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        setTimeout(function() { if (window._replyEditor) window._replyEditor.editing.view.focus(); }, 80);
+        // Focus the editor first (CKEditor scrolls the caret into view), THEN
+        // scroll the whole panel's bottom — through the Send Reply button —
+        // into view so this scroll wins over the focus scroll and the editor
+        // has reflowed to its full height first.
+        setTimeout(function() {
+            if (window._replyEditor) window._replyEditor.editing.view.focus();
+            requestAnimationFrame(function() {
+                requestAnimationFrame(function() {
+                    box.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                });
+            });
+        }, 80);
         [btnReply, btnForward, btnNote].forEach(function(b) { b.classList.remove('active'); });
         ({ reply: btnReply, forward: btnForward, note: btnNote })[mode].classList.add('active');
     }
