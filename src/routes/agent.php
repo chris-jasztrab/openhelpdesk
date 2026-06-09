@@ -710,6 +710,22 @@ $router->get('/agent/tickets/create', function () {
     )->fetchAll();
     $templates  = $db->query('SELECT * FROM ticket_templates ORDER BY name')->fetchAll();
 
+    // Map each ticket type to its group, and each group to its staff members,
+    // so the Assign-To dropdown can narrow to the type's group on the client.
+    $typeGroups   = [];
+    foreach ($types as $t) {
+        $typeGroups[(int) $t['id']] = $t['group_id'] !== null ? (int) $t['group_id'] : null;
+    }
+    $groupMembers = [];
+    $memberRows   = $db->query(
+        "SELECT gum.group_id, gum.user_id FROM group_user_map gum
+         JOIN users u ON u.id = gum.user_id
+         WHERE " . staffRoleSqlIn('u.role')
+    )->fetchAll();
+    foreach ($memberRows as $r) {
+        $groupMembers[(int) $r['group_id']][] = (int) $r['user_id'];
+    }
+
     $formLayouts  = [];
     $customFields = [];
     $seenCustomIds = [];
@@ -749,6 +765,8 @@ $router->get('/agent/tickets/create', function () {
         'locations'     => $locations,
         'groups'        => $groups,
         'agents'        => $agents,
+        'typeGroups'    => $typeGroups,
+        'groupMembers'  => $groupMembers,
         'templates'     => $templates,
         'isAgent'       => true,
         'formAction'    => '/admin/tickets/create',

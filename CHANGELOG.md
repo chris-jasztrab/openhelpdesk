@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.85.0 &mdash; 2026-06-09
+
+### Changed
+- **Tickets (staff create form):** on both the agent and admin "New Ticket" forms, the **Assign To** dropdown now narrows to the members of the chosen ticket type's group instead of always listing every agent. Picking a type (or explicitly choosing a **Group**) filters the assignee list to that group's staff; an explicitly chosen group takes precedence over the type's group. Types with no group — or a group with no members — keep showing the full agent list so assignment can never be locked out, and a selection that no longer fits the filter falls back to **Unassigned**.
+
 ## 2.84.0 &mdash; 2026-06-08
 
 ### Added

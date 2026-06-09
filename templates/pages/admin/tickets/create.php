@@ -395,6 +395,59 @@ $statusOptions = ticketStatusLabelMap();
     applyLayout();
 })();
 
+// ── Narrow the Assign-To list to the chosen type/group's members ──
+(function() {
+    var typeGroups   = <?= json_encode($typeGroups ?? new stdClass()) ?>;
+    var groupMembers = <?= json_encode($groupMembers ?? new stdClass()) ?>;
+    var typeSelect   = document.getElementById('type_id');
+    var groupSelect  = document.getElementById('group_id');
+    var assignSelect = document.getElementById('assigned_to');
+    if (!assignSelect) return;
+
+    // Snapshot the full agent list so we can rebuild from it on every change.
+    var allOptions = Array.prototype.map.call(assignSelect.options, function(o) {
+        return { value: o.value, text: o.text };
+    });
+
+    function effectiveGroup() {
+        // An explicitly chosen group wins; otherwise fall back to the type's group.
+        var g = groupSelect && groupSelect.value ? parseInt(groupSelect.value, 10) : 0;
+        if (g) return g;
+        var t = typeSelect && typeSelect.value ? parseInt(typeSelect.value, 10) : 0;
+        var tg = t ? typeGroups[t] : null;
+        return tg ? parseInt(tg, 10) : 0;
+    }
+
+    function applyAssigneeFilter() {
+        var g       = effectiveGroup();
+        // Only restrict when the group has known members; otherwise keep everyone
+        // so an empty/ungrouped type can never lock assignment out.
+        var members = (g && groupMembers[g] && groupMembers[g].length)
+            ? groupMembers[g].map(String) : null;
+        var prev    = assignSelect.value;
+
+        assignSelect.innerHTML = '';
+        allOptions.forEach(function(o) {
+            if (o.value === '' || !members || members.indexOf(o.value) !== -1) {
+                var opt = document.createElement('option');
+                opt.value = o.value;
+                opt.text  = o.text;
+                assignSelect.appendChild(opt);
+            }
+        });
+
+        // Keep the prior selection if it survived the filter, else go unassigned.
+        var stillThere = Array.prototype.some.call(assignSelect.options, function(o) {
+            return o.value === prev;
+        });
+        assignSelect.value = stillThere ? prev : '';
+    }
+
+    if (typeSelect)  typeSelect.addEventListener('change', applyAssigneeFilter);
+    if (groupSelect) groupSelect.addEventListener('change', applyAssigneeFilter);
+    applyAssigneeFilter();
+})();
+
 <?php if (!empty($customFields)): ?>
 
 // ── Dependent field cascading dropdowns ────────────────────────
