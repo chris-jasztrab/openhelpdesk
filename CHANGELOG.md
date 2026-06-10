@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.87.2 &mdash; 2026-06-10
+
+### Added
+- **Dev tooling:** `database/seed_training_tickets.php` &mdash; a one-off seed that creates 10 demo tickets spanning the real ticket types, each with a full history of public replies, internal notes, and agent `@mentions` (with real mention notifications), for recording training videos. Every seeded ticket is tagged `[[TRAINING-DEMO]]` in its description and the script prints the exact `DELETE` statements to remove just those tickets afterwards. Not wired into the app; run manually with `php database/seed_training_tickets.php`.
+
+---
+
 ## 2.87.1 &mdash; 2026-06-10
 
 ### Fixed
