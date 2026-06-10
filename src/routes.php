@@ -485,6 +485,7 @@ $router->post('/api/tickets/{id}/set-group', function (array $p) {
         $groupName = $gs->fetchColumn() ?: null;
     }
 
+    $typeCleared = false;
     if ($groupId !== $oldGroupId) {
         $db->prepare('UPDATE tickets SET group_id = ? WHERE id = ?')->execute([$groupId, $ticketId]);
         $oldName = 'None';
@@ -495,6 +496,8 @@ $router->post('/api/tickets/{id}/set-group', function (array $p) {
         }
         $db->prepare('INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)')
            ->execute([$ticketId, Auth::id(), 'group_changed', 'Group changed from ' . $oldName . ' to ' . ($groupName ?? 'None')]);
+        // A ticket type maps 1:1 to a default group — clear a now-mismatched type.
+        $typeCleared = clearTicketTypeIfGroupMismatch($db, $ticketId, $groupId, Auth::id());
         if ($groupId) { notifyAssignedGroup($db, $ticketId, $groupId); }
         runAutomations($db, $ticketId, 'ticket_updated');
     }
@@ -511,7 +514,7 @@ $router->post('/api/tickets/{id}/set-group', function (array $p) {
                           WHERE " . staffRoleSqlIn('role') . " ORDER BY first_name, last_name");
     }
     $agents = array_map(fn($r) => ['id' => (int)$r['id'], 'name' => $r['name']], $as->fetchAll());
-    echo json_encode(['success' => true, 'group_name' => $groupName, 'agents' => $agents]);
+    echo json_encode(['success' => true, 'group_name' => $groupName, 'agents' => $agents, 'type_cleared' => $typeCleared]);
     exit;
 });
 

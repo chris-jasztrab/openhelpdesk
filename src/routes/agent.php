@@ -357,7 +357,11 @@ $router->get('/agent/tickets', function () {
         "SELECT id, CONCAT(first_name, ' ', last_name) AS name FROM users WHERE " . staffRoleSqlIn('role') . " ORDER BY first_name, last_name"
     )->fetchAll();
 
-    if (!empty($agentGroupIds)) {
+    // Group picker scope: by default a non-admin agent can only move tickets into
+    // groups they belong to. The 'agents_assign_any_group' setting lifts that and
+    // shows every group (admins are never restricted — $agentGroupIds is empty).
+    $assignAnyGroup = getSetting('agents_assign_any_group', '0') === '1';
+    if (!empty($agentGroupIds) && !$assignAnyGroup) {
         $placeholders = implode(',', array_fill(0, count($agentGroupIds), '?'));
         $gDropStmt = $db->prepare("SELECT * FROM `groups` WHERE id IN ($placeholders) ORDER BY sort_order, name");
         $gDropStmt->execute($agentGroupIds);
@@ -911,6 +915,10 @@ $router->post('/agent/tickets/bulk', function () {
             }
             $db->prepare("UPDATE tickets SET group_id = ? WHERE id IN ({$placeholders})")
                ->execute(array_merge([$groupId], $ticketIds));
+            // Type maps 1:1 to a default group — clear a now-mismatched type per ticket.
+            foreach ($ticketIds as $bulkTicketId) {
+                clearTicketTypeIfGroupMismatch($db, (int) $bulkTicketId, $groupId, Auth::id());
+            }
             logAudit(
                 'ticket.bulk_group_changed',
                 $groupId,
@@ -1966,34 +1974,9 @@ $router->post('/agent/tickets/{id}/update', function (array $p) {
         if ($newAssigned) { notifyAssignedAgent($db, $id, $newAssigned); }
     }
 
-    // Group change
-    $newGroupRaw = $_POST['group_id'] ?? '';
-    $newGroup = $newGroupRaw === '' ? null : (int) $newGroupRaw;
-    $oldGroup = $ticket['group_id'] ? (int) $ticket['group_id'] : null;
-    if ($newGroup !== $oldGroup) {
-        $db->prepare('UPDATE tickets SET group_id = ? WHERE id = ?')->execute([$newGroup, $id]);
-
-        $oldGroupName = 'None';
-        $newGroupName = 'None';
-        if ($oldGroup) {
-            $s = $db->prepare('SELECT name FROM groups WHERE id = ?');
-            $s->execute([$oldGroup]);
-            $oldGroupName = $s->fetchColumn() ?: 'None';
-        }
-        if ($newGroup) {
-            $s = $db->prepare('SELECT name FROM groups WHERE id = ?');
-            $s->execute([$newGroup]);
-            $newGroupName = $s->fetchColumn() ?: 'None';
-        }
-
-        $db->prepare(
-            'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
-        )->execute([$id, Auth::id(), 'group_changed', "Group changed from {$oldGroupName} to {$newGroupName}"]);
-        $changes[] = 'group';
-        if ($newGroup) { notifyAssignedGroup($db, $id, $newGroup); }
-    }
-
-    // Type change
+    // Type change — handled before the group change below so an explicit
+    // type+group pairing in the same save is preserved, while a group change
+    // on its own can still clear a now-mismatched type.
     $newTypeRaw = $_POST['type_id'] ?? '';
     $newType = $newTypeRaw === '' ? null : (int) $newTypeRaw;
     $oldType = $ticket['type_id'] ? (int) $ticket['type_id'] : null;
@@ -2020,6 +2003,37 @@ $router->post('/agent/tickets/{id}/update', function (array $p) {
 
         // Recalculate SLA for new type
         Sla::onTypeChanged($db, $id, $newType);
+    }
+
+    // Group change
+    $newGroupRaw = $_POST['group_id'] ?? '';
+    $newGroup = $newGroupRaw === '' ? null : (int) $newGroupRaw;
+    $oldGroup = $ticket['group_id'] ? (int) $ticket['group_id'] : null;
+    if ($newGroup !== $oldGroup) {
+        $db->prepare('UPDATE tickets SET group_id = ? WHERE id = ?')->execute([$newGroup, $id]);
+
+        $oldGroupName = 'None';
+        $newGroupName = 'None';
+        if ($oldGroup) {
+            $s = $db->prepare('SELECT name FROM groups WHERE id = ?');
+            $s->execute([$oldGroup]);
+            $oldGroupName = $s->fetchColumn() ?: 'None';
+        }
+        if ($newGroup) {
+            $s = $db->prepare('SELECT name FROM groups WHERE id = ?');
+            $s->execute([$newGroup]);
+            $newGroupName = $s->fetchColumn() ?: 'None';
+        }
+
+        $db->prepare(
+            'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
+        )->execute([$id, Auth::id(), 'group_changed', "Group changed from {$oldGroupName} to {$newGroupName}"]);
+        $changes[] = 'group';
+        if ($newGroup) { notifyAssignedGroup($db, $id, $newGroup); }
+        // Type maps 1:1 to a default group — clear a now-mismatched type.
+        if (clearTicketTypeIfGroupMismatch($db, $id, $newGroup, Auth::id()) && !in_array('type', $changes, true)) {
+            $changes[] = 'type';
+        }
     }
 
     // Run automations on ticket update

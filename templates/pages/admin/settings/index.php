@@ -140,6 +140,21 @@ $breadcrumbs  = Auth::isAdmin()
         </p>
         <form method="POST" action="/admin/settings/ticket-routing">
             <?= csrfField() ?>
+            <div class="mb-4">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch"
+                           id="agents_assign_any_group" name="agents_assign_any_group" value="1"
+                           <?= ($settings['agents_assign_any_group'] ?? '0') === '1' ? 'checked' : '' ?>>
+                    <label class="form-check-label fw-semibold" for="agents_assign_any_group">
+                        Allow agents to assign tickets to groups they're not part of
+                    </label>
+                </div>
+                <div class="form-text">
+                    When off, the group picker on the agent ticket list only offers the groups an agent
+                    belongs to. Turn this on to let agents move tickets into <strong>any</strong> group.
+                    Admins always see every group.
+                </div>
+            </div>
             <div class="row g-3 align-items-end">
                 <div class="col-md-6">
                     <label for="default_group_id" class="form-label fw-semibold">Default Group</label>

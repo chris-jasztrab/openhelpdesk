@@ -1283,6 +1283,53 @@ function resolveTicketGroup(PDO $db, ?int $explicit, ?int $typeId): ?int
 }
 
 /**
+ * Keep a ticket's type in sync with its group after a group change.
+ *
+ * A ticket type maps 1:1 to a default group, so once an agent moves a ticket
+ * into a group that is NOT the type's default group, the type no longer
+ * describes where the ticket lives. Rather than silently carry a mismatched
+ * type, clear it to "Not Set" (NULL). Writes a timeline entry and recalculates
+ * SLA when it clears, and returns true so callers can refresh their UI.
+ *
+ * No-ops when: the ticket has no type, the type has no default group (so it can
+ * coexist with any group), or the new group still matches the type's default.
+ * Call this AFTER the ticket's group_id has been persisted, and — where the same
+ * request may also set the type explicitly — AFTER that type change, so an
+ * intentional type+group pairing is never clobbered.
+ */
+function clearTicketTypeIfGroupMismatch(PDO $db, int $ticketId, ?int $newGroupId, ?int $actorId): bool
+{
+    $stmt = $db->prepare(
+        'SELECT tt.name AS type_name, tt.group_id AS type_group_id
+         FROM tickets t
+         JOIN ticket_types tt ON tt.id = t.type_id
+         WHERE t.id = ?'
+    );
+    $stmt->execute([$ticketId]);
+    $row = $stmt->fetch();
+    if (!$row) {
+        return false; // ticket has no type (or the type row is gone) — nothing to reconcile
+    }
+
+    $typeGroupId = $row['type_group_id'] !== null ? (int) $row['type_group_id'] : null;
+    if ($typeGroupId === null || $typeGroupId === $newGroupId) {
+        return false; // type isn't pinned to a group, or the group still matches it
+    }
+
+    $db->prepare('UPDATE tickets SET type_id = NULL WHERE id = ?')->execute([$ticketId]);
+    $db->prepare(
+        'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
+    )->execute([
+        $ticketId,
+        $actorId,
+        'type_changed',
+        'Type cleared (was ' . $row['type_name'] . ") — the new group does not match the type's default group",
+    ]);
+    Sla::onTypeChanged($db, $ticketId, null);
+    return true;
+}
+
+/**
  * Final NULL-group safety net inside runPostTicketCreateHooks(). AI
  * classification and "set group" automations run BEFORE this — so by
  * the time we get here, anything that's still NULL has slipped past

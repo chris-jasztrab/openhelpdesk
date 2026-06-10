@@ -11,6 +11,16 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.86.0 &mdash; 2026-06-10
+
+### Added
+- **Tickets (group assignment scope):** new setting **"Allow agents to assign tickets to groups they're not part of"** under **Admin → Settings → Ticket Routing Defaults**. When off (the default), the group picker on the agent ticket list only offers the groups an agent belongs to — unchanged from before. When on, agents can move tickets into **any** group. Admins always see every group.
+
+### Changed
+- **Tickets (type/group consistency):** because a ticket type maps 1:1 to a default group, changing a ticket's group to one that no longer matches its type's default group now automatically clears the type to **Not Set**, rather than leaving a mismatched type behind. Applies everywhere a group is changed by hand — the ticket-list group chevron, the agent and admin ticket detail forms, and bulk group reassignment — and is recorded in the ticket timeline. Types with no default group are never affected.
+
+---
+
 ## 2.85.1 &mdash; 2026-06-09
 
 ### Fixed

@@ -4371,6 +4371,10 @@ $router->post('/admin/tickets/bulk', function () {
             }
             $db->prepare("UPDATE tickets SET group_id = ? WHERE id IN ({$placeholders})")
                ->execute(array_merge([$groupId], $ticketIds));
+            // Type maps 1:1 to a default group — clear a now-mismatched type per ticket.
+            foreach ($ticketIds as $bulkTicketId) {
+                clearTicketTypeIfGroupMismatch($db, (int) $bulkTicketId, $groupId, Auth::id());
+            }
             logAudit(
                 'ticket.bulk_group_changed',
                 $groupId,
@@ -5425,34 +5429,9 @@ $router->post('/admin/tickets/{id}/update', function (array $p) {
         }
     }
 
-    // Group change
-    $newGroupRaw = $_POST['group_id'] ?? '';
-    $newGroup = $newGroupRaw === '' ? null : (int) $newGroupRaw;
-    $oldGroup = $ticket['group_id'] ? (int) $ticket['group_id'] : null;
-    if ($newGroup !== $oldGroup) {
-        $db->prepare('UPDATE tickets SET group_id = ? WHERE id = ?')->execute([$newGroup, $id]);
-
-        $oldGroupName = 'None';
-        $newGroupName = 'None';
-        if ($oldGroup) {
-            $s = $db->prepare('SELECT name FROM `groups` WHERE id = ?');
-            $s->execute([$oldGroup]);
-            $oldGroupName = $s->fetchColumn() ?: 'None';
-        }
-        if ($newGroup) {
-            $s = $db->prepare('SELECT name FROM `groups` WHERE id = ?');
-            $s->execute([$newGroup]);
-            $newGroupName = $s->fetchColumn() ?: 'None';
-        }
-
-        $db->prepare(
-            'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
-        )->execute([$id, Auth::id(), 'group_changed', "Group changed from {$oldGroupName} to {$newGroupName}"]);
-        $changes[] = 'group';
-        if ($newGroup) { notifyAssignedGroup($db, $id, $newGroup); }
-    }
-
-    // Type change
+    // Type change — handled before the group change below so an explicit
+    // type+group pairing in the same save is preserved, while a group change
+    // on its own can still clear a now-mismatched type.
     $newTypeRaw = $_POST['type_id'] ?? '';
     $newType = $newTypeRaw === '' ? null : (int) $newTypeRaw;
     $oldType = $ticket['type_id'] ? (int) $ticket['type_id'] : null;
@@ -5479,6 +5458,37 @@ $router->post('/admin/tickets/{id}/update', function (array $p) {
 
         // Recalculate SLA for new type
         Sla::onTypeChanged($db, $id, $newType);
+    }
+
+    // Group change
+    $newGroupRaw = $_POST['group_id'] ?? '';
+    $newGroup = $newGroupRaw === '' ? null : (int) $newGroupRaw;
+    $oldGroup = $ticket['group_id'] ? (int) $ticket['group_id'] : null;
+    if ($newGroup !== $oldGroup) {
+        $db->prepare('UPDATE tickets SET group_id = ? WHERE id = ?')->execute([$newGroup, $id]);
+
+        $oldGroupName = 'None';
+        $newGroupName = 'None';
+        if ($oldGroup) {
+            $s = $db->prepare('SELECT name FROM `groups` WHERE id = ?');
+            $s->execute([$oldGroup]);
+            $oldGroupName = $s->fetchColumn() ?: 'None';
+        }
+        if ($newGroup) {
+            $s = $db->prepare('SELECT name FROM `groups` WHERE id = ?');
+            $s->execute([$newGroup]);
+            $newGroupName = $s->fetchColumn() ?: 'None';
+        }
+
+        $db->prepare(
+            'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
+        )->execute([$id, Auth::id(), 'group_changed', "Group changed from {$oldGroupName} to {$newGroupName}"]);
+        $changes[] = 'group';
+        if ($newGroup) { notifyAssignedGroup($db, $id, $newGroup); }
+        // Type maps 1:1 to a default group — clear a now-mismatched type.
+        if (clearTicketTypeIfGroupMismatch($db, $id, $newGroup, Auth::id()) && !in_array('type', $changes, true)) {
+            $changes[] = 'type';
+        }
     }
 
     // Run automations on ticket update
@@ -6434,7 +6444,7 @@ $router->get('/admin/settings', function () {
         'graph_client_secret', 'graph_mailbox', 'graph_secret_expires_at',
         'email_to_ticket_enabled', 'email_to_ticket_auto_create_users',
         'email_to_ticket_default_type_id', 'email_to_ticket_default_priority_id',
-        'default_group_id',
+        'default_group_id', 'agents_assign_any_group',
     ];
     $settings = [];
     foreach ($keys as $k) {
@@ -6596,7 +6606,12 @@ $router->post('/admin/settings/ticket-routing', function () {
     }
     setSetting('default_group_id', $value);
     logAudit('settings.default_group_changed', null, null, $value === '' ? 'cleared' : "id={$value}");
-    flash('success', 'Default group saved.');
+
+    $assignAny = isset($_POST['agents_assign_any_group']) ? '1' : '0';
+    setSetting('agents_assign_any_group', $assignAny);
+    logAudit('settings.agents_assign_any_group_changed', null, null, $assignAny);
+
+    flash('success', 'Ticket routing defaults saved.');
     redirect('/admin/settings');
 });
 

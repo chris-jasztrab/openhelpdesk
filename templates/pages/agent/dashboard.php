@@ -383,6 +383,11 @@ $dir  = $dir ?? 'desc';
                         var newAgents = data.agents || quickAllAgents;
                         var assignBtn = document.querySelector('.quick-assign-wrap[data-ticket-id="' + ticketId + '"] .quick-assign-btn');
                         if (assignBtn) { assignBtn.dataset.agents = JSON.stringify(newAgents); }
+                        // Server cleared a now-mismatched type (type maps 1:1 to a default group).
+                        if (data.type_cleared) {
+                            var typeBadge = document.querySelector('.quick-type-wrap[data-ticket-id="' + ticketId + '"] .quick-type-badge');
+                            if (typeBadge) { typeBadge.innerHTML = '<span class="text-muted small">Not Set</span>'; }
+                        }
                     }
                 }).catch(function () {});
             }

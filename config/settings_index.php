@@ -91,6 +91,11 @@ return [
      'section' => 'Ticket Routing Defaults', 'anchor' => 'default_group_id',
      'keywords' => 'triage fallback unrouted no group queue catch-all default routing'],
 
+    ['label' => "Allow agents to assign tickets to groups they're not part of", 'description' => 'Let agents move tickets into any group, not just their own',
+     'group' => 'Tickets', 'page_label' => 'Settings', 'page_url' => '/admin/settings',
+     'section' => 'Ticket Routing Defaults', 'anchor' => 'agents_assign_any_group',
+     'keywords' => 'agent group assign restrict membership any all dropdown picker reassign'],
+
     ['label' => 'Default Ticket Type (email)',  'description' => 'Type applied to tickets created via email',
      'group' => 'Email', 'page_label' => 'Email / SMTP', 'page_url' => '/admin/settings',
      'section' => 'Email-to-Ticket', 'anchor' => 'email_to_ticket_default_type_id',
