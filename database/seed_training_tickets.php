@@ -25,8 +25,53 @@ $db = Database::connect();
 
 $MARKER = '[[TRAINING-DEMO]]';
 
-/* ── Timeline base date: spread tickets across the past ~12 days ──────── */
-$base = new DateTimeImmutable('2026-05-29 09:00:00');
+/* ── Preflight: the seed hard-codes user and type IDs taken from one DB.
+ * Abort cleanly (before inserting anything) if those IDs don't resolve to the
+ * expected names on THIS database, so we never silently mis-assign tickets to
+ * the wrong person on a DB where the IDs drifted. ─────────────────────────── */
+$expectedUsers = [
+    1 => 'Chris Jasztrab',   157 => 'Josh deRuiter',     158 => 'Anjana Kipfer',
+    161 => 'Susan Letkeman', 163 => 'Meaghan Gibbons',   165 => 'Corrine Denbok',
+    166 => 'Jennifer Webb',  168 => 'Emma Stout',         169 => 'Robin Holmes',
+    170 => 'Kim Sachs',      171 => 'Janet Seally',       172 => 'Natalie Fisk',
+    173 => 'Ryan Snyder',    174 => 'Laura Peacock',      176 => 'Natalie Gallo',
+    177 => 'Kelly Kipfer',   180 => 'Chelsea Telfer',     181 => 'Nancy Yee',
+    182 => 'Julia Gingrich', 183 => 'Megan Roberts',      185 => 'Alex Geitz',
+    186 => 'Teresa Zvonar',  196 => 'Becky Roi',          198 => 'Claire MacFarlane',
+    228 => 'Liana Jupan',    231 => 'Matthew Jackow',     283 => 'Alison Schroeder',
+    306 => 'Dylan Kellendonk', 312 => 'Allie Landy',
+];
+$expectedTypes = [
+    1 => 'IT', 2 => 'Marketing', 3 => 'Facilities', 10 => 'Lifelong Learning',
+    13 => 'Collections/Discover', 14 => 'Circulation', 15 => 'Human Resources',
+    18 => 'Programs & Partnerships', 19 => 'Customer Experience',
+];
+
+$mismatches = [];
+foreach ($expectedUsers as $uid => $name) {
+    $got = $db->query("SELECT CONCAT(first_name,' ',last_name) FROM users WHERE id=" . (int) $uid)->fetchColumn();
+    if ($got === false) {
+        $mismatches[] = "user id {$uid}: expected \"{$name}\", but no such user on this DB";
+    } elseif ($got !== $name) {
+        $mismatches[] = "user id {$uid}: expected \"{$name}\", got \"{$got}\"";
+    }
+}
+foreach ($expectedTypes as $tid => $name) {
+    $got = $db->query("SELECT name FROM ticket_types WHERE id=" . (int) $tid)->fetchColumn();
+    if ($got === false) {
+        $mismatches[] = "ticket_type id {$tid}: expected \"{$name}\", but no such type on this DB";
+    } elseif ($got !== $name) {
+        $mismatches[] = "ticket_type id {$tid}: expected \"{$name}\", got \"{$got}\"";
+    }
+}
+if ($mismatches) {
+    fwrite(STDERR, "ABORTED — ID assumptions don't match this database. Nothing was inserted.\n");
+    foreach ($mismatches as $m) {
+        fwrite(STDERR, "  - {$m}\n");
+    }
+    fwrite(STDERR, "\nRemap the IDs in this script to match this DB, then re-run.\n");
+    exit(1);
+}
 
 /**
  * Insert a comment (reply or internal note) onto the timeline at a backdated
