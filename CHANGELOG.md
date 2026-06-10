@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.87.4 &mdash; 2026-06-10
+
+### Changed
+- **Docs:** the admin **Tickets** help page now documents the **Allow agents to assign tickets to groups they're not part of** setting (Admin → Settings → Ticket Routing Defaults) in the *Assigning Tickets* section — explaining the default group-membership scoping and how turning the setting on lets agents route tickets into any group.
+
+---
+
 ## 2.87.3 &mdash; 2026-06-10
 
 ### Changed

@@ -134,9 +134,13 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
     <li>From the ticket list — click the <strong>agent chevron <i class="bi bi-chevron-down"></i></strong> in the Agent column to open a quick-assign dropdown without leaving the list.</li>
     <li>Via automations (see the <a href="/admin/docs/automations">Automations</a> doc).</li>
 </ul>
-<div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
+<div class="alert alert-info small mb-3"><i class="bi bi-info-circle me-2"></i>
     When a ticket is assigned to a <strong>Group</strong>, the agent picker (both in the ticket view and the quick-assign dropdown) is automatically filtered to show only members of that group. In the ticket's <strong>Update Ticket</strong> panel this now happens <strong>live</strong> — change the <strong>Group</strong> dropdown and the <strong>Assigned To</strong> list immediately re-filters to that group's members (no need to save the group change first); pick <em>None</em> to choose from all staff. The current assignee is kept selected if they belong to the newly chosen group, otherwise it resets to Unassigned.
 </div>
+
+<h6 class="fw-semibold mt-3">Letting agents assign to any group</h6>
+<p class="text-muted mb-2">By default, the <strong>Group</strong> picker on the agent ticket list only offers the groups an agent actually belongs to — an agent can't move a ticket into a queue they aren't a member of. Admins are never restricted; they always see every group.</p>
+<p class="text-muted mb-0">To loosen this, turn on <strong>Allow agents to assign tickets to groups they're not part of</strong> at <a href="/admin/settings/ticket-routing"><strong>Admin → Settings → Ticket Routing Defaults</strong></a>. With it on, agents can move tickets into <strong>any</strong> group, not just their own — useful when a small team triages and routes work across the whole organisation. Leaving it off keeps each agent scoped to their own queues.</p>
 </div>
 </div>
 
