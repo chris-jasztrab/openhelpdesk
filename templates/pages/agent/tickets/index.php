@@ -44,7 +44,7 @@ foreach ((array) ($filters['status'] ?? []) as $v)   $appliedPills[] = ['label' 
 foreach ((array) ($filters['priority'] ?? []) as $v) $appliedPills[] = ['label' => 'Priority: ' . ($prioMap[(string) $v] ?? $v), 'url' => $buildRemoveUrl('priority', $v)];
 foreach ((array) ($filters['type'] ?? []) as $v)     $appliedPills[] = ['label' => 'Type: '     . ($typeMap[(string) $v] ?? $v), 'url' => $buildRemoveUrl('type', $v)];
 foreach ((array) ($filters['location'] ?? []) as $v) $appliedPills[] = ['label' => label('location.singular') . ': ' . ($locMap[(string) $v] ?? $v), 'url' => $buildRemoveUrl('location', $v)];
-foreach ((array) ($filters['agent'] ?? []) as $v)    $appliedPills[] = ['label' => 'Agent: '    . ($agentMap[(string) $v] ?? $v), 'url' => $buildRemoveUrl('agent', $v)];
+foreach ((array) ($filters['agent'] ?? []) as $v)    $appliedPills[] = ['label' => 'Assigned To: '    . ($agentMap[(string) $v] ?? $v), 'url' => $buildRemoveUrl('agent', $v)];
 foreach ((array) ($filters['group'] ?? []) as $v)    $appliedPills[] = ['label' => 'Group: '    . ($groupMap[(string) $v] ?? $v), 'url' => $buildRemoveUrl('group', $v)];
 if (($filters['q'] ?? '') !== '')          $appliedPills[] = ['label' => 'Search: "' . $filters['q'] . '"', 'url' => $buildRemoveUrl('q')];
 if (!empty($filters['watched']))           $appliedPills[] = ['label' => 'My Watched Tickets', 'url' => $buildRemoveUrl('watched')];
@@ -310,7 +310,7 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                 </div>
             </div>
             <div class="mb-3">
-                <label class="form-label small fw-semibold mb-1">Agent</label>
+                <label class="form-label small fw-semibold mb-1">Assigned To</label>
                 <div class="filter-checklist">
                     <label class="filter-check-item">
                         <input type="checkbox" name="agent[]" value="mine" <?= in_array('mine', $filters['agent'], true) ? 'checked' : '' ?>>

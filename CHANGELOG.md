@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.87.3 &mdash; 2026-06-10
+
+### Changed
+- **Tickets list:** the assignment filter is now labelled **Assigned To** to match the column header of the same name (it previously read **Agent**). The applied-filter pill now reads `Assigned To: …` to match. Updated in both the admin and agent ticket lists.
+
+---
+
 ## 2.87.2 &mdash; 2026-06-10
 
 ### Added
