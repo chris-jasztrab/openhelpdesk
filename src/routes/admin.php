@@ -6444,7 +6444,6 @@ $router->get('/admin/settings', function () {
         'graph_client_secret', 'graph_mailbox', 'graph_secret_expires_at',
         'email_to_ticket_enabled', 'email_to_ticket_auto_create_users',
         'email_to_ticket_default_type_id', 'email_to_ticket_default_priority_id',
-        'default_group_id', 'agents_assign_any_group',
     ];
     $settings = [];
     foreach ($keys as $k) {
@@ -6457,14 +6456,28 @@ $router->get('/admin/settings', function () {
     $db         = Database::connect();
     $types      = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
     $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
-    $groups     = $db->query('SELECT id, name FROM `groups` ORDER BY name')->fetchAll();
 
     render('admin/settings/index', [
         'settings' => $settings,
         'runOutput' => $runOutput,
         'types' => $types,
         'priorities' => $priorities,
-        'groups' => $groups,
+    ]);
+});
+
+$router->get('/admin/settings/ticket-routing', function () {
+    Auth::requirePermission('settings.manage');
+    $settings = [
+        'default_group_id'        => getSetting('default_group_id'),
+        'agents_assign_any_group' => getSetting('agents_assign_any_group'),
+    ];
+    $groups = Database::connect()
+        ->query('SELECT id, name FROM `groups` ORDER BY name')
+        ->fetchAll();
+
+    render('admin/settings/ticket-routing', [
+        'settings' => $settings,
+        'groups'   => $groups,
     ]);
 });
 
@@ -6587,7 +6600,7 @@ $router->post('/admin/settings/ticket-routing', function () {
     Auth::requirePermission('settings.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
-        redirect('/admin/settings');
+        redirect('/admin/settings/ticket-routing');
     }
 
     $raw = trim($_POST['default_group_id'] ?? '');
@@ -6601,7 +6614,7 @@ $router->post('/admin/settings/ticket-routing', function () {
             $value = (string) $candidate;
         } else {
             flash('error', 'Selected default group no longer exists.');
-            redirect('/admin/settings');
+            redirect('/admin/settings/ticket-routing');
         }
     }
     setSetting('default_group_id', $value);
@@ -6612,7 +6625,7 @@ $router->post('/admin/settings/ticket-routing', function () {
     logAudit('settings.agents_assign_any_group_changed', null, null, $assignAny);
 
     flash('success', 'Ticket routing defaults saved.');
-    redirect('/admin/settings');
+    redirect('/admin/settings/ticket-routing');
 });
 
 $router->post('/admin/settings/email-to-ticket', function () {

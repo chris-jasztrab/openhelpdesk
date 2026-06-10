@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.87.0 &mdash; 2026-06-10
+
+### Changed
+- **Settings (Ticket Routing):** moved the **Ticket Routing Defaults** section (system-wide default group + "allow agents to assign to any group") off the **Email / SMTP** page, where it never belonged, onto its own **Ticket Routing** page under the **Organization** group in the settings left-nav (`/admin/settings/ticket-routing`). Saving now returns to that page, and settings search points there. No behavior change to the routing logic itself.
+
+---
+
 ## 2.86.0 &mdash; 2026-06-10
 
 ### Added

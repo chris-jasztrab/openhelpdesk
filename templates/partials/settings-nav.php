@@ -43,6 +43,8 @@ $settingsNavGroups = [
          'keywords' => 'matrix overview chart confidential ai routing duplicate threshold compare summary print'],
         ['label' => 'Groups',                 'url' => '/admin/groups',     'icon' => 'bi-people-fill',
          'keywords' => 'team queue assignee department'],
+        ['label' => 'Ticket Routing',         'url' => '/admin/settings/ticket-routing', 'icon' => 'bi-diagram-3',
+         'keywords' => 'routing default group triage fallback unrouted no group queue catch-all agent assign any'],
         ['label' => 'Agent Skills',           'url' => '/admin/skills',     'icon' => 'bi-mortarboard',
          'keywords' => 'skill expertise routing assignment competency'],
     ],

@@ -87,12 +87,12 @@ return [
      'keywords' => 'auto register portal users new'],
 
     ['label' => 'Default Group (system-wide fallback)', 'description' => 'Catch-all group for tickets that nothing else routed — keeps tickets out of the no-group queue',
-     'group' => 'Tickets', 'page_label' => 'Settings', 'page_url' => '/admin/settings',
+     'group' => 'Organization', 'page_label' => 'Ticket Routing', 'page_url' => '/admin/settings/ticket-routing',
      'section' => 'Ticket Routing Defaults', 'anchor' => 'default_group_id',
      'keywords' => 'triage fallback unrouted no group queue catch-all default routing'],
 
     ['label' => "Allow agents to assign tickets to groups they're not part of", 'description' => 'Let agents move tickets into any group, not just their own',
-     'group' => 'Tickets', 'page_label' => 'Settings', 'page_url' => '/admin/settings',
+     'group' => 'Organization', 'page_label' => 'Ticket Routing', 'page_url' => '/admin/settings/ticket-routing',
      'section' => 'Ticket Routing Defaults', 'anchor' => 'agents_assign_any_group',
      'keywords' => 'agent group assign restrict membership any all dropdown picker reassign'],
 
