@@ -537,7 +537,7 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                             <?php endif; ?>
                         </td>
                         <?php if (in_array('status', $visibleColumns)): ?>
-                        <td style="white-space:nowrap;cursor:default;" onclick="event.stopPropagation()">
+                        <td style="white-space:nowrap;overflow:hidden;cursor:default;" onclick="event.stopPropagation()">
                             <span class="d-inline-flex align-items-center gap-1 quick-status-wrap" data-ticket-id="<?= (int)$t['id'] ?>" data-current-status="<?= e($t['status']) ?>" style="cursor:pointer;">
                                 <span class="quick-status-badge"><?= ticketStatusBadgeHtml($t['status']) ?></span>
                                 <button class="btn btn-link btn-sm p-0 border-0 text-muted quick-status-btn" type="button" title="Change status" style="line-height:1;"><i class="bi bi-chevron-down" style="font-size:0.65rem;"></i></button>
@@ -550,7 +550,7 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                         </td>
                         <?php endif; ?>
                         <?php if (in_array('priority', $visibleColumns)): ?>
-                        <td style="white-space:nowrap;cursor:default;" onclick="event.stopPropagation()">
+                        <td style="white-space:nowrap;overflow:hidden;cursor:default;" onclick="event.stopPropagation()">
                             <span class="d-inline-flex align-items-center gap-1 quick-priority-wrap" data-ticket-id="<?= (int)$t['id'] ?>" style="cursor:pointer;">
                                 <span class="quick-priority-badge"><?php if ($t['priority_name']): ?><span class="badge" style="background:<?= e($t['priority_color']) ?>;"><?= e($t['priority_name']) ?></span><?php else: ?><span class="text-muted">—</span><?php endif; ?></span>
                                 <button class="btn btn-link btn-sm p-0 border-0 text-muted quick-priority-btn" type="button" title="Change priority" style="line-height:1;"><i class="bi bi-chevron-down" style="font-size:0.65rem;"></i></button>
@@ -558,7 +558,7 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                         </td>
                         <?php endif; ?>
                         <?php if (in_array('type', $visibleColumns)): ?>
-                        <td style="white-space:nowrap;cursor:default;" onclick="event.stopPropagation()">
+                        <td style="white-space:nowrap;overflow:hidden;cursor:default;" onclick="event.stopPropagation()">
                             <span class="d-inline-flex align-items-center gap-1 quick-type-wrap" data-ticket-id="<?= (int)$t['id'] ?>" style="cursor:pointer;">
                                 <span class="quick-type-badge"><?php if ($t['type_name']): ?><span class="badge" style="background:<?= e($t['type_color'] ?: '#6c757d') ?>;"><?= e($t['type_name']) ?></span><?php else: ?><span class="text-muted small">Not Set</span><?php endif; ?></span>
                                 <button class="btn btn-link btn-sm p-0 border-0 text-muted quick-type-btn" type="button" title="Change type" style="line-height:1;"><i class="bi bi-chevron-down" style="font-size:0.65rem;"></i></button>
@@ -585,7 +585,7 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                         </td>
                         <?php endif; ?>
                         <?php if (in_array('group', $visibleColumns)): ?>
-                        <td style="white-space:nowrap;overflow:visible;cursor:default;" onclick="event.stopPropagation()">
+                        <td style="white-space:nowrap;overflow:hidden;cursor:default;" onclick="event.stopPropagation()">
                             <span class="d-inline-flex align-items-center gap-1 quick-group-wrap" data-ticket-id="<?= (int)$t['id'] ?>" style="cursor:pointer;">
                                 <span class="quick-group-name<?= $t['group_name'] ? '' : ' text-muted' ?>"><?= e($t['group_name'] ?: '—') ?></span>
                                 <button class="btn btn-link btn-sm p-0 border-0 text-muted quick-group-btn" type="button" title="Change group" style="line-height:1;"><i class="bi bi-chevron-down" style="font-size:0.65rem;"></i></button>

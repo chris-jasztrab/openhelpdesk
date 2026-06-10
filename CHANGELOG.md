@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.87.1 &mdash; 2026-06-10
+
+### Fixed
+- **Tickets list:** narrowing the **Status** column with the resize grip no longer lets a long status badge (e.g. "Waiting on Customer") overflow into the **Priority** column. The quick-edit badge cells (Status, Priority, Type, Group) now clip at their column boundary like the Subject column already did, so resizing crops the badge instead of overlapping its neighbour. Fixed in both the admin and agent ticket lists. The quick-change dropdowns are unaffected (they render on `document.body`).
+
+---
+
 ## 2.87.0 &mdash; 2026-06-10
 
 ### Changed
