@@ -12218,8 +12218,18 @@ function handleAvatarUpload(): ?string
         flash('error', 'Avatar must be a JPG/PNG/GIF/WEBP image under 2 MB.');
         return null;
     }
-    $ext       = pathinfo($_FILES['avatar']['name'], PATHINFO_EXTENSION);
-    $filename  = uniqid('avatar_', true) . '.' . strtolower($ext);
+    // Derive the stored extension from the validated MIME, never from the
+    // user-supplied filename — otherwise a `GIF89a`+`<?php …` polyglot named
+    // "x.php" would pass the image MIME check yet land an executable .php file
+    // in the web-served uploads directory.
+    $ext = match ($mime) {
+        'image/jpeg' => 'jpg',
+        'image/png'  => 'png',
+        'image/gif'  => 'gif',
+        'image/webp' => 'webp',
+        default      => 'png',
+    };
+    $filename  = uniqid('avatar_', true) . '.' . $ext;
     $uploadDir = ROOT_DIR . '/public/uploads/avatars/';
     if (!is_dir($uploadDir)) {
         mkdir($uploadDir, 0755, true);

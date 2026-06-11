@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.87.9 &mdash; 2026-06-11
+
+### Security
+- **Authenticated RCE via avatar upload (High):** the avatar uploader validated the image MIME (sniffed from magic bytes) but took the stored file extension straight from the user-supplied filename, so an image/PHP polyglot named `x.php` passed the check and landed an executable `.php` file in the web-served `public/uploads/avatars/` directory. Any holder of the `users.manage` permission could gain code execution. The extension is now derived from the validated MIME (jpg/png/gif/webp only), matching the branding-logo handler, so no script extension can ever be written. Added `public/uploads/.htaccess` as defence-in-depth to disable PHP/CGI execution for all uploaded content (avatars, branding, field-images); nginx deployments should add the equivalent `location` rule.
+
+---
+
 ## 2.87.8 &mdash; 2026-06-11
 
 ### Security

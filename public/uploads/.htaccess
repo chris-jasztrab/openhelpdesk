@@ -1,0 +1,34 @@
+# Security guard for user-uploaded content (avatars, branding, field-images).
+#
+# Everything under this directory is supplied by users and must be treated as
+# inert data — never executed. Even though uploads are validated on the way in,
+# this is defence-in-depth: if a malicious file (e.g. an image/PHP polyglot)
+# ever lands here, Apache must refuse to run it.
+#
+# NOTE: this protects Apache. If you serve the app behind nginx, add the
+# equivalent there (e.g. a `location ^~ /uploads/ { location ~ \.php$ { return 403; } }`).
+
+# Disable the PHP engine for mod_php setups.
+<IfModule mod_php.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php7.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php5.c>
+    php_flag engine off
+</IfModule>
+
+# For PHP-FPM / CGI / SAPI setups where php_flag is unavailable, refuse to hand
+# any script-like file to an interpreter, regardless of how it got here.
+<FilesMatch "(?i)\.(php|php3|php4|php5|php7|php8|phps|phtml|pht|phar|cgi|pl|py|rb|asp|aspx|jsp|sh|shtml)$">
+    Require all denied
+    SetHandler none
+</FilesMatch>
+
+# Strip any inherited handlers/types that could trigger execution.
+RemoveHandler .php .php3 .php4 .php5 .php7 .php8 .phtml .phar .cgi .pl .py
+RemoveType .php .php3 .php4 .php5 .php7 .php8 .phtml .phar
+
+# No directory listings.
+Options -Indexes -ExecCGI
