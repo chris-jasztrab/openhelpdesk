@@ -52,6 +52,15 @@ final class DatabaseSeeder
 
             if ($existing) {
                 $id = (int) $existing['id'];
+                // Self-heal: these fixture rows persist between runs, and tests
+                // (e.g. the user-edit suite) can mutate a fixture's role or
+                // password. Reset the load-bearing fields to their expected
+                // values on every seed so a leftover row can't silently break
+                // the next run (a test_admin left as role='user' would 403 every
+                // admin test). Idempotent.
+                $db->prepare(
+                    'UPDATE users SET first_name = ?, last_name = ?, password = ?, role = ? WHERE id = ?'
+                )->execute([$first, $last, $hash, $role, $id]);
             } else {
                 $db->prepare(
                     'INSERT INTO users (first_name, last_name, email, password, role) VALUES (?, ?, ?, ?, ?)'
