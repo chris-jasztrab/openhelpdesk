@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.87.5 &mdash; 2026-06-11
+
+### Changed
+- **Docs:** expanded the agent assign-to-any-group documentation on the admin **Tickets** help page into its own dedicated section. It now explains what the **Allow agents to assign tickets to groups they're not part of** setting does, its impact (agent-only, affects the ticket-list and dashboard group picker scope, audit-logged), when to turn it on vs. leave it off, a step-by-step on enabling it at Admin → Settings → Organization → Ticket Routing, and the related auto-clearing of a mismatched ticket type on group change.
+
+---
+
 ## 2.87.4 &mdash; 2026-06-10
 
 ### Changed
