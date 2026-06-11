@@ -11,6 +11,14 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.88.5 &mdash; 2026-06-11
+
+### Security
+- **Safer defaults in `.env.example` (Medium):** `APP_DEBUG` now ships as `false`. Previously the example defaulted to `true`, so anyone copying it straight to `.env` inherited debug mode, which surfaces PHP stack traces (file paths, DB details) to end users.
+- **Installer `.env` line-injection (Low):** the installer now strips CR/LF from values before writing `.env`, so a newline in an operator-supplied field (e.g. DB password or app name) can't inject additional environment lines.
+
+---
+
 ## 2.88.4 &mdash; 2026-06-11
 
 ### Security

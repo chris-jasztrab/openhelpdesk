@@ -469,15 +469,18 @@ function checkRequirements(): array
 
 function buildEnvContent(array $data): string
 {
-    $appName  = $data['app_name']  ?? 'OpenHelpDesk';
-    $appUrl   = $data['app_url']   ?? 'http://localhost';
-    $debug    = $data['app_debug'] ?? 'false';
-    $timezone = $data['timezone']  ?? 'UTC';
-    $dbHost   = $data['db_host']   ?? '127.0.0.1';
-    $dbPort   = $data['db_port']   ?? '3306';
-    $dbName   = $data['db_name']   ?? 'localdesk';
-    $dbUser   = $data['db_user']   ?? 'root';
-    $dbPass   = $data['db_pass']   ?? '';
+    // Strip CR/LF from every value so a newline in (say) the DB password or app
+    // name can't inject extra lines into the generated .env file.
+    $clean    = static fn ($v): string => str_replace(["\r", "\n"], '', (string) $v);
+    $appName  = $clean($data['app_name']  ?? 'OpenHelpDesk');
+    $appUrl   = $clean($data['app_url']   ?? 'http://localhost');
+    $debug    = $clean($data['app_debug'] ?? 'false');
+    $timezone = $clean($data['timezone']  ?? 'UTC');
+    $dbHost   = $clean($data['db_host']   ?? '127.0.0.1');
+    $dbPort   = $clean($data['db_port']   ?? '3306');
+    $dbName   = $clean($data['db_name']   ?? 'localdesk');
+    $dbUser   = $clean($data['db_user']   ?? 'root');
+    $dbPass   = $clean($data['db_pass']   ?? '');
 
     return "# Application\n"
          . "APP_NAME={$appName}\n"
