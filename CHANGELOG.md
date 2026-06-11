@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.87.7 &mdash; 2026-06-11
+
+### Fixed
+- **Tickets:** changing a ticket's type now moves the ticket into the new type's default group — the mirror image of the existing rule that clears a mismatched type when the group changes. Previously a re-typed ticket stayed in its old group, so (for example) a Marketing-typed ticket left in the IT group kept appearing in IT agents' unassigned queue and dashboard count even though no IT agent should be working it. Applies to the quick type dropdown on ticket lists and to the full Update Ticket form in both the agent and admin views; an explicit type+group pairing in the same save still wins, and types with no default group continue to coexist with any group. The move is recorded on the ticket timeline and notifies the new group.
+
+---
+
 ## 2.87.6 &mdash; 2026-06-11
 
 ### Fixed

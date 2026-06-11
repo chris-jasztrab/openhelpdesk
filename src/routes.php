@@ -446,6 +446,8 @@ $router->post('/api/tickets/{id}/set-type', function (array $p) {
         }
         $db->prepare('INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)')
            ->execute([$ticketId, Auth::id(), 'type_changed', 'Type changed from ' . $oldName . ' to ' . ($typeName ?? 'None')]);
+        // Type maps 1:1 to a default group — move the ticket into the new type's group.
+        syncTicketGroupToType($db, $ticketId, $typeId, Auth::id());
         runAutomations($db, $ticketId, 'ticket_updated');
     }
     echo json_encode(['success' => true, 'type_name' => $typeName, 'type_color' => $typeColor ?: '#6c757d']);

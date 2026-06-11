@@ -1330,6 +1330,66 @@ function clearTicketTypeIfGroupMismatch(PDO $db, int $ticketId, ?int $newGroupId
 }
 
 /**
+ * Keep a ticket's group in sync with its type after a type change — the
+ * mirror image of clearTicketTypeIfGroupMismatch(). A type maps 1:1 to a
+ * default group, so when an agent re-types a ticket, the ticket should move
+ * into the new type's group; otherwise it stays visible to the old group's
+ * agents even though it no longer belongs to them. Writes a timeline entry,
+ * notifies the new group, and returns true when it moves the ticket.
+ *
+ * No-ops when: the new type is NULL, the type has no default group (it can
+ * coexist with any group), the type's group no longer exists, or the ticket
+ * is already in that group. Call this AFTER the type change is persisted, and
+ * NOT when the same request also sets the group explicitly — an intentional
+ * type+group pairing wins.
+ */
+function syncTicketGroupToType(PDO $db, int $ticketId, ?int $newTypeId, ?int $actorId): bool
+{
+    if ($newTypeId === null) {
+        return false;
+    }
+    $stmt = $db->prepare(
+        'SELECT t.group_id AS ticket_group_id, tt.name AS type_name,
+                tg.id AS type_group_id, tg.name AS type_group_name
+         FROM tickets t
+         JOIN ticket_types tt ON tt.id = ?
+         LEFT JOIN `groups` tg ON tg.id = tt.group_id
+         WHERE t.id = ?'
+    );
+    $stmt->execute([$newTypeId, $ticketId]);
+    $row = $stmt->fetch();
+    if (!$row || $row['type_group_id'] === null) {
+        return false; // type isn't pinned to a (still-existing) group
+    }
+
+    $typeGroupId = (int) $row['type_group_id'];
+    $oldGroupId  = $row['ticket_group_id'] !== null ? (int) $row['ticket_group_id'] : null;
+    if ($typeGroupId === $oldGroupId) {
+        return false; // already where the type says it belongs
+    }
+
+    $oldGroupName = 'None';
+    if ($oldGroupId) {
+        $g = $db->prepare('SELECT name FROM `groups` WHERE id = ?');
+        $g->execute([$oldGroupId]);
+        $oldGroupName = $g->fetchColumn() ?: 'None';
+    }
+
+    $db->prepare('UPDATE tickets SET group_id = ? WHERE id = ?')->execute([$typeGroupId, $ticketId]);
+    $db->prepare(
+        'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
+    )->execute([
+        $ticketId,
+        $actorId,
+        'group_changed',
+        'Group changed from ' . $oldGroupName . ' to ' . $row['type_group_name']
+            . " to match the new type's default group",
+    ]);
+    notifyAssignedGroup($db, $ticketId, $typeGroupId);
+    return true;
+}
+
+/**
  * Final NULL-group safety net inside runPostTicketCreateHooks(). AI
  * classification and "set group" automations run BEFORE this — so by
  * the time we get here, anything that's still NULL has slipped past

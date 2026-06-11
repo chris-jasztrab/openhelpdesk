@@ -2016,6 +2016,13 @@ $router->post('/agent/tickets/{id}/update', function (array $p) {
     $newGroupRaw = $_POST['group_id'] ?? '';
     $newGroup = $newGroupRaw === '' ? null : (int) $newGroupRaw;
     $oldGroup = $ticket['group_id'] ? (int) $ticket['group_id'] : null;
+
+    // Type maps 1:1 to a default group — a type change with no explicit group
+    // change in the same save moves the ticket into the new type's group.
+    if ($newType !== $oldType && $newGroup === $oldGroup
+        && syncTicketGroupToType($db, $id, $newType, Auth::id())) {
+        $changes[] = 'group';
+    }
     if ($newGroup !== $oldGroup) {
         $db->prepare('UPDATE tickets SET group_id = ? WHERE id = ?')->execute([$newGroup, $id]);
 
