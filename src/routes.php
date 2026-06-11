@@ -1497,6 +1497,37 @@ function ssoHttpGet(string $url, string $token): ?array
     return is_array($data) ? $data : null;
 }
 
+/**
+ * Extract the `tid` (tenant id) claim from the id_token returned by the token
+ * exchange. The token came directly from Microsoft's token endpoint over
+ * verified TLS, so reading its claims is trustworthy without re-verifying the
+ * signature. Returns null when no id_token / tid is present.
+ */
+function ssoTokenTenantId(?array $tokens): ?string
+{
+    $jwt = is_array($tokens) ? ($tokens['id_token'] ?? null) : null;
+    if (!is_string($jwt)) {
+        return null;
+    }
+    $parts = explode('.', $jwt);
+    if (count($parts) < 2) {
+        return null;
+    }
+    $payload = json_decode(base64_decode(strtr($parts[1], '-_', '+/')) ?: '', true);
+    return (is_array($payload) && !empty($payload['tid'])) ? (string) $payload['tid'] : null;
+}
+
+/**
+ * True when SSO is configured for a multi-tenant audience (common / organizations
+ * / consumers) rather than a specific tenant GUID. In that mode any Azure user
+ * worldwide can complete the flow, so email-based account linking/provisioning
+ * is unsafe and must be refused.
+ */
+function ssoIsMultiTenant(string $tenantId): bool
+{
+    return in_array(strtolower(trim($tenantId)), ['common', 'organizations', 'consumers'], true);
+}
+
 function ssoSetSessionUser(array $user): void
 {
     $_SESSION['user'] = [
@@ -1588,6 +1619,19 @@ $router->get('/auth/microsoft/callback', function () {
     }
     ssoDebugLog('Token exchange OK | expires_in=' . ($tokens['expires_in'] ?? '?') . ' | token_type=' . ($tokens['token_type'] ?? '?'));
 
+    // Tenant trust gate. Identity is keyed to the immutable Azure object id
+    // (oid); email is a mutable, spoofable attribute. With a specific tenant
+    // GUID configured, Microsoft only issues tokens for that tenant, so we also
+    // verify the token's tid claim matches (defence-in-depth against misconfig).
+    $multiTenant = ssoIsMultiTenant($tenantId);
+    if (!$multiTenant && trim((string) $tenantId) !== '') {
+        $tid = ssoTokenTenantId($tokens);
+        if ($tid !== null && strcasecmp($tid, trim((string) $tenantId)) !== 0) {
+            ssoDebugLog("Tenant mismatch: token tid={$tid} != configured {$tenantId} - refusing");
+            redirect('/login?sso_error=tenant');
+        }
+    }
+
     // 4. Fetch user profile from Microsoft Graph
     $me = ssoHttpGet('https://graph.microsoft.com/v1.0/me', $tokens['access_token']);
 
@@ -1619,6 +1663,12 @@ $router->get('/auth/microsoft/callback', function () {
 
     if ($user) {
         ssoDebugLog("User found by azure_oid: id={$user['id']} | email={$user['email']} | role={$user['role']}");
+    } elseif ($multiTenant) {
+        // No oid match and any tenant is trusted — linking/creating by a mutable
+        // email would let a user from any Azure tenant take over a matching local
+        // account or self-provision. Refuse; admins must use a specific tenant.
+        ssoDebugLog("No azure_oid match under multi-tenant config - refusing email link/auto-provision for {$email}");
+        redirect('/login?sso_error=tenant');
     } else {
         ssoDebugLog("No user by azure_oid={$oid} - trying email lookup");
         $stmt = $db->prepare('SELECT * FROM users WHERE email = ? LIMIT 1');

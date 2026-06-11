@@ -88,6 +88,7 @@ $pageTitle = 'Sign In';
                         'token'        => 'Could not complete sign-in with Microsoft. Please try again.',
                         'graph'        => 'Could not retrieve your account details from Microsoft. Please try again.',
                         'denied'       => 'Sign-in was cancelled or access was denied.',
+                        'tenant'       => 'Your organization is not authorized for single sign-on here. Please contact your administrator.',
                         default        => 'An error occurred during Microsoft sign-in. Please try again.',
                     } ?>
                 </span>

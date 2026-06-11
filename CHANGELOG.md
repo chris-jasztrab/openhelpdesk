@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.88.3 &mdash; 2026-06-11
+
+### Security
+- **Harden Microsoft SSO account linking (Medium):** when no account matched the Azure object id, the callback linked the immutable Azure identity to an existing local account purely by email (a mutable, spoofable attribute) with no tenant check. If SSO were ever configured with a multi-tenant audience (`common`/`organizations`/`consumers`), a user from any Azure tenant could set their email to a victim's and take over the matching local account on first sign-in. The callback now refuses email-based linking and auto-provisioning under multi-tenant configs (only pre-established `azure_oid` matches are allowed), and, for a specific tenant GUID, additionally verifies the id_token's `tid` claim matches the configured tenant. Normal single-tenant setups are unaffected.
+
+---
+
 ## 2.88.2 &mdash; 2026-06-11
 
 ### Security
