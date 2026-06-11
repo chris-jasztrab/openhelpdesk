@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.88.4 &mdash; 2026-06-11
+
+### Security
+- **Installer re-run takeover (Medium):** the web installer at `/install/` was gated only by the `storage/installed.lock` file. If that file was lost (a backup restore or `storage/` wipe that dropped it), anyone reaching `/install/` could re-run the wizard — overwriting `.env`, repointing the database, and creating a new admin — an unauthenticated full takeover. The installer now has a second, independent gate: it refuses to run when the configured database already contains an admin user, regardless of the lock file. The check fails safe (any error → treat as not-yet-installed) so genuine first installs are never blocked.
+
+---
+
 ## 2.88.3 &mdash; 2026-06-11
 
 ### Security

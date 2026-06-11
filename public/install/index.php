@@ -16,7 +16,12 @@ define('INSTALL_ROOT', dirname(dirname(__DIR__)));
 $lockFile = INSTALL_ROOT . '/storage/installed.lock';
 
 // ─── Already installed? ───────────────────────────────────────────────────────
-if (file_exists($lockFile)) {
+// Two independent gates: the lock file AND a live check that the configured
+// database already has an admin user. The second gate means that even if the
+// lock file is lost (e.g. a backup restore or storage/ wipe that drops it), an
+// attacker who reaches /install/ still cannot re-run the wizard to overwrite
+// .env or mint a new admin against an already-configured system.
+if (file_exists($lockFile) || installationAlreadyComplete()) {
     renderAlreadyInstalled($lockFile);
     exit;
 }
@@ -44,6 +49,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
+
+/**
+ * Secondary install gate: is the app already configured? Returns true when a
+ * .env with DB settings exists AND that database already contains at least one
+ * admin user. Fails safe — any error (no .env, unreachable DB, missing table)
+ * returns false so a genuine first-time install is never blocked.
+ */
+function installationAlreadyComplete(): bool
+{
+    $envFile = INSTALL_ROOT . '/.env';
+    if (!is_file($envFile)) {
+        return false;
+    }
+    $env = [];
+    foreach (file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [] as $line) {
+        $line = trim($line);
+        if ($line === '' || $line[0] === '#' || strpos($line, '=') === false) {
+            continue;
+        }
+        [$k, $v] = explode('=', $line, 2);
+        $env[trim($k)] = trim(trim($v), "\"'");
+    }
+    if (empty($env['DB_NAME'])) {
+        return false;
+    }
+    try {
+        $dsn = sprintf(
+            'mysql:host=%s;port=%s;dbname=%s;charset=utf8mb4',
+            $env['DB_HOST'] ?? '127.0.0.1',
+            $env['DB_PORT'] ?? '3306',
+            $env['DB_NAME']
+        );
+        $pdo = new PDO($dsn, $env['DB_USER'] ?? 'root', $env['DB_PASS'] ?? '', [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_TIMEOUT => 3,
+        ]);
+        if (!$pdo->query("SHOW TABLES LIKE 'users'")->fetch()) {
+            return false;
+        }
+        return (int) $pdo->query("SELECT COUNT(*) FROM users WHERE role = 'admin'")->fetchColumn() > 0;
+    } catch (\Throwable $e) {
+        return false; // can't verify → assume not yet installed, let the wizard run
+    }
+}
 
 function handleStep1(): void
 {
