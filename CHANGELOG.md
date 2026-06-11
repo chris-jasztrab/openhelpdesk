@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.88.9 &mdash; 2026-06-11
+
+### Fixed
+- **Agent dashboard: priority is now quick-editable.** The Recent Tickets table on the agent dashboard showed priority as a static badge while type, assignee, and group all had quick-change chevron dropdowns. Priority now has the same chevron, mirroring the ticket-list behaviour (posts to the existing `set-priority` API and updates the badge in place).
+
+---
+
 ## 2.88.8 &mdash; 2026-06-11
 
 ### Tests

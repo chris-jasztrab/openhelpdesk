@@ -172,12 +172,11 @@ $dir  = $dir ?? 'desc';
                     </td>
                     <?php endif; ?>
                     <?php if (in_array('priority', $visibleColumns)): ?>
-                    <td>
-                        <?php if ($t['priority_name']): ?>
-                        <span class="badge" style="background:<?= e($t['priority_color']) ?>;"><?= e($t['priority_name']) ?></span>
-                        <?php else: ?>
-                        <span class="text-muted">—</span>
-                        <?php endif; ?>
+                    <td style="white-space:nowrap;">
+                        <span class="d-inline-flex align-items-center gap-1 quick-priority-wrap" data-ticket-id="<?= (int)$t['id'] ?>">
+                            <span class="quick-priority-badge"><?php if ($t['priority_name']): ?><span class="badge" style="background:<?= e($t['priority_color']) ?>;"><?= e($t['priority_name']) ?></span><?php else: ?><span class="text-muted">—</span><?php endif; ?></span>
+                            <button class="btn btn-link btn-sm p-0 border-0 text-muted quick-priority-btn" type="button" title="Change priority" style="line-height:1;"><i class="bi bi-chevron-down" style="font-size:0.65rem;"></i></button>
+                        </span>
                     </td>
                     <?php endif; ?>
                     <?php if (in_array('type', $visibleColumns)): ?>
@@ -260,6 +259,7 @@ $dir  = $dir ?? 'desc';
 (function () {
     var quickTypes      = <?= json_encode(array_values(array_map(fn($t) => ['id' => (int)$t['id'], 'name' => $t['name'], 'color' => $t['color'] ?: '#6c757d', 'group_id' => $t['group_id'] ? (int)$t['group_id'] : null], $types))) ?>;
     var quickGroups     = <?= json_encode(array_values(array_map(fn($g) => ['id' => (int)$g['id'], 'name' => $g['name']], $groups))) ?>;
+    var quickPriorities = <?= json_encode(array_values(array_map(fn($pr) => ['id' => (int)$pr['id'], 'name' => $pr['name'], 'color' => $pr['color'] ?: '#6c757d'], $priorities))) ?>;
     var quickGroupAgents = <?= json_encode(array_map(fn($agents) => array_values($agents), $groupAgents)) ?>;
     var quickAllAgents  = <?= json_encode(array_values(array_map(fn($a) => ['id' => (int)$a['id'], 'name' => $a['name']], $allAgentsForAssign))) ?>;
     var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
@@ -303,6 +303,14 @@ $dir  = $dir ?? 'desc';
                     html += '<li><a class="dropdown-item quick-menu-item" href="#" data-kind="group" data-val="' + esc(g.id) + '" data-ticket-id="' + esc(ticketId) + '">' + esc(g.name) + '</a></li>';
                 });
             }
+        } else if (kind === 'priority') {
+            html += '<li><a class="dropdown-item quick-menu-item" href="#" data-kind="priority" data-val="" data-ticket-id="' + esc(ticketId) + '"><span class="text-muted">None</span></a></li>';
+            if (quickPriorities.length) {
+                html += '<li><hr class="dropdown-divider"></li>';
+                quickPriorities.forEach(function (pr) {
+                    html += '<li><a class="dropdown-item quick-menu-item" href="#" data-kind="priority" data-val="' + esc(pr.id) + '" data-ticket-id="' + esc(ticketId) + '"><span class="badge" style="background:' + safeColor(pr.color) + ';">' + esc(pr.name) + '</span></a></li>';
+                });
+            }
         }
         html += '</ul>';
         var div = document.createElement('div');
@@ -327,6 +335,7 @@ $dir  = $dir ?? 'desc';
     document.querySelectorAll('.quick-assign-btn').forEach(function (b) { bindBtn(b, 'agent'); });
     document.querySelectorAll('.quick-type-btn').forEach(function (b) { bindBtn(b, 'type'); });
     document.querySelectorAll('.quick-group-btn').forEach(function (b) { bindBtn(b, 'group'); });
+    document.querySelectorAll('.quick-priority-btn').forEach(function (b) { bindBtn(b, 'priority'); });
 
     document.addEventListener('click', function (e) {
         var item = e.target.closest('.quick-menu-item');
@@ -390,10 +399,27 @@ $dir  = $dir ?? 'desc';
                         }
                     }
                 }).catch(function () {});
+            } else if (kind === 'priority') {
+                var priorityWrap = document.querySelector('.quick-priority-wrap[data-ticket-id="' + ticketId + '"]');
+                if (!priorityWrap) return;
+                var priorityBadge = priorityWrap.querySelector('.quick-priority-badge');
+                fetch('/api/tickets/' + ticketId + '/set-priority', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
+                    body: JSON.stringify({priority_id: val === '' ? null : parseInt(val, 10)})
+                }).then(function (r) { return r.json(); }).then(function (data) {
+                    if (data.success) {
+                        if (data.priority_name) {
+                            priorityBadge.innerHTML = '<span class="badge" style="background:' + safeColor(data.priority_color || '#6c757d') + ';">' + esc(data.priority_name) + '</span>';
+                        } else {
+                            priorityBadge.innerHTML = '<span class="text-muted">—</span>';
+                        }
+                    }
+                }).catch(function () {});
             }
             return;
         }
-        if (!e.target.closest('.quick-assign-btn') && !e.target.closest('.quick-type-btn') && !e.target.closest('.quick-group-btn') && !(activeMenu && activeMenu.contains(e.target))) {
+        if (!e.target.closest('.quick-assign-btn') && !e.target.closest('.quick-type-btn') && !e.target.closest('.quick-group-btn') && !e.target.closest('.quick-priority-btn') && !(activeMenu && activeMenu.contains(e.target))) {
             closeMenu();
         }
     });

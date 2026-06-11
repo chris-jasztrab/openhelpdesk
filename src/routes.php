@@ -2961,8 +2961,9 @@ $router->get('/agent', function () {
     $stmt->execute($vis['params']);
     $recent = $stmt->fetchAll();
 
-    // Quick-assign / type / group dropdown data for dashboard
+    // Quick-assign / type / group / priority dropdown data for dashboard
     $dashTypes = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
+    $dashPriorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
     $gaRows2 = $db->query(
         "SELECT gum.group_id, u.id, CONCAT(u.first_name, ' ', u.last_name) AS name
          FROM group_user_map gum
@@ -3008,6 +3009,7 @@ $router->get('/agent', function () {
         'dir'                => strtolower($dir),
         'autoShowTour'       => $autoShowTour,
         'types'              => $dashTypes,
+        'priorities'         => $dashPriorities,
         'groups'             => $dashGroups,
         'groupAgents'        => $dashGroupAgents,
         'allAgentsForAssign' => $dashAllAgents,
