@@ -1134,6 +1134,17 @@ $router->get('/login', function () {
     render('login');
 });
 
+/*
+ * Brute-force throttle for the interactive web login. Mirrors the mobile API
+ * login limits (_API_LOGIN_* in routes/api.php): cap failed attempts per email
+ * and per IP in a 15-minute sliding window using the shared login_attempts
+ * table. A clean login clears the failed rows for that email+IP pair so a user
+ * who fat-fingers their password then logs in is not locked out.
+ */
+const _WEB_LOGIN_WINDOW_MINUTES         = 15;
+const _WEB_LOGIN_MAX_FAILURES_PER_EMAIL = 5;
+const _WEB_LOGIN_MAX_FAILURES_PER_IP    = 10;
+
 $router->post('/login', function () {
     $email    = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
@@ -1147,11 +1158,41 @@ $router->post('/login', function () {
         render('login', ['error' => 'Please enter both email and password.', 'email' => $email]);
     }
 
+    $db = Database::connect();
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+
+    // Throttle before verifying the password so an attacker can't keep guessing.
+    $window = _WEB_LOGIN_WINDOW_MINUTES;
+    $byEmail = $db->prepare(
+        "SELECT COUNT(*) FROM login_attempts
+          WHERE email = ? AND succeeded = 0
+            AND attempted_at >= (NOW() - INTERVAL {$window} MINUTE)"
+    );
+    $byEmail->execute([$email]);
+    $byIp = $db->prepare(
+        "SELECT COUNT(*) FROM login_attempts
+          WHERE ip = ? AND succeeded = 0
+            AND attempted_at >= (NOW() - INTERVAL {$window} MINUTE)"
+    );
+    $byIp->execute([$ip]);
+    if ((int) $byEmail->fetchColumn() >= _WEB_LOGIN_MAX_FAILURES_PER_EMAIL
+        || (int) $byIp->fetchColumn() >= _WEB_LOGIN_MAX_FAILURES_PER_IP) {
+        logAudit('auth.login_throttled', null, null, 'email=' . $email);
+        render('login', [
+            'error' => 'Too many failed login attempts. Please wait a few minutes and try again.',
+            'email' => $email,
+        ]);
+    }
+
     if (Auth::attempt($email, $password)) {
         session_regenerate_id(true);
+        // Correct password — clear the failed-attempt rows for this email+IP.
+        $db->prepare('INSERT INTO login_attempts (email, ip, succeeded) VALUES (?, ?, 1)')
+           ->execute([$email, $ip]);
+        $db->prepare('DELETE FROM login_attempts WHERE email = ? AND ip = ? AND succeeded = 0')
+           ->execute([$email, $ip]);
         // Check if 2FA is required before completing login
         $uid   = Auth::id();
-        $db    = Database::connect();
         $tfRow = $db->prepare('SELECT totp_enabled FROM users WHERE id = ?');
         $tfRow->execute([$uid]);
         $tf = $tfRow->fetch();
@@ -1165,10 +1206,11 @@ $router->post('/login', function () {
         redirect(consumeIntendedUrl());
     }
 
-    // Resolve the email to a user_id so the failed attempt is tied to the
-    // targeted account when one exists — important for spotting credential-
-    // stuffing patterns from the audit log.
-    $db = Database::connect();
+    // Failed: record the attempt for the throttle and tie it to the targeted
+    // account when one exists — important for spotting credential-stuffing
+    // patterns from the audit log.
+    $db->prepare('INSERT INTO login_attempts (email, ip, succeeded) VALUES (?, ?, 0)')
+       ->execute([$email, $ip]);
     $uidStmt = $db->prepare('SELECT id FROM users WHERE email = ?');
     $uidStmt->execute([$email]);
     $targetUid = $uidStmt->fetchColumn() ?: null;

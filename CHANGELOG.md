@@ -11,6 +11,14 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.88.0 &mdash; 2026-06-11
+
+### Security
+- **Brute-force throttle on the web login (High):** the interactive `/login` form recorded failures only to the audit log and had no lockout, so it was open to unlimited password guessing / credential stuffing. It now enforces the same sliding-window throttle as the mobile API login (max 5 failures per email and 10 per IP in 15 minutes) via the shared `login_attempts` table. A successful login clears the failed-attempt rows for that email+IP pair, so a user who mistypes their password then logs in cleanly is not locked out.
+- **API login bypassed 2FA (High):** `POST /api/v1/auth/login` issued a 90-day bearer token on a correct password alone, ignoring `totp_enabled` — so any account that had enabled 2FA could be fully accessed from the API with the password only. The API now requires a valid TOTP code (`totp_code`) for 2FA-enabled accounts, matching the web login's behaviour, and returns `401 { totp_required: true }` until a correct code is supplied.
+
+---
+
 ## 2.87.9 &mdash; 2026-06-11
 
 ### Security

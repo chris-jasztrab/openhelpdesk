@@ -311,7 +311,7 @@ $router->post('/api/v1/auth/login', function () {
     _apiLoginThrottleCheck($db, $email, $ip);
 
     $stmt = $db->prepare(
-        'SELECT id, first_name, last_name, email, password, role, avatar
+        'SELECT id, first_name, last_name, email, password, role, avatar, totp_enabled, totp_secret
            FROM users WHERE email = ?'
     );
     $stmt->execute([$email]);
@@ -329,6 +329,21 @@ $router->post('/api/v1/auth/login', function () {
             $user ? (int) $user['id'] : null
         );
         _apiJson(['error' => 'Invalid credentials'], 401);
+    }
+
+    // Enforce the second factor: the web login redirects 2FA-enabled users to
+    // /2fa before completing, so the API must likewise require a valid TOTP
+    // code rather than issuing a token on the password alone.
+    if (!empty($user['totp_enabled'])) {
+        $code = trim((string) ($input['totp_code'] ?? $input['code'] ?? ''));
+        if ($code === '') {
+            _apiJson(['error' => 'A two-factor authentication code is required.', 'totp_required' => true], 401);
+        }
+        if (!totpVerify((string) $user['totp_secret'], $code)) {
+            _apiLoginRecordAttempt($db, $email, $ip, false);
+            logAudit('auth.api_2fa_failed', null, null, 'device=' . $device, (int) $user['id']);
+            _apiJson(['error' => 'Invalid two-factor authentication code.', 'totp_required' => true], 401);
+        }
     }
 
     _apiLoginRecordAttempt($db, $email, $ip, true);
