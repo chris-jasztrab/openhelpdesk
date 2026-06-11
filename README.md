@@ -169,8 +169,12 @@ Twelve built-in report types accessible from the Reports Overview:
 - HTML output escaping via `e()` helper throughout all templates
 - File upload validation (MIME type whitelist and size limit; attachments stored outside webroot)
 - Role checks on every route (`Auth::requireRole()`)
-- Installer locked after first run via `storage/installed.lock`
+- Rich CKEditor content (ticket descriptions, comments, KB articles) sanitized through an allowlist on render
+- Brute-force throttling on web and API login; TOTP attempt cap on the 2FA step
+- Installer locked after first run via `storage/installed.lock` **and** a live check that the database has no admin user yet
 - API tokens hashed at rest; secure session cookie flag set automatically under HTTPS
+
+> ⚠️ **Operational warning — the admin rescue script.** `scripts/admin/rescue.php` resets any user's password or role **with no authentication** (it is an emergency break-glass tool, run from the CLI). Keep it **outside the web root** and **delete any copy you place under `public/`** the moment you are done. A copy left web-accessible is an instant account-takeover endpoint. `public/rescue.php` and `/rescue.php` are gitignored to discourage this, but the responsibility is operational.
 
 ---
 

@@ -17,7 +17,7 @@ $isWindows = stripos(PHP_OS, 'WIN') === 0;
 // (copy-and-paste ready). When we're showing the *other* platform's tab, we
 // fall back to a conventional placeholder so the command is at least shaped
 // correctly — the user replaces the path with their own.
-$linuxRoot   = $isWindows ? '/var/www/freshwpl'           : rtrim(ROOT_DIR, '/');
+$linuxRoot   = $isWindows ? '/var/www/openhelpdesk'       : rtrim(ROOT_DIR, '/');
 $linuxPhp    = 'php';
 
 $windowsRoot = $isWindows ? str_replace('/', '\\', rtrim(ROOT_DIR, '/')) : 'C:\\xampp\\htdocs\\freshwpl';
@@ -263,7 +263,7 @@ foreach ($cronJobs as $j) {
         <strong>How to edit your crontab:</strong> Run <code>crontab -e</code> on your server, paste the desired
         cron lines, save, and exit.
         <?php if ($isWindows): ?>
-            The paths below use the conventional Linux web-root <code>/var/www/freshwpl</code> as a placeholder &mdash;
+            The paths below use the conventional Linux web-root <code>/var/www/openhelpdesk</code> as a placeholder &mdash;
             replace it with your actual install path.
         <?php else: ?>
             All paths below are absolute paths for your installation.

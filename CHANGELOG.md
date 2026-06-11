@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.88.6 &mdash; 2026-06-11
+
+### Changed
+- **Open-source scrub:** removed an internal hostname (`helpdeskvm.wpl.ca`) from a historical changelog entry and genericized the placeholder deploy path shown in the admin Cron Jobs help (`/var/www/openhelpdesk`). Added a prominent operational warning to the README about the unauthenticated `scripts/admin/rescue.php` break-glass tool, and refreshed the README security section. (Note: `scripts/deploy.py` was removed from HEAD earlier but still exists in git history — purge it with `git filter-repo` or publish a fresh/squashed history before the public release.)
+
+---
+
 ## 2.88.5 &mdash; 2026-06-11
 
 ### Security
@@ -1303,7 +1310,7 @@ This is a wide, mechanical pass — no new infrastructure, just call-sites. Phas
 ## 2.27.1 — 2026-05-05
 
 ### Fixes
-- **Live preview iframe was being blocked by the site's framing-deny baseline.** 2.27.0 shipped the form-builder live preview but [src/bootstrap.php](src/bootstrap.php#L51) emits `X-Frame-Options: DENY` and a CSP that ends with `frame-ancestors 'none'` for every response — both block framing outright, even from the same origin, so the iframe rendered as the browser's "helpdeskvm.wpl.ca refused to connect" error page. The `/portal/tickets/create` handler now overrides both headers when `?embed=1` is set: `X-Frame-Options: SAMEORIGIN` and the CSP re-emitted with `frame-ancestors 'self'` (PHP's `header()` replaces same-name headers by default, so the baseline emitted in bootstrap is cleanly superseded). Non-embed page loads keep the strict deny baseline — the relaxation is scoped strictly to the read-only preview response.
+- **Live preview iframe was being blocked by the site's framing-deny baseline.** 2.27.0 shipped the form-builder live preview but [src/bootstrap.php](src/bootstrap.php#L51) emits `X-Frame-Options: DENY` and a CSP that ends with `frame-ancestors 'none'` for every response — both block framing outright, even from the same origin, so the iframe rendered as the browser's "refused to connect" error page. The `/portal/tickets/create` handler now overrides both headers when `?embed=1` is set: `X-Frame-Options: SAMEORIGIN` and the CSP re-emitted with `frame-ancestors 'self'` (PHP's `header()` replaces same-name headers by default, so the baseline emitted in bootstrap is cleanly superseded). Non-embed page loads keep the strict deny baseline — the relaxation is scoped strictly to the read-only preview response.
 
 ---
 
