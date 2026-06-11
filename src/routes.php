@@ -1415,6 +1415,9 @@ $router->post('/reset', function () {
     $db->prepare('UPDATE password_resets SET used_at = NOW()
                   WHERE user_id = ? AND used_at IS NULL')
        ->execute([$userId]);
+    // Revoke all mobile/API bearer tokens — after a reset (e.g. following an
+    // account compromise) an attacker-held 90-day token must not stay valid.
+    $db->prepare('DELETE FROM api_tokens WHERE user_id = ?')->execute([$userId]);
 
     logAudit('auth.password_reset_completed', $userId, 'user', null, $userId);
 
@@ -2207,10 +2210,13 @@ $router->post('/profile/password', function () {
 
     $db->prepare('UPDATE users SET password = ? WHERE id = ?')
        ->execute([password_hash($newPassword, PASSWORD_DEFAULT), $userId]);
+    // Revoke existing mobile/API bearer tokens so a password change signs the
+    // account out of other devices (standard "log out everywhere" behaviour).
+    $db->prepare('DELETE FROM api_tokens WHERE user_id = ?')->execute([$userId]);
 
     logAudit('auth.password_changed', $userId, 'user');
 
-    flash('success', 'Password updated successfully.');
+    flash('success', 'Password updated successfully. You may need to sign in again on the mobile app.');
     redirect('/profile');
 });
 

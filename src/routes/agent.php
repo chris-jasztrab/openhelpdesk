@@ -449,7 +449,7 @@ $router->post('/agent/tickets/columns', function () {
         $columns = [];
     }
     setUserColumns(Auth::id(), $columns);
-    redirect($_POST['_redirect'] ?? '/agent/tickets');
+    redirect(safeRedirectPath($_POST['_redirect'] ?? null, '/agent/tickets'));
 });
 
 /* ── Saved Filters (Agent) ────────────────────────────────────────── */

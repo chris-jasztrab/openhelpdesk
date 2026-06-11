@@ -103,6 +103,26 @@ function consumeIntendedUrl(string $fallback = '/'): string
     return $intended;
 }
 
+/**
+ * Validate a caller-supplied redirect target, returning it only when it is a
+ * safe same-site relative path (leading single "/", no "//" or "/\" that would
+ * become a protocol-relative off-site URL). Anything else returns $fallback.
+ * Use for any redirect built from request input (e.g. a `_redirect` form field).
+ */
+function safeRedirectPath(?string $url, string $fallback = '/'): string
+{
+    if (!is_string($url) || $url === '' || strlen($url) > 2000) {
+        return $fallback;
+    }
+    if ($url[0] !== '/') {
+        return $fallback;
+    }
+    if (isset($url[1]) && ($url[1] === '/' || $url[1] === '\\')) {
+        return $fallback;
+    }
+    return $url;
+}
+
 function render(string $view, array $data = []): never
 {
     // Defaults

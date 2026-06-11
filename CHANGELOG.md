@@ -11,6 +11,16 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.88.7 &mdash; 2026-06-11
+
+### Security
+- **Open redirect (Low):** the "save columns" routes redirected to a raw `$_POST['_redirect']` value. They now pass it through a new `safeRedirectPath()` helper that only allows same-site relative paths (blocking `//host` and `/\host` protocol-relative escapes).
+- **AI classification IDOR (Low):** the admin re-classify and classification-override routes were gated by `requireStaff()` only, so a non-admin staff member could act on a ticket outside their group/confidential scope. Both now call `_agentRequireTicketAccess()` (admins pass through; other staff are limited to tickets they can access).
+- **API tokens survived password changes (Low):** completing a password reset or changing the password in the profile now revokes all of that user's mobile/API bearer tokens, so a leaked 90-day token can't outlive a post-compromise reset.
+- **`storage/` web-access guard (Low):** added `storage/.htaccess` denying all direct HTTP access and execution as defence-in-depth against a misconfigured document root.
+
+---
+
 ## 2.88.6 &mdash; 2026-06-11
 
 ### Changed

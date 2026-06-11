@@ -262,6 +262,9 @@ $router->post('/admin/tickets/{id}/classify', function (array $p) {
         redirect('/admin/tickets/' . (int) $p['id']);
     }
     $ticketId = (int) $p['id'];
+    // Non-admin staff may only re-classify tickets they can actually access
+    // (group / confidential scope) — admins pass through.
+    _agentRequireTicketAccess(Database::connect(), ['id' => $ticketId]);
     if (getSetting('ai_enabled', '0') !== '1') {
         flash('error', 'AI classification is disabled in settings.');
         redirect('/admin/tickets/' . $ticketId);
@@ -290,6 +293,9 @@ $router->post('/admin/tickets/{id}/classification/override', function (array $p)
     }
     $ticketId = (int) $p['id'];
     $db = Database::connect();
+    // Non-admin staff may only override classification on tickets they can
+    // access (group / confidential scope) — admins pass through.
+    _agentRequireTicketAccess($db, ['id' => $ticketId]);
 
     $tStmt = $db->prepare('SELECT ai_classification_id, group_id FROM tickets WHERE id = ?');
     $tStmt->execute([$ticketId]);
@@ -3794,7 +3800,7 @@ $router->post('/admin/tickets/columns', function () {
         $columns = [];
     }
     setUserColumns(Auth::id(), $columns);
-    redirect($_POST['_redirect'] ?? '/admin/tickets');
+    redirect(safeRedirectPath($_POST['_redirect'] ?? null, '/admin/tickets'));
 });
 
 /* ── Saved Filters (Admin) ────────────────────────────────────────── */

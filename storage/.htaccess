@@ -1,0 +1,21 @@
+# The storage/ directory holds attachments, backups, imports, logs, and other
+# private application data. It lives OUTSIDE the public/ web root by design, so
+# it should never be reachable over HTTP. This file is defence-in-depth: if a
+# server is ever misconfigured to point the document root above public/, deny
+# all direct web access to everything here.
+#
+# Apache 2.4+
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+# Apache 2.2
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>
+
+# Never execute anything under here.
+<IfModule mod_php.c>
+    php_flag engine off
+</IfModule>
+Options -Indexes -ExecCGI
