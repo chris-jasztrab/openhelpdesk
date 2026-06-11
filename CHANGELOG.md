@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.87.8 &mdash; 2026-06-11
+
+### Security
+- **Stored XSS in rich text (Critical):** ticket descriptions, ticket timeline comments/replies, KB article bodies, the duplicate-ticket preview modal, and outbound email bodies all rendered raw CKEditor HTML, so a low-privilege requester could plant `<script>`/`onerror` markup that executed in an agent's or admin's browser (privilege escalation). All rich-HTML output now passes through a new `sanitizeRichHtml()` allowlist sanitizer (DOMDocument-based, same engine as the status-banner sanitizer) applied at render time, which also neutralises any malicious markup already stored in the database. Legitimate formatting — headings, lists, tables, images, links, and safe inline styles — is preserved; scripts, event handlers, `javascript:`/`data:` URLs, and `<iframe>`/`<svg>`-style tags are stripped.
+
+---
+
 ## 2.87.7 &mdash; 2026-06-11
 
 ### Fixed

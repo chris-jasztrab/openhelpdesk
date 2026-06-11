@@ -255,7 +255,7 @@ if ($solutionTimelineId > 0) {
             <div class="card-body">
                 <?php $desc = $ticket['description'] ?? ''; ?>
                 <?php if ($desc !== '' && ltrim($desc)[0] === '<'): ?>
-                <div class="ck-content"><?= $desc ?></div>
+                <div class="ck-content"><?= sanitizeRichHtml($desc) ?></div>
                 <?php else: ?>
                 <div style="white-space:pre-wrap;"><?= linkify($desc) ?></div>
                 <?php endif; ?>

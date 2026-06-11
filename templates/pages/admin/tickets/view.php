@@ -140,7 +140,7 @@ if ($solutionTimelineId > 0) {
             <div class="card-body">
                 <?php $desc = $ticket['description'] ?? ''; ?>
                 <?php if ($desc !== '' && ltrim($desc)[0] === '<'): ?>
-                <div class="ck-content"><?= $desc ?></div>
+                <div class="ck-content"><?= sanitizeRichHtml($desc) ?></div>
                 <?php else: ?>
                 <div style="white-space:pre-wrap;"><?= linkify($desc) ?></div>
                 <?php endif; ?>
@@ -322,7 +322,7 @@ if ($solutionTimelineId > 0) {
                                     }
                                 ?>
                                 <?php if ($isHtmlDet): ?>
-                                <div class="mt-1 ck-content"><?= $det ?></div>
+                                <div class="mt-1 ck-content"><?= sanitizeRichHtml($det) ?></div>
                                 <?php else: ?>
                                 <div class="mt-1 text-muted" style="white-space:pre-wrap;"><?= $det ?></div>
                                 <?php endif; ?>

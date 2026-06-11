@@ -775,10 +775,12 @@ function getFileIcon(string $mimeType): string
 
 function renderMarkdown(string $content): string
 {
-    // Content saved by the WYSIWYG editor is already HTML — return as-is.
+    // Content saved by the WYSIWYG editor is already HTML — sanitize and return.
+    // Sanitizing here is a stored-XSS boundary: it neutralises any malicious
+    // markup already in the database, not just freshly-saved content.
     $trimmed = ltrim($content);
     if ($trimmed !== '' && $trimmed[0] === '<') {
-        return $content;
+        return sanitizeRichHtml($content);
     }
 
     // Legacy markdown content — convert to HTML.
@@ -1849,7 +1851,7 @@ function getDupPreviewTicket(int $userId, int $ticketId, bool $agentScope): ?arr
         'created_at'       => (string) $row['created_at'],
         'type_name'        => (string) ($row['type_name'] ?? ''),
         'requester'        => $requester,
-        'description_html' => mb_substr((string) ($row['description'] ?? ''), 0, 4000),
+        'description_html' => sanitizeRichHtml(mb_substr((string) ($row['description'] ?? ''), 0, 4000)),
         'comment_count'    => $commentCount,
     ];
 }
@@ -2538,8 +2540,8 @@ function phpBinary(): string
 function emailContent(string $content): string
 {
     if (strip_tags($content) !== $content) {
-        // Contains HTML markup — output as-is (rich text from editor)
-        return $content;
+        // Contains HTML markup — sanitize the rich text before it reaches mail.
+        return sanitizeRichHtml($content);
     }
     // Plain text — escape entities and preserve line breaks
     return nl2br(htmlspecialchars($content, ENT_QUOTES, 'UTF-8'));
@@ -6026,28 +6028,29 @@ function getActiveBanners(): array
  * rejected structurally, so the old regex's reassembly bypass can't happen.
  * Unparseable input yields '' rather than passing raw HTML through.
  */
-function sanitizeBannerHtml(string $html): string
+/**
+ * Shared HTML allowlist sanitizer (DOMDocument-based). Parses the markup and
+ * keeps only the tags in $allowed, and on those only the listed attributes — so
+ * every event handler (on*) is dropped regardless of quoting/casing/whitespace,
+ * unknown tags are unwrapped (text preserved), and the $dropSubtree tags
+ * (script/style/iframe/svg/…) are discarded outright. Attributes named in
+ * $urlAttrs (href/src) are scheme-checked against $okSchemes — relative URLs are
+ * always allowed; javascript:/data:/etc. are rejected structurally. When
+ * $filterStyle is true a permitted `style` attribute is property-filtered via
+ * sanitizeStyleAttr(). Unparseable input yields '' rather than passing through.
+ *
+ * @param array<string,string[]> $allowed     tag => allowed attribute names
+ * @param string[]               $dropSubtree tags whose entire subtree is discarded
+ * @param string[]               $urlAttrs    attributes validated against $okSchemes
+ * @param string[]               $okSchemes   permitted URL schemes (relative always allowed)
+ */
+function sanitizeHtmlAllowlist(string $html, array $allowed, array $dropSubtree, array $urlAttrs, array $okSchemes, bool $filterStyle = false): string
 {
     $html = trim($html);
     if ($html === '') {
         return '';
     }
-
-    // tag => allowed attributes. Everything not listed here is stripped.
-    $allowed = [
-        'p' => [], 'br' => [], 'strong' => [], 'b' => [], 'em' => [], 'i' => [],
-        'u' => [], 's' => [], 'span' => [], 'div' => [], 'ul' => [], 'ol' => [],
-        'li' => [], 'h3' => [], 'h4' => [], 'h5' => [], 'h6' => [], 'blockquote' => [],
-        'code' => [], 'pre' => [],
-        'a' => ['href', 'title', 'target', 'rel'],
-    ];
-    // Tags whose entire subtree is discarded (content is never safe / wanted).
-    $drop = array_flip([
-        'script', 'style', 'iframe', 'object', 'embed', 'svg', 'math', 'template',
-        'noscript', 'form', 'input', 'button', 'textarea', 'select', 'option',
-        'link', 'meta', 'base', 'frame', 'frameset', 'applet', 'audio', 'video', 'source',
-    ]);
-    $okSchemes = ['http', 'https', 'mailto'];
+    $drop = array_flip($dropSubtree);
 
     $dom = new DOMDocument();
     $prev = libxml_use_internal_errors(true);
@@ -6068,7 +6071,7 @@ function sanitizeBannerHtml(string $html): string
         return '';
     }
 
-    $clean = function (DOMNode $node) use (&$clean, $allowed, $drop, $okSchemes): void {
+    $clean = function (DOMNode $node) use (&$clean, $allowed, $drop, $urlAttrs, $okSchemes, $filterStyle): void {
         // Snapshot children first: we mutate the live NodeList as we go.
         foreach (iterator_to_array($node->childNodes) as $child) {
             if ($child instanceof DOMText) {
@@ -6106,14 +6109,21 @@ function sanitizeBannerHtml(string $html): string
                     $child->removeAttribute($attr->nodeName);
                     continue;
                 }
-                if ($an === 'href') {
+                if (in_array($an, $urlAttrs, true)) {
                     // Decode entities, strip control/whitespace chars, then
                     // enforce the scheme allowlist (relative URLs are fine).
                     $val = html_entity_decode((string) $attr->nodeValue, ENT_QUOTES | ENT_HTML5);
                     $val = preg_replace('/[\x00-\x20]+/', '', $val) ?? '';
                     if (preg_match('#^([a-z][a-z0-9+.\-]*):#i', $val, $m)
                         && !in_array(strtolower($m[1]), $okSchemes, true)) {
-                        $child->removeAttribute('href');
+                        $child->removeAttribute($attr->nodeName);
+                    }
+                } elseif ($an === 'style' && $filterStyle) {
+                    $safe = sanitizeStyleAttr((string) $attr->nodeValue);
+                    if ($safe === '') {
+                        $child->removeAttribute('style');
+                    } else {
+                        $child->setAttribute('style', $safe);
                     }
                 }
             }
@@ -6134,6 +6144,100 @@ function sanitizeBannerHtml(string $html): string
         $out .= $dom->saveHTML($c);
     }
     return trim($out);
+}
+
+/**
+ * Filter a CSS `style` attribute down to a small allowlist of presentational
+ * properties with script-free values. Preserves common CKEditor output (table
+ * borders, image sizing, text alignment) while dropping anything that could
+ * carry a script vector (url(), expression(), @import, backslash escapes).
+ */
+function sanitizeStyleAttr(string $css): string
+{
+    static $allowedProps = [
+        'text-align', 'width', 'height', 'max-width', 'min-width',
+        'background-color', 'background', 'color', 'border', 'border-color',
+        'border-width', 'border-style', 'border-collapse', 'padding', 'margin',
+        'vertical-align', 'font-weight', 'font-style', 'text-decoration', 'float',
+    ];
+    $out = [];
+    foreach (explode(';', $css) as $decl) {
+        if (strpos($decl, ':') === false) {
+            continue;
+        }
+        [$prop, $val] = explode(':', $decl, 2);
+        $prop = strtolower(trim($prop));
+        $val  = trim($val);
+        if ($val === '' || !in_array($prop, $allowedProps, true)) {
+            continue;
+        }
+        // Reject any value that could smuggle script/resource loads.
+        if (preg_match('/url\s*\(|expression|javascript:|@import|<|\\\\/i', $val)) {
+            continue;
+        }
+        // Allow only a safe character set (covers rgb()/rgba()/hsl() colours).
+        if (!preg_match('/^[#a-z0-9 .,%()\-]+$/i', $val)) {
+            continue;
+        }
+        $out[] = $prop . ': ' . $val;
+    }
+    return implode('; ', $out);
+}
+
+/**
+ * Sanitize the restrictive set of formatting allowed in status banners.
+ */
+function sanitizeBannerHtml(string $html): string
+{
+    $allowed = [
+        'p' => [], 'br' => [], 'strong' => [], 'b' => [], 'em' => [], 'i' => [],
+        'u' => [], 's' => [], 'span' => [], 'div' => [], 'ul' => [], 'ol' => [],
+        'li' => [], 'h3' => [], 'h4' => [], 'h5' => [], 'h6' => [], 'blockquote' => [],
+        'code' => [], 'pre' => [],
+        'a' => ['href', 'title', 'target', 'rel'],
+    ];
+    $drop = [
+        'script', 'style', 'iframe', 'object', 'embed', 'svg', 'math', 'template',
+        'noscript', 'form', 'input', 'button', 'textarea', 'select', 'option',
+        'link', 'meta', 'base', 'frame', 'frameset', 'applet', 'audio', 'video', 'source',
+    ];
+    return sanitizeHtmlAllowlist($html, $allowed, $drop, ['href'], ['http', 'https', 'mailto'], false);
+}
+
+/**
+ * Sanitize rich CKEditor content for ticket descriptions, timeline comments,
+ * and KB article bodies. This is a hard stored-XSS boundary applied at render
+ * time — it neutralises any malicious markup that may already be in the
+ * database, not just new writes. The allowlist covers the tag/attribute set the
+ * WYSIWYG editor actually emits (headings, lists, tables, images, links).
+ */
+function sanitizeRichHtml(string $html): string
+{
+    $allowed = [
+        'p' => ['class', 'style'], 'br' => [], 'hr' => [],
+        'strong' => [], 'b' => [], 'em' => [], 'i' => [], 'u' => [], 's' => [],
+        'sub' => [], 'sup' => [], 'mark' => [], 'small' => [], 'del' => [], 'ins' => [], 'abbr' => ['title'],
+        'span' => ['class', 'style'], 'div' => ['class', 'style'],
+        'ul' => ['class'], 'ol' => ['class', 'start', 'type'], 'li' => ['class'],
+        'h1' => ['class'], 'h2' => ['class'], 'h3' => ['class'], 'h4' => ['class'],
+        'h5' => ['class'], 'h6' => ['class'],
+        'blockquote' => ['class'], 'code' => ['class'], 'pre' => ['class'],
+        'a' => ['href', 'title', 'target', 'rel', 'class'],
+        'img' => ['src', 'alt', 'title', 'width', 'height', 'class', 'style'],
+        'figure' => ['class', 'style'], 'figcaption' => ['class'],
+        'table' => ['class', 'style', 'border', 'cellpadding', 'cellspacing'],
+        'thead' => ['class'], 'tbody' => ['class'], 'tfoot' => ['class'],
+        'tr' => ['class', 'style'],
+        'th' => ['class', 'style', 'colspan', 'rowspan', 'scope'],
+        'td' => ['class', 'style', 'colspan', 'rowspan'],
+        'caption' => ['class'],
+    ];
+    $drop = [
+        'script', 'style', 'iframe', 'object', 'embed', 'svg', 'math', 'template',
+        'noscript', 'form', 'input', 'button', 'textarea', 'select', 'option',
+        'link', 'meta', 'base', 'frame', 'frameset', 'applet', 'audio', 'video', 'source',
+    ];
+    return sanitizeHtmlAllowlist($html, $allowed, $drop, ['href', 'src'], ['http', 'https', 'mailto', 'tel'], true);
 }
 
 /* ── Ticket status helpers ───────────────────────────────────────────────────
