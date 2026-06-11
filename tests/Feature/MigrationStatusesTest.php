@@ -169,13 +169,16 @@ class MigrationStatusesTest extends TestCase
 
     public function test_tickets_status_index_exists(): void
     {
+        // Migration 046 dropped the single-column idx_tickets_status in favour of
+        // the composite idx_tickets_status_created (status, created_at) — status is
+        // still the leading index column, so the status filter stays indexed.
         $stmt = self::$pdo->prepare(
             "SELECT COUNT(*) FROM information_schema.STATISTICS
              WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'tickets'
-               AND COLUMN_NAME = 'status' AND INDEX_NAME = 'idx_tickets_status'"
+               AND COLUMN_NAME = 'status' AND SEQ_IN_INDEX = 1"
         );
         $stmt->execute([self::$dbName]);
-        $this->assertGreaterThan(0, (int) $stmt->fetchColumn(), 'tickets.status should have idx_tickets_status');
+        $this->assertGreaterThan(0, (int) $stmt->fetchColumn(), 'tickets.status should be the leading column of an index');
     }
 
     public function test_every_ticket_status_value_exists_in_lookup(): void

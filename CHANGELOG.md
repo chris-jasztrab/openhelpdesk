@@ -11,7 +11,10 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
-## 2.88.7 &mdash; 2026-06-11
+## 2.88.8 &mdash; 2026-06-11
+
+### Tests
+- **Restored a trustworthy test suite.** The feature suite was non-deterministically failing dozens of tests (8→170 across runs). Root cause: the `DatabaseSeeder` was idempotent-by-skip, so a leftover `test_admin` fixture whose role had been mutated to `user` by an earlier run persisted and 403'd every admin-route test. The seeder now self-heals fixture users' role/password/name on each run. Also brought several outdated test expectations in line with intended behaviour: `/admin/settings` is an all-staff landing as of v2.66.0 (real gating is on its config sub-pages); migration 046 replaced `idx_tickets_status` with the composite `idx_tickets_status_created`; and the portal create button is a customizable label (assert the create link, not literal text). Full suite now passes (405 tests). No application code changed.
 
 ### Security
 - **Open redirect (Low):** the "save columns" routes redirected to a raw `$_POST['_redirect']` value. They now pass it through a new `safeRedirectPath()` helper that only allows same-site relative paths (blocking `//host` and `/\host` protocol-relative escapes).

@@ -247,7 +247,9 @@ class TicketsTest extends TestCase
 
     public function test_agent_cannot_access_admin_settings(): void
     {
-        $r = $this->get($this->agentClient(), '/admin/settings', follow: false);
+        // /admin/settings is an all-staff landing as of v2.66.0; the agent must
+        // still be blocked from settings.manage-gated config such as branding.
+        $r = $this->get($this->agentClient(), '/admin/settings/branding', follow: false);
         $this->assertForbidden($r);
     }
 

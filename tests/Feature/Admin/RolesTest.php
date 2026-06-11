@@ -167,7 +167,9 @@ class RolesTest extends TestCase
         // Ungranted admin areas → forbidden.
         $this->assertForbidden($this->get($client, '/admin/users', follow: false), ' — users.manage not granted');
         $this->assertForbidden($this->get($client, '/admin/reports', follow: false), ' — reports.view not granted');
-        $this->assertForbidden($this->get($client, '/admin/settings', follow: false), ' — settings.manage not granted');
+        // /admin/settings itself is an all-staff landing; the settings.manage-gated
+        // config (e.g. branding/email) is what an un-granted role can't reach.
+        $this->assertForbidden($this->get($client, '/admin/settings/branding', follow: false), ' — settings.manage not granted');
         // Staff baseline still works (agent ticket queue).
         $this->assertOk($this->get($client, '/agent/tickets'), ' — staff baseline ticket access');
         // Managing roles is never grantable → still forbidden.

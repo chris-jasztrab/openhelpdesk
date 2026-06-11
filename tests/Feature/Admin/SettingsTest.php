@@ -241,7 +241,9 @@ class SettingsTest extends TestCase
     public static function settingsPagePaths(): array
     {
         return [
-            ['/admin/settings'],
+            // /admin/settings itself is a staff landing as of v2.66.0 — every staff
+            // role may open it (it shows only their permitted nav). The gated config
+            // sub-pages below are what non-permitted staff are blocked from.
             ['/admin/settings/branding'],
             ['/admin/settings/business-hours'],
             ['/admin/settings/sla-policies'],

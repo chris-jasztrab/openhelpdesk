@@ -30,7 +30,9 @@ class TicketsTest extends TestCase
     public function test_portal_ticket_list_shows_create_button(): void
     {
         $r = $this->get($this->portalClient(), '/portal/tickets');
-        $this->assertSee('New Ticket', $r);
+        // The button label is customizable (label('portal.action.new', …),
+        // default "New Help Request"), so assert the stable create link instead.
+        $this->assertSee('/portal/tickets/create', $r);
     }
 
     // ── Create ────────────────────────────────────────────────────────────────

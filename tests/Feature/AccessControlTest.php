@@ -96,7 +96,10 @@ class AccessControlTest extends TestCase
     public static function adminOnlyRoutes(): array
     {
         return [
-            ['/admin/settings'],
+            // /admin/settings itself is intentionally a staff landing as of v2.66.0
+            // (single Settings link on the staff rail → permission-filtered nav;
+            // Status Banners etc. are open to all staff). Real access control is on
+            // the config sub-pages below, which agents still 403 on.
             ['/admin/settings/danger-zone'],
             ['/admin/users'],
             ['/admin/users/create'],
