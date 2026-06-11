@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.87.6 &mdash; 2026-06-11
+
+### Fixed
+- **Tickets:** the agent ticket list's "Showing tickets assigned to your group(s)" banner no longer lists every group in the system (including confidential ones) when the **Allow agents to assign tickets to groups they're not part of** setting is on. The banner now always lists only the groups the agent actually belongs to; the wider group list is still used for the assignment dropdowns, which is what the setting controls.
+
+---
+
 ## 2.87.5 &mdash; 2026-06-11
 
 ### Changed

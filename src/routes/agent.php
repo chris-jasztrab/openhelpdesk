@@ -360,12 +360,18 @@ $router->get('/agent/tickets', function () {
     // Group picker scope: by default a non-admin agent can only move tickets into
     // groups they belong to. The 'agents_assign_any_group' setting lifts that and
     // shows every group (admins are never restricted — $agentGroupIds is empty).
+    // $myGroups is always the agent's own groups — the banner lists these, never
+    // the (possibly site-wide) dropdown scope, which would leak confidential groups.
     $assignAnyGroup = getSetting('agents_assign_any_group', '0') === '1';
-    if (!empty($agentGroupIds) && !$assignAnyGroup) {
+    $myGroups = [];
+    if (!empty($agentGroupIds)) {
         $placeholders = implode(',', array_fill(0, count($agentGroupIds), '?'));
         $gDropStmt = $db->prepare("SELECT * FROM `groups` WHERE id IN ($placeholders) ORDER BY sort_order, name");
         $gDropStmt->execute($agentGroupIds);
-        $groups = $gDropStmt->fetchAll();
+        $myGroups = $gDropStmt->fetchAll();
+    }
+    if (!empty($agentGroupIds) && !$assignAnyGroup) {
+        $groups = $myGroups;
     } else {
         $groups = $db->query('SELECT * FROM `groups` ORDER BY sort_order, name')->fetchAll();
     }
@@ -401,6 +407,7 @@ $router->get('/agent/tickets', function () {
         'locations'          => $locations,
         'agents'             => $agents,
         'groups'             => $groups,
+        'myGroups'           => $myGroups,
         'groupAgents'        => $groupAgents,
         'allAgentsForAssign' => $allAgentsForAssign,
         'filters'            => $filters,
