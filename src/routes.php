@@ -1145,6 +1145,10 @@ const _WEB_LOGIN_WINDOW_MINUTES         = 15;
 const _WEB_LOGIN_MAX_FAILURES_PER_EMAIL = 5;
 const _WEB_LOGIN_MAX_FAILURES_PER_IP    = 10;
 
+// Max wrong TOTP codes allowed on the /2fa step before the pending login is
+// discarded and the user must re-enter their password.
+const _2FA_MAX_ATTEMPTS = 5;
+
 $router->post('/login', function () {
     $email    = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
@@ -1827,7 +1831,7 @@ $router->post('/2fa', function () {
     $u = $stmt->fetch();
 
     if ($u && totpVerify($u['totp_secret'], $code)) {
-        unset($_SESSION['2fa_pending']);
+        unset($_SESSION['2fa_pending'], $_SESSION['2fa_attempts']);
         $_SESSION['user'] = [
             'id'         => (int) $u['id'],
             'first_name' => $u['first_name'],
@@ -1838,6 +1842,17 @@ $router->post('/2fa', function () {
         ];
         logAudit('auth.login');
         redirect(consumeIntendedUrl());
+    }
+
+    // Cap online guessing of the 6-digit code: with a ±1 step window three
+    // codes are valid at any moment, so an unbounded retry loop is brute-
+    // forceable. After too many misses, drop the pending state and force the
+    // user back through password login.
+    $_SESSION['2fa_attempts'] = ($_SESSION['2fa_attempts'] ?? 0) + 1;
+    if ($_SESSION['2fa_attempts'] >= _2FA_MAX_ATTEMPTS) {
+        logAudit('auth.2fa_throttled', null, null, null, (int) $uid);
+        unset($_SESSION['2fa_pending'], $_SESSION['2fa_attempts']);
+        render('login', ['error' => 'Too many incorrect authentication codes. Please sign in again.']);
     }
 
     render('2fa', ['error' => 'Invalid code. Please try again.']);

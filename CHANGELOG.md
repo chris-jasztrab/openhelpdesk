@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.88.2 &mdash; 2026-06-11
+
+### Security
+- **Cap TOTP verification attempts (Medium):** the `/2fa` step allowed unlimited 6-digit code guesses against a persistent pending session — and with the ±1 step verification window, three codes are valid at any moment, making online brute-force feasible for an attacker who already has the password. After 5 incorrect codes the pending login is now discarded and the user is sent back to password login.
+
+---
+
 ## 2.88.1 &mdash; 2026-06-11
 
 ### Security
