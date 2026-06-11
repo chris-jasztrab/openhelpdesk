@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.88.1 &mdash; 2026-06-11
+
+### Security
+- **Prevent committing local credential helpers:** added `/pw.txt` and `/check_prod.py` to `.gitignore`. These local-only files can hold production secrets (the deploy SSH/sudo password) and must never be committed — particularly important ahead of the public GitHub release. Neither file is currently tracked or present in git history.
+
+---
+
 ## 2.88.0 &mdash; 2026-06-11
 
 ### Security

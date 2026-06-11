@@ -24,6 +24,12 @@ test-results*.txt
 # Never commit a working copy at the webroot or project root.
 /public/rescue.php
 /rescue.php
+
+# Local-only ops/credential helpers — these hold production secrets (e.g. the
+# deploy SSH/sudo password) and must NEVER be committed, especially before the
+# public GitHub push.
+/pw.txt
+/check_prod.py
 .claude/*
 
 .claude/settings.json
