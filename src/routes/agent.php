@@ -181,9 +181,13 @@ $router->get('/agent/tickets', function () {
     }
     if (!empty($fLocation)) {
         $ids = array_map('intval', $fLocation);
-        $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $where[]  = 't.location_id IN (' . $placeholders . ')';
-        $params   = array_merge($params, $ids);
+        // Ticking the "System Wide" meta-branch means "any location":
+        // skip the constraint instead of matching the literal row.
+        if (!array_intersect($ids, metaLocationIds())) {
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $where[]  = 't.location_id IN (' . $placeholders . ')';
+            $params   = array_merge($params, $ids);
+        }
     }
     if (!empty($fAgent)) {
         $agentConds  = [];
@@ -2477,11 +2481,8 @@ function _agentBannerLocations(PDO $db, array $keepIds = []): array
 {
     $locations = $db->query('SELECT id, name FROM locations ORDER BY name')->fetchAll();
     return array_values(array_filter($locations, static function ($l) use ($keepIds) {
-        if (in_array((int) $l['id'], $keepIds, true)) {
-            return true;
-        }
-        $slug = preg_replace('/[^a-z]/', '', strtolower((string) $l['name']));
-        return !in_array($slug, ['systemwide', 'allbranches'], true);
+        return in_array((int) $l['id'], $keepIds, true)
+            || !isMetaLocationName((string) $l['name']);
     }));
 }
 

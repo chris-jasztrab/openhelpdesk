@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.92.1 &mdash; 2026-06-12
+
+### Fixed
+- **"System Wide" in location filters now means "any location".** Ticking the "System Wide" meta-branch in the agent/admin ticket-list filters (and the admin users-list filter) used to match items literally tagged with that row — almost always zero results. It now acts as the shortcut you'd expect: the location constraint is skipped entirely, showing items from every location (including none), even when combined with other branch checkboxes. Applies to the admin CSV export and saved filters too, since they share the same query builder (`buildTicketFilterQuery()` / the agent list's inline copy). The checklist labels the row "System Wide *(any)*" so the behaviour is discoverable, and the banner picker's meta-branch detection now shares the same `isMetaLocationName()` helper.
+
+---
+
 ## 2.92.0 &mdash; 2026-06-12
 
 ### Changed

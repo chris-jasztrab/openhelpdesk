@@ -323,7 +323,7 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                     <?php foreach ($locations as $loc): ?>
                     <label class="filter-check-item">
                         <input type="checkbox" name="location[]" value="<?= $loc['id'] ?>" <?= in_array((string)$loc['id'], $filters['location'], true) ? 'checked' : '' ?>>
-                        <span><?= e($loc['name']) ?></span>
+                        <span><?= e($loc['name']) ?><?= isMetaLocationName((string) $loc['name']) ? ' <span class="text-muted fst-italic">(any)</span>' : '' ?></span>
                     </label>
                     <?php endforeach; ?>
                 </div>

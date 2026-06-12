@@ -701,7 +701,10 @@ $router->get('/admin/users', function () {
 
     $hasNone = in_array('none', $locFilter, true);
     $locIds  = array_values(array_filter($locFilter, fn($l) => $l !== 'none' && ctype_digit((string) $l)));
-    if ($hasNone && !empty($locIds)) {
+    if (array_intersect(array_map('intval', $locIds), metaLocationIds())) {
+        // Ticking the "System Wide" meta-branch means "any location":
+        // skip the constraint instead of matching the literal row.
+    } elseif ($hasNone && !empty($locIds)) {
         $placeholders = implode(',', array_fill(0, count($locIds), '?'));
         $where[]  = "(u.location_id IS NULL OR u.location_id IN ($placeholders))";
         $params   = array_merge($params, array_map('intval', $locIds));

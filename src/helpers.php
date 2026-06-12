@@ -5072,6 +5072,36 @@ function sortIcon(string $col, string $currentSort, string $currentDir): string
 }
 
 /**
+ * True when a location row is the "System Wide" / "All Branches"
+ * meta-branch — a data row used to tag work that affects every branch,
+ * not a real site.
+ */
+function isMetaLocationName(string $name): bool
+{
+    return in_array(preg_replace('/[^a-z]/', '', strtolower($name)), ['systemwide', 'allbranches'], true);
+}
+
+/**
+ * Ids of meta-branch location rows (usually one or none). In list
+ * filters, ticking one of these means "any location" — the location
+ * constraint is skipped entirely — because matching the literal row
+ * would show (almost) nothing.
+ */
+function metaLocationIds(): array
+{
+    static $ids = null;
+    if ($ids === null) {
+        $ids = [];
+        foreach (Database::connect()->query('SELECT id, name FROM locations')->fetchAll() as $l) {
+            if (isMetaLocationName((string) $l['name'])) {
+                $ids[] = (int) $l['id'];
+            }
+        }
+    }
+    return $ids;
+}
+
+/**
  * Build WHERE clause and bindings for ticket filtering.
  * Returns ['where' => string, 'params' => array].
  */
@@ -5120,9 +5150,13 @@ function buildTicketFilterQuery(array $filters): array
     }
     if (!empty($fLocation)) {
         $ids = array_map('intval', $fLocation);
-        $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $where[]  = 't.location_id IN (' . $placeholders . ')';
-        $params   = array_merge($params, $ids);
+        // Ticking the "System Wide" meta-branch means "any location":
+        // skip the constraint instead of matching the literal row.
+        if (!array_intersect($ids, metaLocationIds())) {
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $where[]  = 't.location_id IN (' . $placeholders . ')';
+            $params   = array_merge($params, $ids);
+        }
     }
     if (!empty($fAgent)) {
         $agentConds  = [];

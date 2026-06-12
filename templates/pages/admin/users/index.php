@@ -69,7 +69,7 @@ $hasFilters = !empty($filterParams);
                     <?php foreach ($locations as $loc): ?>
                     <label class="filter-check-item">
                         <input type="checkbox" name="location[]" value="<?= $loc['id'] ?>" <?= in_array((string) $loc['id'], $locFilter, true) ? 'checked' : '' ?>>
-                        <span><?= e($loc['name']) ?></span>
+                        <span><?= e($loc['name']) ?><?= isMetaLocationName((string) $loc['name']) ? ' <span class="text-muted fst-italic">(any)</span>' : '' ?></span>
                     </label>
                     <?php endforeach; ?>
                 </div>
