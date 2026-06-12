@@ -149,12 +149,15 @@ $inboxBase = $inboxBase ?? '/agent/tickets';
 </div>
 
 <script>
-(function () {
+// (Re)bind the hover detail cards; re-run after an ajax swap replaces the rows.
+window.ldInboxHoverInit = function () {
     var table = document.getElementById('ticketInbox');
     if (!table) return;
 
-    var pop = document.getElementById('ldInboxPop');
-    if (!pop) { pop = document.createElement('div'); pop.id = 'ldInboxPop'; document.body.appendChild(pop); }
+    // Recreate the card element so listeners from a previous init don't linger.
+    var oldPop = document.getElementById('ldInboxPop');
+    if (oldPop) oldPop.remove();
+    var pop = document.createElement('div'); pop.id = 'ldInboxPop'; document.body.appendChild(pop);
 
     function relTime(ts) {
         var diff = Math.floor((Date.now() / 1000) - ts);
@@ -246,5 +249,6 @@ $inboxBase = $inboxBase ?? '/agent/tickets';
             fromName.addEventListener('mouseleave', function () { cancelShow(); scheduleHide(); });
         }
     });
-})();
+};
+window.ldInboxHoverInit();
 </script>

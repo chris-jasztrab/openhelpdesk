@@ -306,7 +306,9 @@
         for (var i = 0; i < tables.length; i++) enhance(tables[i], i);
     }
 
-    window.LDColResize = { syncTableWidth: syncTableWidth };
+    // init is safe to re-call after dynamic content swaps: enhance() skips
+    // tables it has already processed, so only new tables get grips.
+    window.LDColResize = { syncTableWidth: syncTableWidth, init: init };
 
     if (document.readyState === "loading") {
         document.addEventListener("DOMContentLoaded", function () {

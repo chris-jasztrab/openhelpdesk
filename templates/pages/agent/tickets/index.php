@@ -96,11 +96,11 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="fw-bold mb-0">Tickets</h2>
     <div class="d-flex align-items-center gap-2">
-        <?php if ($hasFilters): ?><span class="badge bg-secondary fs-6"><?= $totalTickets ?> filtered of <?= $allTickets ?> total</span><?php else: ?><span class="badge bg-secondary fs-6"><?= $totalTickets ?> total</span><?php endif; ?>
+        <span class="badge bg-secondary fs-6" id="ticketCount"><?php if ($hasFilters): ?><?= $totalTickets ?> filtered of <?= $allTickets ?> total<?php else: ?><?= $totalTickets ?> total<?php endif; ?></span>
         <?php require ROOT_DIR . '/templates/partials/ticket-view-switcher.php'; ?>
         <button type="button" class="btn btn-sm btn-outline-secondary" id="filterPanelBtn" onclick="filterPanelToggle()">
             <i class="bi bi-funnel me-1"></i>Filters
-            <?php if ($hasFilters): ?><span class="badge bg-primary rounded-pill ms-1"><?= count($hasFilters) ?></span><?php endif; ?>
+            <span id="filterCount"><?php if ($hasFilters): ?><span class="badge bg-primary rounded-pill ms-1"><?= count($hasFilters) ?></span><?php endif; ?></span>
         </button>
         <?php if (($ticketView ?? 'table') === 'table'): // Columns only apply to the table layout ?>
         <div class="dropdown">
@@ -155,6 +155,7 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
         <button type="button" class="btn-close" onclick="filterPanelClose()" aria-label="Close"></button>
     </div>
     <div class="filter-panel-body">
+        <div id="filterPanelDynamic">
         <!-- Applied Filters -->
         <?php if ($appliedPills): ?>
         <div class="mb-3">
@@ -257,6 +258,7 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
             <i class="bi bi-bookmark-plus me-1"></i>Save Current Filter
         </button>
         <?php endif; ?>
+        </div>
         <hr class="my-3">
         <form method="GET" action="/agent/tickets" id="filterForm">
             <?php if ($perPage !== 25): ?><input type="hidden" name="per_page" value="<?= $perPage ?>"><?php endif; ?>
@@ -389,6 +391,8 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
         <div class="modal-content">
             <form method="POST" action="/agent/tickets/filters/save">
                 <?= csrfField() ?>
+                <!-- Rebuilt from the live URL on open (ticket-list-ajax.php) -->
+                <div id="saveFilterParams">
                 <?php foreach ($filters as $fk => $fv): ?>
                     <?php if (is_array($fv)): ?>
                         <?php foreach ($fv as $v): ?>
@@ -398,6 +402,7 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                     <input type="hidden" name="<?= e($fk) ?>" value="<?= e($fv) ?>">
                     <?php endif; ?>
                 <?php endforeach; ?>
+                </div>
                 <div class="modal-header">
                     <h6 class="modal-title fw-bold">Save Filter</h6>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -458,6 +463,7 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
             <i class="bi bi-x-lg"></i>
         </button>
     </div>
+    <div id="ticketResults">
     <?php if (($ticketView ?? 'table') === 'inbox'): ?>
     <?php $inboxBase = '/agent/tickets'; require ROOT_DIR . '/templates/partials/ticket-inbox.php'; ?>
     <?php elseif (($ticketView ?? 'table') === 'card'): ?>
@@ -643,6 +649,7 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
         </table>
     </div>
     <?php endif; ?>
+    </div>
 </div>
 
 <!-- Bulk Actions Form (submitted programmatically) -->
@@ -816,15 +823,7 @@ sessionStorage.setItem('agentTicketListUrl', window.location.href);
     window.filterPanelClose = filterPanelClose;
     if (sessionStorage.getItem('agentFilterPanelOpen') === '1') filterPanelOpen();
 
-    // Auto-apply filters the moment a checkbox or date is changed (search still uses Enter/Apply)
-    var _filterForm = document.getElementById('filterForm');
-    if (_filterForm) {
-        _filterForm.addEventListener('change', function (e) {
-            if (e.target.matches('input[type="checkbox"], input[type="date"]')) {
-                _filterForm.submit();
-            }
-        });
-    }
+    // Filter auto-apply is ajax now — see templates/partials/ticket-list-ajax.php.
 
     // ── Bulk selection ────────────────────────────────────────────────────────
     var selectedIds = new Set();
@@ -840,16 +839,17 @@ sessionStorage.setItem('agentTicketListUrl', window.location.href);
         }
     }
 
-    document.getElementById('selectAll').addEventListener('change', function () {
-        var checked = this.checked;
-        document.querySelectorAll('.ticket-cb').forEach(function (cb) {
-            cb.checked = checked;
-            if (checked) { selectedIds.add(cb.value); } else { selectedIds.delete(cb.value); }
-        });
-        updateBulkBar();
-    });
-
+    // Delegated so the bindings survive ajax swaps of the list (#ticketResults).
     document.addEventListener('change', function (e) {
+        if (e.target.id === 'selectAll') {
+            var checked = e.target.checked;
+            document.querySelectorAll('.ticket-cb').forEach(function (cb) {
+                cb.checked = checked;
+                if (checked) { selectedIds.add(cb.value); } else { selectedIds.delete(cb.value); }
+            });
+            updateBulkBar();
+            return;
+        }
         if (!e.target.classList.contains('ticket-cb')) return;
         if (e.target.checked) { selectedIds.add(e.target.value); } else { selectedIds.delete(e.target.value); }
         var all     = document.querySelectorAll('.ticket-cb');
@@ -991,8 +991,9 @@ sessionStorage.setItem('agentTicketListUrl', window.location.href);
     }
 })();
 
-    // Measure natural column widths then switch to fixed layout so subject truncates
-    (function () {
+    // Measure natural column widths then switch to fixed layout so subject
+    // truncates. Re-run after each ajax swap of the list.
+    window.ldMeasureTicketTable = function () {
         var tbl = document.getElementById("ticketTable");
         if (!tbl) return;
         tbl.querySelectorAll("thead th:not(.subject-col)").forEach(function (th) {
@@ -1000,7 +1001,8 @@ sessionStorage.setItem('agentTicketListUrl', window.location.href);
         });
         tbl.style.tableLayout = "fixed";
         tbl.style.visibility = "";
-    })();
+    };
+    window.ldMeasureTicketTable();
 
     // Quick-change: type, group, agent dropdowns
     (function () {
@@ -1096,6 +1098,10 @@ sessionStorage.setItem('agentTicketListUrl', window.location.href);
             });
         }
 
+        // Bound per element (cell-level stopPropagation keeps these clicks from
+        // ever reaching document, so delegation can't work). Exposed so the
+        // ajax list swap can rebind the fresh elements.
+        window.ldBindQuickEdit = function () {
         document.querySelectorAll('.quick-assign-btn').forEach(function (b) { bindBtn(b, 'agent'); });
         document.querySelectorAll('.quick-type-btn').forEach(function (b) { bindBtn(b, 'type'); });
         document.querySelectorAll('.quick-group-btn').forEach(function (b) { bindBtn(b, 'group'); });
@@ -1137,6 +1143,8 @@ sessionStorage.setItem('agentTicketListUrl', window.location.href);
                 if (btn) { e.stopPropagation(); if (activeBtn === btn) { closeMenu(); } else { openMenu(btn, 'priority'); } }
             });
         });
+        };
+        window.ldBindQuickEdit();
 
         document.addEventListener('click', function (e) {
             var item = e.target.closest('.quick-menu-item');
@@ -1268,6 +1276,7 @@ if ($sort !== 'created_at' || $dir !== 'desc') {
 if ($perPage !== 25) $pagerParams['per_page'] = $perPage;
 $pagerBase = '/agent/tickets';
 ?>
+<div id="ticketPager">
 <?php if ($totalTickets > 0): ?>
 <nav class="d-flex justify-content-between align-items-center mt-3">
     <div class="d-flex align-items-center gap-2">
@@ -1283,7 +1292,7 @@ $pagerBase = '/agent/tickets';
                 <?php endif; ?>
             <?php endforeach; ?>
             <select name="per_page" class="form-select form-select-sm d-inline-block w-auto"
-                    onchange="this.form.submit()" aria-label="Tickets per page">
+                    aria-label="Tickets per page">
                 <?php foreach ([25, 50, 100, 200] as $opt): ?>
                 <option value="<?= $opt ?>" <?= $perPage === $opt ? 'selected' : '' ?>><?= $opt ?> per page</option>
                 <?php endforeach; ?>
@@ -1312,6 +1321,7 @@ $pagerBase = '/agent/tickets';
     <?php endif; ?>
 </nav>
 <?php endif; ?>
+</div>
 
 <!-- Delete Saved Filter Modal -->
 <div class="modal fade" id="deleteFilterModal" tabindex="-1" aria-labelledby="deleteFilterModalLabel" aria-hidden="true">
@@ -1345,3 +1355,4 @@ document.getElementById('deleteFilterModal').addEventListener('show.bs.modal', f
     document.getElementById('deleteFilterForm').action = btn.dataset.url;
 });
 </script>
+<?php $ticketListScope = 'agent'; require ROOT_DIR . '/templates/partials/ticket-list-ajax.php'; ?>

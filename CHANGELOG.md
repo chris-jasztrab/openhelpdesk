@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.92.0 &mdash; 2026-06-12
+
+### Changed
+- **Ticket list filters apply without a page reload.** On the agent and admin ticket lists, toggling a filter checkbox, removing an applied-filter pill, clicking a saved filter, Clear/Clear All, searching, sorting by a column header, paginating, or changing the per-page size now fetches the result in the background (via a new shared `ticket-list-ajax.php` partial) and swaps in just the updated regions — count badges, applied pills, the list itself, and the pager — instead of reloading the whole page. The URL still updates via `history.pushState` (links stay shareable, back/forward work in place), and the admin Export CSV link and the Save Filter modal always reflect the live filter set. Accessibility wins: keyboard focus stays on the checkbox or search box you just used (a reload used to throw it back to the top of the page), focus lands somewhere predictable when the element you clicked was swapped away, and each update is announced to screen readers through an `aria-live` region. Quick-edit dropdowns, bulk select, resizable columns, and the compact view's hover cards all re-bind after every swap; any fetch failure falls back to a normal full navigation. Also fixes a quirk where removing the last filter pill could resurrect the day's remembered filter on the next visit.
+
+---
+
 ## 2.91.0 &mdash; 2026-06-12
 
 ### Added
