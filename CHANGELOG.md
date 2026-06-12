@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.89.0 &mdash; 2026-06-12
+
+### Added
+- **Ticket template editor now uses CKEditor 5.** The template body field on `/admin/ticket-templates` create/edit was a plain textarea while the rest of the app uses CKEditor 5; it now gets the same rich-text editor (same plugin/toolbar set as the ticket description editors, so nothing a template author writes gets stripped when the template is applied). Existing plain-text template bodies are lazily converted to HTML (escaped, line breaks preserved) when first opened in the editor. The template pickers on the admin/agent and portal new-ticket forms already inject the body via `editor.setData()`, so rich bodies flow through unchanged — and templates saved from the new editor keep their line breaks when applied, which plain-text bodies previously lost.
+
+---
+
 ## 2.88.12 &mdash; 2026-06-12
 
 ### Changed
