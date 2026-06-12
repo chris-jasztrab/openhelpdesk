@@ -19,6 +19,9 @@ $tokenSets = [
         ['token' => '{{type}}',         'desc' => 'Ticket type (if set)'],
         ['token' => '{{location}}',     'desc' => 'Location (if set)'],
         ['token' => '{{priority}}',     'desc' => 'Priority name (if set)'],
+        ['token' => '{{sla}}',            'desc' => 'SLA summary sentence for the ticket\'s type + priority, e.g. "First response within 4 hours and resolution within 16 hours (business hours)". Empty if no SLA policy applies.'],
+        ['token' => '{{sla_response}}',   'desc' => 'SLA first-response target in business hours, e.g. "4 hours". Empty if no policy.'],
+        ['token' => '{{sla_resolution}}', 'desc' => 'SLA resolution target in business hours, e.g. "16 hours". Empty if no policy.'],
     ],
     'ticket_updated' => [
         ['token' => '{{first_name}}',   'desc' => 'Recipient\'s first name'],
@@ -62,6 +65,9 @@ $tokenSets = [
         ['token' => '{{location}}',     'desc' => 'Location (if set)'],
         ['token' => '{{priority}}',     'desc' => 'Priority name (if set)'],
         ['token' => '{{submitter}}',    'desc' => 'Full name of the person who submitted the ticket'],
+        ['token' => '{{sla}}',            'desc' => 'SLA summary sentence for the ticket\'s type + priority. Empty if no SLA policy applies.'],
+        ['token' => '{{sla_response}}',   'desc' => 'SLA first-response target in business hours, e.g. "4 hours". Empty if no policy.'],
+        ['token' => '{{sla_resolution}}', 'desc' => 'SLA resolution target in business hours, e.g. "16 hours". Empty if no policy.'],
     ],
     'ticket_assigned_agent' => [
         ['token' => '{{first_name}}',   'desc' => 'Agent\'s first name'],
@@ -72,6 +78,9 @@ $tokenSets = [
         ['token' => '{{type}}',         'desc' => 'Ticket type (if set)'],
         ['token' => '{{priority}}',     'desc' => 'Priority name (if set)'],
         ['token' => '{{submitter}}',    'desc' => 'Full name of the person who submitted the ticket'],
+        ['token' => '{{sla}}',            'desc' => 'SLA summary sentence for the ticket\'s type + priority. Empty if no SLA policy applies.'],
+        ['token' => '{{sla_response}}',   'desc' => 'SLA first-response target in business hours, e.g. "4 hours". Empty if no policy.'],
+        ['token' => '{{sla_resolution}}', 'desc' => 'SLA resolution target in business hours, e.g. "16 hours". Empty if no policy.'],
     ],
     'ticket_assigned_group' => [
         ['token' => '{{first_name}}',   'desc' => 'Recipient\'s first name'],
@@ -83,6 +92,9 @@ $tokenSets = [
         ['token' => '{{type}}',         'desc' => 'Ticket type (if set)'],
         ['token' => '{{priority}}',     'desc' => 'Priority name (if set)'],
         ['token' => '{{submitter}}',    'desc' => 'Full name of the person who submitted the ticket'],
+        ['token' => '{{sla}}',            'desc' => 'SLA summary sentence for the ticket\'s type + priority. Empty if no SLA policy applies.'],
+        ['token' => '{{sla_response}}',   'desc' => 'SLA first-response target in business hours, e.g. "4 hours". Empty if no policy.'],
+        ['token' => '{{sla_resolution}}', 'desc' => 'SLA resolution target in business hours, e.g. "16 hours". Empty if no policy.'],
     ],
     'escalation_alert' => [
         ['token' => '{{first_name}}',   'desc' => 'Recipient\'s first name'],
@@ -411,14 +423,14 @@ $groups ??= [];
                 <?php
                 $subjectTpl = $tplValues["email_subject_{$activeTab}"] ?? $defaults[$activeTab]['subject'];
                 $previewTokens = [
-                    'ticket_created'  => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working', 'type' => 'Hardware', 'location' => 'Main Branch', 'priority' => 'High'],
+                    'ticket_created'  => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working', 'type' => 'Hardware', 'location' => 'Main Branch', 'priority' => 'High', 'sla' => 'First response within 4 hours and resolution within 16 hours (business hours)', 'sla_response' => '4 hours', 'sla_resolution' => '16 hours'],
                     'ticket_updated'  => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working', 'message' => 'We are looking into this.', 'author' => 'Jane Smith'],
                     'ticket_merged'   => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'source_ticket_id' => '42', 'source_subject' => 'Printer not working', 'target_ticket_id' => '38', 'target_subject' => 'Office printer issues'],
                     'csat_survey'     => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working'],
                     'ticket_reminder' => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working'],
-                    'group_alerts'          => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working', 'type' => 'Hardware', 'location' => 'Main Branch', 'priority' => 'High', 'submitter' => 'Jordan Lee'],
-                    'ticket_assigned_agent' => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working', 'type' => 'Hardware', 'priority' => 'High', 'submitter' => 'Jordan Lee'],
-                    'ticket_assigned_group' => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working', 'group' => 'IT Support', 'type' => 'Hardware', 'priority' => 'High', 'submitter' => 'Jordan Lee'],
+                    'group_alerts'          => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working', 'type' => 'Hardware', 'location' => 'Main Branch', 'priority' => 'High', 'submitter' => 'Jordan Lee', 'sla' => 'First response within 4 hours and resolution within 16 hours (business hours)', 'sla_response' => '4 hours', 'sla_resolution' => '16 hours'],
+                    'ticket_assigned_agent' => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working', 'type' => 'Hardware', 'priority' => 'High', 'submitter' => 'Jordan Lee', 'sla' => 'First response within 4 hours and resolution within 16 hours (business hours)', 'sla_response' => '4 hours', 'sla_resolution' => '16 hours'],
+                    'ticket_assigned_group' => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working', 'group' => 'IT Support', 'type' => 'Hardware', 'priority' => 'High', 'submitter' => 'Jordan Lee', 'sla' => 'First response within 4 hours and resolution within 16 hours (business hours)', 'sla_response' => '4 hours', 'sla_resolution' => '16 hours'],
                     'escalation_alert'      => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working', 'rule_name' => 'Overdue after 24h'],
                 ];
                 $preview = $subjectTpl;

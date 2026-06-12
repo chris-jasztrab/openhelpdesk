@@ -241,7 +241,7 @@ class Sla
      * Find the best-matching SLA policy for a type+priority combination.
      * Checks for a type-specific policy first, then falls back to the default (NULL type).
      */
-    private static function findPolicy(PDO $db, ?int $typeId, int $priorityId): ?array
+    public static function findPolicy(PDO $db, ?int $typeId, int $priorityId): ?array
     {
         if ($typeId !== null) {
             $stmt = $db->prepare(

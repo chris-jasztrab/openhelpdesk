@@ -211,9 +211,13 @@ I've confirmed the fix is deployed and the user has verified it works.
         <tr><td><code>{{user_name}}</code></td><td>Recipient's full name</td></tr>
         <tr><td><code>{{ticket_id}}</code></td><td>Ticket number</td></tr>
         <tr><td><code>{{subject}}</code></td><td>Ticket subject line</td></tr>
+        <tr><td><code>{{sla}}</code></td><td>SLA summary for the ticket's type + priority, e.g. "First response within 4 hours and resolution within 16 hours (business hours)" — empty when no SLA policy applies</td></tr>
+        <tr><td><code>{{sla_response}}</code></td><td>SLA first-response target, e.g. "4 hours" (business hours)</td></tr>
+        <tr><td><code>{{sla_resolution}}</code></td><td>SLA resolution target, e.g. "16 hours" (business hours)</td></tr>
     </tbody>
 </table>
 </div>
+<p class="text-muted mb-3">The SLA tokens are available on the <strong>Ticket Created</strong>, <strong>Group Alerts</strong>, <strong>Assigned to Agent</strong>, and <strong>Assigned to Group</strong> templates. They resolve from the SLA policy matching the ticket's type and priority (falling back to the default policy), and render as empty text when SLA tracking is disabled or no policy matches — so a sentence like "{{sla}}" simply disappears rather than showing a blank value.</p>
 <p class="text-muted mb-0">Each template also has a <strong>Reset to default</strong> button to restore the original built-in content if needed. A shared <strong>Footer Text</strong> tab lets you customise the footer that appears on all outgoing ticket emails.</p>
 </div>
 </div>

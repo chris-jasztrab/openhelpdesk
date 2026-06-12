@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.91.0 &mdash; 2026-06-12
+
+### Added
+- **SLA tokens for email templates.** Three new tokens — `{{sla}}`, `{{sla_response}}`, and `{{sla_resolution}}` — resolve from the SLA policy matching the ticket's type and priority (falling back to the default policy when the type has no override). `{{sla}}` renders a full sentence, e.g. "First response within 4 hours and resolution within 16 hours (business hours)"; the other two render just the duration ("4 hours") so admins can write their own phrasing. All three render as empty text when SLA tracking is disabled, business hours aren't configured, or no policy matches the ticket. Available on the Ticket Created, Group Alerts, Assigned to Agent, and Assigned to Group templates; the token legend on `/admin/settings/email-templates` and the email docs page list them.
+
+---
+
 ## 2.90.0 &mdash; 2026-06-12
 
 ### Added

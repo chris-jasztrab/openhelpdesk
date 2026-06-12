@@ -2700,6 +2700,49 @@ function applyEmailTokens(string $template, array $tokens): string
 }
 
 /**
+ * Format SLA minutes as a human-readable duration, e.g. "30 minutes",
+ * "4 hours", "1 hour 30 minutes".
+ */
+function formatSlaDuration(int $minutes): string
+{
+    $h = intdiv($minutes, 60);
+    $m = $minutes % 60;
+    $parts = [];
+    if ($h > 0) {
+        $parts[] = $h . ' ' . ($h === 1 ? 'hour' : 'hours');
+    }
+    if ($m > 0 || $h === 0) {
+        $parts[] = $m . ' ' . ($m === 1 ? 'minute' : 'minutes');
+    }
+    return implode(' ', $parts);
+}
+
+/**
+ * Build the {{sla}}, {{sla_response}} and {{sla_resolution}} email tokens for
+ * a ticket's type + priority combination. All three resolve to empty strings
+ * when SLA tracking is disabled, business hours are not configured, or no
+ * policy matches — so templates referencing them degrade gracefully.
+ */
+function slaEmailTokens(PDO $db, ?int $typeId, ?int $priorityId): array
+{
+    $empty = ['sla' => '', 'sla_response' => '', 'sla_resolution' => ''];
+    if (!$priorityId || !slaEnabled() || Sla::getBusinessSchedule() === null) {
+        return $empty;
+    }
+    $policy = Sla::findPolicy($db, $typeId, $priorityId);
+    if (!$policy) {
+        return $empty;
+    }
+    $response   = formatSlaDuration((int) $policy['first_response_minutes']);
+    $resolution = formatSlaDuration((int) $policy['resolution_minutes']);
+    return [
+        'sla'            => "First response within {$response} and resolution within {$resolution} (business hours)",
+        'sla_response'   => $response,
+        'sla_resolution' => $resolution,
+    ];
+}
+
+/**
  * Resolve the customisable parts of an outgoing email (subject, intro text,
  * button label, footer text) from admin settings, falling back to hard-coded
  * defaults. Token values are HTML-escaped when placed into HTML fields.
@@ -2978,7 +3021,7 @@ function notifyRequesterTicketCreated(PDO $db, int $ticketId): void
         'user_name'  => $row['first_name'] . ' ' . $row['last_name'],
         'first_name' => $row['first_name'],
         'last_name'  => $row['last_name'],
-    ]);
+    ] + slaEmailTokens($db, $row['type_id'] ? (int) $row['type_id'] : null, $row['priority_id'] ? (int) $row['priority_id'] : null));
 
     $emailHtml = renderEmail('ticket-created', [
         'ticketId'     => $ticketId,
@@ -3303,6 +3346,7 @@ function notifyGroupMembers(PDO $db, int $ticketId): void
     }
 
     $appUrl = env('APP_URL', 'http://localhost:8000');
+    $slaTokens = slaEmailTokens($db, $ticket['type_id'] ? (int) $ticket['type_id'] : null, $ticket['priority_id'] ? (int) $ticket['priority_id'] : null);
 
     foreach ($members as $user) {
         // In-app "New Ticket" alert for group members — independent of email opt-out.
@@ -3335,7 +3379,7 @@ function notifyGroupMembers(PDO $db, int $ticketId): void
             'user_name'  => $user['first_name'] . ' ' . $user['last_name'],
             'first_name' => $user['first_name'],
             'last_name'  => $user['last_name'],
-        ]);
+        ] + $slaTokens);
 
         $emailHtml = renderEmail('ticket-opened-group', [
             'ticketId'      => $ticketId,
@@ -3431,7 +3475,7 @@ function notifyAssignedAgent(PDO $db, int $ticketId, int $agentId): void
         'user_name'   => $agent['first_name'] . ' ' . $agent['last_name'],
         'first_name'  => $agent['first_name'],
         'last_name'   => $agent['last_name'],
-    ]);
+    ] + slaEmailTokens($db, $ticket['type_id'] ? (int) $ticket['type_id'] : null, $ticket['priority_id'] ? (int) $ticket['priority_id'] : null));
 
     $emailHtml = renderEmail('ticket-assigned-agent', [
         'ticketId'      => $ticketId,
@@ -3504,6 +3548,7 @@ function notifyAssignedGroup(PDO $db, int $ticketId, int $groupId): void
     );
     $mStmt->execute([$groupId]);
     $appUrl = env('APP_URL', 'http://localhost:8000');
+    $slaTokens = slaEmailTokens($db, $ticket['type_id'] ? (int) $ticket['type_id'] : null, $ticket['priority_id'] ? (int) $ticket['priority_id'] : null);
 
     foreach ($mStmt->fetchAll() as $member) {
         if ((int) $member['id'] === Auth::id()) {
@@ -3531,7 +3576,7 @@ function notifyAssignedGroup(PDO $db, int $ticketId, int $groupId): void
             'user_name'   => $member['first_name'] . ' ' . $member['last_name'],
             'first_name'  => $member['first_name'],
             'last_name'   => $member['last_name'],
-        ]);
+        ] + $slaTokens);
 
         $emailHtml = renderEmail('ticket-assigned-group', [
             'ticketId'      => $ticketId,
