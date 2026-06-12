@@ -51,8 +51,8 @@ $_severityIcon = [
                 <?php endif; ?>
                 <div class="ld-banner-body"><?= sanitizeBannerHtml($_b['body_html']) ?></div>
                 <div class="small text-muted mt-2 d-flex flex-wrap gap-3">
-                    <?php if (!empty($_b['location_name'])): ?>
-                        <span><i class="bi bi-geo-alt me-1" aria-hidden="true"></i><?= e($_b['location_name']) ?></span>
+                    <?php if (!empty($_b['location_names'])): ?>
+                        <span><i class="bi bi-geo-alt me-1" aria-hidden="true"></i><?= e($_b['location_names']) ?></span>
                     <?php else: ?>
                         <span><i class="bi bi-globe me-1" aria-hidden="true"></i>All branches</span>
                     <?php endif; ?>

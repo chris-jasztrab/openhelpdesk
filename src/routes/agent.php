@@ -2430,8 +2430,18 @@ function _agentValidateBannerInput(): array
     if (!in_array($severity, ['info', 'warning', 'critical'], true)) {
         $severity = 'warning';
     }
-    $locationId = $_POST['location_id'] ?? '';
-    $locationId = ($locationId === '' || $locationId === '0') ? null : (int) $locationId;
+    // Multi-branch targeting: empty array = all branches (global). Ids are
+    // validated against the locations table so the FK insert can't blow up.
+    $locationIds = array_values(array_unique(array_map('intval', array_filter(
+        (array) ($_POST['location_ids'] ?? []),
+        static fn($v) => ctype_digit((string) $v) && (int) $v > 0
+    ))));
+    if ($locationIds) {
+        $placeholders = implode(',', array_fill(0, count($locationIds), '?'));
+        $stmt = Database::connect()->prepare("SELECT id FROM locations WHERE id IN ($placeholders)");
+        $stmt->execute($locationIds);
+        $locationIds = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    }
 
     $startsRaw  = trim($_POST['starts_at']  ?? '');
     $expiresRaw = trim($_POST['expires_at'] ?? '');
@@ -2445,24 +2455,59 @@ function _agentValidateBannerInput(): array
     $expiresAt = $toMysql($expiresRaw);
 
     return [
-        'title'       => $title !== '' ? $title : null,
-        'body'        => $body,
-        'severity'    => $severity,
-        'location_id' => $locationId,
-        'starts_at'   => $startsAt,
-        'expires_at'  => $expiresAt,
-        'errors'      => $body === '' ? ['Banner body is required.'] : [],
+        'title'        => $title !== '' ? $title : null,
+        'body'         => $body,
+        'severity'     => $severity,
+        'location_ids' => $locationIds,
+        'starts_at'    => $startsAt,
+        'expires_at'   => $expiresAt,
+        'errors'       => $body === '' ? ['Banner body is required.'] : [],
     ];
+}
+
+/**
+ * Branch choices for the banner form. The built-in "All branches" choice
+ * already covers a system-wide banner, so a meta-branch row named
+ * "System Wide" / "All Branches" (used to tag tickets that affect every
+ * branch) is hidden here to avoid offering the same thing twice. Branches
+ * already targeted by the banner being edited are always kept, so saving
+ * never silently drops one.
+ */
+function _agentBannerLocations(PDO $db, array $keepIds = []): array
+{
+    $locations = $db->query('SELECT id, name FROM locations ORDER BY name')->fetchAll();
+    return array_values(array_filter($locations, static function ($l) use ($keepIds) {
+        if (in_array((int) $l['id'], $keepIds, true)) {
+            return true;
+        }
+        $slug = preg_replace('/[^a-z]/', '', strtolower((string) $l['name']));
+        return !in_array($slug, ['systemwide', 'allbranches'], true);
+    }));
+}
+
+function _agentSaveBannerLocations(PDO $db, int $bannerId, array $locationIds): void
+{
+    $db->prepare('DELETE FROM status_banner_locations WHERE banner_id = ?')->execute([$bannerId]);
+    if (!$locationIds) {
+        return; // no rows = global (all branches)
+    }
+    $stmt = $db->prepare('INSERT IGNORE INTO status_banner_locations (banner_id, location_id) VALUES (?, ?)');
+    foreach ($locationIds as $locId) {
+        $stmt->execute([$bannerId, $locId]);
+    }
 }
 
 $router->get('/agent/banners', function () {
     Auth::requireStaff();
     $db = Database::connect();
     $banners = $db->query(
-        'SELECT b.*, l.name AS location_name,
+        'SELECT b.*,
+                (SELECT GROUP_CONCAT(l.name ORDER BY l.name SEPARATOR ", ")
+                   FROM status_banner_locations sbl
+                   JOIN locations l ON l.id = sbl.location_id
+                  WHERE sbl.banner_id = b.id) AS location_names,
                 CONCAT(u.first_name, " ", u.last_name) AS posted_by_name
          FROM status_banners b
-         LEFT JOIN locations l ON b.location_id = l.id
          LEFT JOIN users     u ON b.created_by  = u.id
          ORDER BY b.is_active DESC,
                   FIELD(b.severity, "critical", "warning", "info"),
@@ -2473,10 +2518,12 @@ $router->get('/agent/banners', function () {
 
 $router->get('/agent/banners/create', function () {
     Auth::requireStaff();
-    $locations = Database::connect()
-        ->query('SELECT id, name FROM locations ORDER BY name')
-        ->fetchAll();
-    render('agent/banners/form', ['editing' => null, 'locations' => $locations]);
+    $locations = _agentBannerLocations(Database::connect());
+    render('agent/banners/form', [
+        'editing'             => null,
+        'locations'           => $locations,
+        'selectedLocationIds' => [],
+    ]);
 });
 
 $router->post('/agent/banners/create', function () {
@@ -2491,14 +2538,16 @@ $router->post('/agent/banners/create', function () {
         flash('error', $v['errors'][0]);
         redirect('/agent/banners/create');
     }
-    Database::connect()->prepare(
+    $db = Database::connect();
+    $db->prepare(
         'INSERT INTO status_banners
-            (title, body_html, severity, location_id, starts_at, expires_at, created_by, updated_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+            (title, body_html, severity, starts_at, expires_at, created_by, updated_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?)'
     )->execute([
-        $v['title'], $v['body'], $v['severity'], $v['location_id'],
+        $v['title'], $v['body'], $v['severity'],
         $v['starts_at'], $v['expires_at'], Auth::id(), Auth::id(),
     ]);
+    _agentSaveBannerLocations($db, (int) $db->lastInsertId(), $v['location_ids']);
     flash('success', 'Status banner posted.');
     redirect('/agent/banners');
 });
@@ -2513,8 +2562,14 @@ $router->get('/agent/banners/{id}/edit', function (array $p) {
         flash('error', 'Banner not found.');
         redirect('/agent/banners');
     }
-    $locations = $db->query('SELECT id, name FROM locations ORDER BY name')->fetchAll();
-    render('agent/banners/form', ['editing' => $editing, 'locations' => $locations]);
+    $sel = $db->prepare('SELECT location_id FROM status_banner_locations WHERE banner_id = ?');
+    $sel->execute([(int) $editing['id']]);
+    $selectedLocationIds = array_map('intval', $sel->fetchAll(PDO::FETCH_COLUMN));
+    render('agent/banners/form', [
+        'editing'             => $editing,
+        'locations'           => _agentBannerLocations($db, $selectedLocationIds),
+        'selectedLocationIds' => $selectedLocationIds,
+    ]);
 });
 
 $router->post('/agent/banners/{id}/edit', function (array $p) {
@@ -2531,15 +2586,17 @@ $router->post('/agent/banners/{id}/edit', function (array $p) {
         redirect("/agent/banners/{$id}/edit");
     }
     $isActive = isset($_POST['is_active']) ? 1 : 0;
-    Database::connect()->prepare(
+    $db = Database::connect();
+    $db->prepare(
         'UPDATE status_banners
-            SET title = ?, body_html = ?, severity = ?, location_id = ?,
+            SET title = ?, body_html = ?, severity = ?,
                 starts_at = ?, expires_at = ?, is_active = ?, updated_by = ?
           WHERE id = ?'
     )->execute([
-        $v['title'], $v['body'], $v['severity'], $v['location_id'],
+        $v['title'], $v['body'], $v['severity'],
         $v['starts_at'], $v['expires_at'], $isActive, Auth::id(), $id,
     ]);
+    _agentSaveBannerLocations($db, $id, $v['location_ids']);
     flash('success', 'Banner updated.');
     redirect('/agent/banners');
 });

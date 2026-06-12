@@ -11,6 +11,16 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.90.0 &mdash; 2026-06-12
+
+### Added
+- **Status banners can target multiple branches.** Banner targeting moves from a single nullable `status_banners.location_id` to a `status_banner_locations` join table (migration 049 backfills existing banners, then drops the old column). The banner form's single-select becomes a checkbox dropdown — tick any combination of branches without Ctrl+click — whose button summarises the selection ("All branches (global)", the branch names, or "N branches selected"). No boxes ticked = global, same as before. Portal visibility, the banner footer, and the Status Banners list all show the full branch list. Deleting a branch now just removes it from any banner targeting it (a banner left with no branches becomes global, matching the old `ON DELETE SET NULL` end state).
+
+### Changed
+- **Redundant "System Wide" choice removed from the banner branch picker.** A meta-branch row named "System Wide" (used to tag tickets that affect every branch) was showing up in the banner form alongside the built-in "All branches (global)" option — two ways to say the same thing. The picker now hides rows named "System Wide"/"All Branches" (any spacing/hyphenation), while keeping them selectable everywhere a real branch assignment is needed (tickets, users). A banner already targeting such a row keeps it in the picker so editing never silently drops it.
+
+---
+
 ## 2.89.1 &mdash; 2026-06-12
 
 ### Changed

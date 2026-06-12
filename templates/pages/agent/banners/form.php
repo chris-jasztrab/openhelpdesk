@@ -16,7 +16,12 @@ $breadcrumbs  = [
 $titleVal     = old('title',       $isEdit ? (string) ($editing['title']     ?? '') : '');
 $bodyVal      = old('body_html',   $isEdit ? (string)   $editing['body_html']       : '');
 $severityVal  = old('severity',    $isEdit ? (string)   $editing['severity']        : 'warning');
-$locationVal  = old('location_id', $isEdit ? (string) ($editing['location_id'] ?? '') : '');
+// Multi-branch targeting: checked ids come from re-flashed input after a
+// validation failure (unchecked boxes don't submit, so the presence of any
+// old input decides which source wins), otherwise from the saved rows.
+$pickedLocs   = isset($_SESSION['_old_input'])
+    ? array_map('intval', (array) ($_SESSION['_old_input']['location_ids'] ?? []))
+    : array_map('intval', $selectedLocationIds ?? []);
 $startsVal    = old('starts_at',   $isEdit && $editing['starts_at']  ? date('Y-m-d\TH:i', strtotime($editing['starts_at']))  : '');
 $expiresVal   = old('expires_at',  $isEdit && $editing['expires_at'] ? date('Y-m-d\TH:i', strtotime($editing['expires_at'])) : '');
 $activeVal    = $isEdit ? (int) $editing['is_active'] === 1 : true;
@@ -61,6 +66,13 @@ $activeVal    = $isEdit ? (int) $editing['is_active'] === 1 : true;
 .severity-card:has(input:checked).is-info     { border-color: #0dcaf0; background: #cff4fc; }
 .severity-card:has(input:checked).is-warning  { border-color: #ffc107; background: #fff3cd; }
 .severity-card:has(input:checked).is-critical { border-color: #dc3545; background: #f8d7da; }
+
+/* Branch picker — checkbox dropdown, no Ctrl+click multi-select needed */
+#branch-picker .dropdown-menu { max-height: 280px; overflow-y: auto; }
+#branch-picker .dropdown-item { cursor: pointer; }
+#branch-picker .branch-all-check { visibility: hidden; }
+#branch-picker #branch-pick-all.is-current .branch-all-check { visibility: visible; }
+#branch-picker #branch-pick-all.is-current { font-weight: 600; }
 </style>
 
 <div class="d-flex align-items-center gap-3 mb-4">
@@ -114,16 +126,30 @@ $activeVal    = $isEdit ? (int) $editing['is_active'] === 1 : true;
 
             <div class="row g-3">
                 <div class="col-md-4">
-                    <label for="location_id" class="form-label fw-semibold">Branch</label>
-                    <select class="form-select" id="location_id" name="location_id">
-                        <option value="">All branches (global)</option>
-                        <?php foreach ($locations as $loc): ?>
-                            <option value="<?= (int) $loc['id'] ?>" <?= (string) $locationVal === (string) $loc['id'] ? 'selected' : '' ?>>
-                                <?= e($loc['name']) ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                    <div class="form-text">Pick a branch to scope this banner to that location's portal users only.</div>
+                    <label class="form-label fw-semibold" for="branch-picker-btn">Branches</label>
+                    <div class="dropdown" id="branch-picker">
+                        <button type="button" class="form-select text-start" id="branch-picker-btn"
+                                data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                            <span id="branch-picker-summary"></span>
+                        </button>
+                        <div class="dropdown-menu w-100 shadow-sm p-1">
+                            <button type="button" class="dropdown-item rounded d-flex align-items-center gap-2" id="branch-pick-all">
+                                <i class="bi bi-globe" aria-hidden="true"></i>
+                                <span>All branches (global)</span>
+                                <i class="bi bi-check-lg ms-auto branch-all-check" aria-hidden="true"></i>
+                            </button>
+                            <div class="dropdown-divider my-1"></div>
+                            <?php foreach ($locations as $loc): ?>
+                            <label class="dropdown-item rounded d-flex align-items-center gap-2 mb-0">
+                                <input class="form-check-input mt-0 flex-shrink-0 branch-pick" type="checkbox"
+                                       name="location_ids[]" value="<?= (int) $loc['id'] ?>"
+                                       <?= in_array((int) $loc['id'], $pickedLocs, true) ? 'checked' : '' ?>>
+                                <span><?= e($loc['name']) ?></span>
+                            </label>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                    <div class="form-text">Tick one or more branches to scope the banner to their portal users, or leave on &ldquo;All branches&rdquo;.</div>
                 </div>
                 <div class="col-md-4">
                     <label for="starts_at" class="form-label fw-semibold">Show from <span class="text-muted fw-normal">(optional)</span></label>
@@ -212,4 +238,43 @@ ClassicEditor.create(document.querySelector('#banner-editor'), {
         document.getElementById('body_html').value = data;
     });
 }).catch(console.error);
+</script>
+<script>
+(function () {
+    var picker  = document.getElementById('branch-picker');
+    if (!picker) return;
+    var summary = document.getElementById('branch-picker-summary');
+    var allBtn  = document.getElementById('branch-pick-all');
+    var boxes   = Array.prototype.slice.call(picker.querySelectorAll('.branch-pick'));
+
+    function refresh() {
+        var picked = boxes.filter(function (b) { return b.checked; });
+        var icon   = document.createElement('i');
+        icon.setAttribute('aria-hidden', 'true');
+        summary.textContent = '';
+        if (!picked.length) {
+            icon.className = 'bi bi-globe me-1';
+            summary.appendChild(icon);
+            summary.appendChild(document.createTextNode('All branches (global)'));
+            allBtn.classList.add('is-current');
+        } else {
+            var names = picked.map(function (b) {
+                return b.parentElement.querySelector('span').textContent.trim();
+            });
+            icon.className = 'bi bi-geo-alt me-1';
+            summary.appendChild(icon);
+            summary.appendChild(document.createTextNode(
+                names.length <= 2 ? names.join(', ') : names.length + ' branches selected'
+            ));
+            allBtn.classList.remove('is-current');
+        }
+    }
+
+    allBtn.addEventListener('click', function () {
+        boxes.forEach(function (b) { b.checked = false; });
+        refresh();
+    });
+    boxes.forEach(function (b) { b.addEventListener('change', refresh); });
+    refresh();
+})();
 </script>

@@ -505,7 +505,6 @@ CREATE TABLE IF NOT EXISTS `status_banners` (
   `title` varchar(255) DEFAULT NULL,
   `body_html` mediumtext NOT NULL,
   `severity` enum('info','warning','critical') NOT NULL DEFAULT 'warning',
-  `location_id` int(10) unsigned DEFAULT NULL,
   `is_active` tinyint(1) NOT NULL DEFAULT 1,
   `starts_at` datetime DEFAULT NULL,
   `expires_at` datetime DEFAULT NULL,
@@ -515,12 +514,20 @@ CREATE TABLE IF NOT EXISTS `status_banners` (
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
   KEY `idx_status_banners_active` (`is_active`,`expires_at`,`starts_at`),
-  KEY `idx_status_banners_location` (`location_id`),
   KEY `fk_status_banners_created_by` (`created_by`),
   KEY `fk_status_banners_updated_by` (`updated_by`),
   CONSTRAINT `fk_status_banners_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `fk_status_banners_location` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_status_banners_updated_by` FOREIGN KEY (`updated_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+-- Multi-branch banner targeting: one row per targeted branch; a banner with
+-- no rows here is global (shown at every branch).
+CREATE TABLE IF NOT EXISTS `status_banner_locations` (
+  `banner_id` int(10) unsigned NOT NULL,
+  `location_id` int(10) unsigned NOT NULL,
+  PRIMARY KEY (`banner_id`,`location_id`),
+  KEY `idx_sbl_location` (`location_id`),
+  CONSTRAINT `fk_sbl_banner` FOREIGN KEY (`banner_id`) REFERENCES `status_banners` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_sbl_location` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE IF NOT EXISTS `ticket_attachments` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,

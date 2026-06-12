@@ -45,7 +45,7 @@ $severityBadge = [
                     <th style="width:90px">Status</th>
                     <th style="width:110px">Severity</th>
                     <th>Title / Body</th>
-                    <th style="width:140px">Branch</th>
+                    <th style="width:160px">Branches</th>
                     <th style="width:160px">Window</th>
                     <th style="width:160px">Posted</th>
                     <th style="width:200px" class="text-end">Actions</th>
@@ -84,8 +84,8 @@ $severityBadge = [
                         <?php endif; ?>
                     </td>
                     <td class="small">
-                        <?php if ($b['location_name']): ?>
-                            <i class="bi bi-geo-alt me-1"></i><?= e($b['location_name']) ?>
+                        <?php if (!empty($b['location_names'])): ?>
+                            <i class="bi bi-geo-alt me-1"></i><?= e($b['location_names']) ?>
                         <?php else: ?>
                             <span class="text-muted"><i class="bi bi-globe me-1"></i>All</span>
                         <?php endif; ?>

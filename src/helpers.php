@@ -5969,8 +5969,9 @@ function notifyStaleTicketRequester(PDO $db, array $ticket, int $hoursSinceUpdat
  *   - is_active = 1
  *   - within the optional starts_at / expires_at window (NULL bounds
  *     mean "no bound on that side")
- *   - location-scoped: portal users only see banners whose
- *     location_id is NULL (global) or matches their users.location_id;
+ *   - location-scoped: a banner targets the branches listed in
+ *     status_banner_locations (no rows = global). Portal users only see
+ *     global banners or ones targeting their users.location_id;
  *     agents/admins/power_users see every active banner regardless of
  *     branch so they always know what's posted.
  *
@@ -6001,17 +6002,21 @@ function getActiveBanners(): array
             $_SESSION['user']['location_id'] = $userLoc;
         }
         if ($userLoc > 0) {
-            $where[]  = '(b.location_id IS NULL OR b.location_id = ?)';
+            $where[]  = '(NOT EXISTS (SELECT 1 FROM status_banner_locations sbl WHERE sbl.banner_id = b.id)
+                          OR EXISTS (SELECT 1 FROM status_banner_locations sbl WHERE sbl.banner_id = b.id AND sbl.location_id = ?))';
             $params[] = $userLoc;
         } else {
-            $where[] = 'b.location_id IS NULL';
+            $where[] = 'NOT EXISTS (SELECT 1 FROM status_banner_locations sbl WHERE sbl.banner_id = b.id)';
         }
     }
 
-    $sql = 'SELECT b.*, l.name AS location_name,
+    $sql = 'SELECT b.*,
+                   (SELECT GROUP_CONCAT(l.name ORDER BY l.name SEPARATOR ", ")
+                      FROM status_banner_locations sbl
+                      JOIN locations l ON l.id = sbl.location_id
+                     WHERE sbl.banner_id = b.id) AS location_names,
                    CONCAT(u.first_name, " ", u.last_name) AS posted_by_name
             FROM status_banners b
-            LEFT JOIN locations l ON b.location_id = l.id
             LEFT JOIN users     u ON b.created_by  = u.id
             WHERE ' . implode(' AND ', $where) . '
             ORDER BY FIELD(b.severity, "critical", "warning", "info"),
