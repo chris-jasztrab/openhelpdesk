@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.88.11 &mdash; 2026-06-12
+
+### Fixed
+- **Agent dashboard: whole cell opens quick-edit pickers.** The status/priority/type/assignee/group dropdowns on the Recent Tickets table only opened when clicking the small chevron itself. Clicking anywhere in the cell (badge, name, or empty space) now opens the picker, with a pointer cursor on the cell.
+
+---
+
 ## 2.88.10 &mdash; 2026-06-12
 
 ### Fixed
