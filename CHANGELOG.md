@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.88.10 &mdash; 2026-06-12
+
+### Fixed
+- **Agent dashboard: status is now quick-editable.** Follow-up to 2.88.9 — the Recent Tickets status column was still a static badge. It now has the same quick-change chevron as the ticket list, including the optimistic-concurrency handling (if another agent changed the status first, the server's 409 response is shown instead of silently overwriting).
+
+---
+
 ## 2.88.9 &mdash; 2026-06-11
 
 ### Fixed

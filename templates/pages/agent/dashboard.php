@@ -167,8 +167,11 @@ $dir  = $dir ?? 'desc';
                         </a>
                     </td>
                     <?php if (in_array('status', $visibleColumns)): ?>
-                    <td>
-                        <?= ticketStatusBadgeHtml($t['status']) ?>
+                    <td style="white-space:nowrap;">
+                        <span class="d-inline-flex align-items-center gap-1 quick-status-wrap" data-ticket-id="<?= (int)$t['id'] ?>" data-current-status="<?= e($t['status']) ?>">
+                            <span class="quick-status-badge"><?= ticketStatusBadgeHtml($t['status']) ?></span>
+                            <button class="btn btn-link btn-sm p-0 border-0 text-muted quick-status-btn" type="button" title="Change status" style="line-height:1;"><i class="bi bi-chevron-down" style="font-size:0.65rem;"></i></button>
+                        </span>
                     </td>
                     <?php endif; ?>
                     <?php if (in_array('priority', $visibleColumns)): ?>
@@ -260,6 +263,7 @@ $dir  = $dir ?? 'desc';
     var quickTypes      = <?= json_encode(array_values(array_map(fn($t) => ['id' => (int)$t['id'], 'name' => $t['name'], 'color' => $t['color'] ?: '#6c757d', 'group_id' => $t['group_id'] ? (int)$t['group_id'] : null], $types))) ?>;
     var quickGroups     = <?= json_encode(array_values(array_map(fn($g) => ['id' => (int)$g['id'], 'name' => $g['name']], $groups))) ?>;
     var quickPriorities = <?= json_encode(array_values(array_map(fn($pr) => ['id' => (int)$pr['id'], 'name' => $pr['name'], 'color' => $pr['color'] ?: '#6c757d'], $priorities))) ?>;
+    var quickStatuses   = <?= json_encode(array_values(array_map(fn($s) => ['slug' => $s['slug'], 'label' => $s['label'], 'color' => $s['color'] ?: '#6c757d', 'text_color' => ticketStatusTextColor($s['color'] ?: '#6c757d')], ticketActiveStatuses()))) ?>;
     var quickGroupAgents = <?= json_encode(array_map(fn($agents) => array_values($agents), $groupAgents)) ?>;
     var quickAllAgents  = <?= json_encode(array_values(array_map(fn($a) => ['id' => (int)$a['id'], 'name' => $a['name']], $allAgentsForAssign))) ?>;
     var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
@@ -303,6 +307,10 @@ $dir  = $dir ?? 'desc';
                     html += '<li><a class="dropdown-item quick-menu-item" href="#" data-kind="group" data-val="' + esc(g.id) + '" data-ticket-id="' + esc(ticketId) + '">' + esc(g.name) + '</a></li>';
                 });
             }
+        } else if (kind === 'status') {
+            quickStatuses.forEach(function (st) {
+                html += '<li><a class="dropdown-item quick-menu-item" href="#" data-kind="status" data-val="' + esc(st.slug) + '" data-ticket-id="' + esc(ticketId) + '"><span class="badge" style="background-color:' + safeColor(st.color) + ';color:' + safeColor(st.text_color) + ';">' + esc(st.label) + '</span></a></li>';
+            });
         } else if (kind === 'priority') {
             html += '<li><a class="dropdown-item quick-menu-item" href="#" data-kind="priority" data-val="" data-ticket-id="' + esc(ticketId) + '"><span class="text-muted">None</span></a></li>';
             if (quickPriorities.length) {
@@ -336,6 +344,7 @@ $dir  = $dir ?? 'desc';
     document.querySelectorAll('.quick-type-btn').forEach(function (b) { bindBtn(b, 'type'); });
     document.querySelectorAll('.quick-group-btn').forEach(function (b) { bindBtn(b, 'group'); });
     document.querySelectorAll('.quick-priority-btn').forEach(function (b) { bindBtn(b, 'priority'); });
+    document.querySelectorAll('.quick-status-btn').forEach(function (b) { bindBtn(b, 'status'); });
 
     document.addEventListener('click', function (e) {
         var item = e.target.closest('.quick-menu-item');
@@ -399,6 +408,27 @@ $dir  = $dir ?? 'desc';
                         }
                     }
                 }).catch(function () {});
+            } else if (kind === 'status') {
+                var statusWrap = document.querySelector('.quick-status-wrap[data-ticket-id="' + ticketId + '"]');
+                if (!statusWrap) return;
+                var statusBadge = statusWrap.querySelector('.quick-status-badge');
+                fetch('/api/tickets/' + ticketId + '/set-status', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
+                    body: JSON.stringify({status: val, expected_status: statusWrap.dataset.currentStatus || ''})
+                }).then(function (r) {
+                    return r.json().then(function (data) { return {ok: r.ok, code: r.status, data: data}; });
+                }).then(function (res) {
+                    if (res.ok && res.data.status_html) {
+                        statusBadge.innerHTML = res.data.status_html;
+                        statusWrap.dataset.currentStatus = val;
+                    } else if (res.code === 409 && res.data.status_html) {
+                        // Another agent changed it first: show their value, don't apply ours.
+                        statusBadge.innerHTML = res.data.status_html;
+                        statusWrap.dataset.currentStatus = res.data.current_status || '';
+                        if (res.data.message) { alert(res.data.message); }
+                    }
+                }).catch(function () {});
             } else if (kind === 'priority') {
                 var priorityWrap = document.querySelector('.quick-priority-wrap[data-ticket-id="' + ticketId + '"]');
                 if (!priorityWrap) return;
@@ -419,7 +449,7 @@ $dir  = $dir ?? 'desc';
             }
             return;
         }
-        if (!e.target.closest('.quick-assign-btn') && !e.target.closest('.quick-type-btn') && !e.target.closest('.quick-group-btn') && !e.target.closest('.quick-priority-btn') && !(activeMenu && activeMenu.contains(e.target))) {
+        if (!e.target.closest('.quick-assign-btn') && !e.target.closest('.quick-type-btn') && !e.target.closest('.quick-group-btn') && !e.target.closest('.quick-priority-btn') && !e.target.closest('.quick-status-btn') && !(activeMenu && activeMenu.contains(e.target))) {
             closeMenu();
         }
     });
