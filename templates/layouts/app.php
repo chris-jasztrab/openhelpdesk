@@ -280,6 +280,14 @@
         [data-bs-theme="dark"] .filter-panel { background: #212529; border-right-color: #373b3e; }
         [data-bs-theme="dark"] .filter-panel-header { border-bottom-color: #373b3e; }
 
+        /* Saved filter list inside filter panel */
+        .saved-filter-list {
+            max-height: 230px;
+            overflow-y: auto;
+        }
+        .saved-filter-list .btn-group > .btn:first-child { min-width: 0; }
+        .saved-filter-list .dropdown-toggle-split { flex: 0 0 auto; }
+
         /* Multi-select checkbox lists inside filter panel */
         .filter-checklist {
             max-height: 150px;

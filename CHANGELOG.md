@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.92.2 &mdash; 2026-06-12
+
+### Fixed
+- **Saved filters list no longer distorts the filter panel.** The split-dropdown arrow next to each saved filter stretched to a different width depending on the filter's name length (Bootstrap's `btn-group` lets every button flex); the arrow button is now a fixed width so all rows match. The list itself is also capped at ~230px with its own scrollbar, so saving more filters no longer pushes the search box and filter checklists further down the panel — and the per-filter dropdown menus use Popper's `fixed` strategy so they overlay the scrollable list instead of being clipped by it. Applies to both the agent and admin ticket lists.
+
+---
+
 ## 2.92.1 &mdash; 2026-06-12
 
 ### Fixed

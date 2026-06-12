@@ -179,7 +179,7 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
         <?php if (empty($savedFilters)): ?>
         <p class="text-muted small">No saved filters yet.</p>
         <?php else: ?>
-        <div class="d-flex flex-column gap-1 mb-2">
+        <div class="d-flex flex-column gap-1 mb-2 saved-filter-list">
             <?php foreach ($savedFilters as $sf):
                 $sfData  = json_decode($sf['filters'], true) ?: [];
                 $sfUrl   = '/agent/tickets' . ($sfData ? '?' . http_build_query($sfData) : '');
@@ -215,7 +215,7 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                 <?php if ($isOwner): ?>
                 <button type="button" class="btn <?= $isActive ? 'text-white border-start' : 'btn-outline-secondary' ?> dropdown-toggle dropdown-toggle-split"
                         <?= $isActive ? 'style="background:#4338ca;"' : '' ?>
-                        data-bs-toggle="dropdown" aria-expanded="false">
+                        data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-expanded="false">
                     <span class="visually-hidden">Options</span>
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end">
