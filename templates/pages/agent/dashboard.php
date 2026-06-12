@@ -346,22 +346,20 @@ $dir  = $dir ?? 'desc';
     document.querySelectorAll('.quick-priority-btn').forEach(function (b) { bindBtn(b, 'priority'); });
     document.querySelectorAll('.quick-status-btn').forEach(function (b) { bindBtn(b, 'status'); });
 
-    // Whole cell opens the picker, not just the chevron.
-    function bindCell(wrap, btnClass, kind) {
-        var cell = wrap.closest('td');
-        if (!cell) return;
-        cell.style.cursor = 'pointer';
-        cell.addEventListener('click', function (e) {
+    // Badge + chevron wrapper opens the picker (matches the ticket list pages).
+    function bindWrap(wrap, btnClass, kind) {
+        wrap.style.cursor = 'pointer';
+        wrap.addEventListener('click', function (e) {
             if (e.target.closest('.' + btnClass)) return;
             var btn = wrap.querySelector('.' + btnClass);
             if (btn) { e.stopPropagation(); if (activeBtn === btn) { closeMenu(); } else { openMenu(btn, kind); } }
         });
     }
-    document.querySelectorAll('.quick-assign-wrap').forEach(function (w) { bindCell(w, 'quick-assign-btn', 'agent'); });
-    document.querySelectorAll('.quick-type-wrap').forEach(function (w) { bindCell(w, 'quick-type-btn', 'type'); });
-    document.querySelectorAll('.quick-group-wrap').forEach(function (w) { bindCell(w, 'quick-group-btn', 'group'); });
-    document.querySelectorAll('.quick-priority-wrap').forEach(function (w) { bindCell(w, 'quick-priority-btn', 'priority'); });
-    document.querySelectorAll('.quick-status-wrap').forEach(function (w) { bindCell(w, 'quick-status-btn', 'status'); });
+    document.querySelectorAll('.quick-assign-wrap').forEach(function (w) { bindWrap(w, 'quick-assign-btn', 'agent'); });
+    document.querySelectorAll('.quick-type-wrap').forEach(function (w) { bindWrap(w, 'quick-type-btn', 'type'); });
+    document.querySelectorAll('.quick-group-wrap').forEach(function (w) { bindWrap(w, 'quick-group-btn', 'group'); });
+    document.querySelectorAll('.quick-priority-wrap').forEach(function (w) { bindWrap(w, 'quick-priority-btn', 'priority'); });
+    document.querySelectorAll('.quick-status-wrap').forEach(function (w) { bindWrap(w, 'quick-status-btn', 'status'); });
 
     document.addEventListener('click', function (e) {
         var item = e.target.closest('.quick-menu-item');

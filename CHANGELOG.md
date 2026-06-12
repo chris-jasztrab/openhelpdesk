@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.88.12 &mdash; 2026-06-12
+
+### Changed
+- **Agent dashboard: quick-edit click target narrowed to badge + chevron.** Walks back part of 2.88.11 — opening the picker from anywhere in the cell was broader than intended. The click target is now the badge/name + chevron wrapper, matching the ticket list pages.
+
+---
+
 ## 2.88.11 &mdash; 2026-06-12
 
 ### Fixed
