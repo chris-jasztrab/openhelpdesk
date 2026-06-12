@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.89.1 &mdash; 2026-06-12
+
+### Changed
+- **Email template intro editor upgraded to the shared CKEditor 5 build.** The Intro Message field on `/admin/settings/email-templates` was loading the legacy CKEditor 5 v41.4.2 predefined "classic" UMD bundle while the rest of the app uses the v43.3.1 modular ESM build; it now uses the same v43.3.1 importmap setup, with the standard toolbar/editable styling and dark-mode support the other editors get. The intentionally minimal toolbar (bold, italic, link, lists) is unchanged, stored values are the same CKEditor HTML as before, and an emptied editor still saves a truly blank value so the "leave blank to use default" behaviour keeps working.
+
+---
+
 ## 2.89.0 &mdash; 2026-06-12
 
 ### Added

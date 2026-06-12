@@ -438,8 +438,10 @@ $groups ??= [];
 
 <?php endif; ?>
 
-<link rel="stylesheet" href="https://cdn.ckeditor.com/ckeditor5/41.4.2/classic/ckeditor.css">
-<script src="https://cdn.ckeditor.com/ckeditor5/41.4.2/classic/ckeditor.js"></script>
+<link rel="stylesheet" href="https://cdn.ckeditor.com/ckeditor5/43.3.1/ckeditor5.css">
+<script type="importmap">
+{"imports":{"ckeditor5":"https://cdn.ckeditor.com/ckeditor5/43.3.1/ckeditor5.js","ckeditor5/":"https://cdn.ckeditor.com/ckeditor5/43.3.1/"}}
+</script>
 <script>
 function copyToken(el) {
     const text = el.textContent.trim();
@@ -449,12 +451,21 @@ function copyToken(el) {
         setTimeout(() => { el.style.background = orig; }, 800);
     });
 }
+</script>
+<script type="module">
+import {
+    ClassicEditor,
+    Essentials,
+    Paragraph,
+    Bold, Italic,
+    Link, AutoLink,
+    List
+} from 'ckeditor5';
 
-(function () {
-    var ta = document.getElementById('intro-editor');
-    if (!ta) return;
-
+const ta = document.getElementById('intro-editor');
+if (ta) {
     ClassicEditor.create(ta, {
+        plugins: [Essentials, Paragraph, Bold, Italic, Link, AutoLink, List],
         placeholder: ta.getAttribute('placeholder') || '',
         toolbar: {
             items: ['bold', 'italic', '|', 'link', '|', 'bulletedList', 'numberedList']
@@ -462,18 +473,39 @@ function copyToken(el) {
         link: {
             defaultProtocol: 'https://'
         }
-    }).then(function (editor) {
-        var form = ta.form || ta.closest('form');
+    }).then(editor => {
+        const form = ta.form || ta.closest('form');
         if (form) {
-            form.addEventListener('submit', function () {
-                ta.value = editor.getData();
+            form.addEventListener('submit', () => {
+                const data = editor.getData();
+                // An "empty" editor still emits markup; keep blank = "use default".
+                ta.value = data.replace(/<[^>]*>/g, '').trim() === '' ? '' : data;
             });
         }
     }).catch(console.error);
-})();
+}
 </script>
 <style>
-.ck-editor__editable { min-height: 7.5em; }
+.ck.ck-editor__editable { min-height: 7.5em; }
+.ck.ck-toolbar { border-radius: .375rem .375rem 0 0 !important; border-color: #dee2e6 !important; }
+.ck.ck-editor__editable { border-radius: 0 0 .375rem .375rem !important; border-color: #dee2e6 !important; }
+
+/* Dark mode */
+[data-bs-theme="dark"] .ck.ck-toolbar,
+[data-bs-theme="dark"] .ck.ck-toolbar__separator { background: #2b3035 !important; border-color: #495057 !important; }
+[data-bs-theme="dark"] .ck.ck-button:not(.ck-disabled):hover,
+[data-bs-theme="dark"] .ck.ck-button.ck-on { background: #373b3e !important; }
+[data-bs-theme="dark"] .ck.ck-button { color: #dee2e6 !important; }
+[data-bs-theme="dark"] .ck.ck-icon { color: #dee2e6 !important; }
+[data-bs-theme="dark"] .ck.ck-editor__editable { background: #212529 !important; color: #dee2e6 !important; border-color: #495057 !important; }
+[data-bs-theme="dark"] .ck.ck-editor__editable:not(.ck-focused) { border-color: #495057 !important; }
+[data-bs-theme="dark"] .ck.ck-list { background: #2b3035 !important; border-color: #495057 !important; }
+[data-bs-theme="dark"] .ck.ck-list__item .ck-button:hover { background: #373b3e !important; }
+[data-bs-theme="dark"] .ck.ck-dropdown__panel { background: #2b3035 !important; border-color: #495057 !important; }
+[data-bs-theme="dark"] .ck.ck-label,
+[data-bs-theme="dark"] .ck.ck-list__item .ck-button .ck-button__label { color: #dee2e6 !important; }
+[data-bs-theme="dark"] .ck.ck-input { background: #212529 !important; color: #dee2e6 !important; border-color: #495057 !important; }
+[data-bs-theme="dark"] .ck.ck-balloon-panel { background: #2b3035 !important; border-color: #495057 !important; }
 </style>
 
 <?php require ROOT_DIR . '/templates/partials/settings-nav-end.php'; ?>
