@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.92.3 &mdash; 2026-06-16
+
+### Changed
+- **Login form tab order.** Moved the "Forgot password?" link out from between the Email and Password fields to below the Password field, so tabbing from Email goes straight to Password without an intervening stop.
+
+---
+
 ## 2.92.2 &mdash; 2026-06-12
 
 ### Fixed

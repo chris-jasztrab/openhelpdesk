@@ -42,16 +42,17 @@ $pageTitle = 'Sign In';
                     </div>
                 </div>
 
-                <div class="mb-4">
-                    <div class="d-flex justify-content-between align-items-baseline">
-                        <label for="password" class="form-label fw-semibold mb-0">Password</label>
-                        <a href="/forgot" class="small text-decoration-none">Forgot password?</a>
-                    </div>
-                    <div class="input-group mt-1">
+                <div class="mb-2">
+                    <label for="password" class="form-label fw-semibold">Password</label>
+                    <div class="input-group">
                         <span class="input-group-text" aria-hidden="true"><i class="bi bi-lock"></i></span>
                         <input type="password" class="form-control" id="password" name="password"
                                placeholder="Enter your password" required autocomplete="current-password">
                     </div>
+                </div>
+
+                <div class="text-end mb-4">
+                    <a href="/forgot" class="small text-decoration-none">Forgot password?</a>
                 </div>
 
                 <button type="submit" class="btn w-100 py-2 fw-semibold text-white"
