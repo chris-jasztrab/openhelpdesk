@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.94.0 &mdash; 2026-06-16
+
+### Added
+- **Ticket forwarding is now a grantable permission.** A new **Forward tickets** permission (under Tickets in the role permission matrix) controls who can forward a ticket. To preserve 2.93.0's behaviour, it is granted to the built-in **Agent** and **Power User** roles on upgrade; admins keep it automatically. Roles without it no longer see the Forward button on the ticket view or in the inbox hover card, and the forward route rejects them. (Migration 051.)
+
+---
+
 ## 2.93.0 &mdash; 2026-06-16
 
 ### Added

@@ -462,9 +462,11 @@ if ($solutionTimelineId > 0) {
             <button type="button" class="btn btn-sm btn-outline-primary" id="btnReply">
                 <i class="bi bi-reply me-1"></i>Reply
             </button>
+            <?php if (Auth::can('tickets.forward')): ?>
             <button type="button" class="btn btn-sm btn-outline-secondary" id="btnForward">
                 <i class="bi bi-forward me-1"></i>Forward
             </button>
+            <?php endif; ?>
             <button type="button" class="btn btn-sm btn-outline-warning" id="btnNote">
                 <i class="bi bi-lock me-1"></i>Add Note
             </button>
@@ -1519,19 +1521,20 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
                 });
             });
         }, 80);
-        [btnReply, btnForward, btnNote].forEach(function(b) { b.classList.remove('active'); });
-        ({ reply: btnReply, forward: btnForward, note: btnNote })[mode].classList.add('active');
+        [btnReply, btnForward, btnNote].forEach(function(b) { if (b) b.classList.remove('active'); });
+        var activeBtn = ({ reply: btnReply, forward: btnForward, note: btnNote })[mode];
+        if (activeBtn) activeBtn.classList.add('active');
     }
 
     function closePanel() {
         box.style.display = 'none';
         currentMode = null;
         statusAfterEl.value = '';
-        [btnReply, btnForward, btnNote].forEach(function(b) { b.classList.remove('active'); });
+        [btnReply, btnForward, btnNote].forEach(function(b) { if (b) b.classList.remove('active'); });
     }
 
     btnReply.addEventListener('click',   function() { openMode('reply'); });
-    btnForward.addEventListener('click', function() { openMode('forward'); });
+    if (btnForward) btnForward.addEventListener('click', function() { openMode('forward'); });
     btnNote.addEventListener('click',    function() { openMode('note'); });
     closeBtn.addEventListener('click',   closePanel);
 
@@ -1546,6 +1549,7 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
     // Deep-link from the inbox-view hover card: /agent/tickets/123#reply|#forward|#note
     function openFromHash() {
         var h = (location.hash || '').replace('#', '');
+        if (h === 'forward' && !btnForward) return; // no forward permission
         if (h === 'reply' || h === 'forward' || h === 'note') openMode(h);
     }
     if ((location.hash || '').replace('#', '').match(/^(reply|forward|note)$/)) {

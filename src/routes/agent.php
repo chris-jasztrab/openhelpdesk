@@ -1874,6 +1874,7 @@ $router->post('/agent/tickets/{id}/comment', function (array $p) {
 
 $router->post('/agent/tickets/{id}/forward', function (array $p) {
     Auth::requireStaff();
+    Auth::requirePermission('tickets.forward');
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');

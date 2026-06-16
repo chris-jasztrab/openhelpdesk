@@ -135,7 +135,9 @@ $inboxBase = $inboxBase ?? '/agent/tickets';
                                 </div>
                                 <div class="ld-pop-actions">
                                     <a href="<?= $inboxBase ?>/<?= $t['id'] ?>#reply" class="btn btn-sm btn-primary"><i class="bi bi-reply me-1"></i>Reply</a>
+                                    <?php if (Auth::can('tickets.forward')): ?>
                                     <a href="<?= $inboxBase ?>/<?= $t['id'] ?>#forward" class="btn btn-sm btn-outline-secondary"><i class="bi bi-forward me-1"></i>Forward</a>
+                                    <?php endif; ?>
                                     <a href="<?= $inboxBase ?>/<?= $t['id'] ?>#note" class="btn btn-sm btn-outline-secondary"><i class="bi bi-lock me-1"></i>Add Note</a>
                                 </div>
                             </div>
