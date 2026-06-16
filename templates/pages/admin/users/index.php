@@ -10,6 +10,7 @@ $filterParams = [];
 if (!empty($roleFilter)) $filterParams['role']     = $roleFilter;
 if (!empty($locFilter))  $filterParams['location'] = $locFilter;
 if ($qFilter !== '')     $filterParams['q']        = $qFilter;
+if (!empty($externalFilter)) $filterParams['external'] = '1';
 $hasFilters = !empty($filterParams);
 ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -74,6 +75,15 @@ $hasFilters = !empty($filterParams);
                     <?php endforeach; ?>
                 </div>
             </div>
+            <div class="mb-3">
+                <label class="form-label small fw-semibold mb-1">Contact type</label>
+                <div class="filter-checklist">
+                    <label class="filter-check-item">
+                        <input type="checkbox" name="external" value="1" <?= !empty($externalFilter) ? 'checked' : '' ?>>
+                        <span>External contacts only <span class="text-muted fst-italic">(forwarded third parties)</span></span>
+                    </label>
+                </div>
+            </div>
             <div class="d-flex gap-2">
                 <button type="submit" class="btn btn-sm text-white flex-grow-1" style="background:var(--ld-primary);">
                     <i class="bi bi-funnel me-1"></i>Apply
@@ -120,6 +130,9 @@ $hasFilters = !empty($filterParams);
                             <a href="/admin/users/<?= $u['id'] ?>" class="text-decoration-none text-dark">
                                 <?= e($u['first_name'] . ' ' . $u['last_name']) ?>
                             </a>
+                            <?php if (!empty($u['is_external'])): ?>
+                            <span class="badge bg-secondary-subtle text-secondary border" title="Auto-created when a ticket was forwarded to this address. Not a portal user.">External</span>
+                            <?php endif; ?>
                         </td>
                         <td><span class="text-muted"><?= e($u['email']) ?></span></td>
                         <td>

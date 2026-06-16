@@ -1869,6 +1869,73 @@ $router->post('/agent/tickets/{id}/comment', function (array $p) {
 });
 
 /* ==================================================================
+ * AGENT – Forward a ticket to external third parties / contacts
+ * ================================================================== */
+
+$router->post('/agent/tickets/{id}/forward', function (array $p) {
+    Auth::requireStaff();
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect("/agent/tickets/{$id}");
+    }
+
+    $db = Database::connect();
+
+    // Verify ticket exists, access, and confidential status (driven by type).
+    $stmt = $db->prepare(
+        'SELECT t.id, t.group_id, t.assigned_to, t.created_by, tt.is_confidential
+         FROM tickets t
+         LEFT JOIN ticket_types tt ON t.type_id = tt.id
+         WHERE t.id = ?'
+    );
+    $stmt->execute([$id]);
+    $ticket = $stmt->fetch();
+    if (!$ticket) {
+        flash('error', 'Ticket not found.');
+        redirect('/agent/tickets');
+    }
+    _agentRequireTicketAccess($db, $ticket);
+
+    // Confidential tickets can never be forwarded — they may only be shared by
+    // a human deliberately copying the relevant details into a separate email.
+    if ((int) ($ticket['is_confidential'] ?? 0) === 1) {
+        flash('error', 'Forwarding is disabled for confidential tickets. To share details with someone outside the helpdesk, copy the specific information you need and paste it into a new email manually.');
+        redirect("/agent/tickets/{$id}");
+    }
+
+    // Parse recipients (comma / semicolon / newline separated).
+    $rawTo     = $_POST['forward_to'] ?? '';
+    $emails    = array_values(array_filter(array_map('trim', preg_split('/[,;\n\r]+/', $rawTo))));
+    if (empty($emails)) {
+        flash('error', 'Enter at least one email address to forward to.');
+        redirect("/agent/tickets/{$id}");
+    }
+
+    $note        = trim($_POST['message'] ?? '');
+    $attachments = handleAttachmentUploads('attachments');
+
+    $res = forwardTicket($db, $id, $emails, $note, $attachments, Auth::id(), Auth::fullName());
+
+    if (empty($res['sent'])) {
+        flash('error', 'Nothing was forwarded — no valid email addresses were provided.');
+        redirect("/agent/tickets/{$id}");
+    }
+
+    // Audit entry (staff-only).
+    $db->prepare(
+        'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 1)'
+    )->execute([$id, Auth::id(), 'forwarded', 'Forwarded to ' . implode(', ', $res['sent'])]);
+
+    $msg = 'Ticket forwarded to ' . count($res['sent']) . ' recipient(s).';
+    if (!empty($res['invalid'])) {
+        $msg .= ' Skipped invalid address(es): ' . implode(', ', $res['invalid']) . '.';
+    }
+    flash('success', $msg);
+    redirect("/agent/tickets/{$id}");
+});
+
+/* ==================================================================
  * AGENT – Update Ticket (status, priority, assignment)
  * ================================================================== */
 

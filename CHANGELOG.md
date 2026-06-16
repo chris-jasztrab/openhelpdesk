@@ -11,6 +11,17 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.93.0 &mdash; 2026-06-16
+
+### Added
+- **Forward a ticket to external third parties and contacts.** The Forward button on a ticket is now a real forward, not a relabelled reply. Agents and admins can enter one or more email addresses; each recipient is emailed the ticket's details, the full public conversation, and **all** of its attachments (plus any new files added in the forward box). An optional note can be added on top.
+  - **Reply capture.** Recipients are added to the ticket's CC list and their email replies thread straight back into the ticket. Unknown addresses are auto-provisioned as contacts so the inbound mail processor can attribute their replies.
+  - **External contacts.** Auto-provisioned recipients are flagged `is_external`; the admin user list shows an **External** badge on them and a new "External contacts only" filter to list them.
+  - **Hardened threading.** The inbound processor now also recovers a ticket ID from the `In-Reply-To` / `References` headers (via the ticket-stamped `Message-ID`), so a reply still threads even if the `[#id]` subject token is stripped.
+  - **Confidential tickets are blocked.** Forwarding is disabled for confidential ticket types; the agent is told to copy the specific details into a separate email by hand instead.
+
+---
+
 ## 2.92.3 &mdash; 2026-06-16
 
 ### Changed

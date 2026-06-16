@@ -687,10 +687,15 @@ $router->get('/admin/users', function () {
     $roleFilter = array_values(array_filter(array_map('trim', (array) ($_GET['role']     ?? []))));
     $locFilter  = array_values(array_filter(array_map('trim', (array) ($_GET['location'] ?? []))));
     $q          = trim($_GET['q'] ?? '');
+    $externalFilter = ($_GET['external'] ?? '') === '1';
 
     $sql    = 'SELECT u.*, l.name AS location_name FROM users u LEFT JOIN locations l ON u.location_id = l.id';
     $where  = [];
     $params = [];
+
+    if ($externalFilter) {
+        $where[] = 'u.is_external = 1';
+    }
 
     $roles = array_values(array_filter($roleFilter, fn($r) => roleExists($r)));
     if (!empty($roles)) {
@@ -750,6 +755,7 @@ $router->get('/admin/users', function () {
         'roleFilter' => $roleFilter,
         'locFilter'  => $locFilter,
         'qFilter'    => $q,
+        'externalFilter' => $externalFilter,
         'locations'  => $locations,
         'sort'       => $sort,
         'dir'        => strtolower($dir),
@@ -5323,6 +5329,67 @@ $router->post('/admin/tickets/{id}/comment', function (array $p) {
     }
 
     flash('success', $base);
+    redirect("/admin/tickets/{$id}");
+});
+
+/* ==================================================================
+ * ADMIN – Forward a ticket to external third parties / contacts
+ * ================================================================== */
+
+$router->post('/admin/tickets/{id}/forward', function (array $p) {
+    Auth::requireAdmin();
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect("/admin/tickets/{$id}");
+    }
+
+    $db = Database::connect();
+
+    $stmt = $db->prepare(
+        'SELECT t.id, tt.is_confidential
+         FROM tickets t
+         LEFT JOIN ticket_types tt ON t.type_id = tt.id
+         WHERE t.id = ?'
+    );
+    $stmt->execute([$id]);
+    $ticket = $stmt->fetch();
+    if (!$ticket) {
+        flash('error', 'Ticket not found.');
+        redirect('/admin/tickets');
+    }
+
+    if ((int) ($ticket['is_confidential'] ?? 0) === 1) {
+        flash('error', 'Forwarding is disabled for confidential tickets. To share details with someone outside the helpdesk, copy the specific information you need and paste it into a new email manually.');
+        redirect("/admin/tickets/{$id}");
+    }
+
+    $rawTo  = $_POST['forward_to'] ?? '';
+    $emails = array_values(array_filter(array_map('trim', preg_split('/[,;\n\r]+/', $rawTo))));
+    if (empty($emails)) {
+        flash('error', 'Enter at least one email address to forward to.');
+        redirect("/admin/tickets/{$id}");
+    }
+
+    $note        = trim($_POST['message'] ?? '');
+    $attachments = handleAttachmentUploads('attachments');
+
+    $res = forwardTicket($db, $id, $emails, $note, $attachments, Auth::id(), Auth::fullName());
+
+    if (empty($res['sent'])) {
+        flash('error', 'Nothing was forwarded — no valid email addresses were provided.');
+        redirect("/admin/tickets/{$id}");
+    }
+
+    $db->prepare(
+        'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 1)'
+    )->execute([$id, Auth::id(), 'forwarded', 'Forwarded to ' . implode(', ', $res['sent'])]);
+
+    $msg = 'Ticket forwarded to ' . count($res['sent']) . ' recipient(s).';
+    if (!empty($res['invalid'])) {
+        $msg .= ' Skipped invalid address(es): ' . implode(', ', $res['invalid']) . '.';
+    }
+    flash('success', $msg);
     redirect("/admin/tickets/{$id}");
 });
 

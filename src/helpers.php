@@ -2567,7 +2567,14 @@ function emailContent(string $content): string
     return nl2br(htmlspecialchars($content, ENT_QUOTES, 'UTF-8'));
 }
 
-function sendMail(string $toEmail, string $toName, string $subject, string $htmlBody, string $textBody = '', ?int $ticketId = null): string|false
+/**
+ * Send an email via SMTP.
+ *
+ * @param array $attachments Optional file attachments, each ['path' => absolute
+ *                           filesystem path, 'name' => display filename]. Files
+ *                           that don't exist on disk are silently skipped.
+ */
+function sendMail(string $toEmail, string $toName, string $subject, string $htmlBody, string $textBody = '', ?int $ticketId = null, array $attachments = []): string|false
 {
     // Outbound-mail kill switch. Dev and test instances set MAIL_ENABLED=false
     // in .env so running the suite (or local dev) never delivers real mail to
@@ -2670,6 +2677,13 @@ function sendMail(string $toEmail, string $toName, string $subject, string $html
             $mail->addCustomHeader('X-Ticket-ID', (string) $ticketId);
         }
 
+        foreach ($attachments as $att) {
+            $path = $att['path'] ?? '';
+            if ($path !== '' && is_file($path)) {
+                $mail->addAttachment($path, $att['name'] ?? basename($path));
+            }
+        }
+
         $mail->Subject = $subject;
         $mail->isHTML(true);
         $mail->Body    = $htmlBody;
@@ -2764,6 +2778,11 @@ function getEmailTpl(string $name, array $rawTokens): array
             'subject' => '[Ticket #{{ticket_id}}] Update: {{subject}}',
             'intro'   => 'Your ticket has been updated.',
             'button'  => 'View Ticket',
+        ],
+        'ticket_forwarded' => [
+            'subject' => '[Ticket #{{ticket_id}}] {{subject}}',
+            'intro'   => '{{author}} has forwarded this support ticket to you for your input. The original request and conversation are included below — reply to this email and your response will be added to the ticket.',
+            'button'  => '',
         ],
         'ticket_merged' => [
             'subject' => '[Ticket #{{source_ticket_id}}] Your ticket has been merged',
@@ -2965,6 +2984,183 @@ function notifyTicketCreator(PDO $db, int $ticketId, string $message, string $au
         '',
         $ticketId
     );
+}
+
+/**
+ * Forward a ticket — its details, full public conversation, and attachments —
+ * to one or more email addresses (external third parties or in-system contacts).
+ *
+ * Each recipient is resolved to a `users` row; unknown addresses are auto-
+ * provisioned as `role = 'user'`, `is_external = 1` contacts so their replies
+ * thread back into the ticket via the inbound mail processor. Every recipient
+ * is added to the ticket CC list so they receive future updates.
+ *
+ * @param string[] $emails          Recipient email addresses.
+ * @param array    $newAttachments  Freshly-uploaded files from handleAttachmentUploads().
+ * @return array{sent: string[], invalid: string[]}  Labels of who was emailed + rejected addresses.
+ */
+function forwardTicket(PDO $db, int $ticketId, array $emails, string $note, array $newAttachments, int $actorId, string $actorName): array
+{
+    $result = ['sent' => [], 'invalid' => []];
+
+    // ── Load ticket + requester + lookups ────────────────────────────────────
+    $tStmt = $db->prepare(
+        'SELECT t.subject, t.description, t.status, t.created_at, t.type_id,
+                t.priority_id, t.location_id,
+                u.first_name AS req_first, u.last_name AS req_last
+         FROM tickets t
+         JOIN users u ON t.created_by = u.id
+         WHERE t.id = ?'
+    );
+    $tStmt->execute([$ticketId]);
+    $t = $tStmt->fetch();
+    if (!$t) {
+        return $result;
+    }
+
+    $typeName = $priorityName = $locationName = '';
+    if ($t['type_id']) {
+        $s = $db->prepare('SELECT name FROM ticket_types WHERE id = ?');
+        $s->execute([$t['type_id']]);
+        $typeName = $s->fetchColumn() ?: '';
+    }
+    if ($t['priority_id']) {
+        $s = $db->prepare('SELECT name FROM ticket_priorities WHERE id = ?');
+        $s->execute([$t['priority_id']]);
+        $priorityName = $s->fetchColumn() ?: '';
+    }
+    if ($t['location_id']) {
+        $s = $db->prepare('SELECT name FROM locations WHERE id = ?');
+        $s->execute([$t['location_id']]);
+        $locationName = $s->fetchColumn() ?: '';
+    }
+
+    // ── Build the conversation thread: original request + public comments ─────
+    $thread = [[
+        'author'  => trim($t['req_first'] . ' ' . $t['req_last']),
+        'date'    => date('M j, Y g:i A', strtotime($t['created_at'])),
+        'message' => $t['description'] ?? '',
+    ]];
+    $cStmt = $db->prepare(
+        "SELECT tl.details, tl.created_at,
+                CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) AS author
+         FROM ticket_timeline tl
+         LEFT JOIN users u ON tl.user_id = u.id
+         WHERE tl.ticket_id = ? AND tl.action = 'comment' AND tl.is_internal = 0
+         ORDER BY tl.created_at ASC"
+    );
+    $cStmt->execute([$ticketId]);
+    foreach ($cStmt->fetchAll() as $c) {
+        $thread[] = [
+            'author'  => trim($c['author']) !== '' ? trim($c['author']) : 'System',
+            'date'    => date('M j, Y g:i A', strtotime($c['created_at'])),
+            'message' => $c['details'] ?? '',
+        ];
+    }
+
+    // ── Gather attachments: every file on the ticket + new uploads ────────────
+    $attachments = [];
+    $aStmt = $db->prepare('SELECT original_name, stored_name FROM ticket_attachments WHERE ticket_id = ?');
+    $aStmt->execute([$ticketId]);
+    foreach ($aStmt->fetchAll() as $a) {
+        $attachments[] = ['path' => ATTACHMENT_STORAGE_PATH . $a['stored_name'], 'name' => $a['original_name']];
+    }
+    foreach ($newAttachments as $a) {
+        $attachments[] = ['path' => ATTACHMENT_STORAGE_PATH . $a['stored_name'], 'name' => $a['original_name']];
+    }
+    $attachmentNote = '';
+    if (!empty($attachments)) {
+        $attachmentNote = count($attachments) . ' file(s) from this ticket are attached to this email.';
+    }
+
+    // ── Resolve recipients, CC them, and send ────────────────────────────────
+    $appUrl = env('APP_URL', 'http://localhost:8000');
+    foreach ($emails as $email) {
+        $email = strtolower(trim($email));
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            if ($email !== '') {
+                $result['invalid'][] = $email;
+            }
+            continue;
+        }
+
+        // Find or auto-provision the recipient as a contact.
+        $uStmt = $db->prepare('SELECT id, first_name, last_name FROM users WHERE LOWER(email) = ?');
+        $uStmt->execute([$email]);
+        $user = $uStmt->fetch();
+        if (!$user) {
+            [$first, $last] = forwardParseName($email);
+            $hashedPw = password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT);
+            $db->prepare(
+                "INSERT INTO users (first_name, last_name, email, password, role, is_external) VALUES (?, ?, ?, ?, 'user', 1)"
+            )->execute([$first, $last, $email, $hashedPw]);
+            $user = ['id' => (int) $db->lastInsertId(), 'first_name' => $first, 'last_name' => $last];
+        }
+
+        // Add to the ticket CC list (idempotent).
+        $exists = $db->prepare('SELECT 1 FROM ticket_cc WHERE ticket_id = ? AND user_id = ?');
+        $exists->execute([$ticketId, $user['id']]);
+        if (!$exists->fetchColumn()) {
+            $db->prepare('INSERT INTO ticket_cc (ticket_id, user_id, added_by) VALUES (?, ?, ?)')
+               ->execute([$ticketId, $user['id'], $actorId]);
+        }
+
+        $tpl = getEmailTpl('ticket-forwarded', [
+            'ticket_id' => $ticketId,
+            'subject'   => $t['subject'],
+            'author'    => $actorName,
+        ]);
+
+        $emailHtml = renderEmail('ticket-forwarded', [
+            'ticketId'      => $ticketId,
+            'subject'       => $t['subject'],
+            'introText'     => $tpl['intro'],
+            'footerText'    => $tpl['footer'],
+            'authorName'    => $actorName,
+            'forwardNote'   => $note,
+            'requesterName' => trim($t['req_first'] . ' ' . $t['req_last']),
+            'statusLabel'   => ticketStatusLabel($t['status']),
+            'typeName'      => $typeName,
+            'priorityName'  => $priorityName,
+            'locationName'  => $locationName,
+            'openedAt'      => date('M j, Y', strtotime($t['created_at'])),
+            'thread'        => $thread,
+            'attachmentNote'=> $attachmentNote,
+        ]);
+
+        sendMail(
+            $email,
+            trim($user['first_name'] . ' ' . $user['last_name']),
+            $tpl['subject'],
+            $emailHtml,
+            '',
+            $ticketId,
+            $attachments
+        );
+
+        $label = trim($user['first_name'] . ' ' . $user['last_name']);
+        $result['sent'][] = $label !== '' ? "{$label} <{$email}>" : $email;
+    }
+
+    return $result;
+}
+
+/**
+ * Split an email address into a [first, last] name guess for an auto-provisioned
+ * external contact. "jane.doe@acme.com" → ["Jane", "Doe"]; "vendor@acme.com" → ["Vendor", ""].
+ */
+function forwardParseName(string $email): array
+{
+    $local = strstr($email, '@', true) ?: $email;
+    $local = str_replace(['.', '_', '-', '+'], ' ', $local);
+    $local = trim(preg_replace('/\s+/', ' ', $local));
+    if ($local === '') {
+        return ['External', 'Contact'];
+    }
+    $parts = explode(' ', $local, 2);
+    $first = ucfirst($parts[0]);
+    $last  = isset($parts[1]) ? ucwords($parts[1]) : '';
+    return [$first, $last];
 }
 
 /**

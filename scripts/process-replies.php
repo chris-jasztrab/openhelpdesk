@@ -107,6 +107,17 @@ foreach ($messages as $msg) {
         $ticketId = (int) $m[1];
     }
 
+    // Fallback: recover the ticket ID from the In-Reply-To / References headers.
+    // Outbound ticket mail stamps a Message-ID of the form <ticket-{id}-{time}@…>,
+    // which replying clients echo back here — so a forwarded third party whose
+    // reply has lost the "[#id]" subject token still threads back correctly.
+    if ($ticketId === null) {
+        $ticketId = extractTicketIdFromHeaders($msg);
+        if ($ticketId !== null) {
+            logMsg('INFO', "  Recovered Ticket #{$ticketId} from In-Reply-To/References headers.");
+        }
+    }
+
     if ($ticketId === null) {
         // ── Email-to-Ticket: create a new ticket from this inbound email ─────────
         if (getSetting('email_to_ticket_enabled') !== '1') {
@@ -341,6 +352,33 @@ function isAutoReply(array $msg): bool
     }
 
     return false;
+}
+
+/**
+ * Recover a ticket ID from a reply's threading headers.
+ *
+ * Outbound ticket mail (sendMail) uses a Message-ID of the form
+ * <ticket-{id}-{timestamp}@domain>. RFC 5322-compliant clients echo that ID
+ * into In-Reply-To and References when replying, so we can pull the ticket ID
+ * back out even when the "[#id]" subject token has been stripped or altered.
+ *
+ * Returns the ticket ID, or null if no ticket-stamped Message-ID is present.
+ */
+function extractTicketIdFromHeaders(array $msg): ?int
+{
+    $headers = $msg['internetMessageHeaders'] ?? [];
+    foreach ($headers as $header) {
+        $name = strtolower(trim($header['name'] ?? ''));
+        if ($name !== 'in-reply-to' && $name !== 'references') {
+            continue;
+        }
+        // References can list several IDs; take the last ticket-stamped one,
+        // which corresponds to the most recent message in the thread.
+        if (preg_match_all('/ticket-(\d+)-\d+@/i', (string) ($header['value'] ?? ''), $m)) {
+            return (int) end($m[1]);
+        }
+    }
+    return null;
 }
 
 /**

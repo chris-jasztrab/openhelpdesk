@@ -8,8 +8,8 @@ $breadcrumbs  = !empty($fromFloor) ? [] : [
     ['label' => '#' . $ticket['id']],
 ];
 $statusLabels = ticketStatusLabelMap();
-$actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-person-check text-primary', 'status_changed' => 'bi-arrow-repeat text-warning', 'priority_changed' => 'bi-flag text-danger', 'comment' => 'bi-chat-dots text-info', 'internal_note' => 'bi-lock text-secondary', 'sla_set' => 'bi-stopwatch text-primary', 'sla_paused' => 'bi-pause-circle text-warning', 'sla_resumed' => 'bi-play-circle text-success', 'merged' => 'bi-arrow-right-circle text-secondary', 'split' => 'bi-scissors text-warning', 'edited' => 'bi-pencil text-secondary', 'escalated' => 'bi-arrow-up-circle text-danger', 'stale_notification_sent' => 'bi-hourglass-split text-warning', 'ai_classified' => 'bi-robot text-info', 'ai_group_routed' => 'bi-signpost-split text-info', 'ai_group_routing_skipped' => 'bi-signpost text-muted', 'ai_duplicate_warned' => 'bi-files text-warning'];
-$actionLabels = ['created' => 'Created', 'assigned' => 'Assigned', 'status_changed' => 'Status Changed', 'priority_changed' => 'Priority Changed', 'comment' => 'Comment', 'internal_note' => 'Internal Note', 'sla_set' => 'SLA Set', 'sla_paused' => 'SLA Paused', 'sla_resumed' => 'SLA Resumed', 'merged' => 'Merged', 'split' => 'Split', 'edited' => 'Edited by Requester', 'escalated' => 'Escalated', 'stale_notification_sent' => 'Stale Reminder Sent', 'ai_classified' => 'AI Classified', 'ai_group_routed' => 'AI Routed', 'ai_group_routing_skipped' => 'AI Routing Skipped', 'ai_duplicate_warned' => 'AI Duplicate Warning'];
+$actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-person-check text-primary', 'status_changed' => 'bi-arrow-repeat text-warning', 'priority_changed' => 'bi-flag text-danger', 'comment' => 'bi-chat-dots text-info', 'internal_note' => 'bi-lock text-secondary', 'sla_set' => 'bi-stopwatch text-primary', 'sla_paused' => 'bi-pause-circle text-warning', 'sla_resumed' => 'bi-play-circle text-success', 'merged' => 'bi-arrow-right-circle text-secondary', 'split' => 'bi-scissors text-warning', 'edited' => 'bi-pencil text-secondary', 'escalated' => 'bi-arrow-up-circle text-danger', 'forwarded' => 'bi-forward text-primary', 'stale_notification_sent' => 'bi-hourglass-split text-warning', 'ai_classified' => 'bi-robot text-info', 'ai_group_routed' => 'bi-signpost-split text-info', 'ai_group_routing_skipped' => 'bi-signpost text-muted', 'ai_duplicate_warned' => 'bi-files text-warning'];
+$actionLabels = ['created' => 'Created', 'assigned' => 'Assigned', 'status_changed' => 'Status Changed', 'priority_changed' => 'Priority Changed', 'comment' => 'Comment', 'internal_note' => 'Internal Note', 'sla_set' => 'SLA Set', 'sla_paused' => 'SLA Paused', 'sla_resumed' => 'SLA Resumed', 'merged' => 'Merged', 'split' => 'Split', 'edited' => 'Edited by Requester', 'escalated' => 'Escalated', 'forwarded' => 'Forwarded', 'stale_notification_sent' => 'Stale Reminder Sent', 'ai_classified' => 'AI Classified', 'ai_group_routed' => 'AI Routed', 'ai_group_routing_skipped' => 'AI Routing Skipped', 'ai_duplicate_warned' => 'AI Duplicate Warning'];
 $slaStateColors = ['on_track' => 'success', 'warning' => 'warning', 'breached' => 'danger'];
 $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' => 'Breached'];
 
@@ -487,6 +487,11 @@ if ($solutionTimelineId > 0) {
                         <?= csrfField() ?>
                         <input type="hidden" name="is_internal" id="replyIsInternal" value="0">
                         <input type="hidden" name="status_after" id="replyStatusAfter" value="">
+                        <div class="mb-3" id="forwardRecipientsRow" style="display:none;">
+                            <label for="forwardTo" class="form-label small fw-semibold">Forward to <span class="text-muted fw-normal">(email addresses, separated by commas)</span></label>
+                            <input type="text" class="form-control" name="forward_to" id="forwardTo" placeholder="vendor@example.com, jane.doe@partner.org" autocomplete="off">
+                            <div class="form-text">Recipients are added as contacts and CC'd on the ticket; their email replies thread back in automatically. The full conversation and all attachments are included.</div>
+                        </div>
                         <div class="mb-3" style="position:relative;">
                             <div id="replyEditor"></div>
                             <input type="hidden" name="message" id="replyMessageHidden">
@@ -1477,6 +1482,12 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
         note:    { title: '<i class="bi bi-lock me-2"></i>Internal Note',  internal: '1', label: 'Add Note',   icon: 'bi-lock',    header: 'bg-warning-subtle' }
     };
 
+    var form           = document.getElementById('replyForm');
+    var recipientsRow  = document.getElementById('forwardRecipientsRow');
+    var statusSplitBtn = form.querySelector('.dropdown-toggle-split');
+    var commentAction  = '/agent/tickets/<?= (int) $ticket['id'] ?>/comment';
+    var forwardAction  = '/agent/tickets/<?= (int) $ticket['id'] ?>/forward';
+
     function openMode(mode) {
         if (currentMode === mode && box.style.display !== 'none') { closePanel(); return; }
         currentMode = mode;
@@ -1487,6 +1498,13 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
         submitIcon.className = 'bi ' + cfg.icon + ' me-1';
         boxHeader.className  = 'card-header border-bottom d-flex align-items-center justify-content-between py-2 ' + cfg.header;
         statusAfterEl.value  = '';
+        // Forward mode posts to a different endpoint, shows the recipients field,
+        // and hides the reply-only "send & change status" split button.
+        var isForward = mode === 'forward';
+        form.dataset.mode = mode;
+        form.action = isForward ? forwardAction : commentAction;
+        recipientsRow.style.display = isForward ? '' : 'none';
+        if (statusSplitBtn) statusSplitBtn.style.display = isForward ? 'none' : '';
         box.style.display    = '';
         if (window._replyEditor) window._replyEditor.ui.update();
         // Focus the editor first (CKEditor scrolls the caret into view), THEN
@@ -1775,7 +1793,16 @@ ClassicEditor.create(document.querySelector('#replyEditor'), {
     document.getElementById('replyForm').addEventListener('submit', function(e) {
         var data = editor.getData();
         var text = data.replace(/<[^>]*>/g, '').trim();
-        if (!text) {
+        if (this.dataset.mode === 'forward') {
+            // The conversation thread is the payload; the note is optional. Just
+            // require at least one recipient.
+            var to = (document.getElementById('forwardTo').value || '').trim();
+            if (!to) {
+                e.preventDefault();
+                document.getElementById('forwardTo').focus();
+                return;
+            }
+        } else if (!text) {
             e.preventDefault();
             editor.editing.view.focus();
             return;
