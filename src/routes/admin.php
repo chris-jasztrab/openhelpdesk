@@ -4561,7 +4561,8 @@ $router->get('/admin/tickets/{id}', function (array $p) {
 
     // Timeline
     $tl = $db->prepare(
-        "SELECT tl.*, CONCAT(u.first_name, ' ', u.last_name) AS user_name
+        "SELECT tl.*, CONCAT(u.first_name, ' ', u.last_name) AS user_name,
+                u.is_external AS author_is_external
          FROM ticket_timeline tl
          LEFT JOIN users u ON tl.user_id = u.id
          WHERE tl.ticket_id = ?

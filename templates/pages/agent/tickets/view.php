@@ -313,6 +313,10 @@ if ($solutionTimelineId > 0) {
                         // "Go to solution" anchor that the target be there.
                         $isOlder    = !$isSolution && $tlIdx >= 10;
                         $isNote     = $entry['is_internal'] && $entry['user_name'];
+                        // A public comment whose author is an auto-provisioned
+                        // external contact (forwarded third party) — flag it so
+                        // staff can tell it didn't come from the requester/staff.
+                        $isExternal = $entry['action'] === 'comment' && empty($entry['is_internal']) && !empty($entry['author_is_external']);
                         $tlClass    = $isNote ? 'ld-timeline-note' : ($isSystem ? 'ld-timeline-system' : '');
                         if ($isAi)       $tlClass .= ' ld-timeline-ai';
                         if ($isSolution) $tlClass .= ' ld-timeline-solution';
@@ -343,6 +347,9 @@ if ($solutionTimelineId > 0) {
                                         <span class="badge ms-1" style="background:var(--ld-timeline-note-accent); color:#fff;">Internal</span>
                                         <?php elseif ($isAi): ?>
                                         <span class="badge ms-1 bg-info text-dark" title="Visible to admins only"><i class="bi bi-robot me-1"></i>AI &middot; Admin only</span>
+                                        <?php endif; ?>
+                                        <?php if ($isExternal): ?>
+                                        <span class="badge ms-1 bg-secondary" title="Reply from an external contact (forwarded third party), not the requester or staff"><i class="bi bi-box-arrow-in-left me-1"></i>External</span>
                                         <?php endif; ?>
                                     </div>
                                     <div class="d-flex align-items-center gap-2">

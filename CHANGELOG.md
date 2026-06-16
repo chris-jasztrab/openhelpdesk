@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.95.0 &mdash; 2026-06-16
+
+### Added
+- **External replies are flagged on the timeline.** When a forwarded third-party contact replies to a ticket and their message lands on the timeline, the entry now carries an **External** badge in both the agent and admin ticket views, so staff can immediately tell the comment came from an outside contact rather than the requester or staff.
+
+---
+
 ## 2.94.0 &mdash; 2026-06-16
 
 ### Added
