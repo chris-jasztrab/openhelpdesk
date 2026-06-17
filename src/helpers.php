@@ -4552,6 +4552,7 @@ function sendCsatSurvey(\PDO $db, int $ticketId): void
     if ($mode === 'external') {
         $surveyUrl = csatSubstitutePlaceholders(getSetting('csat_external_url', ''), [
             'ticket_id'  => (string) $ticketId,
+            'token'      => $token,
             'user_email' => $row['email'],
             'first_name' => $row['first_name'],
             'last_name'  => $row['last_name'],

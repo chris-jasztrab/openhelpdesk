@@ -10825,6 +10825,7 @@ $router->post('/admin/settings/csat/test', function () {
         }
         $surveyUrl = csatSubstitutePlaceholders($extUrl, [
             'ticket_id'  => (string) $ticket['id'],
+            'token'      => $token,
             'user_email' => $email,
             'first_name' => 'Admin',
             'last_name'  => '',

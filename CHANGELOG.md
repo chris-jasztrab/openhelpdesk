@@ -11,6 +11,14 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.98.0 &mdash; 2026-06-17
+
+### Added
+- **`{token}` placeholder for external survey URLs.** External CSAT URLs can now include `{token}` (the survey's unique 64-character token) alongside `{ticket_id}`. Echoing it back through the response webhook is the preferred, unguessable way to match a response to its ticket.
+- **In-depth CSAT admin documentation.** The **Docs → Satisfaction Surveys** page now fully documents the on-ticket Satisfaction panel and the external response webhook: endpoint and signing-secret setup, the request/signature contract, response codes, worked examples (curl, PHP, Python, Node), per-provider integration recipes (Google Forms, Typeform, Jotform, Alchemer, Microsoft Forms, HappyOrNot), a setup checklist, troubleshooting, and security notes.
+
+---
+
 ## 2.97.0 &mdash; 2026-06-17
 
 ### Added

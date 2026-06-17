@@ -82,8 +82,9 @@ $breadcrumbs  = [
                     <div class="form-text">
                         Where the rating button in the email will send the recipient. You can use these placeholders
                         (each value is URL-encoded for safe inclusion in a query string):
-                        <code>{ticket_id}</code>, <code>{user_email}</code>, <code>{first_name}</code>,
+                        <code>{ticket_id}</code>, <code>{token}</code>, <code>{user_email}</code>, <code>{first_name}</code>,
                         <code>{last_name}</code>, <code>{user_name}</code>, <code>{subject}</code>.
+                        Echo <code>{ticket_id}</code> or <code>{token}</code> back through the webhook to match the response to its ticket.
                     </div>
                 </div>
 
