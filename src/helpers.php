@@ -2987,6 +2987,79 @@ function notifyTicketCreator(PDO $db, int $ticketId, string $message, string $au
 }
 
 /**
+ * True if the current user may forward tickets to anyone at all — i.e. holds
+ * either the internal or the external forward permission. Used to decide whether
+ * the Forward button is shown.
+ */
+function canForwardTickets(): bool
+{
+    return Auth::can('tickets.forward.internal') || Auth::can('tickets.forward.external');
+}
+
+/**
+ * Classify forward recipients into internal vs external by email.
+ *
+ * Internal  = the address matches a real in-system user (users.is_external = 0).
+ * External  = a brand-new address, OR one matching a previously auto-provisioned
+ *             external contact (users.is_external = 1).
+ *
+ * Invalid email strings are ignored here — forwardTicket() reports those.
+ *
+ * @return array{internal: string[], external: string[]} lowercased addresses.
+ */
+function classifyForwardRecipients(PDO $db, array $emails): array
+{
+    $valid = [];
+    foreach ($emails as $e) {
+        $e = strtolower(trim($e));
+        if ($e !== '' && filter_var($e, FILTER_VALIDATE_EMAIL)) {
+            $valid[$e] = true; // dedupe
+        }
+    }
+    $valid = array_keys($valid);
+    if (empty($valid)) {
+        return ['internal' => [], 'external' => []];
+    }
+
+    // Which of these are real internal users (is_external = 0)?
+    $ph = implode(',', array_fill(0, count($valid), '?'));
+    $stmt = $db->prepare("SELECT LOWER(email) FROM users WHERE LOWER(email) IN ($ph) AND is_external = 0");
+    $stmt->execute($valid);
+    $internalSet = array_flip($stmt->fetchAll(PDO::FETCH_COLUMN));
+
+    $internal = $external = [];
+    foreach ($valid as $e) {
+        if (isset($internalSet[$e])) {
+            $internal[] = $e;
+        } else {
+            $external[] = $e;
+        }
+    }
+    return ['internal' => $internal, 'external' => $external];
+}
+
+/**
+ * Permission gate for a forward request. Returns a human-readable error naming
+ * the addresses the current user isn't allowed to forward to, or null if the
+ * request is fully permitted.
+ */
+function forwardPermissionError(PDO $db, array $emails): ?string
+{
+    $classes  = classifyForwardRecipients($db, $emails);
+    $problems = [];
+    if (!empty($classes['external']) && !Auth::can('tickets.forward.external')) {
+        $problems[] = 'external addresses (' . implode(', ', $classes['external']) . ')';
+    }
+    if (!empty($classes['internal']) && !Auth::can('tickets.forward.internal')) {
+        $problems[] = 'internal contacts (' . implode(', ', $classes['internal']) . ')';
+    }
+    if (empty($problems)) {
+        return null;
+    }
+    return "You don't have permission to forward to " . implode(' or ', $problems) . '.';
+}
+
+/**
  * Forward a ticket — its details, full public conversation, and attachments —
  * to one or more email addresses (external third parties or in-system contacts).
  *

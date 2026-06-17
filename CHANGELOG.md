@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.96.0 &mdash; 2026-06-17
+
+### Changed
+- **Forwarding split into two permissions: internal vs external.** The single "Forward tickets" permission is replaced by **Forward tickets to internal contacts** and **Forward tickets to external contacts**. Internal = an address that already belongs to a real in-system user; external = a brand-new address or a previously auto-provisioned external contact. The forward route now checks each recipient's class and rejects the send (naming the disallowed addresses) if the user lacks the matching permission; the recipients field hint adapts to what the user is allowed to do. Roles that held the old umbrella permission are granted **both** new permissions on upgrade, preserving existing behaviour. The Forward button shows whenever a user has either permission. (Migration 052.)
+
+---
+
 ## 2.95.0 &mdash; 2026-06-16
 
 ### Added

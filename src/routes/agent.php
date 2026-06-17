@@ -1875,7 +1875,7 @@ $router->post('/agent/tickets/{id}/comment', function (array $p) {
 
 $router->post('/agent/tickets/{id}/forward', function (array $p) {
     Auth::requireStaff();
-    Auth::requirePermission('tickets.forward');
+    Auth::requirePermission('tickets.forward.internal', 'tickets.forward.external');
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -1911,6 +1911,13 @@ $router->post('/agent/tickets/{id}/forward', function (array $p) {
     $emails    = array_values(array_filter(array_map('trim', preg_split('/[,;\n\r]+/', $rawTo))));
     if (empty($emails)) {
         flash('error', 'Enter at least one email address to forward to.');
+        redirect("/agent/tickets/{$id}");
+    }
+
+    // Gate by recipient class: internal contacts vs external addresses.
+    $permErr = forwardPermissionError($db, $emails);
+    if ($permErr !== null) {
+        flash('error', $permErr);
         redirect("/agent/tickets/{$id}");
     }
 

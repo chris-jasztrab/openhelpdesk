@@ -5372,6 +5372,13 @@ $router->post('/admin/tickets/{id}/forward', function (array $p) {
         redirect("/admin/tickets/{$id}");
     }
 
+    // Gate by recipient class: internal contacts vs external addresses.
+    $permErr = forwardPermissionError($db, $emails);
+    if ($permErr !== null) {
+        flash('error', $permErr);
+        redirect("/admin/tickets/{$id}");
+    }
+
     $note        = trim($_POST['message'] ?? '');
     $attachments = handleAttachmentUploads('attachments');
 

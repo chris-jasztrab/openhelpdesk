@@ -413,7 +413,7 @@ if ($solutionTimelineId > 0) {
             <button type="button" class="btn btn-sm btn-outline-primary" id="btnReply">
                 <i class="bi bi-reply me-1"></i>Reply
             </button>
-            <?php if (Auth::can('tickets.forward')): ?>
+            <?php if (canForwardTickets()): ?>
             <button type="button" class="btn btn-sm btn-outline-secondary" id="btnForward">
                 <i class="bi bi-forward me-1"></i>Forward
             </button>
@@ -440,10 +440,19 @@ if ($solutionTimelineId > 0) {
                         <?= csrfField() ?>
                         <input type="hidden" name="is_internal" id="replyIsInternal" value="0">
                         <input type="hidden" name="status_after" id="replyStatusAfter" value="">
+                        <?php
+                        $canFwdInt = Auth::can('tickets.forward.internal');
+                        $canFwdExt = Auth::can('tickets.forward.external');
+                        $fwdHint = $canFwdInt && $canFwdExt
+                            ? 'Enter internal contacts or external email addresses.'
+                            : ($canFwdExt
+                                ? 'Enter external email addresses.'
+                                : 'Enter the email of an existing internal contact — you can&rsquo;t forward to external addresses.');
+                        ?>
                         <div class="mb-3" id="forwardRecipientsRow" style="display:none;">
                             <label for="forwardTo" class="form-label small fw-semibold">Forward to <span class="text-muted fw-normal">(email addresses, separated by commas)</span></label>
                             <input type="text" class="form-control" name="forward_to" id="forwardTo" placeholder="vendor@example.com, jane.doe@partner.org" autocomplete="off">
-                            <div class="form-text">Recipients are added as contacts and CC'd on the ticket; their email replies thread back in automatically. The full conversation and all attachments are included.</div>
+                            <div class="form-text"><?= $fwdHint ?> Recipients are added as contacts and CC'd on the ticket; their email replies thread back in automatically. The full conversation and all attachments are included.</div>
                         </div>
                         <div class="mb-3" style="position:relative;">
                             <div id="replyEditor"></div>
