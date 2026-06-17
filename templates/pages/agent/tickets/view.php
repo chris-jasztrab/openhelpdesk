@@ -8,8 +8,8 @@ $breadcrumbs  = !empty($fromFloor) ? [] : [
     ['label' => '#' . $ticket['id']],
 ];
 $statusLabels = ticketStatusLabelMap();
-$actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-person-check text-primary', 'status_changed' => 'bi-arrow-repeat text-warning', 'priority_changed' => 'bi-flag text-danger', 'comment' => 'bi-chat-dots text-info', 'internal_note' => 'bi-lock text-secondary', 'sla_set' => 'bi-stopwatch text-primary', 'sla_paused' => 'bi-pause-circle text-warning', 'sla_resumed' => 'bi-play-circle text-success', 'merged' => 'bi-arrow-right-circle text-secondary', 'split' => 'bi-scissors text-warning', 'edited' => 'bi-pencil text-secondary', 'escalated' => 'bi-arrow-up-circle text-danger', 'forwarded' => 'bi-forward text-primary', 'stale_notification_sent' => 'bi-hourglass-split text-warning', 'ai_classified' => 'bi-robot text-info', 'ai_group_routed' => 'bi-signpost-split text-info', 'ai_group_routing_skipped' => 'bi-signpost text-muted', 'ai_duplicate_warned' => 'bi-files text-warning'];
-$actionLabels = ['created' => 'Created', 'assigned' => 'Assigned', 'status_changed' => 'Status Changed', 'priority_changed' => 'Priority Changed', 'comment' => 'Comment', 'internal_note' => 'Internal Note', 'sla_set' => 'SLA Set', 'sla_paused' => 'SLA Paused', 'sla_resumed' => 'SLA Resumed', 'merged' => 'Merged', 'split' => 'Split', 'edited' => 'Edited by Requester', 'escalated' => 'Escalated', 'forwarded' => 'Forwarded', 'stale_notification_sent' => 'Stale Reminder Sent', 'ai_classified' => 'AI Classified', 'ai_group_routed' => 'AI Routed', 'ai_group_routing_skipped' => 'AI Routing Skipped', 'ai_duplicate_warned' => 'AI Duplicate Warning'];
+$actionIcons  = ['created' => 'bi-plus-circle text-success', 'assigned' => 'bi-person-check text-primary', 'status_changed' => 'bi-arrow-repeat text-warning', 'priority_changed' => 'bi-flag text-danger', 'comment' => 'bi-chat-dots text-info', 'internal_note' => 'bi-lock text-secondary', 'sla_set' => 'bi-stopwatch text-primary', 'sla_paused' => 'bi-pause-circle text-warning', 'sla_resumed' => 'bi-play-circle text-success', 'merged' => 'bi-arrow-right-circle text-secondary', 'split' => 'bi-scissors text-warning', 'edited' => 'bi-pencil text-secondary', 'escalated' => 'bi-arrow-up-circle text-danger', 'forwarded' => 'bi-forward text-primary', 'stale_notification_sent' => 'bi-hourglass-split text-warning', 'ai_classified' => 'bi-robot text-info', 'ai_group_routed' => 'bi-signpost-split text-info', 'ai_group_routing_skipped' => 'bi-signpost text-muted', 'ai_duplicate_warned' => 'bi-files text-warning', 'csat_received' => 'bi-star-fill text-warning'];
+$actionLabels = ['created' => 'Created', 'assigned' => 'Assigned', 'status_changed' => 'Status Changed', 'priority_changed' => 'Priority Changed', 'comment' => 'Comment', 'internal_note' => 'Internal Note', 'sla_set' => 'SLA Set', 'sla_paused' => 'SLA Paused', 'sla_resumed' => 'SLA Resumed', 'merged' => 'Merged', 'split' => 'Split', 'edited' => 'Edited by Requester', 'escalated' => 'Escalated', 'forwarded' => 'Forwarded', 'stale_notification_sent' => 'Stale Reminder Sent', 'ai_classified' => 'AI Classified', 'ai_group_routed' => 'AI Routed', 'ai_group_routing_skipped' => 'AI Routing Skipped', 'ai_duplicate_warned' => 'AI Duplicate Warning', 'csat_received' => 'Satisfaction Rating'];
 $slaStateColors = ['on_track' => 'success', 'warning' => 'warning', 'breached' => 'danger'];
 $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' => 'Breached'];
 
@@ -776,6 +776,9 @@ if ($solutionTimelineId > 0) {
             </div>
         </div>
         <?php endif; ?>
+
+        <!-- Satisfaction Survey -->
+        <?php require ROOT_DIR . '/templates/partials/ticket-csat.php'; ?>
 
         <!-- Custom Fields -->
         <?php if (!empty($customFields)): ?>

@@ -11,6 +11,14 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.97.0 &mdash; 2026-06-17
+
+### Added
+- **CSAT results now appear on the ticket itself.** The agent and admin ticket views gained a **Satisfaction Survey** panel showing the star rating, the requester's comment, the response time, and a "reopened by requester" badge — or an "awaiting response" state while it's outstanding. Each survey row now stores the exact link that was emailed (`survey_url`), surfaced as a one-click **Open survey** button: the public rating page for built-in surveys, or the third-party survey for external ones. When a rating lands it's also written to the timeline as an internal **Satisfaction Rating** entry. (Migration 053.)
+- **External CSAT response webhook.** External survey tools can now POST a response back so it lands on the ticket exactly like a built-in survey — and counts in the Satisfaction report, which previously always read a 0% response rate in External mode. The tool-agnostic endpoint is `POST /api/csat/webhook` with a JSON body `{ticket_id|token, rating, comment}` authenticated by an HMAC-SHA256 `X-CSAT-Signature` header over the raw body. A signing secret is minted automatically the first time External mode is saved and can be rotated from Settings → CSAT, which also shows the webhook URL.
+
+---
+
 ## 2.96.0 &mdash; 2026-06-17
 
 ### Changed

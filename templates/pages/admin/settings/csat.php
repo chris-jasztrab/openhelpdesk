@@ -96,6 +96,44 @@ $breadcrumbs  = [
                         Shown as a link on the Satisfaction report so admins can jump to the external service to see ratings &amp; comments.
                     </div>
                 </div>
+
+                <hr class="my-3">
+
+                <h6 class="fw-semibold mb-1"><i class="bi bi-arrow-repeat me-1"></i>Response webhook <span class="text-muted fw-normal">(optional)</span></h6>
+                <p class="text-muted mb-3" style="font-size:.85rem;">
+                    Have your survey tool POST each response back here and the rating, comment and
+                    response time land on the ticket itself &mdash; the same as a built-in survey, and
+                    counted in the Satisfaction report. Without this, external ratings live only in
+                    your survey tool. Send a JSON body
+                    <code>{"ticket_id": 123, "rating": 1&ndash;5, "comment": "..."}</code>
+                    (or use <code>"token"</code> instead of <code>ticket_id</code>) and an
+                    <code>X-CSAT-Signature</code> header = the hex HMAC-SHA256 of the raw body keyed with the secret below.
+                </p>
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Webhook URL</label>
+                    <input type="text" class="form-control" readonly
+                           value="<?= htmlspecialchars($settings['csat_webhook_url'], ENT_QUOTES, 'UTF-8') ?>"
+                           onclick="this.select();">
+                    <div class="form-text">Derived from <code>APP_URL</code>. Configure this as the destination in your survey tool.</div>
+                </div>
+
+                <div class="mb-2">
+                    <label class="form-label fw-semibold">Signing secret</label>
+                    <?php if ($settings['csat_webhook_secret'] !== ''): ?>
+                        <input type="text" class="form-control font-monospace" readonly
+                               value="<?= htmlspecialchars($settings['csat_webhook_secret'], ENT_QUOTES, 'UTF-8') ?>"
+                               onclick="this.select();">
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" name="csat_regen_secret" id="csat_regen_secret" value="1">
+                            <label class="form-check-label text-danger" for="csat_regen_secret">
+                                Rotate secret on save (invalidates the current one &mdash; update your survey tool afterwards)
+                            </label>
+                        </div>
+                    <?php else: ?>
+                        <div class="form-text">A signing secret is generated automatically the first time you save with External selected.</div>
+                    <?php endif; ?>
+                </div>
             </div>
 
             <div class="mb-4">

@@ -2379,14 +2379,7 @@ $router->post('/survey/{token}', function (array $p) {
         return;
     }
 
-    $comment = trim($_POST['comment'] ?? '');
-    if (mb_strlen($comment) > 2000) {
-        $comment = mb_substr($comment, 0, 2000);
-    }
-
-    $db->prepare(
-        'UPDATE csat_surveys SET rating = ?, comment = ?, responded_at = NOW() WHERE token = ?'
-    )->execute([$rating, $comment !== '' ? $comment : null, $token]);
+    recordCsatResponse($db, $survey, $rating, $_POST['comment'] ?? '');
 
     redirect('/survey/' . $token . '/thanks');
 });
@@ -2465,6 +2458,74 @@ $router->get('/survey/{token}/reopen', function (array $p) {
         'ticketId' => (int) $survey['ticket_id'],
         'appName'  => getSetting('app_name', 'OpenHelpDesk'),
     ]);
+});
+
+/**
+ * External CSAT webhook — lets a third-party survey tool post a response back
+ * so it lands on the ticket exactly like a built-in survey would. Tool-agnostic:
+ * the body is JSON {ticket_id|token, rating:1-5, comment?} and authenticity is
+ * proven by an HMAC-SHA256 of the raw body in the X-CSAT-Signature header, keyed
+ * with the shared secret configured under Settings → CSAT.
+ */
+$router->post('/api/csat/webhook', function () {
+    header('Content-Type: application/json');
+
+    $secret = trim((string) getSetting('csat_webhook_secret', ''));
+    if ($secret === '') {
+        http_response_code(503);
+        echo json_encode(['ok' => false, 'error' => 'CSAT webhook is not configured']);
+        return;
+    }
+
+    $raw = file_get_contents('php://input') ?: '';
+    $sig = $_SERVER['HTTP_X_CSAT_SIGNATURE'] ?? '';
+    $expected = hash_hmac('sha256', $raw, $secret);
+    if (!is_string($sig) || $sig === '' || !hash_equals($expected, $sig)) {
+        http_response_code(401);
+        echo json_encode(['ok' => false, 'error' => 'Invalid or missing signature']);
+        return;
+    }
+
+    $data = json_decode($raw, true);
+    if (!is_array($data)) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Body must be a JSON object']);
+        return;
+    }
+
+    $rating = (int) ($data['rating'] ?? 0);
+    if ($rating < 1 || $rating > 5) {
+        http_response_code(422);
+        echo json_encode(['ok' => false, 'error' => 'rating must be an integer from 1 to 5']);
+        return;
+    }
+
+    $db = Database::connect();
+
+    // Locate the survey by token (preferred — unguessable) or ticket_id.
+    $token = preg_replace('/[^a-f0-9]/', '', (string) ($data['token'] ?? ''));
+    if (strlen($token) === 64) {
+        $stmt = $db->prepare('SELECT * FROM csat_surveys WHERE token = ?');
+        $stmt->execute([$token]);
+    } else {
+        $ticketId = (int) ($data['ticket_id'] ?? 0);
+        if ($ticketId < 1) {
+            http_response_code(422);
+            echo json_encode(['ok' => false, 'error' => 'token or ticket_id is required']);
+            return;
+        }
+        $stmt = $db->prepare('SELECT * FROM csat_surveys WHERE ticket_id = ?');
+        $stmt->execute([$ticketId]);
+    }
+    $survey = $stmt->fetch();
+    if (!$survey) {
+        http_response_code(404);
+        echo json_encode(['ok' => false, 'error' => 'No survey found for that ticket']);
+        return;
+    }
+
+    $recorded = recordCsatResponse($db, $survey, $rating, (string) ($data['comment'] ?? ''));
+    echo json_encode(['ok' => true, 'status' => $recorded ? 'recorded' : 'already_recorded']);
 });
 
 /* ------------------------------------------------------------------

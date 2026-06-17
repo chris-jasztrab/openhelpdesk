@@ -4748,6 +4748,11 @@ $router->get('/admin/tickets/{id}', function (array $p) {
         $aiGroupClassification = $gcStmt->fetch() ?: null;
     }
 
+    // CSAT survey for this ticket (if one was sent), for the satisfaction panel.
+    $csatStmt = $db->prepare('SELECT * FROM csat_surveys WHERE ticket_id = ?');
+    $csatStmt->execute([$ticket['id']]);
+    $csat = $csatStmt->fetch() ?: null;
+
     render('admin/tickets/view', [
         'ticket' => $ticket, 'timeline' => $timeline, 'agents' => $agents,
         'assignableByGroup' => $assignableByGroup,
@@ -4759,6 +4764,7 @@ $router->get('/admin/tickets/{id}', function (array $p) {
         'aiClassification' => $aiClassification, 'aiSkillsForOverride' => $aiSkillsForOverride,
         'aiGroupClassification' => $aiGroupClassification,
         'aiEnabled' => getSetting('ai_enabled', '0') === '1',
+        'csat' => $csat,
     ]);
 });
 
@@ -10667,6 +10673,8 @@ $router->get('/admin/settings/csat', function () {
         'csat_external_url'          => getSetting('csat_external_url', ''),
         'csat_external_dashboard_url'=> getSetting('csat_external_dashboard_url', ''),
         'csat_show_reopen'           => getSetting('csat_show_reopen', '1'),
+        'csat_webhook_secret'        => getSetting('csat_webhook_secret', ''),
+        'csat_webhook_url'           => rtrim((string) env('APP_URL', ''), '/') . '/api/csat/webhook',
     ];
     render('admin/settings/csat', compact('settings'));
 });
@@ -10714,6 +10722,14 @@ $router->post('/admin/settings/csat', function () {
         flash('error', 'External dashboard URL must be a valid URL (e.g. https://...).');
         redirect('/admin/settings/csat');
         return;
+    }
+
+    // Webhook secret: mint one the first time External is used (so the endpoint
+    // is usable out of the box), or when the admin explicitly asks to rotate it.
+    $secret = getSetting('csat_webhook_secret', '');
+    if ($mode === 'external' && ($secret === '' || isset($_POST['csat_regen_secret']))) {
+        $secret = bin2hex(random_bytes(32));
+        setSetting('csat_webhook_secret', $secret);
     }
 
     setSetting('csat_enabled', $enabled);

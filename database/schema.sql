@@ -174,6 +174,7 @@ CREATE TABLE IF NOT EXISTS `csat_surveys` (
   `token` varchar(64) NOT NULL,
   `rating` tinyint(3) unsigned DEFAULT NULL,
   `comment` text DEFAULT NULL,
+  `survey_url` varchar(2048) DEFAULT NULL,
   `sent_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `responded_at` timestamp NULL DEFAULT NULL,
   `reopened_at` timestamp NULL DEFAULT NULL,

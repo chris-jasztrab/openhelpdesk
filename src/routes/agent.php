@@ -1295,7 +1295,12 @@ $router->get('/agent/tickets/{id}', function (array $p) {
     // that returns to /agent/floor/tickets/{id}. Picked up below in view.php.
     $fromFloor = ($_GET['from'] ?? '') === 'floor';
 
-    render('agent/tickets/view', ['ticket' => $ticket, 'timeline' => $timeline, 'agents' => $agents, 'assignableByGroup' => $assignableByGroup, 'priorities' => $priorities, 'ticketTypes' => $ticketTypes, 'attachments' => $attachments, 'ccUsers' => $ccUsers, 'groups' => $groups, 'customFields' => $customFields, 'fieldValues' => $fieldValues, 'fieldOptions' => $fieldOptions, 'isWatching' => $isWatching, 'isConfidential' => $isConfidential, 'escalationHistory' => $escalationHistory, 'hasEscalationPath' => $hasEscalationPath, 'nextEscalationStep' => $nextEscalationStep, 'fromFloor' => $fromFloor, 'embedMode' => $fromFloor]);
+    // CSAT survey for this ticket (if one was sent), for the satisfaction panel.
+    $csatStmt = $db->prepare('SELECT * FROM csat_surveys WHERE ticket_id = ?');
+    $csatStmt->execute([$ticket['id']]);
+    $csat = $csatStmt->fetch() ?: null;
+
+    render('agent/tickets/view', ['ticket' => $ticket, 'timeline' => $timeline, 'agents' => $agents, 'assignableByGroup' => $assignableByGroup, 'priorities' => $priorities, 'ticketTypes' => $ticketTypes, 'attachments' => $attachments, 'ccUsers' => $ccUsers, 'groups' => $groups, 'customFields' => $customFields, 'fieldValues' => $fieldValues, 'fieldOptions' => $fieldOptions, 'isWatching' => $isWatching, 'isConfidential' => $isConfidential, 'escalationHistory' => $escalationHistory, 'hasEscalationPath' => $hasEscalationPath, 'nextEscalationStep' => $nextEscalationStep, 'fromFloor' => $fromFloor, 'embedMode' => $fromFloor, 'csat' => $csat]);
 });
 
 /* ==================================================================

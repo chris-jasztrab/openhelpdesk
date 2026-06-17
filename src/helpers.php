@@ -4543,8 +4543,6 @@ function sendCsatSurvey(\PDO $db, int $ticketId): void
     }
 
     $token = bin2hex(random_bytes(32));
-    $db->prepare('INSERT INTO csat_surveys (ticket_id, user_id, token) VALUES (?, ?, ?)')
-       ->execute([$ticketId, (int) $row['user_id'], $token]);
 
     $appUrl     = env('APP_URL', 'http://localhost:8000');
     $brandColor = getSetting('branding_primary_color', '#4f46e5');
@@ -4564,6 +4562,11 @@ function sendCsatSurvey(\PDO $db, int $ticketId): void
         $surveyUrl = $appUrl . '/survey/' . $token;
     }
     $reopenUrl = $showReopen ? $appUrl . '/survey/' . $token . '/reopen' : '';
+
+    // Record the survey, storing the exact link sent so the ticket view can
+    // deep-link to it (public page for built-in, third-party URL for external).
+    $db->prepare('INSERT INTO csat_surveys (ticket_id, user_id, token, survey_url) VALUES (?, ?, ?, ?)')
+       ->execute([$ticketId, (int) $row['user_id'], $token, $surveyUrl]);
 
     $tpl = getEmailTpl('csat_survey', [
         'ticket_id'  => $ticketId,
@@ -4607,6 +4610,45 @@ function csatSubstitutePlaceholders(string $url, array $values): string
         $map['{' . $key . '}'] = rawurlencode((string) $value);
     }
     return strtr($url, $map);
+}
+
+/**
+ * Record a CSAT response against a survey row and surface it on the ticket
+ * timeline. Shared by the built-in survey form and the external webhook so
+ * both paths behave identically. First response wins — repeats are ignored.
+ *
+ * Returns true if this call recorded the response, false if one already existed.
+ */
+function recordCsatResponse(\PDO $db, array $survey, int $rating, string $comment = ''): bool
+{
+    if ($rating < 1 || $rating > 5) {
+        return false;
+    }
+    if (($survey['responded_at'] ?? null) !== null) {
+        return false; // already answered — idempotent
+    }
+
+    $comment = trim($comment);
+    if (mb_strlen($comment) > 2000) {
+        $comment = mb_substr($comment, 0, 2000);
+    }
+
+    $db->prepare('UPDATE csat_surveys SET rating = ?, comment = ?, responded_at = NOW() WHERE id = ?')
+       ->execute([$rating, $comment !== '' ? $comment : null, (int) $survey['id']]);
+
+    // Surface the rating inline on the ticket as an internal note so agents see
+    // it in the conversation, not just the CSAT panel.
+    $db->prepare(
+        'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal)
+         VALUES (?, NULL, ?, ?, 1)'
+    )->execute([
+        (int) $survey['ticket_id'],
+        'csat_received',
+        'Customer rated their experience ' . $rating . '/5 via the satisfaction survey'
+            . ($comment !== '' ? ' — “' . $comment . '”' : ''),
+    ]);
+
+    return true;
 }
 
 /* ── Name helpers ─────────────────────────────────────────────── */
