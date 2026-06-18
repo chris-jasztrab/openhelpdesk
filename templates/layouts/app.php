@@ -38,12 +38,6 @@
         /* Same idea for "all system notes". AI notes carry the
            .ld-timeline-system class too, so this hides them as well. */
         .system-notes-hidden .ld-timeline-system { display: none !important; }
-        /* "Oldest first" timeline order. The list is a flex column, so reversing
-           it flips the entries, the hidden "older updates" group and the expand
-           button together — keeping the collapser and "Go to solution" anchor
-           working without re-querying the database. Toggled live by clicking the
-           Timeline heading. */
-        .timeline-reversed { flex-direction: column-reverse !important; }
         body { background-color: #f1f5f9; overflow-x: hidden; }
         .navbar { background: linear-gradient(135deg, <?= e(getSetting('branding_navbar_start', '#1e1b4b')) ?> 0%, <?= e(getSetting('branding_navbar_end', '#312e81')) ?> 100%) !important; }
         /* Header sits above all page-level sticky content (Bootstrap .sticky-top = 1020,

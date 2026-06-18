@@ -365,10 +365,17 @@ if ($solutionTimelineId > 0) {
                 <?php if (empty($timeline)): ?>
                 <div class="text-center py-4 text-muted">No timeline entries.</div>
                 <?php else:
-                $tlHidden = max(0, count($timeline) - 10);
+                // Render in the user's chosen direction. SQL gives newest-first;
+                // reverse for oldest-first. The collapser always keeps the first
+                // 10 (in reading order) visible and tucks the overflow — and its
+                // toggle — at the bottom, so the very oldest entry sits at the top
+                // in oldest-first mode instead of hiding behind a "show older" link.
+                $display    = $timelineSort === 'asc' ? array_values(array_reverse($timeline)) : $timeline;
+                $tlHidden   = max(0, count($display) - 10);
+                $tlMoreWord = $timelineSort === 'asc' ? 'newer' : 'older';
                 ?>
-                <div class="list-group list-group-flush<?= $timelineSort === 'asc' ? ' timeline-reversed' : '' ?>" id="timelineList">
-                    <?php foreach ($timeline as $tlIdx => $entry):
+                <div class="list-group list-group-flush" id="timelineList">
+                    <?php foreach ($display as $tlIdx => $entry):
                         $isSolution = $solutionTimelineId > 0 && (int) $entry['id'] === $solutionTimelineId;
                         // Never let the marked solution be hidden inside the
                         // older-updates collapser — the requester needs to be
@@ -409,7 +416,7 @@ if ($solutionTimelineId > 0) {
                     <div class="list-group-item px-3 py-2 text-center bg-light border-top-0" id="timeline-expand-row">
                         <button type="button" class="btn btn-link btn-sm text-muted text-decoration-none" id="timeline-expand-btn">
                             <i class="bi bi-chevron-up me-1" id="timeline-expand-icon"></i>
-                            <span id="timeline-expand-label">Show <?= $tlHidden ?> older update<?= $tlHidden !== 1 ? 's' : '' ?></span>
+                            <span id="timeline-expand-label">Show <?= $tlHidden ?> <?= $tlMoreWord ?> update<?= $tlHidden !== 1 ? 's' : '' ?></span>
                         </button>
                     </div>
                     <script>
@@ -419,12 +426,13 @@ if ($solutionTimelineId > 0) {
                         var label    = document.getElementById('timeline-expand-label');
                         var items    = document.querySelectorAll('.timeline-older-item');
                         var n        = <?= $tlHidden ?>;
+                        var word     = <?= json_encode($tlMoreWord) ?>;
                         var expanded = false;
                         btn.addEventListener('click', function() {
                             expanded = !expanded;
                             items.forEach(function(el) { el.style.display = expanded ? '' : 'none'; });
                             icon.className    = expanded ? 'bi bi-chevron-down me-1' : 'bi bi-chevron-up me-1';
-                            label.textContent = expanded ? 'Show fewer updates' : 'Show ' + n + ' older update' + (n !== 1 ? 's' : '');
+                            label.textContent = expanded ? 'Show fewer updates' : 'Show ' + n + ' ' + word + ' update' + (n !== 1 ? 's' : '');
                         });
                     })();
                     </script>
@@ -435,26 +443,23 @@ if ($solutionTimelineId > 0) {
         </div>
 
         <script>
-        // Clicking the "Timeline" heading flips the sort order live (a CSS class
-        // reverses the flex column — no reload) and persists the choice as the
-        // user's default timeline order.
+        // Clicking the "Timeline" heading flips the sort order. We persist the
+        // new default and reload so the server re-renders in the right order with
+        // the collapser tucked at the bottom — the server owns ordering, so the
+        // oldest entry truly sits at the top in oldest-first mode.
         (function () {
-            var btn  = document.getElementById('timelineSortToggle');
-            var list = document.getElementById('timelineList');
-            var icon = document.getElementById('timelineSortIcon');
-            if (!btn || !list) return;
+            var btn = document.getElementById('timelineSortToggle');
+            if (!btn) return;
             var csrf = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
+            var next = <?= json_encode($timelineSort === 'asc' ? 'desc' : 'asc') ?>;
             btn.addEventListener('click', function () {
-                var asc = list.classList.toggle('timeline-reversed');
-                if (icon) icon.className = 'bi ' + (asc ? 'bi-sort-up' : 'bi-sort-down') + ' ms-2 small';
-                btn.title = 'Sort: ' + (asc
-                    ? 'oldest first — click to show newest first'
-                    : 'newest first — click to show oldest first');
+                btn.disabled = true;
                 fetch('/profile/setting', {
                     method:  'POST',
                     headers: {'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest'},
-                    body:    '_token=' + encodeURIComponent(csrf) + '&field=timeline_sort&value=' + (asc ? 'asc' : 'desc'),
-                }).catch(function () {});
+                    body:    '_token=' + encodeURIComponent(csrf) + '&field=timeline_sort&value=' + next,
+                }).then(function () { location.reload(); })
+                  .catch(function () { location.reload(); });
             });
         })();
         </script>

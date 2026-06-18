@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.99.1 &mdash; 2026-06-18
+
+### Fixed
+- **Oldest-first timeline now truly shows the oldest entry at the top.** The first cut reversed the timeline purely with CSS, which left the "show older updates" collapser — and the hidden entries — pinned to the *top* of the list, so the genuinely oldest update stayed tucked behind a link. Ordering and collapsing are now done server-side: in either direction the entries you read first are shown at the top and the collapsed overflow (plus its toggle) sits at the bottom, labelled "Show N older updates" (newest-first) or "Show N newer updates" (oldest-first). Clicking the Timeline heading now persists the choice and reloads so the server renders the correct order.
+
+---
+
 ## 2.99.0 &mdash; 2026-06-18
 
 ### Added
