@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.104.2 &mdash; 2026-06-18
+
+### Fixed
+- **The ticket-list column fix (2.104.1) now actually takes effect for everyone.** The resizable-columns feature saves per-page column widths in the browser's `localStorage` and restores them on every load *in preference to* the freshly-computed layout — so anyone who had ever dragged a ticket-list column kept getting their old widths back, with a too-wide Type column squeezing Subject to a sliver and forcing a horizontal scrollbar (the 2.104.1 sizing pass was being overridden before it could apply). The column-width storage key has been bumped to `v2`, which abandons those stale pre-fix widths one time so the new Type→Group→Location priority-fit becomes the default. Column widths you set from now on still persist as before. (This one-time reset clears saved widths on every resizable table site-wide, not just the ticket list.)
+
+---
+
 ## 2.104.1 &mdash; 2026-06-18
 
 ### Fixed

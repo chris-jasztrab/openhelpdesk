@@ -49,8 +49,11 @@
 (function () {
     "use strict";
 
-    var MIN_WIDTH  = 40;       // a column can't be dragged narrower than this
-    var KEY_PREFIX = "ldcw:";  // localStorage namespace ("column widths")
+    var MIN_WIDTH  = 40;        // a column can't be dragged narrower than this
+    // localStorage namespace ("column widths"). Bumped to v2 to abandon widths
+    // saved before the ticket-list priority-fit (v2.104.x): stale wide Type/Group
+    // widths were overriding the new sizing and crushing Subject into a sliver.
+    var KEY_PREFIX = "ldcw2:";
 
     // One storage bucket per logical page. Numeric path segments (ticket ids,
     // user ids, ...) collapse to ":id" so every detail page shares its widths.
