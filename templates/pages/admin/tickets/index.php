@@ -538,14 +538,16 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                             </span>
                             <?php else: ?>
                             <?php $presence = $ticketPresence[$t['id']] ?? null; ?>
-                            <a href="/admin/tickets/<?= $t['id'] ?>" class="text-decoration-none fw-semibold <?= $presence ? '' : 'text-dark' ?>"<?= $presence ? ' style="color:#b45309;"' : '' ?>>
-                                <?= e($t['subject']) ?>
-                            </a>
-                            <?php if ($presence): ?>
-                            <span class="d-block small fst-italic" style="color:#b45309;" title="Another staff member currently has this ticket open">
-                                <i class="bi <?= $presence['replying'] ? 'bi-pencil-fill' : 'bi-eye-fill' ?> me-1"></i><?= $presence['replying'] ? 'Being replied to by ' : 'Opened by ' ?><?= e($presence['name']) ?>
+                            <span class="ld-subject-cell" data-ticket-id="<?= (int) $t['id'] ?>">
+                                <a href="/admin/tickets/<?= $t['id'] ?>" class="ld-subject-link text-decoration-none fw-semibold text-dark"<?= $presence ? ' style="color:#b45309;"' : '' ?>>
+                                    <?= e($t['subject']) ?>
+                                </a>
+                                <span class="ld-presence-hint d-block small fst-italic" style="color:#b45309;<?= $presence ? '' : 'display:none;' ?>" title="Another staff member currently has this ticket open">
+                                    <?php if ($presence): ?>
+                                    <i class="bi <?= $presence['replying'] ? 'bi-pencil-fill' : 'bi-eye-fill' ?> me-1"></i><?= $presence['replying'] ? 'Being replied to by ' : 'Opened by ' ?><?= e($presence['name']) ?>
+                                    <?php endif; ?>
+                                </span>
                             </span>
-                            <?php endif; ?>
                             <?php endif; ?>
                         </td>
                         <?php if (in_array('status', $visibleColumns)): ?>

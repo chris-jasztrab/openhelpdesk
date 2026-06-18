@@ -973,6 +973,49 @@ $router->post('/api/tickets/{id}/presence/leave', function (array $p) {
     exit;
 });
 
+// Batch presence for a ticket-list page — drives the live "Opened by X" subject
+// hint so it appears/clears as agents enter and leave tickets, no refresh needed.
+// Returns { "<ticketId>": {name, replying}, ... } for the requested ids that
+// (a) the caller is allowed to see and (b) another staff member currently has
+// open. Ids the caller can't see are silently dropped.
+$router->get('/api/tickets/presence', function () {
+    Auth::requireAuth();
+    if (!Auth::isStaff()) {
+        http_response_code(403);
+        header('Content-Type: application/json');
+        echo json_encode(['error' => 'Forbidden']);
+        exit;
+    }
+
+    $ids = array_values(array_unique(array_filter(array_map(
+        'intval',
+        explode(',', (string) ($_GET['ids'] ?? ''))
+    ))));
+    $ids = array_slice($ids, 0, 500); // bound the query — list pages cap at 200 rows
+    header('Content-Type: application/json');
+    if (empty($ids)) {
+        echo json_encode((object) []);
+        exit;
+    }
+
+    $db = Database::connect();
+
+    // Restrict to ids the caller can actually see (same predicate the list uses),
+    // so this can't be used to probe presence on out-of-scope tickets.
+    $vis = ticketStaffVisibilitySql($db, (int) Auth::id(), Auth::role(), 't');
+    $ph  = implode(',', array_fill(0, count($ids), '?'));
+    $vStmt = $db->prepare(
+        "SELECT t.id FROM tickets t WHERE t.id IN ($ph) AND ({$vis['sql']})"
+    );
+    $vStmt->execute(array_merge($ids, $vis['params']));
+    $visibleIds = array_map('intval', $vStmt->fetchAll(PDO::FETCH_COLUMN));
+
+    $map = ticketListPresenceMap($db, $visibleIds, (int) Auth::id());
+    // Force an object even when empty so the client always gets a JSON map.
+    echo json_encode($map ?: (object) []);
+    exit;
+});
+
 /* ------------------------------------------------------------------
  * Global User Presence (Logged-in / app-open tracking)
  * ------------------------------------------------------------------

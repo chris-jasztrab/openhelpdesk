@@ -11,6 +11,14 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.103.0 &mdash; 2026-06-18
+
+### Added
+- **The ticket list's "Opened by X" hint is now live.** It used to be a snapshot from page load, so it kept showing an agent on a ticket they'd already left (and missed anyone who opened one after the page loaded). The agent and admin ticket lists now poll every ~10 seconds and update each row on their own: the amber subject + *"Opened by / Being replied to by X"* hint appears when someone enters a ticket and clears when they leave — no refresh. It keeps working after an ajax filter/sort/page change, since the visible rows are re-scanned each tick.
+- New batch endpoint `GET /api/tickets/presence?ids=…` backs it: it returns presence only for the requested tickets the caller is allowed to see (filtered by the same visibility predicate the list uses) and that another staff member currently has open. Ids out of the caller's scope are silently dropped.
+
+---
+
 ## 2.102.0 &mdash; 2026-06-18
 
 ### Added

@@ -208,4 +208,49 @@ $ticketListScope = $ticketListScope ?? 'agent';
         refresh(window.location.pathname + window.location.search, { push: false, syncForm: true });
     });
 })();
+
+// Live "Opened by X" subject hints — poll presence for the visible tickets so the
+// hint appears and clears as agents enter and leave tickets, no refresh needed.
+// The DOM is re-scanned each tick so it keeps working after an ajax filter/sort/
+// page swap replaces the rows.
+(function () {
+    var POLL_MS = 10000;
+
+    function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+    function applyOne(cell, p) {
+        var link = cell.querySelector('.ld-subject-link');
+        var hint = cell.querySelector('.ld-presence-hint');
+        if (p) {
+            if (link) link.style.color = '#b45309';
+            if (hint) {
+                hint.innerHTML = '<i class="bi ' + (p.replying ? 'bi-pencil-fill' : 'bi-eye-fill') + ' me-1"></i>' +
+                                 (p.replying ? 'Being replied to by ' : 'Opened by ') + esc(p.name);
+                hint.style.display = '';
+            }
+        } else {
+            if (link) link.style.color = '';           // revert to the default text-dark
+            if (hint) { hint.style.display = 'none'; hint.innerHTML = ''; }
+        }
+    }
+
+    function poll() {
+        var cells = document.querySelectorAll('.ld-subject-cell');
+        if (!cells.length) return;
+        var ids = [];
+        cells.forEach(function (c) { if (c.dataset.ticketId) ids.push(c.dataset.ticketId); });
+        fetch('/api/tickets/presence?ids=' + encodeURIComponent(ids.join(',')), {
+            headers: { 'X-Requested-With': 'fetch' }, credentials: 'same-origin'
+        })
+            .then(function (r) { return r.json(); })
+            .then(function (map) {
+                document.querySelectorAll('.ld-subject-cell').forEach(function (cell) {
+                    applyOne(cell, map[cell.dataset.ticketId]);
+                });
+            })
+            .catch(function () {});
+    }
+
+    setInterval(poll, POLL_MS);
+})();
 </script>
