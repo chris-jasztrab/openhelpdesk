@@ -537,9 +537,15 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                                 <i class="bi bi-shield-lock me-1"></i>[Confidential]
                             </span>
                             <?php else: ?>
-                            <a href="/admin/tickets/<?= $t['id'] ?>" class="text-decoration-none fw-semibold text-dark">
+                            <?php $presence = $ticketPresence[$t['id']] ?? null; ?>
+                            <a href="/admin/tickets/<?= $t['id'] ?>" class="text-decoration-none fw-semibold <?= $presence ? '' : 'text-dark' ?>"<?= $presence ? ' style="color:#b45309;"' : '' ?>>
                                 <?= e($t['subject']) ?>
                             </a>
+                            <?php if ($presence): ?>
+                            <span class="d-block small fst-italic" style="color:#b45309;" title="Another staff member currently has this ticket open">
+                                <i class="bi <?= $presence['replying'] ? 'bi-pencil-fill' : 'bi-eye-fill' ?> me-1"></i><?= $presence['replying'] ? 'Being replied to by ' : 'Opened by ' ?><?= e($presence['name']) ?>
+                            </span>
+                            <?php endif; ?>
                             <?php endif; ?>
                         </td>
                         <?php if (in_array('status', $visibleColumns)): ?>

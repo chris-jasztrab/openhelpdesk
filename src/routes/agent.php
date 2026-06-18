@@ -339,6 +339,10 @@ $router->get('/agent/tickets', function () {
     $stmt->execute($params);
     $tickets = $stmt->fetchAll();
 
+    // Who else currently has these tickets open (snapshot at render time) — drives
+    // the amber "Opened by X" subject hint in the list.
+    $ticketPresence = ticketListPresenceMap($db, array_column($tickets, 'id'), (int) Auth::id());
+
     // Load filter dropdown options
     $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
     $types      = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
@@ -406,6 +410,7 @@ $router->get('/agent/tickets', function () {
 
     render('agent/tickets/index', [
         'tickets'            => $tickets,
+        'ticketPresence'     => $ticketPresence,
         'priorities'         => $priorities,
         'types'              => $types,
         'locations'          => $locations,

@@ -104,6 +104,8 @@ if ($solutionTimelineId > 0) {
             <?php endif; ?>
             <span class="text-muted">Ticket #<?= $ticket['id'] ?></span>
         </div>
+        <!-- Live concurrent-viewer indicator (replaces the old "Ticket Already Open" popup) -->
+        <div id="presenceIndicator" class="small mt-2 d-flex align-items-center gap-1" style="display:none !important;" role="status" aria-live="polite"></div>
     </div>
     <div class="d-flex gap-2">
         <?php if (empty($isConfidential)): ?>
@@ -1064,17 +1066,23 @@ if ($solutionTimelineId > 0) {
 </div>
 <?php endif; ?>
 
-<!-- Presence Warning Modal -->
-<div class="modal fade" id="presenceModal" tabindex="-1" aria-labelledby="presenceModalLabel" aria-hidden="true" data-bs-backdrop="static">
+<!-- Reply Collision Modal — shown when someone else replied while you were drafting -->
+<div class="modal fade" id="collisionModal" tabindex="-1" aria-labelledby="collisionModalLabel" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header bg-warning-subtle">
-                <h5 class="modal-title" id="presenceModalLabel"><i class="bi bi-people-fill me-2"></i>Ticket Already Open</h5>
+                <h5 class="modal-title" id="collisionModalLabel"><i class="bi bi-exclamation-triangle-fill me-2"></i>Reply collision</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body" id="presenceModalBody"></div>
+            <div class="modal-body">
+                <p class="mb-2" id="collisionIntro"></p>
+                <blockquote class="border-start border-3 border-warning ps-3 mb-3 text-muted small fst-italic" id="collisionExcerpt"></blockquote>
+                <p class="mb-0 small text-muted">Your draft is safe — nothing has been sent yet.</p>
+            </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Dismiss</button>
+                <a href="#" class="btn btn-outline-secondary me-auto" id="collisionReviewBtn"><i class="bi bi-arrow-down-circle me-1"></i>Review their reply</a>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" id="collisionPostAnywayBtn"><i class="bi bi-send me-1"></i>Post anyway</button>
             </div>
         </div>
     </div>
@@ -1425,14 +1433,26 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
 })();
 <?php endif; ?>
 
-// Ticket presence — concurrent viewer warning
+// Ticket presence — concurrent viewer indicator + reply-collision baseline
+<?php
+    // Baseline for reply-collision detection: the newest public reply already on
+    // the page. If the live poll later reports a newer public reply by someone
+    // else, another agent replied while this one was drafting.
+    $baselinePublicCommentId = 0;
+    foreach (($timeline ?? []) as $__tl) {
+        if (($__tl['action'] ?? '') === 'comment' && empty($__tl['is_internal'])) {
+            $baselinePublicCommentId = max($baselinePublicCommentId, (int) $__tl['id']);
+        }
+    }
+?>
 (function() {
-    var ticketId = <?= (int) $ticket['id'] ?>;
-    var pingUrl  = '/api/tickets/' + ticketId + '/presence';
-    var leaveUrl = '/api/tickets/' + ticketId + '/presence/leave';
-    var modal    = null;
-    var knownViewerIds = new Set();
-    var initialCheck   = true;
+    var ticketId  = <?= (int) $ticket['id'] ?>;
+    var pingUrl   = '/api/tickets/' + ticketId + '/presence';
+    var leaveUrl  = '/api/tickets/' + ticketId + '/presence/leave';
+    var indicator = document.getElementById('presenceIndicator');
+    var currentActivity   = 'viewing';
+    var myUserId          = <?= (int) Auth::id() ?>;
+    var baselineCommentId = <?= (int) $baselinePublicCommentId ?>;
 
     // Stale-view detection: the ticket's last-modified timestamp at page render.
     // The presence poll returns the live value; if it advances past this, the
@@ -1462,14 +1482,40 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
 
     function escHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
-    function getModal() {
-        if (!modal) modal = new bootstrap.Modal(document.getElementById('presenceModal'));
-        return modal;
+    // Heartbeat — also reports what we're doing so other viewers see "replying".
+    function ping() {
+        fetch(pingUrl, {
+            method:  'POST',
+            headers: {'X-CSRF-Token': csrfToken, 'Content-Type': 'application/x-www-form-urlencoded'},
+            body:    'activity=' + currentActivity
+        }).catch(function(){});
     }
 
-    function ping() { fetch(pingUrl, {method: 'POST', headers: {'X-CSRF-Token': csrfToken}}).catch(function(){}); }
+    // In-header indicator (replaces the old "Ticket Already Open" popup). A
+    // 'replying' viewer always wins over a plain viewer so the line is unambiguous.
+    function renderIndicator(viewers) {
+        if (!indicator) return;
+        if (!viewers.length) {
+            indicator.style.setProperty('display', 'none', 'important');
+            indicator.innerHTML = '';
+            return;
+        }
+        var replying = viewers.filter(function(v) { return v.activity === 'replying'; });
+        var show     = replying.length ? replying : viewers;
+        var names    = show.map(function(v) { return '<strong>' + escHtml(v.first_name + ' ' + v.last_name) + '</strong>'; });
+        var nameStr  = names.length === 1
+            ? names[0]
+            : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+        var verb = replying.length
+            ? (names.length === 1 ? ' is replying to this ticket' : ' are replying to this ticket')
+            : (names.length === 1 ? ' is viewing this ticket'  : ' are viewing this ticket');
+        indicator.style.color = replying.length ? '#b45309' : '#6c757d';
+        indicator.innerHTML = '<i class="bi ' + (replying.length ? 'bi-pencil-fill' : 'bi-eye-fill') + '"></i>' +
+                              '<span>' + nameStr + verb + '</span>';
+        indicator.style.setProperty('display', 'flex', 'important');
+    }
 
-    function checkPresence() {
+    function poll() {
         fetch(pingUrl)
             .then(function(r) { return r.json(); })
             .then(function(data) {
@@ -1478,40 +1524,42 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
                 if (data.updated_at && loadedUpdatedAt && data.updated_at > loadedUpdatedAt) {
                     showStaleBanner();
                 }
-
-                var viewers = data.viewers || [];
-                var hasNew = initialCheck
-                    ? viewers.length > 0
-                    : viewers.some(function(v) { return !knownViewerIds.has(v.id); });
-
-                if (hasNew && viewers.length > 0) {
-                    var names = viewers.map(function(v) {
-                        var role = v.role.charAt(0).toUpperCase() + v.role.slice(1);
-                        return '<strong>' + escHtml(v.first_name + ' ' + v.last_name) + '</strong> (' + role + ')';
-                    }).join(', ');
-                    var intro = initialCheck
-                        ? 'This ticket is currently also open by:'
-                        : 'This ticket was just opened up by:';
-                    document.getElementById('presenceModalBody').innerHTML =
-                        '<p class="mb-1">' + intro + '</p>' +
-                        '<p class="mb-0">' + names + '</p>' +
-                        '<p class="mt-3 mb-0 text-muted small">Their changes will not appear on your screen until you refresh.</p>';
-                    getModal().show();
-                }
-
-                knownViewerIds = new Set(viewers.map(function(v) { return v.id; }));
-                initialCheck = false;
+                renderIndicator(data.viewers || []);
             })
             .catch(function(){});
     }
 
     ping();
-    checkPresence();
-    setInterval(function() { ping(); checkPresence(); }, 20000);
+    poll();
+    setInterval(function() { ping(); poll(); }, 20000);
 
     window.addEventListener('beforeunload', function() {
         navigator.sendBeacon(leaveUrl);
     });
+
+    // Shared interface for the reply panel + the reply-collision guard.
+    window.ticketPresence = {
+        // Report compose state so other viewers' headers flip to "is replying".
+        setReplying: function(isReplying) {
+            var next = isReplying ? 'replying' : 'viewing';
+            if (next === currentActivity) return;
+            currentActivity = next;
+            ping(); // surface the change now, don't wait for the 20s tick
+        },
+        // Fresh check at submit time. Resolves with the colliding reply
+        // {id, author, created_at, excerpt} if another agent posted a public reply
+        // after our baseline, otherwise null. Network errors resolve null so a
+        // hiccup never blocks a legitimate reply.
+        checkCollision: function(onResult) {
+            fetch(pingUrl)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    var c = data.last_public_comment;
+                    onResult((c && c.id > baselineCommentId && c.user_id !== myUserId) ? c : null);
+                })
+                .catch(function() { onResult(null); });
+        }
+    };
 })();
 
 // Reply / Forward / Note panel
@@ -1575,6 +1623,9 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
         [btnReply, btnForward, btnNote].forEach(function(b) { if (b) b.classList.remove('active'); });
         var activeBtn = ({ reply: btnReply, forward: btnForward, note: btnNote })[mode];
         if (activeBtn) activeBtn.classList.add('active');
+        // Tell other viewers we're composing a reply (public reply only — a note
+        // is internal and a forward isn't a reply to the requester).
+        if (window.ticketPresence) window.ticketPresence.setReplying(mode === 'reply');
     }
 
     function closePanel() {
@@ -1582,6 +1633,7 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
         currentMode = null;
         statusAfterEl.value = '';
         [btnReply, btnForward, btnNote].forEach(function(b) { if (b) b.classList.remove('active'); });
+        if (window.ticketPresence) window.ticketPresence.setReplying(false);
     }
 
     btnReply.addEventListener('click',   function() { openMode('reply'); });
@@ -1863,7 +1915,55 @@ ClassicEditor.create(document.querySelector('#replyEditor'), {
             return;
         }
         document.getElementById('replyMessageHidden').value = data;
+
+        // Reply-collision guard — public replies only, once per confirmed submit.
+        // If another agent posted a reply while this one was drafting, hold the
+        // send and surface it; the draft stays untouched in the editor.
+        var formEl = this;
+        if (formEl.dataset.mode === 'reply' && !formEl._collisionAck && window.ticketPresence) {
+            e.preventDefault();
+            window.ticketPresence.checkCollision(function(collision) {
+                if (!collision) { formEl._collisionAck = true; formEl.requestSubmit(); return; }
+                showCollisionModal(collision, formEl);
+            });
+        }
     });
+
+    // Reply-collision modal wiring.
+    function showCollisionModal(collision, formEl) {
+        var modalEl  = document.getElementById('collisionModal');
+        var intro    = document.getElementById('collisionIntro');
+        var excerpt  = document.getElementById('collisionExcerpt');
+        var review   = document.getElementById('collisionReviewBtn');
+        var postBtn  = document.getElementById('collisionPostAnywayBtn');
+        function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+        var when = collision.created_at ? new Date(collision.created_at.replace(' ', 'T')) : null;
+        var ago  = when ? timeAgo(when) : 'just now';
+        intro.innerHTML = '<strong>' + esc(collision.author) + '</strong> replied while you were drafting (' + esc(ago) + '):';
+        excerpt.textContent = collision.excerpt || '(no preview available)';
+        // Open the up-to-date ticket in a new tab so the draft here is preserved.
+        review.href = '/admin/tickets/<?= (int) $ticket['id'] ?>';
+        review.target = '_blank';
+        review.rel = 'noopener';
+
+        var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        postBtn.onclick = function() {
+            formEl._collisionAck = true;
+            modal.hide();
+            formEl.requestSubmit();
+        };
+        modal.show();
+    }
+
+    function timeAgo(date) {
+        var secs = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+        if (secs < 60)   return secs <= 5 ? 'just now' : secs + ' seconds ago';
+        var mins = Math.floor(secs / 60);
+        if (mins < 60)   return mins + (mins === 1 ? ' minute ago' : ' minutes ago');
+        var hrs = Math.floor(mins / 60);
+        return hrs + (hrs === 1 ? ' hour ago' : ' hours ago');
+    }
 
     // @mention autocomplete
     var dropdown = document.getElementById('mentionDropdown');

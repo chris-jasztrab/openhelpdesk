@@ -852,10 +852,14 @@ $router->post('/api/tickets/{id}/presence', function (array $p) {
     }
     $db = Database::connect();
     _apiRequireTicketAccess($db, (int) $p['id']);
+    // The client reports what it's doing so other viewers see "X is replying"
+    // rather than just "X is viewing". Anything other than 'replying' is
+    // normalised to 'viewing' so a stray value can't pollute the indicator.
+    $activity = (($_POST['activity'] ?? '') === 'replying') ? 'replying' : 'viewing';
     $db->prepare(
-        'INSERT INTO ticket_presence (ticket_id, user_id, last_seen) VALUES (?, ?, NOW())
-         ON DUPLICATE KEY UPDATE last_seen = NOW()'
-    )->execute([(int) $p['id'], Auth::id()]);
+        'INSERT INTO ticket_presence (ticket_id, user_id, last_seen, activity) VALUES (?, ?, NOW(), ?)
+         ON DUPLICATE KEY UPDATE last_seen = NOW(), activity = VALUES(activity)'
+    )->execute([(int) $p['id'], Auth::id(), $activity]);
     header('Content-Type: application/json');
     echo json_encode(['ok' => true]);
     exit;
@@ -882,9 +886,11 @@ $router->get('/api/tickets/{id}/presence', function (array $p) {
         )->execute();
     }
 
-    // Return other current viewers (excluding self), ignoring stale rows.
+    // Return other current viewers (excluding self), ignoring stale rows. The
+    // `activity` drives the in-header indicator: 'replying' viewers are shown
+    // as "X is replying", everyone else as "X is viewing".
     $stmt = $db->prepare(
-        'SELECT u.id, u.first_name, u.last_name, u.role
+        'SELECT u.id, u.first_name, u.last_name, u.role, tp.activity
          FROM ticket_presence tp
          JOIN users u ON u.id = tp.user_id
          WHERE tp.ticket_id = ?
@@ -899,8 +905,41 @@ $router->get('/api/tickets/{id}/presence', function (array $p) {
     $uStmt->execute([(int) $p['id']]);
     $updatedAt = $uStmt->fetchColumn() ?: null;
 
+    // Latest public reply (not an internal note), so the detail page can detect a
+    // reply collision: if this id is newer than the one the agent loaded with —
+    // and authored by someone else — another agent replied while they drafted.
+    $cStmt = $db->prepare(
+        "SELECT tl.id, tl.user_id, tl.details, tl.created_at,
+                CONCAT(u.first_name, ' ', u.last_name) AS author
+         FROM ticket_timeline tl
+         JOIN users u ON u.id = tl.user_id
+         WHERE tl.ticket_id = ? AND tl.action = 'comment' AND tl.is_internal = 0
+         ORDER BY tl.id DESC LIMIT 1"
+    );
+    $cStmt->execute([(int) $p['id']]);
+    $lastComment = $cStmt->fetch();
+    $lastPublicComment = null;
+    if ($lastComment) {
+        // Plain-text excerpt for the collision modal — never leak raw HTML.
+        $excerpt = trim(preg_replace('/\s+/', ' ', strip_tags((string) $lastComment['details'])));
+        if (mb_strlen($excerpt) > 200) {
+            $excerpt = mb_substr($excerpt, 0, 200) . '…';
+        }
+        $lastPublicComment = [
+            'id'         => (int) $lastComment['id'],
+            'user_id'    => (int) $lastComment['user_id'],
+            'author'     => $lastComment['author'],
+            'created_at' => $lastComment['created_at'],
+            'excerpt'    => $excerpt,
+        ];
+    }
+
     header('Content-Type: application/json');
-    echo json_encode(['viewers' => $stmt->fetchAll(), 'updated_at' => $updatedAt]);
+    echo json_encode([
+        'viewers'             => $stmt->fetchAll(),
+        'updated_at'          => $updatedAt,
+        'last_public_comment' => $lastPublicComment,
+    ]);
     exit;
 });
 

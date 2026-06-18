@@ -645,6 +645,7 @@ CREATE TABLE IF NOT EXISTS `ticket_presence` (
   `ticket_id` int(10) unsigned NOT NULL,
   `user_id` int(10) unsigned NOT NULL,
   `last_seen` datetime NOT NULL,
+  `activity` varchar(16) NOT NULL DEFAULT 'viewing',
   PRIMARY KEY (`ticket_id`,`user_id`),
   KEY `user_id` (`user_id`),
   CONSTRAINT `ticket_presence_ibfk_1` FOREIGN KEY (`ticket_id`) REFERENCES `tickets` (`id`) ON DELETE CASCADE,

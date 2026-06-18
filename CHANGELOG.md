@@ -11,6 +11,19 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.100.0 &mdash; 2026-06-18
+
+### Changed
+- **Concurrent-viewer warning is no longer a pop-up.** Testers found the "Ticket Already Open" modal that fired on the ticket page intrusive, so it's gone. In its place:
+  - **In the ticket list**, a ticket that another staff member currently has open shows its subject in amber (an ADA-compliant `#b45309` on white, ~6.3:1 contrast) with a small italic hint underneath — *"Opened by Chris Jasztrab"*, or *"Being replied to by Chris Jasztrab"* if they have the reply box open. The hint is a point-in-time snapshot taken when the list page loads.
+  - **On the ticket page**, a quiet line in the header replaces the modal: *"Chris Jasztrab is viewing this ticket"*, upgrading to *"Chris Jasztrab is replying to this ticket"* (amber, pencil icon) while they have the reply panel open. It updates live on the existing 20-second presence poll and clears when they leave.
+- Each presence heartbeat now reports an `activity` (`viewing` / `replying`) so the indicators can tell the two states apart. (Migration 054.)
+
+### Added
+- **Reply-collision warning.** If another agent posts a public reply while you're drafting yours, clicking **Send Reply** now holds the submit and shows a warning naming who replied, when, and a short excerpt of what they said — with **Review their reply** (opens the up-to-date ticket in a new tab so your draft is untouched), **Cancel**, or **Post anyway**. The check runs at submit time against the live ticket, so it catches a reply that landed seconds earlier. Internal notes and forwards are unaffected; only public replies collide.
+
+---
+
 ## 2.99.1 &mdash; 2026-06-18
 
 ### Fixed

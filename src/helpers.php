@@ -6113,6 +6113,57 @@ function userGroupIds(PDO $db, int $userId): array
  * Pass the acting user explicitly ($userId + role slug) so this works for both
  * the session web context (Auth::id()/Auth::role()) and token API callers.
  */
+/**
+ * Point-in-time "who else has this ticket open" map for a ticket-list render.
+ *
+ * Given the ticket ids on the current list page, returns
+ *   [ ticket_id => ['name' => 'Chris Jasztrab', 'replying' => bool], ... ]
+ * for every ticket that another staff member (not $excludeUserId) currently
+ * has open — i.e. whose `ticket_presence` heartbeat is within the same 45s
+ * staleness window the detail-page poll uses. Tickets nobody else is viewing
+ * are simply absent from the map.
+ *
+ * This is a snapshot taken at render time, not a live feed: the list shows who
+ * was viewing when the page loaded. If two people are viewing, the most recent
+ * heartbeat wins (and a 'replying' viewer is always preferred over a plain
+ * viewer), which keeps the single-line list blurb unambiguous.
+ */
+function ticketListPresenceMap(PDO $db, array $ticketIds, int $excludeUserId): array
+{
+    $ids = array_values(array_unique(array_map('intval', $ticketIds)));
+    if (empty($ids)) {
+        return [];
+    }
+
+    $ph   = implode(',', array_fill(0, count($ids), '?'));
+    // Order so the row we keep per ticket is the one we want to show: a
+    // 'replying' viewer first, then the freshest heartbeat.
+    $stmt = $db->prepare(
+        "SELECT tp.ticket_id, tp.activity,
+                CONCAT(u.first_name, ' ', u.last_name) AS name
+         FROM ticket_presence tp
+         JOIN users u ON u.id = tp.user_id
+         WHERE tp.ticket_id IN ($ph)
+           AND tp.user_id != ?
+           AND tp.last_seen >= DATE_SUB(NOW(), INTERVAL 45 SECOND)
+         ORDER BY (tp.activity = 'replying') DESC, tp.last_seen DESC"
+    );
+    $stmt->execute(array_merge($ids, [$excludeUserId]));
+
+    $map = [];
+    foreach ($stmt->fetchAll() as $row) {
+        $tid = (int) $row['ticket_id'];
+        if (isset($map[$tid])) {
+            continue; // first row per ticket already wins via ORDER BY
+        }
+        $map[$tid] = [
+            'name'     => $row['name'],
+            'replying' => $row['activity'] === 'replying',
+        ];
+    }
+    return $map;
+}
+
 function ticketStaffVisibilitySql(PDO $db, int $userId, ?string $role, string $t = 't'): array
 {
     if (roleIsAdmin($role)) {
