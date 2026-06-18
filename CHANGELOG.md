@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.104.1 &mdash; 2026-06-18
+
+### Fixed
+- **Ticket-list columns no longer crush the Subject or overflow off-screen.** The table still fills its container without a horizontal scrollbar, but when the columns don't all fit, width is now shed from **Type** first, then **Group**, then **Location** (each truncating with an ellipsis down to a readable floor) before the Subject gets squeezed — instead of the old behaviour where wide Type/Group/Location values pinched Subject down to a sliver. Subject keeps a comfortable share, and the inline-edit chevrons on the Type/Group cells stay clickable even when the value is truncated. Applies to both the agent and admin ticket lists, and re-fits after ajax filter/sort/page changes and inline quick-edits.
+
+---
+
 ## 2.104.0 &mdash; 2026-06-18
 
 ### Changed

@@ -476,6 +476,24 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
     <?php elseif (($ticketView ?? 'table') === 'card'): ?>
     <?php $cardBase = '/admin/tickets'; require ROOT_DIR . '/templates/partials/ticket-cards.php'; ?>
     <?php else: ?>
+    <style>
+    /* The ticket list fills its container without horizontal scroll: Subject (the
+       flex column) keeps a comfortable width, and when space is tight the Type,
+       Group, then Location columns shed width and truncate — in that order. */
+    #ticketTable td.type-col .quick-type-wrap,
+    #ticketTable td.group-col .quick-group-wrap { max-width: 100%; }
+    #ticketTable td.type-col .quick-type-badge { min-width: 0; overflow: hidden; }
+    #ticketTable td.type-col .quick-type-badge .badge {
+        display: inline-block; max-width: 100%; overflow: hidden;
+        text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;
+    }
+    #ticketTable td.group-col .quick-group-name {
+        min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    #ticketTable td.type-col .quick-type-btn,
+    #ticketTable td.group-col .quick-group-btn { flex: 0 0 auto; }
+    #ticketTable td.location-col { overflow: hidden; text-overflow: ellipsis; }
+    </style>
     <div style="overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 260px);">
         <table class="table table-hover align-middle mb-0" id="ticketTable" style="width:100%;visibility:hidden;">
             <thead class="table-light" style="position:sticky;top:0;z-index:5;box-shadow:0 1px 2px rgba(0,0,0,.06);">
@@ -490,19 +508,19 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                     <th style="white-space:nowrap;"><a href="<?= sortUrl('priority', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Priority <?= sortIcon('priority', $sort, $dir) ?></a></th>
                     <?php endif; ?>
                     <?php if (in_array('type', $visibleColumns)): ?>
-                    <th style="white-space:nowrap;"><a href="<?= sortUrl('type', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Type <?= sortIcon('type', $sort, $dir) ?></a></th>
+                    <th class="type-col" style="white-space:nowrap;"><a href="<?= sortUrl('type', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Type <?= sortIcon('type', $sort, $dir) ?></a></th>
                     <?php endif; ?>
                     <?php if (in_array('agent', $visibleColumns)): ?>
                     <th style="white-space:nowrap;text-align:right;"><a href="<?= sortUrl('agent', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Assigned To <?= sortIcon('agent', $sort, $dir) ?></a></th>
                     <?php endif; ?>
                     <?php if (in_array('group', $visibleColumns)): ?>
-                    <th style="white-space:nowrap;"><a href="<?= sortUrl('group', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Group <?= sortIcon('group', $sort, $dir) ?></a></th>
+                    <th class="group-col" style="white-space:nowrap;"><a href="<?= sortUrl('group', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Group <?= sortIcon('group', $sort, $dir) ?></a></th>
                     <?php endif; ?>
                     <?php if (in_array('creator', $visibleColumns)): ?>
                     <th style="white-space:nowrap;"><a href="<?= sortUrl('creator', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark">Created By <?= sortIcon('creator', $sort, $dir) ?></a></th>
                     <?php endif; ?>
                     <?php if (in_array('location', $visibleColumns)): ?>
-                    <th style="white-space:nowrap;"><a href="<?= sortUrl('location', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark"><?= label('location.singular') ?> <?= sortIcon('location', $sort, $dir) ?></a></th>
+                    <th class="location-col" style="white-space:nowrap;"><a href="<?= sortUrl('location', $sort, $dir, $sortParams, '/admin/tickets') ?>" class="text-decoration-none text-dark"><?= label('location.singular') ?> <?= sortIcon('location', $sort, $dir) ?></a></th>
                     <?php endif; ?>
                     <?php if (in_array('sla', $visibleColumns)): ?>
                     <th style="white-space:nowrap;">SLA</th>
@@ -572,7 +590,7 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                         </td>
                         <?php endif; ?>
                         <?php if (in_array('type', $visibleColumns)): ?>
-                        <td style="white-space:nowrap;overflow:hidden;cursor:default;" onclick="event.stopPropagation()">
+                        <td class="type-col" style="white-space:nowrap;overflow:hidden;cursor:default;" onclick="event.stopPropagation()">
                             <span class="d-inline-flex align-items-center gap-1 quick-type-wrap" data-ticket-id="<?= (int)$t['id'] ?>" style="cursor:pointer;">
                                 <span class="quick-type-badge"><?php if ($t['type_name']): ?><span class="badge" style="background:<?= e($t['type_color'] ?: '#6c757d') ?>;"><?= e($t['type_name']) ?></span><?php else: ?><span class="text-muted small">Not Set</span><?php endif; ?></span>
                                 <button class="btn btn-link btn-sm p-0 border-0 text-muted quick-type-btn" type="button" title="Change type" style="line-height:1;"><i class="bi bi-chevron-down" style="font-size:0.65rem;"></i></button>
@@ -599,7 +617,7 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                         </td>
                         <?php endif; ?>
                         <?php if (in_array('group', $visibleColumns)): ?>
-                        <td style="white-space:nowrap;overflow:hidden;cursor:default;" onclick="event.stopPropagation()">
+                        <td class="group-col" style="white-space:nowrap;overflow:hidden;cursor:default;" onclick="event.stopPropagation()">
                             <span class="d-inline-flex align-items-center gap-1 quick-group-wrap" data-ticket-id="<?= (int)$t['id'] ?>" style="cursor:pointer;">
                                 <span class="quick-group-name<?= $t['group_name'] ? '' : ' text-muted' ?>"><?= e($t['group_name'] ?: '—') ?></span>
                                 <button class="btn btn-link btn-sm p-0 border-0 text-muted quick-group-btn" type="button" title="Change group" style="line-height:1;"><i class="bi bi-chevron-down" style="font-size:0.65rem;"></i></button>
@@ -610,7 +628,7 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                         <td class="text-muted" style="white-space:nowrap;"><?= $isRedacted ? '—' : e($t['creator_name'] ?? '—') ?></td>
                         <?php endif; ?>
                         <?php if (in_array('location', $visibleColumns)): ?>
-                        <td class="text-muted" style="white-space:nowrap;"><?= e($t['location_name'] ?? '—') ?></td>
+                        <td class="text-muted location-col" style="white-space:nowrap;"><?= e($t['location_name'] ?? '—') ?></td>
                         <?php endif; ?>
                         <?php if (in_array('sla', $visibleColumns)): ?>
                         <td>
@@ -1005,13 +1023,55 @@ document.getElementById('deleteFilterModal').addEventListener('show.bs.modal', f
     document.getElementById('deleteFilterForm').action = btn.dataset.url;
 });
 
-    // Measure natural column widths then switch to fixed layout so subject
-    // truncates. Re-run after each ajax swap of the list.
+    // Size the columns then switch to fixed layout. Subject is the flex column
+    // (it absorbs the leftover width); the Type, Group, then Location columns
+    // shed width in that order so Subject keeps a comfortable share and the
+    // table fits without horizontal scroll. Re-run after each ajax swap.
     window.ldMeasureTicketTable = function () {
         var tbl = document.getElementById("ticketTable");
         if (!tbl) return;
-        tbl.querySelectorAll("thead th:not(.subject-col)").forEach(function (th) {
-            th.style.width = th.offsetWidth + "px";
+        var thead = tbl.tHead;
+        if (!thead || !thead.rows.length) return;
+        var ths = Array.prototype.slice.call(thead.rows[0].cells);
+        var subjectIdx = ths.findIndex(function (th) { return th.classList.contains("subject-col"); });
+        var container = tbl.parentElement ? tbl.parentElement.clientWidth : tbl.offsetWidth;
+
+        // Measure each column's natural content width: let the table shrink-wrap
+        // so columns aren't stretched to fill 100%.
+        tbl.style.tableLayout = "auto";
+        tbl.style.width = "auto";
+        ths.forEach(function (th) {
+            if (!th.classList.contains("subject-col") && !th.hasAttribute("data-ld-resized")) th.style.width = "";
+        });
+        var natural = ths.map(function (th) { return th.offsetWidth; });
+        tbl.style.width = "100%";
+
+        // Guarantee Subject a comfortable share, then shed any overflow from the
+        // squeeze columns (Type → Group → Location) down to a usable floor.
+        var fixedSum = 0;
+        ths.forEach(function (th, i) { if (i !== subjectIdx) fixedSum += natural[i]; });
+        var subjectNatural = subjectIdx >= 0 ? natural[subjectIdx] : 0;
+        var subjectTarget  = Math.min(subjectNatural, Math.max(260, container * 0.3));
+        var deficit = (fixedSum + subjectTarget) - container;
+        var MIN = 110; // floor: badge/text + inline-edit chevron stay readable
+        if (deficit > 0) {
+            ["type-col", "group-col", "location-col"].forEach(function (cls) {
+                if (deficit <= 0) return;
+                var idx = ths.findIndex(function (th) { return th.classList.contains(cls); });
+                if (idx < 0 || idx === subjectIdx) return;
+                var room = natural[idx] - MIN;
+                if (room <= 0) return;
+                var take = Math.min(room, deficit);
+                natural[idx] -= take;
+                deficit -= take;
+            });
+        }
+
+        // Pin every column except Subject; Subject (flex) takes the remainder.
+        ths.forEach(function (th, i) {
+            if (i === subjectIdx) { th.style.width = ""; return; }
+            if (th.hasAttribute("data-ld-resized")) return;
+            th.style.width = natural[i] + "px";
         });
         tbl.style.tableLayout = "fixed";
         tbl.style.visibility = "";
@@ -1036,16 +1096,9 @@ document.getElementById('deleteFilterModal').addEventListener('show.bs.modal', f
         }
 
         function resizeColumns() {
-            var tbl = document.getElementById("ticketTable");
-            if (!tbl) return;
-            // Leave columns the user has manually resized alone — their width is intentional.
-            var ths = tbl.querySelectorAll("thead th:not(.subject-col):not([data-ld-resized])");
-            ths.forEach(function(th) { th.style.width = ''; });
-            tbl.style.tableLayout = 'auto';
-            ths.forEach(function(th) { th.style.width = th.offsetWidth + 'px'; });
-            tbl.style.tableLayout = 'fixed';
-            // Re-pin the overall table width so the resizable-column layout stays consistent.
-            if (window.LDColResize) window.LDColResize.syncTableWidth(tbl);
+            // Re-fit with the shared priority-shrink logic; it leaves manually
+            // resized columns (data-ld-resized) alone and re-flexes Subject.
+            if (window.ldMeasureTicketTable) window.ldMeasureTicketTable();
         }
 
         function openMenu(btn, kind) {
