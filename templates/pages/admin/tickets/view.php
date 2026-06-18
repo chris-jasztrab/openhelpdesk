@@ -57,6 +57,9 @@ if ($solutionTimelineId > 0) {
 .ld-timeline-solution { border-left: 4px solid #198754 !important; background: rgba(25,135,84,.06); }
 [data-bs-theme="dark"] .ld-timeline-solution { background: rgba(25,135,84,.16); }
 .ld-timeline-solution:target { box-shadow: inset 0 0 0 9999px rgba(25,135,84,.12); transition: box-shadow .8s ease; }
+/* Brief highlight when a timeline entry is live-injected (no page refresh). */
+@keyframes ldTimelineNewFlash { 0% { background: rgba(13,110,253,.18); } 100% { background: transparent; } }
+.ld-timeline-new { animation: ldTimelineNewFlash 3.5s ease-out; }
 </style>
 <?php if ($ticket['merged_into_ticket_id']): ?>
 <div class="alert alert-warning d-flex align-items-center gap-2 mb-4" role="alert">
@@ -1443,7 +1446,9 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
     // the page. If the live poll later reports a newer public reply by someone
     // else, another agent replied while this one was drafting.
     $baselinePublicCommentId = 0;
+    $latestTimelineId = 0;
     foreach (($timeline ?? []) as $__tl) {
+        $latestTimelineId = max($latestTimelineId, (int) $__tl['id']);
         if (($__tl['action'] ?? '') === 'comment' && empty($__tl['is_internal'])) {
             $baselinePublicCommentId = max($baselinePublicCommentId, (int) $__tl['id']);
         }
@@ -1454,9 +1459,11 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
     var pingUrl   = '/api/tickets/' + ticketId + '/presence';
     var leaveUrl  = '/api/tickets/' + ticketId + '/presence/leave';
     var indicator = document.getElementById('presenceIndicator');
-    var currentActivity   = 'viewing';
-    var myUserId          = <?= (int) Auth::id() ?>;
-    var baselineCommentId = <?= (int) $baselinePublicCommentId ?>;
+    var currentActivity      = 'viewing';
+    var myUserId             = <?= (int) Auth::id() ?>;
+    var baselineCommentId    = <?= (int) $baselinePublicCommentId ?>;
+    var loadedLatestTimeline = <?= (int) $latestTimelineId ?>;
+    var timelineRefreshing   = false;
 
     // Stale-view detection: the ticket's last-modified timestamp at page render.
     // The presence poll returns the live value; if it advances past this, the
@@ -1531,19 +1538,77 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
         fetch(pingUrl)
             .then(function(r) { return r.json(); })
             .then(function(data) {
-                // Stale-view check (timestamps are 'YYYY-MM-DD HH:MM:SS', so a
-                // lexical compare is a valid chronological compare).
-                if (data.updated_at && loadedUpdatedAt && data.updated_at > loadedUpdatedAt) {
+                renderIndicator(data.viewers || []);
+                // Live timeline: when a new entry lands, inject it without a refresh.
+                if (data.latest_timeline_id && data.latest_timeline_id > loadedLatestTimeline) {
+                    refreshTimeline(data.latest_timeline_id, data.updated_at);
+                } else if (data.updated_at && loadedUpdatedAt && data.updated_at > loadedUpdatedAt) {
+                    // Changed with no new timeline row to inject (rare) — fall back to
+                    // the dismissible refresh hint. (Lexical compare is valid for the
+                    // 'YYYY-MM-DD HH:MM:SS' format.)
                     showStaleBanner();
                 }
-                renderIndicator(data.viewers || []);
             })
             .catch(function(){});
     }
 
+    // Pull the latest timeline from the server and swap it in place. Reuses the
+    // server's exact rendering (sort order, internal notes, collapser) by fetching
+    // the page and lifting out #timelineList — viewing a ticket has no side effects.
+    function refreshTimeline(newLatestId, newUpdatedAt) {
+        if (timelineRefreshing) return;
+        timelineRefreshing = true;
+        var prevMax = loadedLatestTimeline;
+        fetch(window.location.pathname + window.location.search, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function(r) { return r.text(); })
+            .then(function(html) {
+                var doc     = new DOMParser().parseFromString(html, 'text/html');
+                var fresh   = doc.getElementById('timelineList');
+                var current = document.getElementById('timelineList');
+                if (fresh && current) {
+                    current.innerHTML = fresh.innerHTML;
+                    bindTimelineCollapser();
+                    flashNewEntries(prevMax);
+                    loadedLatestTimeline = newLatestId;
+                    if (newUpdatedAt) loadedUpdatedAt = newUpdatedAt; // so the stale banner won't also fire
+                }
+                timelineRefreshing = false;
+            })
+            .catch(function() { timelineRefreshing = false; showStaleBanner(); });
+    }
+
+    // Re-bind the "show older/newer updates" collapser after a swap — the inline
+    // <script> in the fetched markup doesn't run when injected via innerHTML.
+    function bindTimelineCollapser() {
+        var btn = document.getElementById('timeline-expand-btn');
+        if (!btn || btn._ldBound) return;
+        btn._ldBound = true;
+        var icon  = document.getElementById('timeline-expand-icon');
+        var label = document.getElementById('timeline-expand-label');
+        var orig  = label ? label.textContent : '';
+        var open  = false;
+        btn.addEventListener('click', function() {
+            open = !open;
+            document.querySelectorAll('.timeline-older-item').forEach(function(el) { el.style.display = open ? '' : 'none'; });
+            if (icon)  icon.className = open ? 'bi bi-chevron-down me-1' : 'bi bi-chevron-up me-1';
+            if (label) label.textContent = open ? 'Show fewer updates' : orig;
+        });
+    }
+
+    // Briefly highlight entries newer than what we had before the swap.
+    function flashNewEntries(prevMax) {
+        document.querySelectorAll('#timelineList [id^="timeline-entry-"]').forEach(function(el) {
+            var id = parseInt(el.id.replace('timeline-entry-', ''), 10);
+            if (id > prevMax) {
+                el.classList.add('ld-timeline-new');
+                setTimeout(function() { el.classList.remove('ld-timeline-new'); }, 3600);
+            }
+        });
+    }
+
     ping();
     poll();
-    setInterval(function() { ping(); poll(); }, 20000);
+    setInterval(function() { ping(); poll(); }, 8000);
 
     window.addEventListener('beforeunload', function() {
         navigator.sendBeacon(leaveUrl);
@@ -1556,7 +1621,7 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
             var next = isReplying ? 'replying' : 'viewing';
             if (next === currentActivity) return;
             currentActivity = next;
-            ping(); // surface the change now, don't wait for the 20s tick
+            ping(); // surface the change now, don't wait for the next tick
         },
         // Fresh check at submit time. Resolves with the colliding reply
         // {id, author, created_at, excerpt} if another agent posted a public reply

@@ -905,6 +905,13 @@ $router->get('/api/tickets/{id}/presence', function (array $p) {
     $uStmt->execute([(int) $p['id']]);
     $updatedAt = $uStmt->fetchColumn() ?: null;
 
+    // Newest timeline row id, so the detail page can live-inject new activity
+    // (replies, notes, status changes) the moment it advances past what the
+    // agent loaded with — no page refresh needed.
+    $ltStmt = $db->prepare('SELECT MAX(id) FROM ticket_timeline WHERE ticket_id = ?');
+    $ltStmt->execute([(int) $p['id']]);
+    $latestTimelineId = (int) $ltStmt->fetchColumn();
+
     // Latest public reply (not an internal note), so the detail page can detect a
     // reply collision: if this id is newer than the one the agent loaded with —
     // and authored by someone else — another agent replied while they drafted.
@@ -947,6 +954,7 @@ $router->get('/api/tickets/{id}/presence', function (array $p) {
     echo json_encode([
         'viewers'             => $stmt->fetchAll(),
         'updated_at'          => $updatedAt,
+        'latest_timeline_id'  => $latestTimelineId,
         'last_public_comment' => $lastPublicComment,
     ]);
     exit;

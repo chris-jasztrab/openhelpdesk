@@ -11,6 +11,17 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.102.0 &mdash; 2026-06-18
+
+### Added
+- **Live ticket updates — no refresh needed.** While you're on a ticket, the page now keeps itself current on an ~8-second poll:
+  - **The concurrent-viewer pill appears/updates on its own** — when another agent opens the ticket, or starts drafting a reply, the *"… is viewing / is replying"* badge shows up (and clears when they leave) without a refresh.
+  - **New timeline activity is injected automatically.** Replies, internal notes, status/priority/assignment changes, and inbound emails from anyone else slot into the timeline the moment they happen, with a brief highlight on each new entry. The "show older/newer updates" collapser and your chosen sort order are preserved. Your in-progress reply draft is never touched.
+  
+  Implementation note: the presence endpoint now also returns the ticket's newest timeline id; when it advances past what you loaded, the page re-fetches and swaps in the server-rendered timeline (which keeps internal-note visibility, AI/system-note toggles, and ordering exactly right). Viewing a ticket has no side effects, so the background fetch is safe. The old "this ticket was updated — refresh" banner now only appears as a fallback.
+
+---
+
 ## 2.101.0 &mdash; 2026-06-18
 
 ### Added
