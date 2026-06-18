@@ -11,6 +11,18 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.101.0 &mdash; 2026-06-18
+
+### Added
+- **Reply drafts are now autosaved.** Your in-progress reply is saved to the browser as you type, so it survives a refresh, an accidental navigation, or going off to read a colliding reply — when you come back the reply box reopens with *"Restored your unsent draft"* (with a **Discard** link). The draft is cleared the moment the reply is actually sent. This is what makes **Review their reply** in the collision warning safe: it opens the up-to-date ticket in a new tab and your draft is preserved either way.
+
+### Fixed
+- **Reply-collision excerpt no longer shows raw `&nbsp;`.** The preview of the other agent's reply now strips HTML, decodes entities, and collapses non-breaking spaces and whitespace runs into single spaces, so it reads as clean text. (Rendered as plain text on the client — it can't inject markup.)
+- **Reply-collision "… replied (N ago)" time is now correct.** It was computing the elapsed time in the browser against a server timestamp, which could be hours off (e.g. "1 hour ago" for a reply seconds old). The age is now computed on the server in seconds and formatted as-is, so there's no timezone skew.
+- **The "viewing / replying" header indicator is far more visible.** It was easy-to-miss muted grey text; it's now a coloured pill — blue while someone is only viewing, amber while they're replying.
+
+---
+
 ## 2.100.0 &mdash; 2026-06-18
 
 ### Changed

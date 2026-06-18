@@ -910,6 +910,7 @@ $router->get('/api/tickets/{id}/presence', function (array $p) {
     // and authored by someone else — another agent replied while they drafted.
     $cStmt = $db->prepare(
         "SELECT tl.id, tl.user_id, tl.details, tl.created_at,
+                TIMESTAMPDIFF(SECOND, tl.created_at, NOW()) AS age_seconds,
                 CONCAT(u.first_name, ' ', u.last_name) AS author
          FROM ticket_timeline tl
          JOIN users u ON u.id = tl.user_id
@@ -920,17 +921,25 @@ $router->get('/api/tickets/{id}/presence', function (array $p) {
     $lastComment = $cStmt->fetch();
     $lastPublicComment = null;
     if ($lastComment) {
-        // Plain-text excerpt for the collision modal — never leak raw HTML.
-        $excerpt = trim(preg_replace('/\s+/', ' ', strip_tags((string) $lastComment['details'])));
+        // Plain-text excerpt for the collision modal — strip the HTML, decode
+        // entities (CKEditor emits &nbsp; etc.), and fold NBSP + runs of
+        // whitespace into single spaces so the preview reads cleanly. Rendered
+        // via textContent on the client, so it can never inject markup.
+        $plain   = html_entity_decode(strip_tags((string) $lastComment['details']), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $plain   = str_replace("\xC2\xA0", ' ', $plain); // NBSP → normal space
+        $excerpt = trim(preg_replace('/\s+/u', ' ', $plain));
         if (mb_strlen($excerpt) > 200) {
             $excerpt = mb_substr($excerpt, 0, 200) . '…';
         }
         $lastPublicComment = [
-            'id'         => (int) $lastComment['id'],
-            'user_id'    => (int) $lastComment['user_id'],
-            'author'     => $lastComment['author'],
-            'created_at' => $lastComment['created_at'],
-            'excerpt'    => $excerpt,
+            'id'          => (int) $lastComment['id'],
+            'user_id'     => (int) $lastComment['user_id'],
+            'author'      => $lastComment['author'],
+            'created_at'  => $lastComment['created_at'],
+            // Server-computed age dodges any browser/DB timezone skew — the old
+            // client-side Date math reported "1 hour ago" for a reply seconds old.
+            'age_seconds' => max(0, (int) $lastComment['age_seconds']),
+            'excerpt'     => $excerpt,
         ];
     }
 

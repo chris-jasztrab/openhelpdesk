@@ -548,6 +548,10 @@ if ($solutionTimelineId > 0) {
                             <input type="text" class="form-control" name="forward_to" id="forwardTo" placeholder="vendor@example.com, jane.doe@partner.org" autocomplete="off">
                             <div class="form-text"><?= $fwdHint ?> Recipients are added as contacts and CC'd on the ticket; their email replies thread back in automatically. The full conversation and all attachments are included.</div>
                         </div>
+                        <div id="replyDraftNote" class="alert alert-info d-flex align-items-center justify-content-between py-2 px-3 mb-2 small" style="display:none;">
+                            <span><i class="bi bi-arrow-counterclockwise me-1"></i>Restored your unsent draft.</span>
+                            <button type="button" class="btn btn-sm btn-link text-decoration-none p-0 ms-2" id="replyDraftDiscard">Discard</button>
+                        </div>
                         <div class="mb-3" style="position:relative;">
                             <div id="replyEditor"></div>
                             <input type="hidden" name="message" id="replyMessageHidden">
@@ -1513,10 +1517,18 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
         var verb = replying.length
             ? (names.length === 1 ? ' is replying to this ticket' : ' are replying to this ticket')
             : (names.length === 1 ? ' is viewing this ticket'  : ' are viewing this ticket');
-        indicator.style.color = replying.length ? '#b45309' : '#6c757d';
+        // Render as a coloured pill so it actually catches the eye — amber while
+        // someone is replying, blue while they're only viewing.
+        indicator.className = 'small mt-2 d-inline-flex align-items-center gap-1 px-2 py-1 rounded-pill fw-semibold';
+        indicator.style.border = '1px solid';
+        if (replying.length) {
+            indicator.style.color = '#9a3412'; indicator.style.background = '#fff3cd'; indicator.style.borderColor = '#ffd24d';
+        } else {
+            indicator.style.color = '#084298'; indicator.style.background = '#cfe2ff'; indicator.style.borderColor = '#9ec5fe';
+        }
         indicator.innerHTML = '<i class="bi ' + (replying.length ? 'bi-pencil-fill' : 'bi-eye-fill') + '"></i>' +
                               '<span>' + nameStr + verb + '</span>';
-        indicator.style.setProperty('display', 'flex', 'important');
+        indicator.style.setProperty('display', 'inline-flex', 'important');
     }
 
     function poll() {
@@ -1644,6 +1656,9 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
     if (btnForward) btnForward.addEventListener('click', function() { openMode('forward'); });
     btnNote.addEventListener('click',    function() { openMode('note'); });
     closeBtn.addEventListener('click',   closePanel);
+
+    // Let the draft-restore logic (in the editor block) re-open the reply panel.
+    window._openReplyPanel = function() { openMode('reply'); };
 
     document.querySelectorAll('.reply-status-opt').forEach(function(el) {
         el.addEventListener('click', function(e) {
@@ -1900,6 +1915,57 @@ ClassicEditor.create(document.querySelector('#replyEditor'), {
     window._replyEditor = editor;
     editor.ui.view.editable.element.style.minHeight = '150px';
 
+    // ── Reply draft autosave ──────────────────────────────────────────────
+    // Persist the in-progress reply to localStorage so it survives a refresh,
+    // an accidental navigation, or going off to read a colliding reply and
+    // coming back. Cleared once the reply is actually sent.
+    var draftKey   = 'ldReplyDraft:<?= (int) $ticket['id'] ?>';
+    var draftNote  = document.getElementById('replyDraftNote');
+    var draftTimer = null;
+    var submitting = false;
+
+    function draftText(html) { return (html || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim(); }
+
+    function saveDraft() {
+        if (submitting) return;
+        try {
+            var data = editor.getData();
+            if (draftText(data)) localStorage.setItem(draftKey, data);
+            else localStorage.removeItem(draftKey);
+        } catch (e) {}
+    }
+
+    function clearDraft() {
+        submitting = true;
+        try { localStorage.removeItem(draftKey); } catch (e) {}
+        if (draftNote) draftNote.style.display = 'none';
+    }
+
+    editor.model.document.on('change:data', function() {
+        clearTimeout(draftTimer);
+        draftTimer = setTimeout(saveDraft, 800);
+    });
+
+    // Restore a saved draft on load (the editor starts empty) and open the panel
+    // so it's visible. Discard wipes it.
+    (function() {
+        var saved = null;
+        try { saved = localStorage.getItem(draftKey); } catch (e) {}
+        if (saved && draftText(saved) && !draftText(editor.getData())) {
+            editor.setData(saved);
+            if (draftNote) draftNote.style.display = '';
+            if (window._openReplyPanel) window._openReplyPanel();
+        }
+    })();
+
+    var discardBtn = document.getElementById('replyDraftDiscard');
+    if (discardBtn) discardBtn.addEventListener('click', function() {
+        editor.setData('');
+        try { localStorage.removeItem(draftKey); } catch (e) {}
+        if (draftNote) draftNote.style.display = 'none';
+        editor.editing.view.focus();
+    });
+
     // Form submit: validate and populate hidden field
     document.getElementById('replyForm').addEventListener('submit', function(e) {
         var data = editor.getData();
@@ -1922,15 +1988,19 @@ ClassicEditor.create(document.querySelector('#replyEditor'), {
 
         // Reply-collision guard — public replies only, once per confirmed submit.
         // If another agent posted a reply while this one was drafting, hold the
-        // send and surface it; the draft stays untouched in the editor.
+        // send and surface it; the draft stays untouched (and saved) so Cancel
+        // leaves it editable.
         var formEl = this;
         if (formEl.dataset.mode === 'reply' && !formEl._collisionAck && window.ticketPresence) {
             e.preventDefault();
             window.ticketPresence.checkCollision(function(collision) {
-                if (!collision) { formEl._collisionAck = true; formEl.requestSubmit(); return; }
+                if (!collision) { formEl._collisionAck = true; clearDraft(); formEl.requestSubmit(); return; }
                 showCollisionModal(collision, formEl);
             });
+            return;
         }
+        // Forward, note, or an already-confirmed reply: this is a real send.
+        clearDraft();
     });
 
     // Reply-collision modal wiring.
@@ -1942,8 +2012,8 @@ ClassicEditor.create(document.querySelector('#replyEditor'), {
         var postBtn  = document.getElementById('collisionPostAnywayBtn');
         function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
-        var when = collision.created_at ? new Date(collision.created_at.replace(' ', 'T')) : null;
-        var ago  = when ? timeAgo(when) : 'just now';
+        saveDraft(); // flush now so "Review" (new tab) restores the latest draft
+        var ago = formatAge(collision.age_seconds);
         intro.innerHTML = '<strong>' + esc(collision.author) + '</strong> replied while you were drafting (' + esc(ago) + '):';
         excerpt.textContent = collision.excerpt || '(no preview available)';
         // Open the up-to-date ticket in a new tab so the draft here is preserved.
@@ -1954,19 +2024,23 @@ ClassicEditor.create(document.querySelector('#replyEditor'), {
         var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
         postBtn.onclick = function() {
             formEl._collisionAck = true;
+            clearDraft();
             modal.hide();
             formEl.requestSubmit();
         };
         modal.show();
     }
 
-    function timeAgo(date) {
-        var secs = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+    // Age comes straight from the server (seconds), so there's no timezone math.
+    function formatAge(secs) {
+        secs = Math.max(0, secs | 0);
         if (secs < 60)   return secs <= 5 ? 'just now' : secs + ' seconds ago';
         var mins = Math.floor(secs / 60);
         if (mins < 60)   return mins + (mins === 1 ? ' minute ago' : ' minutes ago');
         var hrs = Math.floor(mins / 60);
-        return hrs + (hrs === 1 ? ' hour ago' : ' hours ago');
+        if (hrs < 24)    return hrs + (hrs === 1 ? ' hour ago' : ' hours ago');
+        var days = Math.floor(hrs / 24);
+        return days + (days === 1 ? ' day ago' : ' days ago');
     }
 
     // @mention autocomplete
