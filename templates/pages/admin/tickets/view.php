@@ -217,9 +217,15 @@ if ($solutionTimelineId > 0) {
             }
         }
         ?>
+        <?php $timelineSort = getUserTimelineSort((int) Auth::id()); ?>
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between">
-                <h5 class="mb-0 fw-semibold"><i class="bi bi-clock-history me-2"></i>Timeline</h5>
+                <button type="button" id="timelineSortToggle"
+                        class="btn btn-link p-0 border-0 text-reset text-decoration-none h5 mb-0 fw-semibold d-inline-flex align-items-center"
+                        title="Sort: <?= $timelineSort === 'asc' ? 'oldest first — click to show newest first' : 'newest first — click to show oldest first' ?>">
+                    <i class="bi bi-clock-history me-2"></i>Timeline
+                    <i class="bi <?= $timelineSort === 'asc' ? 'bi-sort-up' : 'bi-sort-down' ?> ms-2 small" id="timelineSortIcon"></i>
+                </button>
                 <?php if ($hasSystemNotes): ?>
                 <div class="d-flex align-items-center gap-3">
                     <div class="form-check form-switch mb-0">
@@ -249,7 +255,7 @@ if ($solutionTimelineId > 0) {
                 <?php else:
                 $tlHidden = max(0, count($timeline) - 10);
                 ?>
-                <div class="list-group list-group-flush<?= $aiNotesOn ? '' : ' ai-notes-hidden' ?><?= $systemNotesOn ? '' : ' system-notes-hidden' ?>" id="timelineList">
+                <div class="list-group list-group-flush<?= $aiNotesOn ? '' : ' ai-notes-hidden' ?><?= $systemNotesOn ? '' : ' system-notes-hidden' ?><?= $timelineSort === 'asc' ? ' timeline-reversed' : '' ?>" id="timelineList">
                     <?php foreach ($timeline as $tlIdx => $entry):
                         $isSolution = $solutionTimelineId > 0 && (int) $entry['id'] === $solutionTimelineId;
                         // Never let the marked solution be hidden inside the
@@ -378,6 +384,31 @@ if ($solutionTimelineId > 0) {
                 <?php endif; ?>
             </div>
         </div>
+
+        <script>
+        // Clicking the "Timeline" heading flips the sort order live (a CSS class
+        // reverses the flex column — no reload, so a half-written reply survives)
+        // and persists the choice as the user's default timeline order.
+        (function () {
+            var btn  = document.getElementById('timelineSortToggle');
+            var list = document.getElementById('timelineList');
+            var icon = document.getElementById('timelineSortIcon');
+            if (!btn || !list) return;
+            var csrf = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
+            btn.addEventListener('click', function () {
+                var asc = list.classList.toggle('timeline-reversed');
+                if (icon) icon.className = 'bi ' + (asc ? 'bi-sort-up' : 'bi-sort-down') + ' ms-2 small';
+                btn.title = 'Sort: ' + (asc
+                    ? 'oldest first — click to show newest first'
+                    : 'newest first — click to show oldest first');
+                fetch('/profile/setting', {
+                    method:  'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest'},
+                    body:    '_token=' + encodeURIComponent(csrf) + '&field=timeline_sort&value=' + (asc ? 'asc' : 'desc'),
+                }).catch(function () {});
+            });
+        })();
+        </script>
 
         <?php if ($hasSystemNotes): ?>
         <script>

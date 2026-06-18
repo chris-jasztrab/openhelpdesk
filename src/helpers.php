@@ -2436,6 +2436,17 @@ function setUserTicketView(int $userId, string $view): void
     setSetting("ticket_view:{$userId}", $view);
 }
 
+/**
+ * A user's preferred ticket-timeline sort order: 'desc' (newest first — the
+ * default, matching the SQL order the routes fetch in) or 'asc' (oldest
+ * first). Used by the three ticket-view templates to decide the initial order
+ * and by the profile page to seed its radio buttons.
+ */
+function getUserTimelineSort(int $userId): string
+{
+    return getSetting("timeline_sort:{$userId}", 'desc') === 'asc' ? 'asc' : 'desc';
+}
+
 /* ── "Tickets by user" page (from the inbox-view person card) ─── */
 
 /**

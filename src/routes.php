@@ -1931,6 +1931,7 @@ $router->get('/profile', function () {
     render('profile/edit', [
         'profileUser'        => $user,
         'theme'              => $theme,
+        'timelineSort'       => getUserTimelineSort((int) Auth::id()),
         'ticketView'         => getUserTicketView((int) Auth::id()),
         'aiNotesVisible'     => aiNotesVisible(),
         'systemNotesVisible' => systemNotesVisible(),
@@ -1981,6 +1982,9 @@ $router->post('/profile', function () {
 
     // Save ticket-list view preference (table vs. inbox)
     setUserTicketView((int) $userId, $_POST['ticket_view'] ?? 'table');
+
+    // Save default ticket-timeline sort order
+    setSetting('timeline_sort:' . $userId, ($_POST['timeline_sort'] ?? '') === 'asc' ? 'asc' : 'desc');
 
     // Save AI / system note timeline preferences. The toggles only render for
     // admins, so a non-admin POST must not be allowed to clear these settings.
@@ -2111,6 +2115,15 @@ $router->post('/profile/setting', function () {
             exit;
         }
         setSetting($field . ':' . $userId, $value === '1' ? '1' : '0');
+        echo json_encode(['ok' => true, 'message' => 'Saved']);
+        exit;
+    }
+
+    // Default ticket-timeline sort order. Also written when the user clicks the
+    // "Timeline" heading on a ticket, so the heading toggle and this preference
+    // stay in sync.
+    if ($field === 'timeline_sort') {
+        setSetting('timeline_sort:' . $userId, $value === 'asc' ? 'asc' : 'desc');
         echo json_encode(['ok' => true, 'message' => 'Saved']);
         exit;
     }

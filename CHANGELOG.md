@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.99.0 &mdash; 2026-06-18
+
+### Added
+- **Sortable ticket timeline + a per-user default.** Click the **Timeline** heading on any ticket to flip the activity order between newest-first and oldest-first. It switches instantly — no page reload, so a half-written reply is never lost — and the choice is remembered as your default across tickets and sessions. A matching **Ticket Timeline** option on the profile page (Newest first / Oldest first) sets the same default; the heading toggle and the profile setting stay in sync. Works on the agent, admin, and portal ticket views, and leaves the "show older updates" collapser and "Go to solution" anchor intact in both directions.
+
+---
+
 ## 2.98.0 &mdash; 2026-06-17
 
 ### Added

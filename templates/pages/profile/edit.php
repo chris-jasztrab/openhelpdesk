@@ -71,6 +71,35 @@ $breadcrumbs = [
                 </div>
             </div>
 
+            <!-- Ticket Timeline -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-transparent fw-semibold">
+                    <i class="bi bi-clock-history me-1"></i>Ticket Timeline
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        Choose the default order for activity on a ticket&rsquo;s timeline. You can also
+                        flip the order at any time by clicking the &ldquo;Timeline&rdquo; heading on a ticket.
+                    </p>
+                    <div class="d-flex gap-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="timeline_sort" id="timelineSortDesc"
+                                   value="desc" <?= ($timelineSort ?? 'desc') === 'desc' ? 'checked' : '' ?>>
+                            <label class="form-check-label" for="timelineSortDesc">
+                                <i class="bi bi-sort-down me-1"></i>Newest first
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="timeline_sort" id="timelineSortAsc"
+                                   value="asc" <?= ($timelineSort ?? 'desc') === 'asc' ? 'checked' : '' ?>>
+                            <label class="form-check-label" for="timelineSortAsc">
+                                <i class="bi bi-sort-up me-1"></i>Oldest first
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <?php if (roleIsAdmin($user['role'])): ?>
             <!-- System Timeline Notes (admin only) -->
             <div class="card border-0 shadow-sm mb-4">
