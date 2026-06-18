@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.104.0 &mdash; 2026-06-18
+
+### Changed
+- **The ticket page header now stays put while you scroll.** On both the agent and admin ticket views, the band with the ticket title, status/priority/SLA badges, the concurrent-viewer indicator, and the Watch / Escalate / Split / Merge / Back actions is now pinned just below the navbar (matching the static-header behaviour of the dashboards and ticket lists). Everything below it — description, attachments, tags, timeline, and the reply box — scrolls underneath. A practical upside: the *"someone else is in this ticket"* presence indicator can no longer scroll off-screen, so a collision warning stays visible the whole time you're working the ticket.
+
+---
+
 ## 2.103.0 &mdash; 2026-06-18
 
 ### Added

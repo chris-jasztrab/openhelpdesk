@@ -87,7 +87,7 @@ if ($solutionTimelineId > 0) {
 </a>
 <?php endif; ?>
 
-<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4 ticket-sticky-header">
     <div>
         <h2 class="fw-bold mb-1"><?= e($ticket['subject']) ?></h2>
         <div class="d-flex flex-wrap gap-2 align-items-center">

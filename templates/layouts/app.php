@@ -93,6 +93,29 @@
             min-height: calc(100vh - var(--ld-navbar-height));
         }
 
+        /* Ticket-view sticky header — pins the ticket title, status badges,
+           presence indicator, and Watch/Split/Merge actions just below the
+           navbar so they never scroll off (mirrors the static-header lists).
+           Everything under it (description, timeline, reply box) scrolls.
+           The navbar (z-index 1040) covers everything above the pin line, so
+           the band only needs an opaque background + a shadow to separate it
+           from content scrolling up underneath. The bottom spacing is pulled
+           inside the band (replacing the header's mb-4) so that content hides
+           flush beneath it instead of showing through a transparent margin. */
+        .ticket-sticky-header {
+            position: sticky;
+            top: var(--ld-navbar-height);
+            z-index: 20;
+            background: #f1f5f9;
+            padding-top: .75rem;
+            margin-bottom: 0 !important;
+            padding-bottom: 1rem;
+            box-shadow: 0 6px 6px -4px rgba(0,0,0,.08);
+        }
+        [data-bs-theme="dark"] .ticket-sticky-header { background: #1a1d21; }
+        /* In chrome-less embeds there is no navbar to pin under, so don't. */
+        body.embed-mode .ticket-sticky-header { position: static; }
+
         /* Cards */
         .stat-card {
             border: none; border-radius: .75rem;
