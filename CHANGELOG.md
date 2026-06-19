@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.106.5 &mdash; 2026-06-19
+
+### Security
+- **The admin attachment download now enforces the confidential re-auth gate.** `GET /admin/attachments/{id}/download` fetched the attachment by id and streamed it after only `Auth::requireAdmin()`, applying neither the per-ticket confidential re-authentication that the ticket-view page enforces nor any redaction. An admin who is not a member of a confidential ticket's group could pull its attachments by enumerating ids. The route now mirrors the ticket view: if the attachment's ticket requires confidential re-auth (`requiresConfidentialReAuth`) and the 5-minute re-auth window has not been granted, it redirects to the ticket (which prompts for re-authentication) instead of serving the file.
+
+---
+
 ## 2.106.4 &mdash; 2026-06-19
 
 ### Security

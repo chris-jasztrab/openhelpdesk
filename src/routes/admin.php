@@ -5673,6 +5673,22 @@ $router->get('/admin/attachments/{id}/download', function (array $p) {
         redirect('/admin/tickets');
     }
 
+    // Mirror the ticket-view confidential re-auth gate: an admin who is not a
+    // member of a confidential ticket's group must re-authenticate (within the
+    // 5-minute window) before pulling its attachments by id.
+    $tk = $db->prepare('SELECT id, type_id FROM tickets WHERE id = ?');
+    $tk->execute([(int) $att['ticket_id']]);
+    $tkRow = $tk->fetch();
+    if ($tkRow && requiresConfidentialReAuth($db, $tkRow)) {
+        $ticketId   = (int) $tkRow['id'];
+        $sessionKey = "confidential_access_{$ticketId}";
+        $granted    = $_SESSION[$sessionKey] ?? 0;
+        if (!$granted || (time() - $granted) > 300) {
+            flash('error', 'Re-authentication required to access this confidential ticket.');
+            redirect('/admin/tickets/' . $ticketId);
+        }
+    }
+
     $filePath = ATTACHMENT_STORAGE_PATH . $att['stored_name'];
     if (!file_exists($filePath)) {
         flash('error', 'File not found on server.');
