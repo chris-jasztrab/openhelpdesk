@@ -852,6 +852,9 @@ $router->post('/api/tickets/{id}/presence', function (array $p) {
     }
     $db = Database::connect();
     _apiRequireTicketAccess($db, (int) $p['id']);
+    // Auth + access are settled; nothing below writes the session. Release the
+    // lock so this user's overlapping poll requests don't serialize behind it.
+    session_write_close();
     // The client reports what it's doing so other viewers see "X is replying"
     // rather than just "X is viewing". Anything other than 'replying' is
     // normalised to 'viewing' so a stray value can't pollute the indicator.
@@ -876,6 +879,10 @@ $router->get('/api/tickets/{id}/presence', function (array $p) {
     }
     $db = Database::connect();
     _apiRequireTicketAccess($db, (int) $p['id']);
+
+    // Auth + access settled; this is a read-only poll. Release the session lock
+    // so a viewer's overlapping detail-page polls don't serialize.
+    session_write_close();
 
     // Stale rows are excluded at read time (filter, not delete) so this hot poll
     // path no longer writes on every request. Actual deletion is amortised: it
@@ -987,6 +994,10 @@ $router->get('/api/tickets/presence', function () {
         exit;
     }
 
+    // Read-only batch poll; release the session lock before the work so a list
+    // page's overlapping presence polls don't serialize behind each other.
+    session_write_close();
+
     $ids = array_values(array_unique(array_filter(array_map(
         'intval',
         explode(',', (string) ($_GET['ids'] ?? ''))
@@ -1030,6 +1041,9 @@ $router->get('/api/tickets/presence', function () {
  * ------------------------------------------------------------------ */
 $router->post('/api/presence', function () {
     Auth::requireAuth();
+    // Heartbeat fires every 30s for every authenticated user and writes nothing
+    // to the session — release the lock so it never blocks the user's real requests.
+    session_write_close();
     $db = Database::connect();
     $ip = $_SERVER['REMOTE_ADDR'] ?? null;
     $ua = isset($_SERVER['HTTP_USER_AGENT']) ? mb_substr((string) $_SERVER['HTTP_USER_AGENT'], 0, 255) : null;
@@ -2960,6 +2974,8 @@ $router->get('/notifications', function () {
 
 $router->get('/notifications/count', function () {
     Auth::requireAuth();
+    // Polled every ~15s; read-only, no session writes — drop the lock early.
+    session_write_close();
     header('Content-Type: application/json');
     echo json_encode(['count' => notificationCount()]);
     exit;
@@ -2972,6 +2988,8 @@ $router->get('/notifications/count', function () {
  */
 $router->get('/notifications/feed', function () {
     Auth::requireAuth();
+    // Read-only poll that renders a partial; no session writes — release early.
+    session_write_close();
     $db = Database::connect();
     $notifications = notificationsFeedRows($db, (int) Auth::id());
     $areaPrefix    = notificationsAreaPrefix();

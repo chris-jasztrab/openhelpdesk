@@ -11,6 +11,16 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.106.0 &mdash; 2026-06-19
+
+### Changed
+- **Background polls no longer hold a user's session lock.** The presence heartbeats, the ticket-detail and ticket-list "who's viewing" polls, and the notification count/feed polls now release the PHP session lock immediately after the auth check, before doing their (read-only) work. PHP serializes concurrent requests that share a session behind a single lock, so a user running several poll timers at once could have those polls — and their real navigation — queue behind each other; releasing early removes that self-contention. Access control is unchanged (the lock is dropped only after authentication/authorization).
+
+### Performance
+- **Added a composite `ticket_timeline (ticket_id, action)` index** (migration 055). The admin resolution-time / SLA / aging reports run a correlated `WHERE ticket_id = ? AND action = 'status_changed' AND details LIKE …` subquery per ticket in range; the table previously indexed only `ticket_id` (the foreign key), so each subquery gathered a ticket's whole timeline and filtered `action` row by row. The composite narrows on both columns up front. No effect at small data volumes (where each ticket has few timeline rows); it pays off as timeline history accumulates.
+
+---
+
 ## 2.105.0 &mdash; 2026-06-19
 
 ### Changed
