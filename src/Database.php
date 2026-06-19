@@ -20,7 +20,9 @@ class Database
             self::$instance = new PDO($dsn, $user, $pass, [
                 PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                PDO::ATTR_EMULATE_PREPARES   => true,
+                // Use real server-side prepared statements (not client-side
+                // emulation) so parameter binding is enforced by the driver.
+                PDO::ATTR_EMULATE_PREPARES   => false,
             ]);
         }
 

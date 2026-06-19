@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.106.11 &mdash; 2026-06-19
+
+### Security
+- **Database connections now use real server-side prepared statements** (`PDO::ATTR_EMULATE_PREPARES => false`). Emulated prepares do the escaping client-side; with the `utf8mb4` DSN the app was already safe against the classic charset SQLi and every query uses placeholders, but disabling emulation has the driver enforce the value/SQL separation. Verified with the full test suite (410 tests). No `LIMIT ?` / `OFFSET ?` placeholders exist in the codebase (the one pattern that commonly breaks under this setting), so the change is transparent.
+
+---
+
 ## 2.106.10 &mdash; 2026-06-19
 
 ### Security
