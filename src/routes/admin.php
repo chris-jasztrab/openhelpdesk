@@ -3713,17 +3713,23 @@ $router->get('/admin/tickets/export', function () {
                 g.name  AS group_name,
                 CONCAT(c.first_name, ' ', c.last_name) AS creator_name,
                 CONCAT(a.first_name, ' ', a.last_name) AS agent_name,
-                (SELECT GROUP_CONCAT(tg.name SEPARATOR ', ')
-                 FROM ticket_tag_map ttm
-                 JOIN ticket_tags tg ON ttm.tag_id = tg.id
-                 WHERE ttm.ticket_id = t.id) AS tag_list
+                tags.tag_list
          FROM tickets t
          LEFT JOIN ticket_priorities tp ON t.priority_id = tp.id
          LEFT JOIN ticket_types tt     ON t.type_id     = tt.id
          LEFT JOIN locations l         ON t.location_id  = l.id
          LEFT JOIN users c             ON t.created_by   = c.id
          LEFT JOIN users a             ON t.assigned_to  = a.id
-         LEFT JOIN `groups` g          ON t.group_id     = g.id"
+         LEFT JOIN `groups` g          ON t.group_id     = g.id
+         -- Pre-aggregate tags once per ticket instead of a correlated
+         -- per-row subquery (which re-scanned the map table for every
+         -- exported row). One grouped pass the optimizer can hash-join.
+         LEFT JOIN (
+             SELECT ttm.ticket_id, GROUP_CONCAT(tg.name SEPARATOR ', ') AS tag_list
+             FROM ticket_tag_map ttm
+             JOIN ticket_tags tg ON ttm.tag_id = tg.id
+             GROUP BY ttm.ticket_id
+         ) tags ON tags.ticket_id = t.id"
          . $whereClause
          . " ORDER BY {$orderCol} {$dir}";
 
@@ -3763,6 +3769,10 @@ $router->get('/admin/tickets/export', function () {
     $gs = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
     $gs->execute([Auth::id()]);
     $exportAdminGroups = array_map('intval', $gs->fetchAll(PDO::FETCH_COLUMN));
+
+    // Full exports can take a while to stream; drop the session lock so the
+    // admin's other tabs stay responsive meanwhile.
+    session_write_close();
 
     while ($row = $stmt->fetch()) {
         // Redact confidential tickets the admin is not in the group for
@@ -5656,6 +5666,10 @@ $router->get('/admin/attachments/{id}/download', function (array $p) {
         redirect('/admin/tickets/' . $att['ticket_id']);
     }
 
+    // Release the session lock before streaming: a large/slow download must not
+    // block every other concurrent request from this user on session_start().
+    session_write_close();
+
     header('Content-Type: ' . $att['mime_type']);
     header('Content-Disposition: attachment; filename="' . str_replace('"', '\\"', $att['original_name']) . '"');
     header('Content-Length: ' . $att['file_size']);
@@ -7293,6 +7307,9 @@ $router->get('/admin/settings/import/download-skipped', function () {
         redirect('/admin/settings/import');
     }
     unset($_SESSION['import_skipped_file']);
+    // Persist the unset and release the lock before streaming so concurrent
+    // requests from this user aren't blocked for the duration of the download.
+    session_write_close();
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename="import_skipped_rows.csv"');
     header('Cache-Control: no-store');
@@ -12044,6 +12061,9 @@ $router->get('/admin/settings/backup/download', function () {
     while (ob_get_level()) {
         ob_end_clean();
     }
+    // Backups can be large; release the session lock so the rest of the admin's
+    // tabs stay responsive while the ZIP streams.
+    session_write_close();
     header('Content-Type: application/zip');
     header('Content-Disposition: attachment; filename="' . $filename . '"');
     header('Content-Length: ' . filesize($path));

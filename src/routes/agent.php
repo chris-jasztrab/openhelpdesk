@@ -2183,6 +2183,10 @@ $router->get('/agent/attachments/{id}/download', function (array $p) {
         redirect('/agent/tickets/' . $att['ticket_id']);
     }
 
+    // Release the session lock before streaming: a large/slow download must not
+    // block every other concurrent request from this user on session_start().
+    session_write_close();
+
     header('Content-Type: ' . $att['mime_type']);
     header('Content-Disposition: attachment; filename="' . str_replace('"', '\\"', $att['original_name']) . '"');
     header('Content-Length: ' . $att['file_size']);

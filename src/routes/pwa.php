@@ -283,6 +283,11 @@ function pwaServeIcon(int $size, bool $maskable): void
         echo 'Icon not generated';
         exit;
     }
+    // Icons are public and hit on every page load; release the session lock so
+    // the request never serializes behind another request from the same user.
+    if (PHP_SESSION_ACTIVE === session_status()) {
+        session_write_close();
+    }
     header('Content-Type: image/png');
     header('Cache-Control: public, max-age=86400, stale-while-revalidate=604800');
     header('Content-Length: ' . filesize($path));

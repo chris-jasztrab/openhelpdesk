@@ -11,6 +11,14 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.105.0 &mdash; 2026-06-19
+
+### Changed
+- **File downloads no longer freeze the rest of the app for the same user.** Every file-streaming route (agent/admin/portal attachment downloads, the admin backup ZIP, the import "skipped rows" CSV, the ticket CSV export, and PWA icons) now releases the PHP session lock *before* streaming the file. Previously PHP held an exclusive lock on the session for the whole transfer, so while one tab downloaded a large attachment or backup, every other request from that same user — navigation, API polls, the live ticket updates — blocked until the download finished, looking like a hung tab. The lock is released only after the permission check, so access control is unchanged.
+- **Ticket CSV export got faster on large exports.** The per-row correlated subquery that fetched each ticket's tags (one extra table scan for every exported row) was replaced with a single pre-aggregated join, so tags are gathered in one grouped pass regardless of export size. Output is unchanged.
+
+---
+
 ## 2.104.2 &mdash; 2026-06-18
 
 ### Fixed
