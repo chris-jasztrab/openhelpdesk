@@ -2068,14 +2068,20 @@ $router->post('/agent/tickets/{id}/update', function (array $p) {
     $newAssigned = $newAssignedRaw === '' ? null : (int) $newAssignedRaw;
     $oldAssigned = $ticket['assigned_to'] ? (int) $ticket['assigned_to'] : null;
     if ($newAssigned !== $oldAssigned) {
-        $db->prepare('UPDATE tickets SET assigned_to = ? WHERE id = ?')->execute([$newAssigned, $id]);
-
         $agentName = 'Unassigned';
         if ($newAssigned) {
-            $s = $db->prepare("SELECT CONCAT(first_name, ' ', last_name) FROM users WHERE id = ?");
+            // Only staff may be assigned a ticket — never a portal user.
+            $s = $db->prepare(
+                "SELECT CONCAT(first_name, ' ', last_name) FROM users WHERE id = ? AND " . staffRoleSqlIn('role')
+            );
             $s->execute([$newAssigned]);
-            $agentName = $s->fetchColumn() ?: 'Unknown';
+            $agentName = $s->fetchColumn();
+            if ($agentName === false) {
+                flash('error', 'Invalid assignee.');
+                redirect("/agent/tickets/{$id}");
+            }
         }
+        $db->prepare('UPDATE tickets SET assigned_to = ? WHERE id = ?')->execute([$newAssigned, $id]);
 
         $db->prepare(
             'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
@@ -2127,6 +2133,14 @@ $router->post('/agent/tickets/{id}/update', function (array $p) {
         $changes[] = 'group';
     }
     if ($newGroup !== $oldGroup) {
+        if ($newGroup !== null) {
+            $chk = $db->prepare('SELECT 1 FROM `groups` WHERE id = ?');
+            $chk->execute([$newGroup]);
+            if (!$chk->fetchColumn()) {
+                flash('error', 'Invalid group.');
+                redirect("/agent/tickets/{$id}");
+            }
+        }
         $db->prepare('UPDATE tickets SET group_id = ? WHERE id = ?')->execute([$newGroup, $id]);
 
         $oldGroupName = 'None';

@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.106.4 &mdash; 2026-06-19
+
+### Security
+- **Ticket updates now validate the assignee and group instead of trusting any id.** The ticket-update handlers (`POST /api/v1/tickets/{id}/update` and `POST /agent/tickets/{id}/update`) accepted an arbitrary `assigned_to` user id — including a portal/customer account — and an arbitrary `group_id` that need not exist. A staffer could "assign" a ticket to a customer (who would then receive assignment-notification mail containing ticket content) or move it into a bogus group. Both handlers now reject an `assigned_to` that is not a staff user (`staffRoleSqlIn`) and a `group_id` that does not exist (422 on the API, flash-and-redirect on the web form).
+
+---
+
 ## 2.106.3 &mdash; 2026-06-19
 
 ### Security

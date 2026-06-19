@@ -1019,9 +1019,15 @@ $router->post('/api/v1/tickets/{id}/update', function (array $p) {
         if ($newAssigned !== $oldAssigned) {
             $agentName = 'Unassigned';
             if ($newAssigned) {
-                $s = $db->prepare("SELECT CONCAT(first_name, ' ', last_name) FROM users WHERE id = ?");
+                // Only staff may be assigned a ticket — never a portal user.
+                $s = $db->prepare(
+                    "SELECT CONCAT(first_name, ' ', last_name) FROM users WHERE id = ? AND " . staffRoleSqlIn('role')
+                );
                 $s->execute([$newAssigned]);
-                $agentName = $s->fetchColumn() ?: 'Unknown';
+                $agentName = $s->fetchColumn();
+                if ($agentName === false) {
+                    _apiJson(['error' => 'Invalid assignee'], 422);
+                }
             }
             $db->prepare('UPDATE tickets SET assigned_to = ? WHERE id = ?')->execute([$newAssigned, $ticketId]);
             $db->prepare(
@@ -1037,6 +1043,13 @@ $router->post('/api/v1/tickets/{id}/update', function (array $p) {
         $newGroup = $input['group_id'] !== null ? (int) $input['group_id'] : null;
         $oldGroup = $ticket['group_id'] !== null ? (int) $ticket['group_id'] : null;
         if ($newGroup !== $oldGroup) {
+            if ($newGroup !== null) {
+                $chk = $db->prepare('SELECT 1 FROM `groups` WHERE id = ?');
+                $chk->execute([$newGroup]);
+                if (!$chk->fetchColumn()) {
+                    _apiJson(['error' => 'Invalid group'], 422);
+                }
+            }
             $oldGroupName = 'None';
             if ($oldGroup) {
                 $s = $db->prepare('SELECT name FROM groups WHERE id = ?');
