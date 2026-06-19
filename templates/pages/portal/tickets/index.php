@@ -99,8 +99,8 @@ $sortParams = array_filter($filters, fn($v) => $v !== '' && $v !== 'mine');
         <table class="table table-hover align-middle mb-0">
             <thead class="table-light">
                 <tr>
-                    <th style="width:60px"><a href="<?= sortUrl('id', $sort, $dir, $sortParams, '/portal/tickets') ?>" class="text-decoration-none text-dark"># <?= sortIcon('id', $sort, $dir) ?></a></th>
-                    <th><a href="<?= sortUrl('subject', $sort, $dir, $sortParams, '/portal/tickets') ?>" class="text-decoration-none text-dark">Subject <?= sortIcon('subject', $sort, $dir) ?></a></th>
+                    <th style="width:60px;min-width:60px;white-space:nowrap;"><a href="<?= sortUrl('id', $sort, $dir, $sortParams, '/portal/tickets') ?>" class="text-decoration-none text-dark"># <?= sortIcon('id', $sort, $dir) ?></a></th>
+                    <th style="min-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><a href="<?= sortUrl('subject', $sort, $dir, $sortParams, '/portal/tickets') ?>" class="text-decoration-none text-dark">Subject <?= sortIcon('subject', $sort, $dir) ?></a></th>
                     <th><a href="<?= sortUrl('status', $sort, $dir, $sortParams, '/portal/tickets') ?>" class="text-decoration-none text-dark">Status <?= sortIcon('status', $sort, $dir) ?></a></th>
                     <th><a href="<?= sortUrl('priority', $sort, $dir, $sortParams, '/portal/tickets') ?>" class="text-decoration-none text-dark">Priority <?= sortIcon('priority', $sort, $dir) ?></a></th>
                     <th><a href="<?= sortUrl('type', $sort, $dir, $sortParams, '/portal/tickets') ?>" class="text-decoration-none text-dark">Type <?= sortIcon('type', $sort, $dir) ?></a></th>
@@ -121,8 +121,8 @@ $sortParams = array_filter($filters, fn($v) => $v !== '' && $v !== 'mine');
                 <?php else: ?>
                     <?php foreach ($tickets as $t): ?>
                     <tr style="cursor:pointer;" onclick="window.location='/portal/tickets/<?= $t['id'] ?>'">
-                        <td class="text-muted fw-bold"><?= $t['id'] ?></td>
-                        <td>
+                        <td class="text-muted fw-bold" style="white-space:nowrap;"><?= $t['id'] ?></td>
+                        <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:1px;" title="<?= e($t['subject']) ?>">
                             <a href="/portal/tickets/<?= $t['id'] ?>" class="text-decoration-none fw-semibold text-dark">
                                 <?= e($t['subject']) ?>
                             </a>

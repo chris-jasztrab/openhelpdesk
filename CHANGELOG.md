@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.107.2 &mdash; 2026-06-19
+
+### Fixed
+- **The portal "My Requests" ticket list no longer wraps the ticket number.** On the requester-facing list, the `#` and Subject columns had no width/wrap rules, so on narrow widths the ticket number could wrap onto a second line and the subject pushed the table around. The `#` column now matches the agent/admin tables — fixed width with `white-space:nowrap` so the number always stays on one line — and the Subject column clips overflowing text with an ellipsis (full subject available on hover) instead of wrapping.
+
+---
+
 ## 2.107.1 &mdash; 2026-06-19
 
 ### Fixed
