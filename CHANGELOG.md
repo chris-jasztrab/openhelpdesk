@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.106.2 &mdash; 2026-06-19
+
+### Security
+- **Knowledge-base article editing now requires the `kb.articles.manage` permission.** The edit form (`GET`/`POST /admin/kb/articles/{id}/edit`) was gated only on `Auth::requireStaff()`, while the sibling create/delete/history routes require `kb.articles.manage` — so any staff member, regardless of KB permission, could overwrite any article (defacement / planting trusted-looking but malicious instructions or links). Both edit handlers now require `kb.articles.manage`, matching create and delete. Admins are unaffected (admin roles bypass every permission check).
+
+---
+
 ## 2.106.1 &mdash; 2026-06-19
 
 ### Security

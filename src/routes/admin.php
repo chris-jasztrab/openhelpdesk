@@ -6015,7 +6015,7 @@ $router->post('/admin/kb/articles/create', function () {
 });
 
 $router->get('/admin/kb/articles/{id}/edit', function (array $p) {
-    Auth::requireStaff();
+    Auth::requirePermission('kb.articles.manage');
     $db   = Database::connect();
     $stmt = $db->prepare('SELECT * FROM kb_articles WHERE id = ?');
     $stmt->execute([(int) $p['id']]);
@@ -6034,7 +6034,7 @@ $router->get('/admin/kb/articles/{id}/edit', function (array $p) {
 });
 
 $router->post('/admin/kb/articles/{id}/edit', function (array $p) {
-    Auth::requireStaff();
+    Auth::requirePermission('kb.articles.manage');
     $id = (int) $p['id'];
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
