@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.106.6 &mdash; 2026-06-19
+
+### Security
+- **CSV exports now neutralise spreadsheet formula (CSV/DDE) injection.** The ticket export, KB-article export, and the failed-import "skipped rows" download wrote user-controlled cell values (subject, tags, names, KB title/body, imported data) verbatim. A value beginning with `=`, `+`, `-`, `@`, tab or CR is executed as a formula when the file is opened in Excel/LibreOffice — e.g. a ticket subject of `=HYPERLINK(...)` or a DDE payload runs in the admin's spreadsheet. Added a shared `csvCell()` sanitizer (prefixes such values with a single quote) and an `fputcsvSafe()` wrapper, applied to all export data rows. New test `TicketsTest::test_export_csv_neutralises_formula_injection`.
+
+---
+
 ## 2.106.5 &mdash; 2026-06-19
 
 ### Security

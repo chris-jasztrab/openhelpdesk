@@ -237,6 +237,27 @@ function requireJsonCsrf(): void
     }
 }
 
+/**
+ * Neutralise CSV / DDE formula injection. Spreadsheet apps (Excel, LibreOffice)
+ * execute a cell whose text begins with = + - @ (or a leading tab / CR). Prefix
+ * any such value with a single quote so it is treated as literal text. Run every
+ * user-influenced cell through this before writing it with fputcsv().
+ */
+function csvCell(mixed $value): string
+{
+    $s = (string) ($value ?? '');
+    if ($s !== '' && in_array($s[0], ['=', '+', '-', '@', "\t", "\r"], true)) {
+        return "'" . $s;
+    }
+    return $s;
+}
+
+/** fputcsv() that sanitises every cell against formula injection (see csvCell). */
+function fputcsvSafe($handle, array $row): void
+{
+    fputcsv($handle, array_map('csvCell', $row));
+}
+
 /* ── Output helpers ───────────────────────────────────────────── */
 
 function e(?string $value): string

@@ -199,6 +199,27 @@ class TicketsTest extends TestCase
         $this->assertOk($r);
     }
 
+    public function test_export_csv_neutralises_formula_injection(): void
+    {
+        $db = \Database::connect();
+        // A subject that begins with '=' is a spreadsheet formula trigger.
+        $subject = '=HYPERLINK("http://evil","[TEST] formula")';
+        $db->prepare("INSERT INTO tickets (subject, description, created_by, status) VALUES (?, 'x', ?, 'open')")
+           ->execute([$subject, DatabaseSeeder::$portalId]);
+        $tid = (int) $db->lastInsertId();
+
+        try {
+            $body = (string) $this->get($this->adminClient(), '/admin/tickets/export')->getBody();
+            $this->assertStringContainsString("'=HYPERLINK", $body,
+                ' — formula cell should be prefixed with a single quote');
+            $this->assertStringNotContainsString('"=HYPERLINK', $body,
+                ' — a CSV field must not begin directly with the formula trigger');
+        } finally {
+            $db->prepare('DELETE FROM ticket_timeline WHERE ticket_id = ?')->execute([$tid]);
+            $db->prepare('DELETE FROM tickets WHERE id = ?')->execute([$tid]);
+        }
+    }
+
     // ── Saved filters ─────────────────────────────────────────────────────────
 
     public function test_save_filter_and_delete_it(): void

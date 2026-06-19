@@ -3782,7 +3782,7 @@ $router->get('/admin/tickets/export', function () {
             $redact = true;
         }
 
-        fputcsv($out, [
+        fputcsvSafe($out, [
             $row['id'],
             $redact ? '[Confidential]' : $row['subject'],
             $statusLabels[$row['status']] ?? $row['status'],
@@ -6281,7 +6281,7 @@ $router->get('/admin/kb/export', function () {
     fputcsv($out, ['title', 'body_markdown', 'category', 'status', 'tags']);
 
     while ($row = $stmt->fetch()) {
-        fputcsv($out, [
+        fputcsvSafe($out, [
             $row['title'],
             $row['body_markdown'],
             $row['category'],
@@ -8007,7 +8007,7 @@ $router->post('/admin/settings/import/confirm', function () {
             $csvHeaders = array_keys($skippedRows[0]);
             fputcsv($fp, array_map(fn($h) => $h === '_reason' ? 'Skipped Reason' : $h, $csvHeaders));
             foreach ($skippedRows as $sr) {
-                fputcsv($fp, array_values($sr));
+                fputcsvSafe($fp, array_values($sr));
             }
             fclose($fp);
             $_SESSION['import_skipped_file'] = $skippedPath;
