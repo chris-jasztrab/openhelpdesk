@@ -813,6 +813,11 @@
                                         "description": "Human-readable label stored with the token",
                                         "example": "Jane's iPhone 15",
                                         "default": "Mobile App"
+                                    },
+                                    "totp_code": {
+                                        "type": "string",
+                                        "description": "Six-digit TOTP code. Required only when the account has two-factor authentication enabled. The key `code` is accepted as an alias.",
+                                        "example": "123456"
                                     }
                                 }
                             }
@@ -841,20 +846,57 @@
                         }
                     },
                     "401": {
-                        "description": "Invalid credentials",
+                        "description": "Invalid credentials, or a two-factor code is required/incorrect. When 2FA is required the body carries `totp_required: true` — resubmit with `totp_code`.",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Error"
+                                    "type": "object",
+                                    "required": [
+                                        "error"
+                                    ],
+                                    "properties": {
+                                        "error": {
+                                            "type": "string"
+                                        },
+                                        "totp_required": {
+                                            "type": "boolean",
+                                            "description": "Present and true when the account has 2FA enabled and a valid code was not supplied"
+                                        }
+                                    }
                                 },
-                                "example": {
-                                    "error": "Invalid credentials"
+                                "examples": {
+                                    "invalid": {
+                                        "summary": "Wrong email/password",
+                                        "value": {
+                                            "error": "Invalid credentials"
+                                        }
+                                    },
+                                    "twoFactor": {
+                                        "summary": "2FA code required",
+                                        "value": {
+                                            "error": "A two-factor authentication code is required.",
+                                            "totp_required": true
+                                        }
+                                    }
                                 }
                             }
                         }
                     },
                     "422": {
                         "$ref": "#/components/responses/UnprocessableEntity"
+                    },
+                    "429": {
+                        "description": "Login throttled — 5 failures per email or 10 per IP within a rolling 15-minute window",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                },
+                                "example": {
+                                    "error": "Too many failed login attempts. Please try again in a few minutes."
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -881,6 +923,43 @@
                                 }
                             }
                         }
+                    }
+                }
+            }
+        },
+        "/auth/rotate": {
+            "post": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Rotate the current Bearer token",
+                "description": "Issues a new token and atomically invalidates the one presented in the `Authorization` header. Call before the 90-day expiry to stay signed in without re-entering credentials. If the new token cannot be stored the old one is preserved.",
+                "responses": {
+                    "200": {
+                        "description": "New token issued",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "token": {
+                                            "type": "string",
+                                            "description": "New 64-character hex Bearer token",
+                                            "example": "f6e5d4c3b2a1..."
+                                        },
+                                        "expires_at": {
+                                            "type": "string",
+                                            "format": "date-time",
+                                            "description": "When the new token expires (90 days out)",
+                                            "example": "2026-09-17 12:00:00"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
                     }
                 }
             }

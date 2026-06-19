@@ -11,6 +11,14 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.107.4 &mdash; 2026-06-19
+
+### Documentation
+- **Added a human-readable Mobile API reference at `docs/API.md`,** generated from the actual `/api/v1` route definitions in `src/routes/api.php`. Covers every endpoint, auth/2FA/throttle behaviour, roles & visibility, response schemas, and a "known gaps" section (no attachment up/download, no push-token registration, no device-revocation list).
+- **Brought `openapi.json` back in sync with the code.** Three things the spec was missing: the `POST /auth/rotate` endpoint (was implemented but undocumented); the `/auth/login` two-factor flow (`totp_code` request field and the `401 { totp_required: true }` response); and the `/auth/login` `429` throttle response.
+
+---
+
 ## 2.107.3 &mdash; 2026-06-19
 
 ### Fixed
