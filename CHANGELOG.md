@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.107.3 &mdash; 2026-06-19
+
+### Fixed
+- **The portal dashboard's recent-tickets list no longer wraps the ticket number.** Applied the same `#`/Subject column treatment as the "My Requests" list (2.107.2): the `#` column is fixed-width with `white-space:nowrap` so the number always stays on one line, and the Subject column clips overflowing text with an ellipsis (full subject on hover) instead of wrapping.
+
+---
+
 ## 2.107.2 &mdash; 2026-06-19
 
 ### Fixed

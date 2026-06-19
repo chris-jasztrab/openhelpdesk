@@ -45,8 +45,8 @@ unset($__s);
         <table class="table table-hover align-middle mb-0">
             <thead class="table-light">
                 <tr>
-                    <th style="width:60px">#</th>
-                    <th>Subject</th>
+                    <th style="width:60px;min-width:60px;white-space:nowrap;">#</th>
+                    <th style="min-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Subject</th>
                     <th>Status</th>
                     <th>Priority</th>
                     <th>Assigned To</th>
@@ -56,8 +56,8 @@ unset($__s);
             <tbody>
                 <?php foreach ($recentTickets as $t): ?>
                 <tr style="cursor:pointer;" onclick="window.location='/portal/tickets/<?= $t['id'] ?>'">
-                    <td class="text-muted fw-bold"><?= $t['id'] ?></td>
-                    <td>
+                    <td class="text-muted fw-bold" style="white-space:nowrap;"><?= $t['id'] ?></td>
+                    <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:1px;" title="<?= e($t['subject']) ?>">
                         <a href="/portal/tickets/<?= $t['id'] ?>" class="text-decoration-none fw-semibold text-dark">
                             <?= e($t['subject']) ?>
                         </a>
