@@ -31,9 +31,28 @@ lives in [`openapi.json`](../openapi.json) at the repo root.
   | `403` | Authenticated but not allowed (role or per-ticket access) |
   | `404` | Resource not found |
   | `422` | Validation error (missing/invalid field) |
-  | `429` | Login throttled — too many failed attempts |
+  | `429` | Rate limit exceeded (per-user cap) or login throttled — see Rate limiting |
 
 - Error bodies are always `{ "error": "<message>" }`.
+
+### Rate limiting
+
+Every authenticated endpoint is capped **per user** at `API_RATE_LIMIT_PER_MIN`
+requests per rolling 60-second window (default **120**; set to `0` to disable).
+The limit is keyed on the user, not the token, so additional tokens don't widen
+it. Every response carries:
+
+| Header | Meaning |
+|--------|---------|
+| `X-RateLimit-Limit` | The per-minute cap |
+| `X-RateLimit-Remaining` | Requests left in the current window |
+
+Over the cap you get `429` with a `Retry-After: <seconds>` header and
+`{ "error": "Rate limit exceeded. Try again in N second(s)." }`. Clients should
+honour `Retry-After` and can watch `X-RateLimit-Remaining` to self-throttle.
+`POST /auth/login` is governed separately by its own failed-attempt throttle
+(see below).
+
 - List endpoints return a consistent envelope:
   ```json
   { "data": [ ... ], "total": 100, "page": 1, "per_page": 25, "last_page": 4 }
@@ -410,9 +429,11 @@ the mobile clients:
 2. **Notifications are still poll-based until push delivery lands.** Clients
    poll `GET /notifications`; the `unread` count in that envelope is cheap to
    poll on a timer.
-3. **Login throttling only.** Per-login throttling exists, but the
-   authenticated endpoints are not separately rate-limited — worth adding before
-   the API is exposed to the open internet.
+3. **Rate limiting is a single per-user cap.** There's one
+   requests-per-minute limit across all authenticated endpoints — it is not
+   tuned per endpoint or stricter for writes/uploads. A heavy GET poller and a
+   burst of POSTs draw from the same bucket. Fine as a baseline DoS guard;
+   revisit if specific endpoints need their own ceilings.
 4. **No "list / revoke my devices" endpoint.** Tokens carry a `device_name`, but
    a user can only revoke the token on the device they're currently holding
    (`/auth/logout`) or rotate it. There's no "sign out all other devices".

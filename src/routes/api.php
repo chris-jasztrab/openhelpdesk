@@ -82,7 +82,68 @@ function _apiAuth(): array
         _apiJson(['error' => 'Invalid or expired token'], 401);
     }
     $db->prepare('UPDATE api_tokens SET last_used_at = NOW() WHERE token_hash = ?')->execute([$hash]);
+
+    // Every authenticated endpoint funnels through here, so this is the single
+    // choke point for per-user request rate limiting.
+    _apiRateLimit($db, (int) $user['id']);
+
     return $user;
+}
+
+/**
+ * Per-user fixed-window request rate limit for the authenticated API.
+ *
+ * A counter row per (user, 60-second window) is incremented on every call; once
+ * it passes API_RATE_LIMIT_PER_MIN (default 120) the caller gets 429 with a
+ * Retry-After until the window rolls over. Keyed on the user — not the token —
+ * so spinning up extra tokens doesn't multiply the allowance. `X-RateLimit-*`
+ * headers are emitted on every response so clients can self-throttle.
+ *
+ * Fails OPEN: a limiter DB error must never take the API down (a rate limiter
+ * that hard-fails is itself a denial-of-service vector), so on error we log and
+ * allow the request. Set API_RATE_LIMIT_PER_MIN=0 to disable entirely.
+ */
+function _apiRateLimit(PDO $db, int $userId): void
+{
+    $limit = (int) env('API_RATE_LIMIT_PER_MIN', '120');
+    if ($limit <= 0) {
+        return; // disabled
+    }
+
+    $now    = time();
+    $window = $now - ($now % 60);
+    $bucket = 'user:' . $userId;
+
+    try {
+        $db->prepare(
+            'INSERT INTO api_rate_limits (bucket, window_start, count)
+             VALUES (?, ?, 1)
+             ON DUPLICATE KEY UPDATE count = count + 1'
+        )->execute([$bucket, $window]);
+
+        $c = $db->prepare('SELECT count FROM api_rate_limits WHERE bucket = ? AND window_start = ?');
+        $c->execute([$bucket, $window]);
+        $count = (int) $c->fetchColumn();
+
+        // Opportunistically prune windows older than two minutes (~1% of calls)
+        // so the table never accumulates stale rows.
+        if (random_int(1, 100) === 1) {
+            $db->prepare('DELETE FROM api_rate_limits WHERE window_start < ?')
+                ->execute([$window - 120]);
+        }
+    } catch (\Throwable $e) {
+        error_log('_apiRateLimit failed (allowing request): ' . $e->getMessage());
+        return; // fail open
+    }
+
+    header('X-RateLimit-Limit: ' . $limit);
+    header('X-RateLimit-Remaining: ' . max(0, $limit - $count));
+
+    if ($count > $limit) {
+        $retry = 60 - ($now % 60);
+        header('Retry-After: ' . $retry);
+        _apiJson(['error' => 'Rate limit exceeded. Try again in ' . $retry . ' second(s).'], 429);
+    }
 }
 
 /**

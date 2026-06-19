@@ -2,7 +2,7 @@
     "openapi": "3.0.3",
     "info": {
         "title": "OpenHelpDesk Mobile API",
-        "description": "REST API for the OpenHelpDesk helpdesk system. Designed for Android and iOS clients.\n\n## Authentication\nAll endpoints (except `POST /auth/login`) require a Bearer token in the\n`Authorization` header:\n```\nAuthorization: Bearer <token>\n```\nObtain a token by calling `POST /auth/login`. Revoke it with `POST /auth/logout`.\n\n## Roles\n| Role    | Access                                          |\n|---------|--------------------------------------------------|\n| `admin` | Full access to all endpoints                    |\n| `agent` | All agent endpoints; sees tickets per group membership |\n| `user`  | Own tickets only; no internal notes or agent data |\n\n## Pagination\nList endpoints return a consistent envelope:\n```json\n{ \"data\": [...], \"total\": 100, \"page\": 1, \"per_page\": 25, \"last_page\": 4 }\n```\n",
+        "description": "REST API for the OpenHelpDesk helpdesk system. Designed for Android and iOS clients.\n\n## Authentication\nAll endpoints (except `POST /auth/login`) require a Bearer token in the\n`Authorization` header:\n```\nAuthorization: Bearer <token>\n```\nObtain a token by calling `POST /auth/login`. Revoke it with `POST /auth/logout`.\n\n## Roles\n| Role    | Access                                          |\n|---------|--------------------------------------------------|\n| `admin` | Full access to all endpoints                    |\n| `agent` | All agent endpoints; sees tickets per group membership |\n| `user`  | Own tickets only; no internal notes or agent data |\n\n## Pagination\nList endpoints return a consistent envelope:\n```json\n{ \"data\": [...], \"total\": 100, \"page\": 1, \"per_page\": 25, \"last_page\": 4 }\n```\n\n## Rate limiting\nEvery authenticated endpoint is capped per user at `API_RATE_LIMIT_PER_MIN`\nrequests per rolling 60-second window (default 120). Responses carry\n`X-RateLimit-Limit` and `X-RateLimit-Remaining`; exceeding the cap returns `429`\nwith a `Retry-After` header. `POST /auth/login` has its own failed-attempt\nthrottle.\n",
         "version": "1.0.0",
         "contact": {
             "name": "Example Library — IT"
@@ -781,6 +781,27 @@
                         },
                         "example": {
                             "error": "subject is required"
+                        }
+                    }
+                }
+            },
+            "TooManyRequests": {
+                "description": "Per-user rate limit exceeded. Carries a Retry-After header.",
+                "headers": {
+                    "Retry-After": {
+                        "description": "Seconds until the current window resets",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/Error"
+                        },
+                        "example": {
+                            "error": "Rate limit exceeded. Try again in 14 second(s)."
                         }
                     }
                 }

@@ -11,6 +11,16 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.108.1 &mdash; 2026-06-19
+
+### Added
+- **Mobile API: per-user request rate limiting.** Every authenticated `/api/v1` endpoint is now capped at `API_RATE_LIMIT_PER_MIN` requests per rolling 60-second window (default 120; `0` disables). Enforced at the single `_apiAuth()` choke point via a fixed-window counter table (`api_rate_limits`, migration `057`), keyed on the user so extra tokens don't widen the allowance. Responses carry `X-RateLimit-Limit` / `X-RateLimit-Remaining`; over the cap returns `429` with `Retry-After`. The limiter **fails open** — a counter DB error logs and allows the request rather than taking the API down — and opportunistically prunes stale windows so the table stays tiny. Hardening step ahead of exposing the API to the public internet.
+
+### Documentation
+- Documented rate limiting (headers, `429`/`Retry-After`, the `API_RATE_LIMIT_PER_MIN` knob) in `docs/API.md` and `openapi.json`.
+
+---
+
 ## 2.108.0 &mdash; 2026-06-19
 
 ### Added
