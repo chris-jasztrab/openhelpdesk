@@ -317,7 +317,11 @@ $router->post('/api/v1/auth/login', function () {
     $stmt->execute([$email]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if (!$user || !password_verify($password, $user['password'])) {
+    // Always run a verify (against a dummy hash when the user is missing) so a
+    // non-existent account can't be distinguished by response latency.
+    $passwordOk = password_verify($password, $user['password'] ?? Auth::DUMMY_PASSWORD_HASH);
+
+    if (!$user || !$passwordOk) {
         _apiLoginRecordAttempt($db, $email, $ip, false);
         // Tie the failed attempt to the targeted account when one exists,
         // so the audit log can surface stuffing patterns against real users.

@@ -26,7 +26,8 @@ loadEnv(ROOT_DIR . '/.env');
 if (php_sapi_name() !== 'cli') {
     $expectedToken = env('SLA_CRON_TOKEN');
     $providedToken = $_GET['token'] ?? '';
-    if ($expectedToken === '' || $providedToken !== $expectedToken) {
+    // Fail closed if no token is configured; constant-time compare otherwise.
+    if ($expectedToken === '' || !hash_equals($expectedToken, (string) $providedToken)) {
         http_response_code(403);
         echo 'Forbidden';
         exit;

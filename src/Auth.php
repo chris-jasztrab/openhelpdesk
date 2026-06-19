@@ -4,6 +4,14 @@ declare(strict_types=1);
 
 class Auth
 {
+    /**
+     * A valid bcrypt hash of a throwaway string. When no user matches the
+     * supplied email we still run password_verify() against this so the
+     * response time does not reveal whether the account exists (timing-based
+     * user enumeration). The literal value is irrelevant — only its cost.
+     */
+    public const DUMMY_PASSWORD_HASH = '$2y$10$s5XI8w2iEwhiUMT/acOjEOgRaZNY6zQghfkyWo0mDt8lJNMw/V0rW';
+
     public static function attempt(string $email, string $password): bool
     {
         $db   = Database::connect();
@@ -11,7 +19,11 @@ class Auth
         $stmt->execute([$email]);
         $user = $stmt->fetch();
 
-        if ($user && password_verify($password, $user['password'])) {
+        // Always run a verify (against a dummy hash when the user is missing) so
+        // a non-existent account can't be distinguished by response latency.
+        $valid = password_verify($password, $user['password'] ?? self::DUMMY_PASSWORD_HASH);
+
+        if ($user && $valid) {
             $_SESSION['user'] = [
                 'id'         => (int) $user['id'],
                 'first_name' => $user['first_name'],

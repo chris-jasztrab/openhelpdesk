@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.106.8 &mdash; 2026-06-19
+
+### Security
+- **Login no longer leaks account existence through response timing, and the SLA cron token compare is constant-time.** Both the web login (`Auth::attempt`) and the API login skipped `password_verify()` entirely when no user matched the email, so a missing account returned measurably faster than a real account with a wrong password (timing-based user enumeration, only partially masked by the throttle). Both now always run one `password_verify()` — against a shared dummy bcrypt hash (`Auth::DUMMY_PASSWORD_HASH`) when the user is absent — equalising the timing. Separately, `public/sla-cron.php` now compares its token with `hash_equals()` instead of `!==` (it already fails closed when the token is unset).
+
+---
+
 ## 2.106.7 &mdash; 2026-06-19
 
 ### Security
