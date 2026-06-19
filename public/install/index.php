@@ -143,7 +143,18 @@ function handleStep2(): void
         $pdo->exec("USE `{$name}`");
 
     } catch (PDOException $e) {
-        setErrors(['Could not connect to the database: ' . $e->getMessage()]);
+        // Log the raw driver message server-side; show the installer a friendly,
+        // non-sensitive hint so a pre-install probe can't harvest host/credential
+        // details from the verbatim DB error.
+        error_log('[install] DB connection failed: ' . $e->getMessage());
+        $code = preg_match('/\[(\d{3,4})\]/', $e->getMessage(), $m) ? (int) $m[1] : 0;
+        $hint = match ($code) {
+            1044, 1045 => 'Access denied — check the database username and password.',
+            1049       => 'The database does not exist — enable “create database”, or create it first.',
+            2002, 2003 => 'Could not reach the database server — check the host and port.',
+            default    => 'Could not connect to the database. Check the host, port, and credentials.',
+        };
+        setErrors([$hint]);
         storeFormData(['db_host' => $host, 'db_port' => $port, 'db_name' => $name, 'db_user' => $user]);
         redirectToStep(2);
         return;
@@ -419,7 +430,10 @@ function handleInstall(): void
         unset($_SESSION['install']);
 
     } catch (Exception $e) {
-        $fatalError = $e->getMessage();
+        // Detail to the server log only; the page shows a generic message so the
+        // setup step can't leak internal paths / schema to a pre-install visitor.
+        error_log('[install] setup failed: ' . $e->getMessage());
+        $fatalError = 'Installation failed while applying the database schema. Check the server error log for details.';
     }
 
     // Render result page

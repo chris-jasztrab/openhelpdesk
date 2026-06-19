@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.106.10 &mdash; 2026-06-19
+
+### Security
+- **The installer no longer echoes raw database / setup error messages.** The setup wizard printed the verbatim `PDOException` message on a failed DB connection and the raw exception message on a failed install step. Both are reachable only before installation completes (the runtime lock blocks re-runs), but during that window a visitor could harvest host/credential/path hints. The DB step now logs the driver message server-side and shows a friendly, non-sensitive hint mapped from the error code; the setup step logs detail and shows a generic message pointing to the server error log.
+
+---
+
 ## 2.106.9 &mdash; 2026-06-19
 
 ### Security
