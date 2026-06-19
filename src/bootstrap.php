@@ -46,9 +46,15 @@ session_set_cookie_params([
 session_start();
 
 // Baseline security response headers. Set before any output so they apply to
-// every response (HTML, JSON, redirects). CSP is intentionally permissive
-// enough for the current Bootstrap-from-CDN + inline-handler templates; tighten
-// once those are migrated to nonces or local assets.
+// every response (HTML, JSON, redirects).
+//
+// CSP note: script-src still allows 'unsafe-inline' because the templates rely
+// on inline <script> blocks and inline event handlers (onclick=…). Removing it
+// requires migrating every one of those to a per-request nonce or external
+// file — a templating refactor tracked separately, not a config flip. The
+// directives below are otherwise locked down (object-src 'none', frame-ancestors
+// 'none', base-uri/form-action 'self') so the inline allowance is the only
+// remaining loosening.
 if (!headers_sent()) {
     header('X-Frame-Options: DENY');
     header('X-Content-Type-Options: nosniff');
@@ -64,6 +70,7 @@ if (!headers_sent()) {
       . "font-src 'self' data: https://cdn.jsdelivr.net https://cdn.ckeditor.com; "
       . "img-src 'self' data: blob:; "
       . "connect-src 'self' https://cdn.ckeditor.com; "
+      . "object-src 'none'; "
       . "frame-ancestors 'none'; "
       . "base-uri 'self'; "
       . "form-action 'self'"

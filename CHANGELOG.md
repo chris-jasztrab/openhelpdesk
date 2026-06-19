@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.106.13 &mdash; 2026-06-19
+
+### Security
+- **Tightened the Content-Security-Policy with `object-src 'none'`** (blocks `<object>`/`<embed>`/plugin-based content). Note: `script-src` still allows `'unsafe-inline'` because the templates depend on inline `<script>` blocks and `onclick=`-style handlers; removing that allowance requires migrating all inline JS to per-request nonces or external files, which is tracked as a separate templating refactor rather than a header change. All other directives remain locked down (`default-src 'self'`, `frame-ancestors 'none'`, `base-uri`/`form-action 'self'`).
+
+---
+
 ## 2.106.12 &mdash; 2026-06-19
 
 ### Changed
