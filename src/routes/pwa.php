@@ -32,13 +32,19 @@ $router->get('/sw.js', function () {
     header('Service-Worker-Allowed: /');
 
     $version = PWA::swCacheVersion();
-    $appName = json_encode(getSetting('branding_app_name', 'OpenHelpDesk'), JSON_UNESCAPED_SLASHES);
+    // Inject every dynamic value as a JSON literal, never via raw string
+    // interpolation, so a branding/app-name string can never break out of its
+    // JS context (defence-in-depth: VERSION is currently APP_VERSION + a hex
+    // hash, but treat all injected values as untrusted data).
+    $versionJs = json_encode($version, JSON_UNESCAPED_SLASHES);
+    $appNameJs = json_encode(getSetting('branding_app_name', 'OpenHelpDesk'), JSON_UNESCAPED_SLASHES);
 
-    // The service worker is plain JS — no PHP except for the version
-    // and app-name strings injected via heredoc.
+    // The service worker is plain JS — the only PHP-injected values are the
+    // JSON literals below.
     echo <<<JS
-// {$appName} service worker — cache version {$version}
-const VERSION = '{$version}';
+// Service worker — cache version {$versionJs}
+const APP_NAME = {$appNameJs};
+const VERSION = {$versionJs};
 const STATIC_CACHE  = 'ld-static-' + VERSION;
 const RUNTIME_CACHE = 'ld-runtime-' + VERSION;
 const OFFLINE_URL   = '/offline';

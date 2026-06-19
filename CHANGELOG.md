@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.106.7 &mdash; 2026-06-19
+
+### Security
+- **Service-worker generation now injects dynamic values as JSON literals.** `/sw.js` built its JavaScript by raw string-interpolating the cache version and the branding app name into the worker source (and the app name into a comment). The cache version is currently `APP_VERSION` + a hex hash (not user-controllable), but the branding app name is admin-set, and raw interpolation is fragile: a crafted name could break out of its JS context and execute at the service worker's root scope on every client. Both values are now emitted via `json_encode()` as proper JS string literals. Added `Public/PwaServiceWorkerTest`, which confirms a hostile app name is escaped (verified separately with `node --check`).
+
+---
+
 ## 2.106.6 &mdash; 2026-06-19
 
 ### Security
