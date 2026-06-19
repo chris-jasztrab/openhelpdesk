@@ -179,6 +179,53 @@ class AccessControlTest extends TestCase
         $this->assertForbidden($r, ' — portal user should not see admin ticket view');
     }
 
+    // ── Bulk actions respect per-ticket visibility (regression) ───────────────
+
+    /**
+     * Regression for the inverted confidential/visibility filter in
+     * POST /agent/tickets/bulk: a non-admin staffer (no tickets.view_all, no
+     * group) must not be able to bulk-act on a ticket they cannot see, even
+     * though they hold tickets.bulk_close. A ticket they DO watch still closes.
+     */
+    public function test_agent_cannot_bulk_act_on_invisible_tickets(): void
+    {
+        $db = \Database::connect();
+
+        // Not visible: portal-owned, no group, agent is not a watcher.
+        $db->prepare("INSERT INTO tickets (subject, description, created_by, status) VALUES ('[TEST] Invisible bulk', 'x', ?, 'open')")
+           ->execute([DatabaseSeeder::$portalId]);
+        $invisibleId = (int) $db->lastInsertId();
+
+        // Visible: same, but the agent watches it.
+        $db->prepare("INSERT INTO tickets (subject, description, created_by, status) VALUES ('[TEST] Visible bulk', 'x', ?, 'open')")
+           ->execute([DatabaseSeeder::$portalId]);
+        $visibleId = (int) $db->lastInsertId();
+        $db->prepare('INSERT IGNORE INTO ticket_watchers (ticket_id, user_id) VALUES (?, ?)')
+           ->execute([$visibleId, DatabaseSeeder::$agentId]);
+
+        $statusOf = function (int $id) use ($db): string {
+            $s = $db->prepare('SELECT status FROM tickets WHERE id = ?');
+            $s->execute([$id]);
+            return (string) $s->fetchColumn();
+        };
+
+        try {
+            $this->post($this->agentClient(), '/agent/tickets/bulk', [
+                'action'     => 'close',
+                'ticket_ids' => [$invisibleId, $visibleId],
+            ]);
+
+            $this->assertSame('open', $statusOf($invisibleId),
+                ' — agent must not bulk-close a ticket they cannot see');
+            $this->assertSame('closed', $statusOf($visibleId),
+                ' — agent should still bulk-close a ticket they can see');
+        } finally {
+            $db->prepare('DELETE FROM ticket_watchers WHERE ticket_id IN (?, ?)')->execute([$invisibleId, $visibleId]);
+            $db->prepare('DELETE FROM ticket_timeline  WHERE ticket_id IN (?, ?)')->execute([$invisibleId, $visibleId]);
+            $db->prepare('DELETE FROM tickets           WHERE id IN (?, ?)')->execute([$invisibleId, $visibleId]);
+        }
+    }
+
     // ── Redirect destination after auth guard ─────────────────────────────────
 
     public function test_unauthenticated_request_redirects_to_login_not_403(): void

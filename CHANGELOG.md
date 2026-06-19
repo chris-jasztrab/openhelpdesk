@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.106.1 &mdash; 2026-06-19
+
+### Security
+- **Bulk ticket actions now enforce per-ticket visibility for non-admin staff.** The confidential/visibility filter in `POST /agent/tickets/bulk` and `POST /admin/tickets/bulk` was gated on `if (Auth::isAdmin())` — exactly backwards. Admins (who reach confidential tickets through the audited re-auth flow) got the filtering, while ordinary agents — who hold the bulk permissions by default — got **none**, letting any staffer close / reassign / re-status / re-prioritise / re-group / merge / delete *any* ticket id (including confidential tickets outside their groups) just by POSTing the ids. Non-admin staff bulk sets are now intersected with the shared `ticketStaffVisibilitySql()` predicate (the same rule the ticket list/count queries use); the admin path keeps its existing confidential-group exclusion. Added a regression test (`AccessControlTest::test_agent_cannot_bulk_act_on_invisible_tickets`).
+
+---
+
 ## 2.106.0 &mdash; 2026-06-19
 
 ### Changed

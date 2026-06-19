@@ -831,8 +831,12 @@ $router->post('/agent/tickets/bulk', function () {
 
     $db           = Database::connect();
 
-    // Filter out confidential tickets the user cannot access
+    // Restrict the operated-on set to tickets the actor may actually access.
+    // Without this, a non-admin staffer could bulk-act on confidential or
+    // out-of-group tickets simply by POSTing arbitrary ids.
     if (Auth::isAdmin()) {
+        // Admins have no per-action re-auth flow for bulk, so exclude
+        // confidential tickets whose group the admin is not a member of.
         $gs = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
         $gs->execute([Auth::id()]);
         $myGroups = array_map('intval', $gs->fetchAll(PDO::FETCH_COLUMN));
@@ -852,10 +856,19 @@ $router->post('/agent/tickets/bulk', function () {
             $allowed[] = $tid;
         }
         $ticketIds = $allowed;
-        if (empty($ticketIds)) {
-            flash('error', 'No accessible tickets selected (confidential tickets were excluded).');
-            redirect('/agent/tickets');
-        }
+    } else {
+        // Non-admin staff: keep only the tickets the shared staff-visibility
+        // predicate permits (same rule used by the ticket list/count queries).
+        $vis  = ticketStaffVisibilitySql($db, (int) Auth::id(), Auth::role(), 't');
+        $ph   = implode(',', array_fill(0, count($ticketIds), '?'));
+        $stmt = $db->prepare("SELECT t.id FROM tickets t WHERE t.id IN ($ph) AND {$vis['sql']}");
+        $stmt->execute(array_merge(array_values($ticketIds), $vis['params']));
+        $ticketIds = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    }
+
+    if (empty($ticketIds)) {
+        flash('error', 'No accessible tickets selected.');
+        redirect('/agent/tickets');
     }
 
     $placeholders = implode(',', array_fill(0, count($ticketIds), '?'));
