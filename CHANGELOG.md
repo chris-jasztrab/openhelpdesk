@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.107.1 &mdash; 2026-06-19
+
+### Fixed
+- **Rich-text email intros no longer render with broken/dropped styling.** Every transactional email wraps the customisable intro in a styled paragraph, but the CKEditor that edits those intros emits its own `<p>…</p>`, producing an invalid `<p><p>…</p></p>` — which mail clients parse by dropping the intended 14px/grey styling (and adding a stray blank line). The intro wrapper is now a `<div>` instead of a `<p>` in the nine editor-managed templates (Ticket Created, Updated, Merged, CSAT, Reminder, Group Alerts/New Ticket, Agent Assigned, Group Assigned, Escalation Alert), so a saved rich-text intro inherits the correct styling and multi-paragraph/bulleted intros render as valid HTML. Plain-text intros are unchanged. This was a latent issue that only surfaced once an intro was saved through the rich-text editor (e.g. the new per-group overrides).
+
+---
+
 ## 2.107.0 &mdash; 2026-06-19
 
 ### Added

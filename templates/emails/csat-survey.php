@@ -19,9 +19,9 @@
     <tr>
         <td style="padding:32px;">
             <p style="margin:0 0 4px; font-size:14px; color:#64748b;">Hi <?= htmlspecialchars($firstName, ENT_QUOTES, 'UTF-8') ?>,</p>
-            <p style="margin:0 0 28px; font-size:14px; color:#64748b;">
+            <div style="margin:0 0 28px; font-size:14px; color:#64748b;">
                 <?= $introText ?>
-            </p>
+            </div>
 
             <?php if (!empty($showReopen)): ?>
             <!-- Step 1: Was your issue resolved? -->

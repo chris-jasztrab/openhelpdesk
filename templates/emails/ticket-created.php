@@ -17,7 +17,7 @@
     <tr>
         <td style="padding:32px;">
             <h2 style="margin:0 0 8px; font-size:18px; color:#1e293b;">[Ticket #<?= (int) $ticketId ?>] <?= htmlspecialchars($subject, ENT_QUOTES, 'UTF-8') ?></h2>
-            <p style="margin:0 0 24px; font-size:14px; color:#64748b;"><?= $introText ?? 'Your ticket has been created and our team will review it shortly.' ?></p>
+            <div style="margin:0 0 24px; font-size:14px; color:#64748b;"><?= $introText ?? 'Your ticket has been created and our team will review it shortly.' ?></div>
 
             <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
                 <tr>

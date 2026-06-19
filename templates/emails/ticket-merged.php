@@ -17,7 +17,7 @@
     <tr>
         <td style="padding:32px;">
             <h2 style="margin:0 0 8px; font-size:18px; color:#1e293b;">Your ticket has been merged</h2>
-            <p style="margin:0 0 24px; font-size:14px; color:#64748b;"><?= $introText ?? 'Ticket #' . (int) $sourceTicketId . ' has been consolidated with a related ticket. You can view updates and add comments on the master ticket.' ?></p>
+            <div style="margin:0 0 24px; font-size:14px; color:#64748b;"><?= $introText ?? 'Ticket #' . (int) $sourceTicketId . ' has been consolidated with a related ticket. You can view updates and add comments on the master ticket.' ?></div>
 
             <!-- Source ticket -->
             <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;">
