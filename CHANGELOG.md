@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.106.14 &mdash; 2026-06-19
+
+### Added
+- **The live "Opened by X" hint now shows in the Compact (inbox) and Card list views too.** It previously only appeared in the table view; the same amber subject + *"Opened by / Being replied to by X"* hint (and its ~10-second live appear/clear polling) now works in all three layouts. No new code path — the card and inbox subject cells were given the same `ld-subject-cell` markup the existing list poller already drives, so they update without a refresh exactly like the table view.
+
+---
+
 ## 2.106.13 &mdash; 2026-06-19
 
 ### Security

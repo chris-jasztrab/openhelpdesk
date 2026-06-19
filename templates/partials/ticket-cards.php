@@ -48,6 +48,7 @@ $slaOn       = slaEnabled();
         <?php
             $isAssignedToMe = ($t['assigned_to'] == Auth::id());
             $isRedacted = isTicketRedactedForUser($t, $confidentialTypeIds ?? [], $adminGroupIds ?? []);
+            $presence   = $ticketPresence[$t['id']] ?? null; // live "Opened by X" hint
             $isOpen     = !in_array($t['status'], $closedSlugs, true);
             $awaitingFirstResponse = $isOpen && empty($t['first_responded_at']);
 
@@ -82,7 +83,7 @@ $slaOn       = slaEnabled();
                 <?php if ($isRedacted): ?><i class="bi bi-shield-lock"></i><?php else: ?><?= e(nameInitials($name ?: 'Unknown')) ?><?php endif; ?>
             </div>
 
-            <div class="flex-grow-1" style="min-width:0;">
+            <div class="flex-grow-1<?= $isRedacted ? '' : ' ld-subject-cell' ?>"<?= $isRedacted ? '' : ' data-ticket-id="' . (int) $t['id'] . '"' ?> style="min-width:0;">
                 <div class="d-flex align-items-center gap-2 flex-wrap">
                     <?php if ($awaitingFirstResponse && !$isRedacted): ?>
                     <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle" title="No agent reply yet">New</span>
@@ -94,7 +95,7 @@ $slaOn       = slaEnabled();
                         <span class="fw-semibold text-muted fst-italic"><i class="bi bi-shield-lock me-1"></i>[Confidential]</span>
                         <span class="text-muted small">#<?= (int) $t['id'] ?></span>
                     <?php else: ?>
-                        <span class="ld-card-subject fw-semibold text-truncate" style="max-width:100%;"><?= e($t['subject']) ?></span>
+                        <span class="ld-card-subject ld-subject-link fw-semibold text-truncate" style="max-width:100%;"><?= e($t['subject']) ?></span>
                         <span class="text-muted small">#<?= (int) $t['id'] ?></span>
                         <?php if ($isAssignedToMe): ?><span class="badge bg-primary bg-opacity-10 text-primary">Mine</span><?php endif; ?>
                         <?php if ($t['merged_into_ticket_id']): ?>
@@ -102,6 +103,13 @@ $slaOn       = slaEnabled();
                         <?php endif; ?>
                     <?php endif; ?>
                 </div>
+                <?php if (!$isRedacted): ?>
+                <span class="ld-presence-hint d-block small fst-italic mt-1" style="color:#b45309;<?= $presence ? '' : 'display:none;' ?>" title="Another staff member currently has this ticket open">
+                    <?php if ($presence): ?>
+                    <i class="bi <?= $presence['replying'] ? 'bi-pencil-fill' : 'bi-eye-fill' ?> me-1"></i><?= $presence['replying'] ? 'Being replied to by ' : 'Opened by ' ?><?= e($presence['name']) ?>
+                    <?php endif; ?>
+                </span>
+                <?php endif; ?>
                 <div class="ld-card-meta text-muted mt-1 d-flex align-items-center gap-2 flex-wrap">
                     <?php $place = $t['location_name'] ?: $t['group_name']; ?>
                     <?php if ($place): ?>

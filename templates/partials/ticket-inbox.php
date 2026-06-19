@@ -26,6 +26,9 @@ $inboxBase = $inboxBase ?? '/agent/tickets';
     }
     #ticketInbox .ld-inbox-subject-text { color: var(--bs-body-color); }
     #ticketInbox tr.ld-inbox-row:hover .ld-inbox-subject-text { text-decoration: underline; }
+    /* The "Opened by X" hint sits on its own line under the subject; let it wrap
+       normally rather than inherit the subject row's nowrap/ellipsis clipping. */
+    #ticketInbox .ld-presence-hint { white-space: normal; }
 
     /* Floating hover detail card. Interactive — the mouse can move into it. */
     #ldInboxPop {
@@ -69,6 +72,7 @@ $inboxBase = $inboxBase ?? '/agent/tickets';
                 <?php
                     $isAssignedToMe = ($t['assigned_to'] == Auth::id());
                     $isRedacted = isTicketRedactedForUser($t, $confidentialTypeIds ?? [], $adminGroupIds ?? []);
+                    $presence   = $ticketPresence[$t['id']] ?? null; // live "Opened by X" hint
                     $ts = strtotime($t['created_at']);
                     $absDate = date('D, j M Y \a\t g:i A', $ts);
                     // The description is stored as HTML; flatten it to plain text for the snippet.
@@ -103,18 +107,23 @@ $inboxBase = $inboxBase ?? '/agent/tickets';
                             </div>
                         <?php endif; ?>
                     </td>
-                    <td class="ld-inbox-subject">
+                    <td class="ld-inbox-subject<?= $isRedacted ? '' : ' ld-subject-cell' ?>"<?= $isRedacted ? '' : ' data-ticket-id="' . (int) $t['id'] . '"' ?>>
                         <?php if ($isRedacted): ?>
                             <span class="text-muted fst-italic"><i class="bi bi-shield-lock me-1"></i>[Confidential]</span>
                         <?php else: ?>
                             <span class="text-muted small me-1">#<?= $t['id'] ?></span>
-                            <span class="ld-inbox-subject-text fw-semibold"><?= e($t['subject']) ?></span>
+                            <span class="ld-inbox-subject-text ld-subject-link fw-semibold"><?= e($t['subject']) ?></span>
                             <?php if ($isAssignedToMe): ?>
                             <span class="badge bg-primary bg-opacity-10 text-primary ms-1">Mine</span>
                             <?php endif; ?>
                             <?php if ($t['merged_into_ticket_id']): ?>
                             <span class="badge bg-secondary ms-1" title="Merged into #<?= (int) $t['merged_into_ticket_id'] ?>"><i class="bi bi-arrow-right-circle"></i> Merged</span>
                             <?php endif; ?>
+                            <span class="ld-presence-hint d-block small fst-italic" style="color:#b45309;<?= $presence ? '' : 'display:none;' ?>" title="Another staff member currently has this ticket open">
+                                <?php if ($presence): ?>
+                                <i class="bi <?= $presence['replying'] ? 'bi-pencil-fill' : 'bi-eye-fill' ?> me-1"></i><?= $presence['replying'] ? 'Being replied to by ' : 'Opened by ' ?><?= e($presence['name']) ?>
+                                <?php endif; ?>
+                            </span>
                             <!-- Hidden source for the hover detail card -->
                             <div class="ld-inbox-src d-none">
                                 <div class="ld-pop-head">
