@@ -60,32 +60,59 @@ $applied = $migrationPdo
     ->fetchAll(PDO::FETCH_COLUMN);
 $applied = array_flip($applied);
 
-// ── Run pending migrations ────────────────────────────────────────────────
 $isCli = PHP_SAPI === 'cli';
 $ran   = 0;
 
-foreach ($files as $file) {
-    $name = basename($file);
+// Fast path: nothing pending → return without taking the lock. This runs on
+// every web request (see src/bootstrap.php), so the common case must be cheap.
+$pending = array_filter($files, static fn(string $f): bool => !isset($applied[basename($f)]));
 
-    if (isset($applied[$name])) {
-        continue;   // already applied
+if (!empty($pending)) {
+    // Serialize concurrent migrators with a MySQL advisory lock. Without it,
+    // two simultaneous web requests can both see a migration as pending and run
+    // the same DDL at once — the second throws (e.g. "column already exists")
+    // and 500s that request. The lock is on this dedicated connection only.
+    $gotLock = (int) $migrationPdo->query("SELECT GET_LOCK('openhelpdesk_migrate', 10)")->fetchColumn();
+
+    try {
+        // Re-read the applied set: another request may have applied migrations
+        // while we waited for the lock, so we don't re-run them.
+        if ($gotLock === 1) {
+            $applied = array_flip(
+                $migrationPdo->query("SELECT migration FROM schema_migrations")->fetchAll(PDO::FETCH_COLUMN)
+            );
+
+            foreach ($files as $file) {
+                $name = basename($file);
+
+                if (isset($applied[$name])) {
+                    continue;   // already applied
+                }
+
+                if ($isCli) {
+                    echo "  → Running {$name} … ";
+                }
+
+                $up = require $file;   // each file returns a callable(PDO $pdo): void
+                $up($migrationPdo);
+
+                $migrationPdo
+                    ->prepare("INSERT INTO schema_migrations (migration) VALUES (?)")
+                    ->execute([$name]);
+
+                if ($isCli) {
+                    echo "done\n";
+                }
+                $ran++;
+            }
+        } elseif ($isCli) {
+            echo "  Could not acquire migration lock; another process is applying migrations.\n";
+        }
+    } finally {
+        if ($gotLock === 1) {
+            $migrationPdo->query("SELECT RELEASE_LOCK('openhelpdesk_migrate')");
+        }
     }
-
-    if ($isCli) {
-        echo "  → Running {$name} … ";
-    }
-
-    $up = require $file;   // each file returns a callable(PDO $pdo): void
-    $up($migrationPdo);
-
-    $migrationPdo
-        ->prepare("INSERT INTO schema_migrations (migration) VALUES (?)")
-        ->execute([$name]);
-
-    if ($isCli) {
-        echo "done\n";
-    }
-    $ran++;
 }
 
 if ($isCli) {

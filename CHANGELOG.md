@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.106.12 &mdash; 2026-06-19
+
+### Changed
+- **Auto-migration on web requests is now race-safe.** Pending migrations are applied on every request (see `src/bootstrap.php`); two simultaneous requests could both see a migration as pending and run the same DDL at once, throwing on the second (e.g. "column already exists") and 500-ing that request. The runner now takes a MySQL advisory lock (`GET_LOCK`) before applying, and re-checks the applied set after acquiring it, so only one process applies at a time. A fast path returns immediately when nothing is pending, so the common request pays no extra round-trip.
+
+---
+
 ## 2.106.11 &mdash; 2026-06-19
 
 ### Security
