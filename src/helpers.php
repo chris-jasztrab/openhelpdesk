@@ -655,6 +655,95 @@ function createNotification(
         )->execute([$userId, $ticketId, $type, $timelineId, $actorId, $body]);
     } catch (\Throwable $e) {
         error_log('createNotification failed: ' . $e->getMessage());
+        return;
+    }
+
+    // Fan the same event out to the user's registered mobile devices as a native
+    // push. Best-effort: a push failure must never break the in-app notification
+    // (or the ticket action that triggered it).
+    try {
+        deliverPushNotification($db, $userId, $type, $ticketId, $body);
+    } catch (\Throwable $e) {
+        error_log('deliverPushNotification failed: ' . $e->getMessage());
+    }
+}
+
+/**
+ * Register (or refresh) a mobile device's push token for a user.
+ *
+ * `token` is unique across the table, so the same physical device re-registering
+ * — or a token the OS reassigns to a different signed-in user — updates the
+ * existing row in place instead of creating a duplicate.
+ */
+function registerPushToken(PDO $db, int $userId, string $platform, string $token, ?string $deviceName = null): void
+{
+    $platform = in_array($platform, ['ios', 'android', 'web'], true) ? $platform : 'android';
+    $db->prepare(
+        'INSERT INTO push_device_tokens (user_id, platform, token, device_name, last_used_at)
+         VALUES (?, ?, ?, ?, NOW())
+         ON DUPLICATE KEY UPDATE
+            user_id     = VALUES(user_id),
+            platform    = VALUES(platform),
+            device_name = VALUES(device_name),
+            last_used_at = NOW()'
+    )->execute([$userId, $platform, $token, $deviceName]);
+}
+
+/**
+ * Remove a device's push token. Scoped to the owning user so a caller can only
+ * unregister their own device, never someone else's.
+ */
+function removePushToken(PDO $db, int $userId, string $token): void
+{
+    $db->prepare('DELETE FROM push_device_tokens WHERE token = ? AND user_id = ?')
+        ->execute([$token, $userId]);
+}
+
+/**
+ * The push tokens registered to a user, as [{platform, token}, ...].
+ */
+function pushTokensForUser(PDO $db, int $userId): array
+{
+    $stmt = $db->prepare('SELECT platform, token FROM push_device_tokens WHERE user_id = ?');
+    $stmt->execute([$userId]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/**
+ * Deliver an in-app notification to a user's registered mobile devices as a
+ * native push.
+ *
+ * STUB — the registration endpoints, storage table and this dispatch hook are
+ * fully wired, but the actual APNs (Apple) / FCM (Firebase) send is NOT
+ * implemented yet. Real delivery needs provider credentials (an APNs `.p8` key,
+ * an FCM service account) that only exist once the native apps are registered
+ * with Apple/Google. Until `PUSH_ENABLED=true` and that config is present this
+ * is a no-op (it just records intent to the error log under APP_DEBUG), so the
+ * rest of the notification pipeline ships and is testable today.
+ *
+ * To finish delivery: build the per-platform payload from ($type, $ticketId,
+ * $body) — notificationMeta() gives a title verb — POST to FCM v1 / APNs for
+ * each token from pushTokensForUser(), and prune any token the provider reports
+ * as unregistered (FCM `NotRegistered` / APNs `410 Gone`) via removePushToken().
+ */
+function deliverPushNotification(PDO $db, int $userId, string $type, int $ticketId, ?string $body): void
+{
+    if (env('PUSH_ENABLED', 'false') !== 'true') {
+        return; // no provider configured — see docblock
+    }
+    $tokens = pushTokensForUser($db, $userId);
+    if (empty($tokens)) {
+        return;
+    }
+    // TODO(push-delivery): send to FCM v1 / APNs here, then prune dead tokens.
+    if (env('APP_DEBUG', 'false') === 'true') {
+        error_log(sprintf(
+            'deliverPushNotification: would push type=%s ticket=%d to %d device(s) for user %d',
+            $type,
+            $ticketId,
+            count($tokens),
+            $userId
+        ));
     }
 }
 

@@ -1653,3 +1653,235 @@ $router->get('/api/v1/users/search', function () {
     $stmt->execute([$like, $like, $like]);
     _apiJson($stmt->fetchAll(PDO::FETCH_ASSOC));
 });
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ATTACHMENTS
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Validate and store uploaded files for the API.
+ *
+ * Unlike the web handleAttachmentUploads() (which flashes errors to the session
+ * and silently skips bad files), this fails loudly with HTTP 422 so a mobile
+ * client gets a clear reason. Reuses the same allow-list, size cap, storage
+ * path and MIME→extension mapping as the web uploader. Returns
+ * [{original_name, stored_name, mime_type, file_size}, ...] on success.
+ */
+function _apiStoreUploads(string $field = 'attachments'): array
+{
+    if (empty($_FILES[$field]['tmp_name'])) {
+        _apiJson(['error' => 'No files uploaded. Send multipart/form-data with an "' . $field . '" field.'], 422);
+    }
+
+    $files = $_FILES[$field];
+    $count = is_array($files['tmp_name']) ? count($files['tmp_name']) : 1;
+    $stored = [];
+
+    for ($i = 0; $i < $count; $i++) {
+        $tmp   = is_array($files['tmp_name']) ? $files['tmp_name'][$i] : $files['tmp_name'];
+        $error = is_array($files['error'])    ? $files['error'][$i]    : $files['error'];
+        $name  = is_array($files['name'])     ? $files['name'][$i]     : $files['name'];
+        $size  = is_array($files['size'])     ? (int) $files['size'][$i] : (int) $files['size'];
+
+        if ($error === UPLOAD_ERR_NO_FILE || $tmp === '') {
+            continue;
+        }
+        if ($error !== UPLOAD_ERR_OK) {
+            _apiJson(['error' => 'Upload failed for "' . $name . '" (PHP upload error ' . $error . ')'], 422);
+        }
+        if (!is_uploaded_file($tmp)) {
+            _apiJson(['error' => 'Invalid upload for "' . $name . '"'], 422);
+        }
+
+        $mime = mime_content_type($tmp) ?: 'application/octet-stream';
+        if (!in_array($mime, UPLOAD_ALLOWED_TYPES, true)) {
+            _apiJson(['error' => 'File type not allowed for "' . $name . '": ' . $mime], 422);
+        }
+        if ($size > UPLOAD_MAX_SIZE) {
+            $maxMb = round(UPLOAD_MAX_SIZE / 1048576, 1);
+            _apiJson(['error' => 'File too large (max ' . $maxMb . ' MB): "' . $name . '"'], 422);
+        }
+
+        $storedName = uniqid('att_', true) . '.' . safeUploadExtension($mime, $name);
+        if (!is_dir(ATTACHMENT_STORAGE_PATH)) {
+            mkdir(ATTACHMENT_STORAGE_PATH, 0755, true);
+        }
+        if (!move_uploaded_file($tmp, ATTACHMENT_STORAGE_PATH . $storedName)) {
+            _apiJson(['error' => 'Could not store uploaded file "' . $name . '"'], 500);
+        }
+        $stored[] = [
+            'original_name' => $name,
+            'stored_name'   => $storedName,
+            'mime_type'     => $mime,
+            'file_size'     => $size,
+        ];
+    }
+
+    if (empty($stored)) {
+        _apiJson(['error' => 'No valid files in the upload'], 422);
+    }
+    return $stored;
+}
+
+/**
+ * POST /api/v1/tickets/{id}/attachments
+ *
+ * multipart/form-data:
+ *   attachments    — one file, or attachments[] for several
+ *   timeline_id    — (optional) attach to an existing reply/note on this ticket
+ *
+ * Returns (201):
+ * { "data": [ { id, ticket_id, timeline_id, original_name, mime_type, file_size }, ... ] }
+ */
+$router->post('/api/v1/tickets/{id}/attachments', function (array $p) {
+    $user     = _apiAuth();
+    $db       = Database::connect();
+    $ticketId = (int) $p['id'];
+
+    $tStmt = $db->prepare('SELECT id, created_by, group_id, type_id FROM tickets WHERE id = ?');
+    $tStmt->execute([$ticketId]);
+    $ticket = $tStmt->fetch(PDO::FETCH_ASSOC);
+    if (!$ticket) {
+        _apiJson(['error' => 'Ticket not found'], 404);
+    }
+    _apiEnforceTicketAccess($db, $user, $ticket);
+    _apiEnforceConfidential($db, $user, $ticket);
+
+    // Optional timeline_id must belong to THIS ticket.
+    $timelineId = null;
+    if (isset($_POST['timeline_id']) && $_POST['timeline_id'] !== '') {
+        $timelineId = (int) $_POST['timeline_id'];
+        $chk = $db->prepare('SELECT 1 FROM ticket_timeline WHERE id = ? AND ticket_id = ?');
+        $chk->execute([$timelineId, $ticketId]);
+        if (!$chk->fetchColumn()) {
+            _apiJson(['error' => 'timeline_id does not belong to this ticket'], 422);
+        }
+    }
+
+    $stored = _apiStoreUploads('attachments');
+
+    $ins = $db->prepare(
+        'INSERT INTO ticket_attachments
+            (ticket_id, timeline_id, uploaded_by, original_name, stored_name, mime_type, file_size)
+         VALUES (?, ?, ?, ?, ?, ?, ?)'
+    );
+    $out = [];
+    foreach ($stored as $att) {
+        $ins->execute([
+            $ticketId, $timelineId, (int) $user['id'],
+            $att['original_name'], $att['stored_name'], $att['mime_type'], $att['file_size'],
+        ]);
+        $out[] = [
+            'id'            => (int) $db->lastInsertId(),
+            'ticket_id'     => $ticketId,
+            'timeline_id'   => $timelineId,
+            'original_name' => $att['original_name'],
+            'mime_type'     => $att['mime_type'],
+            'file_size'     => $att['file_size'],
+        ];
+    }
+
+    _apiJson(['data' => $out], 201);
+});
+
+/**
+ * GET /api/v1/attachments/{id}
+ *
+ * Streams the raw attachment bytes (NOT JSON). Anyone who can access the parent
+ * ticket can download its attachments.
+ */
+$router->get('/api/v1/attachments/{id}', function (array $p) {
+    $user = _apiAuth();
+    $db   = Database::connect();
+    $id   = (int) $p['id'];
+
+    $stmt = $db->prepare(
+        'SELECT id, ticket_id, original_name, stored_name, mime_type, file_size
+           FROM ticket_attachments WHERE id = ?'
+    );
+    $stmt->execute([$id]);
+    $att = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$att) {
+        _apiJson(['error' => 'Attachment not found'], 404);
+    }
+
+    $tStmt = $db->prepare('SELECT id, created_by, group_id, type_id FROM tickets WHERE id = ?');
+    $tStmt->execute([(int) $att['ticket_id']]);
+    $ticket = $tStmt->fetch(PDO::FETCH_ASSOC);
+    if (!$ticket) {
+        _apiJson(['error' => 'Attachment not found'], 404);
+    }
+    _apiEnforceTicketAccess($db, $user, $ticket);
+    _apiEnforceConfidential($db, $user, $ticket);
+
+    $path = ATTACHMENT_STORAGE_PATH . $att['stored_name'];
+    if (!is_file($path)) {
+        _apiJson(['error' => 'Attachment file is missing on the server'], 404);
+    }
+
+    // Release the session lock before streaming so a large download can't block
+    // other requests (mirrors the web download routes).
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_write_close();
+    }
+
+    header('Content-Type: ' . $att['mime_type']);
+    header('Content-Disposition: attachment; filename="' . str_replace('"', '\\"', $att['original_name']) . '"');
+    header('Content-Length: ' . $att['file_size']);
+    header('X-Content-Type-Options: nosniff');
+    readfile($path);
+    exit;
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PUSH NOTIFICATIONS — DEVICE REGISTRATION
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * POST /api/v1/push/register
+ *
+ * Body: { "token": "<APNs/FCM token>", "platform": "ios|android|web",
+ *         "device_name": "Jane's iPhone" }
+ *
+ * Registers (or refreshes) the device's push token for the current user.
+ * Returns: { "ok": true }
+ */
+$router->post('/api/v1/push/register', function () {
+    $user  = _apiAuth();
+    $input = _apiInput();
+
+    $token    = trim($input['token'] ?? '');
+    $platform = trim($input['platform'] ?? '');
+    $device   = isset($input['device_name']) ? trim(substr((string) $input['device_name'], 0, 255)) : null;
+
+    if ($token === '') {
+        _apiJson(['error' => 'token is required'], 422);
+    }
+    if (strlen($token) > 512) {
+        _apiJson(['error' => 'token is too long (max 512 characters)'], 422);
+    }
+    if (!in_array($platform, ['ios', 'android', 'web'], true)) {
+        _apiJson(['error' => 'platform must be one of: ios, android, web'], 422);
+    }
+
+    registerPushToken(Database::connect(), (int) $user['id'], $platform, $token, $device);
+    _apiJson(['ok' => true]);
+});
+
+/**
+ * POST /api/v1/push/unregister
+ *
+ * Body: { "token": "<APNs/FCM token>" }
+ *
+ * Removes the device token (e.g. on sign-out). Returns: { "ok": true }
+ */
+$router->post('/api/v1/push/unregister', function () {
+    $user  = _apiAuth();
+    $input = _apiInput();
+    $token = trim($input['token'] ?? '');
+    if ($token === '') {
+        _apiJson(['error' => 'token is required'], 422);
+    }
+    removePushToken(Database::connect(), (int) $user['id'], $token);
+    _apiJson(['ok' => true]);
+});

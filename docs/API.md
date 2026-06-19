@@ -226,6 +226,68 @@ reply by a non-creator), and email to creator + CC + watchers on public replies.
 
 ---
 
+## Attachments
+
+### `POST /tickets/{id}/attachments`
+Upload one or more files to a ticket. **`multipart/form-data`** (not JSON) — the
+only endpoint that is. Same allow-list and size cap as the web uploader
+(`UPLOAD_ALLOWED_TYPES`, default 20 MB).
+
+| Form field | Notes |
+|------------|-------|
+| `attachments` | One file. Use repeated `attachments[]` fields for several. |
+| `timeline_id` | *(optional)* Attach to an existing reply/note on this ticket. Must belong to the ticket or you get `422`. |
+
+Typical flow: `POST .../replies` (JSON) → take the returned timeline `id` →
+`POST .../attachments` with that `timeline_id` to hang the files off the reply.
+
+Returns `201`:
+```json
+{ "data": [
+  { "id": 11, "ticket_id": 42, "timeline_id": null,
+    "original_name": "photo.jpg", "mime_type": "image/jpeg", "file_size": 51234 }
+] }
+```
+`422` for a disallowed MIME type (validated against the file's **actual**
+content, not the declared type), an over-size file, or a bad `timeline_id`.
+`403`/`404` follow the same ticket-access rules as the rest of the ticket
+endpoints.
+
+### `GET /attachments/{id}`
+Streams the **raw file bytes** (not JSON) with `Content-Disposition: attachment`.
+Anyone who can access the parent ticket can download its attachments. `404` if
+the row or the on-disk file is missing. The session lock is released before
+streaming so a large download never blocks other requests.
+
+---
+
+## Push Notifications (device registration)
+
+> **Delivery is not wired up yet.** These endpoints register device tokens and
+> the server records intent to push on every in-app notification, but the actual
+> APNs/FCM send is a stub pending provider credentials. See "Known gaps".
+
+### `POST /push/register`
+Register (or refresh) the device's push token for the current user. Call after
+the OS grants a token, and again whenever the OS rotates it.
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `token` | string | yes | The APNs/FCM token (max 512 chars) |
+| `platform` | enum | yes | `ios` \| `android` \| `web` |
+| `device_name` | string | no | Human label (max 255) |
+
+Returns `{ "ok": true }`. The token is unique server-side — re-registering the
+same token updates the row in place (and reassigns it to the current user if the
+OS handed it to a different signed-in account). `422` for a missing token or bad
+platform.
+
+### `POST /push/unregister`
+Body `{ "token": "..." }`. Removes the token (call on sign-out). Scoped to the
+caller, so you can only remove your own device. Returns `{ "ok": true }`.
+
+---
+
 ## Knowledge Base
 
 ### `GET /kb/categories`
@@ -322,11 +384,8 @@ Everything in TicketSummary **plus** `description`, `creator_email`,
 
 ### Attachment
 `id`, `timeline_id`, `original_name`, `mime_type`, `file_size` (bytes),
-`created_at`.
-
-> **Note:** the timeline reports attachment metadata, but there is currently **no
-> `/api/v1` endpoint that streams attachment bytes** — downloading a file still
-> goes through the web app. See "Known gaps" below.
+`created_at`. Upload via `POST /tickets/{id}/attachments`; download bytes via
+`GET /attachments/{id}`.
 
 ### Status slugs
 `open`, `in_progress`, `pending`, `waiting_on_customer`,
@@ -342,14 +401,18 @@ Everything in TicketSummary **plus** `description`, `creator_email`,
 These are limitations in the current API surface, worth knowing before you scope
 the mobile clients:
 
-1. **No attachment upload or download over the API.** Tickets and replies are
-   text-only via `/api/v1`; attachment *metadata* appears in the timeline but the
-   bytes are only reachable through the web UI. Photo-attach from a phone would
-   need a new endpoint.
-2. **No push-notification registration endpoint.** Notifications must be polled
-   (`GET /notifications`); there's no device-token registration for APNs/FCM.
+1. **Push *delivery* is stubbed.** Device-token registration
+   (`/push/register`) and the in-app→push hook are built, but the actual APNs/FCM
+   send is a no-op until provider credentials exist. The send happens
+   synchronously inside `createNotification()` once enabled — for volume it
+   should move to a queue. Wiring point and TODO are in
+   `deliverPushNotification()` in `src/helpers.php`.
+2. **Notifications are still poll-based until push delivery lands.** Clients
+   poll `GET /notifications`; the `unread` count in that envelope is cheap to
+   poll on a timer.
 3. **Login throttling only.** Per-login throttling exists, but the
-   authenticated endpoints are not separately rate-limited.
+   authenticated endpoints are not separately rate-limited — worth adding before
+   the API is exposed to the open internet.
 4. **No "list / revoke my devices" endpoint.** Tokens carry a `device_name`, but
    a user can only revoke the token on the device they're currently holding
    (`/auth/logout`) or rotate it. There's no "sign out all other devices".

@@ -59,6 +59,14 @@
         {
             "name": "Users",
             "description": "User search"
+        },
+        {
+            "name": "Attachments",
+            "description": "Upload and download ticket attachments"
+        },
+        {
+            "name": "Push",
+            "description": "Register device tokens for native push notifications"
         }
     ],
     "components": {
@@ -1520,6 +1528,247 @@
                     },
                     "404": {
                         "$ref": "#/components/responses/NotFound"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/UnprocessableEntity"
+                    }
+                }
+            }
+        },
+        "/tickets/{id}/attachments": {
+            "post": {
+                "tags": [
+                    "Attachments"
+                ],
+                "summary": "Upload attachments to a ticket",
+                "description": "The only multipart/form-data endpoint. Send one file as `attachments`, or several as repeated `attachments[]` fields. Files are validated against the server's allow-list (`UPLOAD_ALLOWED_TYPES`) by their actual detected MIME type and against the size cap (`UPLOAD_MAX_SIZE`, default 20 MB). Optionally pass `timeline_id` to hang the files off an existing reply/note on this ticket.",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/PathTicketId"
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "attachments"
+                                ],
+                                "properties": {
+                                    "attachments": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string",
+                                            "format": "binary"
+                                        },
+                                        "description": "One or more files (field name `attachments`, or `attachments[]` for several)"
+                                    },
+                                    "timeline_id": {
+                                        "type": "integer",
+                                        "description": "Optional — attach to an existing reply/note on this ticket"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Files stored",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "ticket_id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "timeline_id": {
+                                                        "type": "integer",
+                                                        "nullable": true
+                                                    },
+                                                    "original_name": {
+                                                        "type": "string"
+                                                    },
+                                                    "mime_type": {
+                                                        "type": "string"
+                                                    },
+                                                    "file_size": {
+                                                        "type": "integer"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/UnprocessableEntity"
+                    }
+                }
+            }
+        },
+        "/attachments/{id}": {
+            "get": {
+                "tags": [
+                    "Attachments"
+                ],
+                "summary": "Download attachment bytes",
+                "description": "Streams the raw file bytes (not JSON) with a `Content-Disposition: attachment` header. Anyone who can access the parent ticket can download its attachments.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "Attachment ID"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The file",
+                        "content": {
+                            "application/octet-stream": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    }
+                }
+            }
+        },
+        "/push/register": {
+            "post": {
+                "tags": [
+                    "Push"
+                ],
+                "summary": "Register a device push token",
+                "description": "Register (or refresh) the APNs/FCM token for the current user's device. Tokens are unique server-side — re-registering the same token updates the row in place and reassigns it to the current user if needed.\n\n**Note:** push *delivery* is not implemented yet (see the API guide's \"Known gaps\"); this stores the token and is a no-op on the send side until provider credentials are configured.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "token",
+                                    "platform"
+                                ],
+                                "properties": {
+                                    "token": {
+                                        "type": "string",
+                                        "maxLength": 512,
+                                        "description": "The APNs/FCM device token"
+                                    },
+                                    "platform": {
+                                        "type": "string",
+                                        "enum": [
+                                            "ios",
+                                            "android",
+                                            "web"
+                                        ]
+                                    },
+                                    "device_name": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Token registered",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OkResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/UnprocessableEntity"
+                    }
+                }
+            }
+        },
+        "/push/unregister": {
+            "post": {
+                "tags": [
+                    "Push"
+                ],
+                "summary": "Unregister a device push token",
+                "description": "Removes the device token (e.g. on sign-out). Scoped to the caller — you can only remove your own device's token.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "token"
+                                ],
+                                "properties": {
+                                    "token": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Token removed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OkResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
                     },
                     "422": {
                         "$ref": "#/components/responses/UnprocessableEntity"

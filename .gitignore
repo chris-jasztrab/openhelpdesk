@@ -17,6 +17,7 @@ kb_articles.csv
 /storage/backups/*.zip
 /storage/pwa/*
 !/storage/pwa/.gitkeep
+/storage/attachments/*
 .phpunit.result.cache
 test-results*.txt
 

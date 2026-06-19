@@ -11,6 +11,18 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.108.0 &mdash; 2026-06-19
+
+### Added
+- **Mobile API: ticket attachment upload & download.** `POST /api/v1/tickets/{id}/attachments` accepts `multipart/form-data` (one `attachments` file or repeated `attachments[]`), with an optional `timeline_id` to hang files off a reply. It reuses the web uploader's allow-list, size cap, storage path and MIME→extension mapping, but validates strictly and returns a clean `422` on a bad type/size/timeline (rather than the web flow's silent skip). `GET /api/v1/attachments/{id}` streams the raw bytes to any caller who can access the parent ticket, releasing the session lock before streaming.
+- **Mobile API: push-notification device registration.** New `push_device_tokens` table (migration `056`) plus `POST /api/v1/push/register` and `POST /api/v1/push/unregister`. Every in-app notification now also fans out through a `deliverPushNotification()` hook in `createNotification()`. **Delivery is intentionally stubbed** — the APNs/FCM send is a no-op until `PUSH_ENABLED=true` and provider credentials are configured; registration, storage and the dispatch hook are complete and tested.
+- Added `/storage/attachments/*` to `.gitignore` so runtime uploads can't be committed.
+
+### Documentation
+- Documented all four new endpoints in `docs/API.md` and `openapi.json`, and refreshed the "Known gaps" section (attachment up/download now done; push delivery and per-endpoint rate-limiting remain).
+
+---
+
 ## 2.107.4 &mdash; 2026-06-19
 
 ### Documentation
