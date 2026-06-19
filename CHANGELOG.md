@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.106.9 &mdash; 2026-06-19
+
+### Security
+- **Uploaded attachments are stored with an extension derived from their validated MIME type, not the client filename.** `handleAttachmentUploads()` previously took the stored-file extension straight from the user-supplied filename, so a file could be stored on disk as `.php` (its random `att_*` name made it non-executable on the current Apache config, but a misconfigured nginx+FPM host that served `storage/` would execute it). The new `safeUploadExtension()` helper maps the validated MIME to a fixed extension for known types and, for anything else, sanitises the client extension and denies executable ones (`php`, `phtml`, `phar`, `exe`, …), falling back to `.bin`. The original filename is still preserved for display and download.
+
+---
+
 ## 2.106.8 &mdash; 2026-06-19
 
 ### Security

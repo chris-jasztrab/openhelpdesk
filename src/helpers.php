@@ -738,6 +738,49 @@ function notifyAgentStatusChanged(PDO $db, int $ticketId, string $oldStatus, str
 
 /* ── Attachment helpers ───────────────────────────────────────── */
 
+/**
+ * Pick the on-disk extension for an upload from its VALIDATED mime type rather
+ * than the (attacker-controlled) client filename. Known types map to a fixed
+ * safe extension; anything else falls back to a sanitised client extension with
+ * executable extensions denied (defence-in-depth — attachments are stored
+ * outside the webroot with PHP execution disabled, but a misconfigured server
+ * must still never be handed a `.php` on disk).
+ */
+function safeUploadExtension(string $mime, string $clientName): string
+{
+    static $map = [
+        'application/pdf'  => 'pdf',
+        'image/jpeg'       => 'jpg',
+        'image/png'        => 'png',
+        'image/gif'        => 'gif',
+        'image/webp'       => 'webp',
+        'image/svg+xml'    => 'svg',
+        'text/plain'       => 'txt',
+        'text/csv'         => 'csv',
+        'application/zip'  => 'zip',
+        'application/msword' => 'doc',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'   => 'docx',
+        'application/vnd.ms-excel' => 'xls',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'         => 'xlsx',
+        'application/vnd.ms-powerpoint' => 'ppt',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation' => 'pptx',
+    ];
+    if (isset($map[$mime])) {
+        return $map[$mime];
+    }
+
+    $ext = strtolower(preg_replace('/[^a-z0-9]/i', '', (string) pathinfo($clientName, PATHINFO_EXTENSION)));
+    $blocked = [
+        'php', 'php3', 'php4', 'php5', 'php7', 'php8', 'phtml', 'phar', 'pht', 'phps',
+        'cgi', 'pl', 'py', 'sh', 'asp', 'aspx', 'jsp', 'jspx', 'exe', 'bat', 'cmd',
+        'com', 'htaccess', 'svgz',
+    ];
+    if ($ext === '' || in_array($ext, $blocked, true)) {
+        return 'bin';
+    }
+    return $ext;
+}
+
 function handleAttachmentUploads(string $fieldName = 'attachments'): array
 {
     if (empty($_FILES[$fieldName]['tmp_name'])) {
@@ -773,8 +816,10 @@ function handleAttachmentUploads(string $fieldName = 'attachments'): array
             continue;
         }
 
-        $ext = pathinfo($name, PATHINFO_EXTENSION);
-        $storedName = uniqid('att_', true) . '.' . strtolower($ext);
+        // Derive the stored extension from the validated MIME, not the client
+        // filename, so a renamed executable can't land on disk as e.g. .php.
+        $ext = safeUploadExtension($mime, $name);
+        $storedName = uniqid('att_', true) . '.' . $ext;
 
         if (!is_dir(ATTACHMENT_STORAGE_PATH)) {
             mkdir(ATTACHMENT_STORAGE_PATH, 0755, true);
