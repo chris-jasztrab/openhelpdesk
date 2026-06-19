@@ -6895,7 +6895,44 @@ $router->get('/admin/settings/email-templates', function () {
          ORDER BY g.sort_order, g.name'
     )->fetchAll();
 
-    render('admin/settings/email-templates', ['tplValues' => $tplValues, 'groups' => $groups]);
+    // Templates whose requester-facing email may be overridden per group.
+    $perGroupTabs = ['ticket_created', 'ticket_updated', 'csat_survey', 'ticket_reminder'];
+    $activeTab    = $_GET['tab'] ?? 'ticket_created';
+    $gid          = (int) ($_GET['group'] ?? 0);
+
+    // When a real group is selected on a per-group tab, load that group's
+    // override values for the active template (empty = "inherits the default").
+    $groupValues = [];
+    if ($gid > 0 && in_array($activeTab, $perGroupTabs, true)) {
+        foreach (['subject', 'intro', 'button'] as $part) {
+            $groupValues["email_{$part}_{$activeTab}"] = getSetting("email_{$part}_{$activeTab}__group_{$gid}");
+        }
+    } else {
+        $gid = 0;
+    }
+
+    // Which groups already have a saved override for the active template — used to
+    // flag "customized" vs "inherits default" in the group picker.
+    $overriddenGroupIds = [];
+    if (in_array($activeTab, $perGroupTabs, true)) {
+        foreach ($groups as $grp) {
+            foreach (['subject', 'intro', 'button'] as $part) {
+                if (getSetting("email_{$part}_{$activeTab}__group_{$grp['id']}")) {
+                    $overriddenGroupIds[(int) $grp['id']] = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    render('admin/settings/email-templates', [
+        'tplValues'          => $tplValues,
+        'groups'             => $groups,
+        'perGroupTabs'       => $perGroupTabs,
+        'gid'                => $gid,
+        'groupValues'        => $groupValues,
+        'overriddenGroupIds' => $overriddenGroupIds,
+    ]);
 });
 
 $router->post('/admin/settings/email-templates', function () {
@@ -6907,17 +6944,26 @@ $router->post('/admin/settings/email-templates', function () {
 
     $tab = $_POST['tab'] ?? 'ticket_created';
 
+    // Per-group override scope. A non-zero group on a per-group tab writes to
+    // suffixed keys (email_*_<tab>__group_<id>); otherwise we edit the global
+    // template exactly as before.
+    $perGroupTabs = ['ticket_created', 'ticket_updated', 'csat_survey', 'ticket_reminder'];
+    $gid          = (int) ($_POST['group'] ?? 0);
+    $scoped       = ($gid > 0 && in_array($tab, $perGroupTabs, true));
+    $suffix       = $scoped ? "__group_{$gid}" : '';
+    $groupQs      = $scoped ? '&group=' . $gid : '';
+
     // Reset buttons clear settings back to default (empty = use hardcoded default)
     if (isset($_POST['reset_template']) && in_array($_POST['reset_template'], ['ticket_created', 'ticket_updated', 'ticket_merged', 'csat_survey', 'ticket_reminder', 'group_alerts', 'ticket_assigned_agent', 'ticket_assigned_group', 'escalation_alert'], true)) {
         $tpl = $_POST['reset_template'];
-        setSetting("email_subject_{$tpl}", '');
-        setSetting("email_intro_{$tpl}", '');
+        setSetting("email_subject_{$tpl}{$suffix}", '');
+        setSetting("email_intro_{$tpl}{$suffix}", '');
         if ($tpl !== 'csat_survey') {
-            setSetting("email_button_{$tpl}", '');
+            setSetting("email_button_{$tpl}{$suffix}", '');
         }
-        logAudit('email_template.reset', null, null, 'template=' . $tpl);
-        flash('success', 'Email template reset to defaults.');
-        redirect('/admin/settings/email-templates?tab=' . $tpl);
+        logAudit('email_template.reset', null, null, 'template=' . $tpl . ($scoped ? ' group=' . $gid : ''));
+        flash('success', $scoped ? 'Group override reset — this group now inherits the default.' : 'Email template reset to defaults.');
+        redirect('/admin/settings/email-templates?tab=' . $tpl . $groupQs);
     }
 
     if (isset($_POST['reset_footer'])) {
@@ -6941,17 +6987,17 @@ $router->post('/admin/settings/email-templates', function () {
         setSetting("email_button_{$tab}",  trim($_POST["email_button_{$tab}"]  ?? ''));
         flash('success', 'Email template saved.');
     } elseif (in_array($tab, ['ticket_created', 'ticket_updated', 'ticket_merged', 'csat_survey', 'ticket_reminder'], true)) {
-        setSetting("email_subject_{$tab}", trim($_POST["email_subject_{$tab}"] ?? ''));
-        setSetting("email_intro_{$tab}",   trim($_POST["email_intro_{$tab}"]   ?? ''));
+        setSetting("email_subject_{$tab}{$suffix}", trim($_POST["email_subject_{$tab}"] ?? ''));
+        setSetting("email_intro_{$tab}{$suffix}",   trim($_POST["email_intro_{$tab}"]   ?? ''));
         if ($tab !== 'csat_survey') {
-            setSetting("email_button_{$tab}",  trim($_POST["email_button_{$tab}"]  ?? ''));
+            setSetting("email_button_{$tab}{$suffix}",  trim($_POST["email_button_{$tab}"]  ?? ''));
         }
-        flash('success', 'Email template saved.');
+        flash('success', $scoped ? 'Group override saved.' : 'Email template saved.');
     }
 
-    logAudit('email_template.saved', null, null, 'tab=' . $tab);
+    logAudit('email_template.saved', null, null, 'tab=' . $tab . ($scoped ? ' group=' . $gid : ''));
 
-    redirect('/admin/settings/email-templates?tab=' . urlencode($tab));
+    redirect('/admin/settings/email-templates?tab=' . urlencode($tab) . $groupQs);
 });
 
 /* ==================================================================

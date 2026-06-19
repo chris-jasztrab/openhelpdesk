@@ -172,6 +172,15 @@ if (!array_key_exists($activeTab, $tabs) && $activeTab !== 'shared') {
     $activeTab = 'ticket_created';
 }
 $groups ??= [];
+$perGroupTabs       ??= ['ticket_created', 'ticket_updated', 'csat_survey', 'ticket_reminder'];
+$gid                ??= 0;
+$groupValues        ??= [];
+$overriddenGroupIds ??= [];
+$isPerGroupTab = in_array($activeTab, $perGroupTabs, true);
+$activeGroupName = '';
+foreach ($groups as $grp) {
+    if ((int) $grp['id'] === $gid) { $activeGroupName = $grp['name']; break; }
+}
 ?>
 
 <div class="mb-4">
@@ -332,30 +341,82 @@ $groups ??= [];
 <div class="card border-0 shadow-sm border-top-0" style="border-radius:0 0 .5rem .5rem;">
     <div class="card-body p-4">
 
+        <?php
+        // Field values + placeholders depend on whether we're editing the global
+        // template or a single group's override.
+        if ($isPerGroupTab && $gid > 0) {
+            $fldSubject = $groupValues["email_subject_{$activeTab}"] ?? '';
+            $fldIntro   = $groupValues["email_intro_{$activeTab}"] ?? '';
+            $fldButton  = $groupValues["email_button_{$activeTab}"] ?? '';
+            // Placeholder = what the group inherits when a field is left blank:
+            // the global custom value if set, else the hard-coded default.
+            $phSubject  = $tplValues["email_subject_{$activeTab}"] ?: $defaults[$activeTab]['subject'];
+            $phIntro    = $tplValues["email_intro_{$activeTab}"]   ?: $defaults[$activeTab]['intro'];
+            $phButton   = ($tplValues["email_button_{$activeTab}"] ?? '') ?: ($defaults[$activeTab]['button'] ?? '');
+            $hasCustom  = !empty($fldSubject) || !empty($fldIntro) || ($activeTab !== 'csat_survey' && !empty($fldButton));
+        } else {
+            $fldSubject = $tplValues["email_subject_{$activeTab}"] ?? '';
+            $fldIntro   = $tplValues["email_intro_{$activeTab}"] ?? '';
+            $fldButton  = $tplValues["email_button_{$activeTab}"] ?? '';
+            $phSubject  = $defaults[$activeTab]['subject'];
+            $phIntro    = $defaults[$activeTab]['intro'];
+            $phButton   = $defaults[$activeTab]['button'] ?? '';
+            $hasCustom  = !empty($fldSubject) || !empty($fldIntro) || ($activeTab !== 'csat_survey' && !empty($fldButton));
+        }
+        ?>
+
+        <?php if ($isPerGroupTab): ?>
+        <!-- Per-group override selector -->
+        <div class="d-flex flex-wrap align-items-center gap-3 p-3 mb-4 rounded"
+             style="background:var(--bs-tertiary-bg, #eef2ff); border:1px solid var(--bs-border-color, #c7d2fe);">
+            <label class="fw-semibold mb-0" for="groupScope">
+                <i class="bi bi-people me-1"></i>Editing for:
+            </label>
+            <select id="groupScope" class="form-select form-select-sm" style="width:auto; min-width:240px;"
+                    onchange="location.href='?tab=<?= e($activeTab) ?>' + (this.value ? '&group=' + this.value : '');">
+                <option value="">Global default — all groups</option>
+                <?php foreach ($groups as $grp): ?>
+                <option value="<?= (int) $grp['id'] ?>" <?= $gid === (int) $grp['id'] ? 'selected' : '' ?>>
+                    <?= e($grp['name']) ?><?= !empty($overriddenGroupIds[(int) $grp['id']]) ? '  ·  custom' : '  ·  inherits default' ?>
+                </option>
+                <?php endforeach; ?>
+            </select>
+            <?php if ($gid > 0): ?>
+            <span class="badge text-bg-success"><i class="bi bi-pencil-fill me-1"></i>Custom version for <?= e($activeGroupName) ?></span>
+            <span class="text-muted small">Blank fields fall back to the global default below.</span>
+            <?php else: ?>
+            <span class="text-muted small">Pick a group to give that team its own wording. Other groups keep this default.</span>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
+
         <div class="row g-4">
             <!-- Editor column -->
             <div class="col-lg-8">
                 <form method="POST" action="/admin/settings/email-templates">
                     <?= csrfField() ?>
                     <input type="hidden" name="tab" value="<?= e($activeTab) ?>">
+                    <?php if ($isPerGroupTab): ?>
+                    <input type="hidden" name="group" value="<?= (int) $gid ?>">
+                    <?php endif; ?>
 
                     <div class="mb-3">
                         <label class="form-label fw-semibold">Subject Line</label>
                         <input type="text" class="form-control font-monospace"
                                name="email_subject_<?= e($activeTab) ?>"
-                               value="<?= e($tplValues["email_subject_{$activeTab}"] ?? '') ?>"
-                               placeholder="<?= e($defaults[$activeTab]['subject']) ?>">
-                        <div class="form-text">Leave blank to use the default shown above as placeholder.</div>
+                               value="<?= e($fldSubject) ?>"
+                               placeholder="<?= e($phSubject) ?>">
+                        <div class="form-text"><?= $gid > 0 ? 'Leave blank to inherit the global default (shown as placeholder).' : 'Leave blank to use the default shown above as placeholder.' ?></div>
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label fw-semibold">Intro Message</label>
                         <textarea id="intro-editor" class="form-control" name="email_intro_<?= e($activeTab) ?>"
                                   rows="3"
-                                  placeholder="<?= e($defaults[$activeTab]['intro']) ?>"><?= e($tplValues["email_intro_{$activeTab}"] ?? '') ?></textarea>
+                                  placeholder="<?= e($phIntro) ?>"><?= e($fldIntro) ?></textarea>
                         <div class="form-text">
                             Appears as the subtitle paragraph below the ticket heading.
-                            Leave blank to use the default.
+                            <?= $gid > 0 ? 'Leave blank to inherit the global default.' : 'Leave blank to use the default.' ?>
                         </div>
                     </div>
 
@@ -364,9 +425,9 @@ $groups ??= [];
                         <label class="form-label fw-semibold">Button Label</label>
                         <input type="text" class="form-control"
                                name="email_button_<?= e($activeTab) ?>"
-                               value="<?= e($tplValues["email_button_{$activeTab}"] ?? '') ?>"
-                               placeholder="<?= e($defaults[$activeTab]['button']) ?>">
-                        <div class="form-text">Leave blank to use the default.</div>
+                               value="<?= e($fldButton) ?>"
+                               placeholder="<?= e($phButton) ?>">
+                        <div class="form-text"><?= $gid > 0 ? 'Leave blank to inherit the global default.' : 'Leave blank to use the default.' ?></div>
                     </div>
                     <?php else: ?>
                     <div class="alert alert-info small mb-4">
@@ -377,17 +438,12 @@ $groups ??= [];
 
                     <div class="d-flex gap-2">
                         <button type="submit" class="btn text-white" style="background:var(--ld-primary);">
-                            <i class="bi bi-check-lg me-1"></i>Save Template
+                            <i class="bi bi-check-lg me-1"></i><?= $gid > 0 ? 'Save Group Override' : 'Save Template' ?>
                         </button>
-                        <?php
-                        $hasCustom = !empty($tplValues["email_subject_{$activeTab}"])
-                                  || !empty($tplValues["email_intro_{$activeTab}"])
-                                  || ($activeTab !== 'csat_survey' && !empty($tplValues["email_button_{$activeTab}"]));
-                        ?>
                         <?php if ($hasCustom): ?>
                         <button type="submit" name="reset_template" value="<?= e($activeTab) ?>"
                                 class="btn btn-outline-secondary">
-                            <i class="bi bi-arrow-counterclockwise me-1"></i>Reset to Defaults
+                            <i class="bi bi-arrow-counterclockwise me-1"></i><?= $gid > 0 ? 'Reset to Global Default' : 'Reset to Defaults' ?>
                         </button>
                         <?php endif; ?>
                     </div>
@@ -421,7 +477,7 @@ $groups ??= [];
 
                 <!-- Live preview of subject -->
                 <?php
-                $subjectTpl = $tplValues["email_subject_{$activeTab}"] ?? $defaults[$activeTab]['subject'];
+                $subjectTpl = ($fldSubject !== '' ? $fldSubject : $phSubject);
                 $previewTokens = [
                     'ticket_created'  => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working', 'type' => 'Hardware', 'location' => 'Main Branch', 'priority' => 'High', 'sla' => 'First response within 4 hours and resolution within 16 hours (business hours)', 'sla_response' => '4 hours', 'sla_resolution' => '16 hours'],
                     'ticket_updated'  => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working', 'message' => 'We are looking into this.', 'author' => 'Jane Smith'],

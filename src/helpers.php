@@ -2856,8 +2856,12 @@ function slaEmailTokens(PDO $db, ?int $typeId, ?int $priorityId): array
  *
  * @param string $name       Template slug: 'ticket-created', 'ticket-updated', or 'ticket-merged'
  * @param array  $rawTokens  Raw (unescaped) values keyed by token name (without braces)
+ * @param ?int   $groupId    When set, look up a per-group override of the subject/
+ *                           intro/button before falling back to the global custom
+ *                           value, then the hard-coded default. Used so different
+ *                           teams can word their requester-facing emails differently.
  */
-function getEmailTpl(string $name, array $rawTokens): array
+function getEmailTpl(string $name, array $rawTokens, ?int $groupId = null): array
 {
     $key = str_replace('-', '_', $name); // e.g. 'ticket-created' → 'ticket_created'
 
@@ -2968,9 +2972,16 @@ function getEmailTpl(string $name, array $rawTokens): array
 
     $d = $defaults[$key] ?? ['subject' => '', 'intro' => '', 'button' => 'View Ticket'];
 
-    $subjectTpl = getSetting("email_subject_{$key}") ?: $d['subject'];
-    $introTpl   = getSetting("email_intro_{$key}")   ?: $d['intro'];
-    $button     = getSetting("email_button_{$key}")  ?: $d['button'];
+    // Per-group override layer. Resolution order for each part:
+    //   group override → global custom value → hard-coded default.
+    // The footer is shared across every email type and is never per-group.
+    $g = $groupId ? "__group_{$groupId}" : '';
+    $subjectTpl = ($g ? getSetting("email_subject_{$key}{$g}") : null)
+                  ?: getSetting("email_subject_{$key}") ?: $d['subject'];
+    $introTpl   = ($g ? getSetting("email_intro_{$key}{$g}") : null)
+                  ?: getSetting("email_intro_{$key}")   ?: $d['intro'];
+    $button     = ($g ? getSetting("email_button_{$key}{$g}") : null)
+                  ?: getSetting("email_button_{$key}")  ?: $d['button'];
     $footer     = getSetting('email_footer_text')    ?: 'This is an automated message from OpenHelpDesk. Please do not reply directly to this email.';
 
     // Add common token aliases so custom templates using alternative names still work
@@ -3031,7 +3042,7 @@ function notifyTicketCreator(PDO $db, int $ticketId, string $message, string $au
         return;
     }
     $stmt = $db->prepare(
-        "SELECT t.subject, t.created_by, u.email, u.first_name, u.last_name, u.notify_ticket_updated
+        "SELECT t.subject, t.created_by, t.group_id, u.email, u.first_name, u.last_name, u.notify_ticket_updated
          FROM tickets t
          JOIN users u ON t.created_by = u.id
          WHERE t.id = ?"
@@ -3056,7 +3067,7 @@ function notifyTicketCreator(PDO $db, int $ticketId, string $message, string $au
         'user_name'  => $row['first_name'] . ' ' . $row['last_name'],
         'first_name' => $row['first_name'],
         'last_name'  => $row['last_name'],
-    ]);
+    ], $row['group_id'] ? (int) $row['group_id'] : null);
 
     $emailHtml = renderEmail('ticket-updated', [
         'ticketId'    => $ticketId,
@@ -3342,7 +3353,7 @@ function notifyRequesterTicketCreated(PDO $db, int $ticketId): void
     }
 
     $stmt = $db->prepare(
-        'SELECT t.subject, t.description, t.type_id, t.location_id, t.priority_id,
+        'SELECT t.subject, t.description, t.type_id, t.location_id, t.priority_id, t.group_id,
                 u.id AS user_id, u.email, u.first_name, u.last_name, u.notify_ticket_created
          FROM tickets t
          JOIN users u ON t.created_by = u.id
@@ -3383,7 +3394,8 @@ function notifyRequesterTicketCreated(PDO $db, int $ticketId): void
         'user_name'  => $row['first_name'] . ' ' . $row['last_name'],
         'first_name' => $row['first_name'],
         'last_name'  => $row['last_name'],
-    ] + slaEmailTokens($db, $row['type_id'] ? (int) $row['type_id'] : null, $row['priority_id'] ? (int) $row['priority_id'] : null));
+    ] + slaEmailTokens($db, $row['type_id'] ? (int) $row['type_id'] : null, $row['priority_id'] ? (int) $row['priority_id'] : null),
+    $row['group_id'] ? (int) $row['group_id'] : null);
 
     $emailHtml = renderEmail('ticket-created', [
         'ticketId'     => $ticketId,
@@ -3505,12 +3517,13 @@ function notifyCcUsers(PDO $db, int $ticketId, string $message, string $authorNa
         return;
     }
     // Get ticket subject and creator
-    $ticket = $db->prepare('SELECT subject, created_by FROM tickets WHERE id = ?');
+    $ticket = $db->prepare('SELECT subject, created_by, group_id FROM tickets WHERE id = ?');
     $ticket->execute([$ticketId]);
     $ticketRow = $ticket->fetch();
     if (!$ticketRow) return;
 
     $creatorId = (int) $ticketRow['created_by'];
+    $ticketGroupId = $ticketRow['group_id'] ? (int) $ticketRow['group_id'] : null;
     $currentId = Auth::id();
     $appUrl    = env('APP_URL', 'http://localhost:8000');
 
@@ -3546,7 +3559,7 @@ function notifyCcUsers(PDO $db, int $ticketId, string $message, string $authorNa
             'user_name'  => $user['first_name'] . ' ' . $user['last_name'],
             'first_name' => $user['first_name'],
             'last_name'  => $user['last_name'],
-        ]);
+        ], $ticketGroupId);
 
         $emailHtml = renderEmail('ticket-updated', [
             'ticketId'    => $ticketId,
@@ -4541,7 +4554,7 @@ function runEscalationRule(\PDO $db, array $rule, array $ticket): void
             case 'notify_ticket_creator':
                 // Send a reminder email to the person who submitted the ticket
                 $s = $db->prepare(
-                    'SELECT t.subject, u.id AS user_id, u.first_name, u.last_name, u.email, u.notify_ticket_updated
+                    'SELECT t.subject, t.group_id, u.id AS user_id, u.first_name, u.last_name, u.email, u.notify_ticket_updated
                      FROM tickets t
                      JOIN users u ON t.created_by = u.id
                      WHERE t.id = ?'
@@ -4557,7 +4570,7 @@ function runEscalationRule(\PDO $db, array $rule, array $ticket): void
                     'first_name' => $creator['first_name'],
                     'last_name'  => $creator['last_name'],
                     'user_name'  => $creator['first_name'] . ' ' . $creator['last_name'],
-                ]);
+                ], $creator['group_id'] ? (int) $creator['group_id'] : null);
                 $ticketUrl  = $appUrl . '/portal/tickets/' . $ticketId;
                 $footerText = getSetting('email_footer_text') ?: 'This is an automated message from ' . $appName . '. Please do not reply directly to this email.';
 
@@ -4612,7 +4625,7 @@ function sendCsatSurvey(\PDO $db, int $ticketId): void
 
     // Fetch ticket subject + creator details
     $stmt = $db->prepare(
-        'SELECT t.subject, u.id AS user_id, u.email, u.first_name, u.last_name, u.notify_csat
+        'SELECT t.subject, t.group_id, u.id AS user_id, u.email, u.first_name, u.last_name, u.notify_csat
          FROM tickets t
          JOIN users u ON t.created_by = u.id
          WHERE t.id = ?'
@@ -4668,7 +4681,7 @@ function sendCsatSurvey(\PDO $db, int $ticketId): void
         'first_name' => $row['first_name'],
         'last_name'  => $row['last_name'],
         'user_name'  => $row['first_name'] . ' ' . $row['last_name'],
-    ]);
+    ], $row['group_id'] ? (int) $row['group_id'] : null);
 
     $emailHtml = renderEmail('csat-survey', [
         'ticketId'   => $ticketId,

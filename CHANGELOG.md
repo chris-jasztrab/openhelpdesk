@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.107.0 &mdash; 2026-06-19
+
+### Added
+- **Per-group email templates.** The requester-facing automated emails — *Ticket Created*, *Ticket Updated*, *Customer Reminder*, and *CSAT Survey* — can now be worded differently per group. On **Settings → Email Templates**, an *"Editing for:"* picker lets you choose a group and give that team its own subject, intro, and button; leaving any field blank inherits the global default. So, for example, the IT group's *Ticket Created* email can quote the SLA response/resolution targets (`{{sla_response}}` / `{{sla_resolution}}`) while Facilities keeps the simpler default. Resolution order for each field is **group override → global custom value → built-in default**, and the footer stays shared across all emails. No schema change: overrides are stored as suffixed `settings` keys (`email_intro_ticket_created__group_<id>`) created only when a group is actually customised, so groups without overrides are unaffected. The handling group is read from the ticket at send time, so a reassigned ticket's later emails follow whichever group owns it then.
+
+---
+
 ## 2.106.14 &mdash; 2026-06-19
 
 ### Added
