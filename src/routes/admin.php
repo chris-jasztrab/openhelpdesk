@@ -8558,7 +8558,10 @@ $router->get('/admin/settings/branding', function () {
 
 $router->post('/admin/settings/branding', function () {
     Auth::requirePermission('settings.manage');
-    verifyCsrf($_POST['_token'] ?? '');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/branding');
+    }
 
     $appName              = trim($_POST['app_name'] ?? 'OpenHelpDesk');
     $navbarIconRaw        = trim($_POST['navbar_icon'] ?? 'bi-person-raised-hand');
@@ -11490,6 +11493,7 @@ $router->get('/admin/workflows/ticket-fields', function () {
 $router->post('/admin/forms/{typeId}/layout/save', function (array $p) {
     Auth::requirePermission('workflows.manage');
     header('Content-Type: application/json');
+    requireJsonCsrf();
     $typeId = (int) $p['typeId'];
     $body   = json_decode(file_get_contents('php://input'), true);
     $order  = $body['order'] ?? [];
@@ -11514,6 +11518,7 @@ $router->post('/admin/forms/{typeId}/layout/save', function (array $p) {
 $router->post('/admin/forms/{typeId}/layout/visibility', function (array $p) {
     Auth::requirePermission('workflows.manage');
     header('Content-Type: application/json');
+    requireJsonCsrf();
     $typeId = (int) $p['typeId'];
     $body   = json_decode(file_get_contents('php://input'), true);
     $kind   = $body['kind'] ?? '';
@@ -11543,6 +11548,7 @@ $router->post('/admin/forms/{typeId}/layout/visibility', function (array $p) {
 $router->post('/admin/forms/{typeId}/layout/label', function (array $p) {
     Auth::requirePermission('workflows.manage');
     header('Content-Type: application/json');
+    requireJsonCsrf();
     $typeId = (int) $p['typeId'];
     $body   = json_decode(file_get_contents('php://input'), true);
     $kind   = $body['kind'] ?? '';
@@ -11567,6 +11573,7 @@ $router->post('/admin/forms/{typeId}/layout/label', function (array $p) {
 $router->post('/admin/forms/{typeId}/layout/add-existing', function (array $p) {
     Auth::requirePermission('workflows.manage');
     header('Content-Type: application/json');
+    requireJsonCsrf();
     $typeId  = (int) $p['typeId'];
     $body    = json_decode(file_get_contents('php://input'), true);
     $fieldId = (int) ($body['field_id'] ?? 0);
@@ -11599,6 +11606,7 @@ $router->post('/admin/forms/{typeId}/layout/add-existing', function (array $p) {
 $router->post('/admin/forms/{typeId}/layout/remove', function (array $p) {
     Auth::requirePermission('workflows.manage');
     header('Content-Type: application/json');
+    requireJsonCsrf();
     $typeId = (int) $p['typeId'];
     $body   = json_decode(file_get_contents('php://input'), true);
     $kind   = $body['kind'] ?? '';
@@ -11627,6 +11635,7 @@ $router->post('/admin/forms/{typeId}/layout/remove', function (array $p) {
 $router->post('/admin/forms/{typeId}/field/create', function (array $p) {
     Auth::requirePermission('workflows.manage');
     header('Content-Type: application/json');
+    requireJsonCsrf();
     $typeId = (int) $p['typeId'];
     $body   = json_decode(file_get_contents('php://input'), true);
 
@@ -11699,6 +11708,7 @@ $router->post('/admin/forms/{typeId}/field/create', function (array $p) {
 $router->post('/admin/forms/field/{id}/update', function (array $p) {
     Auth::requirePermission('workflows.manage');
     header('Content-Type: application/json');
+    requireJsonCsrf();
     $id   = (int) $p['id'];
     $body = json_decode(file_get_contents('php://input'), true);
     if (!is_array($body)) { echo json_encode(['success' => false, 'error' => 'Bad input']); exit; }
@@ -11807,6 +11817,7 @@ $router->post('/admin/forms/field/{id}/update', function (array $p) {
 $router->post('/admin/forms/field/{id}/delete', function (array $p) {
     Auth::requirePermission('workflows.manage');
     header('Content-Type: application/json');
+    requireJsonCsrf();
     $id = (int) $p['id'];
     $db = Database::connect();
     $lblStmt = $db->prepare('SELECT label, field_type FROM ticket_form_fields WHERE id = ?');
@@ -11865,6 +11876,7 @@ $router->get('/admin/forms/field/{id}/details', function (array $p) {
 $router->post('/admin/forms/field/{id}/upload-image', function (array $p) {
     Auth::requirePermission('workflows.manage');
     header('Content-Type: application/json');
+    requireJsonCsrf();
     $id = (int) $p['id'];
     $db = Database::connect();
 
@@ -11915,6 +11927,7 @@ $router->post('/admin/forms/field/{id}/upload-image', function (array $p) {
 $router->post('/admin/forms/system-label', function () {
     Auth::requirePermission('workflows.manage');
     header('Content-Type: application/json');
+    requireJsonCsrf();
     $body  = json_decode(file_get_contents('php://input'), true);
     $field = (string) ($body['field'] ?? '');
     $label = trim((string) ($body['label'] ?? ''));

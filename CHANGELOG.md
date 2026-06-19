@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.106.3 &mdash; 2026-06-19
+
+### Security
+- **CSRF protection added to the form-builder JSON endpoints and fixed on the branding form.** The ten `POST /admin/forms/*` endpoints (layout save/visibility/label/add-existing/remove, field create/update/delete/upload-image, system-label) read their body from `php://input` and had **no CSRF check at all**, so an attacker could forge cross-site requests against a logged-in user with `workflows.manage` to corrupt or delete custom fields and form layouts. Separately, `POST /admin/settings/branding` *called* `verifyCsrf()` but discarded its boolean return, making the guard a no-op. Added a shared `requireJsonCsrf()` helper (validates the `X-CSRF-Token` header the front-end already sends) and applied it to all ten endpoints; the branding handler now honours the check. New tests in `Admin/FormBuilderCsrfTest`.
+
+---
+
 ## 2.106.2 &mdash; 2026-06-19
 
 ### Security

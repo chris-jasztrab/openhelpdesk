@@ -221,6 +221,22 @@ function handleSortableReorder(string $table, string $idColumn = 'id'): void
     exit;
 }
 
+/**
+ * Enforce CSRF on a JSON/fetch endpoint that reads its body from php://input.
+ * The browser sends the token in the X-CSRF-Token header (see the postJson
+ * helper + <meta name="csrf-token"> in the app layout). Emits a 403 JSON error
+ * and exits on failure. Call right after the Auth:: gate, before reading input.
+ */
+function requireJsonCsrf(): void
+{
+    if (!verifyCsrf($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '')) {
+        http_response_code(403);
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'error' => 'Invalid CSRF token.']);
+        exit;
+    }
+}
+
 /* ── Output helpers ───────────────────────────────────────────── */
 
 function e(?string $value): string
