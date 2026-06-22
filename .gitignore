@@ -31,6 +31,7 @@ test-results*.txt
 # public GitHub push.
 /pw.txt
 /check_prod.py
+/scripts/_prod_run.py
 .claude/*
 
 .claude/settings.json

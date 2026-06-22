@@ -221,7 +221,7 @@ Twelve built-in report types accessible from the Reports Overview:
 
 ```bash
 # 1. Clone and install dependencies
-git clone <repo-url> localdesk
+git clone https://github.com/chris-jasztrab/openhelpdesk localdesk
 cd localdesk
 composer install
 
