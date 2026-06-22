@@ -3270,6 +3270,11 @@ require ROOT_DIR . '/src/routes/admin.php';
 require ROOT_DIR . '/src/routes/manager.php';
 
 /* ------------------------------------------------------------------
+ * Kanban board ticket view (agent + admin) + management/placement API
+ * ------------------------------------------------------------------ */
+require ROOT_DIR . '/src/routes/kanban.php';
+
+/* ------------------------------------------------------------------
  * Mobile REST API
  * ------------------------------------------------------------------ */
 require ROOT_DIR . '/src/routes/api.php';

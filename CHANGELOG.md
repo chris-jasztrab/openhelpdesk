@@ -11,6 +11,17 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.109.0 &mdash; 2026-06-22
+
+### Added
+- **Kanban board ticket view (agents & admins).** A fourth ticket view alongside Table / Compact / Card, reached from the new board button in the ticket-list toolbar (`/agent/tickets/board`, `/admin/tickets/board`). Agent and admin share one controller and one template (`templates/pages/shared/kanban-board.php`) so the board is never duplicated across the parallel ticket templates.
+  - **Built-in boards** group tickets by **Status**, **Priority**, or **Assignee**. Columns are derived live from `ticket_statuses` / `ticket_priorities` / staff users, and dragging a card calls the existing `/api/tickets/{id}/set-status|set-priority|assign` endpoints — so the timeline entry, SLA pause/resume, automations and notifications all fire exactly as they do from the list's quick-edit pickers.
+  - **Custom boards** are a personal organizer: an agent defines their own buckets (columns) and drags tickets into them. Placement is stored (`kanban_card_placements`) and **no ticket field changes** — a moved card keeps its real status/priority/assignee. Boards are private to their owner unless shared with the team. Buckets can be added, renamed, recolored and deleted by the board owner.
+  - Drag-and-drop is native HTML5 (no new JS dependency), optimistic with rollback on error. The board respects the same fail-closed ticket visibility predicate as the list, redacts confidential tickets, and caps at the 500 most-recent matching tickets with an on-screen notice.
+  - New tables `kanban_boards`, `kanban_buckets`, `kanban_card_placements` (migration `058`); board page routes + `/api/kanban/*` management/placement API in `src/routes/kanban.php`.
+
+---
+
 ## 2.108.1 &mdash; 2026-06-19
 
 ### Added

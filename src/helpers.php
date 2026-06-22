@@ -2607,6 +2607,71 @@ function setUserTicketView(int $userId, string $view): void
     setSetting("ticket_view:{$userId}", $view);
 }
 
+/* ── Kanban boards ────────────────────────────────────────────────
+ * The Kanban board is a separate ticket view (its own page, not one of the
+ * table/inbox/card list layouts). Two kinds of board exist:
+ *
+ *   Built-in boards group tickets by a single ticket field (status / priority /
+ *   assignee). Their columns are derived live and dragging a card reuses the
+ *   existing /api/tickets/{id}/set-status|set-priority|assign endpoints, so all
+ *   the usual side effects (timeline, SLA, automations, notifications) fire.
+ *
+ *   Custom boards are a personal organizer: the agent defines their own buckets
+ *   and drags tickets into them. Placement is stored (kanban_card_placements);
+ *   the ticket's own fields are never touched. A board is private to its owner
+ *   unless is_shared = 1.
+ * ----------------------------------------------------------------- */
+
+/**
+ * The built-in (virtual) boards, keyed by the id used in the ?board= param.
+ * 'field' is the tickets column the board groups on; 'endpoint' is the existing
+ * quick-edit API a card-drop calls; 'payload' names the JSON key it sends.
+ */
+function kanbanBuiltInBoards(): array
+{
+    return [
+        'status'   => ['label' => 'Status',   'icon' => 'bi-list-check', 'endpoint' => 'set-status',   'payload' => 'status'],
+        'priority' => ['label' => 'Priority', 'icon' => 'bi-flag',       'endpoint' => 'set-priority', 'payload' => 'priority_id'],
+        'assignee' => ['label' => 'Assignee', 'icon' => 'bi-person',     'endpoint' => 'assign',       'payload' => 'assigned_to'],
+    ];
+}
+
+/**
+ * Custom boards a user may open: their own, plus any shared by teammates.
+ * Each row carries is_owner and the owner's name for the board picker.
+ */
+function kanbanBoardsForUser(PDO $db, int $userId): array
+{
+    $stmt = $db->prepare(
+        "SELECT b.*, (b.user_id = ?) AS is_owner,
+                CONCAT(u.first_name, ' ', u.last_name) AS owner_name
+         FROM kanban_boards b
+         JOIN users u ON u.id = b.user_id
+         WHERE b.user_id = ? OR b.is_shared = 1
+         ORDER BY b.name"
+    );
+    $stmt->execute([$userId, $userId]);
+    return $stmt->fetchAll();
+}
+
+/**
+ * Fetch a custom board the user is allowed to see (owner or shared), with its
+ * buckets attached under ['buckets']. Returns null if missing or not visible.
+ */
+function kanbanLoadBoard(PDO $db, int $boardId, int $userId): ?array
+{
+    $stmt = $db->prepare('SELECT * FROM kanban_boards WHERE id = ? AND (user_id = ? OR is_shared = 1)');
+    $stmt->execute([$boardId, $userId]);
+    $board = $stmt->fetch();
+    if (!$board) {
+        return null;
+    }
+    $bs = $db->prepare('SELECT * FROM kanban_buckets WHERE board_id = ? ORDER BY sort_order, id');
+    $bs->execute([$boardId]);
+    $board['buckets'] = $bs->fetchAll();
+    return $board;
+}
+
 /**
  * A user's preferred ticket-timeline sort order: 'desc' (newest first — the
  * default, matching the SQL order the routes fetch in) or 'asc' (oldest

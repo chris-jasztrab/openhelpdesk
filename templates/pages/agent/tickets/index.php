@@ -98,6 +98,7 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
     <div class="d-flex align-items-center gap-2">
         <span class="badge bg-secondary fs-6" id="ticketCount"><?php if ($hasFilters): ?><?= $totalTickets ?> filtered of <?= $allTickets ?> total<?php else: ?><?= $totalTickets ?> total<?php endif; ?></span>
         <?php require ROOT_DIR . '/templates/partials/ticket-view-switcher.php'; ?>
+        <a href="/agent/tickets/board" class="btn btn-sm btn-outline-secondary" title="Kanban board"><i class="bi bi-kanban"></i></a>
         <button type="button" class="btn btn-sm btn-outline-secondary" id="filterPanelBtn" onclick="filterPanelToggle()">
             <i class="bi bi-funnel me-1"></i>Filters
             <span id="filterCount"><?php if ($hasFilters): ?><span class="badge bg-primary rounded-pill ms-1"><?= count($hasFilters) ?></span><?php endif; ?></span>
