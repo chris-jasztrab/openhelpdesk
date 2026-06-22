@@ -190,7 +190,7 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
             'form_params' => [
                 '_token'   => $csrf,
                 'email'    => $emails[$role],
-                'password' => DatabaseSeeder::TEST_PASSWORD,
+                'password' => DatabaseSeeder::password(),
             ],
         ]);
 

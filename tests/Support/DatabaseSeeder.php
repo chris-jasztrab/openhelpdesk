@@ -17,7 +17,20 @@ final class DatabaseSeeder
     public const ADMIN_EMAIL   = 'test_admin@test.local';
     public const AGENT_EMAIL   = 'test_agent@test.local';
     public const PORTAL_EMAIL  = 'test_portal@test.local';
-    public const TEST_PASSWORD = 'TestPass123!';
+
+    // No generic password literal lives in the codebase — the fixtures use a
+    // fresh random password generated once per test run. The suite runs in a
+    // single PHP process, so every caller of password() sees the same value
+    // (used both to hash the fixture rows and to authenticate against them).
+    private static string $password = '';
+
+    public static function password(): string
+    {
+        if (self::$password === '') {
+            self::$password = 'Aa1!' . bin2hex(random_bytes(8));
+        }
+        return self::$password;
+    }
 
     // ── IDs set after seed() runs ─────────────────────────────────────────────
     public static int $adminId    = 0;
@@ -36,7 +49,7 @@ final class DatabaseSeeder
     public static function seed(): void
     {
         $db   = \Database::connect();
-        $hash = password_hash(self::TEST_PASSWORD, PASSWORD_DEFAULT);
+        $hash = password_hash(self::password(), PASSWORD_DEFAULT);
 
         // ── Users ──────────────────────────────────────────────────────────────
         $users = [

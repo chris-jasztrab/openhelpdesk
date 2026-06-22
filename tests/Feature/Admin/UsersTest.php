@@ -63,7 +63,7 @@ class UsersTest extends TestCase
             'first_name' => 'Throwaway',
             'last_name'  => 'User',
             'email'      => $email,
-            'password'   => 'TestPass123!',
+            'password'   => DatabaseSeeder::password(),
             'role'       => 'user',
         ]);
 
@@ -92,7 +92,7 @@ class UsersTest extends TestCase
             'first_name' => 'Dup',
             'last_name'  => 'User',
             'email'      => DatabaseSeeder::ADMIN_EMAIL, // already exists
-            'password'   => 'TestPass123!',
+            'password'   => DatabaseSeeder::password(),
             'role'       => 'user',
         ]);
 

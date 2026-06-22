@@ -3,12 +3,13 @@
  * Database seeder — drops existing tables, applies schema, and seeds all data.
  *
  * ┌─────────────────────────────────────────────────────────────────────┐
- * │  DEV / DEMO SEEDER — LOCAL USE ONLY.                                │
- * │  This script DROPS every table and inserts demo data with           │
- * │  well-known credentials (e.g. admin@localdesk.user / Password123!). │
- * │  NEVER run it against a production database.                        │
- * │  The real administrator account is created by the web installer    │
- * │  (public/install/), not by this file.                              │
+ * │  DROPS every table and reseeds. NEVER run it against a database     │
+ * │  whose data you want to keep.                                       │
+ * │                                                                     │
+ * │  There are NO default/generic passwords: you are prompted to choose │
+ * │  a password for each of the three seeded accounts (or supply them   │
+ * │  non-interactively via SEED_ADMIN_PASSWORD / SEED_AGENT_PASSWORD /  │
+ * │  SEED_USER_PASSWORD).                                               │
  * └─────────────────────────────────────────────────────────────────────┘
  *
  * Usage:  php database/seed.php
@@ -20,6 +21,14 @@ define('ROOT_DIR', dirname(__DIR__));
 require ROOT_DIR . '/src/helpers.php';
 
 loadEnv(ROOT_DIR . '/.env');
+
+// Choose account passwords up front — before anything destructive happens — so
+// an aborted prompt never leaves you with a half-wiped database.
+echo "Set passwords for the three seeded accounts (minimum 8 characters).\n\n";
+$adminPw = promptForPassword('the Admin account (admin@localdesk.user)', 'SEED_ADMIN_PASSWORD');
+$agentPw = promptForPassword('the Agent account (agent@localdesk.user)', 'SEED_AGENT_PASSWORD');
+$userPw  = promptForPassword('the End User account (user@localdesk.user)', 'SEED_USER_PASSWORD');
+echo "\n";
 
 $host   = env('DB_HOST', '127.0.0.1');
 $port   = env('DB_PORT', '3306');
@@ -134,9 +143,9 @@ try {
         'INSERT INTO users (first_name, last_name, email, password, role, work_phone, location_id) VALUES (?, ?, ?, ?, ?, ?, ?)'
     );
     $users = [
-        ['Admin', 'User',  'admin@localdesk.user', 'Password123!',  'admin', '519-555-0001', 1],
-        ['Agent', 'User',  'agent@localdesk.user', 'Password 123!', 'agent', '519-555-0002', 1],
-        ['End',   'User',  'user@localdesk.user',  'Password123!',  'user',  '519-555-0003', 2],
+        ['Admin', 'User',  'admin@localdesk.user', $adminPw, 'admin', '519-555-0001', 1],
+        ['Agent', 'User',  'agent@localdesk.user', $agentPw, 'agent', '519-555-0002', 1],
+        ['End',   'User',  'user@localdesk.user',  $userPw,  'user',  '519-555-0003', 2],
     ];
     foreach ($users as [$fn, $ln, $em, $pw, $role, $phone, $locId]) {
         $userStmt->execute([$fn, $ln, $em, password_hash($pw, PASSWORD_DEFAULT), $role, $phone, $locId]);

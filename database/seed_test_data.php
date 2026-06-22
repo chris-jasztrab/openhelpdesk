@@ -4,11 +4,13 @@
  *
  * ┌─────────────────────────────────────────────────────────────────────┐
  * │  DEV / DEMO SEEDER — LOCAL USE ONLY.                                │
- * │  This script DROPS every table and inserts demo data with           │
- * │  well-known credentials (e.g. admin@localdesk.user / Password123!). │
+ * │  This script DROPS every table and inserts two months of demo data. │
  * │  NEVER run it against a production database.                        │
- * │  The real administrator account is created by the web installer    │
- * │  (public/install/), not by this file.                              │
+ * │                                                                     │
+ * │  There are NO default/generic passwords: every demo account uses a  │
+ * │  password you choose at the prompt, or one supplied non-             │
+ * │  interactively via the SEED_PASSWORD environment variable (handy    │
+ * │  for the automated screenshot workflow).                            │
  * └─────────────────────────────────────────────────────────────────────┘
  *
  * Usage: php database/seed_test_data.php
@@ -17,6 +19,9 @@ declare(strict_types=1);
 define('ROOT_DIR', dirname(__DIR__));
 require ROOT_DIR . '/src/helpers.php';
 loadEnv(ROOT_DIR . '/.env');
+
+// One chosen password is shared by all demo accounts (none of them are real).
+$demoPassword = promptForPassword('all demo accounts', 'SEED_PASSWORD');
 
 $pdo = new PDO(
     sprintf('mysql:host=%s;port=%s', env('DB_HOST','127.0.0.1'), env('DB_PORT','3306')),
@@ -71,7 +76,7 @@ $pdo->exec("INSERT INTO locations (name,address,description) VALUES
 // ── Users ─────────────────────────────────────────────────────────
 // 1=Admin  2=AgentUser  3=EndUser  4=Sarah(agent)  5=Mike(agent)  6=Emma(agent)
 // 7=John   8=Jane       9=Robert   10=Lisa          11=David       12=Patricia  13=Tom  14=Mary
-$pw = password_hash('Password123!', PASSWORD_DEFAULT);
+$pw = password_hash($demoPassword, PASSWORD_DEFAULT);
 $us = $pdo->prepare('INSERT INTO users (first_name,last_name,email,password,role,work_phone,location_id) VALUES(?,?,?,?,?,?,?)');
 foreach ([
     ['Admin',    'User',      'admin@localdesk.user',  $pw,'admin','519-555-0001',1],

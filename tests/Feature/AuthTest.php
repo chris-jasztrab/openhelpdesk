@@ -100,7 +100,7 @@ class AuthTest extends TestCase
         $r = $client->post('/login', [
             'form_params'     => [
                 'email'    => DatabaseSeeder::ADMIN_EMAIL,
-                'password' => DatabaseSeeder::TEST_PASSWORD,
+                'password' => DatabaseSeeder::password(),
                 // no _token
             ],
             'allow_redirects' => false,
@@ -139,7 +139,7 @@ class AuthTest extends TestCase
             'form_params' => [
                 '_token'   => $csrf,
                 'email'    => DatabaseSeeder::ADMIN_EMAIL,
-                'password' => DatabaseSeeder::TEST_PASSWORD,
+                'password' => DatabaseSeeder::password(),
             ],
         ]);
 
@@ -161,7 +161,7 @@ class AuthTest extends TestCase
         $loginHtml = (string) $client->get('/login')->getBody();
         preg_match('/name="_token"\s+value="([^"]+)"/i', $loginHtml, $m);
 
-        $client->post('/login', ['form_params' => ['_token' => $m[1] ?? '', 'email' => DatabaseSeeder::PORTAL_EMAIL, 'password' => DatabaseSeeder::TEST_PASSWORD]]);
+        $client->post('/login', ['form_params' => ['_token' => $m[1] ?? '', 'email' => DatabaseSeeder::PORTAL_EMAIL, 'password' => DatabaseSeeder::password()]]);
         $client->get('/logout');
 
         $r = $this->get($client, '/portal/tickets', false);

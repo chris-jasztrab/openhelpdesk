@@ -6,6 +6,7 @@ namespace Tests\Feature\Admin;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Cookie\CookieJar;
+use Tests\Support\DatabaseSeeder;
 use Tests\Support\TestCase;
 
 /**
@@ -20,7 +21,6 @@ class RolesTest extends TestCase
 {
     private const SLUG = 'test_kb_editor';
     private const USER_EMAIL = 'test_kbeditor@test.local';
-    private const USER_PASS  = 'KbEditPass123!';
 
     private static function db(): \PDO
     {
@@ -120,7 +120,7 @@ class RolesTest extends TestCase
         ]);
         $this->post($admin, '/admin/users/create', [
             'first_name' => 'Test', 'last_name' => 'Assignee',
-            'email'      => 'test_assignee@test.local', 'password' => 'AssignPass123!',
+            'email'      => 'test_assignee@test.local', 'password' => DatabaseSeeder::password(),
             'role'       => 'test_assignable',
         ]);
         $row = self::db()->query("SELECT role FROM users WHERE email = 'test_assignee@test.local'")->fetch(\PDO::FETCH_ASSOC);
@@ -146,7 +146,7 @@ class RolesTest extends TestCase
             'INSERT INTO users (first_name, last_name, email, password, role)
              VALUES (?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE password = VALUES(password), role = VALUES(role)'
-        )->execute(['Test', 'KbOnly', self::USER_EMAIL, password_hash(self::USER_PASS, PASSWORD_DEFAULT), 'test_kbonly']);
+        )->execute(['Test', 'KbOnly', self::USER_EMAIL, password_hash(DatabaseSeeder::password(), PASSWORD_DEFAULT), 'test_kbonly']);
 
         // Log in as that custom-role user.
         $jar    = new CookieJar();
@@ -159,7 +159,7 @@ class RolesTest extends TestCase
         $loginHtml = (string) $client->get('/login')->getBody();
         preg_match('/name="_token"\s+value="([^"]+)"/i', $loginHtml, $m);
         $client->post('/login', ['form_params' => [
-            '_token' => $m[1] ?? '', 'email' => self::USER_EMAIL, 'password' => self::USER_PASS,
+            '_token' => $m[1] ?? '', 'email' => self::USER_EMAIL, 'password' => DatabaseSeeder::password(),
         ]]);
 
         // Granted area → reachable.

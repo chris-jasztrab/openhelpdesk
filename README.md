@@ -230,12 +230,13 @@ cp .env.example .env
 # Edit .env with your database credentials and app URL
 
 # 3. Seed the database (creates DB, applies schema, stamps migrations, inserts sample data)
+#    You will be prompted to choose a password for each of the three accounts.
 php database/seed.php
 
 # 4. Configure your web server (see platform instructions below)
 ```
 
-Then visit your configured site URL and log in with one of the seed accounts below.
+The seeder **prompts you to set a password** for each of the three accounts below — there are no default or generic passwords. For an unattended/scripted install you can instead supply them via the `SEED_ADMIN_PASSWORD`, `SEED_AGENT_PASSWORD`, and `SEED_USER_PASSWORD` environment variables. Then visit your configured site URL and log in with one of those accounts.
 
 > **Windows note — `composer install` failing to delete a temp file.** On Windows you may see Composer abort with `Could not delete …\vendor\composer\tmp-xxxx.zip: This can be due to an antivirus or the Windows Search Indexer locking the file while they are analyzed.` This is a harmless race: a real-time scanner (typically Windows Defender) or the Search Indexer opens the freshly-extracted archive before Composer can remove it. Simply **re-run `composer install`** — it resumes and completes. To prevent it entirely, exclude the project directory and Composer's cache (`%LOCALAPPDATA%\Composer`) from real-time scanning and Search indexing.
 
@@ -328,13 +329,15 @@ Set `APP_URL=http://openhelpdesk.example.com` in your `.env` file.
 5. Ensure the IIS application pool identity has **read/write** access to the `storage\` directory.
 6. Set `APP_URL` in your `.env` to match the IIS site binding URL.
 
-## Default Accounts (seed only)
+## Seed Accounts (manual setup only)
 
-| Email | Password | Role |
-|-------|----------|------|
-| `admin@localdesk.user` | `Password123!` | Admin |
-| `agent@localdesk.user` | `Password 123!` | Agent |
-| `user@localdesk.user` | `Password123!` | User |
+`php database/seed.php` creates these three accounts. **It has no default passwords** — you choose one for each account at the prompt (or supply them via the environment variables shown).
+
+| Email | Role | Password |
+|-------|------|----------|
+| `admin@localdesk.user` | Admin | you set it (`SEED_ADMIN_PASSWORD`) |
+| `agent@localdesk.user` | Agent | you set it (`SEED_AGENT_PASSWORD`) |
+| `user@localdesk.user` | User | you set it (`SEED_USER_PASSWORD`) |
 
 ## Environment Variables
 

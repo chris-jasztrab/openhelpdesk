@@ -11,6 +11,14 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.111.0 &mdash; 2026-06-22
+
+### Security
+- **No generic passwords anywhere — the Manual Setup seeder now makes you choose account passwords.** `php database/seed.php` previously created `admin@localdesk.user`, `agent@localdesk.user` and `user@localdesk.user` with hard-coded passwords (`Password123!`). It now **prompts for a password for each of the three accounts** (minimum 8 characters, with confirmation), or reads them non-interactively from `SEED_ADMIN_PASSWORD` / `SEED_AGENT_PASSWORD` / `SEED_USER_PASSWORD` for scripted installs. The README's "Default Accounts" table no longer ships any passwords.
+- **Every other hard-coded password literal removed from the codebase.** The demo/screenshot seeder (`database/seed_test_data.php`) now sources one chosen password for all demo accounts from a prompt or the `SEED_PASSWORD` env var (so the automated screenshot workflow can still run unattended), and the PHPUnit fixtures (`tests/Support/DatabaseSeeder.php` and friends) generate a fresh random password per test run instead of using a literal. Added a shared `promptForPassword()` helper (`src/helpers.php`) that suppresses terminal echo on POSIX shells.
+
+---
+
 ## 2.110.1 &mdash; 2026-06-22
 
 ### Fixed

@@ -42,6 +42,66 @@ function env(string $key, string $default = ''): string
 }
 
 /**
+ * Prompt for a password on the CLI (used by the database seeders).
+ *
+ * There are deliberately NO generic/default passwords anywhere in this project:
+ * whoever runs a seeder chooses the account passwords here. For unattended /
+ * scripted installs the value can be supplied via an environment variable
+ * ($envVar) instead of being typed.
+ *
+ * Input echo is suppressed on POSIX shells via `stty`; on Windows (no stty) the
+ * password is read normally — keystrokes may be visible, which is acceptable for
+ * a one-off local install step.
+ *
+ * @param string      $label   Human description of the account, e.g. "the Admin account".
+ * @param string|null $envVar  Optional env var to read a non-interactive value from.
+ * @param int         $minLen  Minimum acceptable length.
+ */
+function promptForPassword(string $label, ?string $envVar = null, int $minLen = 8): string
+{
+    if ($envVar !== null) {
+        $fromEnv = getenv($envVar);
+        if ($fromEnv !== false && $fromEnv !== '') {
+            if (strlen($fromEnv) < $minLen) {
+                fwrite(STDERR, "[ERROR] {$envVar} must be at least {$minLen} characters.\n");
+                exit(1);
+            }
+            fwrite(STDOUT, "Using password for {$label} from \${$envVar}.\n");
+            return $fromEnv;
+        }
+    }
+
+    $canHide = DIRECTORY_SEPARATOR !== '\\' && @shell_exec('command -v stty 2>/dev/null');
+
+    $read = static function () use ($canHide): string {
+        if ($canHide) {
+            shell_exec('stty -echo');
+        }
+        $line = fgets(STDIN);
+        if ($canHide) {
+            shell_exec('stty echo');
+            fwrite(STDOUT, "\n");
+        }
+        return rtrim($line === false ? '' : $line, "\r\n");
+    };
+
+    while (true) {
+        fwrite(STDOUT, "Choose a password for {$label}: ");
+        $pw = $read();
+        if (strlen($pw) < $minLen) {
+            fwrite(STDOUT, "  Password must be at least {$minLen} characters. Try again.\n");
+            continue;
+        }
+        fwrite(STDOUT, "Confirm password for {$label}: ");
+        if ($pw !== $read()) {
+            fwrite(STDOUT, "  Passwords did not match. Try again.\n");
+            continue;
+        }
+        return $pw;
+    }
+}
+
+/**
  * Return the application base URL with the correct scheme.
  * Detects HTTPS from the live request (including reverse-proxy headers)
  * so the value is accurate even when APP_URL still says http://.
