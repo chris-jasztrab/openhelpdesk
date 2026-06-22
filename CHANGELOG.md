@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.110.1 &mdash; 2026-06-22
+
+### Fixed
+- **`database/seed.php` now seeds the RBAC tables, so the demo admin and agent can actually reach their interfaces.** A fresh Manual Setup (`php database/seed.php`) created the `roles`, `permissions` and `role_permissions` tables (from `schema.sql`) but left them empty — the seeding migrations are stamped-not-run. With no role rows, `roleIsAdmin()`/`roleIsStaff()` resolved every account to "no privileges", so the seeded `admin@localdesk.user` and `agent@localdesk.user` could log in but got **403** on `/admin` and `/agent` (only the end-user account worked). The seeder now inserts the four built-in roles, the 19-permission catalog, and the default grants — mirroring the web installer's consolidated seed (`public/install/index.php`). The web-installer path was never affected.
+
+---
+
 ## 2.110.0 &mdash; 2026-06-22
 
 ### Changed

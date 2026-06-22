@@ -69,6 +69,54 @@ try {
     }
     echo "[OK] " . count($migrationFiles) . " migrations stamped as baseline.\n";
 
+    // ── Roles & permissions (RBAC) ───────────────────────────────
+    // schema.sql ships the empty roles/permissions/role_permissions tables but
+    // no rows, and the migrations that seed them (042 + later additions) are
+    // stamped-not-run above. Without these rows roleIsAdmin()/roleIsStaff()
+    // resolve every account to "no privileges", so the seeded admin and agent
+    // get 403 on /admin and /agent. Mirror the web installer's consolidated
+    // seed (public/install/index.php) — keep the two in sync if the built-in
+    // roles or permission catalog ever change.
+    $pdo->exec("INSERT IGNORE INTO roles (slug, name, description, is_system, is_admin, is_staff, landing, sort_order) VALUES
+        ('admin',      'Admin',      'Full, unrestricted access to everything.',           1, 1, 1, 'admin',  10),
+        ('agent',      'Agent',      'Works tickets, templates and the knowledge base.',   1, 0, 1, 'agent',  20),
+        ('power_user', 'Power User', 'Everything an Agent can do, plus access to reports.', 1, 0, 1, 'agent',  30),
+        ('user',       'End User',   'Portal access — submit and track their own tickets.', 1, 0, 0, 'portal', 40)");
+
+    $pdo->exec("INSERT IGNORE INTO permissions (perm_key, label, category, description, sort_order) VALUES
+        ('reports.view',             'View reports',                     'Reports',        'Open the reporting dashboards.',                                10),
+        ('kb.articles.manage',       'Create & delete KB articles',      'Knowledge Base', 'Create, delete and view history of knowledge base articles. (All staff can already edit existing articles.)', 20),
+        ('kb.structure.manage',      'Manage KB categories & folders',   'Knowledge Base', 'Add, rename, reorder and delete KB categories and folders.',    30),
+        ('ticket_templates.manage',  'Manage ticket templates',          'Tickets',        'Create, edit and delete reusable ticket templates.',            40),
+        ('tickets.view_all',         'View all tickets',                 'Tickets',        'See tickets across every group, even groups the user does not belong to. Never includes confidential ticket types.', 45),
+        ('recurring_tickets.manage', 'Manage recurring tickets',         'Tickets',        'Create, edit and run scheduled recurring tickets.',             50),
+        ('workflows.manage',         'Manage ticket types & forms',      'Tickets',        'Edit ticket types, custom form fields and ticket statuses.',    60),
+        ('priorities.manage',        'Manage priorities',                'Tickets',        'Add, rename, recolor and reorder ticket priorities.',           70),
+        ('sla.manage',               'Manage SLA policies',              'Tickets',        'Configure service-level agreement targets.',                    80),
+        ('users.manage',             'Manage users',                     'People',         'Create, edit, delete, merge and import users.',                 90),
+        ('groups.manage',            'Manage groups',                    'People',         'Create, edit and delete ticket groups.',                       100),
+        ('skills.manage',            'Manage agent skills',              'People',         'Create and assign agent skills.',                              110),
+        ('locations.manage',         'Manage locations',                 'Organization',   'Create, edit and delete locations / sites.',                   120),
+        ('automations.manage',       'Manage automations & escalations', 'Automation',     'Configure automation rules, escalations, stale-ticket and scheduled-report jobs.', 130),
+        ('csat.manage',              'Manage CSAT surveys',              'Automation',     'Configure customer satisfaction surveys.',                     140),
+        ('ai.manage',                'Manage AI classification',         'Automation',     'Configure AI auto-classification and routing.',                150),
+        ('import.manage',            'Import data & manage backups',     'Data',           'Import tickets/users/KB and create or restore backups.',       160),
+        ('audit.view',               'View the audit log',               'System',         'Read and prune the security audit log.',                       170),
+        ('settings.manage',          'Manage general settings',          'Settings',       'Email/SMTP, SSO, branding, labels, tags, canned responses, business hours, holidays and organization settings.', 180)");
+
+    // admin bypasses every permission (is_admin), so it needs no grants.
+    $pdo->exec("INSERT IGNORE INTO role_permissions (role_id, perm_key)
+        SELECT r.id, p.perm_key FROM roles r CROSS JOIN (
+            SELECT 'ticket_templates.manage' AS perm_key
+            UNION ALL SELECT 'recurring_tickets.manage'
+        ) p WHERE r.slug IN ('agent','power_user')");
+    $pdo->exec("INSERT IGNORE INTO role_permissions (role_id, perm_key)
+        SELECT id, p.perm_key FROM roles, (
+            SELECT 'reports.view' AS perm_key
+            UNION ALL SELECT 'tickets.view_all'
+        ) p WHERE roles.slug = 'power_user'");
+    echo "[OK] 4 roles + 19 permissions + grants seeded.\n";
+
     // ── Locations ────────────────────────────────────────────────
     $locStmt = $pdo->prepare('INSERT INTO locations (name, address, description) VALUES (?, ?, ?)');
     $locations = [
