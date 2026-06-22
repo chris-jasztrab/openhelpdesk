@@ -237,6 +237,8 @@ php database/seed.php
 
 Then visit your configured site URL and log in with one of the seed accounts below.
 
+> **Windows note — `composer install` failing to delete a temp file.** On Windows you may see Composer abort with `Could not delete …\vendor\composer\tmp-xxxx.zip: This can be due to an antivirus or the Windows Search Indexer locking the file while they are analyzed.` This is a harmless race: a real-time scanner (typically Windows Defender) or the Search Indexer opens the freshly-extracted archive before Composer can remove it. Simply **re-run `composer install`** — it resumes and completes. To prevent it entirely, exclude the project directory and Composer's cache (`%LOCALAPPDATA%\Composer`) from real-time scanning and Search indexing.
+
 ---
 
 ## Web Server Configuration
