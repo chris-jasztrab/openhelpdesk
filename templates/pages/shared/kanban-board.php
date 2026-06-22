@@ -10,8 +10,8 @@
  *
  * Expects: $boardBase, $isAdminBoard, $boardParam, $dimension, $dropEndpoint,
  * $dropPayloadKey, $columns, $cardColumn, $tickets, $board, $customBoards,
- * $builtIns, $search, $capped, $kanbanCap, $ticketPresence,
- * $confidentialTypeIds, $adminGroupIds.
+ * $builtIns, $search, $fGroup, $teammatesOnly, $groupOptions, $capped,
+ * $kanbanCap, $ticketPresence, $confidentialTypeIds, $adminGroupIds.
  */
 $csrf       = csrfToken();
 $isCustom   = ($dimension === 'custom');
@@ -19,6 +19,21 @@ $ownsBoard  = $isCustom && $board && (int) $board['user_id'] === (int) Auth::id(
 $boardLabel = $isCustom
     ? ($board['name'] ?? 'Board')
     : ($builtIns[$boardParam]['label'] ?? 'Status');
+
+$fGroup        = $fGroup ?? [];
+$teammatesOnly = $teammatesOnly ?? false;
+$groupOptions  = $groupOptions ?? [];
+$activeFilters = count($fGroup) + ($teammatesOnly ? 1 : 0);
+
+// Build a board URL that preserves the active search + filters, swapping only
+// the board key — so switching boards keeps the user's filters.
+$boardUrl = function (string $boardKey) use ($boardBase, $search, $fGroup, $teammatesOnly): string {
+    $qs = ['board' => $boardKey];
+    if ($search !== '')   { $qs['q'] = $search; }
+    if (!empty($fGroup))  { $qs['group'] = $fGroup; }
+    if ($teammatesOnly)   { $qs['teammates'] = 1; }
+    return $boardBase . '/board?' . http_build_query($qs);
+};
 
 // Pre-bucket the tickets into their columns so each column renders its own list.
 $byColumn = [];
@@ -97,7 +112,7 @@ foreach ($tickets as $t) {
                 <?php foreach ($builtIns as $key => $bi): ?>
                 <li>
                     <a class="dropdown-item d-flex align-items-center gap-2 <?= (!$isCustom && $boardParam === $key) ? 'active' : '' ?>"
-                       href="<?= e($boardBase) ?>/board?board=<?= e($key) ?><?= $search !== '' ? '&q=' . urlencode($search) : '' ?>">
+                       href="<?= e($boardUrl($key)) ?>">
                         <i class="bi <?= e($bi['icon']) ?>"></i><?= e($bi['label']) ?>
                     </a>
                 </li>
@@ -109,7 +124,7 @@ foreach ($tickets as $t) {
                 <?php else: foreach ($customBoards as $cb): ?>
                 <li>
                     <a class="dropdown-item d-flex align-items-center gap-2 <?= ($isCustom && $board && (int) $board['id'] === (int) $cb['id']) ? 'active' : '' ?>"
-                       href="<?= e($boardBase) ?>/board?board=c<?= (int) $cb['id'] ?><?= $search !== '' ? '&q=' . urlencode($search) : '' ?>">
+                       href="<?= e($boardUrl('c' . (int) $cb['id'])) ?>">
                         <i class="bi bi-columns-gap"></i>
                         <span class="text-truncate"><?= e($cb['name']) ?></span>
                         <?php if ((int) $cb['is_shared'] === 1): ?><i class="bi bi-people-fill text-muted ms-auto" title="Shared"></i><?php endif; ?>
@@ -140,12 +155,41 @@ foreach ($tickets as $t) {
         </div>
         <?php endif; ?>
 
-        <!-- Search -->
-        <form class="d-flex" method="get" action="<?= e($boardBase) ?>/board" role="search">
+        <!-- Search + filters -->
+        <form class="d-flex align-items-center gap-2" method="get" action="<?= e($boardBase) ?>/board" role="search">
             <input type="hidden" name="board" value="<?= e($boardParam) ?>">
-            <div class="input-group input-group-sm" style="width:230px;">
+            <div class="input-group input-group-sm" style="width:210px;">
                 <input type="search" class="form-control" name="q" value="<?= e($search) ?>" placeholder="Search subject…" aria-label="Search tickets">
                 <button class="btn btn-outline-secondary" type="submit"><i class="bi bi-search"></i></button>
+            </div>
+
+            <div class="dropdown">
+                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                    <i class="bi bi-funnel me-1"></i>Filters<?php if ($activeFilters > 0): ?> <span class="badge bg-primary"><?= (int) $activeFilters ?></span><?php endif; ?>
+                </button>
+                <div class="dropdown-menu shadow-sm p-3" style="min-width:260px;">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="teammates" value="1" id="filterTeammates" <?= $teammatesOnly ? 'checked' : '' ?>>
+                        <label class="form-check-label fw-semibold" for="filterTeammates">My team&rsquo;s tickets only</label>
+                        <div class="form-text mt-0">Only tickets assigned to a teammate (someone in your groups) or left unassigned.</div>
+                    </div>
+                    <?php if (!empty($groupOptions)): ?>
+                    <hr class="my-2">
+                    <div class="fw-semibold small mb-1"><?= Auth::isAdmin() ? 'Groups' : 'My groups' ?></div>
+                    <div style="max-height:220px;overflow-y:auto;">
+                        <?php $fGroupInts = array_map('intval', $fGroup); foreach ($groupOptions as $g): ?>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="group[]" value="<?= (int) $g['id'] ?>" id="filterGroup<?= (int) $g['id'] ?>" <?= in_array((int) $g['id'], $fGroupInts, true) ? 'checked' : '' ?>>
+                            <label class="form-check-label" for="filterGroup<?= (int) $g['id'] ?>"><?= e($g['name']) ?></label>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php endif; ?>
+                    <div class="d-flex gap-2 mt-3">
+                        <button class="btn btn-sm btn-primary" type="submit">Apply</button>
+                        <a class="btn btn-sm btn-link" href="<?= e($boardBase) ?>/board?board=<?= e($boardParam) ?><?= $search !== '' ? '&q=' . urlencode($search) : '' ?>">Clear</a>
+                    </div>
+                </div>
             </div>
         </form>
 

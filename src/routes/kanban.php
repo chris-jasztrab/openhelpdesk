@@ -35,8 +35,29 @@ function renderKanbanBoard(string $boardBase): never
     $db     = Database::connect();
     $userId = (int) Auth::id();
 
-    $boardParam = (string) ($_GET['board'] ?? 'status');
-    $search     = trim((string) ($_GET['q'] ?? ''));
+    $boardParam    = (string) ($_GET['board'] ?? 'status');
+    $search        = trim((string) ($_GET['q'] ?? ''));
+    $fGroup        = array_values(array_filter(array_map('intval', (array) ($_GET['group'] ?? []))));
+    $teammatesOnly = !empty($_GET['teammates']);
+
+    $myGroupIds = userGroupIds($db, $userId);
+
+    // Teammates = staff who share at least one group with the viewer, plus the
+    // viewer themselves. Drives both the "my team's tickets only" filter and the
+    // assignee board's column scope.
+    $teammateIds = [$userId];
+    if (!empty($myGroupIds)) {
+        $ph = implode(',', array_fill(0, count($myGroupIds), '?'));
+        $tm = $db->prepare(
+            "SELECT DISTINCT u.id FROM group_user_map gum JOIN users u ON gum.user_id = u.id
+             WHERE gum.group_id IN ($ph) AND " . staffRoleSqlIn('u.role')
+        );
+        $tm->execute($myGroupIds);
+        foreach ($tm->fetchAll(PDO::FETCH_COLUMN) as $id) {
+            $teammateIds[] = (int) $id;
+        }
+        $teammateIds = array_values(array_unique($teammateIds));
+    }
 
     // ── Visible ticket set (same fail-closed predicate as the list) ──────────
     $where  = [];
@@ -44,6 +65,20 @@ function renderKanbanBoard(string $boardBase): never
     if ($search !== '') {
         $where[]  = 't.subject LIKE ?';
         $params[] = '%' . $search . '%';
+    }
+    // Group filter: a non-admin can only pick from their own groups (built in the
+    // template); the visibility predicate below still applies regardless, so this
+    // only ever narrows, never widens, what's shown.
+    if (!empty($fGroup)) {
+        $ph      = implode(',', array_fill(0, count($fGroup), '?'));
+        $where[] = "t.group_id IN ($ph)";
+        $params  = array_merge($params, $fGroup);
+    }
+    // "My team's tickets only": tickets assigned to a teammate, or unassigned.
+    if ($teammatesOnly) {
+        $ph      = implode(',', array_fill(0, count($teammateIds), '?'));
+        $where[] = "(t.assigned_to IS NULL OR t.assigned_to IN ($ph))";
+        $params  = array_merge($params, $teammateIds);
     }
     $vis     = ticketStaffVisibilitySql($db, $userId, Auth::role(), 't');
     $where[] = $vis['sql'];
@@ -123,11 +158,42 @@ function renderKanbanBoard(string $boardBase): never
             }
         } else { // assignee
             $columns[] = ['key' => '', 'label' => 'Unassigned', 'color' => '#adb5bd'];
-            $agents = $db->query(
-                "SELECT id, CONCAT(first_name, ' ', last_name) AS name FROM users WHERE " . staffRoleSqlIn('role') . " ORDER BY first_name, last_name"
-            )->fetchAll();
-            foreach ($agents as $a) {
-                $columns[] = ['key' => (string) $a['id'], 'label' => $a['name'], 'color' => '#6366f1'];
+
+            // Which agents get a column? Not the whole staff roster — only people
+            // the viewer can sensibly hand a ticket to:
+            //   - "teammates only" OR a non-admin viewer → their teammates;
+            //   - a non-admin viewer also keeps anyone already holding a visible
+            //     ticket (e.g. a watched ticket assigned outside their groups);
+            //   - an admin with the filter off → all staff.
+            // Tickets are already scoped by visibility (and by the teammates
+            // filter when on), so no card can land under an agent it shouldn't.
+            $candidates = []; // id => name
+
+            if ($teammatesOnly || !Auth::isAdmin()) {
+                if (!empty($teammateIds)) {
+                    $ph   = implode(',', array_fill(0, count($teammateIds), '?'));
+                    $rows = $db->prepare("SELECT id, CONCAT(first_name, ' ', last_name) AS name FROM users WHERE id IN ($ph)");
+                    $rows->execute($teammateIds);
+                    foreach ($rows->fetchAll() as $a) {
+                        $candidates[(int) $a['id']] = $a['name'];
+                    }
+                }
+                if (!$teammatesOnly) {
+                    foreach ($tickets as $t) {
+                        if ($t['assigned_to'] !== null && $t['agent_name'] !== null) {
+                            $candidates[(int) $t['assigned_to']] = $t['agent_name'];
+                        }
+                    }
+                }
+            } else {
+                foreach ($db->query("SELECT id, CONCAT(first_name, ' ', last_name) AS name FROM users WHERE " . staffRoleSqlIn('role'))->fetchAll() as $a) {
+                    $candidates[(int) $a['id']] = $a['name'];
+                }
+            }
+
+            asort($candidates, SORT_NATURAL | SORT_FLAG_CASE);
+            foreach ($candidates as $id => $name) {
+                $columns[] = ['key' => (string) $id, 'label' => $name, 'color' => '#6366f1'];
             }
             foreach ($tickets as $t) {
                 $cardColumn[(int) $t['id']] = $t['assigned_to'] !== null ? (string) $t['assigned_to'] : '';
@@ -159,6 +225,19 @@ function renderKanbanBoard(string $boardBase): never
         }
     }
 
+    // Group filter options: a non-admin filters within their own groups; an admin
+    // within any group.
+    if (Auth::isAdmin()) {
+        $groupOptions = $db->query('SELECT id, name FROM `groups` ORDER BY name')->fetchAll();
+    } elseif (!empty($myGroupIds)) {
+        $ph = implode(',', array_fill(0, count($myGroupIds), '?'));
+        $go = $db->prepare("SELECT id, name FROM `groups` WHERE id IN ($ph) ORDER BY name");
+        $go->execute($myGroupIds);
+        $groupOptions = $go->fetchAll();
+    } else {
+        $groupOptions = [];
+    }
+
     render('shared/kanban-board', [
         'pageTitle'           => 'Ticket Board',
         'boardBase'           => $boardBase,
@@ -174,6 +253,9 @@ function renderKanbanBoard(string $boardBase): never
         'customBoards'        => kanbanBoardsForUser($db, $userId),
         'builtIns'            => $builtIns,
         'search'              => $search,
+        'fGroup'              => $fGroup,
+        'teammatesOnly'       => $teammatesOnly,
+        'groupOptions'        => $groupOptions,
         'capped'              => $capped,
         'kanbanCap'           => KANBAN_TICKET_CAP,
         'ticketPresence'      => $ticketPresence,

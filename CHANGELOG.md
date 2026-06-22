@@ -11,6 +11,19 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.110.0 &mdash; 2026-06-22
+
+### Changed
+- **Kanban Assignee board now scopes its columns instead of listing every agent.** Previously the Assignee board rendered a column for every staff user in the system. Now, for a non-admin agent it shows only **Unassigned + themselves + agents already holding a ticket they can see**; an admin still sees all staff. (No tickets were ever leaked — the board has always applied the same fail-closed `ticketStaffVisibilitySql` predicate as the list, so a card can't appear for a ticket the viewer isn't permitted to see; this change is about not exposing the whole agent roster as empty columns.)
+
+### Added
+- **Board filters.** A Filters control on every Kanban board with:
+  - **My team's tickets only** — restricts the board to tickets assigned to a teammate (a staff member who shares a group with the viewer) or left unassigned. On the Assignee board this also narrows the columns to just those teammates.
+  - **Group filter** — a checklist of groups; a non-admin can filter within their own groups only, an admin within any group.
+  Active filters show a count badge, persist across board switches and search, and have an explicit Clear action.
+
+---
+
 ## 2.109.0 &mdash; 2026-06-22
 
 ### Added
