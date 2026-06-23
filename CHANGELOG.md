@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.111.2 &mdash; 2026-06-23
+
+### Changed
+- **The ticket view switcher now sits in one consistent spot across every view.** The Table / Compact / Card buttons and the Kanban button are now a single segmented control pinned to the far-right of the toolbar on the list pages *and* the board — instead of the switcher floating mid-toolbar on the lists (and sliding sideways when the table-only Columns dropdown appeared/disappeared) while jumping to the screen edge on the board. Because the control is now the last element in the toolbar, changing layout no longer shifts its position. The standalone Kanban icon button was folded into the same group: `ticket-view-switcher.php` gained an optional `$tvBoardUrl` that appends the Kanban link to the control, highlighted when you're on the board.
+
+---
+
 ## 2.111.1 &mdash; 2026-06-23
 
 ### Fixed

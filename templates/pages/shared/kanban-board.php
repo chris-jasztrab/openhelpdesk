@@ -193,20 +193,17 @@ foreach ($tickets as $t) {
             </div>
         </form>
 
-        <!-- View switcher: jump back to the list layouts, or stay on the board. -->
-        <div class="d-flex align-items-center gap-2 ms-auto">
+        <!-- Same Table / Compact / Card / Kanban control as the list pages. The
+             board is not a list layout, so 'board' highlights the Kanban button
+             and the three layout buttons save the layout then navigate to the
+             list (preserving the current search). -->
+        <div class="ms-auto">
             <?php
-            // The board is not itself a list layout: highlight nothing in the
-            // switcher ('board' matches no mode) and have it navigate to the list
-            // (preserving the current search) after saving the chosen layout.
             $tvActiveKey = 'board';
             $tvNavBase   = $boardBase . ($search !== '' ? '?q=' . urlencode($search) : '');
+            $tvBoardUrl  = $boardUrl($boardParam);
             require ROOT_DIR . '/templates/partials/ticket-view-switcher.php';
             ?>
-            <a class="btn btn-sm text-white" style="background:var(--ld-primary);border-color:var(--ld-primary);"
-               href="<?= e($boardUrl($boardParam)) ?>" aria-pressed="true" title="Kanban board">
-                <i class="bi bi-kanban"></i>
-            </a>
         </div>
     </div>
 

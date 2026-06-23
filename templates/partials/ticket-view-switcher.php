@@ -8,16 +8,21 @@
  * render the chosen layout. The current query string (filters, sort) is
  * preserved across the reload.
  *
- * Optional overrides (used by the kanban board, which is not itself a list
- * layout):
- *   $tvActiveKey — which button to highlight; pass a value that matches none of
- *                  the modes (e.g. 'board') so no list button appears selected.
+ * Optional overrides:
+ *   $tvBoardUrl  — if set, append a Kanban button to the same segmented control
+ *                  that links here. Pass it on every page so the control is one
+ *                  consistent unit (Table / Compact / Card / Kanban) everywhere.
+ *   $tvActiveKey — which button to highlight; pass 'board' (matches none of the
+ *                  list modes) so the Kanban button is the selected one and no
+ *                  list layout appears active. Used by the kanban board, which
+ *                  is not itself a list layout.
  *   $tvNavBase   — if set, navigate here after saving instead of reloading the
  *                  current page (so the switcher can jump from the board back to
  *                  the list rendered in the chosen layout).
  */
 $_tvCurrent  = $tvActiveKey ?? ($ticketView ?? 'table');
 $_tvNavBase  = $tvNavBase ?? null;
+$_tvBoardUrl = $tvBoardUrl ?? null;
 $_tvModes = [
     'table' => ['icon' => 'bi-table',      'label' => 'Table',   'hint' => 'Sortable grid with inline controls'],
     'inbox' => ['icon' => 'bi-inbox',      'label' => 'Compact', 'hint' => 'Email-style compact list'],
@@ -38,6 +43,18 @@ $_tvModes = [
         <i class="bi <?= $_tvMode['icon'] ?>"></i>
     </button>
     <?php endforeach; ?>
+    <?php if ($_tvBoardUrl !== null):
+        // Kanban lives in the same segmented control, but it's a separate page
+        // (a link), not one of the saved list layouts.
+        $_tvKActive = ($_tvCurrent === 'board'); ?>
+    <a class="btn <?= $_tvKActive ? 'text-white' : 'btn-outline-secondary' ?>"
+       <?= $_tvKActive ? 'style="background:var(--ld-primary);border-color:var(--ld-primary);" aria-pressed="true"' : 'aria-pressed="false"' ?>
+       href="<?= e($_tvBoardUrl) ?>"
+       aria-label="Kanban board view"
+       title="Kanban — drag-and-drop board">
+        <i class="bi bi-kanban"></i>
+    </a>
+    <?php endif; ?>
 </div>
 <script>
 (function () {
