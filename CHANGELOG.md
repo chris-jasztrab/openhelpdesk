@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.111.1 &mdash; 2026-06-23
+
+### Fixed
+- **The ticket-list view switcher is back on the Kanban board.** The board page only carried a single "List view" button, so once you were on the board there was no way to jump to the Table / Compact / Card list layouts — you had to navigate away by hand. The board toolbar now shows the same Table / Compact / Card segmented control as the list pages, alongside a highlighted Kanban button marking the current view. Picking a list layout saves the choice (via `/profile/setting`) and navigates to the list, preserving the active search. The shared `templates/partials/ticket-view-switcher.php` gained two optional knobs — `$tvActiveKey` (which button to highlight) and `$tvNavBase` (navigate here after saving instead of reloading) — so the board can reuse it without duplicating markup; the list pages are unaffected.
+
+---
+
 ## 2.111.0 &mdash; 2026-06-22
 
 ### Security

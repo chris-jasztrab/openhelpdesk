@@ -193,9 +193,21 @@ foreach ($tickets as $t) {
             </div>
         </form>
 
-        <a class="btn btn-sm btn-outline-secondary ms-auto" href="<?= e($boardBase) ?><?= $search !== '' ? '?q=' . urlencode($search) : '' ?>">
-            <i class="bi bi-table me-1"></i>List view
-        </a>
+        <!-- View switcher: jump back to the list layouts, or stay on the board. -->
+        <div class="d-flex align-items-center gap-2 ms-auto">
+            <?php
+            // The board is not itself a list layout: highlight nothing in the
+            // switcher ('board' matches no mode) and have it navigate to the list
+            // (preserving the current search) after saving the chosen layout.
+            $tvActiveKey = 'board';
+            $tvNavBase   = $boardBase . ($search !== '' ? '?q=' . urlencode($search) : '');
+            require ROOT_DIR . '/templates/partials/ticket-view-switcher.php';
+            ?>
+            <a class="btn btn-sm text-white" style="background:var(--ld-primary);border-color:var(--ld-primary);"
+               href="<?= e($boardUrl($boardParam)) ?>" aria-pressed="true" title="Kanban board">
+                <i class="bi bi-kanban"></i>
+            </a>
+        </div>
     </div>
 
     <?php if ($capped): ?>
