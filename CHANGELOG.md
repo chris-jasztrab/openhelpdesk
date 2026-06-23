@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.111.3 &mdash; 2026-06-23
+
+### Fixed
+- **The audit-log prune card no longer overstates what it removes.** The viewer at `/admin/audit-log` merges system audit events (`audit_log`) with allowlisted ticket-history events (`ticket_timeline`), but prune only deletes from `audit_log` — so old ticket-history rows stayed on screen after a prune, making it look like nothing happened. The prune still works exactly as before (and intentionally leaves ticket history alone, since those rows belong to each ticket's own timeline); the card copy now states this plainly and adds a note that ticket-history events are retained and may keep appearing in the list after pruning.
+
+---
+
 ## 2.111.2 &mdash; 2026-06-23
 
 ### Changed

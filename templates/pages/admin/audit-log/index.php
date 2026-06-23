@@ -85,9 +85,16 @@ function auditBadge(string $action, array $colors): string {
                 <i class="bi bi-exclamation-triangle me-1"></i>Prune audit log
             </h5>
             <p class="text-muted small mb-3">
-                Permanently delete every audit entry created <strong>before</strong> the date you pick.
-                Entries from the chosen day onward are kept. The prune action itself is logged so the
-                record of pruning survives in the audit trail.
+                Permanently delete <strong>system audit events</strong> (logins, user / group / setting
+                changes, etc.) created <strong>before</strong> the date you pick. Events from the chosen
+                day onward are kept, and the prune action itself is logged so the record of pruning
+                survives in the audit trail.
+            </p>
+            <p class="text-muted small mb-3">
+                <i class="bi bi-info-circle me-1"></i>Ticket-history events shown here (created, status
+                changed, assigned, &hellip;) are <strong>not</strong> removed by pruning &mdash; they
+                belong to each ticket and stay on the ticket's own timeline. They may continue to appear
+                in this list after a prune.
             </p>
             <form method="POST" action="/admin/audit-log/prune" class="row g-2 align-items-end"
                   onsubmit="return confirm('Permanently delete all audit entries before ' + this.before_date.value + '?\n\nThis cannot be undone.');">
