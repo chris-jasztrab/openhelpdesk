@@ -1831,6 +1831,7 @@ $router->post('/agent/tickets/{id}/comment', function (array $p) {
         notifyTicketCreator($db, $id, $message, Auth::fullName());
         notifyCcUsers($db, $id, $message, Auth::fullName());
         notifyWatchers($db, $id, $message, Auth::fullName());
+        notifyAssignedAgentReply($db, $id, $message, Auth::fullName(), Auth::id());
 
         // SLA: record first response if this is the first agent/admin public reply
         $ticket = $db->prepare('SELECT created_by, first_responded_at FROM tickets WHERE id = ?');

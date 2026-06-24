@@ -330,6 +330,7 @@ $router->post('/agent/floor/tickets/{id}/action', function (array $p) {
             notifyTicketCreator($db, $id, $message, Auth::fullName());
             notifyCcUsers($db, $id, $message, Auth::fullName());
             notifyWatchers($db, $id, $message, Auth::fullName());
+            notifyAssignedAgentReply($db, $id, $message, Auth::fullName(), $userId);
 
             // First-response SLA mark — same rule as the regular comment endpoint.
             $r = $db->prepare('SELECT created_by, first_responded_at FROM tickets WHERE id = ?');

@@ -1327,6 +1327,7 @@ $router->post('/api/v1/tickets/{id}/replies', function (array $p) {
         notifyTicketCreator($db, $ticketId, $message, $authorName);
         notifyCcUsers($db, $ticketId, $message, $authorName);
         notifyWatchers($db, $ticketId, $message, $authorName);
+        notifyAssignedAgentReply($db, $ticketId, $message, $authorName, (int) $user['id']);
     }
 
     // Return the created timeline entry. Columns are enumerated to match

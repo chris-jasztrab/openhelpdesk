@@ -779,6 +779,8 @@ $router->post('/api/tickets/{id}/cc', function (array $p) {
         if (!$check->fetch()) {
             $db->prepare('INSERT INTO ticket_cc (ticket_id, user_id, added_by) VALUES (?, ?, ?)')
                 ->execute([$ticketId, $userId, Auth::id()]);
+            // Tell the newly-CC'd user they're now on the ticket.
+            notifyCcAdded($db, $ticketId, $userId, Auth::fullName(), Auth::id());
         }
     } else {
         $db->prepare('DELETE FROM ticket_cc WHERE ticket_id = ? AND user_id = ?')

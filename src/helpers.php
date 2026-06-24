@@ -3798,19 +3798,94 @@ function notifyCcUsers(PDO $db, int $ticketId, string $message, string $authorNa
 }
 
 /**
+ * Notify a user that they have just been added as a CC on a ticket.
+ *
+ * Fires once, at the moment of being CC'd — distinct from notifyCcUsers(),
+ * which fires on every subsequent reply. In-app notification always; email
+ * respects the recipient's notify_ticket_cc opt-out. $actorId is the user who
+ * performed the add (skipped, so nobody is told they CC'd themselves).
+ */
+function notifyCcAdded(PDO $db, int $ticketId, int $userId, string $addedByName, int $actorId): void
+{
+    if (!emailNotifyEnabled('cc_note_added')) {
+        return;
+    }
+    if ($userId <= 0 || $userId === $actorId) {
+        return;
+    }
+
+    $ticket = $db->prepare('SELECT subject, group_id FROM tickets WHERE id = ?');
+    $ticket->execute([$ticketId]);
+    $ticketRow = $ticket->fetch();
+    if (!$ticketRow) return;
+
+    $userStmt = $db->prepare(
+        'SELECT id, first_name, last_name, email, role, notify_ticket_cc FROM users WHERE id = ?'
+    );
+    $userStmt->execute([$userId]);
+    $user = $userStmt->fetch();
+    if (!$user) return;
+
+    $ticketGroupId = $ticketRow['group_id'] ? (int) $ticketRow['group_id'] : null;
+
+    // In-app "Ticket Update" — independent of email opt-out.
+    createNotification($db, $userId, $ticketId, 'ticket_update', null, $actorId);
+
+    if (!(bool) ($user['notify_ticket_cc'] ?? 1)) return; // opted out of CC emails
+
+    $appUrl = env('APP_URL', 'http://localhost:8000');
+    $prefix = match ($user['role']) {
+        'admin' => '/admin',
+        'agent' => '/agent',
+        default => '/portal',
+    };
+    $ticketUrl = $appUrl . $prefix . '/tickets/' . $ticketId;
+
+    $tpl = getEmailTpl('ticket-updated', [
+        'ticket_id'  => $ticketId,
+        'subject'    => $ticketRow['subject'],
+        'message'    => '',
+        'author'     => $addedByName,
+        'user_name'  => $user['first_name'] . ' ' . $user['last_name'],
+        'first_name' => $user['first_name'],
+        'last_name'  => $user['last_name'],
+    ], $ticketGroupId);
+
+    $emailHtml = renderEmail('ticket-cc-added', [
+        'ticketId'    => $ticketId,
+        'subject'     => $ticketRow['subject'],
+        'addedByName' => $addedByName,
+        'userName'    => $user['first_name'] . ' ' . $user['last_name'],
+        'ticketUrl'   => $ticketUrl,
+        'buttonLabel' => $tpl['button'],
+        'footerText'  => $tpl['footer'],
+    ]);
+
+    sendMail(
+        $user['email'],
+        $user['first_name'] . ' ' . $user['last_name'],
+        '[Ticket #' . $ticketId . '] You were added as a CC: ' . $ticketRow['subject'],
+        $emailHtml,
+        '',
+        $ticketId
+    );
+}
+
+/**
  * Email all watchers of a ticket about a new public comment.
  * Skips the comment author, the ticket creator (notified separately),
  * and any CC'd users (notified separately).
  */
 function notifyWatchers(PDO $db, int $ticketId, string $message, string $authorName): void
 {
-    $ticketStmt = $db->prepare('SELECT subject, created_by FROM tickets WHERE id = ?');
+    $ticketStmt = $db->prepare('SELECT subject, created_by, assigned_to FROM tickets WHERE id = ?');
     $ticketStmt->execute([$ticketId]);
     $ticketRow = $ticketStmt->fetch();
     if (!$ticketRow) return;
 
-    $creatorId = (int) $ticketRow['created_by'];
-    $currentId = Auth::id();
+    $creatorId  = (int) $ticketRow['created_by'];
+    $assignedId = $ticketRow['assigned_to'] !== null ? (int) $ticketRow['assigned_to'] : 0;
+    $currentId  = Auth::id();
 
     // Collect CC'd user IDs to avoid double-notifying
     $ccStmt = $db->prepare('SELECT user_id FROM ticket_cc WHERE ticket_id = ?');
@@ -3828,6 +3903,7 @@ function notifyWatchers(PDO $db, int $ticketId, string $message, string $authorN
     foreach ($stmt->fetchAll() as $user) {
         $uid = (int) $user['id'];
         if ($uid === $currentId || $uid === $creatorId) continue;
+        if ($assignedId && $uid === $assignedId) continue; // notified separately as the assignee
         if (in_array($uid, $ccIdList, true)) continue;
 
         // In-app "Ticket Update" for watchers on a new public comment.
@@ -4253,6 +4329,79 @@ function notifyAgentRequesterReplied(PDO $db, int $ticketId, string $message): v
         $row['email'],
         $row['first_name'] . ' ' . $row['last_name'],
         '[Ticket #' . $ticketId . '] Requester replied: ' . $row['subject'],
+        $emailHtml,
+        '',
+        $ticketId
+    );
+}
+
+/**
+ * Email the assigned agent when ANOTHER staff member posts a public reply to a
+ * ticket assigned to them. Mirrors notifyAgentRequesterReplied() (requester
+ * replies) and notifyAgentNoteAdded() (internal notes) to close the gap where a
+ * public staff-to-staff reply left the assignee uninformed.
+ *
+ * Skips the reply author ($actorId). In-app notification always; email reuses
+ * the requester-replied opt-out (notify_requester_replied) since both mean
+ * "someone replied to a ticket assigned to you".
+ */
+function notifyAssignedAgentReply(PDO $db, int $ticketId, string $message, string $authorName, int $actorId): void
+{
+    if (!emailNotifyEnabled('agent_requester_reply')) {
+        return;
+    }
+
+    $stmt = $db->prepare(
+        'SELECT t.subject, t.assigned_to,
+                u.id AS agent_id, u.first_name, u.last_name, u.email, u.role, u.notify_requester_replied
+         FROM tickets t
+         JOIN users u ON u.id = t.assigned_to
+         WHERE t.id = ?'
+    );
+    $stmt->execute([$ticketId]);
+    $row = $stmt->fetch();
+    if (!$row || (int) $row['assigned_to'] === $actorId) {
+        return; // unassigned, or the assignee is the one replying
+    }
+
+    // In-app "Ticket Update" for the assigned agent — independent of email opt-out.
+    createNotification($db, (int) $row['agent_id'], $ticketId, 'ticket_update', $message, $actorId);
+    if (!(bool) ($row['notify_requester_replied'] ?? 1)) {
+        return;
+    }
+
+    $appUrl    = env('APP_URL', 'http://localhost:8000');
+    $rolePrefix = match ($row['role']) {
+        'admin' => '/admin',
+        default => '/agent',
+    };
+    $ticketUrl = $appUrl . $rolePrefix . '/tickets/' . $ticketId;
+
+    $tpl = getEmailTpl('ticket-updated', [
+        'ticket_id'  => $ticketId,
+        'subject'    => $row['subject'],
+        'message'    => $message,
+        'author'     => $authorName,
+        'user_name'  => $row['first_name'] . ' ' . $row['last_name'],
+        'first_name' => $row['first_name'],
+        'last_name'  => $row['last_name'],
+    ]);
+
+    $emailHtml = renderEmail('ticket-updated', [
+        'ticketId'    => $ticketId,
+        'subject'     => $row['subject'],
+        'message'     => $message,
+        'authorName'  => $authorName,
+        'ticketUrl'   => $ticketUrl,
+        'introText'   => htmlspecialchars($authorName, ENT_QUOTES, 'UTF-8') . ' replied to a ticket assigned to you.',
+        'buttonLabel' => $tpl['button'],
+        'footerText'  => $tpl['footer'],
+    ]);
+
+    sendMail(
+        $row['email'],
+        $row['first_name'] . ' ' . $row['last_name'],
+        '[Ticket #' . $ticketId . '] New reply: ' . $row['subject'],
         $emailHtml,
         '',
         $ticketId

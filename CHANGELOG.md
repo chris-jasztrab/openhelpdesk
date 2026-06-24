@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.113.0 &mdash; 2026-06-24
+
+### Fixed
+- **Two missing email notifications around CCs and staff replies now fire.** (1) Adding someone as a CC on a ticket (`POST /api/tickets/{id}/cc`) inserted the row but never told them — they only heard about the ticket on the *next* reply. A new `notifyCcAdded()` now sends a one-time "you were added as a CC" email (new `ticket-cc-added` template, since the generic ticket-updated template assumes a comment body) plus an in-app notification, respecting the recipient's `notify_ticket_cc` opt-out. (2) When a staff member posted a **public** reply to a ticket assigned to *another* agent, only the requester, CCs, and watchers were emailed — the assignee got nothing (the assignee was only notified for *internal notes*, via `notifyAgentNoteAdded()`). A new `notifyAssignedAgentReply()` now notifies the assignee on public staff replies across all four reply paths (agent, admin, floor, and the v1 API), skipping the reply author and reusing the `notify_requester_replied` opt-out. To avoid double-emailing, `notifyWatchers()` now skips the assigned agent, who is notified separately.
+
+---
+
 ## 2.112.0 &mdash; 2026-06-24
 
 ### Added
