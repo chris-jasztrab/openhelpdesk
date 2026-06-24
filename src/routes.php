@@ -2108,41 +2108,28 @@ $router->post('/profile', function () {
         setSetting('system_notes_visible:' . $userId, isset($_POST['system_notes_visible']) ? '1' : '0');
     }
 
-    // Save notification preferences
-    $db->prepare(
-        'UPDATE users SET
-            notify_ticket_created    = ?,
-            notify_ticket_updated    = ?,
-            notify_ticket_cc         = ?,
-            notify_ticket_merged     = ?,
-            notify_escalation        = ?,
-            notify_csat              = ?,
-            notify_group_new_ticket  = ?,
-            notify_assigned_to_me    = ?,
-            notify_assigned_to_group = ?,
-            notify_requester_replied = ?,
-            notify_note_added        = ?,
-            notify_ticket_solved     = ?,
-            notify_ticket_closed     = ?,
-            notify_ticket_assigned   = ?
-         WHERE id = ?'
-    )->execute([
-        isset($_POST['notify_ticket_created'])    ? 1 : 0,
-        isset($_POST['notify_ticket_updated'])    ? 1 : 0,
-        isset($_POST['notify_ticket_cc'])         ? 1 : 0,
-        isset($_POST['notify_ticket_merged'])     ? 1 : 0,
-        isset($_POST['notify_escalation'])        ? 1 : 0,
-        isset($_POST['notify_csat'])              ? 1 : 0,
-        isset($_POST['notify_group_new_ticket'])  ? 1 : 0,
-        isset($_POST['notify_assigned_to_me'])    ? 1 : 0,
-        isset($_POST['notify_assigned_to_group']) ? 1 : 0,
-        isset($_POST['notify_requester_replied']) ? 1 : 0,
-        isset($_POST['notify_note_added'])        ? 1 : 0,
-        isset($_POST['notify_ticket_solved'])     ? 1 : 0,
-        isset($_POST['notify_ticket_closed'])     ? 1 : 0,
-        isset($_POST['notify_ticket_assigned'])   ? 1 : 0,
-        $userId,
-    ]);
+    // Save notification preferences (no-JS fallback; the primary path is the
+    // per-field /profile/setting AJAX endpoint below). Only touch the columns
+    // the form actually rendered for this role — listed in `_notify_fields` —
+    // so a toggle that isn't shown is never silently zeroed. An unchecked but
+    // rendered checkbox is absent from $_POST and correctly resolves to 0.
+    $allowedNotify = [
+        'notify_ticket_created', 'notify_ticket_updated', 'notify_ticket_cc',
+        'notify_ticket_merged', 'notify_escalation', 'notify_csat',
+        'notify_group_new_ticket', 'notify_assigned_to_me', 'notify_assigned_to_group',
+        'notify_requester_replied', 'notify_note_added', 'notify_ticket_solved',
+        'notify_ticket_closed', 'notify_ticket_assigned',
+    ];
+    $renderedNotify = array_values(array_intersect(
+        array_filter(array_map('trim', explode(',', $_POST['_notify_fields'] ?? ''))),
+        $allowedNotify
+    ));
+    if ($renderedNotify) {
+        $setSql = implode(', ', array_map(static fn($c) => "$c = ?", $renderedNotify));
+        $params = array_map(static fn($c) => isset($_POST[$c]) ? 1 : 0, $renderedNotify);
+        $params[] = $userId;
+        $db->prepare("UPDATE users SET $setSql WHERE id = ?")->execute($params);
+    }
 
     // Refresh session so navbar reflects changes immediately
     $_SESSION['user']['first_name'] = $fn;

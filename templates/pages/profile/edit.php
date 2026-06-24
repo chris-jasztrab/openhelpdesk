@@ -180,6 +180,17 @@ $breadcrumbs = [
                             ['key' => 'notify_escalation',        'icon' => 'bi-exclamation-triangle', 'label' => 'Escalation alerts',       'desc' => 'Email when an escalation rule fires and targets you.'],
                             ['key' => 'notify_ticket_assigned',   'icon' => 'bi-person-check',         'label' => 'My ticket assigned',      'desc' => 'Email when a ticket you submitted is assigned to an agent, letting you know who is handling it.'],
                         ];
+                        // Staff submit tickets too — these mirror the portal-user
+                        // requester notifications for tickets the agent/admin opens.
+                        $submitOptions = [
+                            ['key' => 'notify_ticket_created',    'icon' => 'bi-ticket-detailed',      'label' => 'Ticket submitted',        'desc' => 'Confirmation email when you open a new ticket.'],
+                            ['key' => 'notify_ticket_updated',    'icon' => 'bi-chat-left-text',       'label' => 'Agent replies',           'desc' => 'Email when an agent replies to a ticket you submitted.'],
+                            ['key' => 'notify_ticket_merged',     'icon' => 'bi-arrows-collapse',      'label' => 'Ticket merged',           'desc' => 'Email when a ticket you submitted is merged into another.'],
+                            ['key' => 'notify_ticket_solved',     'icon' => 'bi-check-circle',         'label' => 'Ticket resolved',         'desc' => 'Email when a ticket you submitted is marked as resolved.'],
+                            ['key' => 'notify_ticket_closed',     'icon' => 'bi-x-circle',             'label' => 'Ticket closed',           'desc' => 'Email when a ticket you submitted is marked as closed.'],
+                            ['key' => 'notify_csat',              'icon' => 'bi-star',                 'label' => 'Satisfaction surveys',    'desc' => 'Survey email after a ticket you submitted is resolved.'],
+                        ];
+                        $allNotifyOptions = array_merge($agentOptions, $otherOptions, $submitOptions);
                     ?>
                         <p class="text-muted small fw-semibold mb-1 mt-1">Agent Notifications</p>
                         <?php foreach ($agentOptions as $opt): $checked = ($profileUser[$opt['key']] ?? 1) ? 'checked' : ''; ?>
@@ -213,6 +224,22 @@ $breadcrumbs = [
                         </div>
                         <?php endforeach; ?>
 
+                        <p class="text-muted small fw-semibold mb-1 mt-3">Tickets You Submit</p>
+                        <?php foreach ($submitOptions as $opt): $checked = ($profileUser[$opt['key']] ?? 1) ? 'checked' : ''; ?>
+                        <div class="d-flex align-items-start gap-3 py-2 border-bottom">
+                            <div class="form-check form-switch mb-0 pt-1">
+                                <input class="form-check-input" type="checkbox"
+                                       name="<?= $opt['key'] ?>" id="<?= $opt['key'] ?>" value="1" <?= $checked ?>>
+                            </div>
+                            <label class="mb-0 flex-grow-1" for="<?= $opt['key'] ?>" style="cursor:pointer;">
+                                <div class="fw-semibold small">
+                                    <i class="bi <?= $opt['icon'] ?> me-1 text-muted"></i><?= $opt['label'] ?>
+                                </div>
+                                <div class="text-muted" style="font-size:.8rem;"><?= $opt['desc'] ?></div>
+                            </label>
+                        </div>
+                        <?php endforeach; ?>
+
                     <?php else: // portal user
                         $portalOptions = [
                             ['key' => 'notify_ticket_created',    'icon' => 'bi-ticket-detailed',     'label' => 'Ticket submitted',       'desc' => 'Confirmation email when you open a new ticket.'],
@@ -224,6 +251,7 @@ $breadcrumbs = [
                             ['key' => 'notify_ticket_closed',     'icon' => 'bi-x-circle',             'label' => 'Ticket closed',          'desc' => 'Email when your ticket is marked as closed.'],
                             ['key' => 'notify_csat',              'icon' => 'bi-star',                 'label' => 'Satisfaction surveys',   'desc' => 'Survey email after your ticket is resolved.'],
                         ];
+                        $allNotifyOptions = $portalOptions;
                         foreach ($portalOptions as $opt): $checked = ($profileUser[$opt['key']] ?? 1) ? 'checked' : ''; ?>
                         <div class="d-flex align-items-start gap-3 py-2 border-bottom">
                             <div class="form-check form-switch mb-0 pt-1">
@@ -239,6 +267,11 @@ $breadcrumbs = [
                         </div>
                         <?php endforeach;
                     endif; ?>
+                    <?php // Tell the no-JS fallback handler which notification columns
+                          // this form actually rendered, so it never zeroes a column
+                          // that isn't shown for this role. ?>
+                    <input type="hidden" name="_notify_fields"
+                           value="<?= htmlspecialchars(implode(',', array_column($allNotifyOptions, 'key')), ENT_QUOTES, 'UTF-8') ?>">
                 </div>
             </div>
 

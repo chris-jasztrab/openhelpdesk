@@ -11,6 +11,16 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.114.0 &mdash; 2026-06-24
+
+### Added
+- **Staff can now control the notification emails for tickets *they* submit.** Agents and admins open tickets too, but their profile only exposed agent-facing toggles — so requester-side preferences (`notify_ticket_created`, `notify_ticket_updated`, `notify_ticket_merged`, `notify_ticket_solved`, `notify_ticket_closed`, `notify_csat`) had **no UI for staff**, even though those columns gate real emails (e.g. the "your ticket was closed" email keys off `notify_ticket_closed`). The profile now shows a **"Tickets You Submit"** group for staff mirroring the portal-user options, so an agent who files a ticket can choose whether to hear about replies, resolution, closure, merges, and surveys on it.
+
+### Fixed
+- **The no-JS profile-save fallback no longer silently zeroes hidden notification preferences.** The bulk `POST /profile` handler wrote all 14 notification columns as `isset($_POST[col]) ? 1 : 0`. Because each role's form only renders a subset of toggles, submitting that form (e.g. without JS) flipped every *unrendered* column to 0 — which is how two staff accounts ended up with `notify_ticket_closed = 0` and stopped getting closure emails for their own tickets. The form now emits a `_notify_fields` marker listing the columns it actually rendered, and the handler only updates those — an unchecked-but-rendered toggle still resolves to 0. (The primary save path remains the per-field `/profile/setting` AJAX endpoint, which was always correct.) Affected staff accounts had the wrongly-zeroed flags reset to the intended default.
+
+---
+
 ## 2.113.1 &mdash; 2026-06-24
 
 ### Fixed
