@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.113.1 &mdash; 2026-06-24
+
+### Fixed
+- **CC'ing a user via an automation rule now emails them too.** The `add_cc` automation action (in `executeAutomation()`) inserted the `ticket_cc` row but, unlike the manual CC button, never notified the person. It now calls the same `notifyCcAdded()` helper. Since there's no human actor on an automation, the notification is attributed to `Automation "<rule name>"` and the in-app record carries no "added by" (the `mentioned_by` foreign key is left null rather than a bogus user id).
+
+---
+
 ## 2.113.0 &mdash; 2026-06-24
 
 ### Fixed

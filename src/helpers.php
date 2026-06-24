@@ -3803,14 +3803,16 @@ function notifyCcUsers(PDO $db, int $ticketId, string $message, string $authorNa
  * Fires once, at the moment of being CC'd — distinct from notifyCcUsers(),
  * which fires on every subsequent reply. In-app notification always; email
  * respects the recipient's notify_ticket_cc opt-out. $actorId is the user who
- * performed the add (skipped, so nobody is told they CC'd themselves).
+ * performed the add (skipped, so nobody is told they CC'd themselves); pass 0
+ * when there is no human actor (e.g. an automation rule), in which case the
+ * in-app notification simply carries no "added by".
  */
 function notifyCcAdded(PDO $db, int $ticketId, int $userId, string $addedByName, int $actorId): void
 {
     if (!emailNotifyEnabled('cc_note_added')) {
         return;
     }
-    if ($userId <= 0 || $userId === $actorId) {
+    if ($userId <= 0 || ($actorId > 0 && $userId === $actorId)) {
         return;
     }
 
@@ -3828,8 +3830,9 @@ function notifyCcAdded(PDO $db, int $ticketId, int $userId, string $addedByName,
 
     $ticketGroupId = $ticketRow['group_id'] ? (int) $ticketRow['group_id'] : null;
 
-    // In-app "Ticket Update" — independent of email opt-out.
-    createNotification($db, $userId, $ticketId, 'ticket_update', null, $actorId);
+    // In-app "Ticket Update" — independent of email opt-out. A non-positive
+    // actor (automation) is recorded as no actor, since mentioned_by is an FK.
+    createNotification($db, $userId, $ticketId, 'ticket_update', null, $actorId > 0 ? $actorId : null);
 
     if (!(bool) ($user['notify_ticket_cc'] ?? 1)) return; // opted out of CC emails
 
@@ -6198,6 +6201,8 @@ function runAutomations(PDO $db, int $ticketId, string $triggerEvent): void
                         $db->prepare(
                             'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, ?, ?, 1)'
                         )->execute([$ticketId, 'automation', "Automation '{$auto['name']}': CC'd {$ccName}"]);
+                        // Notify the newly-CC'd user (no human actor — pass 0).
+                        notifyCcAdded($db, $ticketId, $ccUserId, "Automation \"{$auto['name']}\"", 0);
                     }
                     break;
             }
