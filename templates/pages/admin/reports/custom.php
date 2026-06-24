@@ -38,6 +38,14 @@ $breadcrumbs  = [
                 </select>
             </div>
             <div class="col-sm-auto">
+                <label class="form-label small fw-semibold mb-1">Quick range</label>
+                <select name="range" class="form-select form-select-sm js-report-range">
+                    <?php foreach (reportRangePresets() as $rKey => $rLabel): ?>
+                    <option value="<?= e($rKey) ?>" <?= ($range ?? 'custom') === $rKey ? 'selected' : '' ?>><?= e($rLabel) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-sm-auto">
                 <label class="form-label small fw-semibold mb-1">From</label>
                 <input type="date" name="from" value="<?= e($from) ?>" class="form-control form-control-sm">
             </div>
@@ -51,6 +59,7 @@ $breadcrumbs  = [
                 </button>
             </div>
         </form>
+        <?php require ROOT_DIR . '/templates/partials/report-range-script.php'; ?>
     </div>
 </div>
 

@@ -9580,12 +9580,99 @@ function formatMinutes(float $minutes): string
     return round($minutes / 1440, 1) . 'd';
 }
 
-/** Helper: parse date-range query params with defaults */
+/** Ordered list of report date-range presets: key => human label. */
+function reportRangePresets(): array
+{
+    return [
+        'today'          => 'Today',
+        'yesterday'      => 'Yesterday',
+        'last7'          => 'Last 7 days',
+        'last30'         => 'Last 30 days',
+        'last90'         => 'Last 90 days',
+        'this_week'      => 'This week',
+        'last_week'      => 'Last week',
+        'this_month'     => 'This month',
+        'last_month'     => 'Last month',
+        'this_quarter'   => 'This quarter',
+        'last_quarter'   => 'Last quarter',
+        'ytd'            => 'Year to date',
+        'last_12_months' => 'Last 12 months',
+        'last_year'      => 'Last year',
+        'custom'         => 'Custom range',
+    ];
+}
+
+/** Resolve a preset key to [from, to] (Y-m-d), or null if the key is unknown. */
+function reportPresetDates(string $key): ?array
+{
+    $today = date('Y-m-d');
+    $month = (int) date('n');
+    $year  = (int) date('Y');
+    $qStartMonth = (int) (floor(($month - 1) / 3) * 3) + 1; // 1,4,7,10
+
+    switch ($key) {
+        case 'today':          return [$today, $today];
+        case 'yesterday':      $d = date('Y-m-d', strtotime('-1 day')); return [$d, $d];
+        case 'last7':          return [date('Y-m-d', strtotime('-6 days')), $today];
+        case 'last30':         return [date('Y-m-d', strtotime('-29 days')), $today];
+        case 'last90':         return [date('Y-m-d', strtotime('-89 days')), $today];
+        case 'this_week':      return [date('Y-m-d', strtotime('monday this week')), $today];
+        case 'last_week':      return [date('Y-m-d', strtotime('monday last week')), date('Y-m-d', strtotime('sunday last week'))];
+        case 'this_month':     return [date('Y-m-01'), $today];
+        case 'last_month':     return [date('Y-m-01', strtotime('first day of last month')), date('Y-m-t', strtotime('last day of last month'))];
+        case 'this_quarter':   return [date('Y-m-01', mktime(0, 0, 0, $qStartMonth, 1, $year)), $today];
+        case 'last_quarter':
+            $lqStartMonth = $qStartMonth - 3;
+            $lqYear = $year;
+            if ($lqStartMonth <= 0) { $lqStartMonth += 12; $lqYear--; }
+            return [
+                date('Y-m-01', mktime(0, 0, 0, $lqStartMonth, 1, $lqYear)),
+                date('Y-m-t', mktime(0, 0, 0, $lqStartMonth + 2, 1, $lqYear)),
+            ];
+        case 'ytd':            return [date('Y-01-01'), $today];
+        case 'last_12_months': return [date('Y-m-d', strtotime('-1 year +1 day')), $today];
+        case 'last_year':      return [date('Y-01-01', strtotime('-1 year')), date('Y-12-31', strtotime('-1 year'))];
+    }
+    return null;
+}
+
+/**
+ * Parse date-range query params, supporting both explicit from/to and named
+ * presets (?range=last7). Returns [from, to, range] where `range` is the active
+ * preset key (or 'custom') so the picker can highlight the current selection.
+ */
 function reportDateRange(): array
 {
-    $to   = (!empty($_GET['to']) && strtotime($_GET['to'])) ? $_GET['to'] : date('Y-m-d');
-    $from = (!empty($_GET['from']) && strtotime($_GET['from'])) ? $_GET['from'] : date('Y-m-d', strtotime('-30 days', strtotime($to)));
-    return [$from, $to];
+    $presets = reportRangePresets();
+    $range   = isset($_GET['range']) ? (string) $_GET['range'] : '';
+
+    // A recognised, non-custom preset wins outright — it defines from/to.
+    if ($range !== '' && $range !== 'custom' && isset($presets[$range])) {
+        $dates = reportPresetDates($range);
+        if ($dates) {
+            return [$dates[0], $dates[1], $range];
+        }
+    }
+
+    $hasExplicit = !empty($_GET['from']) || !empty($_GET['to']);
+
+    // No params at all → default landing window (last 30 days).
+    if (!$hasExplicit && $range === '') {
+        $dates = reportPresetDates('last30');
+        return [$dates[0], $dates[1], 'last30'];
+    }
+
+    $to   = (!empty($_GET['to'])   && strtotime($_GET['to']))   ? $_GET['to']   : date('Y-m-d');
+    $from = (!empty($_GET['from']) && strtotime($_GET['from'])) ? $_GET['from'] : date('Y-m-d', strtotime('-29 days', strtotime($to)));
+
+    // If the explicit window happens to match a preset, keep the picker in sync.
+    $resolved = 'custom';
+    foreach ($presets as $key => $_label) {
+        if ($key === 'custom') continue;
+        $d = reportPresetDates($key);
+        if ($d && $d[0] === $from && $d[1] === $to) { $resolved = $key; break; }
+    }
+    return [$from, $to, $resolved];
 }
 
 /* ── Reports Overview ─────────────────────────────────────────────── */
@@ -9593,7 +9680,7 @@ function reportDateRange(): array
 $router->get('/admin/reports', function () {
     Auth::requirePermission('reports.view');
     $db = Database::connect();
-    [$from, $to] = reportDateRange();
+    [$from, $to, $range] = reportDateRange();
     $toEnd = $to . ' 23:59:59';
 
     $closedIn    = ticketStatusSqlIn(ticketClosedBucketSlugs(), 'status');
@@ -9644,7 +9731,7 @@ $router->get('/admin/reports', function () {
     $unassignedCount = (int) $stmt->fetchColumn();
 
     render('admin/reports/index', compact(
-        'from', 'to', 'ticketsCreated', 'ticketsResolved', 'unresolvedCount',
+        'from', 'to', 'range', 'ticketsCreated', 'ticketsResolved', 'unresolvedCount',
         'avgFirstResponse', 'avgResolution', 'slaCompliance', 'slaBreached', 'unassignedCount'
     ));
 });
@@ -9654,7 +9741,7 @@ $router->get('/admin/reports', function () {
 $router->get('/admin/reports/agent-performance', function () {
     Auth::requirePermission('reports.view');
     $db = Database::connect();
-    [$from, $to] = reportDateRange();
+    [$from, $to, $range] = reportDateRange();
     $toEnd = $to . ' 23:59:59';
 
     $closedInT    = ticketStatusSqlIn(ticketClosedBucketSlugs(), 't.status');
@@ -9696,7 +9783,7 @@ $router->get('/admin/reports/agent-performance', function () {
     }
     unset($a);
 
-    render('admin/reports/agent-performance', compact('from', 'to', 'agents'));
+    render('admin/reports/agent-performance', compact('from', 'to', 'range', 'agents'));
 });
 
 /* ── Response Times ───────────────────────────────────────────────── */
@@ -9704,7 +9791,7 @@ $router->get('/admin/reports/agent-performance', function () {
 $router->get('/admin/reports/response-times', function () {
     Auth::requirePermission('reports.view');
     $db = Database::connect();
-    [$from, $to] = reportDateRange();
+    [$from, $to, $range] = reportDateRange();
     $toEnd = $to . ' 23:59:59';
 
     // Overall averages
@@ -9789,7 +9876,7 @@ $router->get('/admin/reports/response-times', function () {
     $weeklyTrend = $stmt->fetchAll();
 
     render('admin/reports/response-times', compact(
-        'from', 'to', 'overallFirstResponse', 'overallResolution', 'ticketsMeasured',
+        'from', 'to', 'range', 'overallFirstResponse', 'overallResolution', 'ticketsMeasured',
         'byPriority', 'weeklyTrend'
     ));
 });
@@ -9799,7 +9886,7 @@ $router->get('/admin/reports/response-times', function () {
 $router->get('/admin/reports/sla', function () {
     Auth::requirePermission('reports.view');
     $db = Database::connect();
-    [$from, $to] = reportDateRange();
+    [$from, $to, $range] = reportDateRange();
     $toEnd = $to . ' 23:59:59';
 
     // Overall compliance
@@ -9877,7 +9964,7 @@ $router->get('/admin/reports/sla', function () {
     unset($bt);
 
     render('admin/reports/sla', compact(
-        'from', 'to', 'overallCompliance', 'firstResponseCompliance', 'resolutionCompliance',
+        'from', 'to', 'range', 'overallCompliance', 'firstResponseCompliance', 'resolutionCompliance',
         'totalBreached', 'totalMet', 'byPriority', 'breachedTickets'
     ));
 });
@@ -10003,7 +10090,7 @@ $router->get('/admin/reports/unresolved', function () {
 $router->get('/admin/reports/ticket-volume', function () {
     Auth::requirePermission('reports.view');
     $db = Database::connect();
-    [$from, $to] = reportDateRange();
+    [$from, $to, $range] = reportDateRange();
     $toEnd = $to . ' 23:59:59';
 
     // Daily volume
@@ -10060,7 +10147,7 @@ $router->get('/admin/reports/ticket-volume', function () {
     $byLocation = $stmt->fetchAll();
 
     render('admin/reports/ticket-volume', compact(
-        'from', 'to', 'dailyVolume', 'byPriority', 'byType', 'byLocation'
+        'from', 'to', 'range', 'dailyVolume', 'byPriority', 'byType', 'byLocation'
     ));
 });
 
@@ -10069,7 +10156,7 @@ $router->get('/admin/reports/ticket-volume', function () {
 $router->get('/admin/reports/lifecycle', function () {
     Auth::requirePermission('reports.view');
     $db = Database::connect();
-    [$from, $to] = reportDateRange();
+    [$from, $to, $range] = reportDateRange();
     $toEnd = $to . ' 23:59:59';
 
     // Get status transitions from timeline
@@ -10189,7 +10276,7 @@ $router->get('/admin/reports/lifecycle', function () {
     unset($row);
 
     render('admin/reports/lifecycle', compact(
-        'from', 'to', 'statusDurations', 'transitions', 'byPriority'
+        'from', 'to', 'range', 'statusDurations', 'transitions', 'byPriority'
     ));
 });
 
@@ -10198,7 +10285,7 @@ $router->get('/admin/reports/lifecycle', function () {
 $router->get('/admin/reports/location', function () {
     Auth::requirePermission('reports.view');
     $db = Database::connect();
-    [$from, $to] = reportDateRange();
+    [$from, $to, $range] = reportDateRange();
     $toEnd = $to . ' 23:59:59';
 
     $closedInT    = ticketStatusSqlIn(ticketClosedBucketSlugs(), 't.status');
@@ -10238,7 +10325,7 @@ $router->get('/admin/reports/location', function () {
     }
     unset($loc);
 
-    render('admin/reports/location', compact('from', 'to', 'locations'));
+    render('admin/reports/location', compact('from', 'to', 'range', 'locations'));
 });
 
 /* ── CSAT Satisfaction Report ─────────────────────────────────────── */
@@ -10246,7 +10333,7 @@ $router->get('/admin/reports/location', function () {
 $router->get('/admin/reports/csat', function () {
     Auth::requirePermission('reports.view');
     $db = Database::connect();
-    [$from, $to] = reportDateRange();
+    [$from, $to, $range] = reportDateRange();
     $toEnd = $to . ' 23:59:59';
 
     $stmt = $db->prepare('SELECT COUNT(*) FROM csat_surveys WHERE sent_at BETWEEN ? AND ?');
@@ -10293,7 +10380,7 @@ $router->get('/admin/reports/csat', function () {
     $responses = $stmt->fetchAll();
 
     render('admin/reports/csat', compact(
-        'from', 'to', 'totalSent', 'totalResponded', 'responseRate',
+        'from', 'to', 'range', 'totalSent', 'totalResponded', 'responseRate',
         'avgRating', 'distribution', 'responses'
     ));
 });
@@ -11010,7 +11097,7 @@ $router->get('/admin/reports/workload', function () {
 $router->get('/admin/reports/trends', function () {
     Auth::requirePermission('reports.view');
     $db      = Database::connect();
-    [$from, $to] = reportDateRange();
+    [$from, $to, $range] = reportDateRange();
     $toEnd   = $to . ' 23:59:59';
     $groupBy = in_array($_GET['group_by'] ?? '', ['type', 'location'], true)
         ? $_GET['group_by'] : 'type';
@@ -11071,7 +11158,7 @@ $router->get('/admin/reports/trends', function () {
         ];
     }
 
-    render('admin/reports/trends', compact('from', 'to', 'groupBy', 'labels', 'datasets'));
+    render('admin/reports/trends', compact('from', 'to', 'range', 'groupBy', 'labels', 'datasets'));
 });
 
 /* ==================================================================
@@ -11081,7 +11168,7 @@ $router->get('/admin/reports/trends', function () {
 $router->get('/admin/reports/fcr', function () {
     Auth::requirePermission('reports.view');
     $db = Database::connect();
-    [$from, $to] = reportDateRange();
+    [$from, $to, $range] = reportDateRange();
     $toEnd = $to . ' 23:59:59';
 
     // Overall FCR
@@ -11183,7 +11270,7 @@ $router->get('/admin/reports/fcr', function () {
     }
     unset($w);
 
-    render('admin/reports/fcr', compact('from', 'to', 'overallFcr', 'fcrByAgent', 'fcrByType', 'weeklyFcr'));
+    render('admin/reports/fcr', compact('from', 'to', 'range', 'overallFcr', 'fcrByAgent', 'fcrByType', 'weeklyFcr'));
 });
 
 /* ==================================================================
@@ -11223,7 +11310,7 @@ $router->get('/admin/reports/group-coverage', function () {
 $router->get('/admin/reports/custom', function () {
     Auth::requirePermission('reports.view');
     $db = Database::connect();
-    [$from, $to] = reportDateRange();
+    [$from, $to, $range] = reportDateRange();
     $toEnd = $to . ' 23:59:59';
 
     $metricOptions = [
@@ -11301,7 +11388,7 @@ $router->get('/admin/reports/custom', function () {
     }
 
     render('admin/reports/custom', compact(
-        'from', 'to', 'metric', 'groupBy', 'rows',
+        'from', 'to', 'range', 'metric', 'groupBy', 'rows',
         'metricLabel', 'metricOptions', 'groupByOptions'
     ));
 });

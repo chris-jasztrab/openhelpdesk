@@ -41,9 +41,7 @@ $csatExtDash   = trim(getSetting('csat_external_dashboard_url', ''));
     <i class="bi bi-calendar3"></i>
     Showing data from <strong><?= e($from) ?></strong> to <strong><?= e($to) ?></strong>
     <form class="d-inline-flex align-items-center gap-2 ms-3">
-        <input type="date" name="from" value="<?= e($from) ?>" class="form-control form-control-sm" style="width:auto;">
-        <span>to</span>
-        <input type="date" name="to" value="<?= e($to) ?>" class="form-control form-control-sm" style="width:auto;">
+        <?php require ROOT_DIR . '/templates/partials/report-date-range.php'; ?>
         <button type="submit" class="btn btn-sm text-white" style="background:var(--ld-primary);">Apply</button>
         <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#scheduleReportModal">
             <i class="bi bi-calendar-plus me-1"></i>Schedule

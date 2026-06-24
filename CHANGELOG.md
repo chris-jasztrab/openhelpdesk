@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.112.0 &mdash; 2026-06-24
+
+### Added
+- **Reports now have a date-range preset dropdown alongside the from/to pickers.** Every report's date filter (`reportDateRange()`) gained a `range` parameter that resolves common windows server-side — Today, Yesterday, Last 7 / 30 / 90 days, This week, Last week, This month, Last month, This quarter, Last quarter, Year to date, Last 12 months, and Last year — plus Custom range for the manual from/to inputs. Picking a preset auto-applies; editing a date flips the dropdown to "Custom"; and if a manual range happens to match a preset, the dropdown stays in sync. The default landing window is now "Last 30 days". The picker is a shared partial (`report-date-range.php` + `report-range-script.php`) wired into all date-scoped reports (overview, agent performance, response times, SLA, ticket volume, lifecycle, location, CSAT, trends, FCR, and the custom builder).
+
+---
+
 ## 2.111.3 &mdash; 2026-06-23
 
 ### Fixed
