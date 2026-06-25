@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.119.0 &mdash; 2026-06-25
+
+### Added
+- **Export the audit log to CSV (opens directly in Excel).** A new **Export to Excel** button on the Audit Log page downloads every matching entry as a UTF-8 CSV. The export honours whatever filters are active — actor, action, source, and date range — so the file matches what's on screen, and it's unpaged (all rows, not just the current page of 50). Columns: When, Source, Actor, Action, Target Type, Target ID, Detail, IP Address. The export action itself is recorded in the audit trail.
+
 ## 2.118.0 &mdash; 2026-06-25
 
 ### Added

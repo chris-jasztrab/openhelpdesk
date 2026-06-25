@@ -12481,6 +12481,129 @@ $router->get('/admin/audit-log', function () {
 });
 
 /*
+ * GET /admin/audit-log/export
+ *
+ * Stream the audit log to CSV (UTF-8 + BOM so Excel opens it cleanly). Honours
+ * the same user / action / date / source filters as the viewer above, so the
+ * export matches whatever the admin is currently looking at. Unpaged — every
+ * matching row is written, not just the current page.
+ */
+$router->get('/admin/audit-log/export', function () {
+    Auth::requirePermission('audit.view');
+    $db = Database::connect();
+
+    // Filters — identical parsing to the viewer route so the export mirrors it.
+    $filterUser   = isset($_GET['user_id']) ? (int) $_GET['user_id'] : null;
+    $filterAction = trim($_GET['action'] ?? '');
+    $filterFrom   = trim($_GET['from']   ?? '');
+    $filterTo     = trim($_GET['to']     ?? '');
+    $filterSource = in_array($_GET['source'] ?? '', ['audit', 'history'], true) ? $_GET['source'] : '';
+
+    $includeAudit   = $filterSource !== 'history';
+    $includeHistory = $filterSource !== 'audit';
+
+    if ($filterAction !== '') {
+        if (strpos($filterAction, 'ticket.') === 0) {
+            $includeAudit = false;
+        } else {
+            $includeHistory = false;
+        }
+    }
+
+    $parts        = [];
+    $params       = [];
+    $allowlistSQL = "'" . implode("','", _AUDIT_LOG_TIMELINE_ALLOWLIST) . "'";
+
+    if ($includeAudit) {
+        $w = [];
+        if ($filterUser)          { $w[] = 'user_id = ?';     $params[] = $filterUser; }
+        if ($filterAction !== '') {
+            $legacy = auditLegacyAliasesFor($filterAction);
+            $names  = array_merge([$filterAction], $legacy);
+            $ph     = implode(',', array_fill(0, count($names), '?'));
+            $w[]    = "action IN ({$ph})";
+            foreach ($names as $n) { $params[] = $n; }
+        }
+        if ($filterFrom !== '')   { $w[] = 'created_at >= ?'; $params[] = $filterFrom . ' 00:00:00'; }
+        if ($filterTo   !== '')   { $w[] = 'created_at <= ?'; $params[] = $filterTo   . ' 23:59:59'; }
+        $wsql    = $w ? ('WHERE ' . implode(' AND ', $w)) : '';
+        $parts[] = "SELECT created_at, user_id, action, target_type, target_id, detail, ip_address,
+                           'audit' AS source
+                    FROM audit_log {$wsql}";
+    }
+
+    if ($includeHistory) {
+        $w = ['is_internal = 0', "action IN ({$allowlistSQL})"];
+        if ($filterUser)          { $w[] = 'user_id = ?';     $params[] = $filterUser; }
+        if ($filterAction !== '' && strpos($filterAction, 'ticket.') === 0) {
+            $w[]      = 'action = ?';
+            $params[] = substr($filterAction, 7);
+        }
+        if ($filterFrom !== '')   { $w[] = 'created_at >= ?'; $params[] = $filterFrom . ' 00:00:00'; }
+        if ($filterTo   !== '')   { $w[] = 'created_at <= ?'; $params[] = $filterTo   . ' 23:59:59'; }
+        $wsql    = 'WHERE ' . implode(' AND ', $w);
+        $parts[] = "SELECT created_at, user_id, CONCAT('ticket.', action) AS action,
+                           'ticket' AS target_type, ticket_id AS target_id,
+                           details AS detail, NULL AS ip_address,
+                           'ticket_history' AS source
+                    FROM ticket_timeline {$wsql}";
+    }
+
+    $filename = 'audit-log-' . date('Y-m-d') . '.csv';
+
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+
+    $out = fopen('php://output', 'w');
+
+    // BOM for Excel UTF-8 compatibility
+    fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
+
+    fputcsv($out, [
+        'When', 'Source', 'Actor', 'Action', 'Target Type', 'Target ID', 'Detail', 'IP Address',
+    ]);
+
+    // Note the export itself in the trail before we start streaming.
+    logAudit('audit.export', null, 'audit_log',
+        'Exported audit log to CSV' . ($params ? ' (filtered)' : ''));
+
+    // Streaming the full log can take a while; release the session lock so the
+    // admin's other tabs stay responsive meanwhile.
+    session_write_close();
+
+    if (!empty($parts)) {
+        $unionSQL = '(' . implode(') UNION ALL (', $parts) . ')';
+        $stmt = $db->prepare(
+            "SELECT combined.*,
+                    CONCAT(u.first_name, ' ', u.last_name) AS actor_name
+             FROM ({$unionSQL}) AS combined
+             LEFT JOIN users u ON combined.user_id = u.id
+             ORDER BY combined.created_at DESC, combined.source DESC"
+        );
+        $stmt->execute($params);
+
+        while ($row = $stmt->fetch()) {
+            $actor = trim((string) ($row['actor_name'] ?? ''));
+            fputcsvSafe($out, [
+                $row['created_at'] ? date('Y-m-d H:i:s', strtotime($row['created_at'])) : '',
+                $row['source'] ?? '',
+                $actor !== '' ? $actor : 'System',
+                auditCanonicalAction((string) $row['action']),
+                $row['target_type'] ?? '',
+                $row['target_id'] ?? '',
+                $row['detail'] ?? '',
+                $row['ip_address'] ?? '',
+            ]);
+        }
+    }
+
+    fclose($out);
+    exit;
+});
+
+/*
  * POST /admin/audit-log/prune
  *
  * Bulk-delete audit_log rows whose created_at is strictly less than the supplied

@@ -66,6 +66,21 @@ function auditBadge(string $action, array $colors): string {
     <h2 class="fw-bold mb-0">Audit Log</h2>
     <div class="d-flex align-items-center gap-3">
         <span class="text-muted small"><?= number_format($total) ?> record<?= $total === 1 ? '' : 's' ?></span>
+        <?php
+            // Carry the active filters onto the export so the download matches
+            // what's on screen. Empty values are dropped by array_filter.
+            $exportParams = array_filter([
+                'user_id' => $filterUser,
+                'action'  => $filterAction,
+                'from'    => $filterFrom,
+                'to'      => $filterTo,
+                'source'  => $filterSource,
+            ], fn($v) => $v !== '' && $v !== null);
+        ?>
+        <a href="/admin/audit-log/export<?= $exportParams ? '?' . http_build_query($exportParams) : '' ?>"
+           class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-download me-1"></i>Export to Excel
+        </a>
         <button type="button"
                 class="btn btn-sm btn-outline-danger"
                 data-bs-toggle="collapse"
