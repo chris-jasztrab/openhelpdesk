@@ -11,10 +11,15 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.119.2 &mdash; 2026-06-25
+
+### Fixed
+- **Form Builder: the edit (pencil) and remove (X) buttons really do work now.** The actual cause (v2.119.1 fixed a related-but-different latent issue): the page's JavaScript created its Bootstrap modal objects the moment the script ran, but the Bootstrap library is loaded by the page layout *after* the page content — so `bootstrap` didn't exist yet, the modal setup threw, and every field-row button handler bound after it was silently skipped. The modals are now created lazily, the first time a button is actually clicked, by which point Bootstrap has loaded. Verified in-browser: both the edit and remove dialogs open with a clean console.
+
 ## 2.119.1 &mdash; 2026-06-25
 
 ### Fixed
-- **Form Builder: the edit (pencil) and remove (X) buttons did nothing.** On the ticket Form Builder page, all field-row actions are wired up inside a single block of JavaScript that began by initialising the drag-to-reorder library (Sortable, loaded from a CDN). If that library failed to load — a restricted network, a CDN hiccup, or being offline — the initialisation threw and silently aborted the rest of the script, so the edit, remove, add-field, and visibility-pill handlers were never attached. The Sortable setup is now guarded: if it can't load, drag-to-reorder is disabled but every other Form Builder action keeps working.
+- **Form Builder: hardened the drag-to-reorder setup.** The field-row action handlers are wired up inside a single block of JavaScript that began by initialising the drag-to-reorder library (Sortable, loaded from a CDN). If that library failed to load — a restricted network, a CDN hiccup, or being offline — the initialisation threw and aborted the rest of the script. The Sortable setup is now guarded: if it can't load, drag-to-reorder is disabled but every other Form Builder action keeps working. (Note: this was not the cause of the dead edit/remove buttons — see 2.119.2.)
 
 ## 2.119.0 &mdash; 2026-06-25
 

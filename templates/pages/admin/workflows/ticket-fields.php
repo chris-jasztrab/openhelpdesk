@@ -726,29 +726,37 @@ $sysDefaults = systemFieldDefaults();
         });
     });
 
+    /* ── Bootstrap modal accessors ──
+       The Bootstrap bundle is loaded by the layout AFTER this page's
+       content/script, so `bootstrap` is undefined while this script first
+       runs. Constructing modals eagerly here throws ReferenceError and
+       aborts the rest of the IIFE — silently killing every handler below
+       (this is why the edit/remove buttons did nothing). Build them lazily
+       instead: by the time a button is clicked, the bundle has loaded. */
+    function getRemoveModal() { return bootstrap.Modal.getOrCreateInstance(document.getElementById('removeRowModal')); }
+    function getFieldModal()  { return bootstrap.Modal.getOrCreateInstance(document.getElementById('fieldModal')); }
+
     /* ── Remove row ── */
     var pendingRemove = null;
-    var removeModal = new bootstrap.Modal(document.getElementById('removeRowModal'));
     canvas.addEventListener('click', function(e) {
         var btn = e.target.closest('.remove-row-btn');
         if (!btn) return;
         var row = btn.closest('.field-row');
         pendingRemove = { kind: row.dataset.rowKind, key: row.dataset.rowKey, row: row };
         document.getElementById('removeRowName').textContent = row.querySelector('.row-label-text').textContent;
-        removeModal.show();
+        getRemoveModal().show();
     });
     document.getElementById('removeRowConfirmBtn').addEventListener('click', function() {
         if (!pendingRemove) return;
         postJson('/admin/forms/' + typeId + '/layout/remove', {
             kind: pendingRemove.kind, key: pendingRemove.key,
         }).then(function(r) {
-            if (r.success) { pendingRemove.row.remove(); removeModal.hide(); reloadPreview(); }
+            if (r.success) { pendingRemove.row.remove(); getRemoveModal().hide(); reloadPreview(); }
             else alert(r.error || 'Could not remove');
         });
     });
 
     /* ── Edit row (rename + per-type label override, plus field definition for custom) ── */
-    var fieldModal = new bootstrap.Modal(document.getElementById('fieldModal'));
     function openEditModal(row) {
         var kind = row.dataset.rowKind;
         var key  = row.dataset.rowKey;
@@ -771,7 +779,7 @@ $sysDefaults = systemFieldDefaults();
             // Prefill current label override (empty if none)
             var current = row.querySelector('.row-label-text').textContent.trim();
             document.getElementById('modalLabelOverride').value = current;
-            fieldModal.show();
+            getFieldModal().show();
             return;
         }
 
@@ -829,7 +837,7 @@ $sysDefaults = systemFieldDefaults();
                         document.getElementById('imageCurrentWrap').style.display = 'none';
                     }
                 }
-                fieldModal.show();
+                getFieldModal().show();
             });
     }
     canvas.addEventListener('click', function(e) {
