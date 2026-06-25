@@ -1159,6 +1159,28 @@ function slaEnabled(): bool
 }
 
 /**
+ * Whether the manual "Escalate" button should be shown for a ticket, given the
+ * admin-configured visibility mode (`escalate_button_visibility`):
+ *
+ *   'always'   — show whenever an escalation path exists (default / legacy).
+ *   'breached' — only show once the ticket's SLA timer has breached.
+ *
+ * The 'breached' mode is meaningless when SLA tracking is off site-wide (no
+ * timer can ever breach), so we fall back to always-show in that case rather
+ * than hiding the button forever.
+ */
+function escalateButtonVisible(?string $slaState): bool
+{
+    if (getSetting('escalate_button_visibility', 'always') !== 'breached') {
+        return true;
+    }
+    if (!slaEnabled()) {
+        return true;
+    }
+    return $slaState === 'breached';
+}
+
+/**
  * Whether the current user wants AI-generated system notes shown in ticket
  * timelines. Stored per-user as `ai_notes_visible:<id>`, defaults to visible.
  *

@@ -149,7 +149,7 @@ if ($solutionTimelineId > 0) {
         </form>
         <?php endif; ?>
         <?php if (!$ticket['merged_into_ticket_id']): ?>
-        <?php if ($hasEscalationPath): ?>
+        <?php if ($hasEscalationPath && escalateButtonVisible($ticket['sla_state'] ?? null)): ?>
         <?php
             $canEscalate = !in_array($ticket['status'], ['resolved', 'closed'], true);
             $escTitle = 'Escalate this ticket to the next person in the path';

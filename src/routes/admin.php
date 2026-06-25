@@ -12566,7 +12566,26 @@ $router->get('/admin/settings/escalation-paths', function () {
          ORDER BY t.sort_order, t.name'
     )->fetchAll();
 
-    render('admin/settings/escalation-paths/index', ['types' => $types]);
+    render('admin/settings/escalation-paths/index', [
+        'types'      => $types,
+        'visibility' => getSetting('escalate_button_visibility', 'always'),
+    ]);
+});
+
+$router->post('/admin/settings/escalation-paths/visibility', function () {
+    Auth::requirePermission('automations.manage');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid session token. Please try again.');
+        redirect('/admin/settings/escalation-paths');
+    }
+
+    $mode = ($_POST['escalate_button_visibility'] ?? 'always') === 'breached'
+        ? 'breached'
+        : 'always';
+    setSetting('escalate_button_visibility', $mode);
+
+    flash('success', 'Escalate button visibility saved.');
+    redirect('/admin/settings/escalation-paths');
 });
 
 $router->get('/admin/settings/escalation-paths/{typeId}', function (array $p) {

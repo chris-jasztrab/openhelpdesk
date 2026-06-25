@@ -479,6 +479,11 @@ return [
      'section' => 'Escalation Paths', 'anchor' => '',
      'keywords' => 'escalation path tier handoff route'],
 
+    ['label' => 'Escalate Button Visibility',   'description' => 'Show the Escalate button always, or only after SLA breach',
+     'group' => 'Automation', 'page_label' => 'Escalation Paths', 'page_url' => '/admin/settings/escalation-paths',
+     'section' => 'Escalate Button Visibility', 'anchor' => 'escalate_button_visibility',
+     'keywords' => 'escalate button show hide visibility sla breach breached always toggle'],
+
     // =======================================================================
     // Scheduled Reports + Cron Jobs
     // =======================================================================

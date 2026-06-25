@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.116.0 &mdash; 2026-06-25
+
+### Added
+- **Admins can now choose when the Escalate button appears on tickets.** A new **Escalate Button Visibility** setting (Settings → Escalation Paths) offers two modes: **Always show** (the existing behaviour — the button appears on every ticket that has an escalation path) or **Only after SLA breach** (the button stays hidden until the ticket's SLA timer has breached). This lets teams reserve manual escalation for tickets that have actually fallen behind, instead of offering it on every ticket. The mode applies to both the agent and the requester (portal) Escalate buttons. The "breached only" mode falls back to always-showing the button when SLA tracking is turned off site-wide, so the action is never hidden permanently. Defaults to "Always show", so existing installs are unchanged.
+
+---
+
 ## 2.115.0 &mdash; 2026-06-25
 
 ### Added

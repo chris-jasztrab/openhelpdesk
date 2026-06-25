@@ -97,7 +97,7 @@ if ($solutionTimelineId > 0) {
         <a href="/portal/tickets/<?= $ticket['id'] ?>/edit" class="btn btn-outline-primary btn-sm">
             <i class="bi bi-pencil me-1"></i>Edit
         </a>
-        <?php if ($hasEscalationPath): ?>
+        <?php if ($hasEscalationPath && escalateButtonVisible($ticket['sla_state'] ?? null)): ?>
         <?php
             $escCanEscalate = !in_array($ticket['status'], ['resolved', 'closed'], true) && empty($ticket['merged_into_ticket_id']);
             if (!$escCanEscalate) {
