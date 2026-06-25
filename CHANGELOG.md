@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.115.0 &mdash; 2026-06-25
+
+### Added
+- **SLA policies can now choose which weekdays their timer counts.** Each policy row (per ticket type and priority) gained an **"SLA counts on"** control with a Mon–Sun toggle. Deselect a day — e.g. Sunday — and that policy's first-response/resolution timer freezes on that day even if the organization is open then, so SLA deadlines roll to the next counted day. Previously the only lever was the global Business Hours open/closed schedule, which is shared by every policy and conflates "are we open" with "should the SLA tick." The selection is stored per policy (`sla_policies.counted_days`); leaving all seven days selected preserves the prior behaviour, so existing policies are unchanged. The chosen days are also honoured when pausing/resuming an SLA, so a never-counted day isn't credited back as paused time.
+
+---
+
 ## 2.114.0 &mdash; 2026-06-24
 
 ### Added

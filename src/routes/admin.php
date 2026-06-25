@@ -7305,7 +7305,7 @@ $router->post('/admin/settings/sla-policies', function () {
     $db->exec('DELETE FROM sla_policies');
 
     $insert = $db->prepare(
-        'INSERT INTO sla_policies (type_id, priority_id, first_response_minutes, resolution_minutes) VALUES (?, ?, ?, ?)'
+        'INSERT INTO sla_policies (type_id, priority_id, first_response_minutes, resolution_minutes, counted_days) VALUES (?, ?, ?, ?, ?)'
     );
 
     $rowsWritten = 0;
@@ -7316,8 +7316,19 @@ $router->post('/admin/settings/sla-policies', function () {
             $firstResponse = (int) ($data['first_response_minutes'] ?? 0);
             $resolution = (int) ($data['resolution_minutes'] ?? 0);
 
+            // Collect the checked weekdays in canonical order. All-seven (or none
+            // submitted) is stored as NULL meaning "count every business-open day".
+            $submittedDays = is_array($data['days'] ?? null) ? $data['days'] : [];
+            $countedDays = array_values(array_filter(
+                Sla::DAY_KEYS,
+                static fn(string $d): bool => !empty($submittedDays[$d])
+            ));
+            $countedCsv = ($countedDays === [] || count($countedDays) === count(Sla::DAY_KEYS))
+                ? null
+                : implode(',', $countedDays);
+
             if ($firstResponse > 0 && $resolution > 0) {
-                $insert->execute([$typeId, $priorityId, $firstResponse, $resolution]);
+                $insert->execute([$typeId, $priorityId, $firstResponse, $resolution, $countedCsv]);
                 $rowsWritten++;
             }
         }

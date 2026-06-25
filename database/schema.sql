@@ -508,6 +508,7 @@ CREATE TABLE IF NOT EXISTS `sla_policies` (
   `priority_id` int(10) unsigned NOT NULL,
   `first_response_minutes` int(10) unsigned NOT NULL DEFAULT 60,
   `resolution_minutes` int(10) unsigned NOT NULL DEFAULT 480,
+  `counted_days` varchar(27) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),

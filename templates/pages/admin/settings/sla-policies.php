@@ -105,7 +105,9 @@ $breadcrumbs  = [
 
             <div class="d-flex justify-content-between align-items-center">
                 <div class="form-text">
-                    Set both values to 0 (or leave empty) to disable SLA for a priority. Type-specific values of 0 inherit the default. Times count only business hours.
+                    Set both values to 0 (or leave empty) to disable SLA for a priority. Type-specific values of 0 inherit the default.
+                    Times count only business hours, and only on the days selected under <strong>SLA counts on</strong> &mdash;
+                    deselect a day (e.g. Sunday) to freeze the timer then, even if you're open that day.
                 </div>
                 <button type="submit" class="btn text-white" style="background:var(--ld-primary);">
                     <i class="bi bi-check-lg me-1"></i>Save Policies
@@ -133,9 +135,10 @@ function renderSlaPriorityTable(array $priorities, array $typePolicies, int $typ
             <thead class="table-light">
                 <tr>
                     <th>Priority</th>
-                    <th style="width:200px">First Response (minutes)</th>
-                    <th style="width:200px">Resolution (minutes)</th>
-                    <th style="width:200px">Human-readable</th>
+                    <th style="width:170px">First Response (minutes)</th>
+                    <th style="width:170px">Resolution (minutes)</th>
+                    <th style="width:160px">Human-readable</th>
+                    <th>SLA counts on</th>
                 </tr>
             </thead>
             <tbody>
@@ -148,6 +151,10 @@ function renderSlaPriorityTable(array $priorities, array $typePolicies, int $typ
                 $defFr = $defPolicy ? (int) $defPolicy['first_response_minutes'] : 0;
                 $defRes = $defPolicy ? (int) $defPolicy['resolution_minutes'] : 0;
                 $uid = $typeKey . '_' . $pri['id'];
+                // Which weekdays this policy's timer counts. NULL/unset → all days.
+                $counted = $policy ? Sla::parseCountedDays($policy['counted_days'] ?? null) : null;
+                $dayLabels = ['mon' => 'M', 'tue' => 'T', 'wed' => 'W', 'thu' => 'T', 'fri' => 'F', 'sat' => 'S', 'sun' => 'S'];
+                $dayNames  = ['mon' => 'Monday', 'tue' => 'Tuesday', 'wed' => 'Wednesday', 'thu' => 'Thursday', 'fri' => 'Friday', 'sat' => 'Saturday', 'sun' => 'Sunday'];
                 ?>
                 <tr>
                     <td>
@@ -180,6 +187,18 @@ function renderSlaPriorityTable(array $priorities, array $typePolicies, int $typ
                             <span id="fr_<?= $uid ?>"><?= $frMin > 0 ? formatMinutes($frMin) : '—' ?></span> /
                             <span id="res_<?= $uid ?>"><?= $resMin > 0 ? formatMinutes($resMin) : '—' ?></span>
                         <?php endif; ?>
+                    </td>
+                    <td>
+                        <div class="btn-group btn-group-sm sla-day-group" role="group" aria-label="Days this SLA counts">
+                            <?php foreach ($dayLabels as $dayKey => $label): ?>
+                            <?php $checked = ($counted === null) || in_array($dayKey, $counted, true); ?>
+                            <input type="checkbox" class="btn-check"
+                                   name="policies[<?= $typeKey ?>][<?= $pri['id'] ?>][days][<?= $dayKey ?>]" value="1"
+                                   id="day_<?= $uid ?>_<?= $dayKey ?>" autocomplete="off" <?= $checked ? 'checked' : '' ?>>
+                            <label class="btn btn-outline-secondary px-2 py-1" for="day_<?= $uid ?>_<?= $dayKey ?>"
+                                   title="<?= e($dayNames[$dayKey]) ?>"><?= $label ?></label>
+                            <?php endforeach; ?>
+                        </div>
                     </td>
                 </tr>
                 <?php endforeach; ?>

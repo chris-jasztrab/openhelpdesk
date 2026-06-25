@@ -4,6 +4,34 @@ declare(strict_types=1);
 
 class Sla
 {
+    /** Canonical weekday order for counted_days, matching the business-hours schedule keys. */
+    public const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+    /**
+     * Parse a policy's stored counted_days CSV into a list of day keys.
+     *
+     * Returns null when the policy counts every business-open day (no
+     * restriction) — either because the value is NULL/empty or because it
+     * already lists all seven days. A non-null result is the subset of days
+     * the SLA timer is allowed to advance on.
+     *
+     * @return string[]|null
+     */
+    public static function parseCountedDays(?string $csv): ?array
+    {
+        if ($csv === null || trim($csv) === '') {
+            return null;
+        }
+        $days = array_values(array_intersect(
+            self::DAY_KEYS,
+            array_map('trim', explode(',', strtolower($csv)))
+        ));
+        if ($days === [] || count($days) === count(self::DAY_KEYS)) {
+            return null; // empty or all-seven → no restriction
+        }
+        return $days;
+    }
+
     /**
      * Get the configured business schedule (timezone + weekly hours).
      * Returns null if not configured.
@@ -44,7 +72,7 @@ class Sla
      * @param array             $schedule Weekly schedule (mon-sun => [start, end] or null)
      * @return DateTimeImmutable The resulting datetime in the business timezone
      */
-    public static function addBusinessMinutes(DateTimeImmutable $start, int $minutes, string $tz, array $schedule, array $excludedDates = []): DateTimeImmutable
+    public static function addBusinessMinutes(DateTimeImmutable $start, int $minutes, string $tz, array $schedule, array $excludedDates = [], ?array $countedDays = null): DateTimeImmutable
     {
         $timezone = new DateTimeZone($tz);
         $current = $start->setTimezone($timezone);
@@ -60,6 +88,12 @@ class Sla
 
             // Holiday/closed day — skip to next day without consuming SLA minutes
             if (in_array($current->format('Y-m-d'), $excludedDates, true)) {
+                $current = $current->modify('+1 day')->setTime(0, 0, 0);
+                continue;
+            }
+
+            // Policy excludes this weekday — skip without consuming SLA minutes
+            if ($countedDays !== null && !in_array($dayKey, $countedDays, true)) {
                 $current = $current->modify('+1 day')->setTime(0, 0, 0);
                 continue;
             }
@@ -245,7 +279,7 @@ class Sla
     {
         if ($typeId !== null) {
             $stmt = $db->prepare(
-                'SELECT first_response_minutes, resolution_minutes FROM sla_policies WHERE type_id = ? AND priority_id = ?'
+                'SELECT first_response_minutes, resolution_minutes, counted_days FROM sla_policies WHERE type_id = ? AND priority_id = ?'
             );
             $stmt->execute([$typeId, $priorityId]);
             $policy = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -255,7 +289,7 @@ class Sla
         }
         // Fallback: default policy (type_id IS NULL)
         $stmt = $db->prepare(
-            'SELECT first_response_minutes, resolution_minutes FROM sla_policies WHERE type_id IS NULL AND priority_id = ?'
+            'SELECT first_response_minutes, resolution_minutes, counted_days FROM sla_policies WHERE type_id IS NULL AND priority_id = ?'
         );
         $stmt->execute([$priorityId]);
         $policy = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -283,9 +317,10 @@ class Sla
         }
 
         $excluded = self::getExcludedDates($db);
+        $countedDays = self::parseCountedDays($sla['counted_days'] ?? null);
         $now = new DateTimeImmutable('now', new DateTimeZone($biz['tz']));
-        $responseDue = self::addBusinessMinutes($now, (int) $sla['first_response_minutes'], $biz['tz'], $biz['schedule'], $excluded);
-        $resolutionDue = self::addBusinessMinutes($now, (int) $sla['resolution_minutes'], $biz['tz'], $biz['schedule'], $excluded);
+        $responseDue = self::addBusinessMinutes($now, (int) $sla['first_response_minutes'], $biz['tz'], $biz['schedule'], $excluded, $countedDays);
+        $resolutionDue = self::addBusinessMinutes($now, (int) $sla['resolution_minutes'], $biz['tz'], $biz['schedule'], $excluded, $countedDays);
 
         $db->prepare(
             'UPDATE tickets SET first_response_due_at = ?, resolution_due_at = ?, sla_state = ? WHERE id = ?'
@@ -335,7 +370,7 @@ class Sla
         }
 
         $stmt = $db->prepare(
-            'SELECT sla_paused_at, first_response_due_at, resolution_due_at, first_responded_at FROM tickets WHERE id = ?'
+            'SELECT sla_paused_at, first_response_due_at, resolution_due_at, first_responded_at, priority_id, type_id FROM tickets WHERE id = ?'
         );
         $stmt->execute([$ticketId]);
         $ticket = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -352,11 +387,20 @@ class Sla
         }
 
         $excluded = self::getExcludedDates($db);
+        // Match the paused-time accounting to the policy's counted days, so a day
+        // the policy never counts isn't credited back as paused time either.
+        $countedDays = null;
+        if (!empty($ticket['priority_id'])) {
+            $policy = self::findPolicy($db, isset($ticket['type_id']) ? (int) $ticket['type_id'] : null, (int) $ticket['priority_id']);
+            if ($policy) {
+                $countedDays = self::parseCountedDays($policy['counted_days'] ?? null);
+            }
+        }
         $pausedAt = new DateTimeImmutable($ticket['sla_paused_at'], new DateTimeZone($biz['tz']));
         $now = new DateTimeImmutable('now', new DateTimeZone($biz['tz']));
 
         // Calculate paused business minutes (holidays are excluded — they don't count as paused time either)
-        $pausedMinutes = self::countBusinessMinutes($pausedAt, $now, $biz['tz'], $biz['schedule'], $excluded);
+        $pausedMinutes = self::countBusinessMinutes($pausedAt, $now, $biz['tz'], $biz['schedule'], $excluded, $countedDays);
 
         // Extend due dates
         $updates = [];
@@ -418,9 +462,10 @@ class Sla
         }
 
         $excluded = self::getExcludedDates($db);
+        $countedDays = self::parseCountedDays($sla['counted_days'] ?? null);
         $createdAt = new DateTimeImmutable($ticket['created_at'], new DateTimeZone($biz['tz']));
-        $responseDue = self::addBusinessMinutes($createdAt, (int) $sla['first_response_minutes'], $biz['tz'], $biz['schedule'], $excluded);
-        $resolutionDue = self::addBusinessMinutes($createdAt, (int) $sla['resolution_minutes'], $biz['tz'], $biz['schedule'], $excluded);
+        $responseDue = self::addBusinessMinutes($createdAt, (int) $sla['first_response_minutes'], $biz['tz'], $biz['schedule'], $excluded, $countedDays);
+        $resolutionDue = self::addBusinessMinutes($createdAt, (int) $sla['resolution_minutes'], $biz['tz'], $biz['schedule'], $excluded, $countedDays);
 
         $db->prepare(
             'UPDATE tickets SET first_response_due_at = ?, resolution_due_at = ? WHERE id = ?'
@@ -478,9 +523,10 @@ class Sla
 
         // Recalculate from ticket creation time
         $excluded = self::getExcludedDates($db);
+        $countedDays = self::parseCountedDays($sla['counted_days'] ?? null);
         $createdAt = new DateTimeImmutable($ticket['created_at'], new DateTimeZone($biz['tz']));
-        $responseDue = self::addBusinessMinutes($createdAt, (int) $sla['first_response_minutes'], $biz['tz'], $biz['schedule'], $excluded);
-        $resolutionDue = self::addBusinessMinutes($createdAt, (int) $sla['resolution_minutes'], $biz['tz'], $biz['schedule'], $excluded);
+        $responseDue = self::addBusinessMinutes($createdAt, (int) $sla['first_response_minutes'], $biz['tz'], $biz['schedule'], $excluded, $countedDays);
+        $resolutionDue = self::addBusinessMinutes($createdAt, (int) $sla['resolution_minutes'], $biz['tz'], $biz['schedule'], $excluded, $countedDays);
 
         $db->prepare(
             'UPDATE tickets SET first_response_due_at = ?, resolution_due_at = ? WHERE id = ?'
@@ -507,7 +553,7 @@ class Sla
     /**
      * Count business minutes between two datetimes.
      */
-    public static function countBusinessMinutes(DateTimeImmutable $from, DateTimeImmutable $to, string $tz, array $schedule, array $excludedDates = []): int
+    public static function countBusinessMinutes(DateTimeImmutable $from, DateTimeImmutable $to, string $tz, array $schedule, array $excludedDates = [], ?array $countedDays = null): int
     {
         $timezone = new DateTimeZone($tz);
         $current = $from->setTimezone($timezone);
@@ -523,6 +569,12 @@ class Sla
 
             // Holiday/closed day — skip without counting minutes
             if (in_array($current->format('Y-m-d'), $excludedDates, true)) {
+                $current = $current->modify('+1 day')->setTime(0, 0, 0);
+                continue;
+            }
+
+            // Policy excludes this weekday — skip without counting minutes
+            if ($countedDays !== null && !in_array($dayKey, $countedDays, true)) {
                 $current = $current->modify('+1 day')->setTime(0, 0, 0);
                 continue;
             }
