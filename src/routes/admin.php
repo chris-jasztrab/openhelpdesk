@@ -12768,6 +12768,53 @@ $router->post('/admin/settings/stale-tickets', function () {
     redirect('/admin/settings/stale-tickets');
 });
 
+$router->post('/admin/settings/stale-tickets/type-overrides', function () {
+    Auth::requirePermission('automations.manage');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/stale-tickets');
+    }
+
+    $db    = Database::connect();
+    $input = (array) ($_POST['type_stale'] ?? []);
+
+    $existing = $db->query('SELECT id, name, stale_threshold_hours FROM ticket_types')->fetchAll();
+
+    $update = $db->prepare('UPDATE ticket_types SET stale_threshold_hours = ? WHERE id = ?');
+    $changed = 0;
+    foreach ($existing as $t) {
+        $id = (int) $t['id'];
+        if (!array_key_exists($id, $input)) {
+            continue;
+        }
+        $raw = trim((string) $input[$id]);
+        $new = $raw === '' ? null : max(0, (int) $raw);
+
+        $old = ($t['stale_threshold_hours'] === null || $t['stale_threshold_hours'] === '')
+            ? null
+            : (int) $t['stale_threshold_hours'];
+
+        if ($new === $old) {
+            continue;
+        }
+
+        $update->execute([$new, $id]);
+        logAuditChange(
+            'ticket_type.stale_threshold_changed',
+            $id,
+            'ticket_type',
+            ['stale_threshold_hours' => $old === null ? '' : (string) $old],
+            ['stale_threshold_hours' => $new === null ? '' : (string) $new]
+        );
+        $changed++;
+    }
+
+    flash('success', $changed > 0
+        ? "Per-type stale thresholds updated ({$changed} change" . ($changed === 1 ? '' : 's') . ")."
+        : 'No changes to per-type stale thresholds.');
+    redirect('/admin/settings/stale-tickets');
+});
+
 $router->post('/admin/settings/stale-tickets/run-now', function () {
     Auth::requirePermission('automations.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {

@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.117.0 &mdash; 2026-06-25
+
+### Added
+- **Edit per-type stale thresholds directly from the Stale Tickets settings page.** The Per-Type Overrides table is now editable inline: each ticket type has a threshold field you can set and save without leaving for the Ticket Types editor. Leave a field blank to fall back to the global threshold, or set it to `0` to disable stale detection for that type. Saving records each change in the audit log.
+
 ## 2.116.1 &mdash; 2026-06-25
 
 ### Changed

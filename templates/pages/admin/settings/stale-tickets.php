@@ -82,50 +82,57 @@ $recheckHours   = (int) ($settings['stale_recheck_hours']   ?? 24);
 </form>
 
 <!-- Per-type overrides -->
-<div class="card border-0 shadow-sm mb-4">
-    <div class="card-header bg-white py-3 d-flex align-items-center justify-content-between">
-        <h6 class="mb-0 fw-semibold"><i class="bi bi-tags me-2"></i>Per-Type Overrides</h6>
-        <a href="/admin/types" class="btn btn-sm btn-outline-secondary">
-            <i class="bi bi-pencil me-1"></i>Manage Ticket Types
-        </a>
-    </div>
-    <div class="card-body p-0">
-        <?php if (empty($types)): ?>
-            <div class="p-4 text-muted small">No ticket types configured yet.</div>
-        <?php else: ?>
-        <table class="table mb-0">
-            <thead class="table-light">
-                <tr>
-                    <th>Ticket Type</th>
-                    <th style="width:240px;">Stale Threshold</th>
-                </tr>
-            </thead>
-            <tbody>
-            <?php foreach ($types as $t): ?>
-                <tr>
-                    <td>
-                        <span class="badge" style="background:<?= e($t['color'] ?? '#6c757d') ?>;">
-                            <?= e($t['name']) ?>
-                        </span>
-                    </td>
-                    <td class="text-muted small">
-                        <?php if ($t['stale_threshold_hours'] === null || $t['stale_threshold_hours'] === ''): ?>
-                            Uses global (<?= (int) $thresholdHours ?>h)
-                        <?php else: ?>
-                            <strong><?= (int) $t['stale_threshold_hours'] ?>h</strong>
-                            <span class="text-muted ms-1">(override)</span>
-                        <?php endif; ?>
-                    </td>
-                </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
+<form method="POST" action="/admin/settings/stale-tickets/type-overrides">
+    <?= csrfField() ?>
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white py-3 d-flex align-items-center justify-content-between">
+            <h6 class="mb-0 fw-semibold"><i class="bi bi-tags me-2"></i>Per-Type Overrides</h6>
+            <a href="/admin/types" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-pencil me-1"></i>Manage Ticket Types
+            </a>
+        </div>
+        <div class="card-body p-0">
+            <?php if (empty($types)): ?>
+                <div class="p-4 text-muted small">No ticket types configured yet.</div>
+            <?php else: ?>
+            <table class="table align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Ticket Type</th>
+                        <th style="width:260px;">Stale Threshold (hours)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php foreach ($types as $t): ?>
+                    <?php $override = ($t['stale_threshold_hours'] === null || $t['stale_threshold_hours'] === ''); ?>
+                    <tr>
+                        <td>
+                            <span class="badge" style="background:<?= e($t['color'] ?? '#6c757d') ?>;">
+                                <?= e($t['name']) ?>
+                            </span>
+                        </td>
+                        <td>
+                            <input type="number" min="0" class="form-control form-control-sm"
+                                   name="type_stale[<?= (int) $t['id'] ?>]"
+                                   value="<?= $override ? '' : (int) $t['stale_threshold_hours'] ?>"
+                                   placeholder="Uses global (<?= (int) $thresholdHours ?>h)">
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+            <?php endif; ?>
+        </div>
+        <?php if (!empty($types)): ?>
+        <div class="card-footer bg-white d-flex align-items-center justify-content-between">
+            <span class="text-muted small">Leave a field blank to use the global threshold. Set to <code>0</code> to disable stale detection for that type.</span>
+            <button type="submit" class="btn btn-sm text-white" style="background:var(--ld-primary);">
+                <i class="bi bi-check-lg me-1"></i>Save Overrides
+            </button>
+        </div>
         <?php endif; ?>
     </div>
-    <div class="card-footer bg-white text-muted small">
-        To override the threshold for a specific ticket type, edit it from <a href="/admin/types">Ticket Types</a>.
-    </div>
-</div>
+</form>
 
 <!-- Cron + Run Now -->
 <div class="card border-0 shadow-sm">
