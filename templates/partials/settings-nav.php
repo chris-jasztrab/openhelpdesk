@@ -31,7 +31,7 @@ $settingsNavGroups = [
          'keywords' => 'organization type sector industry library education government corporate non-profit healthcare'],
         ['label' => label('location.plural'), 'url' => '/admin/locations',  'icon' => 'bi-geo-alt',
          'keywords' => 'site branch office department location'],
-        ['label' => 'Priorities',             'url' => '/admin/priorities', 'icon' => 'bi-flag',
+        ['label' => 'Ticket Priorities',      'url' => '/admin/priorities', 'icon' => 'bi-flag',
          'keywords' => 'urgency severity high low critical'],
         ['label' => 'Ticket Statuses',        'url' => '/admin/settings/ticket-statuses', 'icon' => 'bi-circle-half',
          'keywords' => 'status workflow state open progress resolved closed pending waiting bucket color'],

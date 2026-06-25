@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.116.1 &mdash; 2026-06-25
+
+### Changed
+- Renamed the **Priorities** settings nav item to **Ticket Priorities** for clarity.
+
 ## 2.116.0 &mdash; 2026-06-25
 
 ### Added
