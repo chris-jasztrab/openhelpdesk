@@ -11,8 +11,8 @@ $breadcrumbs  = [
 $runOutput = $_SESSION['_stale_run'] ?? null;
 unset($_SESSION['_stale_run']);
 
-$thresholdHours = (int) ($settings['stale_threshold_hours'] ?? 72);
-$recheckHours   = (int) ($settings['stale_recheck_hours']   ?? 24);
+$thresholdMins = (int) ($settings['stale_threshold_minutes'] ?? 4320);
+$recheckMins   = (int) ($settings['stale_recheck_minutes']   ?? 1440);
 ?>
 <div class="mb-4">
     <h2 class="fw-bold mb-0">Settings</h2>
@@ -39,16 +39,16 @@ $recheckHours   = (int) ($settings['stale_recheck_hours']   ?? 24);
         <div class="card-body p-4">
             <div class="row g-3">
                 <div class="col-md-6">
-                    <label for="stale_threshold_hours" class="form-label fw-semibold">Stale threshold (hours)</label>
-                    <input type="number" min="1" class="form-control" id="stale_threshold_hours"
-                           name="stale_threshold_hours" value="<?= (int) $thresholdHours ?>">
-                    <div class="form-text">A ticket is considered stale once it has had no update for this many hours. Default: 72 (3 days). Set to <code>0</code> to disable the feature entirely.</div>
+                    <label for="stale_threshold_minutes" class="form-label fw-semibold">Stale threshold</label>
+                    <input type="text" class="form-control" id="stale_threshold_minutes"
+                           name="stale_threshold_minutes" value="<?= $thresholdMins > 0 ? e(formatDuration($thresholdMins)) : '0' ?>">
+                    <div class="form-text">A ticket is considered stale once it has had no update for this long. Enter days, hours or minutes &mdash; e.g. <code>3d</code>, <code>72h</code> or <code>4320m</code> (a bare number means hours). Default: 3d. Set to <code>0</code> to disable the feature entirely.</div>
                 </div>
                 <div class="col-md-6">
-                    <label for="stale_recheck_hours" class="form-label fw-semibold">Re-notify after (hours)</label>
-                    <input type="number" min="1" class="form-control" id="stale_recheck_hours"
-                           name="stale_recheck_hours" value="<?= (int) $recheckHours ?>">
-                    <div class="form-text">Minimum gap between repeat stale notifications on the same ticket. Default: 24.</div>
+                    <label for="stale_recheck_minutes" class="form-label fw-semibold">Re-notify after</label>
+                    <input type="text" class="form-control" id="stale_recheck_minutes"
+                           name="stale_recheck_minutes" value="<?= e(formatDuration($recheckMins)) ?>">
+                    <div class="form-text">Minimum gap between repeat stale notifications on the same ticket. Enter <code>d</code>/<code>h</code>/<code>m</code> (a bare number means hours). Default: 1d.</div>
                 </div>
             </div>
 
@@ -99,12 +99,12 @@ $recheckHours   = (int) ($settings['stale_recheck_hours']   ?? 24);
                 <thead class="table-light">
                     <tr>
                         <th>Ticket Type</th>
-                        <th style="width:260px;">Stale Threshold (hours)</th>
+                        <th style="width:260px;">Stale Threshold</th>
                     </tr>
                 </thead>
                 <tbody>
                 <?php foreach ($types as $t): ?>
-                    <?php $override = ($t['stale_threshold_hours'] === null || $t['stale_threshold_hours'] === ''); ?>
+                    <?php $override = ($t['stale_threshold_minutes'] === null || $t['stale_threshold_minutes'] === ''); ?>
                     <tr>
                         <td>
                             <span class="badge" style="background:<?= e($t['color'] ?? '#6c757d') ?>;">
@@ -112,10 +112,10 @@ $recheckHours   = (int) ($settings['stale_recheck_hours']   ?? 24);
                             </span>
                         </td>
                         <td>
-                            <input type="number" min="0" class="form-control form-control-sm"
+                            <input type="text" class="form-control form-control-sm"
                                    name="type_stale[<?= (int) $t['id'] ?>]"
-                                   value="<?= $override ? '' : (int) $t['stale_threshold_hours'] ?>"
-                                   placeholder="Uses global (<?= (int) $thresholdHours ?>h)">
+                                   value="<?= $override ? '' : e(formatDuration((int) $t['stale_threshold_minutes'])) ?>"
+                                   placeholder="Uses global (<?= e(formatDuration($thresholdMins)) ?>)">
                         </td>
                     </tr>
                 <?php endforeach; ?>

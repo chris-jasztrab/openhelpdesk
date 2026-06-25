@@ -3061,6 +3061,66 @@ function formatSlaDuration(int $minutes): string
 }
 
 /**
+ * Parse a human-typed duration into a whole number of minutes.
+ *
+ * Accepts any mix of day/hour/minute tokens with the unit suffix d, h or m
+ * (case-insensitive), e.g. "72h", "3d", "4320m", "1d 2h 30m", "1d2h30m".
+ * A bare number with no suffix is interpreted in $defaultUnit, so existing
+ * single-unit fields keep working when someone types just "72".
+ *
+ * Conversion is calendar-based everywhere: 1d = 24h = 1440m.
+ *
+ * Returns the total minutes, or null when the input is blank or cannot be
+ * parsed (so callers can distinguish "leave unset" from "invalid").
+ */
+function parseDurationToMinutes(string $raw, string $defaultUnit = 'm'): ?int
+{
+    $s = strtolower(trim($raw));
+    if ($s === '') {
+        return null;
+    }
+
+    $factor = ['d' => 1440, 'h' => 60, 'm' => 1];
+    $defaultUnit = isset($factor[$defaultUnit]) ? $defaultUnit : 'm';
+
+    // Each token is a run of digits optionally followed by a d/h/m unit.
+    // The whole string must be nothing but such tokens (plus whitespace),
+    // otherwise we treat it as garbage and bail.
+    if (!preg_match('/^(\s*\d+\s*[dhm]?\s*)+$/', $s)) {
+        return null;
+    }
+
+    preg_match_all('/(\d+)\s*([dhm]?)/', $s, $matches, PREG_SET_ORDER);
+    $total = 0;
+    foreach ($matches as $m) {
+        $unit = $m[2] !== '' ? $m[2] : $defaultUnit;
+        $total += (int) $m[1] * $factor[$unit];
+    }
+    return $total;
+}
+
+/**
+ * Render a minute count as a compact, rolled-up duration using the largest
+ * units that fit, e.g. 60 → "1h", 80 → "1h 20m", 1440 → "1d", 1530 → "1d 1h 30m".
+ *
+ * Calendar-based: 1d = 24h, 1h = 60m. Returns "0m" for zero/negative input.
+ */
+function formatDuration(int $minutes): string
+{
+    if ($minutes <= 0) {
+        return '0m';
+    }
+    $d = intdiv($minutes, 1440);
+    $h = intdiv($minutes % 1440, 60);
+    $m = $minutes % 60;
+    $parts = [];
+    if ($d > 0) { $parts[] = $d . 'd'; }
+    if ($h > 0) { $parts[] = $h . 'h'; }
+    if ($m > 0) { $parts[] = $m . 'm'; }
+    return implode(' ', $parts);
+}
+
+/**
  * Build the {{sla}}, {{sla_response}} and {{sla_resolution}} email tokens for
  * a ticket's type + priority combination. All three resolve to empty strings
  * when SLA tracking is disabled, business hours are not configured, or no
@@ -6705,20 +6765,20 @@ function ticketStaffVisibilitySql(PDO $db, int $userId, ?string $role, string $t
 /* ── Stale ticket notifications ─────────────────────────────────────── */
 
 /**
- * Resolve the effective stale threshold (hours) for a ticket.
- * Per-type override wins; otherwise the global setting; otherwise 72h.
+ * Resolve the effective stale threshold (minutes) for a ticket.
+ * Per-type override wins; otherwise the global setting; otherwise 3 days.
  */
-function staleThresholdHoursForType(PDO $db, ?int $typeId): int
+function staleThresholdMinutesForType(PDO $db, ?int $typeId): int
 {
     if ($typeId) {
-        $stmt = $db->prepare('SELECT stale_threshold_hours FROM ticket_types WHERE id = ?');
+        $stmt = $db->prepare('SELECT stale_threshold_minutes FROM ticket_types WHERE id = ?');
         $stmt->execute([$typeId]);
         $val = $stmt->fetchColumn();
         if ($val !== false && $val !== null && $val !== '') {
             return (int) $val;
         }
     }
-    return (int) (getSetting('stale_threshold_hours', '72') ?: '72');
+    return (int) (getSetting('stale_threshold_minutes', '4320') ?: '4320');
 }
 
 /**

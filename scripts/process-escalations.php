@@ -70,7 +70,7 @@ $totalFired = 0;
 foreach ($rules as $rule) {
     $ruleId        = (int) $rule['id'];
     $ruleName      = $rule['name'];
-    $cooldownHours = (int) $rule['cooldown_hours'];
+    $cooldownMins  = (int) $rule['cooldown_minutes'];
     $conditions    = json_decode($rule['conditions'], true) ?: [];
     $ruleFired     = 0;
 
@@ -78,7 +78,7 @@ foreach ($rules as $rule) {
         $ticketId = (int) $ticket['id'];
 
         // ── Cooldown / dedup check ────────────────────────────────
-        if ($cooldownHours === 0) {
+        if ($cooldownMins === 0) {
             // Fire at most once ever per ticket
             $check = $db->prepare(
                 'SELECT id FROM escalation_log WHERE rule_id = ? AND ticket_id = ? LIMIT 1'
@@ -92,10 +92,10 @@ foreach ($rules as $rule) {
             $check = $db->prepare(
                 'SELECT id FROM escalation_log
                  WHERE rule_id = ? AND ticket_id = ?
-                   AND fired_at > DATE_SUB(NOW(), INTERVAL ? HOUR)
+                   AND fired_at > DATE_SUB(NOW(), INTERVAL ? MINUTE)
                  LIMIT 1'
             );
-            $check->execute([$ruleId, $ticketId, $cooldownHours]);
+            $check->execute([$ruleId, $ticketId, $cooldownMins]);
             if ($check->fetch()) {
                 continue; // still within cooldown
             }

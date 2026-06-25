@@ -1740,8 +1740,9 @@ $router->post('/admin/types/create', function () {
     if ($aiDupThreshold < 0.50) { $aiDupThreshold = 0.50; }
     if ($aiDupThreshold > 0.99) { $aiDupThreshold = 0.99; }
     $showToLocVis   = !empty($_POST['show_to_location_visibility']) ? 1 : 0;
-    $staleRaw       = trim((string) ($_POST['stale_threshold_hours'] ?? ''));
-    $staleHours     = $staleRaw === '' ? null : max(0, (int) $staleRaw);
+    // Stale threshold accepts d/h/m; a bare number means hours (legacy unit).
+    $staleRaw       = trim((string) ($_POST['stale_threshold_minutes'] ?? ''));
+    $staleMinutes   = $staleRaw === '' ? null : max(0, parseDurationToMinutes($staleRaw, 'h') ?? 0);
     $skillIds       = array_filter(array_map('intval', (array) ($_POST['required_skills'] ?? [])));
     if ($name === '') {
         flashInput($_POST);
@@ -1749,8 +1750,8 @@ $router->post('/admin/types/create', function () {
         redirect('/admin/types/create');
     }
     $db = Database::connect();
-    $db->prepare('INSERT INTO ticket_types (name, color, group_id, is_confidential, ai_route_group, ai_dup_check_enabled, ai_dup_threshold, show_to_location_visibility, sort_order, stale_threshold_hours) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $showToLocVis, $order, $staleHours]);
+    $db->prepare('INSERT INTO ticket_types (name, color, group_id, is_confidential, ai_route_group, ai_dup_check_enabled, ai_dup_threshold, show_to_location_visibility, sort_order, stale_threshold_minutes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $showToLocVis, $order, $staleMinutes]);
     $typeId = (int) $db->lastInsertId();
     if ($skillIds) {
         $stmt = $db->prepare('INSERT IGNORE INTO ticket_type_skill_map (ticket_type_id, skill_id) VALUES (?, ?)');
@@ -1810,8 +1811,9 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
     if ($aiDupThreshold < 0.50) { $aiDupThreshold = 0.50; }
     if ($aiDupThreshold > 0.99) { $aiDupThreshold = 0.99; }
     $showToLocVis   = !empty($_POST['show_to_location_visibility']) ? 1 : 0;
-    $staleRaw       = trim((string) ($_POST['stale_threshold_hours'] ?? ''));
-    $staleHours     = $staleRaw === '' ? null : max(0, (int) $staleRaw);
+    // Stale threshold accepts d/h/m; a bare number means hours (legacy unit).
+    $staleRaw       = trim((string) ($_POST['stale_threshold_minutes'] ?? ''));
+    $staleMinutes   = $staleRaw === '' ? null : max(0, parseDurationToMinutes($staleRaw, 'h') ?? 0);
     if ($name === '') {
         flashInput($_POST);
         flash('error', 'Type name is required.');
@@ -1836,7 +1838,7 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
                 'color'     => $color,
                 'sort_order' => (string) $order,
                 'group_id'  => $groupId ? (string) $groupId : '',
-                'stale_threshold_hours' => $staleHours === null ? '' : (string) $staleHours,
+                'stale_threshold_minutes' => $staleMinutes === null ? '' : (string) $staleMinutes,
                 'show_to_location_visibility' => $showToLocVis ? '1' : '',
                 'ai_route_group' => $aiRouteGroup ? '1' : '',
                 'ai_dup_check_enabled' => $aiDupCheck ? '1' : '',
@@ -1881,14 +1883,14 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
     // not just the confidential flag we already snapshotted above.
     $fullPriorStmt = $db->prepare(
         'SELECT name, color, group_id, is_confidential, ai_route_group, ai_dup_check_enabled,
-                ai_dup_threshold, show_to_location_visibility, sort_order, stale_threshold_hours
+                ai_dup_threshold, show_to_location_visibility, sort_order, stale_threshold_minutes
          FROM ticket_types WHERE id = ?'
     );
     $fullPriorStmt->execute([$id]);
     $fullPrior = $fullPriorStmt->fetch(\PDO::FETCH_ASSOC) ?: [];
 
-    $db->prepare('UPDATE ticket_types SET name=?, color=?, group_id=?, is_confidential=?, ai_route_group=?, ai_dup_check_enabled=?, ai_dup_threshold=?, show_to_location_visibility=?, sort_order=?, stale_threshold_hours=? WHERE id=?')
-        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $showToLocVis, $order, $staleHours, $id]);
+    $db->prepare('UPDATE ticket_types SET name=?, color=?, group_id=?, is_confidential=?, ai_route_group=?, ai_dup_check_enabled=?, ai_dup_threshold=?, show_to_location_visibility=?, sort_order=?, stale_threshold_minutes=? WHERE id=?')
+        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $showToLocVis, $order, $staleMinutes, $id]);
 
     // Required skills (used by Skill-Based group auto-assignment)
     $skillIds = array_filter(array_map('intval', (array) ($_POST['required_skills'] ?? [])));
@@ -1915,7 +1917,7 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
             'ai_dup_threshold'            => $aiDupThreshold,
             'show_to_location_visibility' => $showToLocVis,
             'sort_order'                  => $order,
-            'stale_threshold_hours'       => $staleHours,
+            'stale_threshold_minutes'     => $staleMinutes,
         ]
     );
 
@@ -7313,8 +7315,9 @@ $router->post('/admin/settings/sla-policies', function () {
         $typeId = (int) $typeKey === 0 ? null : (int) $typeKey;
         foreach ($priorities as $priorityId => $data) {
             $priorityId = (int) $priorityId;
-            $firstResponse = (int) ($data['first_response_minutes'] ?? 0);
-            $resolution = (int) ($data['resolution_minutes'] ?? 0);
+            // Inputs accept d/h/m (e.g. "8h", "2d", "90m"); bare numbers are minutes.
+            $firstResponse = parseDurationToMinutes((string) ($data['first_response_minutes'] ?? ''), 'm') ?? 0;
+            $resolution    = parseDurationToMinutes((string) ($data['resolution_minutes']     ?? ''), 'm') ?? 0;
 
             // Collect the checked weekdays in canonical order. All-seven (or none
             // submitted) is stored as NULL meaning "count every business-open day".
@@ -9322,7 +9325,8 @@ $router->post('/admin/settings/escalations/create', function () {
 
     $conditions    = buildEscalationConditions($_POST);
     $actions       = buildEscalationActions($_POST);
-    $cooldown      = max(0, (int) ($_POST['cooldown_hours'] ?? 0));
+    // Cooldown accepts d/h/m; a bare number means hours (the field's legacy unit).
+    $cooldown      = max(0, parseDurationToMinutes((string) ($_POST['cooldown_minutes'] ?? ''), 'h') ?? 0);
     $isEnabled     = isset($_POST['is_enabled']) ? 1 : 0;
     $sortOrder     = max(0, (int) ($_POST['sort_order'] ?? 0));
 
@@ -9333,7 +9337,7 @@ $router->post('/admin/settings/escalations/create', function () {
 
     $db = Database::connect();
     $db->prepare(
-        'INSERT INTO escalation_rules (name, conditions, actions, cooldown_hours, is_enabled, sort_order)
+        'INSERT INTO escalation_rules (name, conditions, actions, cooldown_minutes, is_enabled, sort_order)
          VALUES (?, ?, ?, ?, ?, ?)'
     )->execute([$name, json_encode($conditions), json_encode($actions), $cooldown, $isEnabled, $sortOrder]);
     $newId = (int) $db->lastInsertId();
@@ -9341,7 +9345,7 @@ $router->post('/admin/settings/escalations/create', function () {
         'escalation_rule.created',
         $newId,
         'escalation_rule',
-        'name=' . $name . '; enabled=' . $isEnabled . '; cooldown_hours=' . $cooldown . '; actions=' . count($actions)
+        'name=' . $name . '; enabled=' . $isEnabled . '; cooldown_minutes=' . $cooldown . '; actions=' . count($actions)
     );
 
     flash('success', 'Escalation rule created.');
@@ -9388,7 +9392,8 @@ $router->post('/admin/settings/escalations/{id}/edit', function (array $p) {
 
     $conditions = buildEscalationConditions($_POST);
     $actions    = buildEscalationActions($_POST);
-    $cooldown   = max(0, (int) ($_POST['cooldown_hours'] ?? 0));
+    // Cooldown accepts d/h/m; a bare number means hours (the field's legacy unit).
+    $cooldown   = max(0, parseDurationToMinutes((string) ($_POST['cooldown_minutes'] ?? ''), 'h') ?? 0);
     $isEnabled  = isset($_POST['is_enabled']) ? 1 : 0;
     $sortOrder  = max(0, (int) ($_POST['sort_order'] ?? 0));
 
@@ -9397,12 +9402,12 @@ $router->post('/admin/settings/escalations/{id}/edit', function (array $p) {
         redirect('/admin/settings/escalations/' . (int) $p['id'] . '/edit');
     }
 
-    $priorRule = $db->prepare('SELECT name, is_enabled, cooldown_hours, sort_order FROM escalation_rules WHERE id = ?');
+    $priorRule = $db->prepare('SELECT name, is_enabled, cooldown_minutes, sort_order FROM escalation_rules WHERE id = ?');
     $priorRule->execute([(int) $p['id']]);
     $rulePrior = $priorRule->fetch(\PDO::FETCH_ASSOC) ?: [];
 
     $db->prepare(
-        'UPDATE escalation_rules SET name = ?, conditions = ?, actions = ?, cooldown_hours = ?, is_enabled = ?, sort_order = ? WHERE id = ?'
+        'UPDATE escalation_rules SET name = ?, conditions = ?, actions = ?, cooldown_minutes = ?, is_enabled = ?, sort_order = ? WHERE id = ?'
     )->execute([$name, json_encode($conditions), json_encode($actions), $cooldown, $isEnabled, $sortOrder, (int) $p['id']]);
 
     logAuditChange(
@@ -9410,7 +9415,7 @@ $router->post('/admin/settings/escalations/{id}/edit', function (array $p) {
         (int) $p['id'],
         'escalation_rule',
         $rulePrior,
-        ['name' => $name, 'is_enabled' => $isEnabled, 'cooldown_hours' => $cooldown, 'sort_order' => $sortOrder]
+        ['name' => $name, 'is_enabled' => $isEnabled, 'cooldown_minutes' => $cooldown, 'sort_order' => $sortOrder]
     );
 
     flash('success', 'Escalation rule updated.');
@@ -12716,14 +12721,14 @@ $router->get('/admin/settings/stale-tickets', function () {
     $db = Database::connect();
 
     $settings = [
-        'stale_threshold_hours'              => getSetting('stale_threshold_hours', '72'),
-        'stale_recheck_hours'                => getSetting('stale_recheck_hours', '24'),
+        'stale_threshold_minutes'             => getSetting('stale_threshold_minutes', '4320'),
+        'stale_recheck_minutes'               => getSetting('stale_recheck_minutes', '1440'),
         'email_notify:ticket_stale_agent'     => getSetting('email_notify:ticket_stale_agent', '1'),
         'email_notify:ticket_stale_requester' => getSetting('email_notify:ticket_stale_requester', '1'),
     ];
 
     $types = $db->query(
-        'SELECT id, name, color, stale_threshold_hours FROM ticket_types ORDER BY sort_order, name'
+        'SELECT id, name, color, stale_threshold_minutes FROM ticket_types ORDER BY sort_order, name'
     )->fetchAll();
 
     render('admin/settings/stale-tickets', ['settings' => $settings, 'types' => $types]);
@@ -12736,18 +12741,19 @@ $router->post('/admin/settings/stale-tickets', function () {
         redirect('/admin/settings/stale-tickets');
     }
 
-    $threshold = max(0, (int) ($_POST['stale_threshold_hours'] ?? 72));
-    $recheck   = max(1, (int) ($_POST['stale_recheck_hours']   ?? 24));
+    // Inputs accept d/h/m; a bare number means hours (the field's legacy unit).
+    $threshold = max(0, parseDurationToMinutes((string) ($_POST['stale_threshold_minutes'] ?? ''), 'h') ?? 4320);
+    $recheck   = max(1, parseDurationToMinutes((string) ($_POST['stale_recheck_minutes']   ?? ''), 'h') ?? 1440);
 
     $before = [
-        'stale_threshold_hours'              => getSetting('stale_threshold_hours', '72'),
-        'stale_recheck_hours'                => getSetting('stale_recheck_hours', '24'),
+        'stale_threshold_minutes'             => getSetting('stale_threshold_minutes', '4320'),
+        'stale_recheck_minutes'               => getSetting('stale_recheck_minutes', '1440'),
         'email_notify:ticket_stale_agent'    => getSetting('email_notify:ticket_stale_agent', '1'),
         'email_notify:ticket_stale_requester' => getSetting('email_notify:ticket_stale_requester', '1'),
     ];
 
-    setSetting('stale_threshold_hours', (string) $threshold);
-    setSetting('stale_recheck_hours',   (string) $recheck);
+    setSetting('stale_threshold_minutes', (string) $threshold);
+    setSetting('stale_recheck_minutes',   (string) $recheck);
     setSetting('email_notify:ticket_stale_agent',     isset($_POST['notify_agent'])     ? '1' : '0');
     setSetting('email_notify:ticket_stale_requester', isset($_POST['notify_requester']) ? '1' : '0');
 
@@ -12757,8 +12763,8 @@ $router->post('/admin/settings/stale-tickets', function () {
         null,
         $before,
         [
-            'stale_threshold_hours'              => (string) $threshold,
-            'stale_recheck_hours'                => (string) $recheck,
+            'stale_threshold_minutes'             => (string) $threshold,
+            'stale_recheck_minutes'               => (string) $recheck,
             'email_notify:ticket_stale_agent'    => isset($_POST['notify_agent'])     ? '1' : '0',
             'email_notify:ticket_stale_requester' => isset($_POST['notify_requester']) ? '1' : '0',
         ]
@@ -12778,21 +12784,22 @@ $router->post('/admin/settings/stale-tickets/type-overrides', function () {
     $db    = Database::connect();
     $input = (array) ($_POST['type_stale'] ?? []);
 
-    $existing = $db->query('SELECT id, name, stale_threshold_hours FROM ticket_types')->fetchAll();
+    $existing = $db->query('SELECT id, name, stale_threshold_minutes FROM ticket_types')->fetchAll();
 
-    $update = $db->prepare('UPDATE ticket_types SET stale_threshold_hours = ? WHERE id = ?');
+    $update = $db->prepare('UPDATE ticket_types SET stale_threshold_minutes = ? WHERE id = ?');
     $changed = 0;
     foreach ($existing as $t) {
         $id = (int) $t['id'];
         if (!array_key_exists($id, $input)) {
             continue;
         }
+        // Inputs accept d/h/m; a bare number means hours (the field's legacy unit).
         $raw = trim((string) $input[$id]);
-        $new = $raw === '' ? null : max(0, (int) $raw);
+        $new = $raw === '' ? null : max(0, parseDurationToMinutes($raw, 'h') ?? 0);
 
-        $old = ($t['stale_threshold_hours'] === null || $t['stale_threshold_hours'] === '')
+        $old = ($t['stale_threshold_minutes'] === null || $t['stale_threshold_minutes'] === '')
             ? null
-            : (int) $t['stale_threshold_hours'];
+            : (int) $t['stale_threshold_minutes'];
 
         if ($new === $old) {
             continue;
@@ -12803,8 +12810,8 @@ $router->post('/admin/settings/stale-tickets/type-overrides', function () {
             'ticket_type.stale_threshold_changed',
             $id,
             'ticket_type',
-            ['stale_threshold_hours' => $old === null ? '' : (string) $old],
-            ['stale_threshold_hours' => $new === null ? '' : (string) $new]
+            ['stale_threshold_minutes' => $old === null ? '' : (string) $old],
+            ['stale_threshold_minutes' => $new === null ? '' : (string) $new]
         );
         $changed++;
     }

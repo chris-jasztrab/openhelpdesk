@@ -39,15 +39,15 @@ logLine('Stale ticket processor started.');
 
 $db = Database::connect();
 
-$globalThreshold = (int) (getSetting('stale_threshold_hours', '72') ?: '72');
-$recheckHours    = (int) (getSetting('stale_recheck_hours', '24') ?: '24');
+$globalThreshold = (int) (getSetting('stale_threshold_minutes', '4320') ?: '4320');
+$recheckMins     = (int) (getSetting('stale_recheck_minutes', '1440') ?: '1440');
 
 if ($globalThreshold <= 0) {
     logLine('Global stale threshold is 0 or invalid — feature disabled. Exiting.');
     exit(0);
 }
 
-logLine("Global threshold: {$globalThreshold}h | Re-notify gap: {$recheckHours}h");
+logLine('Global threshold: ' . formatDuration($globalThreshold) . ' | Re-notify gap: ' . formatDuration($recheckMins));
 
 // Only flag tickets the requester is still waiting on. Exclude statuses
 // that are intentionally idle (waiting_on_customer / waiting_on_third_party)
@@ -57,12 +57,12 @@ $placeholders   = implode(',', array_fill(0, count($activeStatuses), '?'));
 
 $stmt = $db->prepare(
     "SELECT t.*,
-            COALESCE(tt.stale_threshold_hours, ?) AS effective_threshold,
-            TIMESTAMPDIFF(HOUR, t.updated_at, NOW()) AS hours_since_update
+            COALESCE(tt.stale_threshold_minutes, ?) AS effective_threshold,
+            TIMESTAMPDIFF(MINUTE, t.updated_at, NOW()) AS mins_since_update
      FROM tickets t
      LEFT JOIN ticket_types tt ON tt.id = t.type_id
      WHERE t.status IN ($placeholders)
-       AND TIMESTAMPDIFF(HOUR, t.updated_at, NOW()) >= COALESCE(tt.stale_threshold_hours, ?)"
+       AND TIMESTAMPDIFF(MINUTE, t.updated_at, NOW()) >= COALESCE(tt.stale_threshold_minutes, ?)"
 );
 $params = array_merge([$globalThreshold], $activeStatuses, [$globalThreshold]);
 $stmt->execute($params);
@@ -74,35 +74,39 @@ $notified = 0;
 $skipped  = 0;
 
 foreach ($tickets as $ticket) {
-    $ticketId         = (int) $ticket['id'];
-    $hoursSinceUpdate = (int) $ticket['hours_since_update'];
-    $threshold        = (int) $ticket['effective_threshold'];
+    $ticketId        = (int) $ticket['id'];
+    $minsSinceUpdate = (int) $ticket['mins_since_update'];
+    $thresholdMins   = (int) $ticket['effective_threshold'];
+    // The stale emails still speak in whole hours; the timeline keeps full precision.
+    $hoursSinceUpdate = intdiv($minsSinceUpdate, 60);
+    $thresholdHours   = intdiv($thresholdMins, 60);
 
     // Dedup: skip if we already sent a stale notification within the recheck window.
     $dedup = $db->prepare(
         "SELECT id FROM ticket_timeline
          WHERE ticket_id = ? AND action = 'stale_notification_sent'
-           AND created_at > DATE_SUB(NOW(), INTERVAL ? HOUR)
+           AND created_at > DATE_SUB(NOW(), INTERVAL ? MINUTE)
          ORDER BY id DESC LIMIT 1"
     );
-    $dedup->execute([$ticketId, $recheckHours]);
+    $dedup->execute([$ticketId, $recheckMins]);
     if ($dedup->fetch()) {
         $skipped++;
         continue;
     }
 
     try {
-        notifyStaleTicketAgent($db, $ticket, $hoursSinceUpdate, $threshold);
+        notifyStaleTicketAgent($db, $ticket, $hoursSinceUpdate, $thresholdHours);
         notifyStaleTicketRequester($db, $ticket, $hoursSinceUpdate);
 
-        $details = "No activity for {$hoursSinceUpdate}h (threshold {$threshold}h). Notified agent and requester.";
+        $details = 'No activity for ' . formatDuration($minsSinceUpdate)
+            . ' (threshold ' . formatDuration($thresholdMins) . '). Notified agent and requester.';
         $db->prepare(
             "INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal)
              VALUES (?, NULL, 'stale_notification_sent', ?, 1)"
         )->execute([$ticketId, $details]);
 
         $notified++;
-        logLine("Ticket #{$ticketId}: notified ({$hoursSinceUpdate}h / {$threshold}h).");
+        logLine("Ticket #{$ticketId}: notified (" . formatDuration($minsSinceUpdate) . ' / ' . formatDuration($thresholdMins) . ').');
     } catch (\Throwable $e) {
         logLine("ERROR on ticket #{$ticketId}: " . $e->getMessage());
     }

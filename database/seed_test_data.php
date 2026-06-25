@@ -235,15 +235,15 @@ $pdo->exec("INSERT INTO ticket_templates (name,description,subject,body,type_id,
   1,1,1,1)");
 
 // ── Escalation Rules ──────────────────────────────────────────────
-$pdo->exec("INSERT INTO escalation_rules (name,conditions,actions,cooldown_hours,is_enabled,sort_order) VALUES
+$pdo->exec("INSERT INTO escalation_rules (name,conditions,actions,cooldown_minutes,is_enabled,sort_order) VALUES
  ('High/Critical unassigned > 2 hours',
   '[{\"field\":\"priority\",\"op\":\"in\",\"value\":[\"3\",\"4\"]},{\"field\":\"assigned_to\",\"op\":\"empty\",\"value\":\"\"},{\"field\":\"age_minutes\",\"op\":\"gte\",\"value\":\"120\"}]',
   '[{\"type\":\"notify_admin\",\"value\":\"A High/Critical ticket has been unassigned for over 2 hours.\"}]',
-  4,1,1),
+  240,1,1),
  ('SLA Warning – action required',
   '[{\"field\":\"sla_state\",\"op\":\"eq\",\"value\":\"warning\"},{\"field\":\"status\",\"op\":\"not_in\",\"value\":[\"resolved\",\"closed\"]}]',
   '[{\"type\":\"notify_assigned\",\"value\":\"SLA warning: your ticket is approaching its resolution deadline. Please action immediately.\"}]',
-  2,1,2)");
+  120,1,2)");
 
 // ── Automations ───────────────────────────────────────────────────
 $pdo->exec("INSERT INTO automations (name,trigger_event,conditions,actions,is_enabled,sort_order) VALUES

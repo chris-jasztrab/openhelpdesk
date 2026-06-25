@@ -446,14 +446,14 @@ return [
     // =======================================================================
     // Stale Tickets  (/admin/settings/stale-tickets)
     // =======================================================================
-    ['label' => 'Stale Threshold (hours)',      'description' => 'Hours of inactivity before a ticket is stale',
+    ['label' => 'Stale Threshold',              'description' => 'How long a ticket can be inactive before it is stale (days/hours/minutes)',
      'group' => 'Automation', 'page_label' => 'Stale Tickets', 'page_url' => '/admin/settings/stale-tickets',
-     'section' => 'Global Thresholds', 'anchor' => 'stale_threshold_hours',
+     'section' => 'Global Thresholds', 'anchor' => 'stale_threshold_minutes',
      'keywords' => 'stale threshold idle inactive aging'],
 
-    ['label' => 'Re-notify After (hours)',      'description' => 'Minimum gap between stale notifications',
+    ['label' => 'Re-notify After',              'description' => 'Minimum gap between stale notifications (days/hours/minutes)',
      'group' => 'Automation', 'page_label' => 'Stale Tickets', 'page_url' => '/admin/settings/stale-tickets',
-     'section' => 'Global Thresholds', 'anchor' => 'stale_recheck_hours',
+     'section' => 'Global Thresholds', 'anchor' => 'stale_recheck_minutes',
      'keywords' => 'stale renotify recheck'],
 
     ['label' => 'Notify Assigned Agent (stale)', 'description' => 'Send stale alert to the assigned agent',

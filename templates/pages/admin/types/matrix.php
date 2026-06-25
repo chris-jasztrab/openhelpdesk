@@ -73,7 +73,7 @@ function tt_cell_no(): string  { return '<span class="mx-off">&minus;</span>'; }
                     $thr     = (float) ($t['ai_dup_threshold'] ?? 0.75);
                     $dupOn   = (int) ($t['ai_dup_check_enabled'] ?? 0) === 1;
                     $custThr = $dupOn && abs($thr - 0.75) > 0.001;
-                    $stale   = $t['stale_threshold_hours'];
+                    $stale   = $t['stale_threshold_minutes'];
                     $custSt  = $stale !== null;
                 ?>
                 <tr>
@@ -99,7 +99,7 @@ function tt_cell_no(): string  { return '<span class="mx-off">&minus;</span>'; }
                     </td>
                     <td class="tt-c">
                         <?php if ($custSt): ?>
-                            <span class="mx-on" title="stale_threshold_hours"><?= (int) $stale ?>h</span>
+                            <span class="mx-on" title="stale_threshold_minutes"><?= e(formatDuration((int) $stale)) ?></span>
                         <?php else: ?>
                             <?= tt_cell_no() ?>
                         <?php endif; ?>

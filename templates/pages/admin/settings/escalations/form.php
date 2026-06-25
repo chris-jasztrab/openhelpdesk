@@ -63,10 +63,10 @@ $existingActions    = $isEdit ? ($editing['actions_decoded']    ?? []) : [];
                            placeholder="e.g. Escalate breached critical tickets">
                 </div>
                 <div class="col-md-3">
-                    <label for="cooldown_hours" class="form-label fw-semibold">Re-fire cooldown (hours)</label>
-                    <input type="number" class="form-control" id="cooldown_hours" name="cooldown_hours"
-                           min="0" max="720" value="<?= $isEdit ? (int)$editing['cooldown_hours'] : 0 ?>">
-                    <div class="form-text">0 = fire once per ticket ever</div>
+                    <label for="cooldown_minutes" class="form-label fw-semibold">Re-fire cooldown</label>
+                    <input type="text" class="form-control" id="cooldown_minutes" name="cooldown_minutes"
+                           value="<?= $isEdit && (int)$editing['cooldown_minutes'] > 0 ? e(formatDuration((int)$editing['cooldown_minutes'])) : '0' ?>">
+                    <div class="form-text">Enter <code>d</code>/<code>h</code>/<code>m</code> (e.g. <code>2d</code>, <code>12h</code>); a bare number means hours. <code>0</code> = fire once per ticket ever.</div>
                 </div>
                 <div class="col-md-2">
                     <label for="sort_order" class="form-label fw-semibold">Sort Order</label>

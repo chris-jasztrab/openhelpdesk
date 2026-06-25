@@ -11,6 +11,14 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.118.0 &mdash; 2026-06-25
+
+### Added
+- **Type durations in days, hours or minutes anywhere a time is configured.** Every editable duration field — SLA first-response and resolution targets, the global and per-type stale thresholds, the stale re-notify gap, and the escalation re-fire cooldown — now accepts a unit suffix: type `72h`, `3d` or `4320m` and they all mean the same thing. You can combine units too (`1d 2h 30m`). A bare number keeps each field's previous unit (minutes for SLA, hours for stale/escalation), so existing habits still work. Saved values are displayed rolled up into the largest units that fit — `60m` shows as `1h`, `80m` as `1h 20m`, `24h` as `1d`.
+
+### Changed
+- All editable duration fields now store **minutes** internally (the stale and escalation fields previously stored whole hours), so sub-hour values are no longer lost. The roll-up is calendar-based everywhere (`1d = 24h`); the SLA preview no longer treats a day as 8 business hours. Existing values are migrated automatically.
+
 ## 2.117.0 &mdash; 2026-06-25
 
 ### Added

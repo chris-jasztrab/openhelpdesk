@@ -145,14 +145,19 @@ $action = $isEdit ? "/admin/types/{$editing['id']}/edit" : '/admin/types/create'
             <?php endif; ?>
 
             <div class="mb-3">
-                <label for="stale_threshold_hours" class="form-label fw-semibold">
-                    <i class="bi bi-hourglass-split me-1"></i>Stale Threshold (hours)
+                <label for="stale_threshold_minutes" class="form-label fw-semibold">
+                    <i class="bi bi-hourglass-split me-1"></i>Stale Threshold
                 </label>
-                <input type="number" min="0" class="form-control" id="stale_threshold_hours" name="stale_threshold_hours"
-                       value="<?= e(old('stale_threshold_hours', (string) ($editing['stale_threshold_hours'] ?? ''))) ?>"
+                <?php
+                $staleEditMins = isset($editing['stale_threshold_minutes']) && $editing['stale_threshold_minutes'] !== null && $editing['stale_threshold_minutes'] !== ''
+                    ? formatDuration((int) $editing['stale_threshold_minutes'])
+                    : '';
+                ?>
+                <input type="text" class="form-control" id="stale_threshold_minutes" name="stale_threshold_minutes"
+                       value="<?= e(old('stale_threshold_minutes', $staleEditMins)) ?>"
                        placeholder="Uses global setting">
                 <div class="form-text">
-                    Override the global stale threshold for this ticket type. Leave blank to use the global setting (Admin → Settings → Stale Tickets).
+                    Override the global stale threshold for this ticket type. Enter days, hours or minutes &mdash; e.g. <code>3d</code>, <code>72h</code> or <code>4320m</code> (a bare number means hours). Leave blank to use the global setting (Admin → Settings → Stale Tickets).
                 </div>
             </div>
 

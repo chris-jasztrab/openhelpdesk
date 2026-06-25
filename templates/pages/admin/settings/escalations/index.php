@@ -128,8 +128,8 @@ unset($_SESSION['_escalation_run']);
                         </span>
                     <?php endforeach; ?>
                 </td>
-                <td class="text-muted small" data-sort-value="<?= (int) $rule['cooldown_hours'] ?>">
-                    <?= $rule['cooldown_hours'] > 0 ? $rule['cooldown_hours'] . 'h' : 'Once' ?>
+                <td class="text-muted small" data-sort-value="<?= (int) $rule['cooldown_minutes'] ?>">
+                    <?= (int) $rule['cooldown_minutes'] > 0 ? e(formatDuration((int) $rule['cooldown_minutes'])) : 'Once' ?>
                 </td>
                 <td data-sort-value="<?= $rule['is_enabled'] ? '1' : '0' ?>">
                     <form method="POST" action="/admin/settings/escalations/<?= (int) $rule['id'] ?>/toggle">

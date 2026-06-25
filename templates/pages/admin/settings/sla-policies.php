@@ -49,7 +49,7 @@ $breadcrumbs  = [
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h5 class="fw-bold mb-1">SLA Policies</h5>
-        <p class="text-muted mb-0">Define response and resolution targets per ticket type and priority. Times are in business minutes.</p>
+        <p class="text-muted mb-0">Define response and resolution targets per ticket type and priority. Enter times in days, hours or minutes &mdash; type <code>d</code>, <code>h</code> or <code>m</code> (e.g. <code>90m</code>, <code>8h</code>, <code>2d</code>); a bare number means minutes. These count business time only.</p>
     </div>
     <button type="button" class="btn btn-outline-secondary"
             data-bs-toggle="modal" data-bs-target="#recalcSlaModal">
@@ -135,9 +135,9 @@ function renderSlaPriorityTable(array $priorities, array $typePolicies, int $typ
             <thead class="table-light">
                 <tr>
                     <th>Priority</th>
-                    <th style="width:170px">First Response (minutes)</th>
-                    <th style="width:170px">Resolution (minutes)</th>
-                    <th style="width:160px">Human-readable</th>
+                    <th style="width:170px">First Response</th>
+                    <th style="width:170px">Resolution</th>
+                    <th style="width:160px">Rolled up</th>
                     <th>SLA counts on</th>
                 </tr>
             </thead>
@@ -161,31 +161,31 @@ function renderSlaPriorityTable(array $priorities, array $typePolicies, int $typ
                         <span class="badge" style="background:<?= e($pri['color']) ?>;"><?= e($pri['name']) ?></span>
                     </td>
                     <td>
-                        <input type="number" class="form-control form-control-sm sla-input"
+                        <input type="text" inputmode="text" class="form-control form-control-sm sla-input"
                                name="policies[<?= $typeKey ?>][<?= $pri['id'] ?>][first_response_minutes]"
-                               value="<?= $frMin ?>" min="0"
-                               placeholder="<?= !$isDefault && $defFr > 0 ? e($defFr) : 'e.g. 60' ?>"
+                               value="<?= $frMin > 0 ? e(formatDuration($frMin)) : '' ?>"
+                               placeholder="<?= !$isDefault && $defFr > 0 ? e(formatDuration($defFr)) : 'e.g. 1h' ?>"
                                data-target="fr_<?= $uid ?>"
                                data-type-key="<?= $typeKey ?>"
                                data-default-val="<?= $defFr ?>">
                     </td>
                     <td>
-                        <input type="number" class="form-control form-control-sm sla-input"
+                        <input type="text" inputmode="text" class="form-control form-control-sm sla-input"
                                name="policies[<?= $typeKey ?>][<?= $pri['id'] ?>][resolution_minutes]"
-                               value="<?= $resMin ?>" min="0"
-                               placeholder="<?= !$isDefault && $defRes > 0 ? e($defRes) : 'e.g. 480' ?>"
+                               value="<?= $resMin > 0 ? e(formatDuration($resMin)) : '' ?>"
+                               placeholder="<?= !$isDefault && $defRes > 0 ? e(formatDuration($defRes)) : 'e.g. 8h' ?>"
                                data-target="res_<?= $uid ?>"
                                data-type-key="<?= $typeKey ?>"
                                data-default-val="<?= $defRes ?>">
                     </td>
                     <td class="text-muted small">
                         <?php if (!$isDefault && $frMin === 0 && $resMin === 0 && ($defFr > 0 || $defRes > 0)): ?>
-                            <span id="fr_<?= $uid ?>" class="text-info"><?= $defFr > 0 ? formatMinutes($defFr) : '—' ?></span> /
-                            <span id="res_<?= $uid ?>" class="text-info"><?= $defRes > 0 ? formatMinutes($defRes) : '—' ?></span>
+                            <span id="fr_<?= $uid ?>" class="text-info"><?= $defFr > 0 ? formatDuration($defFr) : '—' ?></span> /
+                            <span id="res_<?= $uid ?>" class="text-info"><?= $defRes > 0 ? formatDuration($defRes) : '—' ?></span>
                             <span class="badge bg-info bg-opacity-10 text-info ms-1">default</span>
                         <?php else: ?>
-                            <span id="fr_<?= $uid ?>"><?= $frMin > 0 ? formatMinutes($frMin) : '—' ?></span> /
-                            <span id="res_<?= $uid ?>"><?= $resMin > 0 ? formatMinutes($resMin) : '—' ?></span>
+                            <span id="fr_<?= $uid ?>"><?= $frMin > 0 ? formatDuration($frMin) : '—' ?></span> /
+                            <span id="res_<?= $uid ?>"><?= $resMin > 0 ? formatDuration($resMin) : '—' ?></span>
                         <?php endif; ?>
                     </td>
                     <td>
@@ -208,22 +208,35 @@ function renderSlaPriorityTable(array $priorities, array $typePolicies, int $typ
 <?php } ?>
 
 <script>
+// Parse a typed duration ("8h", "2d", "90m", "1d 2h", bare = minutes) → minutes.
+function parseDur(raw) {
+    raw = String(raw).toLowerCase().trim();
+    if (raw === '' || !/^(\s*\d+\s*[dhm]?\s*)+$/.test(raw)) return 0;
+    var factor = { d: 1440, h: 60, m: 1 };
+    var total = 0, re = /(\d+)\s*([dhm]?)/g, mt;
+    while ((mt = re.exec(raw)) !== null) {
+        total += parseInt(mt[1], 10) * factor[mt[2] || 'm'];
+    }
+    return total;
+}
+// Compact, calendar-based roll-up (1d = 24h): 80 → "1h 20m", 1440 → "1d".
 function formatMins(m) {
     m = parseInt(m) || 0;
     if (m <= 0) return '—';
-    if (m < 60) return m + 'm';
-    var h = Math.floor(m / 60);
+    var d = Math.floor(m / 1440);
+    var h = Math.floor((m % 1440) / 60);
     var r = m % 60;
-    if (h < 24) return h + 'h' + (r > 0 ? ' ' + r + 'm' : '');
-    var d = Math.floor(h / 8); // 8 business hours per day
-    var rh = h % 8;
-    return d + 'd' + (rh > 0 ? ' ' + rh + 'h' : '') + (r > 0 ? ' ' + r + 'm' : '');
+    var parts = [];
+    if (d > 0) parts.push(d + 'd');
+    if (h > 0) parts.push(h + 'h');
+    if (r > 0) parts.push(r + 'm');
+    return parts.join(' ');
 }
 document.querySelectorAll('.sla-input').forEach(function(input) {
     input.addEventListener('input', function() {
         var target = document.getElementById(this.dataset.target);
         if (!target) return;
-        var val = parseInt(this.value) || 0;
+        var val = parseDur(this.value);
         var typeKey = this.dataset.typeKey;
         var defVal = parseInt(this.dataset.defaultVal) || 0;
 
