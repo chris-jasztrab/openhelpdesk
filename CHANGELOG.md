@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.119.1 &mdash; 2026-06-25
+
+### Fixed
+- **Form Builder: the edit (pencil) and remove (X) buttons did nothing.** On the ticket Form Builder page, all field-row actions are wired up inside a single block of JavaScript that began by initialising the drag-to-reorder library (Sortable, loaded from a CDN). If that library failed to load — a restricted network, a CDN hiccup, or being offline — the initialisation threw and silently aborted the rest of the script, so the edit, remove, add-field, and visibility-pill handlers were never attached. The Sortable setup is now guarded: if it can't load, drag-to-reorder is disabled but every other Form Builder action keeps working.
+
 ## 2.119.0 &mdash; 2026-06-25
 
 ### Added

@@ -665,18 +665,27 @@ $sysDefaults = systemFieldDefaults();
         }).then(function(r) { return r.json(); });
     }
 
-    /* ── Drag-and-drop reorder ── */
-    Sortable.create(canvas, {
-        handle: '.drag-handle',
-        animation: 150,
-        onEnd: function() {
-            var order = Array.from(canvas.querySelectorAll('.field-row')).map(function(row) {
-                return { kind: row.dataset.rowKind, key: row.dataset.rowKey };
-            });
-            postJson('/admin/forms/' + typeId + '/layout/save', { order: order })
-                .then(reloadPreview);
-        }
-    });
+    /* ── Drag-and-drop reorder ──
+       Guarded: if the Sortable CDN script fails to load (restricted network,
+       CDN outage), window.Sortable is undefined. Calling it unguarded would
+       throw and abort the rest of this IIFE — killing the edit/remove/add/
+       visibility handlers below. Degrade gracefully: skip reordering, keep
+       everything else working. (Same pattern as partials/sortable-list.php.) */
+    if (window.Sortable) {
+        Sortable.create(canvas, {
+            handle: '.drag-handle',
+            animation: 150,
+            onEnd: function() {
+                var order = Array.from(canvas.querySelectorAll('.field-row')).map(function(row) {
+                    return { kind: row.dataset.rowKind, key: row.dataset.rowKey };
+                });
+                postJson('/admin/forms/' + typeId + '/layout/save', { order: order })
+                    .then(reloadPreview);
+            }
+        });
+    } else {
+        console.warn('Sortable failed to load — drag-to-reorder disabled, other form-builder actions still work.');
+    }
 
     /* ── Visibility pill: click to cycle required → optional → hidden ── */
     canvas.addEventListener('click', function(e) {
