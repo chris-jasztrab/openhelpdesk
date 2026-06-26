@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.125.1 &mdash; 2026-06-26
+
+### Fixed
+- **Wallboard drag was twitchy — cards glitched back and forth.** Two causes. (1) The insertion point was recalculated from each card's *live* position every pointer move, but right after a reorder the other cards are mid-slide (carrying a CSS transform), so they reported animated, in-between positions and the order kept flip-flopping. The decision now runs against a cached snapshot of the *settled* layout (document coordinates), rebuilt only when a move actually commits. (2) The old "which side of the card's centre line" test flipped on sub-pixel hand jitter; it's replaced by a containment model — the dragged card only hops when the pointer is fully *inside* another card, after which the pointer sits over the dragged card's own footprint, creating a dead zone so a held, shaking hand can't oscillate.
+
 ## 2.125.0 &mdash; 2026-06-26
 
 ### Changed

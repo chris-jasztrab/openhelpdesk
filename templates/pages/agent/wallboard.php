@@ -278,39 +278,66 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
     saveConfig();
   }
 
-  // Which sibling should the dragged card sit before? null => append at end.
-  function afterElement(x, y) {
-    const els = [...grid.querySelectorAll('.wb-col:not(.wb-dragging)')];
-    let best = null, bestDist = Infinity, insertAfter = false;
-    for (const el of els) {
-      const b = el.getBoundingClientRect();
-      const cx = b.left + b.width / 2, cy = b.top + b.height / 2;
-      const d = Math.hypot(x - cx, y - cy);
-      if (d < bestDist) { bestDist = d; best = el; insertAfter = x > cx; }
-    }
-    if (!best) return null;
-    return insertAfter ? best.nextElementSibling : best;
+  /* Reordering is decided against a CACHED snapshot of the settled layout —
+     never against live rects. Two things would otherwise make the board twitch:
+       1. While cards FLIP-animate they carry a transform, so a live
+          getBoundingClientRect() reports a mid-flight position. The cache holds
+          resting boxes (document coords, scroll-invariant), rebuilt only when a
+          move commits, so geometry is stable between commits.
+       2. A "which side of the centre line" test flips state on sub-pixel hand
+          jitter. Instead we only move the dragged card when the pointer is
+          actually INSIDE another card's box, hopping it just past that card.
+          After each hop the pointer sits over the dragged card's own footprint
+          (which is excluded), so there's a natural dead zone and a held,
+          shaking hand can't oscillate. */
+  let slotCache = [];
+
+  function boxOf(el) {
+    const r = el.getBoundingClientRect();
+    return { el, left: r.left + window.scrollX, right: r.right + window.scrollX,
+                 top:  r.top  + window.scrollY, bottom: r.bottom + window.scrollY };
+  }
+  function rebuildSlotCache() {
+    slotCache = [...grid.querySelectorAll('.wb-col:not(.wb-dragging)')].map(boxOf);
   }
 
-  // FLIP: snapshot positions, then animate every (non-dragged) card from its
-  // old box to its new one so the reflow looks like things sliding aside.
-  function flipRecord() {
-    const m = new Map();
-    grid.querySelectorAll('.wb-col').forEach(el => m.set(el, el.getBoundingClientRect()));
-    return m;
+  // The non-dragged card whose box contains the pointer, or null (over the
+  // dragged card's own slot, or in a gutter — either way, don't move).
+  function slotUnder(docX, docY) {
+    for (const s of slotCache) {
+      if (docX >= s.left && docX <= s.right && docY >= s.top && docY <= s.bottom) return s.el;
+    }
+    return null;
   }
-  function flipPlay(prev) {
+
+  // Snap any in-flight FLIP animation to its resting position so the next
+  // measurement reads true layout, not an animated frame.
+  function finalizeAnims() {
     grid.querySelectorAll('.wb-col').forEach(el => {
-      if (drag && el === drag.el) return;       // dragged card tracks the pointer
+      if (el === drag.el) return;
+      el.style.transition = 'none';
+      el.style.transform  = '';
+    });
+    grid.getBoundingClientRect(); // force the snap to apply before we measure
+  }
+
+  // FLIP "last + play": measure each card's new resting box (also refreshing
+  // the slot cache from those same reads), then animate from old box to new.
+  function flipPlayAndCache(prev) {
+    slotCache = [];
+    grid.querySelectorAll('.wb-col').forEach(el => {
+      if (el === drag.el) return;               // dragged card tracks the pointer
+      const r = el.getBoundingClientRect();     // resting layout (transforms already cleared)
+      slotCache.push({ el, left: r.left + window.scrollX, right: r.right + window.scrollX,
+                           top: r.top + window.scrollY, bottom: r.bottom + window.scrollY });
       const p = prev.get(el); if (!p) return;
-      const n = el.getBoundingClientRect();
-      const dx = p.left - n.left, dy = p.top - n.top;
+      const dx = p.left - r.left, dy = p.top - r.top;
       if (!dx && !dy) return;
       el.style.transition = 'none';
       el.style.transform  = 'translate(' + dx + 'px,' + dy + 'px)';
       el.getBoundingClientRect();               // force reflow so the next frame animates
       requestAnimationFrame(() => {
-        el.style.transition = 'transform .22s cubic-bezier(.2,.7,.3,1)';
+        el.style.transition = 'transform .2s cubic-bezier(.2,.7,.3,1)';
         el.style.transform  = '';
       });
     });
@@ -325,20 +352,28 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
     const r = el.getBoundingClientRect();
     const tx = (x - drag.offX) - r.left;
     const ty = (y - drag.offY) - r.top;
-    el.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(1.04)';
+    el.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(1.03)';
     drag.lastX = x; drag.lastY = y;
   }
 
   function reorderTo(x, y) {
-    const ref = afterElement(x, y);
+    const over = slotUnder(x + window.scrollX, y + window.scrollY);
+    if (!over) return;                                   // dead zone — no move
+    const kids = [...grid.children];
+    const di = kids.indexOf(drag.el), oi = kids.indexOf(over);
+    if (di < 0 || oi < 0) return;
+    // Hop the dragged card just past the card the pointer is inside.
+    const ref = oi < di ? over : over.nextElementSibling;
     if (ref === drag.el) return;
-    if (ref && drag.el.nextElementSibling === ref) return;           // already there
-    if (ref === null && grid.lastElementChild === drag.el) return;   // already last
-    const prev = flipRecord();
+    if (ref && drag.el.nextElementSibling === ref) return;
+    if (ref === null && grid.lastElementChild === drag.el) return;
+    finalizeAnims();                  // clear transforms so boxes read true
+    const prev = new Map();           // FLIP "first" (resting boxes)
+    grid.querySelectorAll('.wb-col').forEach(el => { if (el !== drag.el) prev.set(el, el.getBoundingClientRect()); });
     if (ref === null) grid.appendChild(drag.el);
     else grid.insertBefore(drag.el, ref);
-    flipPlay(prev);
-    positionDragged(x, y);   // re-pin: the dragged card's base position just changed
+    flipPlayAndCache(prev);           // animate + refresh the slot cache
+    positionDragged(x, y);            // re-pin: the dragged card's base position just changed
   }
 
   // Auto-scroll when dragging near the top/bottom edge (boards can be tall).
@@ -369,6 +404,7 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
     el.classList.add('wb-dragging');
     document.body.classList.add('wb-grabbing');
     try { el.setPointerCapture(e.pointerId); } catch (_) {}
+    rebuildSlotCache();              // snapshot the settled layout before lifting the card
     positionDragged(e.clientX, e.clientY);
   }
   function onPointerMove(e) {
@@ -398,16 +434,30 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
     grid.addEventListener('pointermove', onPointerMove);
     grid.addEventListener('pointerup', endDrag);
     grid.addEventListener('pointercancel', endDrag);
-    // Remove a widget (× badge) — animate the gap closing.
+    // Remove a widget (× badge) — animate the gap closing (standalone FLIP,
+    // no active drag here so it can't lean on the drag-time cache).
     grid.addEventListener('click', (e) => {
       const btn = e.target.closest('.wb-remove');
       if (!btn || !editMode) return;
       const col = btn.closest('.wb-col');
       const id  = col.dataset.widget;
       if (charts[id]) { charts[id].destroy(); delete charts[id]; }
-      const prev = flipRecord();
+      const prev = new Map();
+      grid.querySelectorAll('.wb-col').forEach(el => prev.set(el, el.getBoundingClientRect()));
       col.remove();
-      flipPlay(prev);
+      grid.querySelectorAll('.wb-col').forEach(el => {
+        const p = prev.get(el); if (!p) return;
+        const n = el.getBoundingClientRect();
+        const dx = p.left - n.left, dy = p.top - n.top;
+        if (!dx && !dy) return;
+        el.style.transition = 'none';
+        el.style.transform  = 'translate(' + dx + 'px,' + dy + 'px)';
+        el.getBoundingClientRect();
+        requestAnimationFrame(() => {
+          el.style.transition = 'transform .2s cubic-bezier(.2,.7,.3,1)';
+          el.style.transform  = '';
+        });
+      });
       config.widgets = (config.widgets || []).filter(w => w !== id);
       empty.classList.toggle('d-none', config.widgets.filter(x => CATALOG[x]).length > 0);
       saveConfig();
