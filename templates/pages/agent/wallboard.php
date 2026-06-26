@@ -86,6 +86,9 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
   </div>
 
   <!-- Widget grid -->
+  <div class="text-muted small mb-2" id="wbDragHint">
+    <i class="bi bi-grip-vertical"></i> Tip: hover a widget and drag the handle to rearrange your board — your layout is saved automatically.
+  </div>
   <div id="wbGrid" class="row g-3"></div>
   <div id="wbEmpty" class="text-center text-muted py-5 d-none">
     <i class="bi bi-grid-3x3-gap fs-1 d-block mb-2"></i>
@@ -115,15 +118,32 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
 
 <style>
   #wallboard.wb-fs { background: var(--bs-body-bg); padding: 1rem; overflow-y: auto; }
-  .wb-card { height: 100%; }
+  .wb-card { height: 100%; position: relative; }
   .wb-kpi-value { font-size: 2.4rem; font-weight: 700; line-height: 1.1; }
   .wb-kpi-sub { font-size: .8rem; }
-  .wb-card .card-header { font-size: .8rem; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+  .wb-card .card-header { font-size: .8rem; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; padding-right: 1.75rem; }
   .wb-list { max-height: 320px; overflow-y: auto; }
   .wb-chart-wrap { position: relative; height: 240px; }
   .wb-fs .wb-kpi-value { font-size: 3rem; }
   #wbWidgetList .wb-grip { cursor: grab; color: var(--bs-secondary-color); }
   #wbWidgetList li.dragging { opacity: .5; }
+
+  /* On-board drag-and-drop reordering */
+  .wb-col { transition: transform .12s ease; }
+  .wb-drag-handle {
+    position: absolute; top: 6px; right: 6px; z-index: 4;
+    border: 0; background: transparent; padding: 2px 5px; line-height: 1;
+    color: var(--bs-secondary-color); cursor: grab; border-radius: 4px;
+    opacity: 0; transition: opacity .12s, background .12s;
+  }
+  .wb-card:hover .wb-drag-handle { opacity: .55; }
+  .wb-drag-handle:hover { opacity: 1; background: var(--bs-secondary-bg); }
+  .wb-drag-handle:active { cursor: grabbing; }
+  .wb-col-dragging { opacity: .45; }
+  .wb-col-dragging .wb-card { outline: 2px dashed var(--ld-primary, #0d6efd); outline-offset: 2px; }
+  .wb-reordering .wb-card { cursor: grabbing; }
+  /* Touch screens can't fire HTML5 drag — keep the handle visible there. */
+  @media (hover: none) { .wb-drag-handle { opacity: .55; } }
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
@@ -183,11 +203,12 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
     widgets.forEach(id => {
       const meta = CATALOG[id];
       const col = document.createElement('div');
-      col.className = sizeClass(meta.size);
+      col.className = sizeClass(meta.size) + ' wb-col';
+      const handle = '<button type="button" class="wb-drag-handle" title="Drag to rearrange" aria-label="Drag widget to rearrange"><i class="bi bi-grip-vertical"></i></button>';
       let inner = '';
       if (meta.kind === 'kpi') {
         inner =
-          '<div class="card wb-card border-0 shadow-sm">' +
+          '<div class="card wb-card border-0 shadow-sm">' + handle +
             '<div class="card-body">' +
               '<div class="text-muted wb-kpi-sub mb-1">' + esc(meta.title) + '</div>' +
               '<div class="wb-kpi-value" data-slot="value">–</div>' +
@@ -196,14 +217,14 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
           '</div>';
       } else if (meta.kind === 'chart') {
         inner =
-          '<div class="card wb-card border-0 shadow-sm">' +
+          '<div class="card wb-card border-0 shadow-sm">' + handle +
             '<div class="card-header bg-transparent text-muted">' + esc(meta.title) + '</div>' +
             '<div class="card-body"><div class="wb-chart-wrap"><canvas></canvas></div>' +
               '<div class="text-muted small text-center mt-2 d-none" data-slot="empty">No data</div></div>' +
           '</div>';
       } else { // list
         inner =
-          '<div class="card wb-card border-0 shadow-sm">' +
+          '<div class="card wb-card border-0 shadow-sm">' + handle +
             '<div class="card-header bg-transparent text-muted">' + esc(meta.title) + '</div>' +
             '<div class="card-body p-0"><div class="wb-list" data-slot="list">' +
               '<div class="text-muted small p-3">Loading…</div></div></div>' +
@@ -211,7 +232,69 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
       }
       col.innerHTML = inner;
       col.dataset.widget = id;
+      // Drag starts only from the grip handle (so list links / charts stay
+      // clickable); the handle flips the column draggable on mousedown.
+      col.draggable = false;
+      const grip = col.querySelector('.wb-drag-handle');
+      grip.addEventListener('mousedown', () => { col.draggable = true; });
+      grip.addEventListener('touchstart', () => { col.draggable = true; }, { passive: true });
       grid.appendChild(col);
+    });
+  }
+
+  /* ---- drag-and-drop reordering on the board --------------------------
+     Native HTML5 DnD: the dragged column is live-moved among its siblings
+     as you hover, so the others shift out of the way and snap into place.
+     The new order is persisted to this agent's saved config on drop. */
+  let dragEl = null;
+
+  function afterElement(x, y) {
+    const els = [...grid.querySelectorAll('.wb-col:not(.wb-col-dragging)')];
+    let best = null, bestDist = Infinity, insertAfter = false;
+    for (const el of els) {
+      const b = el.getBoundingClientRect();
+      const cx = b.left + b.width / 2, cy = b.top + b.height / 2;
+      const d = Math.hypot(x - cx, y - cy);
+      if (d < bestDist) { bestDist = d; best = el; insertAfter = x > cx; }
+    }
+    if (!best) return null;
+    return insertAfter ? best.nextElementSibling : best;
+  }
+
+  function persistOrder() {
+    config.widgets = [...grid.querySelectorAll('.wb-col')].map(c => c.dataset.widget);
+    saveConfig();
+  }
+
+  function attachGridDnD() {
+    grid.addEventListener('dragstart', (e) => {
+      const col = e.target.closest('.wb-col');
+      if (!col) return;
+      dragEl = col;
+      col.classList.add('wb-col-dragging');
+      grid.classList.add('wb-reordering');
+      if (e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', col.dataset.widget); } catch (_) {} }
+    });
+    grid.addEventListener('dragover', (e) => {
+      if (!dragEl) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+      const ref = afterElement(e.clientX, e.clientY);
+      if (ref === dragEl) return;
+      if (ref === null) {
+        if (grid.lastElementChild !== dragEl) grid.appendChild(dragEl);
+      } else {
+        grid.insertBefore(dragEl, ref);
+      }
+    });
+    grid.addEventListener('drop', (e) => { if (dragEl) e.preventDefault(); });
+    grid.addEventListener('dragend', () => {
+      if (!dragEl) return;
+      dragEl.classList.remove('wb-col-dragging');
+      dragEl.draggable = false;
+      grid.classList.remove('wb-reordering');
+      dragEl = null;
+      persistOrder();
     });
   }
 
@@ -472,6 +555,7 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
   document.addEventListener('visibilitychange', () => { if (!document.hidden && !paused) refresh(); });
 
   /* ---- boot ------------------------------------------------------- */
+  attachGridDnD();
   buildGrid();
   refresh();
   startTimer();

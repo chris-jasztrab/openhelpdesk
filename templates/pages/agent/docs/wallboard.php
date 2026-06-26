@@ -50,12 +50,13 @@ $breadcrumbs  = [['label'=>'Help','url'=>'/agent/help'],['label'=>'Live Wallboar
 <div class="card border-0 shadow-sm mb-4" id="customize">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-sliders text-primary me-2"></i>Customising your widgets</h5>
-<p class="text-muted mb-2">Click <strong>Customize</strong> to open the widget panel. There you can:</p>
+<p class="text-muted mb-2"><strong>Rearrange directly on the board.</strong> Hover any widget and a grip handle (<i class="bi bi-grip-vertical"></i>) appears in its top-right corner. Grab it and drag the widget anywhere on the page &mdash; the other widgets move out of the way and snap into their new positions as you go. Drop it and the new arrangement is saved automatically. Put the lists, charts or numbers you care about most right at the top.</p>
+<p class="text-muted mb-2"><strong>Add or remove widgets</strong> with the <strong>Customize</strong> button. The panel lets you:</p>
 <ul class="text-muted mb-2">
     <li><strong>Toggle</strong> any widget on or off with its switch.</li>
-    <li><strong>Reorder</strong> them &mdash; drag the <i class="bi bi-grip-vertical"></i> handle; enabled widgets appear on the board in this order.</li>
+    <li><strong>Reorder</strong> them &mdash; drag the <i class="bi bi-grip-vertical"></i> handle here too; the on-board order and the panel order stay in sync.</li>
 </ul>
-<p class="text-muted mb-0">Click <strong>Save layout</strong> and the board rebuilds. Your selection, order, refresh interval and filters are saved <strong>to your account</strong> &mdash; they're personal to you and follow you to any device you log in from. Every agent gets a sensible default set the first time they open the board.</p>
+<p class="text-muted mb-0">Click <strong>Save layout</strong> and the board rebuilds. Your widget selection, order, refresh interval and filters are all saved <strong>to your account</strong> &mdash; they're personal to you and follow you to any device you log in from. Every agent gets a sensible default set the first time they open the board.</p>
 </div>
 </div>
 

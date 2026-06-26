@@ -11,6 +11,16 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.124.0 &mdash; 2026-06-26
+
+### Added
+- **Wallboard: drag-and-drop widgets directly on the board.** Each widget now has a grip handle (top-right, on hover) — grab it and drag the widget anywhere on the page; the other widgets shift out of the way and snap into their new positions as you move. Drop it and the new arrangement is saved to your account automatically, so every agent keeps their own personal layout with the widgets that matter most up top. (You can still toggle widgets on/off and reorder from the **Customize** panel — both stay in sync.) Reordering preserves live charts without a reload. The help doc (**Agent Help → Live Wallboard**) was updated to cover it.
+
+### Changed
+- **Wallboard help doc** now describes drag-to-rearrange on the board itself, alongside the Customize panel.
+
+---
+
 ## 2.123.0 &mdash; 2026-06-26
 
 ### Added
