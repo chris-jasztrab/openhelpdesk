@@ -265,6 +265,15 @@ class Sla
                         );
                     }
                 }
+
+                // Teams "SLA breached" post on the transition into breach. SLA
+                // recalculation also runs from cron (sla-cron / escalations),
+                // which doesn't load Teams via bootstrap — require it here so the
+                // notification fires no matter where the breach is detected.
+                if ($newState === 'breached') {
+                    require_once ROOT_DIR . '/src/Teams.php';
+                    Teams::notifyTicketEvent($db, (int) $ticket['id'], 'sla');
+                }
             }
         }
 

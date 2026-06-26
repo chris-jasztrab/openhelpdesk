@@ -856,6 +856,10 @@ function notifyAgentStatusChanged(PDO $db, int $ticketId, string $oldStatus, str
     if ($oldStatus === $newStatus) {
         return;
     }
+
+    // Teams "status changed" post — central choke point for every status-change
+    // path; carries the old status so the card can show "from → to".
+    Teams::notifyTicketEvent($db, $ticketId, 'status', ['from_status' => $oldStatus]);
     $oldLabel = function_exists('ticketStatusLabel') ? ticketStatusLabel($oldStatus) : $oldStatus;
     $newLabel = function_exists('ticketStatusLabel') ? ticketStatusLabel($newStatus) : $newStatus;
     $body = "Status changed from {$oldLabel} to {$newLabel}";
@@ -3644,6 +3648,11 @@ function forwardParseName(string $email): array
  */
 function notifyRequesterTicketCreated(PDO $db, int $ticketId): void
 {
+    // Teams fires independently of the requester email gates below — this helper
+    // is called on every ticket-creation path (admin/api/agent/floor/portal),
+    // so it's the single choke point for a "new ticket" channel post.
+    Teams::notifyTicketEvent($db, $ticketId, 'created');
+
     if (!emailNotifyEnabled('requester_new_ticket')) {
         return;
     }
@@ -4161,6 +4170,11 @@ function notifyGroupMembers(PDO $db, int $ticketId): void
  */
 function notifyAssignedAgent(PDO $db, int $ticketId, int $agentId): void
 {
+    // Teams "ticket assigned" post — independent of the agent's email prefs and
+    // of self-assignment skipping below, so the channel always reflects who owns
+    // the ticket now. Disable via the per-event toggle if it's too chatty.
+    Teams::notifyTicketEvent($db, $ticketId, 'assigned', ['assignee_id' => $agentId]);
+
     // In-app "New Assignment" feed notification — fires regardless of the
     // agent's email preferences (createNotification self-skips self-assignment).
     createNotification($db, $agentId, $ticketId, 'assignment', null, Auth::id());

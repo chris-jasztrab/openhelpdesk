@@ -11,6 +11,17 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.122.0 &mdash; 2026-06-26
+
+### Added
+- **Microsoft Teams integration — post ticket activity to a Teams channel.** A new admin page (**Settings → Integrations → Microsoft Teams**) connects the helpdesk to a Teams channel via an **Incoming Webhook** URL (created with the modern *Workflows* / Power Automate "Post to a channel when a webhook request is received" template — the supported successor to the retired Office 365 connectors). Highlights:
+  - **Per-event toggles** — independently enable/disable a card for **new ticket created**, **ticket assigned**, **status changed** (shows the old → new status), and **SLA breached**. Events fire from a single central choke point per type, so every channel is covered — agent, admin, portal, email-to-ticket, and floor mode — and SLA breaches are caught wherever recalculation runs (web or cron).
+  - **Rich cards** — each notification is an Adaptive Card with the ticket number/subject, key facts (status, priority, type, group, location, requester, assignee) and an **Open ticket** button linking straight back to the ticket.
+  - **Send test message** — verify the webhook from the settings page (against the URL you've typed, before saving) with a clear success/error result.
+  - **Fail-soft** — a missing, misconfigured, or unreachable webhook can never break ticket creation or updates: every send is wrapped and time-limited, and failures are logged, not surfaced to the user. The webhook URL is admin-only and kept out of the audit-log detail.
+
+---
+
 ## 2.121.0 &mdash; 2026-06-26
 
 ### Added

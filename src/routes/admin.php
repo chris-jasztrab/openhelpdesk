@@ -10868,6 +10868,84 @@ $router->post('/admin/settings/organization', function () {
  * ADMIN – CSAT Settings
  * ================================================================== */
 
+/* ──────────────────────────────────────────────────────────────────
+ * Microsoft Teams integration
+ * ────────────────────────────────────────────────────────────────── */
+
+$router->get('/admin/settings/teams', function () {
+    Auth::requireAdmin();
+    $settings = [
+        'teams_enabled'        => getSetting('teams_enabled', '0'),
+        'teams_webhook_url'    => getSetting('teams_webhook_url', ''),
+        'teams_event_created'  => getSetting('teams_event_created', '1'),
+        'teams_event_assigned' => getSetting('teams_event_assigned', '1'),
+        'teams_event_status'   => getSetting('teams_event_status', '1'),
+        'teams_event_sla'      => getSetting('teams_event_sla', '1'),
+    ];
+    render('admin/settings/teams', compact('settings'));
+});
+
+$router->post('/admin/settings/teams', function () {
+    Auth::requireAdmin();
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/teams');
+    }
+
+    $url = trim($_POST['teams_webhook_url'] ?? '');
+    $enabled = isset($_POST['teams_enabled']) ? '1' : '0';
+
+    if ($url !== '' && (!filter_var($url, FILTER_VALIDATE_URL) || stripos($url, 'https://') !== 0)) {
+        flash('error', 'Webhook URL must be a valid https:// URL.');
+        redirect('/admin/settings/teams');
+        return;
+    }
+    if ($enabled === '1' && $url === '') {
+        flash('error', 'A webhook URL is required to enable Teams notifications.');
+        redirect('/admin/settings/teams');
+        return;
+    }
+
+    $before = [
+        'teams_enabled'     => getSetting('teams_enabled', '0'),
+        'teams_webhook_url' => getSetting('teams_webhook_url', ''),
+    ];
+
+    setSetting('teams_enabled', $enabled);
+    setSetting('teams_webhook_url', $url);
+    setSetting('teams_event_created',  isset($_POST['teams_event_created'])  ? '1' : '0');
+    setSetting('teams_event_assigned', isset($_POST['teams_event_assigned']) ? '1' : '0');
+    setSetting('teams_event_status',   isset($_POST['teams_event_status'])   ? '1' : '0');
+    setSetting('teams_event_sla',      isset($_POST['teams_event_sla'])      ? '1' : '0');
+
+    // Don't store the full webhook URL in the audit detail — it's a secret.
+    logAuditChange(
+        'teams.settings_changed', null, 'setting',
+        ['enabled' => $before['teams_enabled'], 'webhook_set' => $before['teams_webhook_url'] !== '' ? 'yes' : 'no'],
+        ['enabled' => $enabled,                 'webhook_set' => $url !== '' ? 'yes' : 'no']
+    );
+
+    flash('success', 'Teams settings saved.');
+    redirect('/admin/settings/teams');
+});
+
+$router->post('/admin/settings/teams/test', function () {
+    Auth::requireAdmin();
+    header('Content-Type: application/json');
+    if (!verifyCsrf($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '')) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Invalid CSRF token.']);
+        exit;
+    }
+    // Test against whatever URL is in the form (may be unsaved), falling back to
+    // the stored one — so an admin can verify before committing.
+    $body = json_decode(file_get_contents('php://input'), true);
+    $url  = is_array($body) ? trim((string) ($body['webhook_url'] ?? '')) : '';
+    $res = Teams::post(Teams::testCard(), $url !== '' ? $url : null);
+    echo json_encode($res);
+    exit;
+});
+
 $router->get('/admin/settings/csat', function () {
     Auth::requirePermission('csat.manage');
     $settings = [

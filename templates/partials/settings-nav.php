@@ -58,6 +58,10 @@ $settingsNavGroups = [
         ['label' => 'SSO / Microsoft 365', 'url' => '/admin/settings/sso', 'icon' => 'bi-shield-lock',
          'keywords' => 'sso saml oauth login azure entra m365 office365 single sign on'],
     ],
+    'Integrations' => [
+        ['label' => 'Microsoft Teams', 'url' => '/admin/settings/teams', 'icon' => 'bi-microsoft-teams',
+         'keywords' => 'teams microsoft chat channel webhook notification incoming workflow post message integration chatops'],
+    ],
     'Customization' => [
         ['label' => 'Branding',         'url' => '/admin/settings/branding',         'icon' => 'bi-palette',
          'keywords' => 'logo color theme favicon appearance brand'],
@@ -131,6 +135,7 @@ $settingsNavPerm = static function (string $url): string {
         '/admin/settings/import'            => 'import.manage',
         '/admin/settings/backup'            => 'import.manage',
         '/admin/settings/danger-zone'       => '@admin',
+        '/admin/settings/teams'             => '@admin',
         '/admin/roles'                      => '@admin',
         '/admin/settings'                   => 'settings.manage',
         '/admin/locations'                  => 'locations.manage',
