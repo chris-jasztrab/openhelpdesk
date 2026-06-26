@@ -41,8 +41,11 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
       <button type="button" id="wbFullscreen" class="btn btn-sm btn-outline-secondary" title="Fullscreen">
         <i class="bi bi-arrows-fullscreen"></i>
       </button>
-      <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#wbCustomize">
-        <i class="bi bi-sliders me-1"></i>Customize
+      <button type="button" id="wbAddWidget" class="btn btn-sm btn-outline-primary d-none" data-bs-toggle="modal" data-bs-target="#wbCustomize">
+        <i class="bi bi-plus-lg me-1"></i>Add widget
+      </button>
+      <button type="button" id="wbEditToggle" class="btn btn-sm btn-primary">
+        <i class="bi bi-grid-1x2 me-1"></i>Customize
       </button>
     </div>
   </div>
@@ -86,8 +89,9 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
   </div>
 
   <!-- Widget grid -->
-  <div class="text-muted small mb-2" id="wbDragHint">
-    <i class="bi bi-grip-vertical"></i> Tip: hover a widget and drag the handle to rearrange your board — your layout is saved automatically.
+  <div class="alert alert-primary d-flex align-items-center gap-2 py-2 px-3 mb-3 d-none" id="wbDragHint">
+    <i class="bi bi-arrows-move"></i>
+    <span class="small">Customising — drag any widget to move it; the others slide out of the way. Use <i class="bi bi-x-circle"></i> to remove one, <strong>Add widget</strong> to add more. Your layout saves automatically — click <strong>Done</strong> when finished.</span>
   </div>
   <div id="wbGrid" class="row g-3"></div>
   <div id="wbEmpty" class="text-center text-muted py-5 d-none">
@@ -101,16 +105,16 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title"><i class="bi bi-sliders me-2"></i>Customize wallboard</h5>
+        <h5 class="modal-title"><i class="bi bi-grid-1x2 me-2"></i>Add or remove widgets</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <p class="text-muted small">Choose which widgets to show. Drag the <i class="bi bi-grip-vertical"></i> handle to reorder; enabled widgets appear in this order.</p>
+        <p class="text-muted small">Switch widgets on or off. Then drag them around the board to arrange them — just close this and grab any widget.</p>
         <ul id="wbWidgetList" class="list-group"></ul>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" id="wbSaveConfig" class="btn btn-primary" data-bs-dismiss="modal">Save layout</button>
+        <button type="button" id="wbSaveConfig" class="btn btn-primary" data-bs-dismiss="modal">Apply</button>
       </div>
     </div>
   </div>
@@ -125,25 +129,48 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
   .wb-list { max-height: 320px; overflow-y: auto; }
   .wb-chart-wrap { position: relative; height: 240px; }
   .wb-fs .wb-kpi-value { font-size: 3rem; }
-  #wbWidgetList .wb-grip { cursor: grab; color: var(--bs-secondary-color); }
   #wbWidgetList li.dragging { opacity: .5; }
 
-  /* On-board drag-and-drop reordering */
-  .wb-col { transition: transform .12s ease; }
-  .wb-drag-handle {
-    position: absolute; top: 6px; right: 6px; z-index: 4;
-    border: 0; background: transparent; padding: 2px 5px; line-height: 1;
-    color: var(--bs-secondary-color); cursor: grab; border-radius: 4px;
-    opacity: 0; transition: opacity .12s, background .12s;
+  /* --- Customise (edit) mode: rearrange widgets like phone home-screen icons ---
+     Pointer-driven drag with FLIP animation handled in JS; CSS provides the
+     "edit mode" affordances: a gentle jiggle, a remove badge, and lift-on-drag. */
+  .wb-remove {
+    position: absolute; top: -9px; left: -9px; z-index: 6;
+    width: 24px; height: 24px; padding: 0; border: 2px solid var(--bs-body-bg);
+    border-radius: 50%; background: var(--bs-danger); color: #fff;
+    display: none; align-items: center; justify-content: center;
+    font-size: .8rem; line-height: 1; cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0,0,0,.3);
   }
-  .wb-card:hover .wb-drag-handle { opacity: .55; }
-  .wb-drag-handle:hover { opacity: 1; background: var(--bs-secondary-bg); }
-  .wb-drag-handle:active { cursor: grabbing; }
-  .wb-col-dragging { opacity: .45; }
-  .wb-col-dragging .wb-card { outline: 2px dashed var(--ld-primary, #0d6efd); outline-offset: 2px; }
-  .wb-reordering .wb-card { cursor: grabbing; }
-  /* Touch screens can't fire HTML5 drag — keep the handle visible there. */
-  @media (hover: none) { .wb-drag-handle { opacity: .55; } }
+  .wb-remove:hover { filter: brightness(1.1); }
+  .wb-edit .wb-remove { display: flex; }
+
+  /* In edit mode the whole card is the drag grip; inner links/charts go inert
+     so a grab never navigates or interacts. */
+  .wb-edit .wb-col { touch-action: none; }
+  .wb-edit .wb-card { cursor: grab; user-select: none; }
+  .wb-edit .wb-card a,
+  .wb-edit .wb-card canvas,
+  .wb-edit .wb-card .wb-list { pointer-events: none; }
+
+  @keyframes wbJiggle {
+    0%, 100% { transform: rotate(-.55deg); }
+    50%      { transform: rotate(.55deg); }
+  }
+  /* Jiggle the inner card so it never fights the FLIP transform on .wb-col. */
+  .wb-edit .wb-col:not(.wb-dragging) .wb-card { animation: wbJiggle .35s ease-in-out infinite; }
+  .wb-edit .wb-col:nth-child(even):not(.wb-dragging) .wb-card { animation-delay: -.18s; }
+
+  .wb-col.wb-dragging { position: relative; z-index: 1000; }
+  .wb-col.wb-dragging .wb-card {
+    cursor: grabbing; animation: none;
+    box-shadow: 0 14px 34px rgba(0,0,0,.28);
+    outline: 2px solid var(--ld-primary, #0d6efd); outline-offset: 1px;
+  }
+  body.wb-grabbing, body.wb-grabbing * { cursor: grabbing !important; }
+  @media (prefers-reduced-motion: reduce) {
+    .wb-edit .wb-col .wb-card { animation: none !important; }
+  }
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
@@ -204,11 +231,12 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
       const meta = CATALOG[id];
       const col = document.createElement('div');
       col.className = sizeClass(meta.size) + ' wb-col';
-      const handle = '<button type="button" class="wb-drag-handle" title="Drag to rearrange" aria-label="Drag widget to rearrange"><i class="bi bi-grip-vertical"></i></button>';
+      // Remove badge — only visible in edit mode (CSS-gated by .wb-edit).
+      const remove = '<button type="button" class="wb-remove" title="Remove widget" aria-label="Remove widget"><i class="bi bi-x-lg"></i></button>';
       let inner = '';
       if (meta.kind === 'kpi') {
         inner =
-          '<div class="card wb-card border-0 shadow-sm">' + handle +
+          '<div class="card wb-card border-0 shadow-sm">' + remove +
             '<div class="card-body">' +
               '<div class="text-muted wb-kpi-sub mb-1">' + esc(meta.title) + '</div>' +
               '<div class="wb-kpi-value" data-slot="value">–</div>' +
@@ -217,14 +245,14 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
           '</div>';
       } else if (meta.kind === 'chart') {
         inner =
-          '<div class="card wb-card border-0 shadow-sm">' + handle +
+          '<div class="card wb-card border-0 shadow-sm">' + remove +
             '<div class="card-header bg-transparent text-muted">' + esc(meta.title) + '</div>' +
             '<div class="card-body"><div class="wb-chart-wrap"><canvas></canvas></div>' +
               '<div class="text-muted small text-center mt-2 d-none" data-slot="empty">No data</div></div>' +
           '</div>';
       } else { // list
         inner =
-          '<div class="card wb-card border-0 shadow-sm">' + handle +
+          '<div class="card wb-card border-0 shadow-sm">' + remove +
             '<div class="card-header bg-transparent text-muted">' + esc(meta.title) + '</div>' +
             '<div class="card-body p-0"><div class="wb-list" data-slot="list">' +
               '<div class="text-muted small p-3">Loading…</div></div></div>' +
@@ -232,24 +260,27 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
       }
       col.innerHTML = inner;
       col.dataset.widget = id;
-      // Drag starts only from the grip handle (so list links / charts stay
-      // clickable); the handle flips the column draggable on mousedown.
-      col.draggable = false;
-      const grip = col.querySelector('.wb-drag-handle');
-      grip.addEventListener('mousedown', () => { col.draggable = true; });
-      grip.addEventListener('touchstart', () => { col.draggable = true; }, { passive: true });
       grid.appendChild(col);
     });
   }
 
-  /* ---- drag-and-drop reordering on the board --------------------------
-     Native HTML5 DnD: the dragged column is live-moved among its siblings
-     as you hover, so the others shift out of the way and snap into place.
-     The new order is persisted to this agent's saved config on drop. */
-  let dragEl = null;
+  /* ---- edit mode + pointer-drag reordering (phone home-screen style) -----
+     In edit mode every widget jiggles and can be grabbed anywhere. Dragging
+     uses Pointer Events (mouse + touch + pen) so we control the motion: the
+     dragged card floats under the cursor while the others reflow around the
+     gap and animate into place with a FLIP transition. New order persists. */
+  let editMode = false;
+  let drag     = null;   // { el, offX, offY, pointerId, lastX, lastY, scrollDir }
+  let scrollRAF = null;
 
+  function persistOrder() {
+    config.widgets = [...grid.querySelectorAll('.wb-col')].map(c => c.dataset.widget);
+    saveConfig();
+  }
+
+  // Which sibling should the dragged card sit before? null => append at end.
   function afterElement(x, y) {
-    const els = [...grid.querySelectorAll('.wb-col:not(.wb-col-dragging)')];
+    const els = [...grid.querySelectorAll('.wb-col:not(.wb-dragging)')];
     let best = null, bestDist = Infinity, insertAfter = false;
     for (const el of els) {
       const b = el.getBoundingClientRect();
@@ -261,41 +292,138 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
     return insertAfter ? best.nextElementSibling : best;
   }
 
-  function persistOrder() {
-    config.widgets = [...grid.querySelectorAll('.wb-col')].map(c => c.dataset.widget);
-    saveConfig();
+  // FLIP: snapshot positions, then animate every (non-dragged) card from its
+  // old box to its new one so the reflow looks like things sliding aside.
+  function flipRecord() {
+    const m = new Map();
+    grid.querySelectorAll('.wb-col').forEach(el => m.set(el, el.getBoundingClientRect()));
+    return m;
+  }
+  function flipPlay(prev) {
+    grid.querySelectorAll('.wb-col').forEach(el => {
+      if (drag && el === drag.el) return;       // dragged card tracks the pointer
+      const p = prev.get(el); if (!p) return;
+      const n = el.getBoundingClientRect();
+      const dx = p.left - n.left, dy = p.top - n.top;
+      if (!dx && !dy) return;
+      el.style.transition = 'none';
+      el.style.transform  = 'translate(' + dx + 'px,' + dy + 'px)';
+      el.getBoundingClientRect();               // force reflow so the next frame animates
+      requestAnimationFrame(() => {
+        el.style.transition = 'transform .22s cubic-bezier(.2,.7,.3,1)';
+        el.style.transform  = '';
+      });
+    });
+  }
+
+  // Keep the dragged card's top-left pinned under the cursor regardless of its
+  // current position in the flow (recomputed from the untransformed box).
+  function positionDragged(x, y) {
+    const el = drag.el;
+    el.style.transition = 'none';
+    el.style.transform  = 'none';
+    const r = el.getBoundingClientRect();
+    const tx = (x - drag.offX) - r.left;
+    const ty = (y - drag.offY) - r.top;
+    el.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(1.04)';
+    drag.lastX = x; drag.lastY = y;
+  }
+
+  function reorderTo(x, y) {
+    const ref = afterElement(x, y);
+    if (ref === drag.el) return;
+    if (ref && drag.el.nextElementSibling === ref) return;           // already there
+    if (ref === null && grid.lastElementChild === drag.el) return;   // already last
+    const prev = flipRecord();
+    if (ref === null) grid.appendChild(drag.el);
+    else grid.insertBefore(drag.el, ref);
+    flipPlay(prev);
+    positionDragged(x, y);   // re-pin: the dragged card's base position just changed
+  }
+
+  // Auto-scroll when dragging near the top/bottom edge (boards can be tall).
+  function edgeAutoScroll(y) {
+    const margin = 64;
+    drag.scrollDir = y < margin ? -1 : (y > window.innerHeight - margin ? 1 : 0);
+    if (!drag.scrollDir || scrollRAF) return;
+    const scroller = root.classList.contains('wb-fs') ? root : document.scrollingElement;
+    const step = () => {
+      if (!drag || !drag.scrollDir) { scrollRAF = null; return; }
+      scroller.scrollTop += drag.scrollDir * 12;
+      positionDragged(drag.lastX, drag.lastY);
+      reorderTo(drag.lastX, drag.lastY);
+      scrollRAF = requestAnimationFrame(step);
+    };
+    scrollRAF = requestAnimationFrame(step);
+  }
+
+  function onPointerDown(e) {
+    if (!editMode || drag) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (e.target.closest('.wb-remove')) return;        // let the remove click through
+    const el = e.target.closest('.wb-col');
+    if (!el) return;
+    e.preventDefault();
+    const r = el.getBoundingClientRect();
+    drag = { el, offX: e.clientX - r.left, offY: e.clientY - r.top, pointerId: e.pointerId, lastX: e.clientX, lastY: e.clientY, scrollDir: 0 };
+    el.classList.add('wb-dragging');
+    document.body.classList.add('wb-grabbing');
+    try { el.setPointerCapture(e.pointerId); } catch (_) {}
+    positionDragged(e.clientX, e.clientY);
+  }
+  function onPointerMove(e) {
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    positionDragged(e.clientX, e.clientY);
+    reorderTo(e.clientX, e.clientY);
+    edgeAutoScroll(e.clientY);
+  }
+  function endDrag(e) {
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    const el = drag.el;
+    try { el.releasePointerCapture(e.pointerId); } catch (_) {}
+    el.classList.remove('wb-dragging');
+    el.style.transition = 'transform .18s cubic-bezier(.2,.7,.3,1)';
+    el.style.transform  = 'none';                       // settle into the open slot
+    const clear = () => { el.style.transition = ''; el.style.transform = ''; el.removeEventListener('transitionend', clear); };
+    el.addEventListener('transitionend', clear);
+    setTimeout(clear, 240);
+    document.body.classList.remove('wb-grabbing');
+    drag = null;
+    if (scrollRAF) { cancelAnimationFrame(scrollRAF); scrollRAF = null; }
+    persistOrder();
   }
 
   function attachGridDnD() {
-    grid.addEventListener('dragstart', (e) => {
-      const col = e.target.closest('.wb-col');
-      if (!col) return;
-      dragEl = col;
-      col.classList.add('wb-col-dragging');
-      grid.classList.add('wb-reordering');
-      if (e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', col.dataset.widget); } catch (_) {} }
+    grid.addEventListener('pointerdown', onPointerDown);
+    grid.addEventListener('pointermove', onPointerMove);
+    grid.addEventListener('pointerup', endDrag);
+    grid.addEventListener('pointercancel', endDrag);
+    // Remove a widget (× badge) — animate the gap closing.
+    grid.addEventListener('click', (e) => {
+      const btn = e.target.closest('.wb-remove');
+      if (!btn || !editMode) return;
+      const col = btn.closest('.wb-col');
+      const id  = col.dataset.widget;
+      if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+      const prev = flipRecord();
+      col.remove();
+      flipPlay(prev);
+      config.widgets = (config.widgets || []).filter(w => w !== id);
+      empty.classList.toggle('d-none', config.widgets.filter(x => CATALOG[x]).length > 0);
+      saveConfig();
     });
-    grid.addEventListener('dragover', (e) => {
-      if (!dragEl) return;
-      e.preventDefault();
-      if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
-      const ref = afterElement(e.clientX, e.clientY);
-      if (ref === dragEl) return;
-      if (ref === null) {
-        if (grid.lastElementChild !== dragEl) grid.appendChild(dragEl);
-      } else {
-        grid.insertBefore(dragEl, ref);
-      }
-    });
-    grid.addEventListener('drop', (e) => { if (dragEl) e.preventDefault(); });
-    grid.addEventListener('dragend', () => {
-      if (!dragEl) return;
-      dragEl.classList.remove('wb-col-dragging');
-      dragEl.draggable = false;
-      grid.classList.remove('wb-reordering');
-      dragEl = null;
-      persistOrder();
-    });
+  }
+
+  function setEditMode(on) {
+    editMode = on;
+    root.classList.toggle('wb-edit', on);
+    document.getElementById('wbAddWidget').classList.toggle('d-none', !on);
+    document.getElementById('wbDragHint').classList.toggle('d-none', !on);
+    const btn = document.getElementById('wbEditToggle');
+    btn.innerHTML = on ? '<i class="bi bi-check-lg me-1"></i>Done' : '<i class="bi bi-grid-1x2 me-1"></i>Customize';
+    btn.classList.toggle('btn-primary', !on);
+    btn.classList.toggle('btn-success', on);
+    if (!on) persistOrder();
   }
 
   /* ---- renderers -------------------------------------------------- */
@@ -460,31 +588,14 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
       const meta = CATALOG[id];
       const li = document.createElement('li');
       li.className = 'list-group-item d-flex align-items-center gap-2';
-      li.draggable = true;
       li.dataset.widget = id;
       li.innerHTML =
-        '<i class="bi bi-grip-vertical wb-grip"></i>' +
         '<div class="form-check form-switch flex-grow-1 mb-0">' +
           '<input class="form-check-input" type="checkbox" id="wbw_' + id + '" ' + (enabled.includes(id) ? 'checked' : '') + '>' +
           '<label class="form-check-label" for="wbw_' + id + '">' + esc(meta.title) +
             ' <span class="badge text-bg-light border ms-1">' + esc(meta.group) + '</span></label>' +
         '</div>';
       list.appendChild(li);
-    });
-
-    // drag-to-reorder
-    let dragEl = null;
-    list.querySelectorAll('li').forEach(li => {
-      li.addEventListener('dragstart', () => { dragEl = li; li.classList.add('dragging'); });
-      li.addEventListener('dragend', () => { li.classList.remove('dragging'); dragEl = null; });
-      li.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        const after = [...list.querySelectorAll('li:not(.dragging)')].find(el => {
-          const r = el.getBoundingClientRect();
-          return e.clientY < r.top + r.height / 2;
-        });
-        if (after) list.insertBefore(dragEl, after); else list.appendChild(dragEl);
-      });
     });
   }
 
@@ -538,6 +649,8 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
   });
 
   document.getElementById('wbRefresh').addEventListener('click', refresh);
+
+  document.getElementById('wbEditToggle').addEventListener('click', () => setEditMode(!editMode));
 
   document.getElementById('wbFullscreen').addEventListener('click', () => {
     if (!document.fullscreenElement) {

@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.125.0 &mdash; 2026-06-26
+
+### Changed
+- **Wallboard: rearrange widgets like phone home-screen icons.** Clicking **Customize** now puts the board into a customise mode (the widgets gently wobble) instead of opening a panel. In that mode you grab any widget *anywhere* — not a small handle — and drag it; the other widgets smoothly slide out of the way and the one you're holding drops into the new slot, with a FLIP animation so nothing jumps. Each widget shows a red **×** badge to remove it, and an **Add widget** button opens the full widget list to switch more on. Click **Done** to finish — every change still saves to your account automatically. Drag now uses Pointer Events, so it works by **touch** as well as mouse (the old grip-handle drag only worked with a mouse). The board auto-scrolls when you drag near the top or bottom edge. The help doc (**Agent Help → Live Wallboard**) was updated to match.
+
 ## 2.124.1 &mdash; 2026-06-26
 
 ### Fixed
