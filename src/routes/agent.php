@@ -143,10 +143,14 @@ $router->get('/agent/wallboard', function () {
     // customise panel and the grid stay honest.
     if (!slaEnabled()) {
         $catalog = array_filter($catalog, static fn(array $m) => empty($m['sla']));
-        $config['widgets'] = array_values(array_filter(
-            $config['widgets'],
-            static fn(string $id) => isset($catalog[$id])
-        ));
+        $keep = static fn(string $id) => isset($catalog[$id]);
+        $config['widgets'] = array_values(array_filter($config['widgets'], $keep));
+        if (isset($config['columns']) && is_array($config['columns'])) {
+            $config['columns'] = array_map(
+                static fn($col) => array_values(array_filter((array) $col, $keep)),
+                $config['columns']
+            );
+        }
     }
 
     render('agent/wallboard', [

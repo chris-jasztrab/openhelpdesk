@@ -52,7 +52,8 @@ $breadcrumbs  = [['label'=>'Help','url'=>'/agent/help'],['label'=>'Live Wallboar
 <h5 class="fw-semibold mb-3"><i class="bi bi-grid-1x2 text-primary me-2"></i>Customising your widgets</h5>
 <p class="text-muted mb-2"><strong>Click <i class="bi bi-grid-1x2"></i> Customize</strong> (top-right) to enter customise mode. The widgets start to wobble &mdash; like rearranging app icons on a phone &mdash; and you can:</p>
 <ul class="text-muted mb-2">
-    <li><strong>Move a widget</strong> &mdash; grab it <em>anywhere</em> and drag. The other widgets slide out of the way and the one you're holding drops into the new spot. Put the lists, charts or numbers you care about most right at the top. Works with a mouse or by touch.</li>
+    <li><strong>Choose the number of columns</strong> &mdash; pick 2, 3 or 4 from the <i class="bi bi-layout-three-columns"></i> selector in the toolbar. Each column is <strong>independent</strong>: a tall widget in one column never pushes the widgets in the next column down, so you can stack three short cards beside one tall chart and the heights don't fight. On small screens the columns stack into one.</li>
+    <li><strong>Move a widget</strong> &mdash; grab it <em>anywhere</em> and drag it within a column or across to another. The other widgets slide out of the way and the one you're holding drops into the new spot. Works with a mouse or by touch.</li>
     <li><strong>Resize a widget</strong> &mdash; drag the grip on a widget's <em>bottom edge</em> up or down to set its height. Make the number cards short, give a chart or list more room &mdash; each widget remembers its own height. Charts redraw to fill the new size.</li>
     <li><strong>Remove a widget</strong> &mdash; click the red <i class="bi bi-x-circle text-danger"></i> badge on its corner.</li>
     <li><strong>Add widgets</strong> &mdash; click <strong>Add widget</strong> to open the list of every available widget and switch on the ones you want.</li>

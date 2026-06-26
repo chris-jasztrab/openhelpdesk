@@ -11,6 +11,14 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.127.0 &mdash; 2026-06-26
+
+### Added
+- **Wallboard: independent columns.** The board is now a set of vertical columns (choose 2, 3 or 4 from the new selector in customise mode) that each flow on their own. A tall widget in one column no longer pushes the widgets beside it down — so you can stack three short number cards in the left column next to a single tall chart in the right, or any mix you like, and the heights never fight across columns. Drag widgets within a column or across to another; drop into an empty column to start filling it. Columns collapse into a single stack on narrow screens. Layout (which column, what order) is saved per user.
+
+### Changed
+- **Wallboard widgets are now one-per-column width** rather than the old variable Bootstrap spans. Every widget fills the width of the column it's in; use more columns for a denser board, fewer for wider widgets. (Combined with per-widget heights from 2.126.0, you now control both dimensions.)
+
 ## 2.126.0 &mdash; 2026-06-26
 
 ### Added

@@ -41,6 +41,14 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
       <button type="button" id="wbFullscreen" class="btn btn-sm btn-outline-secondary" title="Fullscreen">
         <i class="bi bi-arrows-fullscreen"></i>
       </button>
+      <div class="input-group input-group-sm d-none" id="wbColumnsCtl" style="width:auto;">
+        <label class="input-group-text" for="wbColumns" title="Number of columns"><i class="bi bi-layout-three-columns"></i></label>
+        <select id="wbColumns" class="form-select form-select-sm" style="width:auto;" title="Number of columns">
+          <option value="2">2 cols</option>
+          <option value="3">3 cols</option>
+          <option value="4">4 cols</option>
+        </select>
+      </div>
       <button type="button" id="wbAddWidget" class="btn btn-sm btn-outline-primary d-none" data-bs-toggle="modal" data-bs-target="#wbCustomize">
         <i class="bi bi-plus-lg me-1"></i>Add widget
       </button>
@@ -91,9 +99,9 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
   <!-- Widget grid -->
   <div class="alert alert-primary d-flex align-items-center gap-2 py-2 px-3 mb-3 d-none" id="wbDragHint">
     <i class="bi bi-arrows-move"></i>
-    <span class="small">Customising — drag a widget to move it; drag its bottom edge to resize its height. Use <i class="bi bi-x-circle"></i> to remove one, <strong>Add widget</strong> to add more. Your layout saves automatically — click <strong>Done</strong> when finished.</span>
+    <span class="small">Customising — drag a widget to move it between the independent columns; drag its bottom edge to resize its height. Set the number of columns at the top. Use <i class="bi bi-x-circle"></i> to remove one, <strong>Add widget</strong> to add more. Your layout saves automatically — click <strong>Done</strong> when finished.</span>
   </div>
-  <div id="wbGrid" class="row g-3"></div>
+  <div id="wbGrid"></div>
   <div id="wbEmpty" class="text-center text-muted py-5 d-none">
     <i class="bi bi-grid-3x3-gap fs-1 d-block mb-2"></i>
     No widgets selected. Click <strong>Customize</strong> to add some.
@@ -123,11 +131,20 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
 <style>
   #wallboard.wb-fs { background: var(--bs-body-bg); padding: 1rem; overflow-y: auto; }
 
+  /* Independent columns: the board is a row of vertical stacks. Each column
+     flows on its own, so a tall widget in one column never pushes widgets in
+     the next column down — the row breaks in one column don't cross to others.
+     Collapses to a single stack on narrow screens. */
+  #wbGrid { display: flex; align-items: flex-start; gap: 1rem; }
+  .wb-column { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 1rem; }
+  .wb-col { width: 100%; }
+  @media (max-width: 767.98px) { #wbGrid { flex-direction: column; } }
+  .wb-edit .wb-column { min-height: 90px; border-radius: 10px; outline: 2px dashed transparent; outline-offset: 4px; transition: outline-color .12s; }
+  .wb-edit .wb-column:empty { outline-color: var(--bs-border-color); }
+
   /* Each widget's height is explicit (set per card from its saved/default
-     height) rather than stretched to the tallest card in its row. The card is
-     a flex column so its inner content (chart canvas, scrolling list) fills
-     whatever height the card is given, and resizing the card resizes them. */
-  #wbGrid { align-items: flex-start; }
+     height). The card is a flex column so its inner content (chart canvas,
+     scrolling list) fills the height it's given, and resizing it resizes them. */
   .wb-card { height: 100%; position: relative; display: flex; flex-direction: column; }
   .wb-card .card-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
   .wb-card .card-header { flex: 0 0 auto; font-size: .8rem; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; padding-right: 1.75rem; }
@@ -221,22 +238,40 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
   }
   const DEFAULT_H = { kpi: 120, chart: 300, list: 260 };
   const MIN_H = 90, MAX_H = 900;
+  const MIN_COLS = 2, MAX_COLS = 4;
   const widgetHeight = (id) => {
     const h = config.heights[id];
     return (typeof h === 'number' && h > 0) ? h : (DEFAULT_H[(CATALOG[id] || {}).kind] || 220);
   };
 
+  // Independent-column layout. The server normalises columns to match the
+  // enabled widgets, but guard here too (legacy configs, hand-edited data).
+  const clampCols = (n) => Math.max(MIN_COLS, Math.min(MAX_COLS, n | 0));
+  function normalizeLayout() {
+    config.columnCount = clampCols(config.columnCount || 2);
+    const enabled = (config.widgets || []).filter(id => CATALOG[id]);
+    let cols = Array.isArray(config.columns) ? config.columns.map(c => Array.isArray(c) ? c.slice() : []) : [];
+    // Trim/grow to columnCount (overflow merges into the last column).
+    while (cols.length > config.columnCount) cols[config.columnCount - 1].push(...cols.pop());
+    while (cols.length < config.columnCount) cols.push([]);
+    // Keep only enabled, de-duplicated ids.
+    const seen = new Set();
+    cols = cols.map(c => c.filter(id => CATALOG[id] && enabled.includes(id) && !seen.has(id) && seen.add(id)));
+    // Append any enabled widget not yet placed to the shortest column.
+    enabled.forEach(id => {
+      if (seen.has(id)) return;
+      seen.add(id);
+      shortestColumn(cols).push(id);
+    });
+    config.columns = cols;
+  }
+  const shortestColumn = (cols) => cols.reduce((a, c) => c.length < a.length ? c : a, cols[0]);
+  // Keep config.widgets in sync as the flat enabled set (used by the poll/modal).
+  const syncWidgets = () => { config.widgets = config.columns.flat(); };
+
   /* ---- helpers ---------------------------------------------------- */
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-
-  const sizeClass = (n) => ({
-    3: 'col-12 col-sm-6 col-xl-3',
-    4: 'col-12 col-md-6 col-xl-4',
-    6: 'col-12 col-lg-6',
-    8: 'col-12 col-xl-8',
-    12: 'col-12',
-  }[n] || 'col-12 col-md-6 col-xl-4');
 
   const toneColor = (tone) => ({
     danger: 'var(--bs-danger)', warning: 'var(--bs-warning-text-emphasis, #997404)',
@@ -256,50 +291,57 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
   }
 
   /* ---- grid construction ----------------------------------------- */
+  function buildCard(id) {
+    const meta = CATALOG[id];
+    const col = document.createElement('div');
+    col.className = 'wb-col';
+    col.style.height = widgetHeight(id) + 'px';
+    col.dataset.widget = id;
+    // Remove badge + bottom resize grip — only visible in edit mode (CSS-gated).
+    const remove = '<button type="button" class="wb-remove" title="Remove widget" aria-label="Remove widget"><i class="bi bi-x-lg"></i></button>';
+    const resize = '<div class="wb-resize" title="Drag to resize" aria-label="Drag to resize widget"></div>';
+    if (meta.kind === 'kpi') {
+      col.innerHTML =
+        '<div class="card wb-card border-0 shadow-sm">' + remove +
+          '<div class="card-body">' +
+            '<div class="text-muted wb-kpi-sub mb-1">' + esc(meta.title) + '</div>' +
+            '<div class="wb-kpi-value" data-slot="value">–</div>' +
+            '<div class="text-muted wb-kpi-sub" data-slot="sub"></div>' +
+          '</div>' + resize +
+        '</div>';
+    } else if (meta.kind === 'chart') {
+      col.innerHTML =
+        '<div class="card wb-card border-0 shadow-sm">' + remove +
+          '<div class="card-header bg-transparent text-muted">' + esc(meta.title) + '</div>' +
+          '<div class="card-body"><div class="wb-chart-wrap"><canvas></canvas></div>' +
+            '<div class="text-muted small text-center mt-2 d-none" data-slot="empty">No data</div></div>' + resize +
+        '</div>';
+    } else { // list
+      col.innerHTML =
+        '<div class="card wb-card border-0 shadow-sm">' + remove +
+          '<div class="card-header bg-transparent text-muted">' + esc(meta.title) + '</div>' +
+          '<div class="card-body p-0"><div class="wb-list" data-slot="list">' +
+            '<div class="text-muted small p-3">Loading…</div></div></div>' + resize +
+        '</div>';
+    }
+    return col;
+  }
+
   function buildGrid() {
     Object.values(charts).forEach(c => c.destroy());
     for (const k in charts) delete charts[k];
+    normalizeLayout();
     grid.innerHTML = '';
 
-    const widgets = (config.widgets || []).filter(id => CATALOG[id]);
-    empty.classList.toggle('d-none', widgets.length > 0);
+    const total = config.columns.flat().filter(id => CATALOG[id]).length;
+    empty.classList.toggle('d-none', total > 0);
 
-    widgets.forEach(id => {
-      const meta = CATALOG[id];
-      const col = document.createElement('div');
-      col.className = sizeClass(meta.size) + ' wb-col';
-      col.style.height = widgetHeight(id) + 'px';
-      // Remove badge + bottom resize grip — only visible in edit mode (CSS-gated).
-      const remove = '<button type="button" class="wb-remove" title="Remove widget" aria-label="Remove widget"><i class="bi bi-x-lg"></i></button>';
-      const resize = '<div class="wb-resize" title="Drag to resize" aria-label="Drag to resize widget"></div>';
-      let inner = '';
-      if (meta.kind === 'kpi') {
-        inner =
-          '<div class="card wb-card border-0 shadow-sm">' + remove +
-            '<div class="card-body">' +
-              '<div class="text-muted wb-kpi-sub mb-1">' + esc(meta.title) + '</div>' +
-              '<div class="wb-kpi-value" data-slot="value">–</div>' +
-              '<div class="text-muted wb-kpi-sub" data-slot="sub"></div>' +
-            '</div>' + resize +
-          '</div>';
-      } else if (meta.kind === 'chart') {
-        inner =
-          '<div class="card wb-card border-0 shadow-sm">' + remove +
-            '<div class="card-header bg-transparent text-muted">' + esc(meta.title) + '</div>' +
-            '<div class="card-body"><div class="wb-chart-wrap"><canvas></canvas></div>' +
-              '<div class="text-muted small text-center mt-2 d-none" data-slot="empty">No data</div></div>' + resize +
-          '</div>';
-      } else { // list
-        inner =
-          '<div class="card wb-card border-0 shadow-sm">' + remove +
-            '<div class="card-header bg-transparent text-muted">' + esc(meta.title) + '</div>' +
-            '<div class="card-body p-0"><div class="wb-list" data-slot="list">' +
-              '<div class="text-muted small p-3">Loading…</div></div></div>' + resize +
-          '</div>';
-      }
-      col.innerHTML = inner;
-      col.dataset.widget = id;
-      grid.appendChild(col);
+    config.columns.forEach((ids, ci) => {
+      const colEl = document.createElement('div');
+      colEl.className = 'wb-column';
+      colEl.dataset.col = ci;
+      ids.forEach(id => { if (CATALOG[id]) colEl.appendChild(buildCard(id)); });
+      grid.appendChild(colEl);
     });
   }
 
@@ -313,8 +355,11 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
   let resizing = null;   // { el, id, startY, startH, curH, pointerId }
   let scrollRAF = null;
 
-  function persistOrder() {
-    config.widgets = [...grid.querySelectorAll('.wb-col')].map(c => c.dataset.widget);
+  // Read the live column layout back out of the DOM and persist it.
+  function persistLayout() {
+    config.columns = [...grid.querySelectorAll('.wb-column')].map(colEl =>
+      [...colEl.querySelectorAll('.wb-col')].map(c => c.dataset.widget));
+    syncWidgets();
     saveConfig();
   }
 
@@ -330,25 +375,40 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
           After each hop the pointer sits over the dragged card's own footprint
           (which is excluded), so there's a natural dead zone and a held,
           shaking hand can't oscillate. */
-  let slotCache = [];
+  let slotCache = [];   // non-dragged widget boxes (doc coords)
+  let colCache  = [];   // column-container boxes (doc coords)
 
   function boxOf(el) {
     const r = el.getBoundingClientRect();
     return { el, left: r.left + window.scrollX, right: r.right + window.scrollX,
                  top:  r.top  + window.scrollY, bottom: r.bottom + window.scrollY };
   }
+  function rebuildColCache() {
+    colCache = [...grid.querySelectorAll('.wb-column')].map(boxOf);
+  }
   function rebuildSlotCache() {
     slotCache = [...grid.querySelectorAll('.wb-col:not(.wb-dragging)')].map(boxOf);
+    rebuildColCache();
   }
 
-  // The non-dragged card whose box contains the pointer, or null (over the
-  // dragged card's own slot, or in a gutter — either way, don't move).
+  // The non-dragged card whose box contains the pointer, or null.
   function slotUnder(docX, docY) {
     for (const s of slotCache) {
       if (docX >= s.left && docX <= s.right && docY >= s.top && docY <= s.bottom) return s.el;
     }
     return null;
   }
+  // The column container under the pointer's X (nearest by centre if between).
+  function columnUnderX(docX) {
+    let best = null, bestDist = Infinity;
+    for (const c of colCache) {
+      if (docX >= c.left && docX <= c.right) return c.el;
+      const cx = (c.left + c.right) / 2, d = Math.abs(docX - cx);
+      if (d < bestDist) { bestDist = d; best = c.el; }
+    }
+    return best;
+  }
+  const cachedBox = (el) => slotCache.find(s => s.el === el);
 
   // Snap any in-flight FLIP animation to its resting position so the next
   // measurement reads true layout, not an animated frame.
@@ -381,6 +441,7 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
         el.style.transform  = '';
       });
     });
+    rebuildColCache();   // column boxes can change height when a card moves in/out
   }
 
   // Keep the dragged card's top-left pinned under the cursor regardless of its
@@ -396,23 +457,59 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
     drag.lastX = x; drag.lastY = y;
   }
 
+  // Move the dragged card into a (column, position) computed from the pointer
+  // against the settled-layout cache. Within a column we "hop past" the card
+  // the pointer is inside; entering another column we insert before/after by
+  // its midpoint; below a column's last card we append. When the pointer is
+  // over the dragged card's own footprint (or a gutter) nothing moves — that
+  // dead zone is what stops a held, shaking hand from oscillating.
   function reorderTo(x, y) {
-    const over = slotUnder(x + window.scrollX, y + window.scrollY);
-    if (!over) return;                                   // dead zone — no move
-    const kids = [...grid.children];
-    const di = kids.indexOf(drag.el), oi = kids.indexOf(over);
-    if (di < 0 || oi < 0) return;
-    // Hop the dragged card just past the card the pointer is inside.
-    const ref = oi < di ? over : over.nextElementSibling;
+    const docX = x + window.scrollX, docY = y + window.scrollY;
+
+    // The dragged card is excluded from the cache, so when the pointer is over
+    // its own slot slotUnder() returns null and nothing moves — that's the
+    // dead zone that prevents oscillation. (Checking the dragged element's own
+    // live box would be wrong: it floats under the cursor, so the pointer is
+    // always "inside" it.)
+    let targetCol, ref;
+    const over = slotUnder(docX, docY);
+    if (over) {
+      targetCol = over.parentElement;
+      if (over.parentElement === drag.el.parentElement) {
+        // same column: hop just past the hovered card
+        const kids = [...targetCol.children];
+        ref = kids.indexOf(over) < kids.indexOf(drag.el) ? over : over.nextElementSibling;
+      } else {
+        // entering another column: before/after the hovered card by its midpoint
+        const b = cachedBox(over) || boxOf(over);
+        ref = docY < (b.top + b.bottom) / 2 ? over : over.nextElementSibling;
+      }
+    } else {
+      // not over any card — decide by column, then top / bottom / ignore
+      targetCol = columnUnderX(docX);
+      if (!targetCol) return;
+      const cards = [...targetCol.querySelectorAll('.wb-col')].filter(c => c !== drag.el);
+      if (!cards.length) { ref = null; }                                   // empty column → place
+      else {
+        const firstTop = (cachedBox(cards[0]) || boxOf(cards[0])).top;
+        const lastBot  = (cachedBox(cards[cards.length - 1]) || boxOf(cards[cards.length - 1])).bottom;
+        if (docY <= firstTop)      ref = cards[0];                          // above the column → top
+        else if (docY >= lastBot)  ref = null;                             // below the column → append
+        else return;                                                       // in a gutter → ignore
+      }
+    }
+
+    // No-op guards (already in that exact spot).
     if (ref === drag.el) return;
-    if (ref && drag.el.nextElementSibling === ref) return;
-    if (ref === null && grid.lastElementChild === drag.el) return;
+    if (ref && ref.parentElement === targetCol && drag.el.parentElement === targetCol && drag.el.nextElementSibling === ref) return;
+    if (ref === null && targetCol.lastElementChild === drag.el) return;
+
     finalizeAnims();                  // clear transforms so boxes read true
     const prev = new Map();           // FLIP "first" (resting boxes)
     grid.querySelectorAll('.wb-col').forEach(el => { if (el !== drag.el) prev.set(el, el.getBoundingClientRect()); });
-    if (ref === null) grid.appendChild(drag.el);
-    else grid.insertBefore(drag.el, ref);
-    flipPlayAndCache(prev);           // animate + refresh the slot cache
+    if (ref) targetCol.insertBefore(drag.el, ref);
+    else targetCol.appendChild(drag.el);
+    flipPlayAndCache(prev);           // animate + refresh the caches
     positionDragged(x, y);            // re-pin: the dragged card's base position just changed
   }
 
@@ -501,7 +598,7 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
     document.body.classList.remove('wb-grabbing');
     drag = null;
     if (scrollRAF) { cancelAnimationFrame(scrollRAF); scrollRAF = null; }
-    persistOrder();
+    persistLayout();
   }
 
   function attachGridDnD() {
@@ -533,9 +630,8 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
           el.style.transform  = '';
         });
       });
-      config.widgets = (config.widgets || []).filter(w => w !== id);
+      persistLayout();   // re-reads columns from the DOM (the card is now gone)
       empty.classList.toggle('d-none', config.widgets.filter(x => CATALOG[x]).length > 0);
-      saveConfig();
     });
   }
 
@@ -548,7 +644,8 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
     btn.innerHTML = on ? '<i class="bi bi-check-lg me-1"></i>Done' : '<i class="bi bi-grid-1x2 me-1"></i>Customize';
     btn.classList.toggle('btn-primary', !on);
     btn.classList.toggle('btn-success', on);
-    if (!on) persistOrder();
+    document.getElementById('wbColumnsCtl').classList.toggle('d-none', !on);
+    if (!on) persistLayout();
   }
 
   /* ---- renderers -------------------------------------------------- */
@@ -733,7 +830,23 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
       const cb = li.querySelector('input[type=checkbox]');
       if (cb && cb.checked) chosen.push(li.dataset.widget);
     });
-    config.widgets = chosen;
+    // Reconcile the column layout with the new enabled set: drop unchecked
+    // widgets, keep the rest in place, add newly-checked ones to the shortest
+    // column. Existing positions and per-column order are preserved.
+    const chosenSet = new Set(chosen);
+    config.columns = (config.columns || []).map(col => col.filter(id => chosenSet.has(id)));
+    const present = new Set(config.columns.flat());
+    chosen.forEach(id => { if (!present.has(id)) shortestColumn(config.columns).push(id); });
+    syncWidgets();
+    saveConfig();
+    buildGrid();
+    refresh();
+  });
+
+  document.getElementById('wbColumns').addEventListener('change', (e) => {
+    config.columnCount = clampCols(parseInt(e.target.value, 10) || 2);
+    normalizeLayout();   // merge overflow / pad, keeping placements
+    syncWidgets();
     saveConfig();
     buildGrid();
     refresh();
@@ -793,6 +906,9 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
   document.addEventListener('visibilitychange', () => { if (!document.hidden && !paused) refresh(); });
 
   /* ---- boot ------------------------------------------------------- */
+  normalizeLayout();
+  syncWidgets();
+  document.getElementById('wbColumns').value = String(config.columnCount);
   attachGridDnD();
   buildGrid();
   refresh();

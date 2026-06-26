@@ -69,16 +69,71 @@ class Dashboard
             }
         }
         return [
-            'widgets'  => $widgets,
-            'filters'  => ['location_id' => 0, 'group_id' => 0, 'type_id' => 0, 'priority_id' => 0, 'range' => 30],
-            'interval' => 30,
-            'heights'  => [],   // widgetId => pixel height override (defaults applied client-side per kind)
+            'widgets'     => $widgets,
+            'filters'     => ['location_id' => 0, 'group_id' => 0, 'type_id' => 0, 'priority_id' => 0, 'range' => 30],
+            'interval'    => 30,
+            'heights'     => [],   // widgetId => pixel height override (defaults applied client-side per kind)
+            'columnCount' => self::DEFAULT_COLUMNS,
+            'columns'     => self::normalizeColumns(null, $widgets, self::DEFAULT_COLUMNS),
         ];
     }
 
     /** Allowed range for a custom widget height, in pixels. */
     private const MIN_WIDGET_HEIGHT = 90;
     private const MAX_WIDGET_HEIGHT = 900;
+
+    /** Column-count bounds for the independent-column layout. */
+    private const MIN_COLUMNS = 1;   // collapses to a single stack on narrow screens anyway
+    private const MAX_COLUMNS = 4;
+    private const DEFAULT_COLUMNS = 2;
+
+    /**
+     * Distribute the enabled widgets into exactly $count columns.
+     *
+     * Honours an incoming layout ($rawCols) where given, keeping each widget in
+     * its column and original order; overflow columns merge into the last kept
+     * one and short layouts are padded. Any enabled widget not present in the
+     * incoming layout (new widget, or legacy config with no columns at all) is
+     * appended to the shortest column so the result is always complete and
+     * deduplicated.
+     *
+     * @param mixed    $rawCols  array-of-arrays from the client, or null
+     * @param string[] $widgets  the enabled widget ids (source of truth for membership)
+     */
+    private static function normalizeColumns($rawCols, array $widgets, int $count): array
+    {
+        $count = max(self::MIN_COLUMNS, min(self::MAX_COLUMNS, $count));
+        $cols = array_fill(0, $count, []);
+        $placed = [];
+
+        if (is_array($rawCols)) {
+            $ci = 0;
+            foreach ($rawCols as $col) {
+                if (!is_array($col)) { continue; }
+                $target = min($ci, $count - 1);   // overflow merges into the last column
+                foreach ($col as $w) {
+                    if (is_string($w) && in_array($w, $widgets, true) && !in_array($w, $placed, true)) {
+                        $cols[$target][] = $w;
+                        $placed[] = $w;
+                    }
+                }
+                $ci++;
+            }
+        }
+
+        // Place any still-unplaced enabled widget into the shortest column.
+        foreach ($widgets as $w) {
+            if (in_array($w, $placed, true)) { continue; }
+            $shortest = 0;
+            for ($i = 1; $i < $count; $i++) {
+                if (count($cols[$i]) < count($cols[$shortest])) { $shortest = $i; }
+            }
+            $cols[$shortest][] = $w;
+            $placed[] = $w;
+        }
+
+        return $cols;
+    }
 
     /** Read a user's saved config, validated and merged over the defaults. */
     public static function userConfig(int $userId): array
@@ -143,7 +198,17 @@ class Dashboard
             }
         }
 
-        return ['widgets' => $widgets, 'filters' => $filters, 'interval' => $interval, 'heights' => $heights];
+        $columnCount = max(self::MIN_COLUMNS, min(self::MAX_COLUMNS, (int) ($in['columnCount'] ?? self::DEFAULT_COLUMNS)));
+        $columns = self::normalizeColumns($in['columns'] ?? null, $widgets, $columnCount);
+
+        return [
+            'widgets'     => $widgets,
+            'filters'     => $filters,
+            'interval'    => $interval,
+            'heights'     => $heights,
+            'columnCount' => $columnCount,
+            'columns'     => $columns,
+        ];
     }
 
     /**
