@@ -60,6 +60,9 @@ $breadcrumbs  = [['label' => 'Admin', 'url' => '/admin'], ['label' => 'Docs']];
         ['url' => '/admin/docs/sso',             'icon' => 'bi-shield-lock',     'color' => '#0369a1', 'bg' => '#f0f9ff',
          'title' => 'Single Sign-On',
          'desc'  => 'Microsoft 365 SSO setup, Azure app registration, location prompt, and troubleshooting.'],
+        ['url' => '/admin/docs/teams',           'icon' => 'bi-microsoft-teams', 'color' => '#4338ca', 'bg' => '#eef2ff',
+         'title' => 'Microsoft Teams',
+         'desc'  => 'Post ticket events to Teams channels, choose which events, and route ticket types to different channels.'],
     ];
     foreach ($cards as $card): ?>
     <div class="col-md-6 col-xl-4">

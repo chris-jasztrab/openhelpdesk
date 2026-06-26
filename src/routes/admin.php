@@ -591,7 +591,7 @@ $router->post('/admin/onboarding/dismiss', function () {
 
 $validDocPages = [
     'getting-started', 'tickets', 'users', 'email',
-    'sla', 'automations', 'flows', 'ai', 'branding', 'portal', 'csat', 'import', 'kb', 'sso',
+    'sla', 'automations', 'flows', 'ai', 'branding', 'portal', 'csat', 'import', 'kb', 'sso', 'teams',
 ];
 
 $router->get('/admin/docs', function () {
@@ -625,6 +625,7 @@ $router->get('/admin/docs/{page}', function (array $p) use ($validDocPages) {
         'import'          => 'Importing Tickets',
         'kb'              => 'Knowledge Base',
         'sso'             => 'Single Sign-On',
+        'teams'           => 'Microsoft Teams',
     ];
     render('admin/docs/' . $page, [
         'sidebarItems' => adminSidebar('docs'),
@@ -10874,6 +10875,7 @@ $router->post('/admin/settings/organization', function () {
 
 $router->get('/admin/settings/teams', function () {
     Auth::requireAdmin();
+    $db = Database::connect();
     $settings = [
         'teams_enabled'        => getSetting('teams_enabled', '0'),
         'teams_webhook_url'    => getSetting('teams_webhook_url', ''),
@@ -10882,7 +10884,14 @@ $router->get('/admin/settings/teams', function () {
         'teams_event_status'   => getSetting('teams_event_status', '1'),
         'teams_event_sla'      => getSetting('teams_event_sla', '1'),
     ];
-    render('admin/settings/teams', compact('settings'));
+    // Per-type channel overrides: each type can route to its own channel,
+    // falling back to the default webhook above.
+    $types = $db->query("SELECT id, name FROM ticket_types ORDER BY sort_order, name")->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($types as &$t) {
+        $t['webhook'] = getSetting('teams_webhook_type:' . (int) $t['id'], '');
+    }
+    unset($t);
+    render('admin/settings/teams', compact('settings', 'types'));
 });
 
 $router->post('/admin/settings/teams', function () {
@@ -10892,16 +10901,37 @@ $router->post('/admin/settings/teams', function () {
         redirect('/admin/settings/teams');
     }
 
+    $db = Database::connect();
     $url = trim($_POST['teams_webhook_url'] ?? '');
     $enabled = isset($_POST['teams_enabled']) ? '1' : '0';
 
-    if ($url !== '' && (!filter_var($url, FILTER_VALIDATE_URL) || stripos($url, 'https://') !== 0)) {
-        flash('error', 'Webhook URL must be a valid https:// URL.');
+    $isValidHook = static fn (string $u): bool =>
+        filter_var($u, FILTER_VALIDATE_URL) !== false && stripos($u, 'https://') === 0;
+
+    if ($url !== '' && !$isValidHook($url)) {
+        flash('error', 'The default webhook URL must be a valid https:// URL.');
         redirect('/admin/settings/teams');
         return;
     }
-    if ($enabled === '1' && $url === '') {
-        flash('error', 'A webhook URL is required to enable Teams notifications.');
+
+    // Validate every per-type override before saving anything.
+    $validTypeIds = array_map('intval', $db->query("SELECT id FROM ticket_types")->fetchAll(PDO::FETCH_COLUMN));
+    $typeUrlsRaw  = is_array($_POST['teams_webhook_type'] ?? null) ? $_POST['teams_webhook_type'] : [];
+    $typeUrls = [];
+    foreach ($validTypeIds as $tid) {
+        $u = trim((string) ($typeUrlsRaw[$tid] ?? ''));
+        if ($u !== '' && !$isValidHook($u)) {
+            flash('error', 'Each per-type channel URL must be a valid https:// URL.');
+            redirect('/admin/settings/teams');
+            return;
+        }
+        $typeUrls[$tid] = $u;
+    }
+
+    // Enabling needs at least one channel to send to — the default or any override.
+    $hasAnyChannel = $url !== '' || array_filter($typeUrls) !== [];
+    if ($enabled === '1' && !$hasAnyChannel) {
+        flash('error', 'Set the default webhook URL (or at least one per-type channel) before enabling Teams notifications.');
         redirect('/admin/settings/teams');
         return;
     }
@@ -10913,6 +10943,9 @@ $router->post('/admin/settings/teams', function () {
 
     setSetting('teams_enabled', $enabled);
     setSetting('teams_webhook_url', $url);
+    foreach ($typeUrls as $tid => $u) {
+        setSetting('teams_webhook_type:' . $tid, $u);
+    }
     setSetting('teams_event_created',  isset($_POST['teams_event_created'])  ? '1' : '0');
     setSetting('teams_event_assigned', isset($_POST['teams_event_assigned']) ? '1' : '0');
     setSetting('teams_event_status',   isset($_POST['teams_event_status'])   ? '1' : '0');

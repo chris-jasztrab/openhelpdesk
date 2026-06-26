@@ -15,6 +15,7 @@ $docsNav = [
     ['url' => '/admin/docs/import',            'label' => 'Importing Tickets',     'icon' => 'bi-cloud-upload'],
     ['url' => '/admin/docs/kb',                'label' => 'Knowledge Base',        'icon' => 'bi-book'],
     ['url' => '/admin/docs/sso',               'label' => 'Single Sign-On',        'icon' => 'bi-shield-lock'],
+    ['url' => '/admin/docs/teams',             'label' => 'Microsoft Teams',       'icon' => 'bi-microsoft-teams'],
 ];
 $cp = currentPath();
 ?>

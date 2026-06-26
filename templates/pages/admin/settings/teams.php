@@ -35,19 +35,65 @@ $breadcrumbs  = [
             </div>
 
             <div class="mb-4">
-                <label for="teams_webhook_url" class="form-label fw-semibold">Webhook URL</label>
+                <label for="teams_webhook_url" class="form-label fw-semibold">Default channel webhook</label>
                 <div class="input-group">
                     <span class="input-group-text"><i class="bi bi-link-45deg"></i></span>
-                    <input type="url" class="form-control" id="teams_webhook_url" name="teams_webhook_url"
+                    <input type="url" class="form-control teams-hook" id="teams_webhook_url" name="teams_webhook_url"
                            placeholder="https://prod-00.westus.logic.azure.com:443/workflows/..."
                            value="<?= e($settings['teams_webhook_url']) ?>">
-                    <button type="button" class="btn btn-outline-secondary" id="teams_test">
-                        <i class="bi bi-send me-1"></i>Send test message
+                    <button type="button" class="btn btn-outline-secondary teams-test" data-target="teams_webhook_url">
+                        <i class="bi bi-send me-1"></i>Test
                     </button>
                 </div>
-                <div id="teams_test_result" class="form-text mt-2"></div>
-                <div class="form-text">The channel webhook URL — see the setup steps below. Stored securely; only admins can view this page.</div>
+                <div class="teams-test-result form-text mt-2" data-for="teams_webhook_url"></div>
+                <div class="form-text">
+                    Tickets are posted here <strong>unless</strong> their type has its own channel below.
+                    Leave blank to only notify the types you route explicitly. See the setup steps at the bottom.
+                </div>
             </div>
+
+            <hr class="my-4">
+
+            <h6 class="fw-semibold mb-1">Route by ticket type <span class="text-muted fw-normal small">(optional)</span></h6>
+            <p class="text-muted small mb-3">
+                Give a ticket type its own channel webhook to send <em>that type's</em> notifications to a different
+                Teams channel — e.g. IT tickets to the IT channel, Lifelong Learning tickets to theirs. Any type left
+                blank uses the default channel above.
+            </p>
+            <?php if (empty($types)): ?>
+                <p class="text-muted small fst-italic">No ticket types defined yet.</p>
+            <?php else: ?>
+            <div class="table-responsive mb-2">
+                <table class="table table-sm align-middle">
+                    <thead>
+                        <tr class="text-muted small">
+                            <th style="width:180px;">Ticket type</th>
+                            <th>Channel webhook URL</th>
+                            <th style="width:80px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($types as $t): $fid = 'teams_type_' . (int) $t['id']; ?>
+                        <tr>
+                            <td><span class="badge text-bg-light border"><i class="bi bi-tag me-1"></i><?= e($t['name']) ?></span></td>
+                            <td>
+                                <input type="url" class="form-control form-control-sm teams-hook" id="<?= e($fid) ?>"
+                                       name="teams_webhook_type[<?= (int) $t['id'] ?>]"
+                                       placeholder="Uses the default channel"
+                                       value="<?= e($t['webhook']) ?>">
+                                <div class="teams-test-result form-text" data-for="<?= e($fid) ?>"></div>
+                            </td>
+                            <td class="text-end">
+                                <button type="button" class="btn btn-sm btn-outline-secondary teams-test" data-target="<?= e($fid) ?>">
+                                    <i class="bi bi-send"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php endif; ?>
 
             <hr class="my-4">
 
@@ -98,29 +144,35 @@ $breadcrumbs  = [
 
 <script>
 (function () {
-    const btn = document.getElementById('teams_test');
-    const out = document.getElementById('teams_test_result');
-    const urlInput = document.getElementById('teams_webhook_url');
     const token = document.querySelector('meta[name="csrf-token"]').content;
 
-    btn.addEventListener('click', function () {
-        const url = urlInput.value.trim();
-        if (!url) { out.innerHTML = '<span class="text-danger">Enter a webhook URL first.</span>'; return; }
-        btn.disabled = true;
-        out.innerHTML = '<span class="text-muted">Sending…</span>';
-        fetch('/admin/settings/teams/test', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token },
-            body: JSON.stringify({ webhook_url: url }),
-        })
-        .then(r => r.json())
-        .then(res => {
-            out.innerHTML = res.ok
-                ? '<span class="text-success"><i class="bi bi-check-circle me-1"></i>Test message sent — check the channel.</span>'
-                : '<span class="text-danger"><i class="bi bi-x-circle me-1"></i>' + (res.error || 'Failed to send.') + '</span>';
-        })
-        .catch(() => { out.innerHTML = '<span class="text-danger">Request failed.</span>'; })
-        .finally(() => { btn.disabled = false; });
+    function resultEl(targetId) {
+        return document.querySelector('.teams-test-result[data-for="' + targetId + '"]');
+    }
+
+    document.querySelectorAll('.teams-test').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const targetId = btn.dataset.target;
+            const input = document.getElementById(targetId);
+            const out = resultEl(targetId);
+            const url = (input.value || '').trim();
+            if (!url) { out.innerHTML = '<span class="text-danger">Enter a webhook URL first.</span>'; return; }
+            btn.disabled = true;
+            out.innerHTML = '<span class="text-muted">Sending…</span>';
+            fetch('/admin/settings/teams/test', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token },
+                body: JSON.stringify({ webhook_url: url }),
+            })
+            .then(r => r.json())
+            .then(res => {
+                out.innerHTML = res.ok
+                    ? '<span class="text-success"><i class="bi bi-check-circle me-1"></i>Test message sent — check the channel.</span>'
+                    : '<span class="text-danger"><i class="bi bi-x-circle me-1"></i>' + (res.error || 'Failed to send.') + '</span>';
+            })
+            .catch(() => { out.innerHTML = '<span class="text-danger">Request failed.</span>'; })
+            .finally(() => { btn.disabled = false; });
+        });
     });
 })();
 </script>

@@ -33,11 +33,30 @@ class Teams
         'sla'      => ['teams_event_sla',      '⏰ SLA breached'],
     ];
 
-    /** Master switch: enabled and a webhook URL is set. */
+    /**
+     * Master switch. A specific channel still has to resolve to a non-empty
+     * webhook at send time (per-type override or the default), so enabling with
+     * no URLs configured simply posts nothing rather than erroring.
+     */
     public static function enabled(): bool
     {
-        return getSetting('teams_enabled', '0') === '1'
-            && trim(getSetting('teams_webhook_url', '')) !== '';
+        return getSetting('teams_enabled', '0') === '1';
+    }
+
+    /**
+     * Resolve the channel webhook for a ticket type: the type's own override if
+     * set, otherwise the default channel. Returns '' when neither is configured
+     * (that type's events are then silently skipped).
+     */
+    public static function webhookForType(?int $typeId): string
+    {
+        if ($typeId !== null && $typeId > 0) {
+            $override = trim(getSetting('teams_webhook_type:' . $typeId, ''));
+            if ($override !== '') {
+                return $override;
+            }
+        }
+        return trim(getSetting('teams_webhook_url', ''));
     }
 
     /** Whether a specific event is enabled (defaults on). */
@@ -63,10 +82,16 @@ class Teams
             if (!self::enabled() || !self::eventEnabled($event) || !isset(self::EVENTS[$event])) {
                 return;
             }
-            $card = self::buildTicketCard($db, $ticketId, $event, $extra);
-            if ($card !== null) {
-                self::post($card);
+            $built = self::buildTicketCard($db, $ticketId, $event, $extra);
+            if ($built === null) {
+                return;
             }
+            [$card, $typeId] = $built;
+            $url = self::webhookForType($typeId);
+            if ($url === '') {
+                return; // no channel for this ticket's type and no default — nothing to do
+            }
+            self::post($card, $url);
         } catch (\Throwable $e) {
             error_log('Teams notify failed: ' . $e->getMessage());
         }
@@ -125,11 +150,15 @@ class Teams
 
     /* ─────────────────────────────────────────────────────────────────── */
 
-    /** Build the Adaptive Card for a ticket event, or null if the ticket is gone. */
+    /**
+     * Build the Adaptive Card for a ticket event.
+     * Returns [cardPayload, typeId|null], or null if the ticket is gone.
+     * The type id is returned so the caller can route to that type's channel.
+     */
     private static function buildTicketCard(PDO $db, int $ticketId, string $event, array $extra): ?array
     {
         $stmt = $db->prepare(
-            "SELECT t.id, t.subject, t.status, t.created_at,
+            "SELECT t.id, t.subject, t.status, t.created_at, t.type_id,
                     COALESCE(ts.label, t.status)          AS status_label,
                     tp.name                                AS priority,
                     tt.name                                AS type,
@@ -185,7 +214,9 @@ class Teams
             ['type' => 'FactSet', 'facts' => $facts],
         ];
 
-        return self::wrap($title, $body, self::ticketUrl($ticketId));
+        $card   = self::wrap($title, $body, self::ticketUrl($ticketId));
+        $typeId = $r['type_id'] !== null ? (int) $r['type_id'] : null;
+        return [$card, $typeId];
     }
 
     private static function statusLabel(PDO $db, string $slug): string

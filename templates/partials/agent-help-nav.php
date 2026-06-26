@@ -2,6 +2,7 @@
 $agentHelpNav = [
     ['url' => '/agent/help',                  'label' => 'Overview',             'icon' => 'bi-house'],
     ['url' => '/agent/help/dashboard',        'label' => 'Dashboard',            'icon' => 'bi-speedometer2'],
+    ['url' => '/agent/help/wallboard',        'label' => 'Live Wallboard',       'icon' => 'bi-display'],
     ['url' => '/agent/help/ticket-list',      'label' => 'Ticket List & Filters','icon' => 'bi-list-ul'],
     ['url' => '/agent/help/kanban',           'label' => 'Kanban Board',         'icon' => 'bi-kanban'],
     ['url' => '/agent/help/working-tickets',  'label' => 'Working on Tickets',   'icon' => 'bi-ticket-detailed'],

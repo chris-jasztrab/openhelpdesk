@@ -11,6 +11,16 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.123.0 &mdash; 2026-06-26
+
+### Added
+- **Teams: route different ticket types to different channels.** The Microsoft Teams integration can now send each ticket type to its own channel — e.g. IT tickets to the IT channel and Lifelong Learning tickets to theirs. On **Settings → Integrations → Microsoft Teams** there's now a *Route by ticket type* table: paste a per-type channel webhook (each with its own Test button) for any type you want to split out, and leave the rest to fall back to the **Default channel webhook**. Resolution per ticket: the type's own webhook if set → otherwise the default → otherwise nothing is posted (no error). The default may be left blank to notify only the types you explicitly route. Event toggles (created / assigned / status / SLA) apply across all channels; routing only changes *where* a notification lands.
+
+### Documentation
+- **Help docs for the two new features.** Added **Agent Help → Live Wallboard** (real-time refresh & controls, filters, customising widgets, the widget catalogue, what data you see, and wall-screen use) and **Admin Docs → Microsoft Teams** (what gets posted, creating a Workflows channel webhook, connecting it, choosing events, per-type channel routing, testing, and troubleshooting). Both are wired into their help navigation, landing-page cards, and the help search index.
+
+---
+
 ## 2.122.0 &mdash; 2026-06-26
 
 ### Added
