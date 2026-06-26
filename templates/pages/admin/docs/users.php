@@ -117,6 +117,18 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-box-arrow-up-right text-primary me-2"></i>External Contacts</h5>
+<p class="text-muted mb-2">When an agent <a href="/agent/help/working-tickets#forwarding">forwards a ticket</a> to an email address that isn't already a user, OpenHelpDesk auto-provisions a lightweight <strong>external contact</strong> account so the person's email replies can thread back onto the ticket.</p>
+<ul class="text-muted mb-0">
+    <li>These accounts show an <span class="badge bg-secondary">External</span> badge in the <a href="/admin/users">user list</a>.</li>
+    <li>An <strong>"External contacts only"</strong> filter lists just them, so they're easy to find and review.</li>
+    <li>They exist only to attribute inbound forwarded-reply mail — they aren't staff and can't sign in to the agent interface.</li>
+</ul>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-pencil text-primary me-2"></i>Editing Users</h5>
 <p class="text-muted mb-2">From <a href="/admin/users"><strong>Admin → Settings → Users &amp; Access → Users</strong></a>, click on any user to edit their details:</p>
 <ul class="text-muted mb-0">
@@ -488,8 +500,15 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
     <li>Ticket references in the detail column are clickable and open the ticket.</li>
 </ul>
 
+<h6 class="fw-semibold mt-3 mb-2">Exporting to Excel</h6>
+<p class="text-muted mb-2">The <strong>Export to Excel</strong> button downloads the matching entries as a UTF-8 CSV that opens directly in Excel. The export <strong>honours whatever filters are active</strong> — actor, action, source, and date range — so the file matches what's on screen, and it's <strong>unpaged</strong> (every matching row, not just the current page of 50).</p>
+<p class="text-muted mb-0">Columns: <em>When, Source, Actor, Action, Target Type, Target ID, Detail, IP Address</em>. The export action itself is recorded in the audit trail.</p>
+
 <h6 class="fw-semibold mt-3 mb-2">Pruning old entries</h6>
-<p class="text-muted mb-0">The audit log keeps entries forever by default. To trim it, use the red <strong>Prune older entries</strong> button in the page header: pick a cut-off date and confirm, and every entry older than that date is permanently deleted. The prune itself is logged (with the cut-off and the deleted-row count), so the record that pruning happened survives even after the pruned rows are gone.</p>
+<p class="text-muted mb-2">The audit log keeps entries forever by default. To trim it, use the red <strong>Prune older entries</strong> button in the page header: pick a cut-off date and confirm, and every <strong>system audit</strong> entry older than that date is permanently deleted. The prune itself is logged (with the cut-off and the deleted-row count), so the record that pruning happened survives even after the pruned rows are gone.</p>
+<div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
+    Pruning only removes rows from the system audit log. <strong>Ticket-history events (the blue <em>Timeline</em> rows) are intentionally retained</strong> — they belong to each ticket's own timeline — so old ticket-history entries may keep appearing in the list after a prune. That's expected, not a failed prune.
+</div>
 </div>
 </div>
 

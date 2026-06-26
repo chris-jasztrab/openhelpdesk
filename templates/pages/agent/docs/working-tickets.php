@@ -30,9 +30,29 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/agent/help'], ['label' => 'Worki
 <ul class="text-muted mb-3">
     <li><strong>Reply</strong> — sends a public message to the requester. The message appears in their portal view and triggers an email notification (if SMTP is configured).</li>
     <li><strong>Add Note</strong> — adds a private internal note visible only to agents and admins. Notes are never sent to the requester or shown in the portal.</li>
-    <li><strong>Forward</strong> — sends a copy of the ticket details to an external email address.</li>
+    <li><strong>Forward</strong> — sends the full ticket out to one or more other people by email (see <a href="#forwarding">Forwarding a Ticket</a> below).</li>
 </ul>
 <p class="text-muted mb-0">The reply composer uses a rich text editor (CKEditor 5). You can apply bold, italic, bullet lists, numbered lists, and hyperlinks. Attachments can be uploaded directly in the composer.</p>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4" id="forwarding">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-forward text-primary me-2"></i>Forwarding a Ticket</h5>
+<p class="text-muted mb-2"><strong>Forward</strong> sends the ticket's details, the full public conversation, and <strong>all</strong> of its attachments out to one or more email addresses — for example to loop in a vendor or a colleague in another department. You can add an optional note on top and attach extra files in the forward box.</p>
+<ul class="text-muted mb-3">
+    <li><strong>Replies thread back in.</strong> Each recipient is added to the ticket's CC list, so when they reply by email their message lands straight on the ticket timeline. Addresses that aren't already users are auto-provisioned as <strong>external contacts</strong> so their replies can be attributed.</li>
+    <li><strong>External replies are flagged.</strong> When a forwarded outside contact replies, their timeline entry carries an <span class="badge bg-secondary">External</span> badge, so you can tell at a glance it came from a third party rather than the requester or a colleague.</li>
+</ul>
+<p class="text-muted mb-2">Forwarding is split into <strong>two permissions</strong>, and which one applies depends on the recipient:</p>
+<ul class="text-muted mb-3">
+    <li><strong>Forward to internal contacts</strong> — addresses that already belong to a real in-system user.</li>
+    <li><strong>Forward to external contacts</strong> — a brand-new address, or a previously auto-provisioned external contact.</li>
+</ul>
+<p class="text-muted mb-2">You'll see the <strong>Forward</strong> button if you hold <em>either</em> permission, and the recipients-field hint adapts to what you're allowed to do. If you try to send to an address you're not permitted to reach, the send is rejected and the disallowed addresses are named so you can remove them.</p>
+<div class="alert alert-warning small mb-0"><i class="bi bi-shield-lock me-2"></i>
+    <strong>Confidential tickets can't be forwarded.</strong> For confidential ticket types the Forward action is disabled — if you need to share something, copy the specific details into a separate email by hand.
+</div>
 </div>
 </div>
 
@@ -99,9 +119,45 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/agent/help'], ['label' => 'Worki
     <li><strong>System Events</strong> — status changes, assignments, priority changes, SLA events, merges, highlighted in your configured system colour. Not visible to portal users.</li>
 </ul>
 <p class="text-muted mb-2">File attachments are shown inline within the entry they were uploaded with. The timeline loads the 10 most recent entries first — click <strong>Load older entries</strong> to see the full history.</p>
+<h6 class="fw-semibold mt-3 mb-2">Sorting the Timeline</h6>
+<p class="text-muted mb-2">Click the <strong>Timeline</strong> heading to flip the order between <strong>newest-first</strong> and <strong>oldest-first</strong>. Your choice is remembered as your default across every ticket and session — and a matching <strong>Ticket Timeline</strong> option on your <a href="/profile">profile page</a> (Newest first / Oldest first) sets the same default. In either direction the entries you read first sit at the top, and the "show older / newer updates" collapser sits at the bottom; the <strong>Go to solution</strong> anchor keeps working both ways.</p>
 <div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
     Admins see two switches in the Timeline header — <strong>System notes</strong> and <strong>AI notes</strong> — to hide automated entries (SLA events, AI classifications, and similar) and keep the focus on the conversation. The choice sticks to the admin's account across tickets. The notes are only hidden from view, never deleted.
 </div>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-broadcast text-primary me-2"></i>Live Updates &amp; Avoiding Collisions</h5>
+<p class="text-muted mb-2">While you have a ticket open, the page keeps itself current without a refresh:</p>
+<ul class="text-muted mb-3">
+    <li><strong>The timeline updates on its own.</strong> Replies, internal notes, status/priority/assignment changes, and inbound emails from other people slot in automatically — with a brief highlight on each new entry — while your in-progress reply draft is left untouched.</li>
+    <li><strong>You can see who else is here.</strong> A coloured pill in the pinned header shows when a colleague has the ticket open: <span class="badge" style="background:#0d6efd;">blue</span> while they're only viewing, <span class="badge" style="background:#b45309;">amber</span> while they're replying. It appears and clears live as people come and go. (Because the header stays pinned just below the navbar as you scroll, this warning never scrolls off-screen.)</li>
+</ul>
+<h6 class="fw-semibold mb-2">Reply-collision warning</h6>
+<p class="text-muted mb-2">If another agent posts a public reply while you're drafting yours, clicking <strong>Send Reply</strong> pauses and shows a warning naming who replied, when, and a short excerpt of what they said. You can:</p>
+<ul class="text-muted mb-3">
+    <li><strong>Review their reply</strong> — opens the up-to-date ticket in a new tab (your draft is safe).</li>
+    <li><strong>Cancel</strong> — go back and adjust your reply.</li>
+    <li><strong>Post anyway</strong> — send your reply as written.</li>
+</ul>
+<div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
+    <strong>Your reply draft is autosaved as you type.</strong> It survives a refresh, an accidental navigation, or going off to read a colliding reply — when you return the reply box reopens with <em>"Restored your unsent draft"</em> and a <strong>Discard</strong> link. The draft is cleared the moment the reply is actually sent. (Only public replies collide — internal notes and forwards never trigger the warning.)
+</div>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-star text-warning me-2"></i>Satisfaction Survey Results</h5>
+<p class="text-muted mb-2">When a requester rates their experience through a CSAT survey, a <strong>Satisfaction Survey</strong> panel appears on the ticket showing:</p>
+<ul class="text-muted mb-2">
+    <li>The <strong>star rating</strong> and the requester's <strong>comment</strong>.</li>
+    <li>The <strong>response time</strong>, and a <span class="badge bg-warning text-dark">Reopened by requester</span> badge if they reopened the ticket from the survey.</li>
+    <li>While a survey is still outstanding, the panel shows an <em>"awaiting response"</em> state instead.</li>
+</ul>
+<p class="text-muted mb-0">An <strong>Open survey</strong> button links to the exact survey that was emailed — the public rating page for built-in surveys, or the third-party form for external ones. When a rating lands it's also written to the timeline as an internal <strong>Satisfaction Rating</strong> entry.</p>
 </div>
 </div>
 

@@ -14,7 +14,7 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/agent/help'], ['label' => 'Ticke
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-layout-text-sidebar text-primary me-2"></i>Choosing a List Layout</h5>
-<p class="text-muted mb-2">The ticket list comes in three layouts. Pick the one you like with the <strong>Table / Compact / Card</strong> view switcher on the ticket-list toolbar; your choice is saved and applies to every ticket list you open. Filtering, sorting, bulk-select checkboxes and the bulk-action bar work the same in all three.</p>
+<p class="text-muted mb-2">The ticket list comes in three layouts. Pick the one you like with the <strong>Table / Compact / Card</strong> view switcher on the far right of the ticket-list toolbar; your choice is saved and applies to every ticket list you open. Filtering, sorting, bulk-select checkboxes and the bulk-action bar work the same in all three. A fourth <strong><i class="bi bi-kanban"></i> Kanban</strong> button in the same switcher opens the drag-and-drop <a href="/agent/help/kanban">board view</a>.</p>
 <div class="table-responsive">
 <table class="table table-sm mb-0">
     <thead class="table-light"><tr><th style="width:120px">Layout</th><th>What it looks like</th></tr></thead>
@@ -26,6 +26,14 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/agent/help'], ['label' => 'Ticke
 </table>
 </div>
 <p class="text-muted small mb-0 mt-2">Confidential tickets stay redacted in every layout.</p>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-eye text-primary me-2"></i>Who&rsquo;s Already in a Ticket</h5>
+<p class="text-muted mb-2">When another staff member currently has a ticket open, that ticket&rsquo;s subject shows in <strong style="color:#b45309;">amber</strong> with a small italic hint underneath &mdash; <em>&ldquo;Opened by Jane Smith&rdquo;</em>, or <em>&ldquo;Being replied to by Jane Smith&rdquo;</em> if they have the reply box open. It&rsquo;s a gentle nudge to avoid two people answering the same ticket at once.</p>
+<p class="text-muted mb-0">The hint is <strong>live</strong>: the list quietly polls every ~10 seconds, so it appears when someone enters a ticket and clears when they leave &mdash; no refresh needed, and it keeps working after you filter, sort or page. It shows in all three layouts (Table, Compact and Card).</p>
 </div>
 </div>
 

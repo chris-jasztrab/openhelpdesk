@@ -89,7 +89,7 @@ function _agentRequireTicketAccess(PDO $db, array $ticket): void
  * AGENT – Help / Documentation
  * ================================================================== */
 
-$validHelpPages = ['dashboard', 'ticket-list', 'working-tickets', 'floor', 'canned-responses'];
+$validHelpPages = ['dashboard', 'ticket-list', 'kanban', 'working-tickets', 'floor', 'canned-responses'];
 
 $router->get('/agent/help', function () {
     Auth::requireStaff();
@@ -110,6 +110,7 @@ $router->get('/agent/help/{page}', function (array $p) use ($validHelpPages) {
     $titles = [
         'dashboard'        => 'Dashboard',
         'ticket-list'      => 'Ticket List & Filters',
+        'kanban'           => 'Kanban Board',
         'working-tickets'  => 'Working on Tickets',
         'floor'            => 'Floor Mode',
         'canned-responses' => 'Canned Responses',

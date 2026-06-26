@@ -11,6 +11,20 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.120.0 &mdash; 2026-06-26
+
+### Documentation
+- **Brought the in-app help in line with the last several weeks of features.** Added a new **Kanban Board** page to the Agent Help section (`/agent/help/kanban`) — built-in status/priority/assignee boards, custom personal-organiser boards, scoped assignee columns, board filters, and the 500-card cap — and wired it into the help nav, the help landing cards, and the help search index. Expanded and corrected the existing help pages to cover features shipped since they were last revised:
+  - **Agent → Working on Tickets** — ticket forwarding (the internal-vs-external permission split, reply capture, the *External* timeline badge, and the confidential-ticket block), live ticket updates (auto-refreshing timeline, the viewing/replying presence pill, the reply-collision warning, and reply-draft autosave), the sortable timeline + per-user default order, and the on-ticket Satisfaction Survey panel.
+  - **Agent → Ticket List & Filters** — the Kanban button in the view switcher and the live "Opened by X / Being replied to by X" hints.
+  - **Admin → SLA Policies** — per-policy *"SLA counts on"* weekday selection, and the new day/hour/minute (`d`/`h`/`m`) duration syntax that now applies to every editable duration field.
+  - **Admin → Email & SMTP** — per-group overrides for the requester-facing email templates.
+  - **Admin → Automations & Escalations** — the *Escalate Button Visibility* setting (always-show vs only-after-SLA-breach) and the now-inline-editable per-type stale thresholds.
+  - **Admin → Users & Agents** — the audit-log *Export to Excel* (CSV) action, a correction to the prune description (ticket-history Timeline rows are retained, not pruned), and a note on auto-provisioned external contacts.
+- **Backfilled a missing changelog entry for 2.88.7** (the open-redirect / AI-classify IDOR / token-revocation / `storage/` guard security release), whose notes had been folded under the 2.88.8 (tests-only) heading.
+
+---
+
 ## 2.119.2 &mdash; 2026-06-25
 
 ### Fixed
@@ -541,6 +555,10 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ### Tests
 - **Restored a trustworthy test suite.** The feature suite was non-deterministically failing dozens of tests (8→170 across runs). Root cause: the `DatabaseSeeder` was idempotent-by-skip, so a leftover `test_admin` fixture whose role had been mutated to `user` by an earlier run persisted and 403'd every admin-route test. The seeder now self-heals fixture users' role/password/name on each run. Also brought several outdated test expectations in line with intended behaviour: `/admin/settings` is an all-staff landing as of v2.66.0 (real gating is on its config sub-pages); migration 046 replaced `idx_tickets_status` with the composite `idx_tickets_status_created`; and the portal create button is a customizable label (assert the create link, not literal text). Full suite now passes (405 tests). No application code changed.
+
+---
+
+## 2.88.7 &mdash; 2026-06-11
 
 ### Security
 - **Open redirect (Low):** the "save columns" routes redirected to a raw `$_POST['_redirect']` value. They now pass it through a new `safeRedirectPath()` helper that only allows same-site relative paths (blocking `//host` and `/\host` protocol-relative escapes).

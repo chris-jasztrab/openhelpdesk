@@ -224,6 +224,22 @@ I've confirmed the fix is deployed and the user has verified it works.
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-people text-primary me-2"></i>Per-Group Email Templates</h5>
+<p class="text-muted mb-2">The four requester-facing emails &mdash; <strong>Ticket Created</strong>, <strong>Ticket Updated</strong>, <strong>Customer Reminder</strong>, and <strong>CSAT Survey</strong> &mdash; can be worded differently per group, so each team can speak in its own voice.</p>
+<p class="text-muted mb-2">On <a href="/admin/settings/email-templates"><strong>Admin → Settings → Email Templates</strong></a>, use the <strong>"Editing for:"</strong> picker to choose a group and give that team its own subject, intro, and button. For example, the IT group's <em>Ticket Created</em> email can quote its SLA targets with <code>{{sla_response}}</code> / <code>{{sla_resolution}}</code> while Facilities keeps the simpler default.</p>
+<ul class="text-muted mb-2">
+    <li><strong>Leave any field blank to inherit.</strong> The resolution order for each field is <strong>group override → global custom value → built-in default</strong>, so you only override the pieces a team actually needs.</li>
+    <li><strong>The footer stays shared</strong> across all groups and all emails.</li>
+    <li><strong>The handling group is read at send time</strong>, so if a ticket is reassigned to another group, its later emails follow whichever group owns it then.</li>
+</ul>
+<div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
+    Overrides are created only when a group is actually customised &mdash; groups with no overrides behave exactly as before, so turning this on changes nothing until you use it.
+</div>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-exclamation-triangle text-warning me-2"></i>Troubleshooting</h5>
 <ul class="text-muted mb-0">
     <li><strong>Test email fails:</strong> Double-check host, port, and credentials. Ensure your firewall allows outbound connections on the SMTP port.</li>

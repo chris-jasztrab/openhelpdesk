@@ -308,6 +308,18 @@ For step-by-step diagrams of every strategy, the master flow that runs on every 
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-eye-slash text-primary me-2"></i>When the Escalate Button Appears</h5>
+<p class="text-muted mb-2">The <strong>Escalate Button Visibility</strong> setting (at the top of <a href="/admin/settings/escalation-paths"><strong>Admin → Settings → Escalation Paths</strong></a>) controls when the button is offered, so you can reserve manual escalation for tickets that have actually fallen behind:</p>
+<ul class="text-muted mb-2">
+    <li><strong>Always show</strong> <span class="badge bg-secondary ms-1">default</span> — the button appears on every ticket that has an escalation path.</li>
+    <li><strong>Only after SLA breach</strong> — the button stays hidden until the ticket's SLA timer has breached.</li>
+</ul>
+<p class="text-muted mb-0">The mode applies to both the agent and the requester (portal) Escalate buttons. If SLA tracking is turned off site-wide, the "breached only" mode falls back to always showing the button, so the action is never hidden permanently. The default is <strong>Always show</strong>, so existing installs are unchanged.</p>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-skip-forward text-primary me-2"></i>Skipping the Current Assignee</h5>
 <p class="text-muted mb-0">If the current assignee already appears in the escalation path (say they <em>are</em> Tier 2), clicking Escalate skips ahead to the step <em>after</em> them rather than re-routing back to an earlier level. This prevents a ticket from looping inside the same tier.</p>
 </div>
@@ -342,11 +354,17 @@ For step-by-step diagrams of every strategy, the master flow that runs on every 
 <h5 class="fw-semibold mb-3"><i class="bi bi-sliders text-primary me-2"></i>Configuration</h5>
 <p class="text-muted mb-2">Settings live at <a href="/admin/settings/stale-tickets"><strong>Admin → Settings → Stale Tickets</strong></a>:</p>
 <ul class="text-muted mb-0">
-    <li><strong>Stale threshold (hours)</strong> — how long a ticket can sit without an update before it counts as stale. Default <code>72</code> (3 days). Set to <code>0</code> to disable the feature globally.</li>
-    <li><strong>Re-notify after (hours)</strong> — minimum gap between repeat stale notifications on the same ticket, so the same nag doesn't fire on every cron run. Default <code>24</code>.</li>
+    <li><strong>Stale threshold</strong> — how long a ticket can sit without an update before it counts as stale. Default <code>3d</code> (72 hours). Set to <code>0</code> to disable the feature globally. Accepts day/hour/minute durations (e.g. <code>3d</code>, <code>72h</code>, <code>1d 12h</code>) — see <a href="/admin/docs/sla#duration-units">Typing Durations</a>.</li>
+    <li><strong>Re-notify after</strong> — minimum gap between repeat stale notifications on the same ticket, so the same nag doesn't fire on every cron run. Default <code>24h</code>. Also accepts day/hour/minute durations.</li>
     <li><strong>Notify the assigned agent</strong> — toggle on/off. When the ticket is unassigned, the email goes to every member of the ticket's group instead.</li>
     <li><strong>Notify the requester</strong> — toggle on/off for the "we haven't forgotten you" email.</li>
-    <li><strong>Per-type override</strong> — each ticket type can override the threshold under <a href="/admin/types">Ticket Types</a>. Leave the override blank to inherit the global value.</li>
+</ul>
+<h6 class="fw-semibold mt-3 mb-2">Per-Type Overrides (editable inline)</h6>
+<p class="text-muted mb-2">The <strong>Per-Type Overrides</strong> table on the same Stale Tickets settings page lets you set a different threshold for each ticket type without leaving for the Ticket Types editor — each type has a threshold field you edit and save right there. Saving records each change in the <a href="/admin/audit-log">audit log</a>.</p>
+<ul class="text-muted mb-0">
+    <li>Leave a type's field <strong>blank</strong> to fall back to the global threshold.</li>
+    <li>Set it to <code>0</code> to <strong>disable</strong> stale detection for that type only.</li>
+    <li>The same day/hour/minute duration formats apply here too.</li>
 </ul>
 </div>
 </div>
