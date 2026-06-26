@@ -9,7 +9,7 @@ $breadcrumbs  = [['label'=>'Help','url'=>'/agent/help'],['label'=>'Live Wallboar
 <div class="col-lg-9">
 
 <h2 class="fw-bold mb-1">Live Wallboard</h2>
-<p class="text-muted mb-4">A real-time operations board you can put on a screen or keep open on your desk. It refreshes on its own, shows only the data you're allowed to see, and you choose which widgets appear and in what order. Open it from <strong><i class="bi bi-display"></i> Wallboard</strong> in the left sidebar, or go to <a href="/agent/wallboard">/agent/wallboard</a>.</p>
+<p class="text-muted mb-4">A real-time operations board you can put on a screen or keep open on your desk. It refreshes on its own, shows only the data you're allowed to see, and you choose which widgets appear, arrange them across independent columns, and size each one. Open it from <strong><i class="bi bi-display"></i> Wallboard</strong> in the left sidebar, or go to <a href="/agent/wallboard">/agent/wallboard</a>.</p>
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
@@ -58,7 +58,7 @@ $breadcrumbs  = [['label'=>'Help','url'=>'/agent/help'],['label'=>'Live Wallboar
     <li><strong>Remove a widget</strong> &mdash; click the red <i class="bi bi-x-circle text-danger"></i> badge on its corner.</li>
     <li><strong>Add widgets</strong> &mdash; click <strong>Add widget</strong> to open the list of every available widget and switch on the ones you want.</li>
 </ul>
-<p class="text-muted mb-0">Click <strong>Done</strong> when you're finished. There's nothing to save manually &mdash; every change is saved as you make it. Your widget selection, order, refresh interval and filters are all stored <strong>to your account</strong>, so they're personal to you and follow you to any device you log in from. Every agent gets a sensible default set the first time they open the board.</p>
+<p class="text-muted mb-0">Click <strong>Done</strong> when you're finished. There's nothing to save manually &mdash; every change is saved as you make it. Your widget selection, column layout and order, each widget's height, the number of columns, refresh interval and filters are all stored <strong>to your account</strong>, so they're personal to you and follow you to any device you log in from. Every agent gets a sensible default set the first time they open the board.</p>
 </div>
 </div>
 

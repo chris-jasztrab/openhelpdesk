@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.127.1 &mdash; 2026-06-26
+
+### Fixed
+- **Wallboard help doc summary wording was stale.** The intro and the "saved to your account" summary still described the old "which widgets and in what order" model and didn't mention the independent columns, per-widget heights, or column count. Reworded so the help (Agent Help → Live Wallboard) accurately lists everything that's saved. (The feature-by-feature instructions were already current.)
+
 ## 2.127.0 &mdash; 2026-06-26
 
 ### Added
