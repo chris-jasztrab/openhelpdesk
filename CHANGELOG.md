@@ -11,6 +11,18 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.121.0 &mdash; 2026-06-26
+
+### Added
+- **Live Wallboard — a real-time, per-user-customisable operations dashboard.** A new **Wallboard** page (`/agent/wallboard`, on the agent and admin sidebars) that auto-refreshes on a poll and is built for a wall-mounted screen as much as a desk. Highlights:
+  - **Real-time** — widgets refresh on a selectable interval (10s / 15s / 30s / 1m / 2m) with a live "updated" indicator; polling pauses automatically when the tab is hidden and catches up on focus, and there's a manual **Pause** / **Refresh now** / **Fullscreen** set.
+  - **Permission-aware** — login required (any staff role), and every metric is scoped through the same ticket-visibility rules used everywhere else (`ticketStaffVisibilitySql`), so a user only ever sees counts for tickets they're allowed to open — confidential and out-of-group tickets never leak, even in an aggregate. Admins see everything.
+  - **Customisable per user** — a **Customize** panel to toggle any of 19 widgets on/off and drag to reorder; choices, filters and refresh interval persist per user. New users get a sensible default set (open / unassigned / SLA breached / created today / resolved today, open-by-status, open-by-priority, created-vs-resolved trend, agent workload, and the unassigned queue).
+  - **Filters** — narrow the whole board by location, group, type, priority, and time range (the range drives the trend / CSAT / first-response widgets). Filters apply *on top of* each user's visibility, so they can only ever narrow, never widen, what's shown.
+  - **Widget catalogue** — KPI cards (open, unassigned, SLA breached / at-risk, due today, created/resolved today, average first response, CSAT, SLA compliance %), breakdown charts (open by status / priority / type / group / location), a created-vs-resolved trend line, and live lists (agent workload, unassigned queue, recently updated). SLA-specific widgets are hidden automatically when SLA tracking is off site-wide.
+
+---
+
 ## 2.120.0 &mdash; 2026-06-26
 
 ### Documentation

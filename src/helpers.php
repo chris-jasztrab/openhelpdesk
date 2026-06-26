@@ -5864,6 +5864,7 @@ function adminSidebar(string $active = ''): array
     return array_map(fn($item) => array_merge($item, ['active' => $item['key'] === $active]), [
         ['icon' => 'bi-speedometer2',    'label' => label('nav.dashboard'),     'url' => '/admin',            'key' => 'dashboard'],
         ['icon' => 'bi-ticket-detailed', 'label' => label('nav.tickets'),       'url' => '/admin/tickets',    'key' => 'tickets'],
+        ['icon' => 'bi-display',         'label' => 'Wallboard',                'url' => '/agent/wallboard',  'key' => 'wallboard'],
         ['icon' => 'bi-sliders',         'label' => label('nav.settings'),      'url' => '/admin/settings',   'key' => 'settings'],
         ['icon' => 'bi-question-circle', 'label' => label('nav.docs'),          'url' => '/admin/docs',       'key' => 'docs'],
     ]);
@@ -5893,6 +5894,7 @@ function staffSidebar(string $active = ''): array
     $items = [
         ['icon' => 'bi-speedometer2',     'label' => label('agent.nav.dashboard'),      'url' => '/agent',                  'key' => 'dashboard'],
         ['icon' => 'bi-ticket-detailed',  'label' => label('agent.nav.tickets'),        'url' => '/agent/tickets',          'key' => 'tickets'],
+        ['icon' => 'bi-display',          'label' => 'Wallboard',                       'url' => '/agent/wallboard',        'key' => 'wallboard'],
         ['icon' => 'bi-grid-1x2',         'label' => 'Floor mode',                      'url' => '/agent/floor',            'key' => 'floor', 'touchOnly' => true],
         ['icon' => 'bi-book',             'label' => label('agent.nav.knowledge_base'), 'url' => '/agent/kb',               'key' => 'kb'],
     ];

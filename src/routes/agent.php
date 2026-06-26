@@ -127,6 +127,39 @@ $router->get('/agent/help/{page}', function (array $p) use ($validHelpPages) {
 });
 
 /* ==================================================================
+ * AGENT – Live Wallboard / Dashboard
+ * ================================================================== */
+
+$router->get('/agent/wallboard', function () {
+    Auth::requireStaff();
+    $db = Database::connect();
+
+    $config  = Dashboard::userConfig((int) Auth::id());
+    $catalog = Dashboard::catalog();
+
+    // SLA-only widgets are meaningless when SLA tracking is off site-wide;
+    // strip them from both the catalog and the user's enabled list so the
+    // customise panel and the grid stay honest.
+    if (!slaEnabled()) {
+        $catalog = array_filter($catalog, static fn(array $m) => empty($m['sla']));
+        $config['widgets'] = array_values(array_filter(
+            $config['widgets'],
+            static fn(string $id) => isset($catalog[$id])
+        ));
+    }
+
+    render('agent/wallboard', [
+        'layout'        => 'app',
+        'pageTitle'     => 'Live Wallboard',
+        'breadcrumbs'   => [['label' => 'Wallboard']],
+        'sidebarItems'  => Auth::isAdmin() ? adminSidebar('wallboard') : agentSidebar('wallboard'),
+        'catalog'       => $catalog,
+        'config'        => $config,
+        'filterOptions' => Dashboard::filterOptions($db),
+    ]);
+});
+
+/* ==================================================================
  * AGENT – Ticket Viewing
  * ================================================================== */
 

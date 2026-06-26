@@ -2996,6 +2996,55 @@ $router->get('/notifications/feed', function () {
     exit;
 });
 
+/* ==================================================================
+ * Live Wallboard / Dashboard (cookie-session API, polled by /agent/wallboard)
+ * ================================================================== */
+
+$router->get('/api/dashboard/metrics', function () {
+    Auth::requireStaff();
+    // Read-only poll (default every 30s). Release the session lock before the
+    // queries so a viewer's overlapping polls don't serialize against the lock.
+    session_write_close();
+
+    $filters = [
+        'location_id' => (int) ($_GET['location_id'] ?? 0),
+        'group_id'    => (int) ($_GET['group_id'] ?? 0),
+        'type_id'     => (int) ($_GET['type_id'] ?? 0),
+        'priority_id' => (int) ($_GET['priority_id'] ?? 0),
+        'range'       => (int) ($_GET['range'] ?? 30),
+    ];
+    $only = array_filter(array_map('trim', explode(',', (string) ($_GET['widgets'] ?? ''))));
+
+    $db = Database::connect();
+    $metrics = Dashboard::metrics($db, (int) Auth::id(), Auth::role(), $filters, $only);
+
+    header('Content-Type: application/json');
+    echo json_encode([
+        'metrics'      => $metrics,
+        'generated_at' => date('c'),
+    ]);
+    exit;
+});
+
+$router->post('/api/dashboard/config', function () {
+    Auth::requireStaff();
+    header('Content-Type: application/json');
+    if (!verifyCsrf($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '')) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Invalid CSRF token']);
+        exit;
+    }
+    $body = json_decode(file_get_contents('php://input'), true);
+    if (!is_array($body)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Invalid payload']);
+        exit;
+    }
+    $saved = Dashboard::saveUserConfig((int) Auth::id(), $body);
+    echo json_encode(['success' => true, 'config' => $saved]);
+    exit;
+});
+
 $router->post('/notifications/{id}/read', function (array $p) {
     Auth::requireAuth();
     $isAjax = ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest';
