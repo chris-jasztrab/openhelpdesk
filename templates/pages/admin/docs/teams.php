@@ -50,7 +50,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <p class="text-muted mb-2">Microsoft has retired the old &ldquo;Office&nbsp;365 connector&rdquo; webhooks in favour of <strong>Workflows</strong> (Power Automate). Creating one takes about a minute and needs no admin approval in most tenants:</p>
 <ol class="text-muted mb-3">
     <li>In Teams, find the channel you want notifications in. Click the <strong>&ctdot;</strong> (more options) next to the channel name &rarr; <strong>Workflows</strong>.</li>
-    <li>Search for and pick the template <strong>&ldquo;Post to a channel when a webhook request is received&rdquo;</strong>.</li>
+    <li>In the search box, type <code>webhook</code> and pick the template <strong>&ldquo;Send webhook alerts to a channel&rdquo;</strong>. <span class="text-muted">(Microsoft renamed this &mdash; it used to be called &ldquo;Post to a channel when a webhook request is received&rdquo;. Avoid the &ldquo;from specific people / from an org&rdquo; and &ldquo;to a chat&rdquo; variants.)</span></li>
     <li>Confirm the team &amp; channel, then click <strong>Add workflow</strong> (or <strong>Create</strong>).</li>
     <li>Teams shows a generated <strong>HTTP POST URL</strong>. Copy it &mdash; that's your webhook.</li>
 </ol>
@@ -100,6 +100,10 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
     Leave the default blank if you only want to notify the specific types you've routed.
     Several types can point at the same channel webhook if you want them grouped together.
     The event switches (created / assigned / status / SLA) apply to <em>all</em> channels &mdash; routing only changes <em>where</em> a notification goes, not <em>which</em> events fire.
+</div>
+<div class="alert alert-warning small mb-0 mt-3">
+    <i class="bi bi-exclamation-triangle me-2"></i><strong>Routing a type does not enable Teams on its own.</strong>
+    The master <strong>Enable Teams notifications</strong> switch at the top of the settings page must be on (and saved) for <em>any</em> card to post &mdash; including per-type ones. The per-row <strong>Test</strong> button works regardless of the master switch, so a passing test but no tickets posting almost always means the master switch is off.
 </div>
 </div>
 </div>

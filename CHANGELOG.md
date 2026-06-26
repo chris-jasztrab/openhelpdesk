@@ -11,6 +11,12 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.124.1 &mdash; 2026-06-26
+
+### Fixed
+- **Teams setup docs pointed at a template Microsoft has renamed.** The Teams settings page and the Teams help doc told admins to pick the workflow template *"Post to a channel when a webhook request is received"* — Microsoft has since renamed it to **"Send webhook alerts to a channel"**, so searching the old name in the Workflows dialog returns no matches. Both spots now reference the current name (and note searching `webhook`, and which lookalike variants to avoid).
+- **Teams help doc now warns that routing a ticket type does not enable Teams on its own.** Added a callout: the master **Enable Teams notifications** switch must be on and saved for any card to post, and the per-row Test button works regardless of that switch — so a passing test with no tickets posting means the master switch is off.
+
 ## 2.124.0 &mdash; 2026-06-26
 
 ### Added

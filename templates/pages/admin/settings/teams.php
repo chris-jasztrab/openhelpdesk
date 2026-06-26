@@ -133,7 +133,7 @@ $breadcrumbs  = [
             </p>
             <ol class="text-muted small mb-0">
                 <li>In Teams, open the channel you want notifications in → <strong>⋯</strong> → <strong>Workflows</strong>.</li>
-                <li>Choose the template <strong>“Post to a channel when a webhook request is received”</strong>.</li>
+                <li>Search for <code>webhook</code> and choose the template <strong>“Send webhook alerts to a channel”</strong> (formerly “Post to a channel when a webhook request is received”).</li>
                 <li>Confirm the team &amp; channel, then <strong>Add workflow</strong>.</li>
                 <li>Copy the generated <strong>HTTP POST URL</strong> and paste it above.</li>
                 <li>Click <strong>Send test message</strong> to confirm it works, then <strong>Save settings</strong>.</li>
