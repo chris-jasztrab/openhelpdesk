@@ -11,6 +11,14 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.128.0 &mdash; 2026-06-26
+
+### Added
+- **Wallboard: every widget is now clickable and drills into its tickets.** Click a number card to open the ticket list filtered to exactly those tickets (open, unassigned, SLA breached/at-risk, due today, created/resolved today, …). Click a single chart slice or bar to drill into just that status / priority / type / group / location — or click elsewhere on the chart for the whole set. In the *Agent workload* list, a row opens that agent's open tickets (the other lists' rows already open the ticket). Whatever filters are set on the board (location, group, type, priority) are carried into the drill-down. Help doc updated with a new "Click any widget to drill in" section.
+
+### Changed
+- **Agent ticket list gained four URL filters** that back the wallboard drill-downs: `created_today=1`, `due_today=1`, `sla=breached|warning`, and `created_within=<days>`. They behave like the existing filters (validated, carried across sort/pagination); unknown values are ignored.
+
 ## 2.127.1 &mdash; 2026-06-26
 
 ### Fixed

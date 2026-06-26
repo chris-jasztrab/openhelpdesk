@@ -373,7 +373,7 @@ class Dashboard
 
             case 'by_status':
                 return ['series' => self::breakdown($db,
-                    "SELECT COALESCE(ts.label, t.status) AS label, COALESCE(ts.color, '#6c757d') AS color, COUNT(*) AS n
+                    "SELECT t.status AS gid, COALESCE(ts.label, t.status) AS label, COALESCE(ts.color, '#6c757d') AS color, COUNT(*) AS n
                        FROM tickets t LEFT JOIN ticket_statuses ts ON ts.slug = t.status
                       WHERE {$where} AND {$openIn}
                       GROUP BY t.status, ts.label, ts.color
@@ -381,7 +381,7 @@ class Dashboard
 
             case 'by_priority':
                 return ['series' => self::breakdown($db,
-                    "SELECT COALESCE(tp.name, 'None') AS label, COALESCE(tp.color, '#6c757d') AS color, COUNT(*) AS n
+                    "SELECT tp.id AS gid, COALESCE(tp.name, 'None') AS label, COALESCE(tp.color, '#6c757d') AS color, COUNT(*) AS n
                        FROM tickets t LEFT JOIN ticket_priorities tp ON tp.id = t.priority_id
                       WHERE {$where} AND {$openIn}
                       GROUP BY tp.id, tp.name, tp.color
@@ -389,7 +389,7 @@ class Dashboard
 
             case 'by_type':
                 return ['series' => self::breakdown($db,
-                    "SELECT COALESCE(tt.name, 'Untyped') AS label, COALESCE(tt.color, '#6c757d') AS color, COUNT(*) AS n
+                    "SELECT tt.id AS gid, COALESCE(tt.name, 'Untyped') AS label, COALESCE(tt.color, '#6c757d') AS color, COUNT(*) AS n
                        FROM tickets t LEFT JOIN ticket_types tt ON tt.id = t.type_id
                       WHERE {$where} AND {$openIn}
                       GROUP BY tt.id, tt.name, tt.color
@@ -397,7 +397,7 @@ class Dashboard
 
             case 'by_group':
                 return ['series' => self::breakdown($db,
-                    "SELECT COALESCE(g.name, 'No group') AS label, '#0d6efd' AS color, COUNT(*) AS n
+                    "SELECT g.id AS gid, COALESCE(g.name, 'No group') AS label, '#0d6efd' AS color, COUNT(*) AS n
                        FROM tickets t LEFT JOIN `groups` g ON g.id = t.group_id
                       WHERE {$where} AND {$openIn}
                       GROUP BY g.id, g.name
@@ -405,7 +405,7 @@ class Dashboard
 
             case 'by_location':
                 return ['series' => self::breakdown($db,
-                    "SELECT COALESCE(l.name, 'No location') AS label, '#6610f2' AS color, COUNT(*) AS n
+                    "SELECT l.id AS gid, COALESCE(l.name, 'No location') AS label, '#6610f2' AS color, COUNT(*) AS n
                        FROM tickets t LEFT JOIN locations l ON l.id = t.location_id
                       WHERE {$where} AND {$openIn}
                       GROUP BY l.id, l.name
@@ -458,13 +458,14 @@ class Dashboard
     {
         $st = $db->prepare($sql);
         $st->execute($params);
-        $labels = $colors = $data = [];
+        $labels = $colors = $data = $ids = [];
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
             $labels[] = $r['label'];
             $colors[] = $r['color'];
             $data[]   = (int) $r['n'];
+            $ids[]    = array_key_exists('gid', $r) && $r['gid'] !== null ? (string) $r['gid'] : null;
         }
-        return ['labels' => $labels, 'colors' => $colors, 'data' => $data];
+        return ['labels' => $labels, 'colors' => $colors, 'data' => $data, 'ids' => $ids];
     }
 
     /** Created-per-day vs resolved-per-day over the range, gap-filled. */

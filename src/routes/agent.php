@@ -161,6 +161,7 @@ $router->get('/agent/wallboard', function () {
         'catalog'       => $catalog,
         'config'        => $config,
         'filterOptions' => Dashboard::filterOptions($db),
+        'openStatuses'  => array_values(ticketOpenBucketSlugs()),
     ]);
 });
 
@@ -197,6 +198,11 @@ $router->get('/agent/tickets', function () {
     $fWatched     = !empty($_GET['watched']) ? '1' : '';
     $fResolvedToday = !empty($_GET['resolved_today']) ? '1' : '';
     $fEscalatedToMe = !empty($_GET['escalated_to_me']) ? '1' : '';
+    // Drill-down filters used by the wallboard widgets (also valid stand-alone).
+    $fCreatedToday  = !empty($_GET['created_today']) ? '1' : '';
+    $fDueToday      = !empty($_GET['due_today']) ? '1' : '';
+    $fSla           = in_array($_GET['sla'] ?? '', ['breached', 'warning'], true) ? $_GET['sla'] : '';
+    $fCreatedWithin = max(0, min(365, (int) ($_GET['created_within'] ?? 0)));
 
     $where  = [];
     $params = [];
@@ -286,6 +292,21 @@ $router->get('/agent/tickets', function () {
     if ($fEscalatedToMe) {
         $where[]  = "t.assigned_to = ? AND t.escalation_level > 0 AND " . ticketStatusSqlIn(ticketOpenBucketSlugs(), 't.status');
         $params[] = Auth::id();
+    }
+
+    if ($fCreatedToday) {
+        $where[] = 'DATE(t.created_at) = CURDATE()';
+    }
+    if ($fDueToday) {
+        $where[] = 't.due_date = CURDATE()';
+    }
+    if ($fSla !== '') {
+        $where[]  = 't.sla_state = ?';
+        $params[] = $fSla;
+    }
+    if ($fCreatedWithin > 0) {
+        $where[]  = 't.created_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY)';
+        $params[] = $fCreatedWithin;
     }
 
     // Fail-closed ticket visibility (one source of truth in ticketStaffVisibilitySql):
@@ -434,6 +455,10 @@ $router->get('/agent/tickets', function () {
         'watched'       => $fWatched,
         'resolved_today' => $fResolvedToday,
         'escalated_to_me' => $fEscalatedToMe,
+        'created_today'  => $fCreatedToday,
+        'due_today'      => $fDueToday,
+        'sla'            => $fSla,
+        'created_within' => $fCreatedWithin ?: '',
     ];
 
     // Load saved filters (own + shared)

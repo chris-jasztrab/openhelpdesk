@@ -17,6 +17,7 @@ $breadcrumbs  = [['label'=>'Help','url'=>'/agent/help'],['label'=>'Live Wallboar
 <ul class="text-muted mb-0">
     <li><a href="#realtime">Real-time refresh &amp; controls</a></li>
     <li><a href="#filters">Filters</a></li>
+    <li><a href="#drilldown">Click any widget to drill in</a></li>
     <li><a href="#customize">Customising your widgets</a></li>
     <li><a href="#widgets">The widgets</a></li>
     <li><a href="#visibility">What data you see</a></li>
@@ -44,6 +45,19 @@ $breadcrumbs  = [['label'=>'Help','url'=>'/agent/help'],['label'=>'Live Wallboar
 <h5 class="fw-semibold mb-3"><i class="bi bi-funnel text-primary me-2"></i>Filters</h5>
 <p class="text-muted mb-2">The filter bar narrows the whole board at once by <strong>location</strong>, <strong>group</strong>, <strong>type</strong>, <strong>priority</strong>, and a <strong>time range</strong> (7 / 14 / 30 / 90 days or the last year). The time range drives the trend, CSAT and first-response widgets; the others apply to every widget that counts tickets.</p>
 <p class="text-muted mb-0"><strong>Clear</strong> resets every filter. Your filter choices are remembered for next time, alongside your widget layout.</p>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4" id="drilldown">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-box-arrow-up-right text-primary me-2"></i>Click any widget to drill in</h5>
+<p class="text-muted mb-2">Every widget is a shortcut into the ticket list, opened with the matching filter already applied &mdash; so the numbers on the board are a jumping-off point, not a dead end:</p>
+<ul class="text-muted mb-2">
+    <li><strong>Number cards</strong> &mdash; click to see exactly those tickets (e.g. <em>Open tickets</em>, <em>Unassigned</em>, <em>SLA breached</em>, <em>Due today</em>, <em>Created/Resolved today</em>).</li>
+    <li><strong>Charts</strong> &mdash; click a single <strong>slice or bar</strong> to drill into just that status, priority, type, group or location; click elsewhere on the chart for the whole set.</li>
+    <li><strong>Live lists</strong> &mdash; rows already open the ticket; in <em>Agent workload</em>, a row opens that agent's open tickets.</li>
+</ul>
+<p class="text-muted mb-0">Whatever <strong>filters</strong> you have set on the board (location, group, type, priority) are carried into the drill-down, so a click always respects the slice you're looking at.</p>
 </div>
 </div>
 

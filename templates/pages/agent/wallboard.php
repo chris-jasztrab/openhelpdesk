@@ -153,6 +153,11 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
   .wb-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
   .wb-chart-wrap { position: relative; flex: 1 1 auto; min-height: 0; }
   .wb-fs .wb-kpi-value { font-size: 3rem; }
+
+  /* Click-to-drill affordance (view mode only — edit mode shows grab/jiggle). */
+  #wallboard:not(.wb-edit) .wb-clickable .wb-card { cursor: pointer; transition: box-shadow .12s ease, transform .12s ease; }
+  #wallboard:not(.wb-edit) .wb-clickable:hover .wb-card { box-shadow: 0 .5rem 1rem rgba(0,0,0,.12) !important; transform: translateY(-2px); }
+  #wallboard:not(.wb-edit) .wb-row-link { cursor: pointer; }
   #wbWidgetList li.dragging { opacity: .5; }
 
   /* --- Customise (edit) mode: rearrange widgets like phone home-screen icons ---
@@ -269,6 +274,63 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
   // Keep config.widgets in sync as the flat enabled set (used by the poll/modal).
   const syncWidgets = () => { config.widgets = config.columns.flat(); };
 
+  /* ---- drill-down links ------------------------------------------------
+     Clicking a widget opens the agent ticket list filtered to the tickets it
+     represents, carrying the wallboard's own filters. Built lazily at click
+     time so they always reflect the current filter bar. */
+  const OPEN_STATUSES = <?= json_encode($openStatuses ?? [], JSON_UNESCAPED_SLASHES) ?>;
+  const openPairs   = () => OPEN_STATUSES.map(s => ['status[]', s]);
+  function wallPairs() {
+    const f = config.filters || {}, p = [];
+    if (+f.location_id) p.push(['location[]', f.location_id]);
+    if (+f.group_id)    p.push(['group[]', f.group_id]);
+    if (+f.type_id)     p.push(['type[]', f.type_id]);
+    if (+f.priority_id) p.push(['priority[]', f.priority_id]);
+    return p;
+  }
+  function ticketsUrl(pairs) {
+    const u = new URLSearchParams();
+    pairs.forEach(([k, v]) => u.append(k, v));
+    const s = u.toString();
+    return '/agent/tickets' + (s ? '?' + s : '');
+  }
+  const rangeDays = () => (config.filters && +config.filters.range) || 30;
+
+  // The whole-widget link (a KPI card, or a chart card clicked off its bars).
+  function drillUrl(id) {
+    const w = wallPairs();
+    switch (id) {
+      case 'open':           return ticketsUrl([...openPairs(), ...w]);
+      case 'unassigned':     return ticketsUrl([...openPairs(), ['agent[]', 'unassigned'], ...w]);
+      case 'breached':       return ticketsUrl([...openPairs(), ['sla', 'breached'], ...w]);
+      case 'at_risk':        return ticketsUrl([...openPairs(), ['sla', 'warning'], ...w]);
+      case 'due_today':      return ticketsUrl([...openPairs(), ['due_today', '1'], ...w]);
+      case 'created_today':  return ticketsUrl([['created_today', '1'], ...w]);
+      case 'resolved_today': return ticketsUrl([['resolved_today', '1'], ...w]);
+      case 'avg_response':
+      case 'csat':
+      case 'sla_compliance': return ticketsUrl([['created_within', rangeDays()], ...w]);
+      case 'by_status': case 'by_priority': case 'by_type':
+      case 'by_group':  case 'by_location':  return ticketsUrl([...openPairs(), ...w]);
+      case 'volume_trend':   return ticketsUrl([['created_within', rangeDays()], ...w]);
+      default: return null;
+    }
+  }
+
+  // A single chart segment → that slice's tickets.
+  function segmentUrl(id, gid) {
+    if (gid === null || gid === undefined || gid === '') return drillUrl(id);
+    const w = wallPairs();
+    switch (id) {
+      case 'by_status':   return ticketsUrl([['status[]', gid], ...w]);   // gid is the status slug
+      case 'by_priority': return ticketsUrl([...openPairs(), ['priority[]', gid], ...w]);
+      case 'by_type':     return ticketsUrl([...openPairs(), ['type[]', gid], ...w]);
+      case 'by_group':    return ticketsUrl([...openPairs(), ['group[]', gid], ...w]);
+      case 'by_location': return ticketsUrl([...openPairs(), ['location[]', gid], ...w]);
+      default: return drillUrl(id);
+    }
+  }
+
   /* ---- helpers ---------------------------------------------------- */
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -294,7 +356,7 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
   function buildCard(id) {
     const meta = CATALOG[id];
     const col = document.createElement('div');
-    col.className = 'wb-col';
+    col.className = 'wb-col' + (meta.kind === 'list' ? '' : ' wb-clickable');
     col.style.height = widgetHeight(id) + 'px';
     col.dataset.widget = id;
     // Remove badge + bottom resize grip — only visible in edit mode (CSS-gated).
@@ -633,6 +695,19 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
       persistLayout();   // re-reads columns from the DOM (the card is now gone)
       empty.classList.toggle('d-none', config.widgets.filter(x => CATALOG[x]).length > 0);
     });
+
+    // View-mode navigation: a click drills into the tickets the widget shows.
+    grid.addEventListener('click', (e) => {
+      if (editMode) return;                              // edit mode owns clicks
+      if (e.target.closest('a')) return;                 // list rows link to a ticket
+      const agentRow = e.target.closest('tr[data-agent]');
+      if (agentRow) { window.location.href = ticketsUrl([...openPairs(), ['agent[]', agentRow.dataset.agent], ...wallPairs()]); return; }
+      if (e.target.closest('canvas')) return;            // charts handle their own clicks (segments)
+      const col = e.target.closest('.wb-col.wb-clickable');
+      if (!col) return;
+      const href = drillUrl(col.dataset.widget);
+      if (href) window.location.href = href;
+    });
   }
 
   function setEditMode(on) {
@@ -683,16 +758,19 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
         { label: 'Resolved', data: d.resolved || [], borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,.1)', tension: .3, fill: true },
       ];
     } else {
-      const ser = d.series || { labels: [], colors: [], data: [] };
+      const ser = d.series || { labels: [], colors: [], data: [], ids: [] };
       labels = ser.labels || [];
       datasets = [{ data: ser.data || [], backgroundColor: ser.colors || [], borderWidth: 0 }];
     }
+    // Segment ids (status slug / priority id / …) for per-slice drill-down.
+    const segIds = (id !== 'volume_trend' && d.series && d.series.ids) ? d.series.ids : null;
 
     const total = datasets.reduce((a, ds) => a + (ds.data || []).reduce((x, y) => x + y, 0), 0);
     if (emptySlot) emptySlot.classList.toggle('d-none', total > 0);
 
     const isPie = meta.chart === 'doughnut' || meta.chart === 'pie';
     if (charts[id]) {
+      charts[id].$ids = segIds;
       charts[id].data.labels = labels;
       charts[id].data.datasets.forEach((ds, i) => {
         ds.data = datasets[i] ? datasets[i].data : [];
@@ -706,6 +784,14 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
       data: { labels, datasets },
       options: {
         responsive: true, maintainAspectRatio: false,
+        onClick: (evt, els, chart) => {
+          if (editMode) return;                          // edit mode: dragging, not drilling
+          const wid = chart.$wid;
+          const href = (els && els.length && chart.$ids)
+            ? segmentUrl(wid, chart.$ids[els[0].index])
+            : drillUrl(wid);
+          if (href) window.location.href = href;
+        },
         plugins: { legend: { display: isPie || id === 'volume_trend', position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } },
         scales: isPie ? {} : {
           x: { ticks: { font: { size: 10 } }, grid: { display: false } },
@@ -713,6 +799,8 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
         },
       },
     });
+    charts[id].$wid = id;
+    charts[id].$ids = segIds;
   }
 
   function renderList(id, col, d) {
@@ -725,7 +813,7 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
       html = '<table class="table table-sm table-hover mb-0 align-middle"><tbody>';
       rows.forEach(r => {
         const breached = Number(r.breached) || 0;
-        html += '<tr>' +
+        html += '<tr class="wb-row-link" data-agent="' + esc(r.id) + '">' +
           '<td>' + esc(r.name) + '</td>' +
           '<td class="text-end"><span class="badge text-bg-secondary">' + (Number(r.open_total) || 0) + '</span></td>' +
           '<td class="text-end" style="width:70px;">' + (breached > 0 ? '<span class="badge text-bg-danger">' + breached + ' SLA</span>' : '') + '</td>' +
