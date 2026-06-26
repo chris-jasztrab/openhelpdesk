@@ -91,7 +91,7 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
   <!-- Widget grid -->
   <div class="alert alert-primary d-flex align-items-center gap-2 py-2 px-3 mb-3 d-none" id="wbDragHint">
     <i class="bi bi-arrows-move"></i>
-    <span class="small">Customising — drag any widget to move it; the others slide out of the way. Use <i class="bi bi-x-circle"></i> to remove one, <strong>Add widget</strong> to add more. Your layout saves automatically — click <strong>Done</strong> when finished.</span>
+    <span class="small">Customising — drag a widget to move it; drag its bottom edge to resize its height. Use <i class="bi bi-x-circle"></i> to remove one, <strong>Add widget</strong> to add more. Your layout saves automatically — click <strong>Done</strong> when finished.</span>
   </div>
   <div id="wbGrid" class="row g-3"></div>
   <div id="wbEmpty" class="text-center text-muted py-5 d-none">
@@ -122,12 +122,19 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
 
 <style>
   #wallboard.wb-fs { background: var(--bs-body-bg); padding: 1rem; overflow-y: auto; }
-  .wb-card { height: 100%; position: relative; }
+
+  /* Each widget's height is explicit (set per card from its saved/default
+     height) rather than stretched to the tallest card in its row. The card is
+     a flex column so its inner content (chart canvas, scrolling list) fills
+     whatever height the card is given, and resizing the card resizes them. */
+  #wbGrid { align-items: flex-start; }
+  .wb-card { height: 100%; position: relative; display: flex; flex-direction: column; }
+  .wb-card .card-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+  .wb-card .card-header { flex: 0 0 auto; font-size: .8rem; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; padding-right: 1.75rem; }
   .wb-kpi-value { font-size: 2.4rem; font-weight: 700; line-height: 1.1; }
   .wb-kpi-sub { font-size: .8rem; }
-  .wb-card .card-header { font-size: .8rem; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; padding-right: 1.75rem; }
-  .wb-list { max-height: 320px; overflow-y: auto; }
-  .wb-chart-wrap { position: relative; height: 240px; }
+  .wb-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+  .wb-chart-wrap { position: relative; flex: 1 1 auto; min-height: 0; }
   .wb-fs .wb-kpi-value { font-size: 3rem; }
   #wbWidgetList li.dragging { opacity: .5; }
 
@@ -145,14 +152,19 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
   .wb-remove:hover { filter: brightness(1.1); }
   .wb-edit .wb-remove { display: flex; }
 
-  /* In edit mode, stop cards stretching to their row's tallest sibling.
-     With the default align-items:stretch, dragging a short widget into a row
-     with a tall one balloons the short card to match — which reflows the
-     board under the cursor and makes the drag oscillate. Top-aligning in edit
-     mode keeps every card at its own content height, so a reorder only moves
-     cards, never resizes them. */
-  .wb-edit #wbGrid { align-items: flex-start; }
-  .wb-edit #wbGrid .wb-card { height: auto; }
+  /* Resize grip along the card's bottom edge — drag to set the card's height.
+     Only shown (and only interactive) in edit mode. */
+  .wb-resize {
+    position: absolute; left: 0; right: 0; bottom: -4px; height: 16px; z-index: 6;
+    display: none; align-items: flex-end; justify-content: center;
+    cursor: ns-resize; touch-action: none;
+  }
+  .wb-resize::after {
+    content: ''; width: 44px; height: 4px; border-radius: 4px;
+    background: var(--ld-primary, #0d6efd); opacity: .45; transition: opacity .12s;
+  }
+  .wb-resize:hover::after { opacity: 1; }
+  .wb-edit .wb-resize { display: flex; }
 
   /* In edit mode the whole card is the drag grip; inner links/charts go inert
      so a grab never navigates or interacts. */
@@ -161,6 +173,10 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
   .wb-edit .wb-card a,
   .wb-edit .wb-card canvas,
   .wb-edit .wb-card .wb-list { pointer-events: none; }
+
+  /* While actively resizing a card, freeze its jiggle and flag it. */
+  .wb-col.wb-resizing .wb-card { animation: none !important; outline: 2px solid var(--ld-primary, #0d6efd); outline-offset: 1px; }
+  body.wb-ns-resize, body.wb-ns-resize * { cursor: ns-resize !important; }
 
   @keyframes wbJiggle {
     0%, 100% { transform: rotate(-.55deg); }
@@ -197,6 +213,18 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
   let   timer   = null;
   let   paused  = false;
   let   inFlight = false;
+
+  // Per-widget height. PHP encodes an empty map as [] (a JS array), on which
+  // string-keyed writes vanish through JSON.stringify — normalise to an object.
+  if (config.heights === null || typeof config.heights !== 'object' || Array.isArray(config.heights)) {
+    config.heights = {};
+  }
+  const DEFAULT_H = { kpi: 120, chart: 300, list: 260 };
+  const MIN_H = 90, MAX_H = 900;
+  const widgetHeight = (id) => {
+    const h = config.heights[id];
+    return (typeof h === 'number' && h > 0) ? h : (DEFAULT_H[(CATALOG[id] || {}).kind] || 220);
+  };
 
   /* ---- helpers ---------------------------------------------------- */
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
@@ -240,8 +268,10 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
       const meta = CATALOG[id];
       const col = document.createElement('div');
       col.className = sizeClass(meta.size) + ' wb-col';
-      // Remove badge — only visible in edit mode (CSS-gated by .wb-edit).
+      col.style.height = widgetHeight(id) + 'px';
+      // Remove badge + bottom resize grip — only visible in edit mode (CSS-gated).
       const remove = '<button type="button" class="wb-remove" title="Remove widget" aria-label="Remove widget"><i class="bi bi-x-lg"></i></button>';
+      const resize = '<div class="wb-resize" title="Drag to resize" aria-label="Drag to resize widget"></div>';
       let inner = '';
       if (meta.kind === 'kpi') {
         inner =
@@ -250,21 +280,21 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
               '<div class="text-muted wb-kpi-sub mb-1">' + esc(meta.title) + '</div>' +
               '<div class="wb-kpi-value" data-slot="value">–</div>' +
               '<div class="text-muted wb-kpi-sub" data-slot="sub"></div>' +
-            '</div>' +
+            '</div>' + resize +
           '</div>';
       } else if (meta.kind === 'chart') {
         inner =
           '<div class="card wb-card border-0 shadow-sm">' + remove +
             '<div class="card-header bg-transparent text-muted">' + esc(meta.title) + '</div>' +
             '<div class="card-body"><div class="wb-chart-wrap"><canvas></canvas></div>' +
-              '<div class="text-muted small text-center mt-2 d-none" data-slot="empty">No data</div></div>' +
+              '<div class="text-muted small text-center mt-2 d-none" data-slot="empty">No data</div></div>' + resize +
           '</div>';
       } else { // list
         inner =
           '<div class="card wb-card border-0 shadow-sm">' + remove +
             '<div class="card-header bg-transparent text-muted">' + esc(meta.title) + '</div>' +
             '<div class="card-body p-0"><div class="wb-list" data-slot="list">' +
-              '<div class="text-muted small p-3">Loading…</div></div></div>' +
+              '<div class="text-muted small p-3">Loading…</div></div></div>' + resize +
           '</div>';
       }
       col.innerHTML = inner;
@@ -280,6 +310,7 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
      gap and animate into place with a FLIP transition. New order persists. */
   let editMode = false;
   let drag     = null;   // { el, offX, offY, pointerId, lastX, lastY, scrollDir }
+  let resizing = null;   // { el, id, startY, startH, curH, pointerId }
   let scrollRAF = null;
 
   function persistOrder() {
@@ -401,10 +432,43 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
     scrollRAF = requestAnimationFrame(step);
   }
 
+  /* ---- height resizing (drag the bottom grip) --------------------------- */
+  function startResize(e, handle) {
+    const el = handle.closest('.wb-col');
+    if (!el) return;
+    e.preventDefault();
+    resizing = { el, id: el.dataset.widget, startY: e.clientY,
+                 startH: el.getBoundingClientRect().height, curH: 0, pointerId: e.pointerId, handle };
+    el.classList.add('wb-resizing');
+    document.body.classList.add('wb-ns-resize');
+    try { handle.setPointerCapture(e.pointerId); } catch (_) {}
+  }
+  function doResize(e) {
+    let h = Math.round(resizing.startH + (e.clientY - resizing.startY));
+    h = Math.max(MIN_H, Math.min(MAX_H, h));
+    resizing.curH = h;
+    resizing.el.style.height = h + 'px';
+    const ch = charts[resizing.id];
+    if (ch) ch.resize();              // keep the chart canvas filling its card live
+  }
+  function endResize(e) {
+    const { el, id, handle } = resizing;
+    try { handle.releasePointerCapture(e.pointerId); } catch (_) {}
+    el.classList.remove('wb-resizing');
+    document.body.classList.remove('wb-ns-resize');
+    const h = resizing.curH || Math.round(el.getBoundingClientRect().height);
+    config.heights[id] = h;
+    resizing = null;
+    if (charts[id]) charts[id].resize();
+    saveConfig();
+  }
+
   function onPointerDown(e) {
-    if (!editMode || drag) return;
+    if (!editMode || drag || resizing) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     if (e.target.closest('.wb-remove')) return;        // let the remove click through
+    const grip = e.target.closest('.wb-resize');
+    if (grip) { startResize(e, grip); return; }        // resize takes priority over drag
     const el = e.target.closest('.wb-col');
     if (!el) return;
     e.preventDefault();
@@ -417,12 +481,14 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
     positionDragged(e.clientX, e.clientY);
   }
   function onPointerMove(e) {
+    if (resizing && e.pointerId === resizing.pointerId) { doResize(e); return; }
     if (!drag || e.pointerId !== drag.pointerId) return;
     positionDragged(e.clientX, e.clientY);
     reorderTo(e.clientX, e.clientY);
     edgeAutoScroll(e.clientY);
   }
   function endDrag(e) {
+    if (resizing && e.pointerId === resizing.pointerId) { endResize(e); return; }
     if (!drag || e.pointerId !== drag.pointerId) return;
     const el = drag.el;
     try { el.releasePointerCapture(e.pointerId); } catch (_) {}

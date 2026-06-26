@@ -11,6 +11,14 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.126.0 &mdash; 2026-06-26
+
+### Added
+- **Wallboard: resize widgets to any height.** In customise mode each widget now has a grip on its bottom edge — drag it up or down to set that widget's height, and it's remembered per widget on your account. Charts redraw to fill the new size.
+
+### Changed
+- **Wallboard widgets are no longer force-stretched to a uniform row height.** Previously every widget in a row stretched to match the tallest one, so a single number card sitting beside a chart ballooned to ~300px of mostly empty space. Each widget now starts at a sensible default height for its type (compact for number cards, taller for charts and lists) and keeps whatever height you give it. (This also removes the last source of drag jitter, since a reorder can no longer resize anything.)
+
 ## 2.125.2 &mdash; 2026-06-26
 
 ### Fixed

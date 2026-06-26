@@ -72,8 +72,13 @@ class Dashboard
             'widgets'  => $widgets,
             'filters'  => ['location_id' => 0, 'group_id' => 0, 'type_id' => 0, 'priority_id' => 0, 'range' => 30],
             'interval' => 30,
+            'heights'  => [],   // widgetId => pixel height override (defaults applied client-side per kind)
         ];
     }
+
+    /** Allowed range for a custom widget height, in pixels. */
+    private const MIN_WIDGET_HEIGHT = 90;
+    private const MAX_WIDGET_HEIGHT = 900;
 
     /** Read a user's saved config, validated and merged over the defaults. */
     public static function userConfig(int $userId): array
@@ -129,7 +134,16 @@ class Dashboard
             $interval = 30;
         }
 
-        return ['widgets' => $widgets, 'filters' => $filters, 'interval' => $interval];
+        $heights = [];
+        if (is_array($in['heights'] ?? null)) {
+            foreach ($in['heights'] as $id => $px) {
+                if (in_array($id, $valid, true) && is_numeric($px)) {
+                    $heights[$id] = max(self::MIN_WIDGET_HEIGHT, min(self::MAX_WIDGET_HEIGHT, (int) $px));
+                }
+            }
+        }
+
+        return ['widgets' => $widgets, 'filters' => $filters, 'interval' => $interval, 'heights' => $heights];
     }
 
     /**
