@@ -145,6 +145,15 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
   .wb-remove:hover { filter: brightness(1.1); }
   .wb-edit .wb-remove { display: flex; }
 
+  /* In edit mode, stop cards stretching to their row's tallest sibling.
+     With the default align-items:stretch, dragging a short widget into a row
+     with a tall one balloons the short card to match — which reflows the
+     board under the cursor and makes the drag oscillate. Top-aligning in edit
+     mode keeps every card at its own content height, so a reorder only moves
+     cards, never resizes them. */
+  .wb-edit #wbGrid { align-items: flex-start; }
+  .wb-edit #wbGrid .wb-card { height: auto; }
+
   /* In edit mode the whole card is the drag grip; inner links/charts go inert
      so a grab never navigates or interacts. */
   .wb-edit .wb-col { touch-action: none; }

@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.125.2 &mdash; 2026-06-26
+
+### Fixed
+- **Wallboard drag still twitched when dragging a short widget next to a tall one.** The grid's cards stretch to match the tallest card in their row (equal-height rows). So dragging a short widget (e.g. a number card) beside a tall one (e.g. a chart) ballooned the short card to the tall height — which reflowed the whole board under the cursor, slid a different card under the pointer, and bounced the card straight back out: an endless glitch loop. While customising, cards now sit at their own natural height (top-aligned) instead of stretching, so a reorder only ever *moves* cards, never resizes them. The equal-height look returns the moment you click **Done**.
+
 ## 2.125.1 &mdash; 2026-06-26
 
 ### Fixed
