@@ -203,6 +203,39 @@ foreach ($reports as $report) {
                 ];
                 break;
 
+            case 'sla_violations':
+                $stmt = $db->prepare(
+                    "SELECT
+                        SUM(CASE WHEN first_response_due_at IS NOT NULL
+                                  AND ((first_responded_at IS NOT NULL AND first_responded_at > first_response_due_at)
+                                       OR (first_responded_at IS NULL AND NOW() > first_response_due_at))
+                                 THEN 1 ELSE 0 END) AS response_breached,
+                        SUM(CASE WHEN resolution_due_at IS NOT NULL
+                                  AND (sla_state = 'breached'
+                                       OR (status NOT IN ('resolved','closed') AND NOW() > resolution_due_at))
+                                 THEN 1 ELSE 0 END) AS resolution_breached,
+                        COUNT(*) AS total_violations
+                     FROM tickets
+                     WHERE created_at BETWEEN ? AND ?
+                       AND (
+                         (first_response_due_at IS NOT NULL
+                            AND ((first_responded_at IS NOT NULL AND first_responded_at > first_response_due_at)
+                                 OR (first_responded_at IS NULL AND NOW() > first_response_due_at)))
+                         OR (resolution_due_at IS NOT NULL
+                            AND (sla_state = 'breached'
+                                 OR (status NOT IN ('resolved','closed') AND NOW() > resolution_due_at)))
+                       )"
+                );
+                $stmt->execute([$from, $toEnd]);
+                $d = $stmt->fetch();
+                $stats = [
+                    'Period'                   => "{$from} to {$to}",
+                    'Total Violations'         => (int) $d['total_violations'],
+                    'First-Response Breaches'  => (int) $d['response_breached'],
+                    'Resolution Breaches'      => (int) $d['resolution_breached'],
+                ];
+                break;
+
             case 'unresolved':
                 $stmt = $db->prepare(
                     "SELECT
@@ -367,6 +400,7 @@ foreach ($reports as $report) {
         'ticket_volume'     => 'Ticket Volume',
         'response_times'    => 'Response Times',
         'sla'               => 'SLA Compliance',
+        'sla_violations'    => 'SLA Violations',
         'unresolved'        => 'Unresolved Tickets',
         'lifecycle'         => 'Ticket Lifecycle',
         'location'          => 'By Location',

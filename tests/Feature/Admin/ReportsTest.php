@@ -28,6 +28,7 @@ class ReportsTest extends TestCase
             ['/admin/reports/agent-performance'],
             ['/admin/reports/response-times'],
             ['/admin/reports/sla'],
+            ['/admin/reports/sla-violations'],
             ['/admin/reports/unresolved'],
             ['/admin/reports/ticket-volume'],
             ['/admin/reports/lifecycle'],

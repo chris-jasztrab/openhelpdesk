@@ -148,6 +148,7 @@ $breadcrumbs  = [
         ['icon' => 'bi-person-badge',        'title' => 'Agent Performance',  'desc' => 'Tickets handled, response times, and resolution rates per agent.',       'url' => '/admin/reports/agent-performance'],
         ['icon' => 'bi-clock-history',        'title' => 'Response Times',     'desc' => 'Average first-response and resolution times by priority.',               'url' => '/admin/reports/response-times'],
         ['icon' => 'bi-stopwatch',            'title' => 'SLA Compliance',     'desc' => 'SLA met vs breached rates and breached ticket details.',                 'url' => '/admin/reports/sla'],
+        ['icon' => 'bi-exclamation-octagon',  'title' => 'SLA Violations',     'desc' => 'Every ticket that breached its first-response or resolution SLA, and by how long.', 'url' => '/admin/reports/sla-violations'],
         ['icon' => 'bi-exclamation-triangle', 'title' => 'Unresolved Tickets', 'desc' => 'All open, in-progress, and pending tickets with aging breakdown.',       'url' => '/admin/reports/unresolved'],
         ['icon' => 'bi-graph-up',             'title' => 'Ticket Volume',      'desc' => 'Ticket creation trends over time by priority, type, and location.',      'url' => '/admin/reports/ticket-volume'],
         ['icon' => 'bi-arrow-repeat',         'title' => 'Ticket Lifecycle',   'desc' => 'Average time spent in each status stage and transition patterns.',       'url' => '/admin/reports/lifecycle'],

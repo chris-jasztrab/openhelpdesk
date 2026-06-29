@@ -21,6 +21,7 @@ $allReportTypes  = [
     'ticket_volume'     => 'Ticket Volume',
     'response_times'    => 'Response Times',
     'sla'               => 'SLA Compliance',
+    'sla_violations'    => 'SLA Violations',
     'unresolved'        => 'Unresolved Tickets',
     'lifecycle'         => 'Ticket Lifecycle',
     'location'          => 'By ' . label('location.singular'),

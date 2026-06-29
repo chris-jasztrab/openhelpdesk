@@ -9987,6 +9987,79 @@ $router->get('/admin/reports/sla', function () {
     ));
 });
 
+/* ── SLA Violations ───────────────────────────────────────────────── */
+
+$router->get('/admin/reports/sla-violations', function () {
+    Auth::requirePermission('reports.view');
+    $db = Database::connect();
+    [$from, $to, $range] = reportDateRange();
+    $toEnd = $to . ' 23:59:59';
+
+    $openSlugs = ticketOpenBucketSlugs();
+    $openIn    = ticketStatusSqlIn($openSlugs, 't.status');
+
+    // A "violation" is any ticket that has breached either its first-response or
+    // its resolution SLA. First-response breaches are detected straight from the
+    // timestamps so we also catch tickets still awaiting a first reply past their
+    // due time — even if sla_state hasn't been recalculated yet. Resolution
+    // breaches fall back to sla_state for closed tickets (there is no resolved_at
+    // column to measure against) and to a live overdue check while still open.
+    $responseBreachSql = "t.first_response_due_at IS NOT NULL
+        AND ((t.first_responded_at IS NOT NULL AND t.first_responded_at > t.first_response_due_at)
+             OR (t.first_responded_at IS NULL AND NOW() > t.first_response_due_at))";
+    $resolutionBreachSql = "t.resolution_due_at IS NOT NULL
+        AND (t.sla_state = 'breached'
+             OR ($openIn AND NOW() > t.resolution_due_at))";
+
+    $stmt = $db->prepare(
+        "SELECT t.id, t.subject, t.status, t.created_at, t.sla_state,
+                t.first_responded_at, t.first_response_due_at, t.resolution_due_at,
+                tp.name AS priority_name, tp.color AS priority_color,
+                CONCAT(a.first_name, ' ', a.last_name) AS agent_name,
+                ($responseBreachSql) AS response_breached,
+                ($resolutionBreachSql) AS resolution_breached,
+                CASE
+                    WHEN t.first_response_due_at IS NOT NULL AND t.first_responded_at IS NOT NULL AND t.first_responded_at > t.first_response_due_at
+                        THEN TIMESTAMPDIFF(MINUTE, t.first_response_due_at, t.first_responded_at)
+                    WHEN t.first_response_due_at IS NOT NULL AND t.first_responded_at IS NULL AND NOW() > t.first_response_due_at
+                        THEN TIMESTAMPDIFF(MINUTE, t.first_response_due_at, NOW())
+                END AS response_overdue_min,
+                CASE
+                    WHEN t.resolution_due_at IS NOT NULL AND $openIn AND NOW() > t.resolution_due_at
+                        THEN TIMESTAMPDIFF(MINUTE, t.resolution_due_at, NOW())
+                END AS resolution_overdue_min
+         FROM tickets t
+         LEFT JOIN ticket_priorities tp ON t.priority_id = tp.id
+         LEFT JOIN users a ON t.assigned_to = a.id
+         WHERE t.created_at BETWEEN ? AND ?
+           AND (($responseBreachSql) OR ($resolutionBreachSql))
+         ORDER BY t.created_at DESC"
+    );
+    $stmt->execute([$from, $toEnd]);
+    $violations = $stmt->fetchAll();
+
+    $responseCount = $resolutionCount = $openCount = 0;
+    foreach ($violations as &$v) {
+        $v['response_breached']   = (bool) $v['response_breached'];
+        $v['resolution_breached'] = (bool) $v['resolution_breached'];
+        $v['worst_overdue_min']   = max(
+            $v['response_overdue_min']   !== null ? (int) $v['response_overdue_min']   : 0,
+            $v['resolution_overdue_min'] !== null ? (int) $v['resolution_overdue_min'] : 0
+        );
+        if ($v['response_breached'])             $responseCount++;
+        if ($v['resolution_breached'])           $resolutionCount++;
+        if (in_array($v['status'], $openSlugs, true)) $openCount++;
+    }
+    unset($v);
+
+    $totalViolations = count($violations);
+
+    render('admin/reports/sla-violations', compact(
+        'from', 'to', 'range', 'violations', 'totalViolations',
+        'responseCount', 'resolutionCount', 'openCount'
+    ));
+});
+
 /* ── Unresolved Tickets ───────────────────────────────────────────── */
 
 $router->get('/admin/reports/unresolved', function () {

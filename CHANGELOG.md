@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.129.0 &mdash; 2026-06-29
+
+### Added
+- **New report: SLA Violations** (Reports &rsaquo; SLA Violations). A focused log of every ticket that breached its SLA in the selected period — each row shows the breach type (first-response and/or resolution), how far overdue it ran, the assigned agent, status, and priority. Unlike the SLA Compliance report (which lists only tickets already flagged `sla_state = breached`), this report also catches tickets that are *overdue but not yet recalculated* — those still awaiting a first reply past their due time, or still open past their resolution deadline. Available as a scheduled report too.
+
 ## 2.128.1 &mdash; 2026-06-26
 
 ### Fixed
