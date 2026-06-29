@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.128.1 &mdash; 2026-06-26
+
+### Fixed
+- **Help button in the top bar now works for logged-in patrons.** For non-staff users it pointed at `/portal` (the dashboard they were usually already on), so clicking *Help* appeared to do nothing. It now links to the patron help section at `/portal/help`.
+
 ## 2.128.0 &mdash; 2026-06-26
 
 ### Added

@@ -38,7 +38,7 @@
                 } elseif (Auth::isStaff()) {
                     $_helpUrl = '/agent/help';
                 } else {
-                    $_helpUrl = '/portal';
+                    $_helpUrl = '/portal/help';
                 }
                 ?>
                 <li class="nav-item">
