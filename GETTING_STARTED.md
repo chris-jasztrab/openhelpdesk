@@ -47,6 +47,7 @@ If you only want to spin up an evaluation copy on your laptop, jump to [Installa
     - 13.1 [Time-based escalation rules](#131-time-based-escalation-rules)
     - 13.2 [Manual escalation paths](#132-manual-escalation-paths)
     - 13.3 [Stale ticket notifications](#133-stale-ticket-notifications)
+    - 13.4 [Out-of-Office coverage](#134-out-of-office-coverage)
 14. [AI ticket triage (optional)](#14-ai-ticket-triage-optional)
 15. [CSAT surveys](#15-csat-surveys)
 16. [Marking a comment as the solution](#16-marking-a-comment-as-the-solution)
@@ -935,7 +936,7 @@ The recommended modern path. Uses OAuth 2.0 client credentials — no IMAP, no a
 **Admin → Settings → Inbound Mail — Reply Processing.** The **Setup Guide** button on that card links to a step-by-step Azure walkthrough at `/admin/settings/email-reply-help`.
 
 ![Microsoft Graph setup guide](docs/screenshots/email-reply-help.png)
-*The in-app setup guide walks through every Azure step: app registration, API permissions (`Mail.Read` + `Mail.ReadWrite`), client secret, and pasting credentials back into OpenHelpDesk.*
+*The in-app setup guide walks through every Azure step: app registration, API permissions (`Mail.Read` + `Mail.ReadWrite`, plus `MailboxSettings.Read` if you use out-of-office coverage), client secret, and pasting credentials back into OpenHelpDesk.*
 
 Summarised here:
 
@@ -945,7 +946,7 @@ Summarised here:
    - Supported account types: *Accounts in this organizational directory only (Single tenant)*
    - Redirect URI: leave blank.
    - Copy the **Application (client) ID** and **Directory (tenant) ID** from the Overview page.
-3. **Add API permissions** — Microsoft Graph → **Application permissions** (not Delegated) → `Mail.Read` and `Mail.ReadWrite`. Then click **Grant admin consent for [your org]** — this is required and only a Global Admin can do it. The status column should turn green.
+3. **Add API permissions** — Microsoft Graph → **Application permissions** (not Delegated) → `Mail.Read` and `Mail.ReadWrite` (and `MailboxSettings.Read` if you plan to use [Out-of-Office Coverage](#134-out-of-office-coverage) — read-only, exposes only automatic-reply settings). Then click **Grant admin consent for [your org]** — this is required and only a Global Admin can do it. The status column should turn green.
 4. **Create a client secret** — Certificates & secrets → New client secret. **Copy the Value column immediately** (it's only shown once). Note the expiry date.
 5. **Paste into OpenHelpDesk**: the Reply-To Address, the Mailbox Address (usually the same), the Tenant ID, Client ID, Client Secret, and the App Secret Expiry Date.
 6. **Enable** the `Enable reply-by-email` toggle, save, and click **Run Now** to test. The output appears below the form — exit code 0 means it worked.
@@ -1098,6 +1099,28 @@ Settings:
 - **Per-type override** on the Ticket Types page — override the global threshold per type.
 
 The cron `0 * * * *` runs `scripts/process-stale-tickets.php`. Each notification posts an internal `stale_notification_sent` timeline entry to dedupe. Replying to or updating the ticket clears its staleness automatically (the threshold is measured from `updated_at`).
+
+### 13.4 Out-of-Office coverage
+
+**Admin → Settings → Out of Office.**
+
+Stops tickets from sitting unanswered when the agent handling them goes on vacation — the classic problem being a group with only one member. A cron job reads each group member's Outlook **automatic-replies (out-of-office)** state via the Microsoft Graph API, then for each active ticket whose responsible agent is away it either **reassigns** the ticket to an available group member, or — when there's nobody to reassign to (single-person groups, or everyone away) — **auto-replies the requester once** with the agent's out-of-office message and leaves the ticket open.
+
+**Prerequisites:**
+
+- Microsoft Graph already configured (the **same Azure app registration** as inbound email — see §11). Add the `MailboxSettings.Read` **application** permission to that app and **grant admin consent**. It's read-only and exposes only automatic-reply settings, not message contents.
+- Schedule the cron (15 min recommended): `*/15 * * * * php /path/to/app/scripts/process-oof-coverage.php >> /path/to/app/storage/logs/oof-coverage.log 2>&1`
+- Agents set their out-of-office in Outlook as usual — use the **"Outside my organization"** message, which is what requesters receive.
+
+**Settings:**
+
+- **Action** — *Reassign, else auto-reply* (recommended), *Reassign only*, or *Auto-reply only*.
+- **Scope** — *Unanswered tickets only* (default) or *All active tickets*.
+- **Two auto-reply messages** — one for agents with a scheduled return date (with a `{return_date}` token) and one for agents who turned automatic replies on with no time range (no date promised). The agent's Outlook message is appended below whichever is used. Each reply fires at most once per ticket.
+
+**Access:** changing these settings needs the *Manage automations & escalations* permission. A separate, grantable **View out-of-office status** (`oof.view`) permission lets other roles (e.g. Power Users) open the page to see who's away — read-only, with the configuration form hidden. Assign it under **Admin → Settings → Permission Levels**.
+
+> **No return date?** An agent who just toggles automatic replies on (no time range) is treated as out of office indefinitely until they turn it off, and the no-return-date message is used. A `403` in the log means `MailboxSettings.Read` consent is missing; a `404` means that address has no Exchange Online mailbox (and is quietly skipped).
 
 ---
 

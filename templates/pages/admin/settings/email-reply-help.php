@@ -104,8 +104,17 @@ $breadcrumbs  = [
                     <tbody>
                         <tr><td><code>Mail.Read</code></td><td>Read messages in the mailbox</td></tr>
                         <tr><td><code>Mail.ReadWrite</code></td><td>Mark messages as read after processing</td></tr>
+                        <tr>
+                            <td><code>MailboxSettings.Read</code></td>
+                            <td>Read agents' out-of-office (automatic-replies) status. <span class="text-muted">Only needed if you use <a href="/admin/settings/oof">Out-of-Office Coverage</a> — see <a href="/admin/settings/oof/help">its setup guide</a>.</span></td>
+                        </tr>
                     </tbody>
                 </table>
+                <p class="text-muted small mt-2 mb-0">
+                    <i class="bi bi-info-circle me-1"></i><code>MailboxSettings.Read</code> is read-only and grants
+                    no access to message contents — it only exposes automatic-reply (out-of-office) settings. Add it to
+                    this <em>same</em> app registration; Out-of-Office Coverage reuses these credentials.
+                </p>
             </li>
             <li class="mb-2">Click <strong>Add permissions</strong>.</li>
             <li>

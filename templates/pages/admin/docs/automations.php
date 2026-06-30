@@ -16,6 +16,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
     <li><a href="#escalation-rules"><strong>Escalation Rules</strong></a> — time-based reminders and reassignments via cron.</li>
     <li><a href="#escalation-paths"><strong>Manual Escalation Paths</strong></a> — the per-type chain used by the agent &amp; portal <strong>Escalate</strong> button.</li>
     <li><a href="#stale-tickets"><strong>Stale Ticket Notifications</strong></a> — automatic nag emails when a ticket has been ignored.</li>
+    <li><a href="#oof-coverage"><strong>Out-of-Office Coverage</strong></a> — reassign or auto-reply an away agent's tickets, read from Outlook.</li>
 </ul>
 
 <h3 id="automation-rules" class="fw-bold mt-5 mb-3">Automation Rules</h3>
@@ -382,6 +383,90 @@ For step-by-step diagrams of every strategy, the master flow that runs on every 
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-shield-check text-primary me-2"></i>De-Duplication</h5>
 <p class="text-muted mb-0">Each notification posts an internal <code>stale_notification_sent</code> timeline entry. The processor checks the timeline before sending: if a stale notification was already sent within the re-notify window, the ticket is skipped this run. Replying to or updating the ticket clears its staleness automatically (the threshold is measured from <code>updated_at</code>).</p>
+</div>
+</div>
+
+<h3 id="oof-coverage" class="fw-bold mt-5 mb-3">Out-of-Office Coverage</h3>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-person-x text-primary me-2"></i>What It Does</h5>
+<p class="text-muted mb-2">Solves the "single-person group" problem: when the only agent in a group goes on vacation, their unanswered tickets would otherwise sit untouched until they return. A background job reads each group member's Outlook <strong>automatic-replies (out-of-office)</strong> state via the Microsoft Graph API, then for each active ticket whose responsible agent is away it either:</p>
+<ul class="text-muted mb-2">
+    <li><strong>Reassigns</strong> the ticket to an available (not-away) member of the same group; or</li>
+    <li><strong>Auto-replies the requester</strong> once with the agent's out-of-office message when there is nobody to reassign to — i.e. a single-person group, or a group where everyone is away — leaving the ticket open.</li>
+</ul>
+<p class="text-muted mb-0">Configure it at <a href="/admin/settings/oof"><strong>Admin → Settings → Out of Office</strong></a>.</p>
+<div class="alert alert-info small mt-3 mb-0"><i class="bi bi-info-circle me-2"></i>
+    OOF coverage only ever acts on a ticket whose work is actually blocked by an absence. It never touches the general unassigned queue when a free group member exists — normal <a href="#group-auto-assign" class="alert-link">Group Auto-Assignment</a> owns that.
+</div>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-key text-primary me-2"></i>Prerequisites</h5>
+<ol class="text-muted mb-0">
+    <li>Microsoft Graph must be configured (Tenant ID, Client ID, Client Secret) — the <strong>same Azure app registration</strong> used for inbound email. No second app is needed.</li>
+    <li>That app needs the <code>MailboxSettings.Read</code> <strong>application</strong> permission, with admin consent granted. See <a href="/admin/settings/oof/help">the OOF setup guide</a> and the Graph app-registration steps in the <a href="/admin/settings/email-reply-help">inbound-email setup guide</a>.</li>
+    <li>The <strong>Out-of-Office Coverage</strong> cron job must be scheduled (see below).</li>
+    <li>Agents set their out-of-office in Outlook as usual. Use the <strong>"Outside my organization"</strong> message — that is the text requesters receive.</li>
+</ol>
+<div class="alert alert-warning small mt-3 mb-0"><i class="bi bi-exclamation-triangle me-2"></i>
+    A missing or unconsented <code>MailboxSettings.Read</code> grant shows up as <strong>HTTP 403</strong> in the log for every agent. Grant admin consent on the correct app registration (the one whose Client ID is in Settings) and re-run. An agent whose email has no Exchange Online mailbox (unlicensed, on-prem, alias, or a test account) returns <strong>HTTP 404</strong> and is quietly skipped.
+</div>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-diagram-3 text-primary me-2"></i>Behaviour When an Agent Is Away</h5>
+<div class="table-responsive mb-0">
+<table class="table table-sm mb-0">
+    <thead class="table-light"><tr><th style="width:200px;">Mode</th><th>Behaviour</th></tr></thead>
+    <tbody class="text-muted">
+        <tr>
+            <td><strong>Reassign, else auto-reply</strong> <span class="badge bg-secondary ms-1">recommended</span></td>
+            <td>Hand the ticket to an available group member (least-loaded). Only auto-reply the requester when there is nobody to reassign to.</td>
+        </tr>
+        <tr><td><strong>Reassign only</strong></td><td>Move tickets to an available member, but never auto-reply. Single-person-group tickets are left untouched.</td></tr>
+        <tr><td><strong>Auto-reply only</strong></td><td>Never move tickets between agents; just let the requester know their agent is away.</td></tr>
+    </tbody>
+</table>
+</div>
+<p class="text-muted mt-3 mb-0"><strong>Scope</strong> — choose <strong>Unanswered tickets only</strong> (the default; only tickets with no agent reply yet, so conversations in progress aren't disturbed) or <strong>All active tickets</strong>.</p>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-chat-left-text text-primary me-2"></i>Auto-Reply Messages</h5>
+<p class="text-muted mb-2">Two independently-editable messages are sent to the requester depending on whether the agent set a return date:</p>
+<ul class="text-muted mb-2">
+    <li><strong>With a return date</strong> — used when the agent scheduled their out-of-office with an end date. Tokens: <code>{requester_name}</code>, <code>{ticket_id}</code>, <code>{agent_name}</code>, <code>{return_date}</code>.</li>
+    <li><strong>No return date</strong> — used when the agent simply turned automatic replies on without a time range, so there is no date to promise. Same tokens <em>except</em> <code>{return_date}</code>.</li>
+</ul>
+<p class="text-muted mb-0">Leave either blank to use its built-in default. The agent's own Outlook out-of-office message is appended below whichever message is used, when present. The reply is posted as a public reply on the ticket and emailed to the requester <strong>once</strong> — a per-ticket stamp prevents it firing twice for the same absence.</p>
+<div class="alert alert-info small mt-3 mb-0"><i class="bi bi-info-circle me-2"></i>
+    <strong>No return date?</strong> An agent who toggles automatic replies on without a time range is treated as out of office <em>indefinitely</em> until they turn it off — there is no end date, so the "no return date" message is used and the agent stays flagged until the next run after they disable OOF. Remind staff to turn automatic replies off when they return.
+</div>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-people text-primary me-2"></i>Read-Only Access for Non-Managers</h5>
+<p class="text-muted mb-2">Changing coverage settings requires the <strong>Manage automations &amp; escalations</strong> permission. A separate, grantable <strong>View out-of-office status</strong> (<code>oof.view</code>) permission lets other roles — e.g. Power Users — open the page to see <em>who is currently away</em> without being able to change anything (the configuration form is hidden for them).</p>
+<p class="text-muted mb-0">Assign it at <a href="/admin/roles"><strong>Admin → Settings → Permission Levels</strong></a>, under the <em>Automation</em> category.</p>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-terminal text-primary me-2"></i>Cron Setup</h5>
+<p class="text-muted mb-2">Schedule the processor (every 15 minutes is recommended). It refreshes the cached out-of-office state and acts on tickets in one pass:</p>
+<code class="d-block bg-light border rounded p-2 small user-select-all mb-3">*/15 * * * * php /path/to/app/scripts/process-oof-coverage.php &gt;&gt; /path/to/app/storage/logs/oof-coverage.log 2&gt;&amp;1</code>
+<p class="text-muted mb-0">The exact command for your platform is on the <a href="/admin/settings/cron-jobs">Cron Jobs</a> page. The job is missed-tick safe — it acts on current state each run and never auto-replies the same ticket twice. The <strong>Current agent status</strong> table on the settings page shows each member's last-read out-of-office state.</p>
 </div>
 </div>
 

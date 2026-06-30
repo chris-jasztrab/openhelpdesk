@@ -11,6 +11,12 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.131.1 &mdash; 2026-06-30
+
+### Documentation
+- **Documented Out-of-Office Coverage** in the in-app help (Docs → Automations & Escalations → Out-of-Office Coverage) and the GETTING_STARTED guide (§13.4): what it does, prerequisites, the three action modes, scope, the two auto-reply messages (with/without a return date), the read-only `oof.view` permission, and cron setup.
+- **Azure app-registration setup now lists `MailboxSettings.Read`.** The inbound-email Graph setup guide (Admin → Settings → Email reply guide) and GETTING_STARTED now include the read-only `MailboxSettings.Read` application permission needed for out-of-office coverage, noted as optional and reusing the same app registration. Docs search indexes the new content.
+
 ## 2.131.0 &mdash; 2026-06-30
 
 ### Added
