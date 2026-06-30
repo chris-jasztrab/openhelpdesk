@@ -34,9 +34,11 @@ $defaultTemplateNoDate =
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h5 class="fw-bold mb-0"><i class="bi bi-person-x me-2"></i>Out of Office Coverage</h5>
+    <?php if ($canManage ?? false): ?>
     <a href="/admin/settings/oof/help" class="btn btn-sm btn-outline-secondary">
         <i class="bi bi-question-circle me-1"></i>Setup Guide
     </a>
+    <?php endif; ?>
 </div>
 
 <p class="text-muted mb-4" style="max-width:48rem;">
@@ -47,7 +49,17 @@ $defaultTemplateNoDate =
     with the agent's out-of-office message.
 </p>
 
-<?php if (!$graphConfigured): ?>
+<?php if (!($canManage ?? false)): ?>
+<div class="alert alert-info d-flex gap-2 align-items-start mb-4">
+    <i class="bi bi-eye mt-1"></i>
+    <div class="small">
+        You have <strong>view-only</strong> access to out-of-office status. Coverage settings are
+        managed by an administrator.
+    </div>
+</div>
+<?php endif; ?>
+
+<?php if (($canManage ?? false) && !$graphConfigured): ?>
 <div class="alert alert-warning d-flex gap-2 align-items-start mb-4">
     <i class="bi bi-exclamation-triangle-fill mt-1"></i>
     <div class="small">
@@ -60,6 +72,7 @@ $defaultTemplateNoDate =
 </div>
 <?php endif; ?>
 
+<?php if ($canManage ?? false): ?>
 <form method="POST" action="/admin/settings/oof">
     <?= csrfField() ?>
 
@@ -182,6 +195,7 @@ $defaultTemplateNoDate =
         <a href="/admin/settings" class="btn btn-outline-secondary">Cancel</a>
     </div>
 </form>
+<?php endif; ?>
 
 <!-- Current status -->
 <div class="card border-0 shadow-sm mt-4">

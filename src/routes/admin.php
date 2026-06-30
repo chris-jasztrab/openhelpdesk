@@ -110,7 +110,9 @@ $router->post('/admin/settings/sso/clear-log', function () {
  * ================================================================== */
 
 $router->get('/admin/settings/oof', function () {
-    Auth::requirePermission('automations.manage');
+    // Managers configure it; anyone with the read-only oof.view permission can
+    // open it to see who's away (but the form is hidden for them — see below).
+    Auth::requirePermission('automations.manage', 'oof.view');
 
     // Current cache of who's flagged out of office (may be empty before the
     // first cron run, or if the table doesn't exist yet on a fresh install).
@@ -138,6 +140,9 @@ $router->get('/admin/settings/oof', function () {
                               && getSetting('graph_client_id') !== ''
                               && getSetting('graph_client_secret') !== '',
         'oofStatuses'      => $oofStatuses,
+        // Read-only viewers (oof.view but not automations.manage) see only the
+        // status table; the form is hidden and the POST below rejects them.
+        'canManage'        => Auth::can('automations.manage'),
     ]);
 });
 
@@ -181,7 +186,7 @@ $router->post('/admin/settings/oof', function () {
 });
 
 $router->get('/admin/settings/oof/help', function () {
-    Auth::requirePermission('automations.manage');
+    Auth::requirePermission('automations.manage', 'oof.view');
     render('admin/settings/oof-help');
 });
 

@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.131.0 &mdash; 2026-06-30
+
+### Added
+- **New permission: "View out-of-office status" (`oof.view`).** A grantable, read-only permission that lets non-managers (e.g. Power Users) open Admin → Settings → Out of Office and see which agents are currently away — without being able to change any coverage settings. Assign it in Admin → Permission Levels. For view-only holders the page shows only the current-status table (the configuration form is hidden); all changes remain gated behind "Manage automations & escalations" (`automations.manage`), including the save handler itself. The settings-nav link now appears for either permission.
+
 ## 2.130.3 &mdash; 2026-06-30
 
 ### Fixed

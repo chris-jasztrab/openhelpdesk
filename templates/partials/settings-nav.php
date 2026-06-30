@@ -129,7 +129,7 @@ $settingsNavPerm = static function (string $url): string {
         '/admin/settings/escalation-paths'  => 'automations.manage',
         '/admin/settings/escalations'       => 'automations.manage',
         '/admin/settings/stale-tickets'     => 'automations.manage',
-        '/admin/settings/oof'               => 'automations.manage',
+        '/admin/settings/oof'               => 'automations.manage|oof.view',
         '/admin/settings/scheduled-reports' => 'automations.manage',
         '/admin/settings/cron-jobs'         => 'automations.manage',
         '/admin/settings/ticket-statuses'   => 'workflows.manage',
@@ -172,7 +172,12 @@ foreach ($settingsNavGroups as $grpKey => $grpItems) {
         $perm = $settingsNavPerm($it['url']);
         if ($perm === '@admin') return Auth::isAdmin();
         if ($perm === '@staff') return Auth::isStaff();
-        return Auth::can($perm);
+        // A '|'-joined value means "any of these permissions" (e.g. a page that
+        // managers configure but read-only roles may also open).
+        foreach (explode('|', $perm) as $p) {
+            if (Auth::can($p)) return true;
+        }
+        return false;
     }));
     if (empty($settingsNavGroups[$grpKey])) {
         unset($settingsNavGroups[$grpKey]);
