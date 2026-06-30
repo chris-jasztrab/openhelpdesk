@@ -118,10 +118,19 @@ foreach ($members as $m) {
     $userId = (int) $m['id'];
     $email  = $m['email'];
 
-    $setting = getAutomaticReplies($accessToken, $email);
+    $httpCode = null;
+    $setting  = getAutomaticReplies($accessToken, $email, $httpCode);
     if ($setting === null) {
-        // Transport/permission error — leave any existing cache row untouched.
-        logMsg('WARN', "  Could not read OOF for {$email} (user #{$userId}); keeping previous state.");
+        if ($httpCode === 404) {
+            // No readable Exchange Online mailbox for this address — unlicensed,
+            // on-prem-only, an alias, or a non-mailbox/test account. Benign: this
+            // person simply can't be tracked for OOF. Skip quietly.
+            logMsg('INFO', "  No mailbox for {$email} (user #{$userId}) — skipping (no OOF tracking).");
+        } else {
+            // Real failure (403 consent, 5xx, transport) — leave the cache row
+            // untouched and surface it.
+            logMsg('WARN', "  Could not read OOF for {$email} (user #{$userId}, HTTP {$httpCode}); keeping previous state.");
+        }
         continue;
     }
 

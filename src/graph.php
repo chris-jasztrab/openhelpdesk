@@ -26,8 +26,13 @@ if (!function_exists('logMsg')) {
 /**
  * Perform an HTTP GET request with cURL. Returns the body, or null on
  * transport error / HTTP >= 400.
+ *
+ * $statusCode is set to the HTTP status (0 on transport failure) so callers
+ * can branch on it. Pass $logErrors = false to suppress the built-in ERROR
+ * log when the caller wants to classify the failure itself (e.g. treat a 404
+ * as benign while still surfacing a 403).
  */
-function curlGet(string $url, array $headers = []): ?string
+function curlGet(string $url, array $headers = [], ?int &$statusCode = null, bool $logErrors = true): ?string
 {
     $ch = curl_init($url);
     curl_setopt_array($ch, [
@@ -36,17 +41,21 @@ function curlGet(string $url, array $headers = []): ?string
         CURLOPT_TIMEOUT        => 30,
     ]);
     $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $statusCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $error    = curl_error($ch);
     curl_close($ch);
 
     if ($response === false || $error !== '') {
-        logMsg('ERROR', "cURL GET error: {$error}");
+        if ($logErrors) {
+            logMsg('ERROR', "cURL GET error: {$error}");
+        }
         return null;
     }
 
-    if ($httpCode >= 400) {
-        logMsg('ERROR', "Graph API GET returned HTTP {$httpCode}: " . substr((string) $response, 0, 300));
+    if ($statusCode >= 400) {
+        if ($logErrors) {
+            logMsg('ERROR', "Graph API GET returned HTTP {$statusCode}: " . substr((string) $response, 0, 300));
+        }
         return null;
     }
 
@@ -150,19 +159,26 @@ function getAccessToken(string $tenantId, string $clientId, string $clientSecret
  *     'externalReplyMessage'   => '<html>',
  *   ]
  */
-function getAutomaticReplies(string $token, string $mailbox): ?array
+function getAutomaticReplies(string $token, string $mailbox, ?int &$statusCode = null): ?array
 {
     // @ is valid in a URL path segment. Request UTC so the dateTime strings are
     // unambiguous regardless of the mailbox owner's working-hours time zone.
     $url = 'https://graph.microsoft.com/v1.0/users/' . $mailbox
          . '/mailboxSettings/automaticRepliesSetting';
 
+    // Suppress curlGet's generic ERROR log so we can classify failures here: a
+    // 404 (no readable Exchange Online mailbox) is benign, but a 403 (consent
+    // missing) or 5xx should still be surfaced loudly.
     $response = curlGet($url, [
         "Authorization: Bearer {$token}",
         'Prefer: outlook.timezone="UTC"',
-    ]);
+    ], $statusCode, false);
+
     if ($response === null) {
-        return null;
+        if ($statusCode !== 404) {
+            logMsg('ERROR', "automaticRepliesSetting for {$mailbox} failed (HTTP {$statusCode}).");
+        }
+        return null; // caller inspects $statusCode (404 = no mailbox, skip quietly)
     }
 
     $data = json_decode($response, true);

@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.130.1 &mdash; 2026-06-30
+
+### Fixed
+- **OOF coverage: stop logging "no mailbox" agents as errors.** When an agent's helpdesk email has no readable Exchange Online mailbox (unlicensed, on-prem-only, an alias, or a non-mailbox/test account), Microsoft Graph returns `404 ErrorInvalidUser`. The coverage job already handled this safely (the agent is simply skipped), but it logged two alarming lines per agent per run (`ERROR` + `WARN`). A 404 is now a single quiet `INFO` ("no mailbox — skipping"), while genuine failures such as a missing-consent `403` or a `5xx` are still logged loudly so real problems stay visible. `curlGet()` gained an optional status-code out-param and an error-logging toggle to support this.
+
 ## 2.130.0 &mdash; 2026-06-30
 
 ### Added
