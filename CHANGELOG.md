@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.130.2 &mdash; 2026-06-30
+
+### Fixed
+- **OOF coverage no longer auto-assigns the whole unassigned queue.** In reassign modes, the coverage job treated *every* unassigned, unanswered ticket that had an available group member as something to auto-assign — which would hijack normal triage and ignore each group's configured assign-strategy the moment OOF coverage was switched on. It now only acts on an unassigned ticket when **every** member of its group is out of office (the genuine single-person-group / everyone-away gap); when any member is available, the ticket is left for normal triage. Tickets actively *assigned* to an away agent are still reassigned to an available colleague as before.
+
 ## 2.130.1 &mdash; 2026-06-30
 
 ### Fixed

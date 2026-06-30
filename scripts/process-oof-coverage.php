@@ -248,21 +248,18 @@ foreach ($candidates as $t) {
         }
         $awayAgentId = $assignedTo;
     } else {
-        // Unassigned: only blocked if EVERY group member is out of office.
+        // Unassigned ticket. OOF coverage only steps in when the absence is what
+        // is stalling it — i.e. EVERY group member is out of office (a
+        // single-person group whose sole member is away, or a group where
+        // everyone is away). If even one member is available, the ticket isn't
+        // blocked by anyone's absence; normal triage / auto-assign owns it, so
+        // we leave it alone rather than hijacking the unassigned queue.
         $availableNow = array_values(array_diff($groupMembers, $oofIds));
         if (!empty($availableNow)) {
-            // Someone is free. Reassign to them if allowed; otherwise leave it
-            // for the normal queue — there's no absence to announce.
-            if ($action !== 'reply_only') {
-                $pick = _autoAssignLeastLoaded($db, $availableNow);
-                if ($pick !== null && oofReassign($db, $ticketId, $pick, null)) {
-                    logMsg('INFO', "  Ticket #{$ticketId}: assigned to available member #{$pick}.");
-                    $reassigned++;
-                }
-            }
             continue;
         }
-        // All members are out — pick the one returning soonest as the "away" face.
+        // Everyone is out — announce the absence to the requester. Pick the
+        // member returning soonest as the "face" of the reply.
         $awayAgentId = oofSoonestReturning($groupMembers, $oofRows);
     }
 
