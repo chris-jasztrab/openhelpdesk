@@ -106,6 +106,81 @@ $router->post('/admin/settings/sso/clear-log', function () {
 });
 
 /* ==================================================================
+ * ADMIN – Out of Office (OOF) coverage
+ * ================================================================== */
+
+$router->get('/admin/settings/oof', function () {
+    Auth::requirePermission('automations.manage');
+
+    // Current cache of who's flagged out of office (may be empty before the
+    // first cron run, or if the table doesn't exist yet on a fresh install).
+    $oofStatuses = [];
+    try {
+        $db = Database::connect();
+        $oofStatuses = $db->query(
+            "SELECT u.first_name, u.last_name, u.email,
+                    s.status, s.scheduled_start, s.scheduled_end, s.is_oof, s.checked_at
+             FROM agent_oof_status s
+             JOIN users u ON s.user_id = u.id
+             ORDER BY s.is_oof DESC, u.first_name, u.last_name"
+        )->fetchAll();
+    } catch (Throwable $e) {
+        $oofStatuses = [];
+    }
+
+    render('admin/settings/oof', [
+        'oofEnabled'       => getSetting('oof_enabled',  '0'),
+        'oofAction'        => getSetting('oof_action',   'reassign_then_reply'),
+        'oofScope'         => getSetting('oof_scope',    'unanswered'),
+        'oofReplyTemplate' => getSetting('oof_reply_template', ''),
+        'graphConfigured'  => getSetting('graph_tenant_id') !== ''
+                              && getSetting('graph_client_id') !== ''
+                              && getSetting('graph_client_secret') !== '',
+        'oofStatuses'      => $oofStatuses,
+    ]);
+});
+
+$router->post('/admin/settings/oof', function () {
+    Auth::requirePermission('automations.manage');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        redirect('/admin/settings/oof');
+    }
+
+    $enabled  = isset($_POST['oof_enabled']) ? '1' : '0';
+    $action   = in_array($_POST['oof_action'] ?? '', ['reassign_then_reply', 'reassign_only', 'reply_only'], true)
+                ? $_POST['oof_action'] : 'reassign_then_reply';
+    $scope    = ($_POST['oof_scope'] ?? '') === 'all' ? 'all' : 'unanswered';
+    $template = trim($_POST['oof_reply_template'] ?? '');
+
+    $before = [
+        'oof_enabled'        => getSetting('oof_enabled',  '0'),
+        'oof_action'         => getSetting('oof_action',   'reassign_then_reply'),
+        'oof_scope'          => getSetting('oof_scope',    'unanswered'),
+        'oof_reply_template' => getSetting('oof_reply_template', ''),
+    ];
+
+    setSetting('oof_enabled',        $enabled);
+    setSetting('oof_action',         $action);
+    setSetting('oof_scope',          $scope);
+    setSetting('oof_reply_template', $template);
+
+    logAuditChange('oof.settings_changed', null, null, $before, [
+        'oof_enabled'        => $enabled,
+        'oof_action'         => $action,
+        'oof_scope'          => $scope,
+        'oof_reply_template' => $template,
+    ]);
+
+    flash('success', 'Out-of-office settings saved.');
+    redirect('/admin/settings/oof');
+});
+
+$router->get('/admin/settings/oof/help', function () {
+    Auth::requirePermission('automations.manage');
+    render('admin/settings/oof-help');
+});
+
+/* ==================================================================
  * ADMIN – AI Classification settings
  *
  * Controls the AI provider, key, model, confidence threshold, and the

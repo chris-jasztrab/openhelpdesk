@@ -11,6 +11,14 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.130.0 &mdash; 2026-06-30
+
+### Added
+- **Out-of-office coverage** (Admin &rsaquo; Settings &rsaquo; Out of Office). Solves the "single-person group" problem: when the only agent in a group goes on vacation, their unanswered tickets no longer sit untouched until they return. A new cron job (`scripts/process-oof-coverage.php`, every 15 min) reads each group member's Outlook automatic-replies (out-of-office) state via Microsoft Graph and caches it. For each active ticket whose responsible agent is out of office, it **reassigns** the ticket to an available group member — and when there's **nobody to reassign to** (single-person groups, or everyone away) it **auto-replies the requester once** with the agent's out-of-office message, leaving the ticket open. Configurable action (reassign-then-reply / reassign-only / reply-only), scope (unanswered-only / all active), and a customisable auto-reply template with `{requester_name}`, `{ticket_id}`, `{agent_name}`, `{return_date}` tokens. Reuses the existing Azure app registration — only the read-only `MailboxSettings.Read` application permission needs to be granted. Admin page shows each agent's current OOF state from the last run.
+
+### Changed
+- **Shared Microsoft Graph helpers** extracted into `src/graph.php` (cURL transport, OAuth2 client-credentials token, and the new `getAutomaticReplies()` reader), so both the inbound-email processor and the out-of-office processor share one implementation.
+
 ## 2.129.0 &mdash; 2026-06-29
 
 ### Added

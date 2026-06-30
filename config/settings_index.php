@@ -467,6 +467,29 @@ return [
      'keywords' => 'stale notify requester customer'],
 
     // =======================================================================
+    // Out of Office  (/admin/settings/oof)
+    // =======================================================================
+    ['label' => 'Enable Out-of-Office Coverage', 'description' => 'Reassign or auto-reply when an agent is away',
+     'group' => 'Automation', 'page_label' => 'Out of Office', 'page_url' => '/admin/settings/oof',
+     'section' => 'Out-of-Office Coverage', 'anchor' => 'oof_enabled',
+     'keywords' => 'out of office oof vacation away absence holiday outlook automatic replies mailbox graph coverage'],
+
+    ['label' => 'OOF Action',                   'description' => 'Reassign, auto-reply, or both when an agent is out of office',
+     'group' => 'Automation', 'page_label' => 'Out of Office', 'page_url' => '/admin/settings/oof',
+     'section' => 'When an agent is out of office', 'anchor' => 'oa_both',
+     'keywords' => 'reassign auto-reply coverage single person group'],
+
+    ['label' => 'OOF Ticket Scope',             'description' => 'Act on unanswered tickets only, or all active tickets',
+     'group' => 'Automation', 'page_label' => 'Out of Office', 'page_url' => '/admin/settings/oof',
+     'section' => 'Which tickets to act on', 'anchor' => 'os_unanswered',
+     'keywords' => 'unanswered active scope tickets'],
+
+    ['label' => 'OOF Auto-reply Message',       'description' => 'Message sent to the requester when no coverage is available',
+     'group' => 'Automation', 'page_label' => 'Out of Office', 'page_url' => '/admin/settings/oof',
+     'section' => 'Auto-reply message', 'anchor' => 'oof_reply_template',
+     'keywords' => 'auto reply template message requester out of office'],
+
+    // =======================================================================
     // Escalations + Paths
     // =======================================================================
     ['label' => 'Escalation Rules',             'description' => 'Create rules for time-based ticket escalation',
