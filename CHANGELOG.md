@@ -11,6 +11,14 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.130.3 &mdash; 2026-06-30
+
+### Fixed
+- **OOF auto-reply no longer invents a return date.** When an agent turns on Outlook automatic replies *without* a time range (`status: alwaysEnabled`), Graph still returns a placeholder `scheduledEndDateTime` (~tomorrow). The refresh stored it, so the auto-reply wrongly told requesters the agent was "out of office until tomorrow." The end date is now only trusted for genuinely `scheduled` out-of-office; an `alwaysEnabled` agent has no return date.
+
+### Added
+- **Separate auto-reply message for no-return-date absences.** Admin → Settings → Out of Office now has two message boxes: one used when the agent has a scheduled end date (with `{return_date}`), and one used when they have no return date (no date promised). Each has its own default and is independently editable.
+
 ## 2.130.2 &mdash; 2026-06-30
 
 ### Fixed

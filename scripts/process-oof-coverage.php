@@ -60,6 +60,19 @@ const DEFAULT_OOF_TEMPLATE =
     "open and will be addressed as soon as possible.\n\n" .
     "We appreciate your patience.";
 
+/**
+ * Auto-reply used when the agent's out-of-office has NO return date (Outlook
+ * "automatic replies" toggled on without a time range). Deliberately makes no
+ * promise about when they'll be back. Tokens: {requester_name}, {ticket_id},
+ * {agent_name} — {return_date} is intentionally not used here.
+ */
+const DEFAULT_OOF_TEMPLATE_NO_DATE =
+    "Hello {requester_name},\n\n" .
+    "Thank you for your request (ticket #{ticket_id}). The staff member handling it, " .
+    "{agent_name}, is currently out of office. Your ticket remains open and will be " .
+    "addressed as soon as possible.\n\n" .
+    "We appreciate your patience.";
+
 // ─── Guard checks ──────────────────────────────────────────────────────────────
 if (!extension_loaded('curl')) {
     logMsg('ERROR', 'PHP cURL extension is not loaded. Enable extension=curl in php.ini.');
@@ -140,8 +153,16 @@ foreach ($members as $m) {
         $extMsg = trim((string) ($setting['internalReplyMessage'] ?? ''));
     }
 
-    $start = oofParseGraphDate($setting['scheduledStartDateTime'] ?? null);
-    $end   = oofParseGraphDate($setting['scheduledEndDateTime'] ?? null);
+    // Graph populates scheduledStart/EndDateTime with placeholder values even
+    // when status is alwaysEnabled (typically ~tomorrow) — only a 'scheduled'
+    // status has a genuine return date. Ignore the dates otherwise, so an agent
+    // who turned OOF on with no time range has NO return date (not a bogus one).
+    $start = null;
+    $end   = null;
+    if ($status === 'scheduled') {
+        $start = oofParseGraphDate($setting['scheduledStartDateTime'] ?? null);
+        $end   = oofParseGraphDate($setting['scheduledEndDateTime'] ?? null);
+    }
 
     // Effective OOF = always-on, or scheduled and we're inside the window now.
     $isOof = 0;
@@ -394,24 +415,30 @@ function oofAutoReply(PDO $db, int $ticketId, int $awayAgentId, ?array $oofRow):
     $requesterName = trim($row['first_name'] . ' ' . $row['last_name']);
     $agentName     = oofUserName($db, $awayAgentId);
 
-    // Return date from the away agent's scheduled end, if any.
-    $returnDate = 'further notice';
-    if ($oofRow && !empty($oofRow['scheduled_end'])) {
-        $ts = strtotime((string) $oofRow['scheduled_end']);
-        if ($ts !== false) {
-            $returnDate = date('F j, Y', $ts);
+    // A genuine return date only exists for a 'scheduled' OOF (the refresh
+    // stores NULL otherwise). With no date we use a separate message that makes
+    // no promise about when the agent is back, rather than inventing one.
+    $returnTs = ($oofRow && !empty($oofRow['scheduled_end'])) ? strtotime((string) $oofRow['scheduled_end']) : false;
+    $hasDate  = $returnTs !== false;
+
+    if ($hasDate) {
+        $template = getSetting('oof_reply_template', DEFAULT_OOF_TEMPLATE);
+        if (trim($template) === '') {
+            $template = DEFAULT_OOF_TEMPLATE;
+        }
+    } else {
+        $template = getSetting('oof_reply_template_no_date', DEFAULT_OOF_TEMPLATE_NO_DATE);
+        if (trim($template) === '') {
+            $template = DEFAULT_OOF_TEMPLATE_NO_DATE;
         }
     }
 
-    $template = getSetting('oof_reply_template', DEFAULT_OOF_TEMPLATE);
-    if (trim($template) === '') {
-        $template = DEFAULT_OOF_TEMPLATE;
-    }
     $text = strtr($template, [
         '{requester_name}' => $requesterName,
         '{ticket_id}'      => (string) $ticketId,
         '{agent_name}'     => $agentName,
-        '{return_date}'    => $returnDate,
+        // Still substituted in case a custom no-date template references it.
+        '{return_date}'    => $hasDate ? date('F j, Y', $returnTs) : 'further notice',
     ]);
 
     // Body for the timeline + email. The template is plain text; the agent's

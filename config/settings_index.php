@@ -484,10 +484,15 @@ return [
      'section' => 'Which tickets to act on', 'anchor' => 'os_unanswered',
      'keywords' => 'unanswered active scope tickets'],
 
-    ['label' => 'OOF Auto-reply Message',       'description' => 'Message sent to the requester when no coverage is available',
+    ['label' => 'OOF Auto-reply Message',       'description' => 'Message sent to the requester when the agent has a return date',
      'group' => 'Automation', 'page_label' => 'Out of Office', 'page_url' => '/admin/settings/oof',
      'section' => 'Auto-reply message', 'anchor' => 'oof_reply_template',
-     'keywords' => 'auto reply template message requester out of office'],
+     'keywords' => 'auto reply template message requester out of office return date'],
+
+    ['label' => 'OOF Auto-reply (no return date)', 'description' => 'Message used when the agent has no out-of-office end date',
+     'group' => 'Automation', 'page_label' => 'Out of Office', 'page_url' => '/admin/settings/oof',
+     'section' => 'Auto-reply message', 'anchor' => 'oof_reply_template_no_date',
+     'keywords' => 'auto reply template no return date always enabled out of office indefinite'],
 
     // =======================================================================
     // Escalations + Paths

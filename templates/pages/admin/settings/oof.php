@@ -16,6 +16,15 @@ $defaultTemplate =
     "{agent_name}, is currently out of office until {return_date}. Your ticket remains " .
     "open and will be addressed as soon as possible.\n\n" .
     "We appreciate your patience.";
+
+// Mirror of DEFAULT_OOF_TEMPLATE_NO_DATE — used when the agent's OOF has no
+// return date (Outlook automatic replies on with no time range).
+$defaultTemplateNoDate =
+    "Hello {requester_name},\n\n" .
+    "Thank you for your request (ticket #{ticket_id}). The staff member handling it, " .
+    "{agent_name}, is currently out of office. Your ticket remains open and will be " .
+    "addressed as soon as possible.\n\n" .
+    "We appreciate your patience.";
 ?>
 <div class="mb-4">
     <h2 class="fw-bold mb-0">Settings</h2>
@@ -140,15 +149,29 @@ $defaultTemplate =
             <i class="bi bi-chat-left-text me-1"></i>Auto-reply message
         </div>
         <div class="card-body">
-            <label for="oof_reply_template" class="form-label fw-semibold">Message to the requester</label>
+            <label for="oof_reply_template" class="form-label fw-semibold">When the agent has a return date</label>
             <textarea class="form-control font-monospace" id="oof_reply_template" name="oof_reply_template"
                       rows="6" placeholder="<?= e($defaultTemplate) ?>"><?= e($oofReplyTemplate ?? '') ?></textarea>
-            <div class="form-text">
-                Leave blank to use the default shown above. Available tokens:
-                <code>{requester_name}</code>, <code>{ticket_id}</code>, <code>{agent_name}</code>,
-                <code>{return_date}</code>. The agent's Outlook out-of-office message is appended
-                below this text automatically when present.
+            <div class="form-text mb-4">
+                Used when the agent set a scheduled out-of-office with an end date. Leave blank to use the
+                default shown above. Tokens: <code>{requester_name}</code>, <code>{ticket_id}</code>,
+                <code>{agent_name}</code>, <code>{return_date}</code>.
             </div>
+
+            <label for="oof_reply_template_no_date" class="form-label fw-semibold">When the agent has <em>no</em> return date</label>
+            <textarea class="form-control font-monospace" id="oof_reply_template_no_date" name="oof_reply_template_no_date"
+                      rows="6" placeholder="<?= e($defaultTemplateNoDate) ?>"><?= e($oofReplyTemplateNoDate ?? '') ?></textarea>
+            <div class="form-text">
+                Used when the agent simply turned automatic replies on without a time range — so there's no
+                date to promise. Leave blank to use the default shown above. Tokens:
+                <code>{requester_name}</code>, <code>{ticket_id}</code>, <code>{agent_name}</code>
+                (no <code>{return_date}</code>).
+            </div>
+
+            <p class="text-muted small mt-3 mb-0">
+                <i class="bi bi-info-circle me-1"></i>The agent's Outlook out-of-office message is appended
+                below whichever message is used, when present.
+            </p>
         </div>
     </div>
 

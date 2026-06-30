@@ -132,7 +132,8 @@ $router->get('/admin/settings/oof', function () {
         'oofEnabled'       => getSetting('oof_enabled',  '0'),
         'oofAction'        => getSetting('oof_action',   'reassign_then_reply'),
         'oofScope'         => getSetting('oof_scope',    'unanswered'),
-        'oofReplyTemplate' => getSetting('oof_reply_template', ''),
+        'oofReplyTemplate'       => getSetting('oof_reply_template', ''),
+        'oofReplyTemplateNoDate' => getSetting('oof_reply_template_no_date', ''),
         'graphConfigured'  => getSetting('graph_tenant_id') !== ''
                               && getSetting('graph_client_id') !== ''
                               && getSetting('graph_client_secret') !== '',
@@ -149,26 +150,30 @@ $router->post('/admin/settings/oof', function () {
     $enabled  = isset($_POST['oof_enabled']) ? '1' : '0';
     $action   = in_array($_POST['oof_action'] ?? '', ['reassign_then_reply', 'reassign_only', 'reply_only'], true)
                 ? $_POST['oof_action'] : 'reassign_then_reply';
-    $scope    = ($_POST['oof_scope'] ?? '') === 'all' ? 'all' : 'unanswered';
-    $template = trim($_POST['oof_reply_template'] ?? '');
+    $scope          = ($_POST['oof_scope'] ?? '') === 'all' ? 'all' : 'unanswered';
+    $template       = trim($_POST['oof_reply_template'] ?? '');
+    $templateNoDate = trim($_POST['oof_reply_template_no_date'] ?? '');
 
     $before = [
-        'oof_enabled'        => getSetting('oof_enabled',  '0'),
-        'oof_action'         => getSetting('oof_action',   'reassign_then_reply'),
-        'oof_scope'          => getSetting('oof_scope',    'unanswered'),
-        'oof_reply_template' => getSetting('oof_reply_template', ''),
+        'oof_enabled'                => getSetting('oof_enabled',  '0'),
+        'oof_action'                 => getSetting('oof_action',   'reassign_then_reply'),
+        'oof_scope'                  => getSetting('oof_scope',    'unanswered'),
+        'oof_reply_template'         => getSetting('oof_reply_template', ''),
+        'oof_reply_template_no_date' => getSetting('oof_reply_template_no_date', ''),
     ];
 
-    setSetting('oof_enabled',        $enabled);
-    setSetting('oof_action',         $action);
-    setSetting('oof_scope',          $scope);
-    setSetting('oof_reply_template', $template);
+    setSetting('oof_enabled',                $enabled);
+    setSetting('oof_action',                 $action);
+    setSetting('oof_scope',                  $scope);
+    setSetting('oof_reply_template',         $template);
+    setSetting('oof_reply_template_no_date', $templateNoDate);
 
     logAuditChange('oof.settings_changed', null, null, $before, [
-        'oof_enabled'        => $enabled,
-        'oof_action'         => $action,
-        'oof_scope'          => $scope,
-        'oof_reply_template' => $template,
+        'oof_enabled'                => $enabled,
+        'oof_action'                 => $action,
+        'oof_scope'                  => $scope,
+        'oof_reply_template'         => $template,
+        'oof_reply_template_no_date' => $templateNoDate,
     ]);
 
     flash('success', 'Out-of-office settings saved.');
