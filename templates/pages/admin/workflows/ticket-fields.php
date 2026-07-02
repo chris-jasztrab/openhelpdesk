@@ -29,9 +29,9 @@ $systemFieldMeta = [
 
 $sysDefaults = systemFieldDefaults();
 ?>
-<link rel="stylesheet" href="https://cdn.ckeditor.com/ckeditor5/43.3.1/ckeditor5.css">
+<link rel="stylesheet" href="/assets/vendor/ckeditor5/ckeditor5.css">
 <script type="importmap">
-{"imports":{"ckeditor5":"https://cdn.ckeditor.com/ckeditor5/43.3.1/ckeditor5.js","ckeditor5/":"https://cdn.ckeditor.com/ckeditor5/43.3.1/"}}
+{"imports":{"ckeditor5":"/assets/vendor/ckeditor5/ckeditor5.js","ckeditor5/":"/assets/vendor/ckeditor5/"}}
 </script>
 <style>
     /* Text-block rich-text editor inside the field modal */
@@ -619,7 +619,7 @@ $sysDefaults = systemFieldDefaults();
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js" integrity="sha384-eeLEhtwdMwD3X9y+8P3Cn7Idl/M+w8H4uZqkgD/2eJVkWIN1yKzEj6XegJ9dL3q0" crossorigin="anonymous"></script>
+<script src="/assets/vendor/sortablejs/Sortable.min.js"></script>
 <script>
 // ── Preview toggle: bound first, outside the main IIFE, so it works even if
 //    the builder IIFE bails on a later error (Sortable load, etc.). ──

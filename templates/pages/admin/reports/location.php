@@ -85,7 +85,7 @@ $breadcrumbs  = [
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script src="/assets/vendor/chartjs/chart.umd.min.js"></script>
 <script>
 new Chart(document.getElementById('locChart'), {
     type: 'bar',

@@ -7,10 +7,10 @@
     <meta name="csrf-token" content="<?= e(csrfToken()) ?>">
     <title><?= e($pageTitle) ?> &ndash; <?= e(getSetting('branding_app_name', 'OpenHelpDesk')) ?></title>
     <?php require ROOT_DIR . '/templates/partials/pwa-head.php'; ?>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" integrity="sha384-XGjxtQfXaH2tnPFa9x+ruJTuLE3Aa6LhHSWRr1XeTyhezb4abCG4ccI5AkVDxqC+" crossorigin="anonymous">
+    <link href="/assets/vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
+    <link href="/assets/vendor/bootstrap-icons/bootstrap-icons.min.css" rel="stylesheet">
     <?php if (Auth::check() && !Auth::isAdmin()): ?>
-    <link href="https://cdn.jsdelivr.net/npm/driver.js@1.3.4/dist/driver.css" rel="stylesheet" integrity="sha384-eyrYgcjChmzD338JTHFZssgJHOqqOZbajet8yZpCw8ESroLDi28BarMEKCImNGHC" crossorigin="anonymous">
+    <link href="/assets/vendor/driverjs/driver.css" rel="stylesheet">
     <?php endif; ?>
     <style>
         :root {
@@ -502,15 +502,15 @@
         <?= $content ?>
     </main>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    <script src="/assets/vendor/bootstrap/bootstrap.bundle.min.js"></script>
     <script>document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function(el){new bootstrap.Tooltip(el)});</script>
     <?php if (empty($embedMode)) require ROOT_DIR . '/templates/partials/pwa-install.php'; ?>
     <?php if (Auth::check() && Auth::isStaff() && !Auth::isAdmin()): ?>
-    <script src="https://cdn.jsdelivr.net/npm/driver.js@1.3.4/dist/driver.js.iife.js" integrity="sha384-mONJQRmOkeJ15jmKjy/48MGRG5RxU3w1yPFGa4RkaIoZw9oD1YQ3rjSqmx7Z55yg" crossorigin="anonymous"></script>
+    <script src="/assets/vendor/driverjs/driver.js.iife.js"></script>
     <?php require ROOT_DIR . '/templates/partials/agent-tour.php'; ?>
     <?php endif; ?>
     <?php if (Auth::check() && !Auth::isStaff()): ?>
-    <script src="https://cdn.jsdelivr.net/npm/driver.js@1.3.4/dist/driver.js.iife.js" integrity="sha384-mONJQRmOkeJ15jmKjy/48MGRG5RxU3w1yPFGa4RkaIoZw9oD1YQ3rjSqmx7Z55yg" crossorigin="anonymous"></script>
+    <script src="/assets/vendor/driverjs/driver.js.iife.js"></script>
     <?php require ROOT_DIR . '/templates/partials/portal-tour.php'; ?>
     <?php endif; ?>
     <?php if (Auth::check()): ?>

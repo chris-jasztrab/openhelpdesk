@@ -220,7 +220,7 @@ $intervalOptions = [10 => '10s', 15 => '15s', 30 => '30s', 60 => '1m', 120 => '2
   }
 </style>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script src="/assets/vendor/chartjs/chart.umd.min.js"></script>
 <script>
 (function () {
   'use strict';

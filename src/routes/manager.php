@@ -28,7 +28,7 @@ function _managerGate(): array
         http_response_code(403);
         echo '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">';
         echo '<title>403 Forbidden</title>';
-        echo '<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">';
+        echo '<link href="/assets/vendor/bootstrap/bootstrap.min.css" rel="stylesheet">';
         echo '</head><body class="d-flex align-items-center justify-content-center" style="min-height:100vh;background:#f1f5f9">';
         echo '<div class="text-center" style="max-width:480px;"><h1 class="display-1 fw-bold text-danger">403</h1>';
         echo '<p class="lead text-muted">You aren\'t flagged as a manager of any group, so the Manage My Team area isn\'t available to you. Ask an admin to delegate group manager rights from <strong>Admin → Settings → Groups</strong>.</p>';

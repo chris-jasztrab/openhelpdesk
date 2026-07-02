@@ -1,0 +1,4 @@
+# Vendored third-party front-end libraries. Store byte-exact on every platform:
+# never apply line-ending conversion (would corrupt fonts and change minified
+# file bytes) and don't attempt text diffs on minified bundles.
+* binary

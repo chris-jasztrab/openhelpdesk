@@ -26,9 +26,9 @@ $startsVal    = old('starts_at',   $isEdit && $editing['starts_at']  ? date('Y-m
 $expiresVal   = old('expires_at',  $isEdit && $editing['expires_at'] ? date('Y-m-d\TH:i', strtotime($editing['expires_at'])) : '');
 $activeVal    = $isEdit ? (int) $editing['is_active'] === 1 : true;
 ?>
-<link rel="stylesheet" href="https://cdn.ckeditor.com/ckeditor5/43.3.1/ckeditor5.css">
+<link rel="stylesheet" href="/assets/vendor/ckeditor5/ckeditor5.css">
 <script type="importmap">
-{"imports":{"ckeditor5":"https://cdn.ckeditor.com/ckeditor5/43.3.1/ckeditor5.js","ckeditor5/":"https://cdn.ckeditor.com/ckeditor5/43.3.1/"}}
+{"imports":{"ckeditor5":"/assets/vendor/ckeditor5/ckeditor5.js","ckeditor5/":"/assets/vendor/ckeditor5/"}}
 </script>
 <style>
 .ck.ck-editor__editable { min-height: 220px; }

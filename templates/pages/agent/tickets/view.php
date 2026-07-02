@@ -28,9 +28,9 @@ if ($solutionTimelineId > 0) {
     }
 }
 ?>
-<link rel="stylesheet" href="https://cdn.ckeditor.com/ckeditor5/43.3.1/ckeditor5.css">
+<link rel="stylesheet" href="/assets/vendor/ckeditor5/ckeditor5.css">
 <script type="importmap">
-{"imports":{"ckeditor5":"https://cdn.ckeditor.com/ckeditor5/43.3.1/ckeditor5.js","ckeditor5/":"https://cdn.ckeditor.com/ckeditor5/43.3.1/"}}
+{"imports":{"ckeditor5":"/assets/vendor/ckeditor5/ckeditor5.js","ckeditor5/":"/assets/vendor/ckeditor5/"}}
 </script>
 <style>
 #replyBox { scroll-margin-bottom: 1.5rem; }

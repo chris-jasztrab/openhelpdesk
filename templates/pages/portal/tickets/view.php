@@ -46,7 +46,7 @@ if ($solutionTimelineId > 0) {
 [data-bs-theme="dark"] .ld-timeline-solution { background: rgba(25,135,84,.16); }
 .ld-timeline-solution:target { box-shadow: inset 0 0 0 9999px rgba(25,135,84,.12); transition: box-shadow .8s ease; }
 </style>
-<link rel="stylesheet" href="https://cdn.ckeditor.com/ckeditor5/43.3.1/ckeditor5.css">
+<link rel="stylesheet" href="/assets/vendor/ckeditor5/ckeditor5.css">
 <?php if (!empty($fromFloor)): ?>
 <style>
 .main-content { padding-top: 1rem !important; }

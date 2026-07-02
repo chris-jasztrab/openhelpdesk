@@ -263,7 +263,7 @@ The default group is genuinely <strong>last-resort</strong>. Don't use it as a p
 </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script src="/assets/vendor/mermaid/mermaid.min.js"></script>
 <script>
   if (window.mermaid) {
     mermaid.initialize({ startOnLoad: true, theme: 'default', flowchart: { curve: 'basis', padding: 16 } });

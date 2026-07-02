@@ -11,6 +11,12 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.132.6 &mdash; 2026-07-02
+
+### Security
+- **All front-end libraries are now self-hosted; the app no longer loads anything from third-party CDNs.** Bootstrap, Bootstrap-Icons (+ its web fonts), SortableJS, Chart.js, driver.js, CKEditor 5, and Mermaid are vendored under `public/assets/vendor/` and referenced with same-origin `/assets/vendor/...` paths across every layout, report, ticket form, and docs page (the SRI attributes added in 2.132.5 were removed as unnecessary for same-origin assets). This removes the CDN-compromise and cross-domain-inclusion risk entirely, and eliminates a hard third-party dependency.
+- **Content-Security-Policy tightened accordingly.** `script-src`, `style-src`, `font-src`, and `connect-src` no longer allow `https://cdn.jsdelivr.net` or `https://cdn.ckeditor.com` — the policy is now `default-src 'self'` with only the (separately-tracked) `'unsafe-inline'` allowance remaining. Applied to both the site-wide header (`bootstrap.php`) and the embed-mode header (`portal.php`). (The standalone `/install/` wizard, which runs without the app CSP and is recommended for removal after setup, still references the CDN and is left unchanged.)
+
 ## 2.132.5 &mdash; 2026-07-02
 
 ### Security
