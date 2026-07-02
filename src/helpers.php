@@ -634,12 +634,24 @@ function notificationCount(): int
  */
 function notificationsFeedRows(PDO $db, int $userId, int $limit = 50): array
 {
+    // Redact the subject/message of a confidential ticket unless the recipient
+    // may actually see it (creator, or a member of the confidential type's
+    // group). A notification is addressed to the user, but being @-mentioned on
+    // a confidential ticket must not leak its subject/excerpt past the
+    // confidential gate. $conf is the shared "is confidential AND not allowed"
+    // predicate, evaluated in SQL so we never SELECT the sensitive text.
+    $conf = "COALESCE(tt.is_confidential, 0) = 1
+             AND t.created_by <> n.user_id
+             AND (tt.group_id IS NULL
+                  OR tt.group_id NOT IN (SELECT group_id FROM group_user_map WHERE user_id = n.user_id))";
     $stmt = $db->prepare(
-        "SELECT n.*, t.subject AS ticket_subject,
+        "SELECT n.*,
+                CASE WHEN {$conf} THEN '[Confidential ticket]' ELSE t.subject END AS ticket_subject,
                 CONCAT(m.first_name, ' ', m.last_name) AS mentioned_by_name,
-                COALESCE(NULLIF(n.body, ''), tl.details) AS message
+                CASE WHEN {$conf} THEN NULL ELSE COALESCE(NULLIF(n.body, ''), tl.details) END AS message
          FROM notifications n
          JOIN tickets t          ON n.ticket_id    = t.id
+         LEFT JOIN ticket_types tt ON tt.id = t.type_id
          LEFT JOIN users m       ON n.mentioned_by = m.id
          LEFT JOIN ticket_timeline tl ON n.timeline_id = tl.id
          WHERE n.user_id = ?
@@ -5316,9 +5328,13 @@ function totpBase32Decode(string $base32): string
 
 /**
  * Verify a 6-digit TOTP code. Allows ±$window time steps for clock drift.
+ * On success, $matchedStep is set to the absolute time-step counter the code
+ * matched — callers use it to reject replay of an already-used step
+ * (see totpVerifyOnce).
  */
-function totpVerify(string $secret, string $code, int $window = 1): bool
+function totpVerify(string $secret, string $code, int $window = 1, ?int &$matchedStep = null): bool
 {
+    $matchedStep = null;
     if (!preg_match('/^\d{6}$/', $code)) {
         return false;
     }
@@ -5335,10 +5351,42 @@ function totpVerify(string $secret, string $code, int $window = 1): bool
              (ord($hmac[$offset + 3]) & 0xff)
         ) % 1_000_000;
         if (str_pad((string) $otp, 6, '0', STR_PAD_LEFT) === $code) {
+            $matchedStep = $timeStep + $i;
             return true;
         }
     }
     return false;
+}
+
+/**
+ * Verify a TOTP code for a specific user AND consume its time-step so the same
+ * code can't be replayed within its ~90s validity window (a captured or
+ * shoulder-surfed code otherwise authenticates a second session). Rejects any
+ * code whose matched step is <= the last step this user already used.
+ *
+ * Falls back to plain verification (no replay protection) only if the
+ * totp_last_step column can't be read/written, so a schema/DB hiccup never
+ * locks a legitimate user out of 2FA.
+ */
+function totpVerifyOnce(PDO $db, int $userId, string $secret, string $code, int $window = 1): bool
+{
+    $matchedStep = null;
+    if (!totpVerify($secret, $code, $window, $matchedStep)) {
+        return false;
+    }
+    try {
+        $stmt = $db->prepare('SELECT totp_last_step FROM users WHERE id = ?');
+        $stmt->execute([$userId]);
+        $last = $stmt->fetchColumn();
+        if ($last !== false && $last !== null && (int) $last >= $matchedStep) {
+            return false; // replay of an already-used (or older) step
+        }
+        $db->prepare('UPDATE users SET totp_last_step = ? WHERE id = ?')
+           ->execute([$matchedStep, $userId]);
+    } catch (\Throwable $e) {
+        error_log('[totp] replay check unavailable: ' . $e->getMessage());
+    }
+    return true;
 }
 
 /**

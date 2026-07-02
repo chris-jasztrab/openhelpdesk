@@ -11,6 +11,15 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.132.3 &mdash; 2026-07-02
+
+### Security
+- **Teams webhook is now restricted to Microsoft endpoints (SSRF fix).** The outgoing Teams webhook URL was validated only as "an https URL," so an admin-set URL pointed at an internal host (the database subnet, a cloud metadata endpoint, `127.0.0.1`, …) would make the app issue blind requests from inside the network perimeter. Posts are now allowed only to `*.webhook.office.com` / `*.logic.azure.com` / `*.office.com` hosts, and IP-literal hosts are rejected.
+- **Sessions now pick up role changes and account deletion immediately.** The user's role was cached in the session at login and never re-checked, so demoting or deleting a rogue admin/agent left their existing session fully privileged until they logged out. Each authenticated request now re-reads the role from the database (and destroys the session if the account is gone).
+- **TOTP codes can no longer be replayed.** A correct 6-digit code could be submitted more than once within its ~90-second window (including across the separate web and API login paths), authenticating extra sessions from a single captured code. The web and API login now record the code's time-step per user and reject any already-used or older step. (Adds `users.totp_last_step` via migration 063.)
+- **Confidential ticket subjects no longer leak through the notifications feed.** Being @-mentioned on a confidential ticket surfaced its subject (and, in the API, a comment excerpt) in the recipient's notifications even without access to the ticket. The web feed and `GET /api/v1/notifications` now redact the subject/excerpt to "[Confidential ticket]" unless the recipient is the creator or a member of the confidential type's group.
+- **The CSAT "reopen ticket" link no longer reopens on a bare GET.** A state-changing `GET /survey/{token}/reopen` could be triggered silently by email-security scanners and link-preview/prefetch bots. The link now lands on a confirmation page and the reopen happens only on an explicit POST.
+
 ## 2.132.2 &mdash; 2026-07-02
 
 ### Security

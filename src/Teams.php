@@ -111,6 +111,9 @@ class Teams
         if (!filter_var($url, FILTER_VALIDATE_URL) || stripos($url, 'https://') !== 0) {
             return ['ok' => false, 'error' => 'Webhook URL must be a valid https:// URL.'];
         }
+        if (!self::isAllowedWebhookHost($url)) {
+            return ['ok' => false, 'error' => 'Webhook host is not a recognised Microsoft Teams endpoint (expected *.webhook.office.com or *.logic.azure.com).'];
+        }
 
         $body = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         $ch = curl_init($url);
@@ -136,6 +139,29 @@ class Teams
             return ['ok' => true, 'error' => ''];
         }
         return ['ok' => false, 'error' => 'HTTP ' . $code . ': ' . substr((string) $resp, 0, 200)];
+    }
+
+    /**
+     * SSRF guard. A Teams incoming webhook is always hosted on a Microsoft
+     * domain, so we refuse to POST anywhere else. Without this, an admin-set
+     * webhook URL pointed at an internal address (the DB subnet, a cloud
+     * metadata endpoint, 127.0.0.1, …) would turn the "Send test message"
+     * button and every ticket event into a blind request originating from
+     * inside the network perimeter. IP-literal hosts are rejected outright.
+     */
+    private static function isAllowedWebhookHost(string $url): bool
+    {
+        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
+        if ($host === '' || filter_var($host, FILTER_VALIDATE_IP)) {
+            return false;
+        }
+        static $allowedSuffixes = ['.webhook.office.com', '.logic.azure.com', '.office.com'];
+        foreach ($allowedSuffixes as $suffix) {
+            if (str_ends_with($host, $suffix)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** A minimal card for the admin test button. */

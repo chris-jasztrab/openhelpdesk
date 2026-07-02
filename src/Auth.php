@@ -101,8 +101,47 @@ class Auth
         session_destroy();
     }
 
+    /**
+     * Re-sync the session user against the database on each authenticated
+     * request. Without this, a role stored in the session at login stays in
+     * effect until the user logs out — so demoting or deleting a rogue
+     * admin/agent leaves their live session fully privileged. Re-reading the
+     * role here means a permission change (or account deletion) takes effect on
+     * the user's very next request. One cheap indexed lookup; negligible at
+     * helpdesk scale (and consistent with how roleCan/_rolesCache already
+     * resolve permissions fresh per request rather than snapshotting them).
+     */
+    private static function refreshCurrentUser(): void
+    {
+        $uid = self::id();
+        if ($uid === null) {
+            return;
+        }
+        try {
+            $stmt = Database::connect()->prepare(
+                'SELECT role, first_name, last_name, email, avatar FROM users WHERE id = ? LIMIT 1'
+            );
+            $stmt->execute([$uid]);
+            $row = $stmt->fetch();
+        } catch (\Throwable $e) {
+            return; // transient DB error: don't lock the user out
+        }
+        if (!$row) {
+            self::logout(); // account deleted → drop the session entirely
+            return;
+        }
+        $_SESSION['user']['role']       = $row['role'];
+        $_SESSION['user']['first_name'] = $row['first_name'];
+        $_SESSION['user']['last_name']  = $row['last_name'];
+        $_SESSION['user']['email']      = $row['email'];
+        $_SESSION['user']['avatar']     = $row['avatar'];
+    }
+
     public static function requireAuth(): void
     {
+        if (self::check()) {
+            self::refreshCurrentUser();
+        }
         if (!self::check()) {
             // Stash the requested URL so the user lands back here after login.
             // Only capture safe-relative GET targets — POSTs can't be replayed

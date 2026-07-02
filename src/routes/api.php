@@ -404,7 +404,7 @@ $router->post('/api/v1/auth/login', function () {
         if ($code === '') {
             _apiJson(['error' => 'A two-factor authentication code is required.', 'totp_required' => true], 401);
         }
-        if (!totpVerify((string) $user['totp_secret'], $code)) {
+        if (!totpVerifyOnce($db, (int) $user['id'], (string) $user['totp_secret'], $code)) {
             _apiLoginRecordAttempt($db, $email, $ip, false);
             logAudit('auth.api_2fa_failed', null, null, 'device=' . $device, (int) $user['id']);
             _apiJson(['error' => 'Invalid two-factor authentication code.', 'totp_required' => true], 401);
@@ -1539,14 +1539,22 @@ $router->get('/api/v1/notifications', function () {
     $offset   = ($page - 1) * $perPage;
     $lastPage = max(1, (int) ceil($total / $perPage));
 
+    // Redact subject/excerpt for confidential tickets the recipient can't see
+    // (not creator, not in the confidential type's group) — same gate as the
+    // web notifications feed, so an @-mention can't leak confidential text.
+    $conf = "COALESCE(tt.is_confidential, 0) = 1
+             AND t.created_by <> n.user_id
+             AND (tt.group_id IS NULL
+                  OR tt.group_id NOT IN (SELECT group_id FROM group_user_map WHERE user_id = n.user_id))";
     $stmt = $db->prepare(
         "SELECT n.id, n.ticket_id, n.is_read, n.created_at,
-                t.subject AS ticket_subject,
-                SUBSTRING(tl.details, 1, 200) AS comment_excerpt,
+                CASE WHEN {$conf} THEN '[Confidential ticket]' ELSE t.subject END AS ticket_subject,
+                CASE WHEN {$conf} THEN NULL ELSE SUBSTRING(tl.details, 1, 200) END AS comment_excerpt,
                 CONCAT(u.first_name, ' ', u.last_name) AS mentioned_by_name,
                 u.avatar AS mentioned_by_avatar
            FROM notifications n
            JOIN tickets t ON n.ticket_id = t.id
+           LEFT JOIN ticket_types tt ON tt.id = t.type_id
            JOIN ticket_timeline tl ON n.timeline_id = tl.id
            JOIN users u ON n.mentioned_by = u.id
           WHERE $whereClause

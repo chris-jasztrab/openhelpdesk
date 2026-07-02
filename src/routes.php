@@ -1998,7 +1998,7 @@ $router->post('/2fa', function () {
     $stmt->execute([(int) $uid]);
     $u = $stmt->fetch();
 
-    if ($u && totpVerify($u['totp_secret'], $code)) {
+    if ($u && totpVerifyOnce($db, (int) $u['id'], $u['totp_secret'], $code)) {
         unset($_SESSION['2fa_pending'], $_SESSION['2fa_attempts']);
         $_SESSION['user'] = [
             'id'         => (int) $u['id'],
@@ -2524,7 +2524,50 @@ $router->get('/survey/{token}/thanks', function (array $p) {
     ]);
 });
 
+// GET shows a confirmation page with a POST button. A state-changing GET would
+// be silently triggered by email-security scanners and link-preview/prefetch
+// bots that fetch the URL, reopening tickets without the customer's intent.
 $router->get('/survey/{token}/reopen', function (array $p) {
+    $token = preg_replace('/[^a-f0-9]/', '', $p['token'] ?? '');
+    if (strlen($token) !== 64) {
+        http_response_code(404);
+        render('errors/404');
+        return;
+    }
+
+    $db   = Database::connect();
+    $stmt = $db->prepare(
+        'SELECT cs.reopened_at, cs.responded_at, t.id AS ticket_id
+         FROM csat_surveys cs
+         JOIN tickets t ON cs.ticket_id = t.id
+         WHERE cs.token = ?'
+    );
+    $stmt->execute([$token]);
+    $survey = $stmt->fetch();
+
+    if (!$survey) {
+        http_response_code(404);
+        render('errors/404');
+        return;
+    }
+
+    // Already reopened / already rated → skip straight to the result page.
+    if ($survey['reopened_at'] !== null || $survey['responded_at'] !== null) {
+        render('survey/reopened', [
+            'ticketId' => (int) $survey['ticket_id'],
+            'appName'  => getSetting('app_name', 'OpenHelpDesk'),
+        ]);
+        return;
+    }
+
+    render('survey/reopen-confirm', [
+        'token'    => $token,
+        'ticketId' => (int) $survey['ticket_id'],
+        'appName'  => getSetting('app_name', 'OpenHelpDesk'),
+    ]);
+});
+
+$router->post('/survey/{token}/reopen', function (array $p) {
     $token = preg_replace('/[^a-f0-9]/', '', $p['token'] ?? '');
     if (strlen($token) !== 64) {
         http_response_code(404);
