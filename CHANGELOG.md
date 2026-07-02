@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.132.1 &mdash; 2026-07-02
+
+### Fixed
+- **Out-of-office auto-replies no longer show raw HTML tags on the ticket page.** The auto-reply body was assembled as HTML but opened with the plain-text greeting ("Hello …"), so the timeline — which decides HTML-vs-plaintext by the first character — misread the whole reply as plain text and escaped every tag, leaving visible `<br />`, `<hr>`, `<blockquote>` and even the agent's `<html><body>` document wrappers on screen. The body is now wrapped so it begins with a tag, and the agent's Outlook message (which Microsoft Graph returns as a full HTML document) is run through the same rich-text sanitizer the rest of the app uses — which unwraps the `<html>/<head>/<body>` wrappers and drops any `<style>`/`<script>` — before it is stored and emailed. Applies to newly generated auto-replies.
+
 ## 2.132.0 &mdash; 2026-07-02
 
 ### Changed

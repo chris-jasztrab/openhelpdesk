@@ -441,12 +441,18 @@ function oofAutoReply(PDO $db, int $ticketId, int $awayAgentId, ?array $oofRow):
         '{return_date}'    => $hasDate ? date('F j, Y', $returnTs) : 'further notice',
     ]);
 
-    // Body for the timeline + email. The template is plain text; the agent's
-    // Outlook message is already HTML and is appended verbatim below a divider.
-    $bodyHtml = nl2br(e($text));
+    // Body for the timeline + email. The template is plain text (escaped +
+    // nl2br); the agent's Outlook message is HTML — but Graph returns it as a
+    // whole document (<html><head><body>…), so run it through the same rich-text
+    // sanitizer the ticket views use, which unwraps those document tags and
+    // drops <style>/<script>. Wrap the whole body in a <div> so it BEGINS with
+    // a '<': the timeline templates decide HTML-vs-plaintext by the first char,
+    // and without this the "Hello …" opening was misread as plain text and the
+    // markup was escaped into visible tags on the ticket page.
+    $bodyHtml = '<div>' . nl2br(e($text)) . '</div>';
     $extMsg   = $oofRow['external_message'] ?? '';
     if (is_string($extMsg) && trim($extMsg) !== '') {
-        $bodyHtml .= '<hr><blockquote>' . $extMsg . '</blockquote>';
+        $bodyHtml .= '<hr><blockquote>' . sanitizeRichHtml($extMsg) . '</blockquote>';
     }
 
     try {
