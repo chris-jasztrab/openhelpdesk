@@ -44,7 +44,7 @@
     [data-bs-theme="dark"] tr.sortable-chosen { background: #343a40; }
     [data-bs-theme="dark"] td.sortable-handle .bi-grip-vertical { color: #6c757d; }
 </style>
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js" integrity="sha384-eeLEhtwdMwD3X9y+8P3Cn7Idl/M+w8H4uZqkgD/2eJVkWIN1yKzEj6XegJ9dL3q0" crossorigin="anonymous"></script>
 <script>
 (function () {
     var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';

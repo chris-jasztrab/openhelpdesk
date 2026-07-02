@@ -11,6 +11,15 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.132.5 &mdash; 2026-07-02
+
+### Security
+- **Added Subresource Integrity (SRI) to the site-wide CDN assets.** The Bootstrap CSS/JS, Bootstrap-Icons CSS, driver.js (tour) CSS/JS, and SortableJS are now loaded with `integrity="sha384-…" crossorigin="anonymous"` in all four layouts (`app`, `base`, `auth`, `public`) and the sortable partials, so a compromised CDN can't substitute malicious script/style — the browser rejects any file whose hash doesn't match. (Resolves the ZAP "Sub Resource Integrity Attribute Missing" / "Cross-Domain JavaScript Source File Inclusion" findings for the assets that load on every page. Not applied to Chart.js, which is pinned only to the `@4` range — SRI needs an exact version — or to CKEditor 5, whose ES-module import map dynamically loads sub-chunks that a single integrity hash can't cover; both are tracked separately.)
+
+### Notes (server configuration — applied on the production host, not in this repo)
+- **Forced HTTPS.** The port-80 Apache vhost now 301-redirects every request to the same host over TLS, so no application content or session cookie is ever served over plain HTTP (previously the app answered on HTTP and issued a session cookie without the `Secure` flag).
+- **Suppressed the Server version banner** (`ServerTokens Prod`, `ServerSignature Off`).
+
 ## 2.132.4 &mdash; 2026-07-02
 
 ### Security
