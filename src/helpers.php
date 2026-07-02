@@ -122,8 +122,12 @@ function appUrl(): string
         return preg_replace('#^https?://#', $scheme . '://', rtrim($appUrl, '/'));
     }
 
-    // Fall back to building the URL from server variables
-    $host = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost';
+    // Fall back to building the URL from server variables. Prefer SERVER_NAME
+    // (pinned by the web server's ServerName / server_name) over the client-
+    // supplied Host header, so a "Host: evil.com" request can't poison absolute
+    // links baked into emails (e.g. password-reset URLs). Set APP_URL in .env to
+    // make this deterministic — the installer always writes it.
+    $host = $_SERVER['SERVER_NAME'] ?? $_SERVER['HTTP_HOST'] ?? 'localhost';
     return $scheme . '://' . $host;
 }
 

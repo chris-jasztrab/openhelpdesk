@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.132.4 &mdash; 2026-07-02
+
+### Security
+- **Attachment downloads now send `X-Content-Type-Options: nosniff`.** The agent, portal, and admin attachment routes served files with a stored MIME type but no anti-sniffing header (only the REST API route had it). All four now match — defence-in-depth so a browser can't second-guess the declared type on a downloaded file.
+- **The REST `GET /api/v1/meta` no longer exposes internal groups to portal tokens.** Group names/descriptions (and the agent list) are internal routing data and are now returned only to staff tokens; end-user tokens still receive the priorities, types, locations, and statuses they need.
+- **Hardened absolute-link generation against Host-header poisoning.** When `APP_URL` is not set, `appUrl()` now falls back to the server-pinned `SERVER_NAME` rather than the client-supplied `Host` header, so a spoofed `Host` can't rewrite links baked into emails (e.g. password-reset URLs). Setting `APP_URL` remains the recommended, deterministic configuration.
+
 ## 2.132.3 &mdash; 2026-07-02
 
 ### Security

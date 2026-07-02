@@ -1206,6 +1206,7 @@ $router->get('/portal/attachments/{id}/download', function (array $p) {
     session_write_close();
 
     header('Content-Type: ' . $att['mime_type']);
+    header('X-Content-Type-Options: nosniff');
     header('Content-Disposition: attachment; filename="' . str_replace('"', '\\"', $att['original_name']) . '"');
     header('Content-Length: ' . $att['file_size']);
     readfile($filePath);

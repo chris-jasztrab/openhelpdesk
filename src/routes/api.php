@@ -1659,13 +1659,15 @@ $router->get('/api/v1/meta', function () {
         'SELECT id, name FROM locations ORDER BY name'
     )->fetchAll(PDO::FETCH_ASSOC);
 
-    $groups = $db->query(
-        'SELECT id, name, description FROM groups ORDER BY sort_order, name'
-    )->fetchAll(PDO::FETCH_ASSOC);
-
-    // Agent list only exposed to agents/admins
+    // Groups and the agent list are internal routing data — only staff need
+    // them. Exposing group names/descriptions to portal tokens leaks internal
+    // org structure, so both are gated behind the staff check.
+    $groups = [];
     $agents = [];
     if (_apiIsStaff($user)) {
+        $groups = $db->query(
+            'SELECT id, name, description FROM groups ORDER BY sort_order, name'
+        )->fetchAll(PDO::FETCH_ASSOC);
         $agents = $db->query(
             "SELECT id, first_name, last_name, email, role, avatar
                FROM users
