@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.133.0 &mdash; 2026-07-02
+
+### Changed
+- **Stale-ticket notifications now follow the same days the SLA policy timer counts.** When a ticket's type + priority matches an SLA policy, its idle time is measured only on days that policy's timer advances: weekdays unticked on the policy, holidays excluded from SLA, and days with no business-schedule hours no longer count toward staleness. Full 24-hour days are still counted on counting days, so existing thresholds keep their meaning (`3d` = three counted days, not three business-hours days). Tickets with no matching SLA policy — or installs with SLA / business hours unconfigured — keep the previous wall-clock behavior. The stale processor's log and the `stale_notification_sent` timeline entry note when the counted-days rule was applied, and runs report how many tickets were past the wall-clock threshold but not yet stale on counted days.
+
 ## 2.132.7 &mdash; 2026-07-02
 
 ### Changed

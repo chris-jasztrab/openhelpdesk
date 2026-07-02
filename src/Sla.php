@@ -560,6 +560,47 @@ class Sla
     }
 
     /**
+     * Count elapsed minutes between two datetimes on SLA-counted days only.
+     *
+     * Unlike countBusinessMinutes(), full 24-hour days are counted — this
+     * measures how long a ticket has sat idle in "days the SLA timer runs",
+     * not in business minutes, so a "3d" stale threshold still means three
+     * counted days. Skipped without counting: holidays excluded from SLA,
+     * weekdays outside the policy's counted_days set, and days the business
+     * schedule marks closed — the same days the SLA timer never advances on.
+     */
+    public static function countElapsedMinutesOnCountedDays(DateTimeImmutable $from, DateTimeImmutable $to, string $tz, array $schedule, array $excludedDates = [], ?array $countedDays = null): int
+    {
+        $timezone = new DateTimeZone($tz);
+        $current = $from->setTimezone($timezone);
+        $end = $to->setTimezone($timezone);
+        $totalMinutes = 0;
+
+        $maxIterations = 365;
+        $iteration = 0;
+
+        while ($current < $end && $iteration < $maxIterations) {
+            $iteration++;
+            $dayKey = strtolower(substr($current->format('D'), 0, 3));
+            $nextMidnight = $current->modify('+1 day')->setTime(0, 0, 0);
+            $segmentEnd = ($end < $nextMidnight) ? $end : $nextMidnight;
+
+            $daySchedule = $schedule[$dayKey] ?? null;
+            $skip = in_array($current->format('Y-m-d'), $excludedDates, true)
+                || ($countedDays !== null && !in_array($dayKey, $countedDays, true))
+                || ($daySchedule === null || !is_array($daySchedule) || count($daySchedule) < 2);
+
+            if (!$skip) {
+                $totalMinutes += (int) floor(($segmentEnd->getTimestamp() - $current->getTimestamp()) / 60);
+            }
+
+            $current = $nextMidnight;
+        }
+
+        return $totalMinutes;
+    }
+
+    /**
      * Count business minutes between two datetimes.
      */
     public static function countBusinessMinutes(DateTimeImmutable $from, DateTimeImmutable $to, string $tz, array $schedule, array $excludedDates = [], ?array $countedDays = null): int

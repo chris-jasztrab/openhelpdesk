@@ -25,6 +25,7 @@ $recheckMins   = (int) ($settings['stale_recheck_minutes']   ?? 1440);
     <p class="text-muted mb-0" style="font-size:.875rem;">
         Automatically notify the assigned agent (and reassure the requester) when a ticket has had no activity for longer than the threshold below.
         Tickets in <strong>Waiting on Customer</strong>, <strong>Waiting on Third Party</strong>, <strong>Resolved</strong>, or <strong>Closed</strong> statuses are ignored — the clock only runs on tickets that are waiting on your team.
+        When a ticket's type and priority match an <a href="/admin/settings/sla-policies">SLA policy</a>, the stale clock also advances only on the days that policy's timer counts — unticked weekdays, holidays excluded from SLA, and days the business schedule marks closed don't count toward staleness.
     </p>
 </div>
 
