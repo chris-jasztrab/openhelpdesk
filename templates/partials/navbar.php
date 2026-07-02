@@ -140,6 +140,9 @@
                         <?php if ($_showManagerLink): ?>
                         <li><a class="dropdown-item" href="/manager"><i class="bi bi-stars me-2" aria-hidden="true"></i>Manage My Team</a></li>
                         <?php endif; ?>
+                        <?php if (Auth::isStaff() || Auth::isAdmin()): ?>
+                        <li><a class="dropdown-item" href="/agent/wallboard"><i class="bi bi-display me-2" aria-hidden="true"></i>Wallboard</a></li>
+                        <?php endif; ?>
                         <li><a class="dropdown-item" href="/profile"><i class="bi bi-person-circle me-2" aria-hidden="true"></i>My Profile</a></li>
                         <?php if (is_file(ROOT_DIR . '/src/routes/credits.php')): ?>
                         <li><a class="dropdown-item" href="/credits"><i class="bi bi-film me-2" aria-hidden="true"></i>Credits</a></li>

@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.132.7 &mdash; 2026-07-02
+
+### Changed
+- **Wallboard moved from the left sidebar to the profile menu.** The "Wallboard" entry no longer appears on the admin or staff sidebar rail; it now lives in the account dropdown (top-right), visible to all staff and admins, between "Manage My Team" and "My Profile". The `/agent/wallboard` route and its access rules are unchanged.
+
 ## 2.132.6 &mdash; 2026-07-02
 
 ### Security
