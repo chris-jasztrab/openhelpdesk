@@ -8771,13 +8771,16 @@ $router->post('/admin/settings/branding', function () {
     // New logo upload
     if (!empty($_FILES['logo']['tmp_name'])) {
         $file = $_FILES['logo'];
-        $allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
+        // SVG is deliberately excluded: it can carry inline <script>, and the
+        // logo is served from the public web root with its native type, so an
+        // SVG logo would be stored XSS in the app origin. Raster formats only.
+        $allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
         $finfo = finfo_open(FILEINFO_MIME_TYPE);
         $mime  = finfo_file($finfo, $file['tmp_name']);
         finfo_close($finfo);
 
         if (!in_array($mime, $allowedMimes, true)) {
-            flash('error', 'Invalid logo file type. Allowed: JPG, PNG, GIF, WEBP, SVG.');
+            flash('error', 'Invalid logo file type. Allowed: JPG, PNG, GIF, WEBP.');
             redirect('/admin/settings/branding');
             return;
         }
@@ -8798,7 +8801,6 @@ $router->post('/admin/settings/branding', function () {
             'image/png'     => 'png',
             'image/gif'     => 'gif',
             'image/webp'    => 'webp',
-            'image/svg+xml' => 'svg',
             default         => 'png',
         };
         $filename = 'logo_' . uniqid() . '.' . $ext;

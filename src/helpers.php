@@ -907,7 +907,9 @@ function safeUploadExtension(string $mime, string $clientName): string
         'image/png'        => 'png',
         'image/gif'        => 'gif',
         'image/webp'       => 'webp',
-        'image/svg+xml'    => 'svg',
+        // NOTE: image/svg+xml is intentionally NOT mapped. SVG can carry inline
+        // <script>; keeping it out of this map means an SVG upload falls through
+        // to the extension-blocklist path and is stored as .bin, never .svg.
         'text/plain'       => 'txt',
         'text/csv'         => 'csv',
         'application/zip'  => 'zip',
@@ -926,7 +928,7 @@ function safeUploadExtension(string $mime, string $clientName): string
     $blocked = [
         'php', 'php3', 'php4', 'php5', 'php7', 'php8', 'phtml', 'phar', 'pht', 'phps',
         'cgi', 'pl', 'py', 'sh', 'asp', 'aspx', 'jsp', 'jspx', 'exe', 'bat', 'cmd',
-        'com', 'htaccess', 'svgz',
+        'com', 'htaccess', 'svg', 'svgz', 'html', 'htm', 'xhtml', 'xml',
     ];
     if ($ext === '' || in_array($ext, $blocked, true)) {
         return 'bin';
@@ -1948,10 +1950,29 @@ function checkTicketDuplicates(int $userId, int $typeId, ?int $locationId, strin
         "COALESCE(tt.is_confidential, 0) = 0",
         "t.created_at >= NOW() - INTERVAL 14 DAY",
     ];
-    if ($locationId !== null) {
-        $where[]  = 't.location_id = ?';
-        $params[] = $locationId;
+
+    // Scope candidates to what the requesting user may actually see so the
+    // returned match list (subjects, requester names) can't leak tickets they
+    // have no access to. Staff: full role visibility (groups / assignment /
+    // view_all). Portal: own tickets, plus same-branch tickets only when the
+    // user holds the can_view_location_tickets flag — mirrors /portal/tickets.
+    $scopeStmt = $db->prepare('SELECT role, can_view_location_tickets, location_id FROM users WHERE id = ?');
+    $scopeStmt->execute([$userId]);
+    $viewer = $scopeStmt->fetch() ?: [];
+    if (roleIsStaff($viewer['role'] ?? null)) {
+        $vis = ticketStaffVisibilitySql($db, $userId, $viewer['role'] ?? null, 't');
+        $where[] = $vis['sql'];
+        foreach ($vis['params'] as $p) { $params[] = $p; }
+    } else {
+        $scope = ['t.created_by = ?'];
+        $params[] = $userId;
+        if (!empty($viewer['can_view_location_tickets']) && !empty($viewer['location_id'])) {
+            $scope[]  = 't.location_id = ?';
+            $params[] = (int) $viewer['location_id'];
+        }
+        $where[] = '(' . implode(' OR ', $scope) . ')';
     }
+
     $whereSql = implode(' AND ', $where);
 
     $cStmt = $db->prepare(
@@ -2080,7 +2101,7 @@ function getDupPreviewTicket(int $userId, int $ticketId, bool $agentScope): ?arr
 
     $stmt = $db->prepare(
         "SELECT t.id, t.subject, t.description, t.status, t.created_at,
-                t.location_id, t.merged_into_ticket_id,
+                t.location_id, t.created_by, t.merged_into_ticket_id,
                 tt.name AS type_name, COALESCE(tt.is_confidential, 0) AS type_is_confidential,
                 u.first_name, u.last_name
          FROM tickets t
@@ -2095,14 +2116,31 @@ function getDupPreviewTicket(int $userId, int $ticketId, bool $agentScope): ?arr
     if ($row['merged_into_ticket_id'] !== null)                 { return null; }
     if (in_array($row['status'], ticketClosedBucketSlugs(), true)) { return null; }
 
-    if (!$agentScope) {
-        // Portal users: only show tickets at the user's own branch.
-        $userStmt = $db->prepare('SELECT location_id FROM users WHERE id = ?');
-        $userStmt->execute([$userId]);
-        $userLocationId = $userStmt->fetchColumn();
-        $userLocationId = $userLocationId ? (int) $userLocationId : null;
-        if ($userLocationId === null) { return null; }
-        if ((int) ($row['location_id'] ?? 0) !== $userLocationId) { return null; }
+    if ($agentScope) {
+        // Staff may only preview tickets their role can actually see (group
+        // membership / assignment / view_all), matching the main ticket routes.
+        // Without this, dup-preview is a cross-group ticket-body IDOR: any agent
+        // could read the subject/requester/body of any non-confidential ticket
+        // by iterating ids.
+        $roleStmt = $db->prepare('SELECT role FROM users WHERE id = ?');
+        $roleStmt->execute([$userId]);
+        $roleSlug = $roleStmt->fetchColumn() ?: null;
+        $vis = ticketStaffVisibilitySql($db, $userId, $roleSlug ?: null, 't');
+        $visStmt = $db->prepare("SELECT 1 FROM tickets t WHERE t.id = ? AND {$vis['sql']} LIMIT 1");
+        $visStmt->execute(array_merge([$ticketId], $vis['params']));
+        if (!$visStmt->fetchColumn()) { return null; }
+    } else {
+        // Portal users: only preview a ticket they may actually view — their own,
+        // or (with the can_view_location_tickets flag) another ticket at their
+        // own branch. Mirrors the gate on /portal/tickets/{id}.
+        $permStmt = $db->prepare('SELECT can_view_location_tickets, location_id FROM users WHERE id = ?');
+        $permStmt->execute([$userId]);
+        $perm = $permStmt->fetch() ?: [];
+        $isOwn = (int) ($row['created_by'] ?? 0) === $userId;
+        $canViewLoc = !empty($perm['can_view_location_tickets'])
+            && !empty($perm['location_id'])
+            && (int) ($row['location_id'] ?? 0) === (int) $perm['location_id'];
+        if (!$isOwn && !$canViewLoc) { return null; }
     }
 
     $first = trim((string) ($row['first_name'] ?? ''));

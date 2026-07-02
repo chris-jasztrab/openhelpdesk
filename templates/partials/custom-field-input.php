@@ -29,7 +29,7 @@ $requiredAttr = ($portalMode && $cfRequired) ? 'required' : '';
     ?>
     <div class="border rounded p-3 bg-light text-secondary small ld-text-block">
         <?php if ($tbIsHtml): ?>
-            <?= $tbContent ?>
+            <?= sanitizeRichHtml($tbContent) ?>
         <?php else: ?>
             <span style="white-space:pre-wrap;"><?= e($tbContent) ?></span>
         <?php endif; ?>

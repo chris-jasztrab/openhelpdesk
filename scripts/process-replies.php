@@ -228,10 +228,17 @@ foreach ($messages as $msg) {
     $parsed  = parseEmailCommands($body);
     $body    = $parsed['body'];
 
-    // Resolve commands (admin/agent only)
+    // Resolve commands (admin/agent only, and never from a spoofed sender).
+    // messageAuthFailed() blocks the privileged #-commands when Exchange Online
+    // flagged this From as failing DMARC/compauth — otherwise an attacker could
+    // spoof an agent's address to close / reopen / reprioritise any ticket.
     $newStatus     = null;
     $newPriorityId = null;
-    if (in_array($user['role'], ['admin', 'agent'], true)) {
+    $authFailed    = messageAuthFailed($msg);
+    if ($authFailed) {
+        logMsg('WARN', "  Sender authentication FAILED for {$fromAddr} (possible spoof) — ignoring inline commands, posting reply as unprivileged.");
+    }
+    if (!$authFailed && in_array($user['role'], ['admin', 'agent'], true)) {
         if ($parsed['status'] !== null) {
             $newStatus = $parsed['status'];
         }
@@ -352,6 +359,38 @@ function isAutoReply(array $msg): bool
         }
     }
 
+    return false;
+}
+
+/**
+ * Did this inbound message fail sender authentication (a spoofed From)?
+ *
+ * Exchange Online stamps an `Authentication-Results` header on every message it
+ * accepts from outside the organization, recording the SPF / DKIM / DMARC and
+ * composite-auth (compauth) verdicts. An external attacker cannot strip or forge
+ * that header — it is added by the service at the trust boundary, after the
+ * sender no longer controls the message. So a message whose Authentication-
+ * Results shows an explicit failing DMARC or compauth verdict is a spoof.
+ *
+ * Returns true ONLY on an explicit failure verdict. Missing header (intra-org
+ * mail, which EXO does not stamp) and pass verdicts both return false, so
+ * legitimate internal staff mail and DMARC-passing external replies are never
+ * blocked. Forwarded mail that fails SPF but passes DMARC is likewise allowed.
+ */
+function messageAuthFailed(array $msg): bool
+{
+    foreach (($msg['internetMessageHeaders'] ?? []) as $header) {
+        if (strtolower(trim($header['name'] ?? '')) !== 'authentication-results') {
+            continue;
+        }
+        $value = strtolower((string) ($header['value'] ?? ''));
+        // dmarc=fail / dmarc=quarantine / dmarc=reject, or compauth=fail, are
+        // authoritative "this From is not who it claims" signals from EXO.
+        if (preg_match('/\bdmarc=(fail|quarantine|reject)\b/', $value)
+            || preg_match('/\bcompauth=fail\b/', $value)) {
+            return true;
+        }
+    }
     return false;
 }
 

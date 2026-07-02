@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.132.2 &mdash; 2026-07-02
+
+### Security
+- **Fixed a cross-group ticket disclosure in the duplicate-detection preview (IDOR).** The agent-side duplicate-preview endpoint (`/agent/tickets/dup-preview`) and the duplicate-check candidate list returned a ticket's subject, requester, and body for *any* non-confidential ticket id, ignoring the agent's group/assignment visibility — so any agent could read tickets in groups they don't belong to by iterating ids. Both the preview and the candidate query now apply the same role-based visibility rules used everywhere else (`ticketStaffVisibilitySql`). The portal-side preview is likewise restricted to the requester's own tickets, plus same-branch tickets only when the user holds the *view location tickets* flag.
+- **Blocked spoofed inbound email from running privileged ticket commands.** The inbound-reply processor honoured `#close`/`#open`/`#priority` commands and attributed them to a staff member based solely on the (forgeable) `From` address, with no sender-authentication check. It now reads the `Authentication-Results` header that Exchange Online stamps at the trust boundary and ignores inline commands from any message with a failing DMARC/compauth verdict (a spoof), logging the rejection. Legitimate internal and DMARC-passing external mail is unaffected.
+- **Closed two stored-XSS vectors.** (1) Text Block custom-field content is now run through the rich-HTML sanitizer when rendered on ticket forms, instead of being echoed raw to every requester. (2) SVG is no longer an accepted branding-logo format (it can carry inline script and was served inline from the web root); `image/svg+xml` was also removed from the attachment extension map and SVG/HTML/XML added to the upload extension blocklist as defence-in-depth.
+
 ## 2.132.1 &mdash; 2026-07-02
 
 ### Fixed
