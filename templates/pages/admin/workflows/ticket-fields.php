@@ -29,6 +29,14 @@ $systemFieldMeta = [
 
 $sysDefaults = systemFieldDefaults();
 ?>
+<link rel="stylesheet" href="https://cdn.ckeditor.com/ckeditor5/43.3.1/ckeditor5.css">
+<script type="importmap">
+{"imports":{"ckeditor5":"https://cdn.ckeditor.com/ckeditor5/43.3.1/ckeditor5.js","ckeditor5/":"https://cdn.ckeditor.com/ckeditor5/43.3.1/"}}
+</script>
+<style>
+    /* Text-block rich-text editor inside the field modal */
+    #sectionTextBlock .ck.ck-editor__editable { min-height: 160px; }
+</style>
 <style>
     /* ── Layout: left rail + canvas + preview ── */
     .builder-shell {
@@ -484,7 +492,7 @@ $sysDefaults = systemFieldDefaults();
 </div>
 
 <!-- ── Field edit modal ── -->
-<div class="modal fade" id="fieldModal" tabindex="-1">
+<div class="modal fade" id="fieldModal" tabindex="-1" data-bs-focus="false">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
@@ -566,6 +574,7 @@ $sysDefaults = systemFieldDefaults();
                     <label class="form-label fw-medium">Content</label>
                     <textarea class="form-control" id="modalTextBlockContent" rows="6"
                               placeholder="Enter text, instructions, or notes to display on the form..."></textarea>
+                    <div class="form-text">Displayed as read-only instructions on the ticket form.</div>
                 </div>
 
                 <!-- Image -->
@@ -825,7 +834,8 @@ $sysDefaults = systemFieldDefaults();
                 if (fieldType === 'text_block') {
                     var tbCfg = {};
                     try { tbCfg = JSON.parse(data.field.config || '{}') || {}; } catch (e) {}
-                    document.getElementById('modalTextBlockContent').value = tbCfg.content || '';
+                    if (window.setTextBlockContent) window.setTextBlockContent(tbCfg.content || '');
+                    else document.getElementById('modalTextBlockContent').value = tbCfg.content || '';
                 }
                 if (fieldType === 'image') {
                     var imgCfg = {};
@@ -961,7 +971,10 @@ $sysDefaults = systemFieldDefaults();
             body.options = parseDepTree(document.getElementById('depHierarchy').value);
         }
         if (fieldType === 'text_block') {
-            body.config = { content: document.getElementById('modalTextBlockContent').value };
+            var tbContent = window.getTextBlockContent
+                ? window.getTextBlockContent()
+                : document.getElementById('modalTextBlockContent').value;
+            body.config = { content: tbContent };
         }
         if (fieldType === 'image') {
             var fileInput = document.getElementById('modalImageFile');
@@ -1018,5 +1031,82 @@ $sysDefaults = systemFieldDefaults();
         }
     }
 })();
+</script>
+
+<!-- Rich-text editor for the Text Block field. Lives in a module (CKEditor 5
+     ships as ES modules); it exposes window.setTextBlockContent/getTextBlockContent
+     so the classic IIFE above can drive it. -->
+<script type="module">
+import {
+    ClassicEditor,
+    Essentials,
+    Heading,
+    Bold, Italic, Underline, Strikethrough,
+    FontColor, FontBackgroundColor, FontSize,
+    Alignment,
+    List, ListProperties,
+    Link, AutoLink,
+    BlockQuote,
+    HorizontalLine,
+    Indent, IndentBlock,
+    RemoveFormat
+} from 'ckeditor5';
+
+var textBlockEditor = null;
+var pendingContent  = null;   // set-before-ready buffer
+
+ClassicEditor.create(document.querySelector('#modalTextBlockContent'), {
+    plugins: [
+        Essentials,
+        Heading,
+        Bold, Italic, Underline, Strikethrough,
+        FontColor, FontBackgroundColor, FontSize,
+        Alignment,
+        List, ListProperties,
+        Link, AutoLink,
+        BlockQuote,
+        HorizontalLine,
+        Indent, IndentBlock,
+        RemoveFormat
+    ],
+    toolbar: {
+        items: [
+            'heading', '|',
+            'fontSize', 'fontColor', 'fontBackgroundColor', '|',
+            'bold', 'italic', 'underline', 'strikethrough', 'removeFormat', '|',
+            'alignment', '|',
+            'bulletedList', 'numberedList', 'outdent', 'indent', '|',
+            'link', 'blockQuote', 'horizontalLine', '|',
+            'undo', 'redo'
+        ],
+        shouldNotGroupWhenFull: true
+    },
+    heading: {
+        options: [
+            { model: 'paragraph', title: 'Paragraph', class: 'ck-heading_paragraph' },
+            { model: 'heading1', view: 'h1', title: 'Heading 1', class: 'ck-heading_heading1' },
+            { model: 'heading2', view: 'h2', title: 'Heading 2', class: 'ck-heading_heading2' },
+            { model: 'heading3', view: 'h3', title: 'Heading 3', class: 'ck-heading_heading3' }
+        ]
+    },
+    link: { defaultProtocol: 'https://', addTargetToExternalLinks: true }
+}).then(function (editor) {
+    textBlockEditor = editor;
+    if (pendingContent !== null) { editor.setData(pendingContent); pendingContent = null; }
+}).catch(function (e) { console.error(e); });
+
+window.setTextBlockContent = function (html) {
+    if (textBlockEditor) textBlockEditor.setData(html || '');
+    else pendingContent = html || '';
+};
+window.getTextBlockContent = function () {
+    if (textBlockEditor) {
+        var data = textBlockEditor.getData();
+        // An "empty" editor still emits <p>&nbsp;</p>-style markup; normalise to ''.
+        return data.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, '').trim() === '' ? '' : data;
+    }
+    var el = document.getElementById('modalTextBlockContent');
+    return el ? el.value : '';
+};
 </script>
 <?php endif; ?>

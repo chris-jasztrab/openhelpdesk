@@ -21,7 +21,19 @@ $requiredAttr = ($portalMode && $cfRequired) ? 'required' : '';
     <?php if (!empty($cf['label'])): ?>
     <p class="fw-semibold mb-1"><?= e($cf['label']) ?></p>
     <?php endif; ?>
-    <div class="border rounded p-3 bg-light text-secondary small" style="white-space:pre-wrap;"><?= e($tbCfg['content'] ?? '') ?></div>
+    <?php
+        $tbContent = (string) ($tbCfg['content'] ?? '');
+        // Content authored in CKEditor is HTML (starts with a tag). Legacy blocks
+        // are plain text — escape those and preserve their line breaks.
+        $tbIsHtml = $tbContent !== '' && ltrim($tbContent)[0] === '<';
+    ?>
+    <div class="border rounded p-3 bg-light text-secondary small ld-text-block">
+        <?php if ($tbIsHtml): ?>
+            <?= $tbContent ?>
+        <?php else: ?>
+            <span style="white-space:pre-wrap;"><?= e($tbContent) ?></span>
+        <?php endif; ?>
+    </div>
 </div>
 <?php elseif ($cf['field_type'] === 'image'):
     $imgCfg = $cf['config'] ? (is_string($cf['config']) ? json_decode($cf['config'], true) : $cf['config']) : [];

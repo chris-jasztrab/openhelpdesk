@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.132.0 &mdash; 2026-07-02
+
+### Changed
+- **The Text Block field on the ticket-forms builder now uses the CKEditor 5 rich-text editor** instead of a plain `<textarea>`. Admins can format instructional text with headings, bold/italic/underline, colours, lists, alignment, links, block quotes, and horizontal rules — matching the editor used elsewhere (email templates, KB articles, banners). Existing plain-text blocks keep rendering exactly as before: content is only treated as HTML when it starts with a tag, otherwise it is escaped and its line breaks preserved. On the form the block renders its saved HTML read-only. (The editor is initialised inside the field modal with Bootstrap's focus trap disabled so CKEditor's link/dropdown dialogs remain usable.)
+
 ## 2.131.1 &mdash; 2026-06-30
 
 ### Documentation
