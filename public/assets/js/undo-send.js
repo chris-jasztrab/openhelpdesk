@@ -107,6 +107,13 @@
             toast.btn.remove();
             toast.text.textContent = label + '…';
             active = null;
+            // The native form.submit() below fires no 'submit' event, and the
+            // countdown can outlive TicketDraft's post-submit autosave quiet
+            // window. Announce the real send so the draft autosaver goes quiet
+            // again — otherwise its pagehide flush re-saves the draft the
+            // server is about to delete, resurrecting the sent message as an
+            // "unsent draft".
+            form.dispatchEvent(new CustomEvent('undosend:send'));
             onSend();
         }
 

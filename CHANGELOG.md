@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.137.1 &mdash; 2026-07-03
+
+### Fixed
+- **A reply sent through the undo-send countdown no longer reappears as an "unsent draft".** The draft autosaver pauses itself for 8 seconds after a form submit, but the undo countdown (default 10s, up to 120s) outlives that pause — so when the held send finally navigated the page, the autosaver's leaving-the-page flush re-saved the reply text *after* the server had already deleted the draft, resurrecting the just-sent message as a draft (restore banner on the ticket, ✎ Draft badge in lists). The undo-send helper now announces the real send with an `undosend:send` event on the form (the expiry send uses native `form.submit()`, which fires no `submit` event), and the autosaver treats it exactly like a submit — going quiet so the flush can't fire. Reproduced with a 12-second window, then verified fixed: expiry send leaves no draft behind, while clicking Undo still deliberately re-saves the draft. Affected every undo window longer than 8 seconds — including the default.
+
 ## 2.137.0 &mdash; 2026-07-03
 
 ### Added

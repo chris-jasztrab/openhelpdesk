@@ -235,13 +235,19 @@
         form.addEventListener('input', schedule);
         form.addEventListener('change', schedule);
 
-        form.addEventListener('submit', function () {
+        function goQuietForSubmit() {
             // The server deletes the draft when the submit lands; go quiet so a
             // trailing autosave can't resurrect it. If the submit is blocked
             // (validation, duplicate-check panel), autosave resumes shortly.
             suppressUntil = Date.now() + SUBMIT_QUIET_MS;
             clearTimeout(timer);
-        });
+        }
+        form.addEventListener('submit', goQuietForSubmit);
+        // Undo-send holds the real send past the quiet window above (its
+        // countdown can run up to 120s) and then submits natively, which fires
+        // no 'submit' event — it announces the send with this custom event so
+        // the pagehide flush can't resurrect the just-sent draft.
+        form.addEventListener('undosend:send', goQuietForSubmit);
 
         document.addEventListener('visibilitychange', function () {
             if (document.visibilityState === 'hidden') flushIfDirty(true);
