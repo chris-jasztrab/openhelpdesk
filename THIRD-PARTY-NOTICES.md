@@ -6,31 +6,47 @@ It incorporates and depends on the open-source projects listed below. Each
 remains the property of its respective authors and is governed by its own
 license. This file is provided for attribution and license-compliance purposes.
 
-> **Note on CKEditor 5.** CKEditor 5 is loaded from the CKEditor CDN under
-> **GPL-2.0-or-later** (or a commercial license). It is **not bundled** in this
-> repository — the browser fetches it from `cdn.ckeditor.com` at runtime — so
-> distributing this MIT-licensed project does not convey any GPL-licensed code.
-> If you prefer to avoid the GPL dependency entirely, self-host a commercial
-> build or swap in a permissively-licensed editor (e.g. Quill, TipTap, Trix).
+> **Note on CKEditor 5.** A build of CKEditor 5 is **bundled** in this
+> repository at `public/assets/vendor/ckeditor5/` and is licensed
+> **GPL-2.0-or-later** (or commercially) by CKSource — separately from this
+> project's MIT license. Distributing this repository therefore also
+> distributes that GPL-licensed build; the GPL governs CKEditor itself, not
+> the surrounding MIT-licensed application code (the app only loads the
+> editor in the browser via `<script>`; it does not link against or derive
+> from it). If the GPL dependency doesn't suit your distribution needs,
+> obtain a commercial CKEditor license or swap in a permissively-licensed
+> editor (e.g. Quill, TipTap, Trix).
 > See the [CKEditor licensing page](https://ckeditor.com/legal/ckeditor-oss-license/).
 
 ---
 
-## Front-end libraries (loaded at runtime via CDN)
+## Front-end libraries (bundled, self-hosted)
 
-These are **not bundled** in this repository. They are fetched from
-`cdn.jsdelivr.net` and `cdn.ckeditor.com` at page load (see the Content-Security
--Policy in [`src/bootstrap.php`](src/bootstrap.php)).
+Since v2.132.6 all front-end libraries are **bundled** in this repository under
+[`public/assets/vendor/`](public/assets/vendor/) and served from the
+application itself — the Content-Security-Policy in
+[`src/bootstrap.php`](src/bootstrap.php) allows no third-party hosts. Versions
+below are taken from each bundled file's banner.
 
 | Project | Version | License | Purpose |
 |---|---|---|---|
-| [Bootstrap](https://github.com/twbs/bootstrap) | 5.3.3 (installer: 5.3.2) | MIT | UI framework / CSS |
-| [Bootstrap Icons](https://github.com/twbs/icons) | 1.11.3 | MIT | Icon set |
+| [Bootstrap](https://github.com/twbs/bootstrap) | 5.3.3 | MIT | UI framework / CSS |
+| [Bootstrap Icons](https://github.com/twbs/icons) | 1.11.3 (incl. woff/woff2 fonts) | MIT | Icon set |
 | [CKEditor 5](https://github.com/ckeditor/ckeditor5) | 43.3.1 | **GPL-2.0-or-later** (or commercial) | Rich-text editor |
-| [Chart.js](https://github.com/chartjs/Chart.js) | 4.x | MIT | Report charts |
-| [Mermaid](https://github.com/mermaid-js/mermaid) | 10.x | MIT | Diagrams in docs |
+| [Chart.js](https://github.com/chartjs/Chart.js) | 4.5.1 | MIT | Report charts |
+| [Mermaid](https://github.com/mermaid-js/mermaid) | 10.9.6 | MIT | Diagrams in docs |
 | [driver.js](https://github.com/kamranahmedse/driver.js) | 1.3.4 | MIT | Onboarding tour |
 | [Sortable.js](https://github.com/SortableJS/Sortable) | 1.15.0 | MIT | Drag-and-drop reordering |
+
+Minified bundles may embed their own upstream dependencies (e.g. Mermaid
+bundles DOMPurify); those remain under their respective upstream licenses as
+part of the bundle.
+
+> **Exception — the web installer.** The standalone installer page
+> ([`public/install/index.php`](public/install/index.php)) still loads
+> Bootstrap 5.3.2 and Bootstrap Icons 1.11.3 from `cdn.jsdelivr.net` at page
+> load; those copies are not bundled. This affects only the one-time setup
+> wizard, which is deleted after installation.
 
 ---
 
@@ -80,7 +96,7 @@ application. Exclude `vendor/` dev packages from production deployments
 | [myclabs/deep-copy](https://github.com/myclabs/DeepCopy) | 1.13.4 | MIT | Object cloning (mocks) |
 | [phar-io/manifest](https://github.com/phar-io/manifest) | 2.0.4 | BSD-3-Clause | PHAR verification |
 | [phar-io/version](https://github.com/phar-io/version) | 3.2.1 | BSD-3-Clause | Version constraints |
-| [theseer/tokenizer](https://github.com/theseer/tokenizer) | — | BSD-3-Clause | Token → XML (coverage) |
+| [theseer/tokenizer](https://github.com/theseer/tokenizer) | 1.3.1 | BSD-3-Clause | Token → XML (coverage) |
 | phpunit/php-code-coverage | 10.1.16 | BSD-3-Clause | Code coverage |
 | phpunit/php-file-iterator | 4.1.0 | BSD-3-Clause | File iteration |
 | phpunit/php-invoker | 4.0.0 | BSD-3-Clause | Timeout invocation |
@@ -90,5 +106,5 @@ application. Exclude `vendor/` dev packages from production deployments
 
 ---
 
-*Generated from `composer.lock` and the project's CDN references. To regenerate
-the PHP portion, run `composer licenses`.*
+*Generated from `composer.lock` and the bundled assets under
+`public/assets/vendor/`. To regenerate the PHP portion, run `composer licenses`.*

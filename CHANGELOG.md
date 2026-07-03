@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.137.3 &mdash; 2026-07-03
+
+### Changed
+- **THIRD-PARTY-NOTICES.md now reflects the self-hosted front-end stack.** The file still described all front-end libraries as CDN-loaded and claimed "distributing this project does not convey any GPL-licensed code" — untrue since 2.132.6 bundled everything under `public/assets/vendor/`, including a GPL-2.0-or-later CKEditor 5 build. The front-end section is retitled "bundled, self-hosted", the CKEditor note now states plainly that the GPL build ships with the repo (and how to avoid it), versions were verified against each bundled file's banner (Chart.js 4.5.1, Mermaid 10.9.6, CKEditor 43.3.1), and a new exception note records that the one-time web installer page still loads Bootstrap 5.3.2 + Icons from jsDelivr. Also pinned theseer/tokenizer at 1.3.1 (was "—"); all Composer entries re-verified against `composer.lock` and unchanged.
+
 ## 2.137.2 &mdash; 2026-07-03
 
 ### Changed
