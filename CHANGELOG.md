@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.137.0 &mdash; 2026-07-03
+
+### Added
+- **Undo send: new tickets and replies can now be taken back before they go out.** A new Admin → Settings → Undo Send page has an enable toggle with an **Undo window** (seconds, 3–120, default 10) field beside it. When on, submitting a new ticket or a reply holds the send client-side and shows a Gmail-style countdown toast — "Sending reply in 10s… **Undo**" — at the bottom of the screen; the message only reaches the server (and notification emails only go out) once the countdown finishes. Undo (or pressing Escape) cancels the send and returns you to the still-filled form; for staff replies the autosaved draft is re-saved, so the undone message is also safe from a closed tab. Covers all five send surfaces: the staff new-ticket form, agent and admin reply boxes (including internal notes and forwards, labeled accordingly), the portal new-request form, and the portal comment box. The hold engages only after the existing validation, duplicate-check, and reply-collision guards have all passed, and the expiry send bypasses them so they can't re-fire; submit buttons are frozen during the countdown so a second click can't race it. Off by default; the settings are audit-logged and findable in settings search.
+
 ## 2.136.0 &mdash; 2026-07-03
 
 ### Added

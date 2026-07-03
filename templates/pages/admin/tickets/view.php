@@ -1900,6 +1900,7 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
 </script>
 
 <script src="/assets/js/ticket-draft.js"></script>
+<script src="/assets/js/undo-send.js"></script>
 <script type="module">
 import {
     ClassicEditor,
@@ -2040,6 +2041,18 @@ ClassicEditor.create(document.querySelector('#replyEditor'), {
             return;
         }
         // Forward, note, or an already-confirmed reply: this is a real send.
+        // With undo send enabled, hold it behind the countdown toast first —
+        // Undo re-saves the draft and puts the user back in the editor.
+        if (window.UndoSend && UndoSend.hold(formEl, {
+                seconds: <?= undoSendSeconds() ?>,
+                label:   formEl.dataset.mode === 'forward' ? 'Forwarding'
+                       : (formEl.dataset.mode === 'note' ? 'Adding note' : 'Sending reply'),
+                onSend:  function () { clearDraft(); formEl.submit(); },
+                onUndo:  function () { formEl._collisionAck = false; saveDraft(); },
+            })) {
+            e.preventDefault();
+            return;
+        }
         clearDraft();
     });
 

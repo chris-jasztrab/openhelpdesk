@@ -10608,6 +10608,46 @@ $router->post('/admin/settings/tags', function () {
 });
 
 /* ==================================================================
+ * ADMIN – Undo Send settings
+ *
+ * Gmail-style unsend: when enabled, new-ticket and reply forms hold
+ * the submit client-side behind an Undo countdown toast for the
+ * configured number of seconds before anything reaches the server.
+ * ================================================================== */
+
+$router->get('/admin/settings/undo-send', function () {
+    Auth::requirePermission('settings.manage');
+    $settings = [
+        'undo_send_enabled' => getSetting('undo_send_enabled', '0'),
+        'undo_send_seconds' => getSetting('undo_send_seconds', '10'),
+    ];
+    render('admin/settings/undo-send', compact('settings'));
+});
+
+$router->post('/admin/settings/undo-send', function () {
+    Auth::requirePermission('settings.manage');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/undo-send');
+    }
+
+    $before = [
+        'undo_send_enabled' => getSetting('undo_send_enabled', '0'),
+        'undo_send_seconds' => getSetting('undo_send_seconds', '10'),
+    ];
+    $after = [
+        'undo_send_enabled' => isset($_POST['undo_send_enabled']) ? '1' : '0',
+        'undo_send_seconds' => (string) max(3, min(120, (int) ($_POST['undo_send_seconds'] ?? 10))),
+    ];
+    setSetting('undo_send_enabled', $after['undo_send_enabled']);
+    setSetting('undo_send_seconds', $after['undo_send_seconds']);
+    logAuditChange('undo_send.settings_changed', null, null, $before, $after);
+
+    flash('success', 'Undo send settings saved.');
+    redirect('/admin/settings/undo-send');
+});
+
+/* ==================================================================
  * ADMIN – Ticket Status Management
  *
  * CRUD + drag-reorder for the `ticket_statuses` lookup table that backs

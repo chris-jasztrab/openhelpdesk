@@ -1184,6 +1184,21 @@ function setSetting(string $key, string $value): void
 }
 
 /**
+ * Undo-send grace window in seconds, or 0 when the feature is off.
+ *
+ * When enabled, ticket-create and reply forms hold the submit client-side
+ * behind an "Undo" countdown toast — nothing reaches the server (and no
+ * notification email goes out) until the window elapses.
+ */
+function undoSendSeconds(): int
+{
+    if (getSetting('undo_send_enabled', '0') !== '1') {
+        return 0;
+    }
+    return max(3, min(120, (int) getSetting('undo_send_seconds', '10')));
+}
+
+/**
  * Whether SLA tracking is enabled site-wide. Defaults to enabled.
  *
  * When off, SLA timers are not initialized, recalculated, paused/resumed, or

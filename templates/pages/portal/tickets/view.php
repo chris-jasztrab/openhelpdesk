@@ -489,21 +489,36 @@ if ($solutionTimelineId > 0) {
                     </button>
                 </form>
                 <script src="/assets/js/ticket-draft.js"></script>
+                <script src="/assets/js/undo-send.js"></script>
                 <script>
                 (function () {
                     // Autosave the in-progress comment server-side so closing the
                     // window (or finishing later) doesn't lose it. The comment
                     // handler deletes the draft once it's actually posted.
-                    var ta = document.getElementById('portalReplyMessage');
+                    var ta   = document.getElementById('portalReplyMessage');
+                    var form = document.getElementById('portalReplyForm');
                     TicketDraft.init({
                         context:      'portal_reply',
                         ticketId:     <?= (int) $ticket['id'] ?>,
-                        form:         document.getElementById('portalReplyForm'),
+                        form:         form,
                         isEmpty:      function () { return ta.value.trim() === ''; },
                         noteEl:       document.getElementById('portalReplyDraftNote'),
                         discardBtn:   document.getElementById('portalReplyDraftDiscard'),
                         statusAnchor: ta,
                         onDiscarded:  function () { ta.value = ''; ta.focus(); },
+                    });
+
+                    // Undo send: hold the post behind the countdown toast. The
+                    // expiry send uses the native form.submit(), which skips
+                    // this listener, so it can't loop.
+                    form.addEventListener('submit', function (e) {
+                        if (e.defaultPrevented) return;
+                        if (window.UndoSend && UndoSend.hold(form, {
+                                seconds: <?= undoSendSeconds() ?>,
+                                label:   'Posting comment',
+                            })) {
+                            e.preventDefault();
+                        }
                     });
                 })();
                 </script>

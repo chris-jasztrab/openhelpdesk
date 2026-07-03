@@ -393,6 +393,19 @@ return [
      'keywords' => 'canned response macro snippet template reply boilerplate'],
 
     // =======================================================================
+    // Undo Send  (/admin/settings/undo-send)
+    // =======================================================================
+    ['label' => 'Enable Undo Send',             'description' => 'Hold new tickets and replies behind an Undo countdown',
+     'group' => 'Customization', 'page_label' => 'Undo Send', 'page_url' => '/admin/settings/undo-send',
+     'section' => 'Undo Send', 'anchor' => 'undo_send_enabled',
+     'keywords' => 'undo unsend recall delay grace countdown cancel oops'],
+
+    ['label' => 'Undo Window (seconds)',        'description' => 'How long the sender has to click Undo before the send',
+     'group' => 'Customization', 'page_label' => 'Undo Send', 'page_url' => '/admin/settings/undo-send',
+     'section' => 'Undo Send', 'anchor' => 'undo_send_seconds',
+     'keywords' => 'undo seconds delay window countdown time grace'],
+
+    // =======================================================================
     // CSAT  (/admin/settings/csat)
     // =======================================================================
     ['label' => 'Enable CSAT Surveys',          'description' => 'Auto-send rating emails after ticket completion',

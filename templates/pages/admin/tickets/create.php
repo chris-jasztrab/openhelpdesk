@@ -746,6 +746,7 @@ document.addEventListener('click', e => {
 </script>
 
 <script src="/assets/js/ticket-draft.js"></script>
+<script src="/assets/js/undo-send.js"></script>
 <script type="module">
 import {
     ClassicEditor,
@@ -826,6 +827,24 @@ ClassicEditor.create(document.querySelector('#admin-ticket-editor'), {
     const dupBox  = document.getElementById('dup-warning');
     const csrfTok = '<?= e(csrfToken()) ?>';
 
+    // Undo send: every real submit funnels through here so the countdown
+    // toast can hold it. The expiry send is the native form.submit(), which
+    // bypasses the submit listener — so the duplicate check never re-runs.
+    const UNDO_SECONDS = <?= undoSendSeconds() ?>;
+    function submitWithUndo() {
+        if (!(window.UndoSend && UNDO_SECONDS > 0)) { form.submit(); return; }
+        // The countdown toast replaces the cycling progress phrases.
+        const btn = form.querySelector('button[type="submit"]');
+        if (btn && btn._submitProgressStop) btn._submitProgressStop();
+        UndoSend.hold(form, { seconds: UNDO_SECONDS, label: 'Creating ticket' });
+    }
+    // For paths that submit via the browser's default action.
+    function holdDefaultSubmit(e) {
+        if (e.defaultPrevented || !(window.UndoSend && UNDO_SECONDS > 0)) return;
+        e.preventDefault();
+        submitWithUndo();
+    }
+
     function escH(s) { const d = document.createElement('div'); d.textContent = (s == null ? '' : String(s)); return d.innerHTML; }
 
     function renderDupMatches(matches) {
@@ -888,7 +907,7 @@ ClassicEditor.create(document.querySelector('#admin-ticket-editor'), {
             dupBox.style.display = 'none';
             const submitBtn = form.querySelector('button[type="submit"]');
             if (submitBtn) window.startTicketSubmitProgress(submitBtn);
-            form.submit();
+            submitWithUndo();
         });
         document.getElementById('dup-edit').addEventListener('click', () => {
             dupBox.style.display = 'none';
@@ -911,11 +930,11 @@ ClassicEditor.create(document.querySelector('#admin-ticket-editor'), {
         errEl.style.display = 'none';
         document.getElementById('description').value = data;
 
-        if (form.dataset.dupOverride === '1') return;
+        if (form.dataset.dupOverride === '1') { holdDefaultSubmit(e); return; }
 
         const typeSel = document.getElementById('type_id');
         const typeId  = typeSel ? parseInt(typeSel.value, 10) : 0;
-        if (!typeId) return;
+        if (!typeId) { holdDefaultSubmit(e); return; }
 
         e.preventDefault();
         const submitBtn = form.querySelector('button[type="submit"]');
@@ -950,7 +969,7 @@ ClassicEditor.create(document.querySelector('#admin-ticket-editor'), {
             // Cycling keeps running through the synchronous form post; the
             // page navigates away and the JS dies naturally with it.
             form.dataset.dupOverride = '1';
-            form.submit();
+            submitWithUndo();
         }
     });
 

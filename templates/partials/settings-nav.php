@@ -75,6 +75,8 @@ $settingsNavGroups = [
          'keywords' => 'ticket template prefill boilerplate new ticket starter'],
         ['label' => 'CSAT Surveys',     'url' => '/admin/settings/csat',             'icon' => 'bi-star',
          'keywords' => 'satisfaction feedback rating score survey'],
+        ['label' => 'Undo Send',        'url' => '/admin/settings/undo-send',        'icon' => 'bi-arrow-counterclockwise',
+         'keywords' => 'undo unsend recall delay grace countdown send cancel oops'],
     ],
     'Automation' => [
         ['label' => 'Automations',        'url' => '/admin/settings/automations',        'icon' => 'bi-lightning',
