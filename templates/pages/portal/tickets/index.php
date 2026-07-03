@@ -180,12 +180,29 @@ $sortParams = array_filter($filters, fn($v) => $v !== '' && $v !== 'mine');
                 <i class="bi bi-chevron-left"></i>
             </a>
         </li>
-        <?php for ($p = max(1, $page - 2); $p <= min($totalPages, $page + 2); $p++): ?>
+        <?php $winStart = max(1, $page - 2); $winEnd = min($totalPages, $page + 2); ?>
+        <?php if ($winStart > 1): ?>
+        <li class="page-item">
+            <a class="page-link" href="<?= e($pagerBase . '?' . http_build_query(array_merge($pagerParams, ['page' => 1]))) ?>">1</a>
+        </li>
+        <?php if ($winStart > 2): ?>
+        <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+        <?php endif; ?>
+        <?php endif; ?>
+        <?php for ($p = $winStart; $p <= $winEnd; $p++): ?>
         <li class="page-item <?= $p === $page ? 'active' : '' ?>">
             <a class="page-link" href="<?= e($pagerBase . '?' . http_build_query(array_merge($pagerParams, ['page' => $p]))) ?>"
                <?= $p === $page ? 'style="background:var(--ld-primary);border-color:var(--ld-primary);"' : '' ?>><?= $p ?></a>
         </li>
         <?php endfor; ?>
+        <?php if ($winEnd < $totalPages): ?>
+        <?php if ($winEnd < $totalPages - 1): ?>
+        <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+        <?php endif; ?>
+        <li class="page-item">
+            <a class="page-link" href="<?= e($pagerBase . '?' . http_build_query(array_merge($pagerParams, ['page' => $totalPages]))) ?>"><?= $totalPages ?></a>
+        </li>
+        <?php endif; ?>
         <li class="page-item <?= $page >= $totalPages ? 'disabled' : '' ?>">
             <a class="page-link" href="<?= e($pagerBase . '?' . http_build_query(array_merge($pagerParams, ['page' => $page + 1]))) ?>">
                 <i class="bi bi-chevron-right"></i>

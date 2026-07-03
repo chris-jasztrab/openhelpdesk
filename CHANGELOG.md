@@ -11,6 +11,14 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.138.0 &mdash; 2026-07-03
+
+### Added
+- **Ticket-list pagination now always offers a jump back to page 1 (and ahead to the last page).** Deep in a long ticket list the pager only showed the current page ±2, so getting back to the start meant clicking through every page. All three ticket lists (agent, admin, portal) now use the standard boundary pattern — `‹ 1 … 5 6 7 … 42 ›` — with first and last page links always visible and ellipses marking the gaps. The links go through the existing AJAX list refresh, so jumping to page 1 keeps filters, sort, and per-page intact without a full reload.
+
+### Fixed
+- **Admin ticket list "Showing X–Y of Z" now reports the correct row range.** The admin route paginates at 25 per page but the template computed the displayed range with a hard-coded 30, so from page 2 onward the label drifted (page 5 claimed rows 121–150 while actually showing 101–125). The label now uses the real per-page value passed by the route.
+
 ## 2.137.3 &mdash; 2026-07-03
 
 ### Changed
