@@ -77,6 +77,11 @@ endif; ?>
         <form method="POST" action="/portal/tickets/create" enctype="multipart/form-data" id="portal-ticket-form">
             <?= csrfField() ?>
 
+            <div id="ticketDraftNote" class="alert alert-info d-flex align-items-center justify-content-between py-2 px-3 mb-3 small" style="display:none;">
+                <span><i class="bi bi-arrow-counterclockwise me-1"></i>Restored your unsent ticket draft.</span>
+                <button type="button" class="btn btn-sm btn-link p-0 text-decoration-none" id="ticketDraftDiscard">Discard draft</button>
+            </div>
+
             <div class="mb-3" id="tour-portal-subject">
                 <label for="subject" class="form-label fw-semibold"><?= e(getSetting('sys_field_label_subject', 'Subject')) ?> <span class="text-danger">*</span></label>
                 <input type="text" class="form-control" id="subject" name="subject"
@@ -497,6 +502,11 @@ endif; ?>
             if (badges.length) badges[badges.length - 1].remove();
         }
     });
+
+    // Draft autosave hooks: tag state lives in this closure, so the draft
+    // glue reads/rebuilds it through these.
+    window._tagDraftGet = function () { return tags.slice(); };
+    window._tagDraftAdd = addTag;
 })();
 <?php endif; ?>
 
@@ -605,6 +615,18 @@ $ccFields = array_filter($customFields, fn($f) => $f['field_type'] === 'cc');
         });
 
         if (isRequired) { input.required = true; }
+
+        // Draft autosave hooks: per-field CC state lives in this closure, so
+        // the draft glue reads/rebuilds it through this registry.
+        window._ccFieldDraftHooks = window._ccFieldDraftHooks || {};
+        window._ccFieldDraftHooks[fieldId] = {
+            get: function () {
+                return Object.values(ccSet).map(function(u) {
+                    return { id: u.id, first_name: u.first_name, last_name: u.last_name, email: u.email };
+                });
+            },
+            add: addUser,
+        };
     }
 
     <?php foreach ($ccFields as $ccf): ?>
@@ -687,6 +709,7 @@ $ccFields = array_filter($customFields, fn($f) => $f['field_type'] === 'cc');
 <?php endif; ?>
 </script>
 
+<script src="/assets/js/ticket-draft.js"></script>
 <script type="module">
 import {
     ClassicEditor,
@@ -897,5 +920,62 @@ ClassicEditor.create(document.querySelector('#portal-ticket-editor'), {
             form.submit();
         }
     });
+
+    <?php if (empty($embedMode)): ?>
+    // ── Draft autosave (server-side) ──────────────────────────────────────
+    // Persist the half-written ticket to ticket_drafts so an accidental
+    // close (or "I'll finish this later") comes back on the next visit.
+    // The create handler deletes the draft once the ticket is submitted.
+    // (Skipped in the form-builder's embed preview — typing there is not a
+    // real ticket and must not touch the previewer's saved draft.)
+    const subjectEl = document.getElementById('subject');
+
+    function draftExtras() {
+        const extras = {};
+        if (window._tagDraftGet) {
+            const tags = window._tagDraftGet();
+            if (tags.length) extras.tags = tags;
+        }
+        if (window._ccFieldDraftHooks) {
+            const cc = {};
+            Object.keys(window._ccFieldDraftHooks).forEach(fid => {
+                const users = window._ccFieldDraftHooks[fid].get();
+                if (users.length) cc[fid] = users;
+            });
+            if (Object.keys(cc).length) extras.ccFields = cc;
+        }
+        return Object.keys(extras).length ? extras : null;
+    }
+
+    function applyExtras(extras) {
+        if (extras.tags && window._tagDraftAdd) extras.tags.forEach(t => window._tagDraftAdd(t));
+        if (extras.ccFields && window._ccFieldDraftHooks) {
+            Object.keys(extras.ccFields).forEach(fid => {
+                const hook = window._ccFieldDraftHooks[fid];
+                if (hook) extras.ccFields[fid].forEach(u => hook.add(u));
+            });
+        }
+    }
+
+    const ticketDraft = TicketDraft.init({
+        context:   'portal_create',
+        form:      form,
+        exclude:   ['description', 'tags[]', 'browser_info', 'os_info'<?php
+            foreach ($ccFields as $ccf) { echo ", 'cc_field_" . (int) $ccf['id'] . "[]'"; }
+        ?>],
+        getHtml:   () => editor.getData(),
+        setHtml:   html => editor.setData(html),
+        getExtras: draftExtras,
+        setExtras: applyExtras,
+        isEmpty:   () => subjectEl.value.trim() === '' && !TicketDraft.textOf(editor.getData()),
+        noteEl:      document.getElementById('ticketDraftNote'),
+        discardBtn:  document.getElementById('ticketDraftDiscard'),
+        statusAnchor: document.getElementById('description'),
+        // Restored tag/CC badges and cascaded fields are easiest to unwind
+        // by reloading — the draft row is already deleted (keepalive).
+        onDiscarded: () => window.location.reload(),
+    });
+    ticketDraft.watchEditor(editor);
+    <?php endif; ?>
 }).catch(console.error);
 </script>

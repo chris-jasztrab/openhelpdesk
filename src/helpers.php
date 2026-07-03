@@ -302,6 +302,21 @@ function requireJsonCsrf(): void
 }
 
 /**
+ * Delete a saved ticket draft once its form has actually been submitted.
+ * Called from the create/comment POST handlers so a successful submit always
+ * clears the autosaved draft, even if the client-side JS never ran.
+ */
+function ticketDraftDelete(PDO $db, int $userId, string $context, int $ticketId = 0): void
+{
+    try {
+        $db->prepare('DELETE FROM ticket_drafts WHERE user_id = ? AND context = ? AND ticket_id = ?')
+           ->execute([$userId, $context, $ticketId]);
+    } catch (Throwable $e) {
+        // Draft cleanup must never break a successful submit.
+    }
+}
+
+/**
  * Neutralise CSV / DDE formula injection. Spreadsheet apps (Excel, LibreOffice)
  * execute a cell whose text begins with = + - @ (or a leading tab / CR). Prefix
  * any such value with a single quote so it is treated as literal text. Run every

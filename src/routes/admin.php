@@ -4241,6 +4241,9 @@ $router->post('/admin/tickets/create', function () {
     )->execute([$subject, $desc, $createdBy, $submittedBy, $typeId, $locationId, $status, $priId, $assignedTo, $groupId, $dueDate]);
     $ticketId = (int) $db->lastInsertId();
 
+    // The ticket is in — clear the submitter's autosaved draft of this form.
+    ticketDraftDelete($db, Auth::id(), 'ticket_create');
+
     // Always run post-create hooks: AI classification (if enabled & non-confidential)
     // happens regardless of who's assigned; auto-assign no-ops when assigned_to is
     // already set or the group strategy is manual.
@@ -5379,6 +5382,9 @@ $router->post('/admin/tickets/{id}/comment', function (array $p) {
         'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, ?)'
     )->execute([$id, Auth::id(), 'comment', $message, $isInternal]);
     $timelineId = (int) $db->lastInsertId();
+
+    // The reply is in — clear the admin's autosaved draft for this ticket.
+    ticketDraftDelete($db, Auth::id(), 'reply', $id);
 
     // Process @mentions and create notifications
     processAtMentions($db, $message, $id, $timelineId, Auth::id());

@@ -11,6 +11,15 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.134.0 &mdash; 2026-07-03
+
+### Added
+- **Ticket and reply drafts now autosave to the server and restore on your next visit.** Half-written work on the staff new-ticket form, the portal new-request form, and every reply box (agent, admin, and portal ticket views) is saved automatically a moment after you stop typing — so an accidentally closed tab, a crash, or "I'll finish this later" no longer loses the draft. Reopening the form shows a "Restored your unsent draft" banner with a one-click **Discard**; a quiet "Draft saved" timestamp appears under the editor as you type. Drafts live in a new `ticket_drafts` table keyed to your account (one per form, per ticket for replies), follow you across machines, and are deleted the moment the ticket or reply is actually submitted (server-side, so it works even if the page dies mid-submit). Unused drafts expire after 90 days. The new-ticket draft captures the whole form — subject, rich-text description, type (with its per-type field layout re-applied), status, due date, location, priority, group, assignee, custom fields including cascading dropdowns, tags, CC, and on-behalf-of.
+- Draft endpoints (`GET/POST /drafts`, `POST /drafts/discard`) require a valid session and the `X-CSRF-Token` header; rows are keyed to the logged-in user, so drafts can never be read, overwritten, or discarded across accounts. Portal draft saves enforce the same ticket-access rule as portal comments (own/merged/location-visible), answering an identical 404 for "not yours" and "doesn't exist" so the API can't be used to probe ticket IDs. Payloads are capped at 1&nbsp;MB with a clean "too large to autosave" response instead of an error page.
+
+### Changed
+- **The agent/admin reply box's old localStorage draft was replaced by the server-side draft.** The previous key wasn't scoped to the signed-in user, so on a shared machine the next person to log in could see the prior agent's unsent reply restored into the editor; any leftover localStorage draft is now proactively removed on page load. Reply drafts also survive switching machines and the reply-collision "Review" flow exactly as before.
+
 ## 2.133.0 &mdash; 2026-07-02
 
 ### Changed

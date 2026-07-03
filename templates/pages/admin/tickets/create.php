@@ -75,6 +75,11 @@ $statusOptions = ticketStatusLabelMap();
             <?= csrfField() ?>
             <input type="hidden" id="dup_matched_ids" name="_dup_matched_ids" value="">
 
+            <div id="ticketDraftNote" class="alert alert-info d-flex align-items-center justify-content-between py-2 px-3 mb-3 small" style="display:none;">
+                <span><i class="bi bi-arrow-counterclockwise me-1"></i>Restored your unsent ticket draft.</span>
+                <button type="button" class="btn btn-sm btn-link p-0 text-decoration-none" id="ticketDraftDiscard">Discard draft</button>
+            </div>
+
             <!-- Subject & Description -->
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-transparent fw-semibold">
@@ -728,9 +733,19 @@ document.addEventListener('click', e => {
     document.addEventListener('click', function(ev) {
         if (!ccInput.contains(ev.target) && !ccDrop.contains(ev.target)) ccClose();
     });
+
+    // Draft autosave hooks: the CC picker's state lives in this closure, so the
+    // draft glue reads/rebuilds it through these.
+    window._ccDraftGet = function () {
+        return Object.values(ccSet).map(function(u) {
+            return { id: u.id, first_name: u.first_name, last_name: u.last_name, email: u.email, role: u.role };
+        });
+    };
+    window._ccDraftAdd = ccAddUser;
 })();
 </script>
 
+<script src="/assets/js/ticket-draft.js"></script>
 <script type="module">
 import {
     ClassicEditor,
@@ -938,5 +953,53 @@ ClassicEditor.create(document.querySelector('#admin-ticket-editor'), {
             form.submit();
         }
     });
+
+    // ── Draft autosave (server-side) ──────────────────────────────────────
+    // Persist the half-written ticket to ticket_drafts so an accidental
+    // close (or "I'll finish this later") comes back on the next visit.
+    // The create handler deletes the draft once the ticket is submitted.
+    const subjectEl = document.getElementById('subject');
+
+    function draftExtras() {
+        const extras = {};
+        const tagEls = document.querySelectorAll('#tagHiddenFields input');
+        if (tagEls.length) extras.tags = Array.prototype.map.call(tagEls, i => i.value);
+        if (window._ccDraftGet) {
+            const cc = window._ccDraftGet();
+            if (cc.length) extras.cc = cc;
+        }
+        const obId = document.getElementById('on_behalf_of_id').value;
+        if (obId) extras.onBehalf = { id: obId, label: document.getElementById('onBehalfBadge').textContent };
+        return Object.keys(extras).length ? extras : null;
+    }
+
+    function applyExtras(extras) {
+        (extras.tags || []).forEach(t => { if (typeof addTag === 'function') addTag(t); });
+        if (extras.cc && window._ccDraftAdd) extras.cc.forEach(u => window._ccDraftAdd(u));
+        if (extras.onBehalf && extras.onBehalf.id) {
+            document.getElementById('on_behalf_of_id').value = extras.onBehalf.id;
+            document.getElementById('onBehalfBadge').textContent = extras.onBehalf.label || '';
+            document.getElementById('onBehalfSelected').style.display = '';
+            document.getElementById('onBehalfSearch').style.display = 'none';
+        }
+    }
+
+    const ticketDraft = TicketDraft.init({
+        context:   'ticket_create',
+        form:      form,
+        exclude:   ['description', 'tags[]', 'cc_user_ids[]', 'on_behalf_of_id'],
+        getHtml:   () => editor.getData(),
+        setHtml:   html => editor.setData(html),
+        getExtras: draftExtras,
+        setExtras: applyExtras,
+        isEmpty:   () => subjectEl.value.trim() === '' && !TicketDraft.textOf(editor.getData()),
+        noteEl:      document.getElementById('ticketDraftNote'),
+        discardBtn:  document.getElementById('ticketDraftDiscard'),
+        statusAnchor: document.getElementById('description'),
+        // Restored tags/CC badges and cascaded fields are easiest to unwind
+        // by reloading — the draft row is already deleted (keepalive).
+        onDiscarded: () => window.location.reload(),
+    });
+    ticketDraft.watchEditor(editor);
 }).catch(console.error);
 </script>

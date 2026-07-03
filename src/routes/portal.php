@@ -381,6 +381,9 @@ $router->post('/portal/tickets/create', function () {
     ]);
     $ticketId = (int) $db->lastInsertId();
 
+    // The ticket is in — clear the submitter's autosaved draft of this form.
+    ticketDraftDelete($db, Auth::id(), 'portal_create');
+
     // AI classification (if enabled & non-confidential type) + strategy-based
     // auto-assignment. Both no-op cleanly when their preconditions aren't met.
     $autoAssignedTo = runPostTicketCreateHooks($db, $ticketId);
@@ -729,6 +732,9 @@ $router->post('/portal/tickets/{id}/comment', function (array $p) {
         'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
     )->execute([$id, Auth::id(), 'comment', $message]);
     $timelineId = (int) $db->lastInsertId();
+
+    // The comment is in — clear the user's autosaved draft for this ticket.
+    ticketDraftDelete($db, Auth::id(), 'portal_reply', $id);
 
     // Handle file attachments
     $attachments = handleAttachmentUploads('attachments');

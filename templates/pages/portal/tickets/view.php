@@ -470,10 +470,14 @@ if ($solutionTimelineId > 0) {
                 <h5 class="mb-0 fw-semibold"><i class="bi bi-chat-dots me-2"></i>Add Comment</h5>
             </div>
             <div class="card-body">
-                <form method="POST" action="/portal/tickets/<?= $ticket['id'] ?>/comment" enctype="multipart/form-data">
+                <form method="POST" action="/portal/tickets/<?= $ticket['id'] ?>/comment" enctype="multipart/form-data" id="portalReplyForm">
                     <?= csrfField() ?>
+                    <div id="portalReplyDraftNote" class="alert alert-info d-flex align-items-center justify-content-between py-2 px-3 mb-2 small" style="display:none;">
+                        <span><i class="bi bi-arrow-counterclockwise me-1"></i>Restored your unsent comment.</span>
+                        <button type="button" class="btn btn-sm btn-link p-0 text-decoration-none" id="portalReplyDraftDiscard">Discard</button>
+                    </div>
                     <div class="mb-3">
-                        <textarea class="form-control" name="message" rows="3" required
+                        <textarea class="form-control" name="message" id="portalReplyMessage" rows="3" required
                                   placeholder="Add an update or ask a question..."></textarea>
                     </div>
                     <div class="mb-3">
@@ -484,6 +488,25 @@ if ($solutionTimelineId > 0) {
                         <i class="bi bi-send me-1"></i>Post Comment
                     </button>
                 </form>
+                <script src="/assets/js/ticket-draft.js"></script>
+                <script>
+                (function () {
+                    // Autosave the in-progress comment server-side so closing the
+                    // window (or finishing later) doesn't lose it. The comment
+                    // handler deletes the draft once it's actually posted.
+                    var ta = document.getElementById('portalReplyMessage');
+                    TicketDraft.init({
+                        context:      'portal_reply',
+                        ticketId:     <?= (int) $ticket['id'] ?>,
+                        form:         document.getElementById('portalReplyForm'),
+                        isEmpty:      function () { return ta.value.trim() === ''; },
+                        noteEl:       document.getElementById('portalReplyDraftNote'),
+                        discardBtn:   document.getElementById('portalReplyDraftDiscard'),
+                        statusAnchor: ta,
+                        onDiscarded:  function () { ta.value = ''; ta.focus(); },
+                    });
+                })();
+                </script>
             </div>
         </div>
     </div>

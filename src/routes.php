@@ -22,6 +22,11 @@ require ROOT_DIR . '/src/routes/pwa.php';
 require ROOT_DIR . '/src/routes/floor.php';
 
 /* ------------------------------------------------------------------
+ * Ticket drafts (server-side autosave for create/reply forms)
+ * ------------------------------------------------------------------ */
+require ROOT_DIR . '/src/routes/drafts.php';
+
+/* ------------------------------------------------------------------
  * Credits roll (local-only easter egg; kept out of the public repo).
  * Only wired in when the gitignored route file is actually present.
  * ------------------------------------------------------------------ */

@@ -1883,6 +1883,9 @@ $router->post('/agent/tickets/{id}/comment', function (array $p) {
     )->execute([$id, Auth::id(), 'comment', $message, $isInternal]);
     $timelineId = (int) $db->lastInsertId();
 
+    // The reply is in — clear the agent's autosaved draft for this ticket.
+    ticketDraftDelete($db, Auth::id(), 'reply', $id);
+
     // Process @mentions and create notifications
     processAtMentions($db, $message, $id, $timelineId, Auth::id());
 

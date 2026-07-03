@@ -1899,6 +1899,7 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
 })();
 </script>
 
+<script src="/assets/js/ticket-draft.js"></script>
 <script type="module">
 import {
     ClassicEditor,
@@ -1976,56 +1977,34 @@ ClassicEditor.create(document.querySelector('#replyEditor'), {
     window._replyEditor = editor;
     editor.ui.view.editable.element.style.minHeight = '150px';
 
-    // ── Reply draft autosave ──────────────────────────────────────────────
-    // Persist the in-progress reply to localStorage so it survives a refresh,
-    // an accidental navigation, or going off to read a colliding reply and
-    // coming back. Cleared once the reply is actually sent.
-    var draftKey   = 'ldReplyDraft:<?= (int) $ticket['id'] ?>';
-    var draftNote  = document.getElementById('replyDraftNote');
-    var draftTimer = null;
-    var submitting = false;
+    // ── Reply draft autosave (server-side) ────────────────────────────────
+    // Persist the in-progress reply to the server (ticket_drafts) so it
+    // survives a refresh, an accidental close, or moving to another machine —
+    // and never leaks to the next account on a shared computer. The comment
+    // handler deletes the draft once the reply is actually sent.
+    var draftNote = document.getElementById('replyDraftNote');
+    // Pre-2.134 drafts lived in localStorage under a key that wasn't
+    // user-scoped; remove any leftover so it can't surface for someone else.
+    try { localStorage.removeItem('ldReplyDraft:<?= (int) $ticket['id'] ?>'); } catch (e) {}
 
-    function draftText(html) { return (html || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim(); }
-
-    function saveDraft() {
-        if (submitting) return;
-        try {
-            var data = editor.getData();
-            if (draftText(data)) localStorage.setItem(draftKey, data);
-            else localStorage.removeItem(draftKey);
-        } catch (e) {}
-    }
-
-    function clearDraft() {
-        submitting = true;
-        try { localStorage.removeItem(draftKey); } catch (e) {}
-        if (draftNote) draftNote.style.display = 'none';
-    }
-
-    editor.model.document.on('change:data', function() {
-        clearTimeout(draftTimer);
-        draftTimer = setTimeout(saveDraft, 800);
+    var ticketDraft = TicketDraft.init({
+        context:       'reply',
+        ticketId:      <?= (int) $ticket['id'] ?>,
+        form:          document.getElementById('replyForm'),
+        captureFields: false,
+        getHtml:       function () { return editor.getData(); },
+        setHtml:       function (html) { editor.setData(html); },
+        hasText:       function () { return !!TicketDraft.textOf(editor.getData()); },
+        noteEl:        draftNote,
+        discardBtn:    document.getElementById('replyDraftDiscard'),
+        statusAnchor:  document.getElementById('replyMessageHidden'),
+        onRestored:    function () { if (window._openReplyPanel) window._openReplyPanel(); },
+        onDiscarded:   function () { editor.setData(''); editor.editing.view.focus(); },
     });
+    ticketDraft.watchEditor(editor);
 
-    // Restore a saved draft on load (the editor starts empty) and open the panel
-    // so it's visible. Discard wipes it.
-    (function() {
-        var saved = null;
-        try { saved = localStorage.getItem(draftKey); } catch (e) {}
-        if (saved && draftText(saved) && !draftText(editor.getData())) {
-            editor.setData(saved);
-            if (draftNote) draftNote.style.display = '';
-            if (window._openReplyPanel) window._openReplyPanel();
-        }
-    })();
-
-    var discardBtn = document.getElementById('replyDraftDiscard');
-    if (discardBtn) discardBtn.addEventListener('click', function() {
-        editor.setData('');
-        try { localStorage.removeItem(draftKey); } catch (e) {}
-        if (draftNote) draftNote.style.display = 'none';
-        editor.editing.view.focus();
-    });
+    function saveDraft()  { ticketDraft.flush(); }
+    function clearDraft() { ticketDraft.clear(); }
 
     // Form submit: validate and populate hidden field
     document.getElementById('replyForm').addEventListener('submit', function(e) {
