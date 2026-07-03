@@ -472,7 +472,7 @@ if ($solutionTimelineId > 0) {
             <div class="card-body">
                 <form method="POST" action="/portal/tickets/<?= $ticket['id'] ?>/comment" enctype="multipart/form-data" id="portalReplyForm">
                     <?= csrfField() ?>
-                    <div id="portalReplyDraftNote" class="alert alert-info d-flex align-items-center justify-content-between py-2 px-3 mb-2 small" style="display:none;">
+                    <div id="portalReplyDraftNote" class="alert alert-info d-flex align-items-center justify-content-between py-2 px-3 mb-2 small d-none">
                         <span><i class="bi bi-arrow-counterclockwise me-1"></i>Restored your unsent comment.</span>
                         <button type="button" class="btn btn-sm btn-link p-0 text-decoration-none" id="portalReplyDraftDiscard">Discard</button>
                     </div>

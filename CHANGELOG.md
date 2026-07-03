@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.134.1 &mdash; 2026-07-03
+
+### Fixed
+- **The "Restored your unsent draft" banner no longer appears when there is no draft.** The banner divs carry Bootstrap's `d-flex` class, whose `display:flex !important` overrides an inline `style="display:none"` — so the banner rendered whenever its container was visible (e.g. as soon as the reply panel was opened), draft or not. All five banners (staff/portal new-ticket forms and the agent/admin/portal reply boxes) are now hidden with the `d-none` utility class (which is declared after `d-flex` and wins), the autosave module toggles that class instead of the style attribute, and it force-hides the banner on init as a belt-and-braces guard. Verified against computed styles this time, not the inline style property. (Latent since the localStorage draft banner shipped; surfaced by 2.134.0.)
+
 ## 2.134.0 &mdash; 2026-07-03
 
 ### Added

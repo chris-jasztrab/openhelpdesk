@@ -72,6 +72,20 @@
             statusEl.style.display = '';
         }
 
+        // The banner carries d-flex (display:flex !important), which beats an
+        // inline display:none — hide/show it with Bootstrap's d-none class
+        // (declared after d-flex, so it wins) instead of the style attribute.
+        function showNote() {
+            if (!opts.noteEl) return;
+            opts.noteEl.classList.remove('d-none');
+            opts.noteEl.style.display = '';
+        }
+
+        function hideNote() {
+            if (!opts.noteEl) return;
+            opts.noteEl.classList.add('d-none');
+        }
+
         function controls() {
             return form.querySelectorAll('input[name], select[name], textarea[name]');
         }
@@ -169,7 +183,7 @@
             lastSaved = '';
             post('/drafts', JSON.stringify({ context: opts.context, ticket_id: ticketId, payload: null }), true)
                 .catch(function () {});
-            if (opts.noteEl) opts.noteEl.style.display = 'none';
+            hideNote();
             setStatus(null);
         }
 
@@ -210,11 +224,13 @@
                     if (opts.setHtml && typeof p.html === 'string') opts.setHtml(p.html);
                     if (opts.setExtras && p.extras) opts.setExtras(p.extras);
                     lastSaved = JSON.stringify(capture());
-                    if (opts.noteEl) opts.noteEl.style.display = '';
+                    showNote();
                     if (opts.onRestored) opts.onRestored();
                 })
                 .catch(function () {});
         }
+
+        hideNote(); // start hidden regardless of the template's markup
 
         form.addEventListener('input', schedule);
         form.addEventListener('change', schedule);

@@ -77,7 +77,7 @@ endif; ?>
         <form method="POST" action="/portal/tickets/create" enctype="multipart/form-data" id="portal-ticket-form">
             <?= csrfField() ?>
 
-            <div id="ticketDraftNote" class="alert alert-info d-flex align-items-center justify-content-between py-2 px-3 mb-3 small" style="display:none;">
+            <div id="ticketDraftNote" class="alert alert-info d-flex align-items-center justify-content-between py-2 px-3 mb-3 small d-none">
                 <span><i class="bi bi-arrow-counterclockwise me-1"></i>Restored your unsent ticket draft.</span>
                 <button type="button" class="btn btn-sm btn-link p-0 text-decoration-none" id="ticketDraftDiscard">Discard draft</button>
             </div>

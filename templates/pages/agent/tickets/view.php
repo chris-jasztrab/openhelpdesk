@@ -551,7 +551,7 @@ if ($solutionTimelineId > 0) {
                             <input type="text" class="form-control" name="forward_to" id="forwardTo" placeholder="vendor@example.com, jane.doe@partner.org" autocomplete="off">
                             <div class="form-text"><?= $fwdHint ?> Recipients are added as contacts and CC'd on the ticket; their email replies thread back in automatically. The full conversation and all attachments are included.</div>
                         </div>
-                        <div id="replyDraftNote" class="alert alert-info d-flex align-items-center justify-content-between py-2 px-3 mb-2 small" style="display:none;">
+                        <div id="replyDraftNote" class="alert alert-info d-flex align-items-center justify-content-between py-2 px-3 mb-2 small d-none">
                             <span><i class="bi bi-arrow-counterclockwise me-1"></i>Restored your unsent draft.</span>
                             <button type="button" class="btn btn-sm btn-link text-decoration-none p-0 ms-2" id="replyDraftDiscard">Discard</button>
                         </div>
