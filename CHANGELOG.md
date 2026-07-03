@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.137.2 &mdash; 2026-07-03
+
+### Changed
+- **README rewritten to match the app as it exists at v2.137.** The feature list — last refreshed around v2.42 — now covers everything shipped since: Kanban board and the four ticket-list views, the live Wallboard, Microsoft Teams integration, granular RBAC permission levels, configurable ticket statuses, ticket forwarding to external contacts, out-of-office coverage, server-side drafts, undo send, recurring tickets, stale-ticket follow-ups, manual escalation paths, confidential tickets, status banners, PWA/floor mode, presence and live updates, per-type form builder, the full 14-report catalogue, and the expanded REST API. Also corrected drifted facts: inbound email is Microsoft Graph only (IMAP support was removed), all front-end libraries are self-hosted since 2.132.6 (the CKEditor licensing note now reflects that it *is* bundled), the cron list gains `process-oof-coverage.php`, the env-var table gains `MAIL_ENABLED` and `UPLOAD_ALLOWED_TYPES`, the role table reflects RBAC instead of fixed roles, and the project-structure tree includes the kanban/floor/drafts/pwa/manager route files and new `src/` classes.
+
 ## 2.137.1 &mdash; 2026-07-03
 
 ### Fixed
