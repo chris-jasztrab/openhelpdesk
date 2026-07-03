@@ -13132,6 +13132,8 @@ $router->get('/admin/settings/stale-tickets', function () {
     $settings = [
         'stale_threshold_minutes'             => getSetting('stale_threshold_minutes', '4320'),
         'stale_recheck_minutes'               => getSetting('stale_recheck_minutes', '1440'),
+        'stale_scope'                         => getSetting('stale_scope', 'all'),
+        'stale_scope_cutoff'                  => getSetting('stale_scope_cutoff', ''),
         'email_notify:ticket_stale_agent'     => getSetting('email_notify:ticket_stale_agent', '1'),
         'email_notify:ticket_stale_requester' => getSetting('email_notify:ticket_stale_requester', '1'),
     ];
@@ -13153,16 +13155,34 @@ $router->post('/admin/settings/stale-tickets', function () {
     // Inputs accept d/h/m; a bare number means hours (the field's legacy unit).
     $threshold = max(0, parseDurationToMinutes((string) ($_POST['stale_threshold_minutes'] ?? ''), 'h') ?? 4320);
     $recheck   = max(1, parseDurationToMinutes((string) ($_POST['stale_recheck_minutes']   ?? ''), 'h') ?? 1440);
+    $scope     = ($_POST['stale_scope'] ?? 'all') === 'new' ? 'new' : 'all';
 
     $before = [
         'stale_threshold_minutes'             => getSetting('stale_threshold_minutes', '4320'),
         'stale_recheck_minutes'               => getSetting('stale_recheck_minutes', '1440'),
+        'stale_scope'                         => getSetting('stale_scope', 'all'),
+        'stale_scope_cutoff'                  => getSetting('stale_scope_cutoff', ''),
         'email_notify:ticket_stale_agent'    => getSetting('email_notify:ticket_stale_agent', '1'),
         'email_notify:ticket_stale_requester' => getSetting('email_notify:ticket_stale_requester', '1'),
     ];
 
+    // The cutoff is stamped only when entering "new tickets only" mode and
+    // stays stable across subsequent saves, so re-saving unrelated settings
+    // never quietly excludes tickets created since the mode was enabled.
+    // Switching back to retroactive clears it. Stamped in DB time (not PHP
+    // time) because it's compared against tickets.created_at, which MySQL
+    // writes — the two clocks can sit in different timezones.
+    $cutoff = '';
+    if ($scope === 'new') {
+        $cutoff = ($before['stale_scope'] === 'new' && $before['stale_scope_cutoff'] !== '')
+            ? $before['stale_scope_cutoff']
+            : (string) Database::connect()->query('SELECT NOW()')->fetchColumn();
+    }
+
     setSetting('stale_threshold_minutes', (string) $threshold);
     setSetting('stale_recheck_minutes',   (string) $recheck);
+    setSetting('stale_scope',             $scope);
+    setSetting('stale_scope_cutoff',      $cutoff);
     setSetting('email_notify:ticket_stale_agent',     isset($_POST['notify_agent'])     ? '1' : '0');
     setSetting('email_notify:ticket_stale_requester', isset($_POST['notify_requester']) ? '1' : '0');
 
@@ -13174,6 +13194,8 @@ $router->post('/admin/settings/stale-tickets', function () {
         [
             'stale_threshold_minutes'             => (string) $threshold,
             'stale_recheck_minutes'               => (string) $recheck,
+            'stale_scope'                         => $scope,
+            'stale_scope_cutoff'                  => $cutoff,
             'email_notify:ticket_stale_agent'    => isset($_POST['notify_agent'])     ? '1' : '0',
             'email_notify:ticket_stale_requester' => isset($_POST['notify_requester']) ? '1' : '0',
         ]

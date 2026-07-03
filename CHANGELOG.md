@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.136.0 &mdash; 2026-07-03
+
+### Added
+- **Stale-ticket notifications can now be scoped to new tickets only.** A new **Coverage** choice on Admin → Settings → Stale Tickets picks between **Retroactive** (the previous and still-default behavior: every open ticket is eligible, including ones created before the feature was turned on — with an explicit warning that the first run can email the whole backlog at once) and **New tickets only** (a cutoff timestamp is stamped the moment you save, and only tickets created after it are ever notified — the historical backlog stays quiet). The cutoff is stable across re-saves so tweaking unrelated settings never silently moves it; switching to Retroactive clears it and switching back stamps a fresh one. The cutoff is stamped in database time (not PHP time) since it's compared against `tickets.created_at`, the processor logs which coverage mode each run used, and if the cutoff is ever missing in new-only mode the run safely skips everything instead of mass-mailing. Coverage changes are recorded in the audit log and the option is findable in settings search.
+
 ## 2.135.0 &mdash; 2026-07-03
 
 ### Added

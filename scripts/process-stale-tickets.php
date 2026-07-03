@@ -52,13 +52,29 @@ if ($globalThreshold <= 0) {
     exit(0);
 }
 
-logLine('Global threshold: ' . formatDuration($globalThreshold) . ' | Re-notify gap: ' . formatDuration($recheckMins));
+// Coverage: 'all' evaluates every open ticket (retroactive); 'new' only
+// considers tickets created after the cutoff stamped when the admin chose
+// that mode, so enabling the feature never blasts the historical backlog.
+$scope       = getSetting('stale_scope', 'all');
+$scopeCutoff = getSetting('stale_scope_cutoff', '');
+if ($scope === 'new' && $scopeCutoff === '') {
+    // Shouldn't happen (the settings page always stamps a cutoff), but if it
+    // does, skipping everything is the safe failure mode — not mass-mailing.
+    // DB time, to match tickets.created_at.
+    $scopeCutoff = (string) $db->query('SELECT NOW()')->fetchColumn();
+    logLine('WARN: coverage is "new tickets only" but no cutoff is stored — re-save the stale ticket settings. Treating all existing tickets as out of scope this run.');
+}
+
+logLine('Global threshold: ' . formatDuration($globalThreshold) . ' | Re-notify gap: ' . formatDuration($recheckMins)
+    . ' | Coverage: ' . ($scope === 'new' ? "tickets created after {$scopeCutoff}" : 'all open tickets (retroactive)'));
 
 // Only flag tickets the requester is still waiting on. Exclude statuses
 // that are intentionally idle (waiting_on_customer / waiting_on_third_party)
 // and closed-out states (resolved / closed).
 $activeStatuses = ['open', 'in_progress', 'pending'];
 $placeholders   = implode(',', array_fill(0, count($activeStatuses), '?'));
+
+$scopeSql = $scope === 'new' ? ' AND t.created_at >= ?' : '';
 
 $stmt = $db->prepare(
     "SELECT t.*,
@@ -67,9 +83,12 @@ $stmt = $db->prepare(
      FROM tickets t
      LEFT JOIN ticket_types tt ON tt.id = t.type_id
      WHERE t.status IN ($placeholders)
-       AND TIMESTAMPDIFF(MINUTE, t.updated_at, NOW()) >= COALESCE(tt.stale_threshold_minutes, ?)"
+       AND TIMESTAMPDIFF(MINUTE, t.updated_at, NOW()) >= COALESCE(tt.stale_threshold_minutes, ?)$scopeSql"
 );
 $params = array_merge([$globalThreshold], $activeStatuses, [$globalThreshold]);
+if ($scope === 'new') {
+    $params[] = $scopeCutoff;
+}
 $stmt->execute($params);
 $tickets = $stmt->fetchAll();
 

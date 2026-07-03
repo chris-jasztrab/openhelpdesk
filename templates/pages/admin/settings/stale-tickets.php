@@ -13,6 +13,8 @@ unset($_SESSION['_stale_run']);
 
 $thresholdMins = (int) ($settings['stale_threshold_minutes'] ?? 4320);
 $recheckMins   = (int) ($settings['stale_recheck_minutes']   ?? 1440);
+$scope         = ($settings['stale_scope'] ?? 'all') === 'new' ? 'new' : 'all';
+$scopeCutoff   = (string) ($settings['stale_scope_cutoff'] ?? '');
 ?>
 <div class="mb-4">
     <h2 class="fw-bold mb-0">Settings</h2>
@@ -51,6 +53,31 @@ $recheckMins   = (int) ($settings['stale_recheck_minutes']   ?? 1440);
                            name="stale_recheck_minutes" value="<?= e(formatDuration($recheckMins)) ?>">
                     <div class="form-text">Minimum gap between repeat stale notifications on the same ticket. Enter <code>d</code>/<code>h</code>/<code>m</code> (a bare number means hours). Default: 1d.</div>
                 </div>
+            </div>
+
+            <hr class="my-4">
+
+            <h6 class="fw-semibold mb-1">Coverage</h6>
+            <p class="text-muted mb-3" style="font-size:.875rem;">Choose which tickets are eligible for stale notifications.</p>
+            <div class="form-check mb-2">
+                <input class="form-check-input" type="radio" name="stale_scope" id="stale_scope_all"
+                       value="all" <?= $scope === 'all' ? 'checked' : '' ?>>
+                <label class="form-check-label" for="stale_scope_all">
+                    <span class="fw-semibold">Retroactive</span> — evaluate every open ticket, including ones created before stale notifications were turned on.
+                    <span class="d-block text-muted small mt-1">Heads up: on the next run, every existing ticket already past its threshold gets a notification. On an established helpdesk with an old backlog this can be a lot of email at once.</span>
+                </label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="stale_scope" id="stale_scope_new"
+                       value="new" <?= $scope === 'new' ? 'checked' : '' ?>>
+                <label class="form-check-label" for="stale_scope_new">
+                    <span class="fw-semibold">New tickets only</span> — only tickets created after this option is saved are eligible; the existing backlog is never notified.
+                    <?php if ($scope === 'new' && $scopeCutoff !== ''): ?>
+                        <span class="d-block text-muted small mt-1">Currently covering tickets created after <strong><?= e($scopeCutoff) ?></strong>. Re-saving keeps this cutoff; switching to Retroactive and back stamps a new one.</span>
+                    <?php else: ?>
+                        <span class="d-block text-muted small mt-1">The cutoff timestamp is stamped when you save.</span>
+                    <?php endif; ?>
+                </label>
             </div>
 
             <hr class="my-4">

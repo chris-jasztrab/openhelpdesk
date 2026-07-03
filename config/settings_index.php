@@ -456,6 +456,11 @@ return [
      'section' => 'Global Thresholds', 'anchor' => 'stale_recheck_minutes',
      'keywords' => 'stale renotify recheck'],
 
+    ['label' => 'Stale Coverage',               'description' => 'Retroactive (all open tickets) or only tickets created after enabling',
+     'group' => 'Automation', 'page_label' => 'Stale Tickets', 'page_url' => '/admin/settings/stale-tickets',
+     'section' => 'Coverage', 'anchor' => 'stale_scope_all',
+     'keywords' => 'stale retroactive backlog new tickets only coverage cutoff scope'],
+
     ['label' => 'Notify Assigned Agent (stale)', 'description' => 'Send stale alert to the assigned agent',
      'group' => 'Automation', 'page_label' => 'Stale Tickets', 'page_url' => '/admin/settings/stale-tickets',
      'section' => 'Email notifications', 'anchor' => 'notify_agent',
