@@ -560,6 +560,9 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                                 <a href="/admin/tickets/<?= $t['id'] ?>" class="ld-subject-link text-decoration-none fw-semibold text-dark"<?= $presence ? ' style="color:#b45309;"' : '' ?>>
                                     <?= e($t['subject']) ?>
                                 </a>
+                                <?php if (!empty($draftTicketIds[$t['id']])): ?>
+                                <span class="badge bg-warning bg-opacity-25 text-dark ms-1" title="You have an unsent reply draft on this ticket"><i class="bi bi-pencil-square me-1"></i>Draft</span>
+                                <?php endif; ?>
                                 <span class="ld-presence-hint d-block small fst-italic" style="color:#b45309;<?= $presence ? '' : 'display:none;' ?>" title="Another staff member currently has this ticket open">
                                     <?php if ($presence): ?>
                                     <i class="bi <?= $presence['replying'] ? 'bi-pencil-fill' : 'bi-eye-fill' ?> me-1"></i><?= $presence['replying'] ? 'Being replied to by ' : 'Opened by ' ?><?= e($presence['name']) ?>

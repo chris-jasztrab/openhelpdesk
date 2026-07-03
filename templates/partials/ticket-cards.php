@@ -98,6 +98,7 @@ $slaOn       = slaEnabled();
                         <span class="ld-card-subject ld-subject-link fw-semibold text-truncate" style="max-width:100%;"><?= e($t['subject']) ?></span>
                         <span class="text-muted small">#<?= (int) $t['id'] ?></span>
                         <?php if ($isAssignedToMe): ?><span class="badge bg-primary bg-opacity-10 text-primary">Mine</span><?php endif; ?>
+                        <?php if (!empty($draftTicketIds[$t['id']])): ?><span class="badge bg-warning bg-opacity-25 text-dark" title="You have an unsent reply draft on this ticket"><i class="bi bi-pencil-square me-1"></i>Draft</span><?php endif; ?>
                         <?php if ($t['merged_into_ticket_id']): ?>
                         <span class="badge bg-secondary" title="Merged into #<?= (int) $t['merged_into_ticket_id'] ?>"><i class="bi bi-arrow-right-circle"></i> Merged</span>
                         <?php endif; ?>

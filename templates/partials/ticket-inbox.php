@@ -116,6 +116,9 @@ $inboxBase = $inboxBase ?? '/agent/tickets';
                             <?php if ($isAssignedToMe): ?>
                             <span class="badge bg-primary bg-opacity-10 text-primary ms-1">Mine</span>
                             <?php endif; ?>
+                            <?php if (!empty($draftTicketIds[$t['id']])): ?>
+                            <span class="badge bg-warning bg-opacity-25 text-dark ms-1" title="You have an unsent reply draft on this ticket"><i class="bi bi-pencil-square me-1"></i>Draft</span>
+                            <?php endif; ?>
                             <?php if ($t['merged_into_ticket_id']): ?>
                             <span class="badge bg-secondary ms-1" title="Merged into #<?= (int) $t['merged_into_ticket_id'] ?>"><i class="bi bi-arrow-right-circle"></i> Merged</span>
                             <?php endif; ?>

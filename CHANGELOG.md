@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.135.0 &mdash; 2026-07-03
+
+### Added
+- **Ticket lists now flag tickets where you have an unsent draft.** An amber "✎ Draft" badge appears next to the subject — in the staff table, inbox, and card views (agent and admin) for unsent reply drafts, and in the portal "My Requests" list for unsent comment drafts. The badge is per-user (it marks *your* drafts, keyed to your account, one cheap indexed lookup per page) and disappears as soon as the draft is sent or discarded. This closes the discoverability gap where a draft saved "for later" was only visible once you happened to reopen the right form.
+
 ## 2.134.1 &mdash; 2026-07-03
 
 ### Fixed

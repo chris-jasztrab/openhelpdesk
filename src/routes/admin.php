@@ -3722,8 +3722,16 @@ $router->get('/admin/tickets', function () {
         $adminGroupIds = array_map('intval', $gs->fetchAll(PDO::FETCH_COLUMN));
     }
 
+    // Tickets where this user has an unsent reply draft — marked in the list.
+    $draftStmt = $db->prepare(
+        "SELECT ticket_id FROM ticket_drafts WHERE user_id = ? AND context = 'reply' AND ticket_id > 0"
+    );
+    $draftStmt->execute([Auth::id()]);
+    $draftTicketIds = array_fill_keys($draftStmt->fetchAll(PDO::FETCH_COLUMN), true);
+
     render('admin/tickets/index', [
         'tickets'              => $tickets,
+        'draftTicketIds'       => $draftTicketIds,
         'ticketPresence'       => $ticketPresence,
         'priorities'           => $priorities,
         'types'                => $types,

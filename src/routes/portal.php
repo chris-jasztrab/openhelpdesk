@@ -127,8 +127,16 @@ $router->get('/portal/tickets', function () {
         'scope'    => $fScope,
     ];
 
+    // Tickets where this user has an unsent comment draft — marked in the list.
+    $draftStmt = $db->prepare(
+        "SELECT ticket_id FROM ticket_drafts WHERE user_id = ? AND context = 'portal_reply' AND ticket_id > 0"
+    );
+    $draftStmt->execute([Auth::id()]);
+    $draftTicketIds = array_fill_keys($draftStmt->fetchAll(PDO::FETCH_COLUMN), true);
+
     render('portal/tickets/index', [
         'tickets'           => $tickets,
+        'draftTicketIds'    => $draftTicketIds,
         'priorities'        => $priorities,
         'filters'           => $filters,
         'page'              => $page,

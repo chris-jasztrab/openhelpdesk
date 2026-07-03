@@ -132,6 +132,9 @@ $sortParams = array_filter($filters, fn($v) => $v !== '' && $v !== 'mine');
                                 <i class="bi bi-arrow-up-circle me-1"></i>Escalated L<?= (int) $t['escalation_level'] ?>
                             </span>
                             <?php endif; ?>
+                            <?php if (!empty($draftTicketIds[$t['id']])): ?>
+                            <span class="badge bg-warning bg-opacity-25 text-dark ms-1" title="You have an unsent comment draft on this request"><i class="bi bi-pencil-square me-1"></i>Draft</span>
+                            <?php endif; ?>
                         </td>
                         <td>
                             <span class="badge" style="<?= ticketStatusBadgeStyle($t['status']) ?>">
