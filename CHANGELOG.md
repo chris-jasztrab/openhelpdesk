@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.141.1 &mdash; 2026-07-06
+
+### Fixed
+- **Agent SLA help page no longer links to admin-only pages.** The new <strong>Agent &rarr; Help &rarr; SLAs &amp; Response Times</strong> page previously linked to <strong>Admin &rarr; Docs &rarr; SLA Policies</strong> and the <strong>SLA Compliance report</strong>, both of which require admin access — so a regular agent following those links hit a "no access" wall. Those links are now plain-text references, keeping the whole page usable by any agent.
+
 ## 2.141.0 &mdash; 2026-07-06
 
 ### Added

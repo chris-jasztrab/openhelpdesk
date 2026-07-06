@@ -30,7 +30,7 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/agent/help'], ['label' => 'SLAs 
 <ul class="text-muted mb-0">
     <li><strong>Requesters know what to expect.</strong> An urgent outage and a "nice to have" request get different, agreed-upon response windows.</li>
     <li><strong>Nothing quietly rots.</strong> A ticket that's approaching its deadline lights up so it can't be forgotten at the bottom of the list.</li>
-    <li><strong>The team can measure itself.</strong> Managers can see how often the desk hits its targets and where the pressure points are (the <a href="/admin/reports/sla">SLA Compliance report</a>, if you have access).</li>
+    <li><strong>The team can measure itself.</strong> Managers can see how often the desk hits its targets and where the pressure points are, using the SLA Compliance report.</li>
 </ul>
 </div>
 </div>
@@ -135,7 +135,7 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/agent/help'], ['label' => 'SLAs 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-gear text-primary me-2"></i>Who sets the targets?</h5>
-<p class="text-muted mb-0">SLA policies, business hours, holidays, and which priorities get which targets are all configured by administrators. If you think a target is wrong for the kind of work you handle, raise it with an admin &mdash; the full configuration guide lives at <a href="/admin/docs/sla">Admin &rarr; Docs &rarr; SLA Policies</a> (visible if you have admin access).</p>
+<p class="text-muted mb-0">SLA policies, business hours, holidays, and which priorities get which targets are all configured by administrators. If you think a target is wrong for the kind of work you handle, raise it with an admin &mdash; they have a full configuration guide under <strong>Admin &rarr; Docs &rarr; SLA Policies</strong>.</p>
 </div>
 </div>
 
