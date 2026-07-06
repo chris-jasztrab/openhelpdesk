@@ -181,6 +181,33 @@ I've confirmed the fix is deployed and the user has verified it works.
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-toggles text-primary me-2"></i>Outbound Mail Switches (<code>.env</code>)</h5>
+<p class="text-muted mb-2">Two master switches control whether any mail leaves the server at all. They live in the application's <code>.env</code> file on the server &mdash; <strong>not</strong> in the admin UI &mdash; so changing them requires shell access to the host. This is deliberate: it keeps the "stop all email" control off the web interface, where an accidental click (or a compromised admin account) could otherwise flip mail on for every recipient at once.</p>
+<div class="table-responsive mb-3">
+<table class="table table-sm mb-0">
+    <thead class="table-light"><tr><th>Setting</th><th>Default</th><th>Effect</th></tr></thead>
+    <tbody>
+        <tr>
+            <td class="fw-semibold"><code>MAIL_ENABLED</code></td>
+            <td><code>true</code></td>
+            <td class="text-muted">Master kill switch. When <code>false</code>, <strong>all</strong> outbound mail is silently skipped (each attempt is logged to <code>storage/logs/smtp.log</code>). Set to <code>false</code> on dev, staging, and test instances so they never deliver real mail; leave <code>true</code> on production.</td>
+        </tr>
+        <tr>
+            <td class="fw-semibold"><code>MAIL_TRANSACTIONAL_ENABLED</code></td>
+            <td><code>false</code></td>
+            <td class="text-muted">Transactional bypass. When <code>MAIL_ENABLED=false</code>, setting this to <code>true</code> still lets <strong>user-initiated, single-recipient</strong> mail through &mdash; currently <strong>password-reset</strong> emails &mdash; while bulk ticket-notification mail stays suppressed. Has no effect when <code>MAIL_ENABLED=true</code> (everything already sends).</td>
+        </tr>
+    </tbody>
+</table>
+</div>
+<div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
+    The transactional bypass still needs SMTP configured above &mdash; it changes <em>whether</em> the kill switch blocks the message, not how it is delivered. Use it when you want password resets to work on an instance that intentionally keeps all other outbound mail turned off.
+</div>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-envelope-paper text-primary me-2"></i>Customisable Email Templates</h5>
 <p class="text-muted mb-2">The subject line, introductory message, button label and footer text for several system emails can be customised without editing code. Go to <a href="/admin/settings/email-templates"><strong>Admin → Settings → Email Templates</strong></a>.</p>
 <div class="table-responsive mb-3">
@@ -247,6 +274,7 @@ I've confirmed the fix is deployed and the user has verified it works.
     <li><strong>Gmail "Less secure app" error:</strong> Use an App Password instead of your regular Gmail password when 2FA is enabled.</li>
     <li><strong>Microsoft 365 authentication error:</strong> Ensure SMTP AUTH is enabled for the mailbox in the Exchange admin centre under <em>Mail flow → Connectors</em>.</li>
     <li><strong>No errors but emails not arriving:</strong> Check that your From Address matches the authenticated SMTP user — mismatches can cause silent rejection.</li>
+    <li><strong>No mail at all (and nothing in the send log):</strong> Confirm <code>MAIL_ENABLED=true</code> in the server's <code>.env</code> — when it is <code>false</code>, every message is skipped and logged to <code>storage/logs/smtp.log</code> as <code>SKIPPED</code>. If you intend to keep general mail off but need password resets to work, set <code>MAIL_TRANSACTIONAL_ENABLED=true</code> (see <em>Outbound Mail Switches</em> above).</li>
 </ul>
 </div>
 </div>

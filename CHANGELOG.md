@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.140.1 &mdash; 2026-07-06
+
+### Changed
+- **Email help docs now document the outbound-mail `.env` switches.** Added an "Outbound Mail Switches" section to <strong>Admin &rarr; Docs &rarr; Email &amp; SMTP</strong> explaining `MAIL_ENABLED` (the master kill switch) and the new `MAIL_TRANSACTIONAL_ENABLED` bypass — what each defaults to, what they do, and why they live in the server `.env` rather than the admin UI. A matching troubleshooting bullet points anyone debugging "no mail at all" at the kill switch and the `SKIPPED` entries in `storage/logs/smtp.log`.
+
 ## 2.140.0 &mdash; 2026-07-06
 
 ### Added
