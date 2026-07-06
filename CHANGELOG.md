@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.141.0 &mdash; 2026-07-06
+
+### Added
+- **New agent help page: "SLAs & Response Times."** Added <strong>Agent &rarr; Help &rarr; SLAs &amp; Response Times</strong>, a plain-English guide for agents explaining what an SLA is and why it exists, how the clock is measured against business hours / counted days / holidays (not calendar time), how to read the <em>On track / Warning / Breached</em> badge, what stops each clock, how policies attach on creation and recalculate on priority/type change, the in-app warning and breach notifications, pausing while waiting on the requester, where SLAs surface, and practical tips to stay on track. Wired into the agent help nav, the overview card grid, and the help search index. Complements the existing configuration-focused <strong>Admin &rarr; Docs &rarr; SLA Policies</strong> guide.
+
 ## 2.140.1 &mdash; 2026-07-06
 
 ### Changed

@@ -6,6 +6,7 @@ $agentHelpNav = [
     ['url' => '/agent/help/ticket-list',      'label' => 'Ticket List & Filters','icon' => 'bi-list-ul'],
     ['url' => '/agent/help/kanban',           'label' => 'Kanban Board',         'icon' => 'bi-kanban'],
     ['url' => '/agent/help/working-tickets',  'label' => 'Working on Tickets',   'icon' => 'bi-ticket-detailed'],
+    ['url' => '/agent/help/sla',              'label' => 'SLAs & Response Times','icon' => 'bi-stopwatch'],
     ['url' => '/agent/help/floor',            'label' => 'Floor Mode',           'icon' => 'bi-grid-1x2'],
     ['url' => '/agent/help/canned-responses', 'label' => 'Canned Responses',     'icon' => 'bi-chat-square-text'],
 ];
