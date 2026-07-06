@@ -158,6 +158,7 @@ $breadcrumbs  = [
         ['icon' => 'bi-graph-up-arrow',       'title' => 'Ticket Trends',      'desc' => 'Multi-line volume trend over time, drilled down by type or location.',      'url' => '/admin/reports/trends'],
         ['icon' => 'bi-patch-check',          'title' => 'FCR Rate',           'desc' => 'First-contact resolution rate — tickets resolved without back-and-forth.',   'url' => '/admin/reports/fcr'],
         ['icon' => 'bi-diagram-3',            'title' => 'Group Coverage',     'desc' => 'Each ticket type, its default group, and the members of that group.',        'url' => '/admin/reports/group-coverage'],
+        ['icon' => 'bi-cpu',                  'title' => 'AI Token Usage',     'desc' => 'AI token consumption by hour, day, week, or month, with period-over-period comparison.', 'url' => '/admin/reports/ai-usage'],
         ['icon' => 'bi-sliders',              'title' => 'Custom Builder',     'desc' => 'Pick any metric and group-by combination to build a custom report.',         'url' => '/admin/reports/custom'],
     ];
     foreach ($reportCards as $rc): ?>

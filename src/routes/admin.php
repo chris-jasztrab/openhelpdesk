@@ -11505,6 +11505,207 @@ $router->get('/admin/reports/trends', function () {
 });
 
 /* ==================================================================
+ * ADMIN – Report: AI Token Usage
+ * ================================================================== */
+
+/**
+ * Map an AI-usage bucket granularity to the MySQL expression that buckets a
+ * `created_at` column, plus the matching PHP date() format (so SQL keys and
+ * PHP-enumerated keys line up) and a human label format.
+ */
+function aiUsageGranularity(string $key): array
+{
+    switch ($key) {
+        case 'hour':
+            return [
+                'sql'    => "DATE_FORMAT(created_at, '%Y-%m-%d %H:00')",
+                'step'   => 'PT1H',
+                'phpKey' => 'Y-m-d H:00',
+                'label'  => 'M j, ga',
+                'axis'   => 'Hour',
+            ];
+        case 'week':
+            // Bucket by the Monday that starts each ISO week.
+            return [
+                'sql'    => "DATE_FORMAT(DATE_SUB(created_at, INTERVAL WEEKDAY(created_at) DAY), '%Y-%m-%d')",
+                'step'   => 'P1W',
+                'phpKey' => 'Y-m-d',
+                'label'  => '\\w\\k M j',
+                'axis'   => 'Week (starting Mon)',
+            ];
+        case 'month':
+            return [
+                'sql'    => "DATE_FORMAT(created_at, '%Y-%m-01')",
+                'step'   => 'P1M',
+                'phpKey' => 'Y-m-01',
+                'label'  => 'M Y',
+                'axis'   => 'Month',
+            ];
+        case 'day':
+        default:
+            return [
+                'sql'    => "DATE_FORMAT(created_at, '%Y-%m-%d')",
+                'step'   => 'P1D',
+                'phpKey' => 'Y-m-d',
+                'label'  => 'M j',
+                'axis'   => 'Day',
+            ];
+    }
+}
+
+/**
+ * Enumerate every bucket (start-of-bucket key + display label) between $from
+ * and $to at the given granularity, so the chart has zero-filled, gap-free
+ * buckets whose keys match aiUsageGranularity()'s SQL output.
+ */
+function aiUsageEnumerateBuckets(string $from, string $to, string $gran): array
+{
+    $cfg   = aiUsageGranularity($gran);
+    $start = new DateTime($from . ' 00:00:00');
+    $end   = new DateTime($to . ' 23:59:59');
+
+    // Snap the cursor back to the start of its bucket.
+    if ($gran === 'hour') {
+        $start->setTime((int) $start->format('G'), 0, 0);
+    } elseif ($gran === 'week') {
+        $start->modify('-' . ((int) $start->format('N') - 1) . ' days')->setTime(0, 0, 0);
+    } elseif ($gran === 'month') {
+        $start->modify('first day of this month')->setTime(0, 0, 0);
+    } else {
+        $start->setTime(0, 0, 0);
+    }
+
+    $interval = new DateInterval($cfg['step']);
+    $cursor   = clone $start;
+    $buckets  = [];
+    $guard    = 0;
+    while ($cursor <= $end && $guard < 20000) {
+        $buckets[] = [
+            'key'   => $cursor->format($cfg['phpKey']),
+            'label' => $cursor->format($cfg['label']),
+        ];
+        $cursor->add($interval);
+        $guard++;
+    }
+    return $buckets;
+}
+
+$router->get('/admin/reports/ai-usage', function () {
+    Auth::requirePermission('reports.view');
+    $db = Database::connect();
+    [$from, $to, $range] = reportDateRange();
+
+    $gran = in_array($_GET['granularity'] ?? '', ['hour', 'day', 'week', 'month'], true)
+        ? $_GET['granularity'] : 'day';
+    $cfg = aiUsageGranularity($gran);
+
+    // Comparison window: explicit cmp_from/cmp_to if given, else the equal-length
+    // window immediately preceding the primary range (period-over-period).
+    $lenDays      = (int) round((strtotime($to) - strtotime($from)) / 86400) + 1;
+    $autoPrevTo   = date('Y-m-d', strtotime($from . ' -1 day'));
+    $autoPrevFrom = date('Y-m-d', strtotime($autoPrevTo . ' -' . ($lenDays - 1) . ' days'));
+    $cmpTo   = (!empty($_GET['cmp_to'])   && strtotime((string) $_GET['cmp_to']))   ? date('Y-m-d', strtotime((string) $_GET['cmp_to']))   : $autoPrevTo;
+    $cmpFrom = (!empty($_GET['cmp_from']) && strtotime((string) $_GET['cmp_from'])) ? date('Y-m-d', strtotime((string) $_GET['cmp_from'])) : $autoPrevFrom;
+
+    // All three AI-classification tables share the same token columns.
+    $union = "SELECT prompt_tokens, output_tokens, created_at, provider, model, 'Skill classification' AS source FROM ai_classifications
+              UNION ALL
+              SELECT prompt_tokens, output_tokens, created_at, provider, model, 'Group routing' AS source FROM ai_group_classifications
+              UNION ALL
+              SELECT prompt_tokens, output_tokens, created_at, provider, model, 'Duplicate detection' AS source FROM ai_duplicate_classifications";
+
+    $bucketSql = "SELECT {$cfg['sql']} AS bkt,
+                         COALESCE(SUM(prompt_tokens),0) AS in_tok,
+                         COALESCE(SUM(output_tokens),0) AS out_tok,
+                         COUNT(*) AS calls
+                  FROM ( $union ) u
+                  WHERE created_at BETWEEN ? AND ?
+                  GROUP BY bkt";
+
+    $fetchBuckets = function (string $wFrom, string $wTo) use ($db, $bucketSql) {
+        $stmt = $db->prepare($bucketSql);
+        $stmt->execute([$wFrom . ' 00:00:00', $wTo . ' 23:59:59']);
+        $map = [];
+        foreach ($stmt->fetchAll() as $r) {
+            $map[$r['bkt']] = $r;
+        }
+        return $map;
+    };
+
+    $curMap  = $fetchBuckets($from, $to);
+    $prevMap = $fetchBuckets($cmpFrom, $cmpTo);
+
+    $curBuckets  = aiUsageEnumerateBuckets($from, $to, $gran);
+    $prevBuckets = aiUsageEnumerateBuckets($cmpFrom, $cmpTo, $gran);
+
+    // Chart series: current-period totals per bucket, previous-period totals
+    // aligned by bucket index so the two windows overlay for comparison.
+    $labels = $prevLabels = $curTotal = $prevTotal = [];
+    foreach ($curBuckets as $i => $b) {
+        $labels[]   = $b['label'];
+        $cr         = $curMap[$b['key']] ?? null;
+        $curTotal[] = $cr ? (int) $cr['in_tok'] + (int) $cr['out_tok'] : 0;
+
+        $pb = $prevBuckets[$i] ?? null;
+        if ($pb) {
+            $prevLabels[] = $pb['label'];
+            $pr           = $prevMap[$pb['key']] ?? null;
+            $prevTotal[]  = $pr ? (int) $pr['in_tok'] + (int) $pr['out_tok'] : 0;
+        } else {
+            $prevLabels[] = '';
+            $prevTotal[]  = null;
+        }
+    }
+
+    // Window totals (summed across every bucket in each window, not just aligned ones).
+    $curIn = $curOut = $curCalls = 0;
+    foreach ($curMap as $r) { $curIn += (int) $r['in_tok']; $curOut += (int) $r['out_tok']; $curCalls += (int) $r['calls']; }
+    $prevIn = $prevOut = $prevCalls = 0;
+    foreach ($prevMap as $r) { $prevIn += (int) $r['in_tok']; $prevOut += (int) $r['out_tok']; $prevCalls += (int) $r['calls']; }
+
+    $stats = [
+        ['label' => 'Total tokens',  'icon' => 'bi-cpu',                'cur' => $curIn + $curOut, 'prev' => $prevIn + $prevOut],
+        ['label' => 'Input tokens',  'icon' => 'bi-box-arrow-in-right', 'cur' => $curIn,           'prev' => $prevIn],
+        ['label' => 'Output tokens', 'icon' => 'bi-box-arrow-right',    'cur' => $curOut,          'prev' => $prevOut],
+        ['label' => 'API calls',     'icon' => 'bi-braces',             'cur' => $curCalls,        'prev' => $prevCalls],
+    ];
+
+    // Breakdown tables for the current window.
+    $stmt = $db->prepare(
+        "SELECT source,
+                COALESCE(SUM(prompt_tokens),0) AS in_tok,
+                COALESCE(SUM(output_tokens),0) AS out_tok,
+                COUNT(*) AS calls
+         FROM ( $union ) u
+         WHERE created_at BETWEEN ? AND ?
+         GROUP BY source
+         ORDER BY (COALESCE(SUM(prompt_tokens),0) + COALESCE(SUM(output_tokens),0)) DESC"
+    );
+    $stmt->execute([$from . ' 00:00:00', $to . ' 23:59:59']);
+    $bySource = $stmt->fetchAll();
+
+    $stmt = $db->prepare(
+        "SELECT COALESCE(provider,'—') AS provider,
+                COALESCE(model,'—')    AS model,
+                COALESCE(SUM(prompt_tokens),0) AS in_tok,
+                COALESCE(SUM(output_tokens),0) AS out_tok,
+                COUNT(*) AS calls
+         FROM ( $union ) u
+         WHERE created_at BETWEEN ? AND ?
+         GROUP BY provider, model
+         ORDER BY (COALESCE(SUM(prompt_tokens),0) + COALESCE(SUM(output_tokens),0)) DESC"
+    );
+    $stmt->execute([$from . ' 00:00:00', $to . ' 23:59:59']);
+    $byModel = $stmt->fetchAll();
+
+    render('admin/reports/ai-usage', compact(
+        'from', 'to', 'range', 'gran', 'cfg', 'cmpFrom', 'cmpTo',
+        'labels', 'prevLabels', 'curTotal', 'prevTotal',
+        'stats', 'bySource', 'byModel'
+    ));
+});
+
+/* ==================================================================
  * ADMIN – Report: First Contact Resolution (FCR)
  * ================================================================== */
 

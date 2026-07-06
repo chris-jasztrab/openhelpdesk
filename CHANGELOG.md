@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.139.0 &mdash; 2026-07-06
+
+### Added
+- **New "AI Token Usage" report tracks AI token consumption over time.** Admins (anyone with `reports.view`) get a new card under Reports &amp; Analytics that aggregates the token counts already logged by the three AI features — skill classification, group routing, and duplicate detection — into one view. A **Bucket** selector rolls usage up by **hour, day, week, or month**, and a **Compare to** control overlays a second window on the same chart so any period can be measured against another: by default it auto-fills the equal-length window immediately preceding the selected range (true period-over-period), or you can type any custom comparison window. Summary cards show total, input, and output tokens plus API-call count, each with the percent change versus the comparison period (a rise reads red since more tokens means more cost, a drop reads green). Below the comparison chart, two tables break the current window down by feature and by provider/model. All figures come from the existing `ai_classifications`, `ai_group_classifications`, and `ai_duplicate_classifications` tables, so no new logging or migration was needed.
+
 ## 2.138.0 &mdash; 2026-07-03
 
 ### Added
