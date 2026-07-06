@@ -2991,23 +2991,35 @@ function emailContent(string $content): string
  *                           filesystem path, 'name' => display filename]. Files
  *                           that don't exist on disk are silently skipped.
  */
-function sendMail(string $toEmail, string $toName, string $subject, string $htmlBody, string $textBody = '', ?int $ticketId = null, array $attachments = []): string|false
+function sendMail(string $toEmail, string $toName, string $subject, string $htmlBody, string $textBody = '', ?int $ticketId = null, array $attachments = [], bool $transactional = false): string|false
 {
     // Outbound-mail kill switch. Dev and test instances set MAIL_ENABLED=false
     // in .env so running the suite (or local dev) never delivers real mail to
     // real recipients — the helpdesk DB carries live SMTP credentials, so a
     // single test ticket would otherwise email every member of a notified group.
+    //
+    // Transactional bypass: password-reset / account mail is user-initiated and
+    // sends to exactly one recipient (the person who typed their own address),
+    // so it can't be used for a blast. When MAIL_TRANSACTIONAL_ENABLED=true a
+    // caller that passes $transactional=true is allowed through even while the
+    // general kill switch is off — letting resets work without re-enabling all
+    // the bulk ticket-notification mail.
     if (env('MAIL_ENABLED', 'true') === 'false') {
-        $logDir = ROOT_DIR . '/storage/logs';
-        if (is_dir($logDir)) {
-            file_put_contents(
-                $logDir . '/smtp.log',
-                sprintf("[%s] sendMail() SKIPPED — MAIL_ENABLED=false — to=%s subject=%s\n",
-                    date('Y-m-d H:i:s'), $toEmail, $subject),
-                FILE_APPEND | LOCK_EX
-            );
+        $transactionalAllowed = $transactional
+            && env('MAIL_TRANSACTIONAL_ENABLED', 'false') === 'true';
+
+        if (!$transactionalAllowed) {
+            $logDir = ROOT_DIR . '/storage/logs';
+            if (is_dir($logDir)) {
+                file_put_contents(
+                    $logDir . '/smtp.log',
+                    sprintf("[%s] sendMail() SKIPPED — MAIL_ENABLED=false — to=%s subject=%s\n",
+                        date('Y-m-d H:i:s'), $toEmail, $subject),
+                    FILE_APPEND | LOCK_EX
+                );
+            }
+            return false;
         }
-        return false;
     }
 
     $host = getSetting('smtp_host');

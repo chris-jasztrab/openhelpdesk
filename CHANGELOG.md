@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.140.0 &mdash; 2026-07-06
+
+### Added
+- **New `MAIL_TRANSACTIONAL_ENABLED` flag lets password-reset mail send while the general mail kill switch stays off.** When `MAIL_ENABLED=false`, `sendMail()` suppresses *all* outbound mail — so on an instance that deliberately keeps bulk ticket-notification mail off, users who request a password reset never receive the link (the reset flow itself works; the email is silently dropped). `sendMail()` now takes a `$transactional` flag, and the forgot-password handler passes it. When `MAIL_TRANSACTIONAL_ENABLED=true`, transactional mail (user-initiated, single-recipient — it can't be used for a blast) is allowed through even while `MAIL_ENABLED=false`; bulk notifications stay suppressed. Defaults to `false`, so behaviour is unchanged unless the flag is set. Requires SMTP configured in Admin &rarr; Settings.
+
 ## 2.139.0 &mdash; 2026-07-06
 
 ### Added

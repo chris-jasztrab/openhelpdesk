@@ -1448,7 +1448,11 @@ $router->post('/forgot', function () {
                 $user['email'],
                 trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? '')),
                 'Reset your ' . $appName . ' password',
-                $emailHtml
+                $emailHtml,
+                '',    // textBody
+                null,  // ticketId
+                [],    // attachments
+                true   // transactional — bypasses MAIL_ENABLED when MAIL_TRANSACTIONAL_ENABLED=true
             );
 
             logAudit('auth.password_reset_requested', (int) $user['id'], 'user', 'email=' . $email);
