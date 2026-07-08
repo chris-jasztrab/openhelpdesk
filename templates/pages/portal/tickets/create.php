@@ -53,6 +53,12 @@ endif; ?>
     <span><strong>Preview mode</strong> — this is a live render of the ticket form for the form-builder. Submission is disabled.</span>
 </div>
 <?php endif; ?>
+<?php if (!empty($tourMode)): ?>
+<div class="alert alert-info py-2 px-3 mb-3 small d-flex align-items-center gap-2" id="tour-create-preview-note">
+    <i class="bi bi-mortarboard-fill"></i>
+    <span><strong>Tour preview</strong> — try things out here. During the tour this form won't actually submit or create a ticket.</span>
+</div>
+<?php endif; ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="fw-bold mb-0"><?= e(label('portal.action.new', 'New Help Request')) ?></h2>
     <?php if (empty($embedMode)): ?>
@@ -940,7 +946,28 @@ ClassicEditor.create(document.querySelector('#portal-ticket-editor'), {
         }
     });
 
-    <?php if (empty($embedMode)): ?>
+    <?php if (!empty($tourMode)): ?>
+    // ── Guided-tour preview ───────────────────────────────────────────────
+    // Expose a canned duplicate warning the walkthrough can trigger, and make
+    // absolutely sure this form can never submit or create a ticket during the
+    // tour (capture-phase preventer + a no-op native submit for the
+    // "Create anyway" / undo-send paths that call form.submit() directly).
+    window._tourShowDupDemo = function () {
+        renderDupMatches([{
+            ticket_id:  1042,
+            subject:    'Wi-Fi hotspot at the Main Branch keeps dropping',
+            status:     'in_progress',
+            created_at: '<?= date('Y-m-d H:i:s', strtotime('-1 day')) ?>',
+            requester:  'Alex Chen',
+            confidence: 0.92,
+            reasoning:  'Same device and symptom already reported at your branch.'
+        }]);
+    };
+    form.addEventListener('submit', function (e) { e.preventDefault(); e.stopImmediatePropagation(); }, true);
+    try { form.submit = function () {}; } catch (err) {}
+    <?php endif; ?>
+
+    <?php if (empty($embedMode) && empty($tourMode)): ?>
     // ── Draft autosave (server-side) ──────────────────────────────────────
     // Persist the half-written ticket to ticket_drafts so an accidental
     // close (or "I'll finish this later") comes back on the next visit.

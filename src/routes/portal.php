@@ -245,6 +245,11 @@ $router->get('/portal/tickets/create', function () {
     // for portal users.
     $embedMode = !empty($_GET['embed']);
 
+    // Tour-preview mode: the onboarding walkthrough drives this real form so the
+    // user can watch the KB suggestions and duplicate check happen live. It never
+    // submits, autosaves a draft, or creates a ticket — see create.php.
+    $tourMode = !empty($_GET['tour']);
+
     // The site-wide baseline (src/bootstrap.php) sets X-Frame-Options: DENY and
     // CSP frame-ancestors 'none', which blocks even same-origin framing. For embed
     // mode only, downgrade both to permit same-origin framing so the form-builder
@@ -278,6 +283,7 @@ $router->get('/portal/tickets/create', function () {
         'formLayouts'       => $formLayouts,
         'preselectedTypeId' => $preselectedTypeId,
         'embedMode'         => $embedMode,
+        'tourMode'          => $tourMode,
     ]);
 });
 

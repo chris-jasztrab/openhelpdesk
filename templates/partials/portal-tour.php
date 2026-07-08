@@ -6,17 +6,25 @@
  * Tour flow (5 sections across different pages):
  *   dashboard → /portal
  *   tickets   → /portal/tickets
- *   create    → /portal/tickets/create
- *   demo      → /portal/tour/demo-ticket   (synthetic practice ticket —
+ *   create    → /portal/tickets/create?tour=1   (real form in tour-preview mode:
+ *               never submits, KB suggestions live, duplicate check demoed)
+ *   demo      → /portal/tour/demo-ticket        (synthetic practice ticket —
  *               lets the tour spotlight the escalate button, answer banner,
  *               attachments etc. without needing a real ticket to exist)
  *   profile   → /profile
  *
- * Section hand-off uses localStorage (ld_portal_tour_page): the last step of
- * each section stores the next section's key and navigates. Closing the tour
- * (✕ / Esc / overlay click) calls /portal/tour/dismiss, which clears the
- * per-user show_portal_tour flag; closing the browser mid-tour leaves the
- * flag set, so the tour re-offers from the start on the next portal visit.
+ * Robustness:
+ *   - Hand-off + "live" + "resume" state lives in sessionStorage, so it is
+ *     scoped to this browser session/tab and never leaks into a later visit.
+ *   - If the user follows a suggestion that reloads the page (e.g. the
+ *     "My Location" toggle), the tour RESUMES on the reloaded page instead of
+ *     dying — it stores the next step index before the navigation.
+ *   - If the tour is nonetheless left before finishing (✕, Esc, clicking the
+ *     dimmed backdrop, or navigating somewhere the tour doesn't cover), a
+ *     friendly toast tells the user it ended and how to restart it.
+ *   - Closing the tour calls /portal/tour/dismiss, clearing the per-user
+ *     show_portal_tour flag; closing the browser mid-tour leaves that flag
+ *     set, so the tour re-offers from the start on the next portal visit.
  */
 $_portalTourCsrf     = csrfToken();
 $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
@@ -25,12 +33,49 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
 (function () {
     'use strict';
 
-    var autoShow    = <?= $_portalTourAutoShow ?>;
-    var path        = window.location.pathname;
-    var storedPage  = localStorage.getItem('ld_portal_tour_page');
-    var isNavigating = false;
+    var HANDOFF = 'ld_portal_tour_page';   // which section to auto-run on the next page
+    var LIVE    = 'ld_portal_tour_live';    // a section is currently mid-flight
+    var RESUME  = 'ld_portal_tour_resume';  // step index to resume at after a reload
 
-    // Determine which section of the tour belongs on this page
+    var autoShow  = <?= $_portalTourAutoShow ?>;
+    var path      = window.location.pathname;
+    var csrfToken = <?= json_encode($_portalTourCsrf) ?>;
+
+    function store() { try { return window.sessionStorage; } catch (e) { return null; } }
+    function ssGet(k) { var s = store(); return s ? s.getItem(k) : null; }
+    function ssSet(k, v) { var s = store(); if (s) { try { s.setItem(k, v); } catch (e) {} } }
+    function ssDel(k) { var s = store(); if (s) { try { s.removeItem(k); } catch (e) {} } }
+
+    // ── Exit toast — shown when the tour ends before the finish line ────
+    function showExitToast() {
+        if (document.getElementById('ld-tour-exit-toast')) return;
+        var t = document.createElement('div');
+        t.id = 'ld-tour-exit-toast';
+        t.setAttribute('role', 'status');
+        // Start fully visible — a requestAnimationFrame fade-in is throttled to
+        // nothing when the tab isn't foregrounded, which would leave the toast
+        // invisible. The fade-OUT still animates via the transition property.
+        t.style.cssText = 'position:fixed;left:50%;bottom:1.5rem;transform:translateX(-50%);' +
+            'z-index:2147483000;max-width:min(92vw,30rem);background:#0f172a;color:#fff;' +
+            'padding:.8rem 1rem;border-radius:.65rem;box-shadow:0 10px 30px rgba(2,6,23,.4);' +
+            'font-size:.9rem;line-height:1.4;display:flex;gap:.65rem;align-items:flex-start;' +
+            'opacity:1;transition:opacity .2s ease;';
+        t.innerHTML =
+            '<i class="bi bi-info-circle-fill" style="font-size:1.15rem;flex-shrink:0;"></i>' +
+            '<div>You’ve left the tour — no problem. You can restart it anytime from your ' +
+            'name in the top-right corner → <strong>Restart Tour</strong>.' +
+            '<div style="margin-top:.55rem;text-align:right;">' +
+            '<button type="button" id="ld-tour-exit-dismiss" class="btn btn-sm btn-light py-0 px-2">Got it</button>' +
+            '</div></div>';
+        document.body.appendChild(t);
+        var kill = function () { t.style.opacity = '0'; setTimeout(function () { if (t.parentNode) t.remove(); }, 250); };
+        var btn = document.getElementById('ld-tour-exit-dismiss');
+        if (btn) btn.addEventListener('click', kill);
+        setTimeout(kill, 10000);
+    }
+
+    // ── Which section (if any) belongs on this page ─────────────────────
+    var storedPage = ssGet(HANDOFF);
     var tourSection = null;
     if (autoShow && path === '/portal') {
         tourSection = 'dashboard';
@@ -44,12 +89,25 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
         tourSection = 'profile';
     }
 
-    if (!tourSection) return;
+    // No section here. If the tour was mid-flight, the user navigated somewhere
+    // it doesn't cover (e.g. opened a search result) — let them know it ended.
+    if (!tourSection) {
+        if (ssGet(LIVE) === '1') {
+            ssDel(LIVE); ssDel(HANDOFF); ssDel(RESUME);
+            showExitToast();
+        }
+        return;
+    }
 
-    var csrfToken = <?= json_encode($_portalTourCsrf) ?>;
+    if (!window.driver || !window.driver.js || !window.driver.js.driver) return;
+
+    ssSet(LIVE, '1');
+
+    var isNavigating = false;   // set when the tour itself is driving a navigation
+    var scopeStepIndex = -1;    // index of the "My Location" step (for resume)
 
     function dismissTour() {
-        localStorage.removeItem('ld_portal_tour_page');
+        ssDel(HANDOFF); ssDel(LIVE); ssDel(RESUME);
         fetch('/portal/tour/dismiss', {
             method:      'POST',
             headers:     { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -61,7 +119,7 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
     function goTo(nextSection, url) {
         return function () {
             isNavigating = true;
-            localStorage.setItem('ld_portal_tour_page', nextSection);
+            ssSet(HANDOFF, nextSection);
             window.location.href = url;
         };
     }
@@ -74,11 +132,55 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
         return !!(el && (el.offsetParent !== null || getComputedStyle(el).position === 'fixed'));
     }
 
-    // ── Step definitions ────────────────────────────────────────────
+    // The user clicked a real "My Location / My Requests" toggle mid-tour.
+    // Let the browser follow it (so they SEE their branch's requests), but
+    // arrange for the tour to resume on the reloaded page at the next step.
+    function scopeClickHandler() {
+        isNavigating = true;
+        ssSet(HANDOFF, 'tickets');
+        ssSet(RESUME, String((scopeStepIndex >= 0 ? scopeStepIndex : 0) + 1));
+    }
 
+    // ── Fake status banner (dashboard section only) ─────────────────────
+    // A real-looking incident banner injected purely for the tour, so the
+    // "Status Banners" step always has something concrete to point at. It is
+    // client-side only, never saved, and vanishes on navigation/refresh.
+    function injectFakeBanner() {
+        if (document.getElementById('ld-tour-fake-banner')) return;
+        var main = document.querySelector('.main-content') || document.body;
+        var wrap = document.createElement('div');
+        wrap.id = 'ld-tour-fake-banner';
+        wrap.className = 'mb-3';
+        wrap.innerHTML =
+            '<div class="alert alert-warning d-flex align-items-start gap-3 shadow-sm" role="status">' +
+                '<div class="flex-shrink-0 fs-4 lh-1 pt-1"><i class="bi bi-exclamation-triangle-fill"></i></div>' +
+                '<div class="flex-grow-1 min-w-0">' +
+                    '<div class="fw-bold mb-1">Example: Public Wi-Fi is temporarily down at the Main Branch</div>' +
+                    '<div>Our team is already aware and working on it — there’s no need to submit a request about this. ' +
+                    '(This is a sample banner shown only during the tour.)</div>' +
+                    '<div class="small text-muted mt-2 d-flex flex-wrap gap-3">' +
+                        '<span><i class="bi bi-globe me-1"></i>All branches</span>' +
+                        '<span><i class="bi bi-clock me-1"></i>Example notice</span>' +
+                    '</div>' +
+                '</div>' +
+                '<button type="button" class="btn-close flex-shrink-0" aria-label="Hide"></button>' +
+            '</div>';
+        main.insertBefore(wrap, main.firstChild);
+        var x = wrap.querySelector('.btn-close');
+        if (x) x.addEventListener('click', function () { wrap.remove(); });
+    }
+    function removeFakeBanner() {
+        var b = document.getElementById('ld-tour-fake-banner');
+        if (b) b.remove();
+    }
+
+    // ── Step definitions ────────────────────────────────────────────
+    var driverObj;   // assigned below; referenced by step callbacks
     var steps = [];
 
     if (tourSection === 'dashboard') {
+
+        injectFakeBanner();
 
         steps.push({
             popover: {
@@ -89,18 +191,15 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
             }
         });
 
-        var bannerPresent = !!document.getElementById('ld-status-banners');
         steps.push({
-            element: bannerPresent ? '#ld-status-banners' : undefined,
+            element: '#ld-tour-fake-banner',
             popover: {
                 title:       '📢 Status Banners',
-                description: 'When something is broken that affects lots of people — say, the Wi-Fi is down at a branch — ' +
-                             'we post a coloured banner at the very top of every page.' +
-                             (bannerPresent
-                                ? ' Like this one!'
-                                : ' (None is active right now, so there\'s nothing to point at — they only appear during an incident.)') +
-                             '<br><br>If a banner already describes your problem, <strong>we know about it</strong> — you don\'t need to ' +
-                             'submit a request. Click the ✕ on a banner to hide it for the rest of your session.',
+                description: 'When something is broken that affects lots of people — like the Wi-Fi being down at a branch — ' +
+                             'we post a coloured banner at the top of every page. <strong>Here\'s an example.</strong><br><br>' +
+                             'If a banner already describes your problem, <strong>we know about it</strong> — you don\'t need to ' +
+                             'submit a request. Click the ✕ on a banner to hide it for the rest of your session. ' +
+                             '(This sample banner disappears as soon as the tour moves on.)',
                 side:  'bottom',
                 align: 'center'
             }
@@ -125,7 +224,8 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
                     title:       '🔍 Search Everything',
                     description: 'Search your requests <em>and</em> Knowledge Base articles from anywhere. ' +
                                  'Use the tabs in the results to narrow down to just tickets or just articles.<br><br>' +
-                                 '<strong>Shortcut:</strong> press <kbd>/</kbd> on any page to jump straight into the search box.',
+                                 '<strong>Shortcut:</strong> press <kbd>/</kbd> on any page to jump straight into the search box. ' +
+                                 '(Feel free to give it a real try once the tour is finished.)',
                     side:  'bottom',
                     align: 'center'
                 }
@@ -208,15 +308,29 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
                 element: '#tour-portal-scope',
                 popover: {
                     title:       '🏢 My Location',
-                    description: 'Your account can also see requests from your whole branch. Flip to <strong>My Location</strong> to ' +
-                                 'view what <em>anyone</em> at your branch has reported — handy for checking whether someone already ' +
-                                 'submitted the problem you\'re about to report, or for following an issue a colleague opened. ' +
-                                 'You can open those tickets and even add comments to them.<br><br>' +
-                                 'Requests in confidential categories never show up in this view.',
+                    description: 'Your account can also see requests from your whole branch. <strong>Go ahead and click ' +
+                                 '"My Location"</strong> to view what <em>anyone</em> at your branch has reported — handy for checking ' +
+                                 'whether someone already submitted the problem you\'re about to report, or for following an issue a ' +
+                                 'colleague opened. You can open those tickets and even comment on them.<br><br>' +
+                                 'The tour will keep going after the page refreshes. (Requests in confidential categories never appear here.)',
                     side:  'bottom',
                     align: 'start'
+                },
+                onHighlighted: function () {
+                    document.querySelectorAll('#tour-portal-scope a').forEach(function (a) {
+                        if (a.__tourBound) return;
+                        a.__tourBound = true;
+                        a.addEventListener('click', scopeClickHandler);
+                    });
+                },
+                onDeselected: function () {
+                    document.querySelectorAll('#tour-portal-scope a').forEach(function (a) {
+                        a.removeEventListener('click', scopeClickHandler);
+                        a.__tourBound = false;
+                    });
                 }
             });
+            scopeStepIndex = steps.length - 1;
         }
 
         steps.push({
@@ -237,7 +351,7 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
             popover: {
                 title:       'Let\'s Write One',
                 description: 'Time for the main event — the new-request form. Don\'t worry, the tour won\'t actually submit anything.',
-                onNextClick: goTo('create', '/portal/tickets/create')
+                onNextClick: goTo('create', '/portal/tickets/create?tour=1')
             }
         });
 
@@ -247,7 +361,8 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
             popover: {
                 title:       'New Help Request',
                 description: 'This form is smarter than it looks: it adapts to what kind of help you need, suggests answers while ' +
-                             'you type, and checks for duplicate requests before anything is created. Let\'s walk through it.'
+                             'you type, and checks for duplicate requests before anything is created. Let\'s walk through it — ' +
+                             'nothing here will actually be submitted.'
             }
         });
 
@@ -269,10 +384,21 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
             popover: {
                 title:       'Subject — and Instant Answers',
                 description: 'Give a brief, clear summary. As you type, matching <strong>Knowledge Base articles pop up right below ' +
-                             'this box</strong> — your answer might already be written! Click one to read it in a new tab, ' +
-                             'or dismiss the suggestions with the ✕.',
+                             'this box</strong> — your answer might already be written!<br><br>' +
+                             'We\'ve typed <strong>"hotspot"</strong> for you as an example — take a look at the related articles that ' +
+                             'appeared. On a real request, click one to read it in a new tab, or dismiss the suggestions with the ✕.',
                 side:  'bottom',
                 align: 'start'
+            },
+            onHighlighted: function () {
+                var subj = document.getElementById('subject');
+                if (subj && subj.value.trim() === '') {
+                    subj.value = 'hotspot';
+                    subj.dispatchEvent(new Event('input', { bubbles: true }));
+                    // Give the debounced KB lookup time to return, then grow the
+                    // spotlight so the suggestion box is included (not dimmed).
+                    setTimeout(function () { if (driverObj && driverObj.refresh) driverObj.refresh(); }, 900);
+                }
             }
         });
 
@@ -358,13 +484,38 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
             popover: {
                 title:       '🤖 Submit — With a Duplicate Check',
                 description: 'When you press Submit, an <strong>AI assistant first compares your request with open requests from your ' +
-                             'branch</strong>. If it spots likely matches, you\'ll see them <em>before</em> anything is created — each with a ' +
-                             'similarity score and a peek at the existing ticket — so you can leave it with the team already working on it, ' +
-                             'or click <em>"Create anyway"</em> if yours really is different.<br><br>' +
-                             'AI also works behind the scenes to suggest the right team and category so requests get to the right people ' +
-                             'faster. Requests in confidential categories are <strong>never</strong> sent to the AI service.',
+                             'branch</strong>. AI also works behind the scenes to suggest the right team and category so requests reach the ' +
+                             'right people faster. Requests in confidential categories are <strong>never</strong> sent to the AI service.<br><br>' +
+                             'Click <strong>Next</strong> and we\'ll show you exactly what that duplicate check looks like.',
+                side:  'top',
+                align: 'start',
+                // onNextClick is a popover-level hook in Driver.js. Reveal the
+                // (canned) duplicate warning, then advance to the step that
+                // spotlights it.
+                onNextClick: function () {
+                    if (typeof window._tourShowDupDemo === 'function') {
+                        window._tourShowDupDemo();
+                        setTimeout(function () { if (driverObj) driverObj.moveNext(); }, 450);
+                    } else if (driverObj) {
+                        driverObj.moveNext();
+                    }
+                }
+            }
+        });
+
+        steps.push({
+            element: '#dup-warning',
+            popover: {
+                title:       '👀 What a Duplicate Looks Like',
+                description: 'Because this request looks like an existing <em>"hotspot"</em> ticket at your branch, we flag it ' +
+                             '<strong>before</strong> creating anything — with a similarity score and a peek at the existing ticket. ' +
+                             'You can leave it with the team already working on it, or choose <em>"Create anyway"</em> if yours really is ' +
+                             'different. This saves everyone from chasing the same problem twice.',
                 side:  'top',
                 align: 'start'
+            },
+            onHighlighted: function () {
+                setTimeout(function () { if (driverObj && driverObj.refresh) driverObj.refresh(); }, 120);
             }
         });
 
@@ -582,7 +733,7 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
 
     // ── Initialise Driver.js ────────────────────────────────────────
 
-    var driverObj = window.driver.js.driver({
+    driverObj = window.driver.js.driver({
         showProgress:   true,
         progressText:   'Step {{current}} of {{total}}',
         allowClose:     true,
@@ -591,20 +742,33 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
         steps:          steps,
 
         onDestroyStarted: function () {
-            if (!isNavigating) {
-                localStorage.removeItem('ld_portal_tour_page');
-                dismissTour();
-            }
+            removeFakeBanner();
+
+            // The tour itself is navigating to the next section — keep state.
+            if (isNavigating) { driverObj.destroy(); return; }
+
+            // Distinguish "finished" (Done pressed on the last step) from a
+            // genuine bail-out (✕ / Esc / backdrop click). Only warn on bail.
+            var idx  = (typeof driverObj.getActiveIndex === 'function') ? driverObj.getActiveIndex() : 0;
+            var last = steps.length - 1;
+            var finished = (tourSection === 'profile') && idx >= last;
+
+            if (!finished) showExitToast();
+            dismissTour();
             driverObj.destroy();
         }
     });
 
-    // Sections that auto-play on arrival consume their hand-off flag so a
-    // later organic visit to the page doesn't unexpectedly restart mid-tour.
-    if (tourSection !== 'dashboard') {
-        localStorage.removeItem('ld_portal_tour_page');
+    // Resume support: if we arrived here because the user followed a
+    // reload-inducing suggestion (e.g. the My Location toggle), pick up at the
+    // stored step instead of restarting the section.
+    var startIndex = 0;
+    var resumeRaw = ssGet(RESUME);
+    if (resumeRaw !== null && resumeRaw !== '') {
+        startIndex = Math.max(0, Math.min(steps.length - 1, parseInt(resumeRaw, 10) || 0));
+        ssDel(RESUME);
     }
 
-    driverObj.drive();
+    driverObj.drive(startIndex);
 })();
 </script>

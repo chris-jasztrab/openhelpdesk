@@ -11,6 +11,19 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.143.0 &mdash; 2026-07-08
+
+### Added
+- **The portal walkthrough is now interactive and survives being followed.** Building on the 2.142.0 rewrite, the onboarding tour now demonstrates features live instead of only describing them:
+  - **A sample status banner** is injected at the top of the dashboard during the tour, so the "Status Banners" step always has a real-looking incident notice to point at (it's client-side only and vanishes when the tour moves on).
+  - **Knowledge Base suggestions are shown for real.** On the create-form step the tour types <em>"hotspot"</em> into the subject for you and expands the spotlight to include the matching KB articles that pop up, so you can see the "your answer may already be written" feature actually working.
+  - **The duplicate-ticket check is demonstrated.** A canned but realistic duplicate warning (with a similarity score and a peek at the "existing" ticket) is revealed on the Submit step, so users see exactly what happens when they file something that already exists.
+- **Following the tour no longer breaks it.** If the user does what a step suggests and it reloads the page — e.g. clicking the <strong>My Location</strong> toggle to see their branch's requests — the tour now <strong>resumes</strong> on the reloaded page at the next step instead of ending. Tour state (hand-off / in-progress / resume point) moved to <code>sessionStorage</code> so it's scoped to the session and never leaks into a later visit.
+- **A friendly "you've left the tour" toast.** If the tour is closed early (✕ / Esc / clicking the dimmed backdrop) or the user navigates somewhere the tour doesn't cover (e.g. opening a search result), a toast now tells them the tour ended and that they can restart it anytime from their name menu → <strong>Restart Tour</strong>.
+
+### Changed
+- The create-ticket form gained a `?tour=1` **preview mode** (`tourMode`): the walkthrough drives the real form in this mode, but it can never submit, autosave a draft, or create a ticket, and it shows a "Tour preview" banner. Normal (non-tour) use of the form is unchanged.
+
 ## 2.142.0 &mdash; 2026-07-08
 
 ### Added
