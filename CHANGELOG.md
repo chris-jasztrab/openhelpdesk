@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.143.2 &mdash; 2026-07-08
+
+### Fixed
+- **Navigation rail no longer disappears on the My Profile page.** The left sidebar renders whatever `sidebarItems` the current route passes, and the `/profile` route passed none — so it fell back to an empty list and every navigation icon vanished. The route now builds the correct rail (admin, staff, or portal) for the signed-in user's role, matching how the shared Notifications page already works.
+
 ## 2.143.1 &mdash; 2026-07-08
 
 ### Fixed

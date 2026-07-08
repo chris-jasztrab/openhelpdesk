@@ -2051,6 +2051,17 @@ $router->get('/profile', function () {
         redirect('/login');
     }
 
+    // Profile is a shared page across all roles — render the left rail for
+    // whichever area the user belongs to, otherwise the sidebar renders empty
+    // and every navigation icon disappears.
+    if (Auth::isAdmin()) {
+        $sidebarItems = adminSidebar();
+    } elseif (Auth::isStaff()) {
+        $sidebarItems = staffSidebar();
+    } else {
+        $sidebarItems = portalSidebar();
+    }
+
     $theme = getSetting('ui_theme:' . Auth::id(), 'light');
     render('profile/edit', [
         'profileUser'        => $user,
@@ -2059,6 +2070,7 @@ $router->get('/profile', function () {
         'ticketView'         => getUserTicketView((int) Auth::id()),
         'aiNotesVisible'     => aiNotesVisible(),
         'systemNotesVisible' => systemNotesVisible(),
+        'sidebarItems'       => $sidebarItems,
     ]);
 });
 
