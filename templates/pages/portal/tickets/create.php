@@ -178,7 +178,7 @@ endif; ?>
                     $wrapStyle  = $isAbsent ? 'style="display:none;"' : '';
                 ?>
                 <?php if ($sysKey === 'location'): ?>
-                <div class="row g-3 mb-3 dynamic-field-wrap" data-field-kind="system" data-field-key="location" <?= $wrapStyle ?>>
+                <div class="row g-3 mb-3 dynamic-field-wrap" id="tour-portal-location" data-field-kind="system" data-field-key="location" <?= $wrapStyle ?>>
                     <div class="col-md-6">
                         <label for="location_id" class="form-label fw-semibold">
                             <?= label('location.singular') ?>
@@ -199,7 +199,7 @@ endif; ?>
                     </div>
                 </div>
                 <?php elseif ($sysKey === 'priority'): ?>
-                <div class="row g-3 mb-3 dynamic-field-wrap" data-field-kind="system" data-field-key="priority" <?= $wrapStyle ?>>
+                <div class="row g-3 mb-3 dynamic-field-wrap" id="tour-portal-priority" data-field-kind="system" data-field-key="priority" <?= $wrapStyle ?>>
                     <div class="col-md-6">
                         <label for="priority_id" class="form-label fw-semibold">
                             <?= e(label('portal.field.priority_label', 'How urgent is this?')) ?>
@@ -220,7 +220,7 @@ endif; ?>
                 </div>
                 <?php elseif ($sysKey === 'tags'): ?>
                 <?php if (getSetting('tags_enabled', '1') === '1'): ?>
-                <div class="mb-3 dynamic-field-wrap" data-field-kind="system" data-field-key="tags" <?= $wrapStyle ?>>
+                <div class="mb-3 dynamic-field-wrap" id="tour-portal-tags" data-field-kind="system" data-field-key="tags" <?= $wrapStyle ?>>
                     <label class="form-label fw-semibold">
                         <?= e(getSetting('sys_field_label_tags', 'Tags')) ?>
                         <span class="text-danger field-required-star" <?= $isRequired ? '' : 'style="display:none;"' ?>>*</span>
@@ -233,7 +233,7 @@ endif; ?>
                 </div>
                 <?php endif; ?>
                 <?php elseif ($sysKey === 'attachments'): ?>
-                <div class="mb-3 dynamic-field-wrap" data-field-kind="system" data-field-key="attachments" <?= $wrapStyle ?>>
+                <div class="mb-3 dynamic-field-wrap" id="tour-portal-attachments" data-field-kind="system" data-field-key="attachments" <?= $wrapStyle ?>>
                     <label for="attachments" class="form-label fw-semibold"><?= e(getSetting('sys_field_label_attachments', 'Attachments')) ?></label>
                     <input type="file" class="form-control" id="attachments" name="attachments[]" multiple>
                     <div class="form-text">
@@ -274,7 +274,7 @@ endif; ?>
             <hr class="my-4">
 
             <div class="d-flex gap-2">
-                <button type="submit" class="btn text-white"
+                <button type="submit" id="tour-portal-submit" class="btn text-white"
                         style="background:var(--ld-primary);<?= !empty($embedMode) ? 'opacity:.55;cursor:not-allowed;' : '' ?>"
                         <?= !empty($embedMode) ? 'disabled aria-disabled="true" title="Submission disabled in preview"' : '' ?>>
                     <i class="bi bi-send me-1"></i><?= e(label('portal.action.submit', 'Submit Request')) ?>

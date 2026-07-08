@@ -2,6 +2,11 @@
 $layout       = 'app';
 $pageTitle    = 'Request #' . $ticket['id'];
 $sidebarItems = portalSidebar('tickets');
+// Demo mode: the /portal/tour/demo-ticket route renders this template with a
+// fully synthetic $ticket so the onboarding tour can spotlight every element
+// (escalate button, solution banner, attachments, …) without a real ticket
+// row existing. All write actions are disabled; nothing is saved or sent.
+$demoMode     = !empty($demoMode);
 $breadcrumbs  = !empty($fromFloor) ? [] : [
     ['label' => label('portal.nav.help', 'Help'), 'url' => '/portal'],
     ['label' => label('portal.request.my_plural', 'My Requests'), 'url' => '/portal/tickets'],
@@ -71,10 +76,20 @@ if ($solutionTimelineId > 0) {
     <i class="bi bi-x-lg" aria-hidden="true"></i>
 </a>
 <?php endif; ?>
+<?php if ($demoMode): ?>
+<div class="alert alert-info d-flex align-items-center gap-3 mb-3" id="tour-demo-notice">
+    <i class="bi bi-mortarboard-fill fs-4" aria-hidden="true"></i>
+    <div>
+        <strong>This is a practice request used by the tour.</strong>
+        It isn't a real ticket — the buttons here are switched off, and nothing you click will be saved or sent.
+        <a href="/portal" class="alert-link">Back to your dashboard</a>
+    </div>
+</div>
+<?php endif; ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h2 class="fw-bold mb-1"><?= e($ticket['subject']) ?></h2>
-        <div class="d-flex gap-2 align-items-center">
+        <div class="d-flex gap-2 align-items-center" id="tour-ticket-status">
             <span class="badge fs-6" style="<?= ticketStatusBadgeStyle($ticket['status']) ?>">
                 <?= e($statusLabels[$ticket['status']] ?? $ticket['status']) ?>
             </span>
@@ -92,9 +107,12 @@ if ($solutionTimelineId > 0) {
             <span class="text-muted">Request #<?= $ticket['id'] ?></span>
         </div>
     </div>
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2" id="tour-ticket-actions">
         <?php if ($isOwner && $ticket['status'] !== 'closed'): ?>
-        <a href="/portal/tickets/<?= $ticket['id'] ?>/edit" class="btn btn-outline-primary btn-sm">
+        <a href="<?= $demoMode ? '#' : '/portal/tickets/' . $ticket['id'] . '/edit' ?>"
+           id="tour-ticket-edit"
+           class="btn btn-outline-primary btn-sm<?= $demoMode ? ' disabled' : '' ?>"
+           <?= $demoMode ? 'aria-disabled="true" tabindex="-1"' : '' ?>>
             <i class="bi bi-pencil me-1"></i>Edit
         </a>
         <?php if ($hasEscalationPath && escalateButtonVisible($ticket['sla_state'] ?? null)): ?>
@@ -119,7 +137,7 @@ if ($solutionTimelineId > 0) {
             <i class="bi bi-arrow-up-circle me-1"></i>Escalate
         </button>
         <?php endif; ?>
-        <button type="button" class="btn btn-outline-secondary btn-sm"
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="tour-ticket-close"
                 data-bs-toggle="modal" data-bs-target="#closeTicketModal">
             <i class="bi bi-x-circle me-1"></i><?= e(label('portal.action.close', 'Close this request')) ?>
         </button>
@@ -164,7 +182,8 @@ if ($solutionTimelineId > 0) {
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" id="escalateConfirmBtn" class="btn btn-danger">
+                    <button type="button" id="escalateConfirmBtn" class="btn btn-danger"
+                            <?= $demoMode ? 'disabled title="Disabled in this practice view"' : '' ?>>
                         <i class="bi bi-arrow-up-circle me-1"></i>Escalate
                     </button>
                 </div>
@@ -211,6 +230,7 @@ if ($solutionTimelineId > 0) {
 
 <?php if ($solutionEntry): ?>
 <a href="#timeline-entry-<?= (int) $solutionEntry['id'] ?>"
+   id="tour-ticket-solution"
    class="alert alert-success d-flex align-items-center gap-2 mb-4 text-decoration-none"
    role="note"
    style="border-left:4px solid #198754;">
@@ -229,7 +249,7 @@ if ($solutionTimelineId > 0) {
 <?php endif; ?>
 
 <?php if ($isOwner && $ticket['status'] === 'open'): ?>
-<div class="alert border-0 shadow-sm mb-4" role="note"
+<div class="alert border-0 shadow-sm mb-4" role="note" id="tour-ticket-whatnext"
      style="background:#eef2ff;border-left:4px solid var(--ld-primary) !important;">
     <div class="d-flex gap-3">
         <i class="bi bi-info-circle-fill fs-4" style="color:var(--ld-primary);" aria-hidden="true"></i>
@@ -248,7 +268,7 @@ if ($solutionTimelineId > 0) {
 <div class="row g-4">
     <!-- Left column: Description + Tags + Timeline -->
     <div class="col-lg-8">
-        <div class="card border-0 shadow-sm mb-4">
+        <div class="card border-0 shadow-sm mb-4" id="tour-ticket-description">
             <div class="card-header bg-white border-bottom">
                 <h5 class="mb-0 fw-semibold"><i class="bi bi-text-paragraph me-2"></i>Description</h5>
             </div>
@@ -321,13 +341,14 @@ if ($solutionTimelineId > 0) {
         <?php endif; ?>
 
         <?php if (!empty($attachments)): ?>
-        <div class="card border-0 shadow-sm mb-4">
+        <div class="card border-0 shadow-sm mb-4" id="tour-ticket-attachments">
             <div class="card-header bg-white border-bottom">
                 <h5 class="mb-0 fw-semibold"><i class="bi bi-paperclip me-2"></i>Attachments</h5>
             </div>
             <div class="list-group list-group-flush">
                 <?php foreach ($attachments as $att): ?>
-                <a href="/portal/attachments/<?= $att['id'] ?>/download"
+                <a href="<?= $demoMode ? '#' : '/portal/attachments/' . $att['id'] . '/download' ?>"
+                   <?= $demoMode ? 'onclick="return false;"' : '' ?>
                    class="list-group-item list-group-item-action d-flex align-items-center gap-3">
                     <i class="bi <?= getFileIcon($att['mime_type']) ?> fs-4"></i>
                     <div class="flex-grow-1">
@@ -352,7 +373,7 @@ if ($solutionTimelineId > 0) {
         <?php endif; ?>
 
         <?php $timelineSort = getUserTimelineSort((int) Auth::id()); ?>
-        <div class="card border-0 shadow-sm">
+        <div class="card border-0 shadow-sm" id="tour-ticket-timeline">
             <div class="card-header bg-white border-bottom">
                 <button type="button" id="timelineSortToggle"
                         class="btn btn-link p-0 border-0 text-reset text-decoration-none h5 mb-0 fw-semibold d-inline-flex align-items-center"
@@ -450,6 +471,7 @@ if ($solutionTimelineId > 0) {
         (function () {
             var btn = document.getElementById('timelineSortToggle');
             if (!btn) return;
+            if (<?= $demoMode ? 'true' : 'false' ?>) return; // demo: sort toggle would reload mid-tour
             var csrf = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
             var next = <?= json_encode($timelineSort === 'asc' ? 'desc' : 'asc') ?>;
             btn.addEventListener('click', function () {
@@ -465,7 +487,7 @@ if ($solutionTimelineId > 0) {
         </script>
 
         <!-- Add Comment -->
-        <div class="card border-0 shadow-sm mt-4">
+        <div class="card border-0 shadow-sm mt-4" id="tour-ticket-comment">
             <div class="card-header bg-white border-bottom">
                 <h5 class="mb-0 fw-semibold"><i class="bi bi-chat-dots me-2"></i>Add Comment</h5>
             </div>
@@ -484,10 +506,12 @@ if ($solutionTimelineId > 0) {
                         <input type="file" class="form-control" name="attachments[]" multiple>
                         <div class="form-text">Max <?= UPLOAD_MAX_SIZE / 1024 / 1024 ?>MB per file</div>
                     </div>
-                    <button type="submit" class="btn text-white" style="background:var(--ld-primary);">
+                    <button type="submit" class="btn text-white" style="background:var(--ld-primary);"
+                            <?= $demoMode ? 'disabled title="Disabled in this practice view"' : '' ?>>
                         <i class="bi bi-send me-1"></i>Post Comment
                     </button>
                 </form>
+                <?php if (!$demoMode): ?>
                 <script src="/assets/js/ticket-draft.js"></script>
                 <script src="/assets/js/undo-send.js"></script>
                 <script>
@@ -522,13 +546,14 @@ if ($solutionTimelineId > 0) {
                     });
                 })();
                 </script>
+                <?php endif; ?>
             </div>
         </div>
     </div>
 
     <!-- Right column: Metadata -->
     <div class="col-lg-4">
-        <div class="card border-0 shadow-sm">
+        <div class="card border-0 shadow-sm" id="tour-ticket-details">
             <div class="card-header bg-white border-bottom">
                 <h5 class="mb-0 fw-semibold"><i class="bi bi-info-circle me-2"></i>Details</h5>
             </div>
@@ -575,7 +600,7 @@ if ($solutionTimelineId > 0) {
         </div>
 
         <?php if (!empty($ccUsers)): ?>
-        <div class="card border-0 shadow-sm mt-4">
+        <div class="card border-0 shadow-sm mt-4" id="tour-ticket-cc">
             <div class="card-header bg-white border-bottom">
                 <h5 class="mb-0 fw-semibold"><i class="bi bi-people me-2"></i>CC</h5>
             </div>
@@ -609,7 +634,8 @@ if ($solutionTimelineId > 0) {
                 <form method="POST" action="/portal/tickets/<?= $ticket['id'] ?>/close">
                     <?= csrfField() ?>
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-secondary px-4">
+                    <button type="submit" class="btn btn-secondary px-4"
+                            <?= $demoMode ? 'disabled title="Disabled in this practice view"' : '' ?>>
                         <i class="bi bi-x-circle me-1"></i><?= e(label('portal.action.close', 'Close this request')) ?>
                     </button>
                 </form>

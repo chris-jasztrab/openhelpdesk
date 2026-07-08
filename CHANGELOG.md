@@ -11,6 +11,16 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.142.0 &mdash; 2026-07-08
+
+### Added
+- **Portal walkthrough rewritten to cover every end-user feature.** The onboarding tour for portal users (Driver.js) now spans five pages instead of four and teaches everything a contact will actually see: status banners at the top of every page, the sidebar / global search (<kbd>/</kbd> shortcut) / Help menu / account menu, the My Requests list with search, filters, sorting, and the <strong>My Location</strong> branch-visibility toggle (shown only to users who have it), the new-request form — including per-type forms that rearrange and require fields as the <strong>Ticket Type</strong> changes, Knowledge Base article suggestions while typing a subject, priority ("let our team decide"), location, tags, attachments, the <strong>AI duplicate-ticket check</strong> that runs on submit (with an honest note on how AI is used and that confidential types are never sent to it), and draft autosave — then a full ticket anatomy lesson, and finally the profile page with per-event email notification toggles. Conditional steps skip UI the user doesn't have (permission- or config-gated), and the tour ends with a recap of where Help and Restart Tour live.
+- **New practice-ticket page for the tour: <code>/portal/tour/demo-ticket</code>.** Some ticket elements (the Escalate button, the green "Answer available" banner, attachments, CC list) only appear under specific conditions, so the tour now walks through a <em>synthetic</em> ticket rendered by the real portal ticket-view template with a <code>demoMode</code> flag. On it the tour explains status badges in plain words, the "What happens next?" box, the marked-answer banner, the timeline (sorting, collapsing older updates), commenting — including that <strong>replying to any notification email adds the reply to the ticket as a comment</strong> — CC'd colleagues, the Details panel, self-serve <strong>Edit</strong> and <strong>Close</strong> (with the satisfaction-survey mention), and <strong>what SLAs are and when the Escalate button appears</strong>. The page is deliberately <em>not</em> a database row: nothing is written, no notification/AI/SLA/auto-assign hooks can fire, any number of users can run the tour at once without seeing each other's activity, and an abandoned tour (closed browser) leaves nothing behind — the flow simply re-offers itself on the next portal visit. All action buttons on the practice page are disabled and a banner labels it a practice request.
+- **Migration 065** resets the per-user <code>show_portal_tour</code> flag so every user is offered the updated walkthrough once.
+
+### Changed
+- Portal templates gained stable tour anchor ids (ticket view, create form, list scope toggle, navbar Help/account menus); the stale "Your Summary" tour step that pointed at a removed dashboard element is gone.
+
 ## 2.141.1 &mdash; 2026-07-06
 
 ### Fixed

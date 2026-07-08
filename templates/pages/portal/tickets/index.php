@@ -75,7 +75,7 @@ $sortParams = array_filter($filters, fn($v) => $v !== '' && $v !== 'mine');
                 <?php endif; ?>
             </div>
             <?php if ($canViewLocation): ?>
-            <div class="col-12 pt-1">
+            <div class="col-12 pt-1" id="tour-portal-scope">
                 <div class="btn-group btn-group-sm" role="group">
                     <a href="?<?= http_build_query(array_merge(array_filter($filters, fn($v) => $v !== '' && $v !== 'mine'), ['scope' => 'mine'])) ?>"
                        class="btn <?= $filters['scope'] !== 'location' ? 'text-white' : 'btn-outline-secondary' ?>"

@@ -42,7 +42,7 @@
                 }
                 ?>
                 <li class="nav-item">
-                    <a class="nav-link <?= isActive($_helpUrl) ? 'active' : '' ?>" href="<?= e($_helpUrl) ?>" <?= isActive($_helpUrl) ? 'aria-current="page"' : '' ?>>
+                    <a class="nav-link <?= isActive($_helpUrl) ? 'active' : '' ?>" id="tour-nav-help" href="<?= e($_helpUrl) ?>" <?= isActive($_helpUrl) ? 'aria-current="page"' : '' ?>>
                         <i class="bi bi-life-preserver me-1" aria-hidden="true"></i><?= e(label('portal.nav.help', 'Help')) ?>
                     </a>
                 </li>
@@ -96,6 +96,7 @@
                 <?php endif; ?>
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle d-flex align-items-center gap-2" href="#"
+                       id="tour-nav-user"
                        role="button" data-bs-toggle="dropdown"
                        aria-haspopup="true" aria-expanded="false"
                        aria-label="<?= e(Auth::fullName()) ?> account menu">

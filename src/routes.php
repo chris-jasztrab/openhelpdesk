@@ -2713,6 +2713,108 @@ $router->post('/portal/tour/dismiss', function () {
     exit;
 });
 
+/*
+ * Practice ticket for the portal tour.
+ *
+ * Renders the real portal ticket-view template with a fully synthetic,
+ * in-memory ticket so the walkthrough can spotlight every element a user
+ * might ever see on a request — the escalate button, the marked-answer
+ * banner, attachments, CC list, timeline — regardless of what real data
+ * exists. Deliberately NOT a database row:
+ *   - no writes at all, so any number of users can tour at once and an
+ *     abandoned tour (closed browser) leaves nothing behind;
+ *   - no notification / AI-classification / SLA / auto-assign hooks fire;
+ *   - nothing leaks between users — each request renders its own copy.
+ * The demoMode flag makes the template disable every action button.
+ */
+$router->get('/portal/tour/demo-ticket', function () {
+    Auth::requireAuth();
+
+    $ticket = [
+        'id'                    => 'DEMO',
+        'subject'               => 'Example: Receipt printer at the front desk won\'t print',
+        'description'           => '<p>The receipt printer at the circulation desk has a flashing red light and '
+                                 . 'nothing comes out when we check items in. I already tried turning it off and '
+                                 . 'back on. Patrons are lining up, so any quick workaround would help!</p>',
+        'status'                => ticketDefaultNewStatusSlug(),
+        'priority_name'         => 'Medium',
+        'priority_color'        => '#fd7e14',
+        'type_name'             => 'Hardware',
+        'type_color'            => '#4f46e5',
+        'location_name'         => 'Main Branch',
+        'agent_name'            => 'Jordan Rivera',
+        'escalation_level'      => 0,
+        // 'breached' keeps the Escalate button visible even when the admin has
+        // set escalate_button_visibility = 'breached'.
+        'sla_state'             => 'breached',
+        'merged_into_ticket_id' => null,
+        'created_at'            => date('Y-m-d H:i:s', strtotime('-3 hours')),
+        'solution_timeline_id'  => 903003,
+        'tags'                  => [],
+    ];
+
+    // Newest-first, matching the real query. IDs are arbitrary but must be
+    // unique on the page and match solution_timeline_id above.
+    $timeline = [
+        [
+            'id'         => 903003,
+            'user_name'  => 'Jordan Rivera',
+            'action'     => 'comment',
+            'details'    => "Hi! That flashing light usually means a paper jam under the roller. "
+                          . "Open the front cover, pull the slip straight up, and close it firmly — "
+                          . "the light should turn green. I've attached your photo for reference. "
+                          . "Let me know if that doesn't fix it and I'll come by the desk.",
+            'created_at' => date('Y-m-d H:i:s', strtotime('-1 hour')),
+        ],
+        [
+            'id'         => 903002,
+            'user_name'  => null, // renders as "System"
+            'action'     => 'assigned',
+            'details'    => 'Assigned to Jordan Rivera.',
+            'created_at' => date('Y-m-d H:i:s', strtotime('-2 hours')),
+        ],
+        [
+            'id'         => 903001,
+            'user_name'  => Auth::fullName(),
+            'action'     => 'created',
+            'details'    => 'Ticket created.',
+            'created_at' => date('Y-m-d H:i:s', strtotime('-3 hours')),
+        ],
+    ];
+
+    $attachments = [
+        [
+            'id'            => 0,
+            'original_name' => 'printer-error-light.jpg',
+            'mime_type'     => 'image/jpeg',
+            'file_size'     => 248320,
+        ],
+    ];
+
+    $ccUsers = [
+        ['first_name' => 'Alex', 'last_name' => 'Chen', 'email' => 'alex.chen@example.org'],
+    ];
+
+    render('portal/tickets/view', [
+        'ticket'             => $ticket,
+        'timeline'           => $timeline,
+        'attachments'        => $attachments,
+        'ccUsers'            => $ccUsers,
+        'customFields'       => [],
+        'fieldValues'        => [],
+        'fieldOptions'       => [],
+        'isOwner'            => true,
+        'hasEscalationPath'  => true,
+        'nextEscalationStep' => [
+            'user_name'  => 'Riley Manager',
+            'step_order' => 1,
+            'label'      => 'Escalation contact for this request type',
+        ],
+        'fromFloor'          => false,
+        'demoMode'           => true,
+    ]);
+});
+
 $router->get('/portal', function () {
     Auth::requireAuth();
     $db = Database::connect();
