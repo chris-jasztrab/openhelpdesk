@@ -258,12 +258,19 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
             });
         }
 
+        // A brand-new user taking the tour usually has no requests yet, so the
+        // card shows its empty state. Match the copy to what's on screen instead
+        // of telling them to "click a row" that isn't there.
+        var hasRecentRows = document.querySelectorAll('#tour-portal-recent tbody tr').length > 0;
         steps.push({
             element: '#tour-portal-recent',
             popover: {
                 title:       'Your Active Requests',
-                description: 'Your most recent open requests appear here, with their status and who\'s handling them. ' +
-                             'Click any row to open the request and see updates from the team.',
+                description: hasRecentRows
+                    ? 'Your most recent open requests appear here, with their status and who\'s handling them. ' +
+                      'Click any row to open the request and see updates from the team.'
+                    : 'Once you submit a request, it\'ll show up here — with its status and who\'s handling it — ' +
+                      'so you can check on it at a glance. It\'s empty right now because you haven\'t submitted anything yet.',
                 side:  'top',
                 align: 'start'
             }
@@ -689,7 +696,7 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
                 description: 'Problem sorted itself out, or the answer worked? You can close any of your own requests with this button — ' +
                              'it tells the team it\'s taken care of. Afterwards you may get a short <strong>satisfaction survey</strong> by ' +
                              'email; if the issue ever comes back, just reply or submit a new request.<br><br>' +
-                             'One last stop: your profile and email preferences.',
+                             'One last stop — let\'s head to your profile and email preferences (normally reached from your name menu, top-right).',
                 side:  'bottom',
                 align: 'end',
                 onNextClick: goTo('profile', '/profile')
@@ -697,6 +704,33 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
         });
 
     } else {
+
+        // The tour jumped straight to /profile, so first make it clear HOW a user
+        // reaches this page on their own: the account menu (top-right). Point at
+        // that menu when it's on screen; fall back to a centred note on mobile,
+        // where it's tucked inside the collapsed navbar.
+        if (visible('#tour-nav-user')) {
+            steps.push({
+                element: '#tour-nav-user',
+                popover: {
+                    title:       'How to Reach Your Profile',
+                    description: 'We brought you straight here, but on your own you\'d get to this page by clicking ' +
+                                 '<strong>your name in the top-right corner</strong> and choosing <strong>My Profile</strong>. ' +
+                                 'That same menu is also where <strong>Restart Tour</strong> and <strong>Sign Out</strong> live.',
+                    side:  'bottom',
+                    align: 'end'
+                }
+            });
+        } else {
+            steps.push({
+                popover: {
+                    title:       'How to Reach Your Profile',
+                    description: 'We brought you straight here, but on your own you\'d get to this page by opening the menu under ' +
+                                 '<strong>your name in the top-right corner</strong> and choosing <strong>My Profile</strong>. ' +
+                                 'That same menu is also where <strong>Restart Tour</strong> and <strong>Sign Out</strong> live.'
+                }
+            });
+        }
 
         steps.push({
             popover: {

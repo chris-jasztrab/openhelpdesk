@@ -11,6 +11,12 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.143.1 &mdash; 2026-07-08
+
+### Fixed
+- **Portal tour "Your Active Requests" step now reads correctly for new users.** The dashboard step's card renders an empty state ("You have no active requests…") when the user hasn't submitted anything yet — which is the normal case for someone taking the onboarding tour — but the tour popover still told them their requests "appear here" and to "click any row." The popover copy now adapts: when the list is empty it explains that requests <em>will</em> show up there once submitted, instead of pointing at rows that don't exist.
+- **Portal tour now shows how to reach the Profile page.** The walkthrough jumps straight to <code>/profile</code> for its last section, which left users unclear how they got there. A new opening step points at the account menu (top-right) and explains that you reach your profile by clicking <strong>your name → My Profile</strong> (the same menu that holds Restart Tour and Sign Out), with a centred fallback on mobile where that menu is collapsed. The preceding "close your request" step also now foreshadows the hand-off.
+
 ## 2.143.0 &mdash; 2026-07-08
 
 ### Added
