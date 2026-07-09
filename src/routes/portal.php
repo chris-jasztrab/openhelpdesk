@@ -269,21 +269,36 @@ $router->get('/portal/tickets/create', function () {
         );
     }
 
+    // "No Wrong Door" types (ai_route_group = 1) let AI pick the destination
+    // group from the ticket text. Surface their names to the onboarding tour so
+    // it can explain the feature — but only when AI is actually enabled and
+    // configured, otherwise the routing is dormant and explaining it would
+    // mislead. AIClassifierFactory::fromSettings() returns null when AI is off.
+    $noWrongDoorTypeNames = [];
+    if (AIClassifierFactory::fromSettings() !== null) {
+        foreach ($types as $t) {
+            if ((int) ($t['ai_route_group'] ?? 0) === 1) {
+                $noWrongDoorTypeNames[] = $t['name'];
+            }
+        }
+    }
+
     render('portal/tickets/create', [
-        'types'             => $types,
-        'locations'         => $locations,
-        'priorities'        => $priorities,
-        'tags'              => $tags,
-        'userLocationId'    => $userLocationId,
-        'userLocationName'  => $userLocationName,
-        'userHasNoLocation' => $userHasNoLocation,
-        'customFields'      => $customFields,
-        'fieldOptions'      => $fieldOptions,
-        'sharedTemplates'   => $sharedTemplates,
-        'formLayouts'       => $formLayouts,
-        'preselectedTypeId' => $preselectedTypeId,
-        'embedMode'         => $embedMode,
-        'tourMode'          => $tourMode,
+        'types'                => $types,
+        'locations'            => $locations,
+        'priorities'           => $priorities,
+        'tags'                 => $tags,
+        'userLocationId'       => $userLocationId,
+        'userLocationName'     => $userLocationName,
+        'userHasNoLocation'    => $userHasNoLocation,
+        'customFields'         => $customFields,
+        'fieldOptions'         => $fieldOptions,
+        'sharedTemplates'      => $sharedTemplates,
+        'formLayouts'          => $formLayouts,
+        'preselectedTypeId'    => $preselectedTypeId,
+        'embedMode'            => $embedMode,
+        'tourMode'             => $tourMode,
+        'noWrongDoorTypeNames' => $noWrongDoorTypeNames,
     ]);
 });
 

@@ -132,6 +132,14 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
         return !!(el && (el.offsetParent !== null || getComputedStyle(el).position === 'fixed'));
     }
 
+    // Escape admin-configured text (e.g. ticket-type names) before dropping it
+    // into a popover, which Driver.js renders as HTML.
+    function escHtml(s) {
+        var d = document.createElement('div');
+        d.textContent = (s == null ? '' : String(s));
+        return d.innerHTML;
+    }
+
     // The user clicked a real "My Location / My Requests" toggle mid-tour.
     // Let the browser follow it (so they SEE their branch's requests), but
     // arrange for the tour to resume on the reloaded page at the next step.
@@ -421,14 +429,31 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
             }
         });
 
+        var typeDesc = '<strong>Each request type has its own form.</strong> Choosing <em>Hardware</em> vs <em>Software</em> vs ' +
+                       '<em>Account</em> (for example) rearranges the fields below — some appear, some disappear, and some become ' +
+                       'required — so you\'re only ever asked what\'s relevant. Pick the closest match and watch the form adjust; ' +
+                       'the type also routes your request to the right team.';
+
+        // If the helpdesk has one or more "No Wrong Door" types (AI picks the
+        // best team from what you wrote), explain them right here — this is set
+        // by the create page and only present when AI routing is actually live.
+        var nwdTypes = Array.isArray(window.__ldNoWrongDoorTypes) ? window.__ldNoWrongDoorTypes : [];
+        if (nwdTypes.length) {
+            var nwdNames = nwdTypes.map(function (n) { return '<strong>&ldquo;' + escHtml(n) + '&rdquo;</strong>'; });
+            var nwdList = nwdNames.length === 1
+                ? nwdNames[0]
+                : nwdNames.slice(0, -1).join(', ') + ' or ' + nwdNames[nwdNames.length - 1];
+            typeDesc += '<br><br><strong>🧭 Not sure which type to pick?</strong> Choose ' + nwdList + '. ' +
+                        'It\'s a special <em>&ldquo;No Wrong Door&rdquo;</em> option — instead of you guessing who handles your issue, ' +
+                        'our AI reads what you wrote and automatically sends the request to the team best suited to help. ' +
+                        'If it isn\'t sure, a real person still steps in, so your request never gets lost.';
+        }
+
         steps.push({
             element: '#tour-portal-type',
             popover: {
                 title:       '🧩 Ticket Type — the Form Changes With It',
-                description: '<strong>Each request type has its own form.</strong> Choosing <em>Hardware</em> vs <em>Software</em> vs ' +
-                             '<em>Account</em> (for example) rearranges the fields below — some appear, some disappear, and some become ' +
-                             'required — so you\'re only ever asked what\'s relevant. Pick the closest match and watch the form adjust; ' +
-                             'the type also routes your request to the right team.',
+                description: typeDesc,
                 side:  'bottom',
                 align: 'start'
             }

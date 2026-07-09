@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.144.0 &mdash; 2026-07-09
+
+### Added
+- **Portal tour now explains "No Wrong Door" ticket types.** When the helpdesk has one or more ticket types with <em>"Let AI route this to the best group"</em> enabled (<code>ai_route_group</code>) <strong>and</strong> AI classification is actually turned on, the walkthrough's ticket-type step now adds a short explanation naming those type(s): if the user isn't sure who handles their issue, they can pick that type and AI reads their description and routes the request to the best team, with a human stepping in if AI isn't confident. The explanation only appears when the feature is both configured and live — if no such type exists, or AI is disabled (so routing would be dormant), the tour stays silent about it. Placed exactly where the tour already explains that each type has its own form.
+
 ## 2.143.2 &mdash; 2026-07-08
 
 ### Fixed

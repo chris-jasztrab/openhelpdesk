@@ -58,6 +58,9 @@ endif; ?>
     <i class="bi bi-mortarboard-fill"></i>
     <span><strong>Tour preview</strong> — try things out here. During the tour this form won't actually submit or create a ticket.</span>
 </div>
+<?php // Hand the "No Wrong Door" type names (if any, and only when AI is live)
+      // to the onboarding tour so its ticket-type step can explain the feature. ?>
+<script>window.__ldNoWrongDoorTypes = <?= json_encode(array_values($noWrongDoorTypeNames ?? []), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;</script>
 <?php endif; ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="fw-bold mb-0"><?= e(label('portal.action.new', 'New Help Request')) ?></h2>
