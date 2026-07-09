@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.145.0 &mdash; 2026-07-09
+
+### Added
+- **Saving an AI-dependent ticket type now live-tests AI first.** Enabling <em>"Let AI route this to the best group"</em> (<code>ai_route_group</code>) or <em>"Check for duplicates on submit"</em> (<code>ai_dup_check_enabled</code>) on a ticket type used to save silently even when AI was switched off or misconfigured, leaving the feature dormant with no feedback. The create/edit handlers now call <code>AIClassifierFactory::fromSettings()</code> and run a real <code>testConnection()</code> before saving. If AI is off or the connection fails, the form re-renders with a warning modal that states the reason, links to <strong>Settings → AI Classification</strong> and the relevant help docs (opened in a new window), and warns that the type would just route every ticket to its Default Group. The admin can <strong>Save anyway</strong> (via an <code>ai_check_bypass</code> flag) or <strong>Close and edit</strong> to change the type. Confidential types force the AI flags off, so they skip the test entirely.
+
 ## 2.144.0 &mdash; 2026-07-09
 
 ### Added

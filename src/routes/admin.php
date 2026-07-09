@@ -1836,6 +1836,27 @@ $router->post('/admin/types/create', function () {
         redirect('/admin/types/create');
     }
     $db = Database::connect();
+
+    // "No Wrong Door" routing and duplicate detection can't work without a live
+    // AI connection. Test it before saving; if it fails, re-render the form with
+    // a warning modal that offers a "save anyway" escape hatch (ai_check_bypass).
+    $aiReason = aiTicketTypeUnavailableReason(
+        $aiRouteGroup === 1 || $aiDupCheck === 1,
+        !empty($_POST['ai_check_bypass'])
+    );
+    if ($aiReason !== null) {
+        flashInput($_POST);
+        $groups = $db->query('SELECT id, name FROM `groups` ORDER BY sort_order, name')->fetchAll();
+        $skills = $db->query('SELECT id, name FROM agent_skills ORDER BY sort_order, name')->fetchAll();
+        render('admin/types/form', [
+            'editing'          => null,
+            'groups'           => $groups,
+            'skills'           => $skills,
+            'requiredSkillIds' => array_filter(array_map('intval', (array) ($_POST['required_skills'] ?? []))),
+            'aiWarning'        => $aiReason,
+        ]);
+    }
+
     $db->prepare('INSERT INTO ticket_types (name, color, group_id, is_confidential, ai_route_group, ai_dup_check_enabled, ai_dup_threshold, show_to_location_visibility, sort_order, stale_threshold_minutes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
         ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $showToLocVis, $order, $staleMinutes]);
     $typeId = (int) $db->lastInsertId();
@@ -1907,6 +1928,29 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
     }
 
     $db = Database::connect();
+
+    // Live-test AI before saving an AI-dependent type, same as the create
+    // handler. Runs first so a "save anyway" resubmit still flows through the
+    // confidential re-auth gate below rather than short-circuiting it.
+    $aiReason = aiTicketTypeUnavailableReason(
+        $aiRouteGroup === 1 || $aiDupCheck === 1,
+        !empty($_POST['ai_check_bypass'])
+    );
+    if ($aiReason !== null) {
+        flashInput($_POST);
+        $editStmt = $db->prepare('SELECT * FROM ticket_types WHERE id = ?');
+        $editStmt->execute([$id]);
+        $editing = $editStmt->fetch() ?: null;
+        $groups  = $db->query('SELECT id, name FROM `groups` ORDER BY sort_order, name')->fetchAll();
+        $skills  = $db->query('SELECT id, name FROM agent_skills ORDER BY sort_order, name')->fetchAll();
+        render('admin/types/form', [
+            'editing'          => $editing,
+            'groups'           => $groups,
+            'skills'           => $skills,
+            'requiredSkillIds' => array_filter(array_map('intval', (array) ($_POST['required_skills'] ?? []))),
+            'aiWarning'        => $aiReason,
+        ]);
+    }
 
     // Snapshot prior confidential state
     $priorStmt = $db->prepare('SELECT name, is_confidential, group_id FROM ticket_types WHERE id = ?');

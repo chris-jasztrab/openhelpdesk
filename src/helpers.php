@@ -2271,6 +2271,32 @@ function recordDupOverrideOnNewTicket(PDO $db, int $newTicketId, int $userId, st
 }
 
 /**
+ * Live-check that AI is usable before saving a ticket type whose features
+ * depend on it — "No Wrong Door" group routing (ai_route_group) or duplicate
+ * detection (ai_dup_check_enabled). Actually pings the provider so a bad key
+ * or unreachable endpoint is caught at setup time, not silently at submit time.
+ *
+ * Returns null when the save may proceed: the type uses no AI feature, the
+ * admin explicitly chose "save anyway", or a real connection test succeeded.
+ * Otherwise returns a human-readable reason for the caller's warning modal.
+ */
+function aiTicketTypeUnavailableReason(bool $wantsAI, bool $saveAnyway): ?string
+{
+    if (!$wantsAI || $saveAnyway) {
+        return null;
+    }
+    $classifier = AIClassifierFactory::fromSettings();
+    if ($classifier === null) {
+        return 'AI classification is currently switched off (or no API key is set) under Admin → Settings → AI Classification.';
+    }
+    $result = $classifier->testConnection(10);
+    if (!empty($result['ok'])) {
+        return null;
+    }
+    return 'AI is switched on, but a live connection test just failed: ' . trim((string) ($result['message'] ?? 'unknown error'));
+}
+
+/**
  * "No Wrong Door" group routing. Run for ticket types flagged with
  * ai_route_group=1: ask the AI to pick the best group from every
  * non-confidential group (using the description column to ground the

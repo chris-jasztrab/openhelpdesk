@@ -10,6 +10,9 @@ $breadcrumbs  = [
     ['label' => $isEdit ? 'Edit' : 'Add'],
 ];
 $action = $isEdit ? "/admin/types/{$editing['id']}/edit" : '/admin/types/create';
+// Set when a save was blocked because an AI-dependent feature is on but AI
+// isn't working — triggers the warning modal + "save anyway" escape hatch.
+$aiWarning = $aiWarning ?? null;
 ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="fw-bold mb-0"><?= $isEdit ? 'Edit Ticket Type' : 'Add Ticket Type' ?></h2>
@@ -20,8 +23,10 @@ $action = $isEdit ? "/admin/types/{$editing['id']}/edit" : '/admin/types/create'
 
 <div class="card border-0 shadow-sm" style="max-width:600px;">
     <div class="card-body p-4">
-        <form method="POST" action="<?= e($action) ?>">
+        <form method="POST" action="<?= e($action) ?>" id="typeForm">
             <?= csrfField() ?>
+            <?php // Set to 1 by the "Save anyway" button when AI is unavailable. ?>
+            <input type="hidden" name="ai_check_bypass" id="aiCheckBypass" value="">
 
             <div class="mb-3">
                 <label for="name" class="form-label fw-semibold">Type Name <span class="text-danger">*</span></label>
@@ -248,3 +253,63 @@ document.getElementById('name').addEventListener('input', function() {
     toggle();
 })();
 </script>
+
+<?php if ($aiWarning !== null): ?>
+<!-- AI-unavailable warning: this type turns on an AI feature but AI isn't working -->
+<div class="modal fade" id="aiUnavailableModal" tabindex="-1" aria-labelledby="aiUnavailableModalLabel" aria-modal="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-0 pb-1 bg-warning bg-opacity-10">
+                <h5 class="modal-title fw-semibold d-flex align-items-center gap-2" id="aiUnavailableModalLabel">
+                    <i class="bi bi-robot text-warning" aria-hidden="true"></i>
+                    AI isn't ready for this ticket type
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body py-4">
+                <p class="mb-3">
+                    This ticket type turns on an AI feature &mdash; <strong>"No Wrong Door" group routing</strong>
+                    and/or <strong>duplicate detection</strong> &mdash; but AI isn't working right now:
+                </p>
+                <div class="alert alert-warning small mb-3"><?= e($aiWarning) ?></div>
+                <p class="mb-2 fw-semibold">Enable and test AI, or read how these features work:</p>
+                <ul class="mb-3">
+                    <li><a href="/admin/settings/ai" target="_blank" rel="noopener">Enable &amp; test AI (Settings &rarr; AI Classification)</a></li>
+                    <li><a href="/admin/docs/ai#no-wrong-door" target="_blank" rel="noopener">How "No Wrong Door" routing works</a></li>
+                    <li><a href="/admin/docs/ai#duplicate-detection" target="_blank" rel="noopener">How duplicate detection works</a></li>
+                </ul>
+                <p class="mb-0 small text-muted">
+                    <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+                    You can still save. Until AI is enabled and working, every ticket of this type will simply land in its
+                    <strong>Default Group</strong> &mdash; no AI routing and no duplicate checks will run.
+                </p>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-warning" id="aiSaveAnywayBtn">
+                    <i class="bi bi-save me-1" aria-hidden="true"></i>Save anyway
+                </button>
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    Close and edit
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var modalEl = document.getElementById('aiUnavailableModal');
+    if (modalEl) {
+        new bootstrap.Modal(modalEl).show();
+    }
+    var saveAnyway = document.getElementById('aiSaveAnywayBtn');
+    if (saveAnyway) {
+        saveAnyway.addEventListener('click', function () {
+            var bypass = document.getElementById('aiCheckBypass');
+            var form   = document.getElementById('typeForm');
+            if (bypass) { bypass.value = '1'; }
+            if (form)   { form.submit(); }
+        });
+    }
+});
+</script>
+<?php endif; ?>
