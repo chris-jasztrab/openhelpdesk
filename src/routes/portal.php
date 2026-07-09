@@ -914,7 +914,7 @@ $router->post('/portal/tickets/{id}/edit', function (array $p) {
  * (overview index + per-page templates) but written for non-staff.
  * ================================================================== */
 
-$validPortalHelpPages = ['floor'];
+$validPortalHelpPages = ['getting-started', 'submitting', 'tracking', 'managing', 'knowledge-base', 'profile', 'floor'];
 
 $router->get('/portal/help', function () {
     Auth::requireAuth();
@@ -932,7 +932,15 @@ $router->get('/portal/help/{page}', function (array $p) use ($validPortalHelpPag
     if (!in_array($page, $validPortalHelpPages, true)) {
         redirect('/portal/help');
     }
-    $titles = ['floor' => 'Floor Mode'];
+    $titles = [
+        'getting-started' => 'Getting Started',
+        'submitting'      => 'Submitting a Request',
+        'tracking'        => 'Tracking Your Requests',
+        'managing'        => 'Replying, Editing & Closing',
+        'knowledge-base'  => 'Finding Answers Yourself',
+        'profile'         => 'Your Profile & Emails',
+        'floor'           => 'Floor Mode',
+    ];
     render('portal/docs/' . $page, [
         'sidebarItems' => portalSidebar('help'),
         'layout'       => 'app',

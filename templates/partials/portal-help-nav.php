@@ -1,7 +1,13 @@
 <?php
 $portalHelpNav = [
-    ['url' => '/portal/help',       'label' => 'Overview',   'icon' => 'bi-house'],
-    ['url' => '/portal/help/floor', 'label' => 'Floor Mode', 'icon' => 'bi-grid-1x2'],
+    ['url' => '/portal/help',                 'label' => 'Overview',              'icon' => 'bi-house'],
+    ['url' => '/portal/help/getting-started', 'label' => 'Getting Started',       'icon' => 'bi-compass'],
+    ['url' => '/portal/help/submitting',      'label' => 'Submitting a Request',  'icon' => 'bi-send'],
+    ['url' => '/portal/help/tracking',        'label' => 'Tracking Your Requests','icon' => 'bi-ticket-detailed'],
+    ['url' => '/portal/help/managing',        'label' => 'Replying & Closing',    'icon' => 'bi-chat-dots'],
+    ['url' => '/portal/help/knowledge-base',  'label' => 'Finding Answers',       'icon' => 'bi-book'],
+    ['url' => '/portal/help/profile',         'label' => 'Profile & Emails',      'icon' => 'bi-person-gear'],
+    ['url' => '/portal/help/floor',           'label' => 'Floor Mode',            'icon' => 'bi-grid-1x2'],
 ];
 $cp = currentPath();
 ?>
