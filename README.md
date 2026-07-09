@@ -39,6 +39,7 @@ OpenHelpDesk also has optional AI-assisted triage, powered by your choice of Ant
 - Internal notes visible only to staff; public comments visible to the submitter
 - CC additional users on a ticket (with autocomplete) to keep them in the notification loop; CC-added notification email
 - **Mark as Solution** — flag a comment as the ticket's solution with a green "Go to solution" jump-link on staff and portal views (labels renameable)
+- **Resolution note on close** — optional per-type flag that prompts the assigned owner to record what fixed a ticket when they close it without a comment; a framework-scaffolded modal (Action Taken → Verification → Next Steps) saves the note as an internal note, or they close with a logged reason instead. A soft nudge scoped to the owner closing from the ticket page — replies-then-close, list quick-edits, bulk changes, and automated closes skip it
 - **Ticket Merge** — combine duplicate tickets; choose which is primary; timeline entries, tags, and CC users are copied; source ticket is closed with a link to the primary
 - **Ticket Splitting** — split a single ticket into two, choosing which timeline entries move
 - **Ticket Watching** — staff can watch tickets to receive all update notifications

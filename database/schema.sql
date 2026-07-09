@@ -749,6 +749,7 @@ CREATE TABLE IF NOT EXISTS `ticket_types` (
   `ai_dup_check_enabled` tinyint(1) NOT NULL DEFAULT 0,
   `ai_dup_threshold` decimal(3,2) NOT NULL DEFAULT 0.75,
   `show_to_location_visibility` tinyint(1) NOT NULL DEFAULT 1,
+  `require_resolution_on_close` tinyint(1) NOT NULL DEFAULT 0,
   `sort_order` int(10) unsigned NOT NULL DEFAULT 0,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),

@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.147.0 &mdash; 2026-07-09
+
+### Added
+- **Ticket types can prompt for a resolution note before the owner closes.** A new per-type checkbox &mdash; <strong>Prompt for a resolution note before the owner closes</strong> (<code>ticket_types.require_resolution_on_close</code>, migration 066, default off) &mdash; nudges agents to record what actually fixed a ticket instead of silently closing it. When it's on and the ticket's <strong>assigned owner</strong> moves it to a closed-bucket status (<em>Resolved</em>/<em>Closed</em>) from the ticket page without having added any comment, a modal appears with a note box pre-filled with a framework scaffold (<em>Action Taken &rarr; Verification &rarr; Next Steps</em>). <strong>Add resolution &amp; close</strong> saves the note as an internal note (staff-only, requester not emailed) and closes; <strong>Close without a note</strong> requires picking a reason (Duplicate / Spam / No response needed / Resolved elsewhere / Other) which is logged to the timeline. Deliberately narrow so it doesn't slow triage: it only fires for the assignee, only from the ticket page's Update panel, and only when no staff comment exists yet &mdash; so replying-then-closing, list quick-edits, bulk status changes, non-owner closes, and automated closes all skip it. Implemented on both the agent and admin ticket views (parallel templates); note/reason capture lives in the two <code>/update</code> handlers via the new <code>recordCloseResolution()</code> helper.
+
 ## 2.146.0 &mdash; 2026-07-09
 
 ### Added

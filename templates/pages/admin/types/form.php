@@ -135,6 +135,20 @@ $aiWarning = $aiWarning ?? null;
                 </div>
             </div>
 
+            <div class="mb-3">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="require_resolution_on_close" name="require_resolution_on_close" value="1"
+                           <?= (int) old('require_resolution_on_close', (string) ($editing['require_resolution_on_close'] ?? '0')) ? 'checked' : '' ?>>
+                    <label class="form-check-label fw-semibold" for="require_resolution_on_close">
+                        <i class="bi bi-journal-check me-1"></i>Prompt for a resolution note before the owner closes
+                    </label>
+                </div>
+                <div class="form-text">
+                    When the ticket's <strong>assigned agent</strong> moves it to a closed status from the ticket page without having added any comment, a modal prompts them to record what resolved it, pre-filled with a suggested framework (<em>Action Taken → Verification → Next Steps</em>).
+                    They can still close without a note by choosing a reason (which is logged). This is a nudge to capture troubleshooting steps — it only applies to the owner closing from the ticket page, not to list quick-edits or bulk changes.
+                </div>
+            </div>
+
             <?php if ($isEdit): ?>
             <div class="mb-3">
                 <label class="form-label fw-semibold">

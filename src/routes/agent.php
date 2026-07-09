@@ -1167,6 +1167,7 @@ $router->get('/agent/tickets/{id}', function (array $p) {
                 tp.name AS priority_name, tp.color AS priority_color,
                 l.name  AS location_name,
                 tt.name AS type_name, tt.color AS type_color, tt.group_id AS type_group_id,
+                tt.require_resolution_on_close AS type_require_resolution_on_close,
                 c.first_name AS creator_first_name, c.last_name AS creator_last_name,
                 CONCAT(c.first_name, ' ', c.last_name) AS creator_name, c.email AS creator_email,
                 CONCAT(a.first_name, ' ', a.last_name) AS agent_name,
@@ -2108,6 +2109,21 @@ $router->post('/agent/tickets/{id}/update', function (array $p) {
         } elseif (in_array($oldStatus, $pausingStatuses, true)) {
             Sla::resume($db, $id);
         }
+    }
+
+    // Resolution-note capture for `require_resolution_on_close` types. The owner
+    // closing from the ticket page is prompted (client-side) to record what
+    // resolved it; the modal posts either `resolution_note` or, if they opted to
+    // skip it, `close_without_note_reason`. Only acts when the submitted status
+    // lands in the closed bucket. See recordCloseResolution() in helpers.php.
+    if ($newStatus !== '' && in_array($newStatus, ticketClosedBucketSlugs(), true)) {
+        recordCloseResolution(
+            $db,
+            $id,
+            (int) Auth::id(),
+            (string) ($_POST['resolution_note'] ?? ''),
+            (string) ($_POST['close_without_note_reason'] ?? '')
+        );
     }
 
     // Priority change

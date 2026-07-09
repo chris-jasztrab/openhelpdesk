@@ -523,6 +523,15 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-journal-check text-primary me-2"></i>Prompt for a Resolution Note on Close</h5>
+<p class="text-muted mb-2">Agents often close their own tickets without recording what actually fixed the issue &mdash; so the next person who hits the same problem starts from scratch. Each ticket type has a <strong>Prompt for a resolution note before the owner closes</strong> checkbox to nudge that knowledge out before the ticket disappears into the closed pile.</p>
+<p class="text-muted mb-2">When it's on and the ticket's <strong>assigned owner</strong> moves it to a closed-bucket status (<em>Resolved</em> / <em>Closed</em>) <strong>from the ticket page</strong> without having added any comment, a modal appears asking what resolved it. The note box is pre-filled with a suggested framework (<em>Action Taken &rarr; Verification &rarr; Next Steps</em>) they can edit freely, and it saves as an <strong>internal note</strong> (staff-only &mdash; the requester is not emailed). Agents who genuinely have nothing to record can still close by clicking <strong>Close without a note</strong> and picking a reason (Duplicate, Spam, No response needed, …), which is logged to the timeline &mdash; so even a skipped note leaves a breadcrumb.</p>
+<p class="text-muted mb-0"><strong>It's a nudge, not a wall.</strong> The prompt is deliberately narrow so it doesn't slow triage: it only fires for the <em>assigned owner</em>, only <em>from the ticket page</em>, and only when <em>no comment exists yet</em> &mdash; so replying with a resolution before closing skips it entirely, as do list quick-edits and bulk status changes. It does not apply when someone other than the assignee closes the ticket, nor to automated closes.</p>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-shield-lock text-primary me-2"></i>Confidential Ticket Types</h5>
 <p class="text-muted mb-2">Ticket types can be marked as <strong>Confidential</strong> to restrict access to sensitive tickets (e.g., HR, Legal). This feature ensures that only authorised group members can view the ticket details.</p>
 

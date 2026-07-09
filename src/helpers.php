@@ -7788,6 +7788,30 @@ function ticketClosedBucketSlugs(): array
     ));
 }
 
+/**
+ * Record what happened when a ticket type with `require_resolution_on_close`
+ * is closed from the ticket page. Called only from the /update handlers when the
+ * submitted status lands in the closed bucket. Writes an INTERNAL timeline note
+ * (so it documents troubleshooting steps for staff without emailing the
+ * requester): either the resolution note the owner typed, or — if they chose to
+ * close without one — the reason they picked. A no-op if both are empty.
+ */
+function recordCloseResolution(PDO $db, int $ticketId, int $userId, string $note, string $reason): void
+{
+    $note   = trim($note);
+    $reason = trim($reason);
+    if ($note !== '') {
+        $details = $note;
+    } elseif ($reason !== '') {
+        $details = 'Closed without a resolution note. Reason: ' . $reason;
+    } else {
+        return;
+    }
+    $db->prepare(
+        'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 1)'
+    )->execute([$ticketId, $userId, 'comment', $details]);
+}
+
 /** Slugs that pause SLA timers — replaces the inline $pausingStatuses arrays. */
 function ticketSlaPausingSlugs(): array
 {

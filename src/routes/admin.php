@@ -1826,6 +1826,7 @@ $router->post('/admin/types/create', function () {
     if ($aiDupThreshold < 0.50) { $aiDupThreshold = 0.50; }
     if ($aiDupThreshold > 0.99) { $aiDupThreshold = 0.99; }
     $showToLocVis   = !empty($_POST['show_to_location_visibility']) ? 1 : 0;
+    $requireResolution = !empty($_POST['require_resolution_on_close']) ? 1 : 0;
     // Stale threshold accepts d/h/m; a bare number means hours (legacy unit).
     $staleRaw       = trim((string) ($_POST['stale_threshold_minutes'] ?? ''));
     $staleMinutes   = $staleRaw === '' ? null : max(0, parseDurationToMinutes($staleRaw, 'h') ?? 0);
@@ -1857,8 +1858,8 @@ $router->post('/admin/types/create', function () {
         ]);
     }
 
-    $db->prepare('INSERT INTO ticket_types (name, color, group_id, is_confidential, ai_route_group, ai_dup_check_enabled, ai_dup_threshold, show_to_location_visibility, sort_order, stale_threshold_minutes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $showToLocVis, $order, $staleMinutes]);
+    $db->prepare('INSERT INTO ticket_types (name, color, group_id, is_confidential, ai_route_group, ai_dup_check_enabled, ai_dup_threshold, show_to_location_visibility, require_resolution_on_close, sort_order, stale_threshold_minutes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $showToLocVis, $requireResolution, $order, $staleMinutes]);
     $typeId = (int) $db->lastInsertId();
     if ($skillIds) {
         $stmt = $db->prepare('INSERT IGNORE INTO ticket_type_skill_map (ticket_type_id, skill_id) VALUES (?, ?)');
@@ -1918,6 +1919,7 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
     if ($aiDupThreshold < 0.50) { $aiDupThreshold = 0.50; }
     if ($aiDupThreshold > 0.99) { $aiDupThreshold = 0.99; }
     $showToLocVis   = !empty($_POST['show_to_location_visibility']) ? 1 : 0;
+    $requireResolution = !empty($_POST['require_resolution_on_close']) ? 1 : 0;
     // Stale threshold accepts d/h/m; a bare number means hours (legacy unit).
     $staleRaw       = trim((string) ($_POST['stale_threshold_minutes'] ?? ''));
     $staleMinutes   = $staleRaw === '' ? null : max(0, parseDurationToMinutes($staleRaw, 'h') ?? 0);
@@ -2013,14 +2015,14 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
     // not just the confidential flag we already snapshotted above.
     $fullPriorStmt = $db->prepare(
         'SELECT name, color, group_id, is_confidential, ai_route_group, ai_dup_check_enabled,
-                ai_dup_threshold, show_to_location_visibility, sort_order, stale_threshold_minutes
+                ai_dup_threshold, show_to_location_visibility, require_resolution_on_close, sort_order, stale_threshold_minutes
          FROM ticket_types WHERE id = ?'
     );
     $fullPriorStmt->execute([$id]);
     $fullPrior = $fullPriorStmt->fetch(\PDO::FETCH_ASSOC) ?: [];
 
-    $db->prepare('UPDATE ticket_types SET name=?, color=?, group_id=?, is_confidential=?, ai_route_group=?, ai_dup_check_enabled=?, ai_dup_threshold=?, show_to_location_visibility=?, sort_order=?, stale_threshold_minutes=? WHERE id=?')
-        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $showToLocVis, $order, $staleMinutes, $id]);
+    $db->prepare('UPDATE ticket_types SET name=?, color=?, group_id=?, is_confidential=?, ai_route_group=?, ai_dup_check_enabled=?, ai_dup_threshold=?, show_to_location_visibility=?, require_resolution_on_close=?, sort_order=?, stale_threshold_minutes=? WHERE id=?')
+        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $showToLocVis, $requireResolution, $order, $staleMinutes, $id]);
 
     // Required skills (used by Skill-Based group auto-assignment)
     $skillIds = array_filter(array_map('intval', (array) ($_POST['required_skills'] ?? [])));
@@ -2046,6 +2048,7 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
             'ai_dup_check_enabled'        => $aiDupCheck,
             'ai_dup_threshold'            => $aiDupThreshold,
             'show_to_location_visibility' => $showToLocVis,
+            'require_resolution_on_close' => $requireResolution,
             'sort_order'                  => $order,
             'stale_threshold_minutes'     => $staleMinutes,
         ]
@@ -4684,6 +4687,7 @@ $router->get('/admin/tickets/{id}', function (array $p) {
                 tp.name AS priority_name, tp.color AS priority_color,
                 l.name  AS location_name,
                 tt.name AS type_name, tt.color AS type_color,
+                tt.require_resolution_on_close AS type_require_resolution_on_close,
                 c.first_name AS creator_first_name, c.last_name AS creator_last_name,
                 CONCAT(c.first_name, ' ', c.last_name) AS creator_name, c.email AS creator_email,
                 CONCAT(a.first_name, ' ', a.last_name) AS agent_name,
@@ -5638,6 +5642,19 @@ $router->post('/admin/tickets/{id}/update', function (array $p) {
         } elseif (in_array($oldStatus, $pausingStatuses, true)) {
             Sla::resume($db, $id);
         }
+    }
+
+    // Resolution-note capture for `require_resolution_on_close` types — mirrors
+    // the agent /update handler. Writes an internal note with either what the
+    // owner typed or the reason they chose to skip it, when closing.
+    if ($newStatus !== '' && in_array($newStatus, ticketClosedBucketSlugs(), true)) {
+        recordCloseResolution(
+            $db,
+            $id,
+            (int) Auth::id(),
+            (string) ($_POST['resolution_note'] ?? ''),
+            (string) ($_POST['close_without_note_reason'] ?? '')
+        );
     }
 
     // Priority change

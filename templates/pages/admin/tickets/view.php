@@ -27,6 +27,21 @@ if ($solutionTimelineId > 0) {
         }
     }
 }
+
+// "Require a resolution note before close" gate (per ticket type). See the agent
+// ticket view for the full rationale — same logic, parallel template.
+$resolutionHasStaffNote = false;
+foreach ($timeline as $__tlRow) {
+    if (($__tlRow['action'] ?? '') === 'comment' && !empty($__tlRow['user_id'])) {
+        $resolutionHasStaffNote = true;
+        break;
+    }
+}
+$resolutionIsAssignee   = (int) Auth::id() === (int) ($ticket['assigned_to'] ?? 0);
+$resolutionGateActive   = !empty($ticket['type_require_resolution_on_close'])
+                          && $resolutionIsAssignee
+                          && !$resolutionHasStaffNote;
+$resolutionClosedSlugs  = ticketClosedBucketSlugs();
 ?>
 <link rel="stylesheet" href="/assets/vendor/ckeditor5/ckeditor5.css">
 <script type="importmap">
@@ -534,6 +549,51 @@ if ($solutionTimelineId > 0) {
         </div>
     </div>
 
+    <!-- Resolution-note-on-close Modal (require_resolution_on_close types) -->
+    <div class="modal fade" id="resolutionNoteModal" tabindex="-1" aria-labelledby="resolutionNoteModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h6 class="modal-title fw-semibold" id="resolutionNoteModalLabel">
+                        <i class="bi bi-journal-check me-2 text-primary"></i>Before you close &mdash; what resolved this?
+                    </h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small mb-2">
+                        Recording what fixed this helps the next person who hits the same issue. Your note is saved as an <strong>internal note</strong> (staff-only) and the ticket is closed. This appears because this ticket type asks for a resolution note.
+                    </p>
+                    <label for="resolutionNoteTextarea" class="form-label fw-semibold small">Resolution note</label>
+                    <textarea class="form-control" id="resolutionNoteTextarea" rows="8" style="font-family:var(--bs-font-monospace);font-size:.9rem;"></textarea>
+                    <div class="form-text">Suggested framework &mdash; edit freely. Delete any lines you don&rsquo;t need.</div>
+
+                    <div id="closeWithoutNoteRow" class="mt-3 d-none">
+                        <label for="closeReasonSelect" class="form-label fw-semibold small text-danger">Closing without a note &mdash; pick a reason</label>
+                        <select class="form-select form-select-sm" id="closeReasonSelect">
+                            <option value="">Choose a reason&hellip;</option>
+                            <option value="Duplicate">Duplicate of another ticket</option>
+                            <option value="Spam / not a real request">Spam / not a real request</option>
+                            <option value="No response needed">No response needed</option>
+                            <option value="Resolved elsewhere">Resolved elsewhere (phone/in person)</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer justify-content-between">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="resolutionCloseWithoutBtn">
+                        <i class="bi bi-x-circle me-1"></i>Close without a note
+                    </button>
+                    <div>
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Keep working</button>
+                        <button type="button" class="btn text-white" style="background:var(--ld-primary);" id="resolutionAddBtn">
+                            <i class="bi bi-check-circle me-1"></i>Add resolution &amp; close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Canned Response Picker Modal -->
     <div class="modal fade" id="cannedModal" tabindex="-1" aria-labelledby="cannedModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg">
@@ -900,10 +960,16 @@ if ($solutionTimelineId > 0) {
                 <h5 class="mb-0 fw-semibold"><i class="bi bi-pencil-square me-2"></i>Update Ticket</h5>
             </div>
             <div class="card-body">
-                <form method="POST" action="/admin/tickets/<?= $ticket['id'] ?>/update">
+                <form method="POST" action="/admin/tickets/<?= $ticket['id'] ?>/update" id="updateTicketForm"
+                      data-resolution-gate="<?= $resolutionGateActive ? '1' : '0' ?>"
+                      data-original-status="<?= e($ticket['status']) ?>"
+                      data-closed-slugs="<?= e(implode(',', $resolutionClosedSlugs)) ?>">
                     <?= csrfField() ?>
                     <?php /* Optimistic-lock token: the status this page rendered with. */ ?>
                     <input type="hidden" name="expected_status" value="<?= e($ticket['status']) ?>">
+                    <?php /* Filled by the resolution-note modal (require_resolution_on_close types). */ ?>
+                    <input type="hidden" name="resolution_note" id="resolutionNoteField" value="">
+                    <input type="hidden" name="close_without_note_reason" id="closeWithoutNoteReasonField" value="">
 
                     <div class="mb-3">
                         <label for="status" class="form-label fw-semibold small">Status</label>
@@ -1760,6 +1826,70 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
     fields.forEach(function (id) {
         var el = document.getElementById(id);
         if (el) el.addEventListener('change', check);
+    });
+})();
+
+/* ── Resolution-note-on-close gate (require_resolution_on_close types) ──
+   Parallel to the agent ticket view. Intercepts the Update form when the owner
+   closes without a comment; offers a scaffolded note or a logged reason. Both
+   paths resubmit THIS form so other pending changes are preserved. */
+(function () {
+    var form = document.getElementById('updateTicketForm');
+    if (!form || form.dataset.resolutionGate !== '1') return;
+    var modalEl = document.getElementById('resolutionNoteModal');
+    if (!modalEl) return;
+
+    var statusSel   = document.getElementById('status');
+    var noteField   = document.getElementById('resolutionNoteField');
+    var reasonField = document.getElementById('closeWithoutNoteReasonField');
+    var textarea    = document.getElementById('resolutionNoteTextarea');
+    var reasonRow   = document.getElementById('closeWithoutNoteRow');
+    var reasonSel   = document.getElementById('closeReasonSelect');
+    var addBtn      = document.getElementById('resolutionAddBtn');
+    var withoutBtn  = document.getElementById('resolutionCloseWithoutBtn');
+    var closedSlugs = (form.dataset.closedSlugs || '').split(',').filter(Boolean);
+    var originalStatus = form.dataset.originalStatus || '';
+    var SCAFFOLD = 'Action Taken:\n- \n\nVerification:\n- \n\nNext Steps:\n- ';
+    function getModal() { return window.bootstrap ? bootstrap.Modal.getOrCreateInstance(modalEl) : null; }
+
+    function isClosing() {
+        var v = statusSel ? statusSel.value : '';
+        return v !== originalStatus && closedSlugs.indexOf(v) !== -1;
+    }
+
+    form.addEventListener('submit', function (e) {
+        if (form._resolutionAck) return;
+        if (!isClosing()) return;
+        e.preventDefault();
+        var m = getModal();
+        if (!m) { form._resolutionAck = true; form.requestSubmit(); return; } // fail open
+        if (!textarea.value.trim()) textarea.value = SCAFFOLD;
+        reasonRow.classList.add('d-none');
+        reasonSel.value = '';
+        m.show();
+        setTimeout(function () { textarea.focus(); }, 300);
+    });
+
+    function submitWith(note, reason) {
+        noteField.value   = note;
+        reasonField.value = reason;
+        form._resolutionAck = true;
+        var m = getModal();
+        if (m) m.hide();
+        form.requestSubmit();
+    }
+
+    addBtn.addEventListener('click', function () {
+        if (!textarea.value.trim()) { textarea.focus(); return; }
+        submitWith(textarea.value.trim(), '');
+    });
+
+    withoutBtn.addEventListener('click', function () {
+        reasonRow.classList.remove('d-none');
+        reasonSel.focus();
+    });
+    reasonSel.addEventListener('change', function () {
+        if (reasonSel.value) submitWith('', reasonSel.value);
     });
 })();
 
