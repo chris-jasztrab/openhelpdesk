@@ -247,12 +247,20 @@ $sentimentColors = [
                     Bump priority by one level when AI sentiment is "angry" or "urgent"
                 </label>
             </div>
-            <div class="form-check form-switch">
+            <div class="form-check form-switch mb-2">
                 <input class="form-check-input" type="checkbox" role="switch" name="ai_classify_inbound_email" id="ai_classify_inbound_email" value="1"
                        <?= $aiClassifyInboundEmail === '1' ? 'checked' : '' ?>>
                 <label class="form-check-label" for="ai_classify_inbound_email">
                     Classify tickets created from inbound email (in addition to portal / admin / API)
                 </label>
+            </div>
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" name="ai_similar_enabled" id="ai_similar_enabled" value="1"
+                       <?= $aiSimilarEnabled === '1' ? 'checked' : '' ?>>
+                <label class="form-check-label" for="ai_similar_enabled">
+                    Show <strong>similar past tickets</strong> to agents on the ticket view
+                </label>
+                <div class="form-text">When an agent opens a ticket, search the whole ticket history for tickets describing the same or a related problem (including resolved and closed ones) and list them with an AI note on how each relates. Confidential ticket types are never sent to the provider. Runs once per ticket and is cached.</div>
             </div>
         </div>
     </div>

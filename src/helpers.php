@@ -2121,6 +2121,230 @@ function checkTicketDuplicates(int $userId, int $typeId, ?int $locationId, strin
 }
 
 /**
+ * "Similar past tickets" agent assist. Given a ticket an agent is working,
+ * search the WHOLE ticket archive (open, resolved, closed) for tickets that
+ * describe the same or a closely related problem, then let the LLM rank the
+ * lexical candidates by how useful each is. Returns display-ready rows.
+ *
+ * Two-stage RAG-style pipeline:
+ *   1. Retrieval — a MySQL FULLTEXT MATCH...AGAINST query narrows the archive
+ *      to the ~20 most lexically-similar tickets (cheap, no API call).
+ *   2. Rerank — those candidates go to the LLM, which scores relevance and
+ *      explains how each relates.
+ *
+ * Gated behind `ai_enabled` + `ai_similar_enabled`. Confidential ticket types
+ * are never sent to the provider. The newest ai_similarity_classifications row
+ * for the ticket is reused as a cache so the LLM runs once per ticket, not once
+ * per page view — pass $forceRefresh to recompute.
+ *
+ * Result shape:
+ *   [
+ *     'enabled' => bool,          // feature on AND this ticket is eligible
+ *     'matches' => [
+ *       ['ticket_id' => int, 'subject' => string, 'status' => string,
+ *        'created_at' => string, 'type_name' => string,
+ *        'relevance' => float, 'reasoning' => string],
+ *       ...
+ *     ],
+ *   ]
+ *
+ * @param int  $ticketId     The ticket the agent is working
+ * @param int  $viewerId     Auth::id() of the viewing agent (scopes visibility)
+ * @param bool $forceRefresh Skip the cache and re-run the LLM
+ */
+function findSimilarPastTickets(int $ticketId, int $viewerId, bool $forceRefresh = false): array
+{
+    $off = ['enabled' => false, 'matches' => []];
+
+    if (getSetting('ai_enabled', '0') !== '1')          { return $off; }
+    if (getSetting('ai_similar_enabled', '0') !== '1')  { return $off; }
+    if ($ticketId <= 0)                                 { return $off; }
+
+    $db = Database::connect();
+
+    // Load the current ticket. Skip confidential types entirely — their bodies
+    // must never reach the provider (same rule as duplicate detection).
+    $tStmt = $db->prepare(
+        "SELECT t.id, t.subject, t.description, COALESCE(tt.is_confidential, 0) AS type_is_confidential
+         FROM tickets t
+         LEFT JOIN ticket_types tt ON tt.id = t.type_id
+         WHERE t.id = ?"
+    );
+    $tStmt->execute([$ticketId]);
+    $ticket = $tStmt->fetch();
+    if (!$ticket)                                        { return $off; }
+    if ((int) $ticket['type_is_confidential'] === 1)     { return $off; }
+
+    // Visibility scope for the viewing agent, so matches can't leak tickets
+    // they have no access to. This feature is agent-facing (staff only).
+    $scopeStmt = $db->prepare('SELECT role FROM users WHERE id = ?');
+    $scopeStmt->execute([$viewerId]);
+    $viewer = $scopeStmt->fetch() ?: [];
+    if (!roleIsStaff($viewer['role'] ?? null))           { return $off; }
+    $vis = ticketStaffVisibilitySql($db, $viewerId, $viewer['role'] ?? null, 't');
+
+    // Re-hydrate a list of {ticket_id, relevance, reasoning} into display rows,
+    // re-checking visibility + confidentiality against the CURRENT viewer so a
+    // cached result can never surface a ticket this agent may not see.
+    $hydrate = function (array $ranked) use ($db, $vis, $ticketId): array {
+        $ranked = array_values(array_filter($ranked, static fn($r) => (int) ($r['ticket_id'] ?? 0) > 0));
+        if (empty($ranked)) { return []; }
+        $ids   = array_map(static fn($r) => (int) $r['ticket_id'], $ranked);
+        $place = implode(',', array_fill(0, count($ids), '?'));
+
+        $params = $ids;
+        foreach ($vis['params'] as $p) { $params[] = $p; }
+        $params[] = $ticketId;
+
+        $rowStmt = $db->prepare(
+            "SELECT t.id, t.subject, t.status, t.created_at, tt.name AS type_name
+             FROM tickets t
+             LEFT JOIN ticket_types tt ON tt.id = t.type_id
+             WHERE t.id IN ({$place})
+               AND t.merged_into_ticket_id IS NULL
+               AND COALESCE(tt.is_confidential, 0) = 0
+               AND ({$vis['sql']})
+               AND t.id != ?"
+        );
+        $rowStmt->execute($params);
+        $byId = [];
+        foreach ($rowStmt->fetchAll() as $row) { $byId[(int) $row['id']] = $row; }
+
+        $out = [];
+        foreach ($ranked as $r) {
+            $tid = (int) $r['ticket_id'];
+            if (!isset($byId[$tid])) { continue; } // gone / merged / not visible now
+            $row = $byId[$tid];
+            $out[] = [
+                'ticket_id'  => $tid,
+                'subject'    => (string) $row['subject'],
+                'status'     => (string) $row['status'],
+                'created_at' => (string) $row['created_at'],
+                'type_name'  => (string) ($row['type_name'] ?? ''),
+                'relevance'  => (float) ($r['relevance'] ?? 0.0),
+                'reasoning'  => (string) ($r['reasoning'] ?? ''),
+            ];
+        }
+        return $out;
+    };
+
+    // Cache: reuse the newest run for this ticket unless a refresh is forced.
+    if (!$forceRefresh) {
+        $cStmt = $db->prepare(
+            'SELECT matches FROM ai_similarity_classifications
+             WHERE ticket_id = ? ORDER BY created_at DESC, id DESC LIMIT 1'
+        );
+        $cStmt->execute([$ticketId]);
+        $cached = $cStmt->fetchColumn();
+        if ($cached !== false) {
+            $ranked = json_decode((string) $cached, true);
+            return ['enabled' => true, 'matches' => is_array($ranked) ? $hydrate($ranked) : []];
+        }
+    }
+
+    $classifier = AIClassifierFactory::fromSettings();
+    if (!$classifier instanceof AIClassifier) { return ['enabled' => true, 'matches' => []]; }
+
+    // Stage 1 — FULLTEXT retrieval. The query is the current ticket's own
+    // subject + body; NATURAL LANGUAGE MODE ranks archive tickets by term
+    // overlap. Scope to visible, non-confidential, non-merged tickets and
+    // exclude the ticket itself. Cap at 20 candidates for the rerank prompt.
+    $query = trim($ticket['subject'] . ' ' . strip_tags((string) $ticket['description']));
+    $query = mb_substr($query, 0, 4000);
+    if (trim($query) === '') { return ['enabled' => true, 'matches' => []]; }
+
+    $params = [$query];                 // MATCH in SELECT (for the relevance score)
+    $params[] = $query;                 // MATCH in WHERE
+    foreach ($vis['params'] as $p) { $params[] = $p; }
+    $params[] = $ticketId;
+
+    $cStmt = $db->prepare(
+        "SELECT t.id, t.subject, t.description, t.status, t.created_at,
+                tt.name AS type_name,
+                MATCH(t.subject, t.description) AGAINST (? IN NATURAL LANGUAGE MODE) AS relevance
+         FROM tickets t
+         LEFT JOIN ticket_types tt ON tt.id = t.type_id
+         WHERE MATCH(t.subject, t.description) AGAINST (? IN NATURAL LANGUAGE MODE)
+           AND t.merged_into_ticket_id IS NULL
+           AND COALESCE(tt.is_confidential, 0) = 0
+           AND ({$vis['sql']})
+           AND t.id != ?
+         ORDER BY relevance DESC
+         LIMIT 20"
+    );
+    $cStmt->execute($params);
+    $candidates = $cStmt->fetchAll();
+    if (empty($candidates)) {
+        // Record the empty run so we don't re-query on every page view.
+        _logSimilarityRun($db, $ticketId, [], [], null);
+        return ['enabled' => true, 'matches' => []];
+    }
+
+    $maxTokens  = max(600, (int) getSetting('ai_max_tokens', '500'));
+    $timeoutSec = (int) getSetting('ai_timeout_seconds', '5');
+
+    try {
+        $verdict = $classifier->findSimilarTickets(
+            (string) $ticket['subject'],
+            (string) $ticket['description'],
+            array_map(static fn($c) => [
+                'id'          => (int) $c['id'],
+                'subject'     => (string) $c['subject'],
+                'description' => (string) ($c['description'] ?? ''),
+                'status'      => (string) ($c['status'] ?? ''),
+                'created_at'  => (string) ($c['created_at'] ?? ''),
+            ], $candidates),
+            $maxTokens,
+            $timeoutSec
+        );
+    } catch (\Throwable $e) {
+        error_log('[AI similar] ticket ' . $ticketId . ' failed: ' . $e->getMessage());
+        return ['enabled' => true, 'matches' => []];
+    }
+
+    // The LLM verdict is just {ticket_id, relevance, reasoning}. Persist it as
+    // the cache/audit record, then hydrate into display rows.
+    $ranked = $verdict['matches'] ?? [];
+    $candidateIds = array_map(static fn($c) => (int) $c['id'], $candidates);
+    _logSimilarityRun($db, $ticketId, $candidateIds, $ranked, $verdict);
+
+    return ['enabled' => true, 'matches' => $hydrate($ranked)];
+}
+
+/**
+ * Insert one ai_similarity_classifications audit/cache row. Never throws —
+ * a logging failure must not break the agent's ticket view.
+ */
+function _logSimilarityRun(PDO $db, int $ticketId, array $candidateIds, array $matches, ?array $verdict): void
+{
+    $providerKey = (string) getSetting('ai_provider', 'anthropic');
+    $modelKey    = $providerKey === 'anthropic'
+        ? (string) getSetting('ai_anthropic_model', 'claude-haiku-4-5')
+        : (string) getSetting('ai_openai_model',    'gpt-4o-mini');
+
+    try {
+        $db->prepare(
+            'INSERT INTO ai_similarity_classifications
+                (ticket_id, provider, model, candidate_ticket_ids, matches,
+                 raw_output, latency_ms, prompt_tokens, output_tokens)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        )->execute([
+            $ticketId,
+            $providerKey,
+            $modelKey,
+            json_encode(array_values($candidateIds), JSON_UNESCAPED_SLASHES),
+            json_encode(array_values($matches), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            json_encode($verdict['raw'] ?? null, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            (int) ($verdict['latency_ms']    ?? 0),
+            (int) ($verdict['prompt_tokens'] ?? 0),
+            (int) ($verdict['output_tokens'] ?? 0),
+        ]);
+    } catch (\Throwable $e) {
+        error_log('[AI similar] audit insert failed: ' . $e->getMessage());
+    }
+}
+
+/**
  * Fetch a small, presentation-safe view of a candidate-duplicate ticket
  * for the modal preview shown on the create form. Returns null when the
  * ticket should NOT be visible to the requesting user under the same

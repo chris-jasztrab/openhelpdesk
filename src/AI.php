@@ -84,6 +84,29 @@ interface AIClassifier
      */
     public function findDuplicates(string $subject, string $body, array $candidates, int $maxTokens, int $timeoutSec): array;
 
+    /**
+     * Rank a set of candidate PAST tickets by how useful each would be to an
+     * agent working the current ticket. Unlike findDuplicates() (which asks
+     * "is this the SAME open issue?"), this looks across resolved/closed
+     * history and surfaces related problems so the agent can see how similar
+     * issues were handled. Confidential ticket bodies are NEVER passed in.
+     *
+     * Returns:
+     *   [
+     *     'matches' => [
+     *       ['ticket_id' => int, 'relevance' => float 0..1, 'reasoning' => string],
+     *       ...
+     *     ],
+     *     'raw'           => [...],
+     *     'latency_ms'    => int,
+     *     'prompt_tokens' => int,
+     *     'output_tokens' => int,
+     *   ]
+     *
+     * @param array $candidates Each row: ['id', 'subject', 'description'|null, 'status'|null, 'created_at'|null]
+     */
+    public function findSimilarTickets(string $subject, string $body, array $candidates, int $maxTokens, int $timeoutSec): array;
+
     /** @return array{0:string,1:string}[] [[id, name], ...] from the provider catalogue */
     public function listModels(int $timeoutSec = 10): array;
 
@@ -404,6 +427,121 @@ TXT;
 
         usort($matches, static fn($a, $b) => $b['confidence'] <=> $a['confidence']);
         return array_slice($matches, 0, 3);
+    }
+
+    /**
+     * Similar-tickets system prompt. Output schema is a list of
+     * {ticket_id, relevance, reasoning} — empty list means nothing helpful.
+     */
+    protected function similarSystemPrompt(): string
+    {
+        return <<<TXT
+You are a help-desk assistant helping an agent work a ticket. Given the CURRENT ticket's subject + body and a list of PAST tickets (which may be open, resolved, or closed), pick the ones that would genuinely help the agent — because they describe the same or a closely related problem, and (if resolved) show how it was handled. Output one JSON object only — no markdown, no prose.
+
+Schema:
+{
+  "matches": [
+    {
+      "ticket_id": <int>,                   // must be one of the provided ids
+      "relevance": <float 0.0-1.0>,         // how useful this past ticket is to the agent
+      "reasoning": "<one short sentence>"   // how it relates / what to look at
+    },
+    ...
+  ]
+}
+
+Rules:
+- Include a past ticket ONLY when it shares the underlying problem, symptom, equipment, or workflow — not merely the same general topic. "Printer jamming" and "printer out of toner" are related but distinct; rank a same-symptom match far higher than a same-topic one.
+- Prefer tickets that look resolved/closed when they demonstrate a fix, but relevant open tickets are fine too.
+- Order matches by relevance, highest first. List at most 5.
+- If nothing is genuinely helpful, return an empty list — do NOT pad with weak topical matches.
+- Output JSON only.
+TXT;
+    }
+
+    protected function similarUserPrompt(string $subject, string $body, array $candidates): string
+    {
+        $subject = mb_substr(trim($subject), 0, 200);
+        $body    = mb_substr(trim(strip_tags($body)), 0, 4000);
+
+        $list = '';
+        foreach ($candidates as $c) {
+            $cid = (int) ($c['id'] ?? 0);
+            if ($cid <= 0) { continue; }
+            $cSubj   = mb_substr(trim((string) ($c['subject'] ?? '')), 0, 200);
+            $cBody   = mb_substr(trim(strip_tags((string) ($c['description'] ?? ''))), 0, 400);
+            $cStatus = trim((string) ($c['status'] ?? ''));
+            $cAge    = trim((string) ($c['created_at'] ?? ''));
+            $list   .= '- id ' . $cid;
+            $meta = [];
+            if ($cStatus !== '') { $meta[] = $cStatus; }
+            if ($cAge    !== '') { $meta[] = 'opened ' . $cAge; }
+            if ($meta) { $list .= ' (' . implode(', ', $meta) . ')'; }
+            $list .= ': ' . $cSubj;
+            if ($cBody !== '') { $list .= ' — ' . str_replace(["\n", "\r"], ' ', $cBody); }
+            $list .= "\n";
+        }
+        if ($list === '') {
+            $list = "(no candidates)\n";
+        }
+
+        return "Past candidate tickets:\n{$list}\nCURRENT ticket subject: {$subject}\n\nCURRENT ticket body:\n{$body}\n\nRespond with JSON only.";
+    }
+
+    /**
+     * Parse a provider response for similar tickets. Mirrors parseDupVerdict()
+     * but keys on `relevance` and lists up to 5.
+     *
+     * @throws SoftAIException
+     */
+    protected function parseSimilarVerdict(string $raw, array $candidateIds): array
+    {
+        $stripped = trim($raw);
+        if (preg_match('/```(?:json)?\s*([\s\S]*?)\s*```/i', $stripped, $m)) {
+            $stripped = trim($m[1]);
+        }
+        if (!str_starts_with($stripped, '{') && !str_starts_with($stripped, '[')) {
+            $start = strpos($stripped, '{');
+            $end   = strrpos($stripped, '}');
+            if ($start === false || $end === false || $end <= $start) {
+                throw new SoftAIException('AI response did not contain JSON: ' . mb_substr($raw, 0, 200));
+            }
+            $stripped = substr($stripped, $start, $end - $start + 1);
+        }
+
+        $decoded = json_decode($stripped, true);
+        if (!is_array($decoded)) {
+            throw new SoftAIException('AI JSON decode failed: ' . json_last_error_msg());
+        }
+
+        $list = [];
+        if (isset($decoded['matches']) && is_array($decoded['matches'])) {
+            $list = $decoded['matches'];
+        } elseif (array_is_list($decoded)) {
+            $list = $decoded;
+        }
+
+        $matches = [];
+        $seen    = [];
+        foreach ($list as $row) {
+            if (!is_array($row)) { continue; }
+            $tid = (int) ($row['ticket_id'] ?? $row['id'] ?? 0);
+            if ($tid <= 0 || !in_array($tid, $candidateIds, true) || isset($seen[$tid])) {
+                continue;
+            }
+            $seen[$tid] = true;
+
+            $rel = isset($row['relevance']) ? (float) $row['relevance'] : (float) ($row['confidence'] ?? 0.0);
+            if ($rel < 0.0) { $rel = 0.0; }
+            if ($rel > 1.0) { $rel = 1.0; }
+
+            $reason = isset($row['reasoning']) ? mb_substr((string) $row['reasoning'], 0, 300) : '';
+
+            $matches[] = ['ticket_id' => $tid, 'relevance' => $rel, 'reasoning' => $reason];
+        }
+
+        usort($matches, static fn($a, $b) => $b['relevance'] <=> $a['relevance']);
+        return array_slice($matches, 0, 5);
     }
 
     /**
@@ -978,6 +1116,49 @@ class AnthropicClassifier extends BaseAIClassifier
         ];
     }
 
+    public function findSimilarTickets(string $subject, string $body, array $candidates, int $maxTokens, int $timeoutSec): array
+    {
+        $candidateIds = array_map(static fn($c) => (int) $c['id'], $candidates);
+
+        $resp = $this->curlPostJson(
+            'https://api.anthropic.com/v1/messages',
+            [
+                'model'      => $this->model,
+                'max_tokens' => $maxTokens,
+                'system'     => $this->similarSystemPrompt(),
+                'messages'   => [
+                    ['role' => 'user', 'content' => $this->similarUserPrompt($subject, $body, $candidates)],
+                ],
+            ],
+            [
+                'Content-Type: application/json',
+                'x-api-key: ' . $this->apiKey,
+                'anthropic-version: 2023-06-01',
+            ],
+            $timeoutSec
+        );
+
+        $decoded = $resp['decoded'];
+        $text = '';
+        foreach (($decoded['content'] ?? []) as $block) {
+            if (($block['type'] ?? '') === 'text') {
+                $text .= $block['text'] ?? '';
+            }
+        }
+        if ($text === '') {
+            throw new SoftAIException('Anthropic returned no text content');
+        }
+
+        $matches = $this->parseSimilarVerdict($text, $candidateIds);
+        return [
+            'matches'       => $matches,
+            'raw'           => $decoded,
+            'latency_ms'    => $resp['latency_ms'],
+            'prompt_tokens' => (int) ($decoded['usage']['input_tokens']  ?? 0),
+            'output_tokens' => (int) ($decoded['usage']['output_tokens'] ?? 0),
+        ];
+    }
+
     public function chat(string $systemPrompt, string $userPrompt, int $maxTokens, int $timeoutSec): string
     {
         $resp = $this->curlPostJson(
@@ -1163,6 +1344,45 @@ class OpenAIClassifier extends BaseAIClassifier
         }
 
         $matches = $this->parseDupVerdict($text, $candidateIds);
+        return [
+            'matches'       => $matches,
+            'raw'           => $decoded,
+            'latency_ms'    => $resp['latency_ms'],
+            'prompt_tokens' => (int) ($decoded['usage']['prompt_tokens']     ?? 0),
+            'output_tokens' => (int) ($decoded['usage']['completion_tokens'] ?? 0),
+        ];
+    }
+
+    public function findSimilarTickets(string $subject, string $body, array $candidates, int $maxTokens, int $timeoutSec): array
+    {
+        $candidateIds = array_map(static fn($c) => (int) $c['id'], $candidates);
+
+        $resp = $this->curlPostJson(
+            'https://api.openai.com/v1/chat/completions',
+            [
+                'model' => $this->model,
+                'messages' => [
+                    ['role' => 'system', 'content' => $this->similarSystemPrompt()],
+                    ['role' => 'user',   'content' => $this->similarUserPrompt($subject, $body, $candidates)],
+                ],
+                'max_tokens'      => $maxTokens,
+                'response_format' => ['type' => 'json_object'],
+                'temperature'     => 0.0,
+            ],
+            [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $this->apiKey,
+            ],
+            $timeoutSec
+        );
+
+        $decoded = $resp['decoded'];
+        $text = (string) ($decoded['choices'][0]['message']['content'] ?? '');
+        if ($text === '') {
+            throw new SoftAIException('OpenAI returned no message content');
+        }
+
+        $matches = $this->parseSimilarVerdict($text, $candidateIds);
         return [
             'matches'       => $matches,
             'raw'           => $decoded,

@@ -219,6 +219,26 @@ $resolutionClosedSlugs  = ticketClosedBucketSlugs();
             </div>
         </div>
 
+        <?php if (!empty($similarEnabled)): ?>
+        <!-- Similar past tickets (AI) — populated async from /agent/tickets/{id}/similar -->
+        <div class="card border-0 shadow-sm mb-4" id="similarTicketsCard"
+             data-ticket-id="<?= (int) $ticket['id'] ?>"
+             data-status-labels="<?= e(json_encode($statusLabels)) ?>">
+            <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between">
+                <h5 class="mb-0 fw-semibold"><i class="bi bi-stars me-2 text-primary"></i>Similar past tickets</h5>
+                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" id="similarRefreshBtn" title="Re-run the search">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </button>
+            </div>
+            <div class="card-body" id="similarTicketsBody">
+                <div class="text-muted small d-flex align-items-center gap-2" id="similarLoading">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    Searching ticket history…
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+
         <?php
         // Split attachments: those linked to a timeline entry render inline; others show here
         $attachmentsByTimeline = [];
@@ -2468,3 +2488,77 @@ ClassicEditor.create(document.querySelector('#replyEditor'), {
     window.addEventListener('resize', closeMenu);
 })();
 </script>
+
+<?php if (!empty($similarEnabled)): ?>
+<script>
+// Similar past tickets — async fetch + render so the LLM rerank never blocks
+// the ticket page. The endpoint caches per ticket; the refresh button forces
+// a recompute.
+(function () {
+    var card = document.getElementById('similarTicketsCard');
+    if (!card) { return; }
+    var body     = document.getElementById('similarTicketsBody');
+    var ticketId = card.dataset.ticketId;
+    var labels   = {};
+    try { labels = JSON.parse(card.dataset.statusLabels || '{}'); } catch (_) {}
+
+    var esc = function (s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    };
+
+    function render(matches) {
+        if (!matches || !matches.length) {
+            body.innerHTML = '<div class="text-muted small">No similar past tickets found.</div>';
+            return;
+        }
+        var html = '<div class="list-group list-group-flush">';
+        matches.forEach(function (m) {
+            var status = labels[m.status] || m.status || '';
+            var when   = (m.created_at || '').slice(0, 10);
+            var pct    = Math.round((parseFloat(m.relevance) || 0) * 100);
+            html += '<a href="/agent/tickets/' + encodeURIComponent(m.ticket_id) + '" '
+                 +  'class="list-group-item list-group-item-action px-0">'
+                 +    '<div class="d-flex justify-content-between align-items-start gap-2">'
+                 +      '<span class="fw-semibold">#' + esc(m.ticket_id) + ' · ' + esc(m.subject) + '</span>'
+                 +      '<span class="badge bg-primary bg-opacity-10 text-primary flex-shrink-0">' + pct + '%</span>'
+                 +    '</div>'
+                 +    (m.reasoning ? '<div class="small text-muted mt-1">' + esc(m.reasoning) + '</div>' : '')
+                 +    '<div class="small text-muted mt-1">'
+                 +      (status ? '<span class="me-2">' + esc(status) + '</span>' : '')
+                 +      (when ? '<span>' + esc(when) + '</span>' : '')
+                 +    '</div>'
+                 +  '</a>';
+        });
+        html += '</div>';
+        body.innerHTML = html;
+    }
+
+    function load(force) {
+        body.innerHTML = '<div class="text-muted small d-flex align-items-center gap-2">'
+            + '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>'
+            + (force ? 'Re-running search…' : 'Searching ticket history…') + '</div>';
+        var url = '/agent/tickets/' + encodeURIComponent(ticketId) + '/similar' + (force ? '?refresh=1' : '');
+        fetch(url, { headers: { 'Accept': 'application/json' } })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (!data || !data.ok || !data.enabled) {
+                    body.innerHTML = '<div class="text-muted small">Similar-ticket search is unavailable.</div>';
+                    return;
+                }
+                render(data.matches);
+            })
+            .catch(function () {
+                body.innerHTML = '<div class="text-danger small">Could not load similar tickets.</div>';
+            });
+    }
+
+    var refreshBtn = document.getElementById('similarRefreshBtn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', function () { load(true); });
+    }
+    load(false);
+})();
+</script>
+<?php endif; ?>

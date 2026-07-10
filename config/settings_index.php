@@ -456,6 +456,11 @@ return [
      'section' => 'OpenAI Credentials', 'anchor' => 'ai_openai_model',
      'keywords' => 'openai model gpt 4o turbo'],
 
+    ['label' => 'Similar Past Tickets',         'description' => 'Show agents historical tickets like the one they are working',
+     'group' => 'Automation', 'page_label' => 'AI Classification', 'page_url' => '/admin/settings/ai',
+     'section' => 'Routing & Tuning', 'anchor' => 'ai_similar_enabled',
+     'keywords' => 'similar past tickets history semantic search related duplicate rag agent assist suggestions resolved'],
+
     // =======================================================================
     // Stale Tickets  (/admin/settings/stale-tickets)
     // =======================================================================

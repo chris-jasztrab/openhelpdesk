@@ -790,6 +790,44 @@ $router->post('/agent/tickets/check-duplicates', function () {
     exit;
 });
 
+// "Similar past tickets" agent assist. Fetched async by the ticket view so the
+// LLM rerank never blocks page render. Result is cached per ticket in
+// ai_similarity_classifications; ?refresh=1 forces a recompute.
+$router->get('/agent/tickets/{id}/similar', function (array $p) {
+    Auth::requireStaff();
+    header('Content-Type: application/json');
+
+    $db       = Database::connect();
+    $ticketId = (int) ($p['id'] ?? 0);
+    $viewerId = (int) Auth::id();
+
+    // Confirm the viewer may see this ticket before spending an LLM call on it.
+    // Admins see all; everyone else must pass staff visibility. (Confidential
+    // ticket bodies are excluded inside findSimilarPastTickets regardless.)
+    if (!Auth::isAdmin()) {
+        $roleStmt = $db->prepare('SELECT role FROM users WHERE id = ?');
+        $roleStmt->execute([$viewerId]);
+        $vis    = ticketStaffVisibilitySql($db, $viewerId, $roleStmt->fetchColumn() ?: null, 't');
+        $params = array_merge([$ticketId], $vis['params']);
+        $chk    = $db->prepare("SELECT 1 FROM tickets t WHERE t.id = ? AND ({$vis['sql']}) LIMIT 1");
+        $chk->execute($params);
+        if ($chk->fetchColumn() === false) {
+            http_response_code(403);
+            echo json_encode(['ok' => false, 'enabled' => false, 'matches' => []]);
+            exit;
+        }
+    }
+
+    $force  = ($_GET['refresh'] ?? '') === '1';
+    $result = findSimilarPastTickets($ticketId, $viewerId, $force);
+    echo json_encode([
+        'ok'      => true,
+        'enabled' => $result['enabled'],
+        'matches' => $result['matches'],
+    ]);
+    exit;
+});
+
 $router->get('/agent/tickets/create', function () {
     Auth::requireStaff();
     $db         = Database::connect();
@@ -1392,7 +1430,14 @@ $router->get('/agent/tickets/{id}', function (array $p) {
     $csatStmt->execute([$ticket['id']]);
     $csat = $csatStmt->fetch() ?: null;
 
-    render('agent/tickets/view', ['ticket' => $ticket, 'timeline' => $timeline, 'agents' => $agents, 'assignableByGroup' => $assignableByGroup, 'priorities' => $priorities, 'ticketTypes' => $ticketTypes, 'attachments' => $attachments, 'ccUsers' => $ccUsers, 'groups' => $groups, 'customFields' => $customFields, 'fieldValues' => $fieldValues, 'fieldOptions' => $fieldOptions, 'isWatching' => $isWatching, 'isConfidential' => $isConfidential, 'escalationHistory' => $escalationHistory, 'hasEscalationPath' => $hasEscalationPath, 'nextEscalationStep' => $nextEscalationStep, 'fromFloor' => $fromFloor, 'embedMode' => $fromFloor, 'csat' => $csat]);
+    // "Similar past tickets" agent assist — only when the feature is on and
+    // this ticket is eligible (non-confidential). The panel fetches results
+    // async so the LLM rerank never blocks the ticket page render.
+    $similarEnabled = getSetting('ai_enabled', '0') === '1'
+        && getSetting('ai_similar_enabled', '0') === '1'
+        && !$isConfidential;
+
+    render('agent/tickets/view', ['ticket' => $ticket, 'timeline' => $timeline, 'agents' => $agents, 'assignableByGroup' => $assignableByGroup, 'priorities' => $priorities, 'ticketTypes' => $ticketTypes, 'attachments' => $attachments, 'ccUsers' => $ccUsers, 'groups' => $groups, 'customFields' => $customFields, 'fieldValues' => $fieldValues, 'fieldOptions' => $fieldOptions, 'isWatching' => $isWatching, 'isConfidential' => $isConfidential, 'escalationHistory' => $escalationHistory, 'hasEscalationPath' => $hasEscalationPath, 'nextEscalationStep' => $nextEscalationStep, 'fromFloor' => $fromFloor, 'embedMode' => $fromFloor, 'csat' => $csat, 'similarEnabled' => $similarEnabled]);
 });
 
 /* ==================================================================

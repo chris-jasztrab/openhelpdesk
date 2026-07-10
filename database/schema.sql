@@ -91,6 +91,23 @@ CREATE TABLE IF NOT EXISTS `ai_duplicate_classifications` (
   CONSTRAINT `ai_duplicate_classifications_ibfk_3` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`) ON DELETE SET NULL,
   CONSTRAINT `ai_duplicate_classifications_ibfk_4` FOREIGN KEY (`chosen_ticket_id`) REFERENCES `tickets` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS `ai_similarity_classifications` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `ticket_id` int(10) unsigned NOT NULL,
+  `provider` varchar(32) NOT NULL,
+  `model` varchar(128) NOT NULL,
+  `candidate_ticket_ids` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL CHECK (json_valid(`candidate_ticket_ids`)),
+  `matches` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL CHECK (json_valid(`matches`)),
+  `raw_output` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`raw_output`)),
+  `latency_ms` int(10) unsigned DEFAULT NULL,
+  `prompt_tokens` int(10) unsigned DEFAULT NULL,
+  `output_tokens` int(10) unsigned DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_ticket` (`ticket_id`),
+  KEY `idx_created` (`created_at`),
+  CONSTRAINT `ai_similarity_classifications_ibfk_1` FOREIGN KEY (`ticket_id`) REFERENCES `tickets` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE IF NOT EXISTS `ai_group_classifications` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `ticket_id` int(10) unsigned NOT NULL,
@@ -809,6 +826,7 @@ CREATE TABLE IF NOT EXISTS `tickets` (
   KEY `idx_ai_sentiment` (`ai_sentiment`),
   KEY `idx_tickets_submitted_by` (`submitted_by`),
   KEY `fk_tickets_ai_group_classification` (`ai_group_classification_id`),
+  FULLTEXT KEY `ft_tickets_subject_description` (`subject`,`description`),
   CONSTRAINT `fk_tickets_ai_classification` FOREIGN KEY (`ai_classification_id`) REFERENCES `ai_classifications` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_tickets_ai_group_classification` FOREIGN KEY (`ai_group_classification_id`) REFERENCES `ai_group_classifications` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_tickets_solution_timeline` FOREIGN KEY (`solution_timeline_id`) REFERENCES `ticket_timeline` (`id`) ON DELETE SET NULL,

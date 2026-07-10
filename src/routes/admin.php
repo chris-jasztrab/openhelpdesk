@@ -232,6 +232,7 @@ $router->get('/admin/settings/ai', function () {
         'aiTimeoutSeconds'         => getSetting('ai_timeout_seconds', '5'),
         'aiSentimentPriorityBump'  => getSetting('ai_sentiment_priority_bump', '1'),
         'aiClassifyInboundEmail'   => getSetting('ai_classify_inbound_email', '1'),
+        'aiSimilarEnabled'         => getSetting('ai_similar_enabled', '0'),
         'recent'                   => $recent,
     ]);
 });
@@ -254,6 +255,7 @@ $router->post('/admin/settings/ai', function () {
     $timeout         = (int)   ($_POST['ai_timeout_seconds'] ?? '5');
     $sentimentBump   = isset($_POST['ai_sentiment_priority_bump']) ? '1' : '0';
     $classifyInbound = isset($_POST['ai_classify_inbound_email']) ? '1' : '0';
+    $similarEnabled  = isset($_POST['ai_similar_enabled']) ? '1' : '0';
 
     if ($threshold < 0.0) { $threshold = 0.0; }
     if ($threshold > 1.0) { $threshold = 1.0; }
@@ -282,6 +284,7 @@ $router->post('/admin/settings/ai', function () {
     setSetting('ai_timeout_seconds',         (string) $timeout);
     setSetting('ai_sentiment_priority_bump', $sentimentBump);
     setSetting('ai_classify_inbound_email',  $classifyInbound);
+    setSetting('ai_similar_enabled',         $similarEnabled);
 
     // Only overwrite a key if the admin provided a new value
     if ($anthropicKey !== '') { setSetting('ai_anthropic_api_key', $anthropicKey); }
