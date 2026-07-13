@@ -61,9 +61,19 @@ $_agentTourCanTemplates = Auth::can('ticket_templates.manage') ? 'true' : 'false
     var _nativeScrollIntoView = Element.prototype.scrollIntoView;
     var _slowScrollRAF = null;
     function _easeInOutQuad(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+    // Keep the popover out of sight while the page is gliding. Otherwise Driver
+    // shows the next step's instruction mid-scroll and it visibly slides up as
+    // the page settles — which reads as if a step was skipped. We reveal it only
+    // once the page has arrived, so the sequence is: scroll to the section, THEN
+    // show the instruction.
+    function _setPopoverHidden(hidden) {
+        var p = document.querySelector('.driver-popover');
+        if (p) p.style.visibility = hidden ? 'hidden' : '';
+    }
     function slowScrollIntoView(opts) {
         var el = this;
         if (_slowScrollRAF) { cancelAnimationFrame(_slowScrollRAF); _slowScrollRAF = null; }
+        _setPopoverHidden(false);   // clear any leftover hide from an interrupted scroll
         var vh    = window.innerHeight || document.documentElement.clientHeight;
         var rect  = el.getBoundingClientRect();
         var startY = window.pageYOffset || document.documentElement.scrollTop || 0;
@@ -82,8 +92,14 @@ $_agentTourCanTemplates = Auth::can('ticket_templates.manage') ? 'true' : 'false
         function frame(ts) {
             if (t0 === null) t0 = ts;
             var p = Math.min(1, (ts - t0) / duration);
+            _setPopoverHidden(true);   // keep it hidden while the page moves
             window.scrollTo(0, startY + dist * _easeInOutQuad(p));
-            _slowScrollRAF = (p < 1) ? requestAnimationFrame(frame) : null;
+            if (p < 1) {
+                _slowScrollRAF = requestAnimationFrame(frame);
+            } else {
+                _slowScrollRAF = null;
+                _setPopoverHidden(false);   // arrived — now reveal the instruction
+            }
         }
         _slowScrollRAF = requestAnimationFrame(frame);
     }
@@ -91,6 +107,7 @@ $_agentTourCanTemplates = Auth::can('ticket_templates.manage') ? 'true' : 'false
     function disableSlowScroll() {
         Element.prototype.scrollIntoView = _nativeScrollIntoView;
         if (_slowScrollRAF) { cancelAnimationFrame(_slowScrollRAF); _slowScrollRAF = null; }
+        _setPopoverHidden(false);
     }
 
     // ── Step definitions ────────────────────────────────────────────

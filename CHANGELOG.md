@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.148.5 &mdash; 2026-07-13
+
+### Fixed
+- **Tour no longer shows the next instruction mid-scroll.** After the slow-scroll change (2.148.4), advancing to a step lower on the page (e.g. <em>My Location</em> &rarr; <em>Your Requests</em> on the portal <em>My Requests</em> page) showed the next popover <em>immediately</em>, then visibly slid it up as the page glided down &mdash; which looked like a step had been skipped. The popover is now held hidden for the duration of the scroll and revealed only once the page has settled, so the sequence reads cleanly: the page scrolls to the section, <em>then</em> the instruction appears. Applies to both the portal and agent walkthroughs.
+
 ## 2.148.4 &mdash; 2026-07-13
 
 ### Changed
