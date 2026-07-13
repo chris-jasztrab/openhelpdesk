@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.149.2 &mdash; 2026-07-13
+
+### Documentation
+- **Documented the "similar past tickets" feature.** Added a full <strong>Similar Past Tickets</strong> section to the in-app AI docs (<strong>Admin → Docs → AI Classification</strong>, anchor <code>#similar-tickets</code>) covering the two-stage FULLTEXT-then-LLM pipeline, per-ticket caching, and the global-master-plus-per-type controls (including that the master switch overrides per-type and that confidential types are always excluded). Added a matching bullet to the readme's AI Features list and a per-type field row to the ticket-type table in <code>DOCS.md</code>.
+
 ## 2.149.1 &mdash; 2026-07-13
 
 ### Changed

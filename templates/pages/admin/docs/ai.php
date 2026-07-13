@@ -87,6 +87,33 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 </div>
 </div>
 
+<div class="card border-0 shadow-sm mb-4" id="similar-tickets">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-diagram-3 text-info me-2"></i>Similar Past Tickets</h5>
+<p class="text-muted mb-3">Duplicate detection (above) fires at <em>submit</em> time and looks only at recent open tickets. <strong>Similar past tickets</strong> is the agent-facing counterpart: when an agent or admin <em>opens</em> a ticket, a sidebar panel surfaces the most relevant tickets from the <em>whole</em> archive — including resolved and closed ones — so they can reuse an earlier fix instead of solving the same problem from scratch.</p>
+
+<h6 class="fw-semibold mt-3 mb-2">How it works</h6>
+<ol class="text-muted mb-3">
+    <li>The panel loads <strong>asynchronously</strong> after the ticket page renders, so the AI call never blocks the page.</li>
+    <li><strong>Stage 1 — retrieval (no API call).</strong> A MySQL <code>FULLTEXT</code> index on <code>tickets(subject, description)</code> narrows the archive to roughly the 20 most lexically-similar candidates.</li>
+    <li><strong>Stage 2 — rerank.</strong> Those candidates go to the configured provider, which scores each for relevance and writes a one-line note on how it relates. Results are scoped to what the viewing agent is allowed to see.</li>
+    <li>The result is cached per ticket in <code>ai_similarity_classifications</code>, so the LLM runs <strong>once per ticket</strong>, not once per page view. A refresh button forces a recompute.</li>
+</ol>
+
+<h6 class="fw-semibold mt-3 mb-2">Turning it on — a global switch <em>and</em> a per-type switch</h6>
+<p class="text-muted mb-2">The feature has two independent controls that work together:</p>
+<ul class="text-muted mb-3">
+    <li><strong>Global master switch</strong> — <a href="/admin/settings/ai"><strong>Admin → Settings → AI Classification</strong></a> → <strong>"Show similar past tickets to agents"</strong>. This is the master: while it's <strong>off</strong>, the panel is hidden on <em>every</em> ticket regardless of any per-type setting.</li>
+    <li><strong>Per-ticket-type toggle</strong> — edit a type at <a href="/admin/types"><strong>Admin → Settings → Ticket Types</strong></a> → <strong>"Show similar past tickets to agents"</strong>. When the master switch is on, the panel appears only on the ticket types whose own toggle is also on. New types default to <strong>on</strong>.</li>
+</ul>
+<p class="text-muted mb-3">So the effective rule is <strong>master ON <em>and</em> per-type ON <em>and</em> not confidential</strong>. The AI settings page shows a live summary of exactly which types have it on, which are off, and which are excluded as confidential — and updates as you flip the master switch, before you save. The toggle auto-disables when a type is marked <strong>Confidential</strong> — mirroring duplicate detection and "No Wrong Door" routing. The <a href="/admin/types/matrix">Ticket Types settings matrix</a> gains an <strong>AI similar tickets</strong> column so you can see every type's setting at a glance.</p>
+
+<div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
+    Confidential ticket types are <strong>never</strong> scanned and never appear as candidate matches — the same guarantee as duplicate detection. Like the other AI features it soft-fails: if the provider errors or times out, the panel simply shows nothing; the ticket page is unaffected.
+</div>
+</div>
+</div>
+
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-shield-lock text-success me-2"></i>Privacy &amp; Confidential Tickets</h5>
