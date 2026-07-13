@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.148.2 &mdash; 2026-07-13
+
+### Fixed
+- **Credits roll now plays its music again on the dev server.** The credits page (<code>/credits</code>, the local-only tester thank-you roll) served its music bed from a route ending in <code>.mp3</code> (<code>/credits/audio.mp3</code>). PHP's built-in dev server (<code>php -S</code>) intercepts URLs ending in a known media extension and answers them itself &mdash; returning its own 404 without ever invoking <code>index.php</code> &mdash; so the audio route could never reach the router and the names rolled in silence. The route is now extensionless (<code>/credits/audio</code>); the browser still plays it because the handler sends an explicit <code>Content-Type: audio/mpeg</code> header. Works under both <code>php -S</code> and Apache. Names-only, no functional change to the roll itself.
+
 ## 2.148.1 &mdash; 2026-07-13
 
 ### Changed
