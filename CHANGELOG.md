@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.150.0 &mdash; 2026-07-13
+
+### Changed
+- **Clicking an actor's name in the audit log now filters the log to that person.** Previously the name linked out to the user's open tickets, which isn't useful when auditing. It now links to <code>/admin/audit-log?user_id=&lt;id&gt;</code>, showing every action that user has taken across both the audit log and ticket-timeline sources.
+
 ## 2.149.2 &mdash; 2026-07-13
 
 ### Documentation

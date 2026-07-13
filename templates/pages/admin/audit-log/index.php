@@ -247,7 +247,9 @@ function auditBadge(string $action, array $colors): string {
                         </td>
                         <td>
                             <?php if ($entry['user_id']): ?>
-                                <a href="/admin/users/<?= $entry['user_id'] ?>" class="text-decoration-none fw-semibold">
+                                <a href="/admin/audit-log?user_id=<?= $entry['user_id'] ?>"
+                                   class="text-decoration-none fw-semibold"
+                                   title="Filter the audit log to <?= e($entry['actor_name']) ?>">
                                     <?= e($entry['actor_name']) ?>
                                 </a>
                             <?php else: ?>
