@@ -3274,6 +3274,26 @@ function emailContent(string $content): string
  */
 function sendMail(string $toEmail, string $toName, string $subject, string $htmlBody, string $textBody = '', ?int $ticketId = null, array $attachments = [], bool $transactional = false): string|false
 {
+    // ==== DEMO BUILD: OUTBOUND MAIL PHYSICALLY DISABLED ====================
+    // This is the public internet-facing demo server (openhelpdesk.wpl.ca).
+    // Mail is crippled here UNCONDITIONALLY — above every env/settings check —
+    // so NO configuration change (MAIL_ENABLED, MAIL_TRANSACTIONAL_ENABLED, an
+    // admin toggle, or an .env edit) can ever cause this instance to deliver
+    // mail. Nothing downstream (SMTP transport, PHPMailer) is ever constructed.
+    // This lives only on the `demo` branch; `main` retains full mail capability.
+    // Do NOT remove — it is the code-level half of a defense-in-depth block
+    // (the other halves are MAIL_ENABLED=false and a firewall block on 25/465/587).
+    if (is_dir(ROOT_DIR . '/storage/logs')) {
+        file_put_contents(
+            ROOT_DIR . '/storage/logs/smtp.log',
+            sprintf("[%s] sendMail() BLOCKED (demo build — mail disabled in code) — to=%s subject=%s\n",
+                date('Y-m-d H:i:s'), $toEmail, $subject),
+            FILE_APPEND | LOCK_EX
+        );
+    }
+    return false;
+    // ======================================================================
+
     // Outbound-mail kill switch. Dev and test instances set MAIL_ENABLED=false
     // in .env so running the suite (or local dev) never delivers real mail to
     // real recipients — the helpdesk DB carries live SMTP credentials, so a
