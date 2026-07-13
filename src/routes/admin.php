@@ -4942,8 +4942,27 @@ $router->get('/admin/tickets/{id}', function (array $p) {
         'aiClassification' => $aiClassification, 'aiSkillsForOverride' => $aiSkillsForOverride,
         'aiGroupClassification' => $aiGroupClassification,
         'aiEnabled' => getSetting('ai_enabled', '0') === '1',
+        'similarEnabled' => getSetting('ai_enabled', '0') === '1'
+            && getSetting('ai_similar_enabled', '0') === '1'
+            && !$isConfidential,
         'csat' => $csat,
     ]);
+});
+
+// "Similar past tickets" agent assist for the admin ticket view. Mirrors the
+// agent endpoint; admins bypass ticket visibility (findSimilarPastTickets still
+// scopes candidate matches and skips confidential types).
+$router->get('/admin/tickets/{id}/similar', function (array $p) {
+    Auth::requireAdmin();
+    header('Content-Type: application/json');
+
+    $result = findSimilarPastTickets((int) ($p['id'] ?? 0), (int) Auth::id(), ($_GET['refresh'] ?? '') === '1');
+    echo json_encode([
+        'ok'      => true,
+        'enabled' => $result['enabled'],
+        'matches' => $result['matches'],
+    ]);
+    exit;
 });
 
 /* ==================================================================

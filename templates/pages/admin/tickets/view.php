@@ -167,6 +167,27 @@ $resolutionClosedSlugs  = ticketClosedBucketSlugs();
             </div>
         </div>
 
+        <?php if (!empty($similarEnabled)): ?>
+        <!-- Similar past tickets (AI) — populated async from /admin/tickets/{id}/similar -->
+        <div class="card border-0 shadow-sm mb-4" id="similarTicketsCard"
+             data-ticket-id="<?= (int) $ticket['id'] ?>"
+             data-similar-url="/admin/tickets/<?= (int) $ticket['id'] ?>/similar"
+             data-status-labels="<?= e(json_encode($statusLabels)) ?>">
+            <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between">
+                <h5 class="mb-0 fw-semibold"><i class="bi bi-stars me-2 text-primary"></i>Similar past tickets</h5>
+                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" id="similarRefreshBtn" title="Re-run the search">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </button>
+            </div>
+            <div class="card-body" id="similarTicketsBody">
+                <div class="text-muted small d-flex align-items-center gap-2" id="similarLoading">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    Searching ticket history…
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+
         <?php
         // Split attachments: those linked to a timeline entry render inline; others show here
         $attachmentsByTimeline = [];
@@ -2031,6 +2052,9 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
 
 <script src="/assets/js/ticket-draft.js"></script>
 <script src="/assets/js/undo-send.js"></script>
+<?php if (!empty($similarEnabled)): ?>
+<script src="/assets/js/similar-tickets.js"></script>
+<?php endif; ?>
 <script type="module">
 import {
     ClassicEditor,
