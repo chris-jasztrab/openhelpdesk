@@ -260,8 +260,83 @@ $sentimentColors = [
                 <label class="form-check-label" for="ai_similar_enabled">
                     Show <strong>similar past tickets</strong> to agents on the ticket view
                 </label>
-                <div class="form-text">When an agent opens a ticket, search the whole ticket history for tickets describing the same or a related problem (including resolved and closed ones) and list them with an AI note on how each relates. Confidential ticket types are never sent to the provider. Runs once per ticket and is cached. This is the master switch; you can also turn the panel off for individual ticket types under <a href="/admin/types">Admin → Ticket Types</a>.</div>
+                <div class="form-text">When an agent opens a ticket, search the whole ticket history for tickets describing the same or a related problem (including resolved and closed ones) and list them with an AI note on how each relates. Confidential ticket types are never sent to the provider. Runs once per ticket and is cached.</div>
             </div>
+
+            <?php
+                $similarTypes    = $similarTypes ?? [];
+                $enabledTypes    = array_values(array_filter($similarTypes, static fn($t) => (int) $t['ai_similar_check_enabled'] === 1 && (int) $t['is_confidential'] === 0));
+                $suppressedTypes = array_values(array_filter($similarTypes, static fn($t) => (int) $t['ai_similar_check_enabled'] !== 1 && (int) $t['is_confidential'] === 0));
+                $confidentialTypes = array_values(array_filter($similarTypes, static fn($t) => (int) $t['is_confidential'] === 1));
+            ?>
+            <div class="border rounded p-3 mt-2 mb-0 ms-4 small bg-body-tertiary" id="ld-similar-scope" data-saved-on="<?= $aiSimilarEnabled === '1' ? '1' : '0' ?>">
+                <div class="mb-2">
+                    <i class="bi bi-info-circle-fill me-1" aria-hidden="true"></i>
+                    <strong>This master switch overrides the per-type settings.</strong>
+                    When it's <strong>off</strong>, the panel is hidden on <em>every</em> ticket no matter how individual ticket
+                    types are set. When it's <strong>on</strong>, the panel shows only on ticket types that <em>also</em> have
+                    <a href="/admin/types">their own "Show similar past tickets" toggle</a> switched on. Confidential types are
+                    always excluded.
+                </div>
+
+                <!-- Live state banner — JS keeps this in sync with the switch above, before you save. -->
+                <div id="ld-similar-state" class="rounded px-2 py-2 mb-2 fw-semibold"></div>
+
+                <?php if (empty($similarTypes)): ?>
+                    <div class="text-muted">No ticket types are configured yet.</div>
+                <?php else: ?>
+                    <div class="mb-1">
+                        <i class="bi bi-check-circle-fill text-success me-1"></i>
+                        <strong>Per-type toggle ON (<?= count($enabledTypes) ?>):</strong>
+                        <?= $enabledTypes ? implode(', ', array_map(static fn($t) => e($t['name']), $enabledTypes)) : '<span class="text-muted fw-normal">none</span>' ?>
+                    </div>
+                    <?php if ($suppressedTypes): ?>
+                    <div class="mb-1 text-muted">
+                        <i class="bi bi-slash-circle me-1"></i>
+                        <strong class="fw-semibold">Per-type toggle OFF (<?= count($suppressedTypes) ?>):</strong>
+                        <?= implode(', ', array_map(static fn($t) => e($t['name']), $suppressedTypes)) ?>
+                    </div>
+                    <?php endif; ?>
+                    <?php if ($confidentialTypes): ?>
+                    <div class="mb-1 text-muted">
+                        <i class="bi bi-shield-lock me-1"></i>
+                        <strong class="fw-semibold">Always excluded — confidential (<?= count($confidentialTypes) ?>):</strong>
+                        <?= implode(', ', array_map(static fn($t) => e($t['name']), $confidentialTypes)) ?>
+                    </div>
+                    <?php endif; ?>
+                <?php endif; ?>
+
+                <div class="mt-2">
+                    <a href="/admin/types" class="fw-semibold">Manage per-type settings →</a>
+                </div>
+            </div>
+            <script>
+            (function () {
+                var sw    = document.getElementById('ai_similar_enabled');
+                var box   = document.getElementById('ld-similar-scope');
+                var state = document.getElementById('ld-similar-state');
+                if (!sw || !box || !state) return;
+                var enabledCount = <?= count($enabledTypes) ?>;
+                var savedOn      = box.getAttribute('data-saved-on') === '1';
+                function render() {
+                    var on      = sw.checked;
+                    var changed = (on !== savedOn);
+                    var unsaved = changed ? ' <span class="fw-normal fst-italic">(unsaved — click “Save settings” to apply)</span>' : '';
+                    if (on) {
+                        state.className = 'rounded px-2 py-2 mb-2 fw-semibold text-success-emphasis bg-success-subtle';
+                        state.innerHTML = '<i class="bi bi-eye me-1"></i>ON — the panel will show on the <strong>' +
+                            enabledCount + '</strong> ticket type' + (enabledCount === 1 ? '' : 's') +
+                            ' listed below with their per-type toggle on.' + unsaved;
+                    } else {
+                        state.className = 'rounded px-2 py-2 mb-2 fw-semibold text-secondary-emphasis bg-secondary-subtle';
+                        state.innerHTML = '<i class="bi bi-eye-slash me-1"></i>OFF — the panel is hidden on <strong>every</strong> ' +
+                            'ticket. Per-type toggles below are ignored until this is turned back on.' + unsaved;
+                    }
+                }
+                sw.addEventListener('change', render);
+                render();
+            })();
+            </script>
         </div>
     </div>
 

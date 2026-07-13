@@ -216,6 +216,13 @@ $router->get('/admin/settings/ai', function () {
          LIMIT 10"
     )->fetchAll();
 
+    // Per-type breakdown for the "similar past tickets" master switch, so the
+    // admin can see exactly which types the panel will (and won't) appear on.
+    $similarTypes = $db->query(
+        'SELECT name, is_confidential, ai_similar_check_enabled
+         FROM ticket_types ORDER BY sort_order, name'
+    )->fetchAll();
+
     render('admin/settings/ai', [
         'aiEnabled'                => getSetting('ai_enabled', '0'),
         'aiProvider'               => getSetting('ai_provider', 'anthropic'),
@@ -233,6 +240,7 @@ $router->get('/admin/settings/ai', function () {
         'aiSentimentPriorityBump'  => getSetting('ai_sentiment_priority_bump', '1'),
         'aiClassifyInboundEmail'   => getSetting('ai_classify_inbound_email', '1'),
         'aiSimilarEnabled'         => getSetting('ai_similar_enabled', '0'),
+        'similarTypes'             => $similarTypes,
         'recent'                   => $recent,
     ]);
 });

@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.149.1 &mdash; 2026-07-13
+
+### Changed
+- **The similar-tickets master switch now explains its relationship to the per-type toggles and shows the current scope.** On <strong>Admin &rarr; Settings &rarr; AI Classification</strong>, the global "Show similar past tickets" switch now carries a panel that spells out that it <em>overrides</em> the per-type settings (off = hidden on every ticket regardless of type; on = shows only on types whose own toggle is on), and lists exactly which ticket types have their per-type toggle <strong>on</strong>, which have it <strong>off</strong>, and which are always excluded because they're confidential. A live banner updates as the admin flips the switch — before saving — so it's clear the master switch wins, with an "unsaved" hint until they click Save.
+
 ## 2.149.0 &mdash; 2026-07-13
 
 ### Added
