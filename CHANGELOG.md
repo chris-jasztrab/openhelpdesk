@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.150.1 &mdash; 2026-07-13
+
+### Fixed
+- **Confidential ticket contents no longer leak into group notification emails.** Creating a confidential ticket previously emailed its full subject and description to every member of every group with "notify on new ticket" enabled — including people outside the confidential group who cannot otherwise see the ticket — and assigning a confidential ticket to a group emailed its body to that group's members. Both <code>notifyGroupMembers()</code> (creation) and <code>notifyAssignedGroup()</code> (assignment) now restrict recipients to members of the confidential type's group and redact the subject to <code>[Confidential ticket]</code> with a bare "open the ticket to view it" link instead of the body, mirroring the redaction already applied in the in-app notification feed. The in-app "new ticket" alert on these paths is likewise limited to confidential-group members.
+
 ## 2.150.0 &mdash; 2026-07-13
 
 ### Changed
