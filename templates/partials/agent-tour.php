@@ -51,6 +51,53 @@ $_agentTourCanTemplates = Auth::can('ticket_templates.manage') ? 'true' : 'false
         }).catch(function () {});
     }
 
+    // ── Scroll cue ──────────────────────────────────────────────────────
+    // Driver.js scrolls the page to each step, but its smooth scroll is often
+    // fast enough that the user's eye stays on the popover and never registers
+    // that the page MOVED. When a step is far enough off-screen to need a real
+    // jump, show a brief "↓ Scrolling down…" pill so the movement is explicit.
+    function ensureCueStyles() {
+        if (document.getElementById('ld-tour-cue-style')) return;
+        var s = document.createElement('style');
+        s.id = 'ld-tour-cue-style';
+        s.textContent = '@keyframes ld-tour-bob{0%,100%{transform:translateY(-3px)}50%{transform:translateY(3px)}}';
+        document.head.appendChild(s);
+    }
+    function showScrollCue(direction) {
+        ensureCueStyles();
+        var old = document.getElementById('ld-tour-scroll-cue');
+        if (old) old.remove();
+        var up  = direction === 'up';
+        var cue = document.createElement('div');
+        cue.id = 'ld-tour-scroll-cue';
+        cue.setAttribute('role', 'status');
+        cue.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);' +
+            (up ? 'top:1rem;' : 'bottom:1rem;') +
+            'z-index:2147483001;background:#0f172a;color:#fff;padding:.5rem .95rem;' +
+            'border-radius:999px;box-shadow:0 8px 24px rgba(2,6,23,.35);font-size:.85rem;' +
+            'font-weight:600;display:flex;gap:.55rem;align-items:center;pointer-events:none;' +
+            'opacity:1;transition:opacity .2s ease;';
+        cue.innerHTML =
+            '<span style="font-size:1.1rem;line-height:1;display:inline-block;' +
+            'animation:ld-tour-bob .6s ease-in-out infinite;">' + (up ? '↑' : '↓') + '</span>' +
+            '<span>Scrolling ' + (up ? 'up' : 'down') + ' the page…</span>';
+        document.body.appendChild(cue);
+        setTimeout(function () {
+            cue.style.opacity = '0';
+            setTimeout(function () { if (cue.parentNode) cue.remove(); }, 220);
+        }, 1100);
+    }
+    // Called before Driver.js scrolls (rect still reflects the pre-scroll
+    // position). Only cue element-anchored steps that are genuinely off-screen.
+    function maybeCueScroll(element, step) {
+        if (!element || !step || typeof step.element !== 'string') return;
+        var rect = element.getBoundingClientRect();
+        var vh   = window.innerHeight || document.documentElement.clientHeight;
+        var THRESH = 80;   // ignore trivial nudges that don't read as "scrolling"
+        if (rect.top >= vh - THRESH)      showScrollCue('down');
+        else if (rect.bottom <= THRESH)   showScrollCue('up');
+    }
+
     // ── Step definitions ────────────────────────────────────────────
 
     var dashboardSteps = [
@@ -409,6 +456,12 @@ $_agentTourCanTemplates = Auth::can('ticket_templates.manage') ? 'true' : 'false
         allowClose:     true,
         smoothScroll:   true,
         steps:          steps,
+
+        // Fires just before Driver.js scrolls to the step — flash a directional
+        // cue when the jump is big enough that the user might miss the movement.
+        onHighlightStarted: function (element, step) {
+            maybeCueScroll(element, step);
+        },
 
         onDestroyStarted: function () {
             if (!isNavigating) {

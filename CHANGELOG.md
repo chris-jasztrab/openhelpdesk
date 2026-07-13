@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.148.3 &mdash; 2026-07-13
+
+### Changed
+- **Tour now signals when it scrolls the page.** Driver.js jumps the page to each step, but its smooth scroll is often fast enough that the user&rsquo;s eye stays on the popover and never registers that the page <em>moved</em> &mdash; making it easy to lose your place. When a step is far enough off-screen to need a real jump, both the portal and agent tours now flash a brief directional pill (<strong>&ldquo;↓ Scrolling down the page…&rdquo;</strong> / <strong>&ldquo;↑ Scrolling up the page…&rdquo;</strong>) at the edge being scrolled toward. It auto-dismisses after about a second, never fires on small nudges or centered (element-less) steps, and doesn&rsquo;t block clicks. Copy/UX only &mdash; no change to the tour flow.
+
 ## 2.148.2 &mdash; 2026-07-13
 
 ### Fixed
