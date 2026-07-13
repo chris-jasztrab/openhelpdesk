@@ -288,7 +288,9 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
             element: '#tour-portal-new-ticket',
             popover: {
                 title:       'Start a New Request',
-                description: 'This button is how you reach the team. Next, let\'s look at the page that lists ' +
+                description: 'This button is how you reach the team.<br><br>' +
+                             '➡️ <strong>Click Next</strong> and we\'ll leave the Dashboard and take you to your ' +
+                             '<strong>My Requests</strong> page (you\'ll find it in the sidebar), which lists ' +
                              '<em>all</em> of your requests.',
                 side:  'bottom',
                 align: 'end',
@@ -300,8 +302,10 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
 
         steps.push({
             popover: {
-                title:       'My Requests',
-                description: 'Every help request you\'ve ever submitted lives on this page — open ones and finished ones.'
+                title:       '📍 New page: My Requests',
+                description: '<strong>Notice the page changed</strong> — we\'ve moved you from the Dashboard to your ' +
+                             '<strong>My Requests</strong> page (the one in the sidebar). Every help request you\'ve ' +
+                             'ever submitted lives here — open ones and finished ones.'
             }
         });
 
@@ -365,7 +369,10 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
         steps.push({
             popover: {
                 title:       'Let\'s Write One',
-                description: 'Time for the main event — the new-request form. Don\'t worry, the tour won\'t actually submit anything.',
+                description: 'Time for the main event — the new-request form.<br><br>' +
+                             '➡️ <strong>Click Next</strong> and we\'ll take you to the <strong>New Request</strong> page ' +
+                             '(the same one that <strong>"New Request"</strong> button opens). Don\'t worry, the tour won\'t ' +
+                             'actually submit anything.',
                 onNextClick: goTo('create', '/portal/tickets/create?tour=1')
             }
         });
@@ -374,10 +381,10 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
 
         steps.push({
             popover: {
-                title:       'New Help Request',
-                description: 'This form is smarter than it looks: it adapts to what kind of help you need, suggests answers while ' +
-                             'you type, and checks for duplicate requests before anything is created. Let\'s walk through it — ' +
-                             'nothing here will actually be submitted.'
+                title:       '📍 New page: New Request',
+                description: 'We\'ve moved you to the <strong>New Request form</strong>. This form is smarter than it looks: it ' +
+                             'adapts to what kind of help you need, suggests answers while you type, and checks for duplicate ' +
+                             'requests before anything is created. Let\'s walk through it — nothing here will actually be submitted.'
             }
         });
 
@@ -556,8 +563,8 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
                 title:       '💾 Drafts & Undo',
                 description: 'Half-written requests are <strong>saved automatically</strong> — close the browser mid-sentence and ' +
                              'everything is restored the next time you open this form. The same goes for comments you start writing ' +
-                             'on a ticket.<br><br>Next: let\'s look at what a request looks like <em>after</em> you submit it, ' +
-                             'using a practice ticket.',
+                             'on a ticket.<br><br>➡️ <strong>Click Next</strong> and we\'ll leave this form and open a ' +
+                             '<strong>practice request</strong>, so you can see what a request looks like <em>after</em> you submit it.',
                 onNextClick: goTo('demo', '/portal/tour/demo-ticket')
             }
         });
@@ -566,10 +573,10 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
 
         steps.push({
             popover: {
-                title:       '🎓 A Practice Request',
-                description: 'This is a <strong>pretend ticket</strong> we use for the tour — it isn\'t real, its buttons are disabled, ' +
-                             'and nothing here is saved or sent. But it looks exactly like your real requests will, ' +
-                             'so let\'s take it apart piece by piece.'
+                title:       '📍 New page: A Practice Request',
+                description: 'We\'ve opened a new page — this is a <strong>pretend ticket</strong> we use for the tour. It isn\'t real, ' +
+                             'its buttons are disabled, and nothing here is saved or sent. But it looks exactly like your real requests ' +
+                             'will, so let\'s take it apart piece by piece.'
             }
         });
 
@@ -721,7 +728,8 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
                 description: 'Problem sorted itself out, or the answer worked? You can close any of your own requests with this button — ' +
                              'it tells the team it\'s taken care of. Afterwards you may get a short <strong>satisfaction survey</strong> by ' +
                              'email; if the issue ever comes back, just reply or submit a new request.<br><br>' +
-                             'One last stop — let\'s head to your profile and email preferences (normally reached from your name menu, top-right).',
+                             '➡️ One last stop — <strong>click Next</strong> and we\'ll take you to your <strong>Profile</strong> page ' +
+                             'and email preferences (normally reached from your name menu in the top-right corner).',
                 side:  'bottom',
                 align: 'end',
                 onNextClick: goTo('profile', '/profile')
@@ -738,7 +746,7 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
             steps.push({
                 element: '#tour-nav-user',
                 popover: {
-                    title:       'How to Reach Your Profile',
+                    title:       '📍 New page: Your Profile',
                     description: 'We brought you straight here, but on your own you\'d get to this page by clicking ' +
                                  '<strong>your name in the top-right corner</strong> and choosing <strong>My Profile</strong>. ' +
                                  'That same menu is also where <strong>Restart Tour</strong> and <strong>Sign Out</strong> live.',
@@ -749,7 +757,7 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
         } else {
             steps.push({
                 popover: {
-                    title:       'How to Reach Your Profile',
+                    title:       '📍 New page: Your Profile',
                     description: 'We brought you straight here, but on your own you\'d get to this page by opening the menu under ' +
                                  '<strong>your name in the top-right corner</strong> and choosing <strong>My Profile</strong>. ' +
                                  'That same menu is also where <strong>Restart Tour</strong> and <strong>Sign Out</strong> live.'

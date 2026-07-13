@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.148.1 &mdash; 2026-07-13
+
+### Changed
+- **Portal tour now makes page changes obvious.** When the end-user walkthrough moved between sections (Dashboard &rarr; My Requests &rarr; New Request form &rarr; practice ticket &rarr; Profile) it navigated to a new page without clearly signalling the move, so users could lose track of where they were. Each hand-off step now spells out the destination before navigating (&ldquo;➡️ Click Next and we&rsquo;ll take you to your <strong>My Requests</strong> page&hellip;&rdquo;), and each arriving section opens with a <strong>📍 New page: &lt;name&gt;</strong> marker that confirms the page changed and names where the page lives in the navigation. Copy only &mdash; no behavioural change to the tour flow.
+
 ## 2.148.0 &mdash; 2026-07-10
 
 ### Added
