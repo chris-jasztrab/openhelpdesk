@@ -2121,6 +2121,32 @@ function checkTicketDuplicates(int $userId, int $typeId, ?int $locationId, strin
 }
 
 /**
+ * Whether the "similar past tickets" panel should be offered for a ticket of a
+ * given type. The single source of truth for the render-time decision on both
+ * the agent and admin ticket views — the async endpoint that actually fetches
+ * matches re-checks the same rules inside findSimilarPastTickets().
+ *
+ * Gate: master AI switch, the global feature switch, then the per-type
+ * ai_similar_check_enabled column (confidential types are always off). A ticket
+ * with no type honours the global switch (there's no per-type row to disable).
+ */
+function similarTicketsEnabledForType(PDO $db, ?int $typeId): bool
+{
+    if (getSetting('ai_enabled', '0') !== '1')         { return false; }
+    if (getSetting('ai_similar_enabled', '0') !== '1') { return false; }
+    if ($typeId === null)                              { return true; }
+
+    $stmt = $db->prepare(
+        'SELECT is_confidential, ai_similar_check_enabled FROM ticket_types WHERE id = ?'
+    );
+    $stmt->execute([$typeId]);
+    $row = $stmt->fetch();
+    if (!$row)                                    { return true; }  // orphaned id → honour global
+    if ((int) $row['is_confidential'] === 1)      { return false; }
+    return (int) $row['ai_similar_check_enabled'] === 1;
+}
+
+/**
  * "Similar past tickets" agent assist. Given a ticket an agent is working,
  * search the WHOLE ticket archive (open, resolved, closed) for tickets that
  * describe the same or a closely related problem, then let the LLM rank the
@@ -2163,9 +2189,13 @@ function findSimilarPastTickets(int $ticketId, int $viewerId, bool $forceRefresh
     $db = Database::connect();
 
     // Load the current ticket. Skip confidential types entirely — their bodies
-    // must never reach the provider (same rule as duplicate detection).
+    // must never reach the provider (same rule as duplicate detection) — and
+    // skip types the admin has switched the feature off for. A ticket with no
+    // type (LEFT JOIN → NULL) defaults to enabled, honouring the global switch.
     $tStmt = $db->prepare(
-        "SELECT t.id, t.subject, t.description, COALESCE(tt.is_confidential, 0) AS type_is_confidential
+        "SELECT t.id, t.subject, t.description,
+                COALESCE(tt.is_confidential, 0) AS type_is_confidential,
+                COALESCE(tt.ai_similar_check_enabled, 1) AS type_similar_enabled
          FROM tickets t
          LEFT JOIN ticket_types tt ON tt.id = t.type_id
          WHERE t.id = ?"
@@ -2174,6 +2204,7 @@ function findSimilarPastTickets(int $ticketId, int $viewerId, bool $forceRefresh
     $ticket = $tStmt->fetch();
     if (!$ticket)                                        { return $off; }
     if ((int) $ticket['type_is_confidential'] === 1)     { return $off; }
+    if ((int) $ticket['type_similar_enabled'] !== 1)     { return $off; }
 
     // Visibility scope for the viewing agent, so matches can't leak tickets
     // they have no access to. This feature is agent-facing (staff only).

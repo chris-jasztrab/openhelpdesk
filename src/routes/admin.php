@@ -1828,6 +1828,7 @@ $router->post('/admin/types/create', function () {
     $aiDupThreshold = isset($_POST['ai_dup_threshold']) ? (float) $_POST['ai_dup_threshold'] : 0.75;
     if ($aiDupThreshold < 0.50) { $aiDupThreshold = 0.50; }
     if ($aiDupThreshold > 0.99) { $aiDupThreshold = 0.99; }
+    $aiSimilarCheck = !empty($_POST['ai_similar_check_enabled']) && !$isConfidential ? 1 : 0;
     $showToLocVis   = !empty($_POST['show_to_location_visibility']) ? 1 : 0;
     $requireResolution = !empty($_POST['require_resolution_on_close']) ? 1 : 0;
     // Stale threshold accepts d/h/m; a bare number means hours (legacy unit).
@@ -1841,11 +1842,12 @@ $router->post('/admin/types/create', function () {
     }
     $db = Database::connect();
 
-    // "No Wrong Door" routing and duplicate detection can't work without a live
-    // AI connection. Test it before saving; if it fails, re-render the form with
-    // a warning modal that offers a "save anyway" escape hatch (ai_check_bypass).
+    // "No Wrong Door" routing, duplicate detection and similar-ticket lookup all
+    // need a live AI connection. Test it before saving; if it fails, re-render
+    // the form with a warning modal that offers a "save anyway" escape hatch
+    // (ai_check_bypass).
     $aiReason = aiTicketTypeUnavailableReason(
-        $aiRouteGroup === 1 || $aiDupCheck === 1,
+        $aiRouteGroup === 1 || $aiDupCheck === 1 || $aiSimilarCheck === 1,
         !empty($_POST['ai_check_bypass'])
     );
     if ($aiReason !== null) {
@@ -1861,8 +1863,8 @@ $router->post('/admin/types/create', function () {
         ]);
     }
 
-    $db->prepare('INSERT INTO ticket_types (name, color, group_id, is_confidential, ai_route_group, ai_dup_check_enabled, ai_dup_threshold, show_to_location_visibility, require_resolution_on_close, sort_order, stale_threshold_minutes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $showToLocVis, $requireResolution, $order, $staleMinutes]);
+    $db->prepare('INSERT INTO ticket_types (name, color, group_id, is_confidential, ai_route_group, ai_dup_check_enabled, ai_dup_threshold, ai_similar_check_enabled, show_to_location_visibility, require_resolution_on_close, sort_order, stale_threshold_minutes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $aiSimilarCheck, $showToLocVis, $requireResolution, $order, $staleMinutes]);
     $typeId = (int) $db->lastInsertId();
     if ($skillIds) {
         $stmt = $db->prepare('INSERT IGNORE INTO ticket_type_skill_map (ticket_type_id, skill_id) VALUES (?, ?)');
@@ -1921,6 +1923,7 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
     $aiDupThreshold = isset($_POST['ai_dup_threshold']) ? (float) $_POST['ai_dup_threshold'] : 0.75;
     if ($aiDupThreshold < 0.50) { $aiDupThreshold = 0.50; }
     if ($aiDupThreshold > 0.99) { $aiDupThreshold = 0.99; }
+    $aiSimilarCheck = !empty($_POST['ai_similar_check_enabled']) && !$isConfidential ? 1 : 0;
     $showToLocVis   = !empty($_POST['show_to_location_visibility']) ? 1 : 0;
     $requireResolution = !empty($_POST['require_resolution_on_close']) ? 1 : 0;
     // Stale threshold accepts d/h/m; a bare number means hours (legacy unit).
@@ -1938,7 +1941,7 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
     // handler. Runs first so a "save anyway" resubmit still flows through the
     // confidential re-auth gate below rather than short-circuiting it.
     $aiReason = aiTicketTypeUnavailableReason(
-        $aiRouteGroup === 1 || $aiDupCheck === 1,
+        $aiRouteGroup === 1 || $aiDupCheck === 1 || $aiSimilarCheck === 1,
         !empty($_POST['ai_check_bypass'])
     );
     if ($aiReason !== null) {
@@ -1978,6 +1981,7 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
                 'ai_route_group' => $aiRouteGroup ? '1' : '',
                 'ai_dup_check_enabled' => $aiDupCheck ? '1' : '',
                 'ai_dup_threshold' => (string) $aiDupThreshold,
+                'ai_similar_check_enabled' => $aiSimilarCheck ? '1' : '',
                 // is_confidential intentionally omitted (unchecked = removal)
             ];
             logAudit(
@@ -2018,14 +2022,14 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
     // not just the confidential flag we already snapshotted above.
     $fullPriorStmt = $db->prepare(
         'SELECT name, color, group_id, is_confidential, ai_route_group, ai_dup_check_enabled,
-                ai_dup_threshold, show_to_location_visibility, require_resolution_on_close, sort_order, stale_threshold_minutes
+                ai_dup_threshold, ai_similar_check_enabled, show_to_location_visibility, require_resolution_on_close, sort_order, stale_threshold_minutes
          FROM ticket_types WHERE id = ?'
     );
     $fullPriorStmt->execute([$id]);
     $fullPrior = $fullPriorStmt->fetch(\PDO::FETCH_ASSOC) ?: [];
 
-    $db->prepare('UPDATE ticket_types SET name=?, color=?, group_id=?, is_confidential=?, ai_route_group=?, ai_dup_check_enabled=?, ai_dup_threshold=?, show_to_location_visibility=?, require_resolution_on_close=?, sort_order=?, stale_threshold_minutes=? WHERE id=?')
-        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $showToLocVis, $requireResolution, $order, $staleMinutes, $id]);
+    $db->prepare('UPDATE ticket_types SET name=?, color=?, group_id=?, is_confidential=?, ai_route_group=?, ai_dup_check_enabled=?, ai_dup_threshold=?, ai_similar_check_enabled=?, show_to_location_visibility=?, require_resolution_on_close=?, sort_order=?, stale_threshold_minutes=? WHERE id=?')
+        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $aiSimilarCheck, $showToLocVis, $requireResolution, $order, $staleMinutes, $id]);
 
     // Required skills (used by Skill-Based group auto-assignment)
     $skillIds = array_filter(array_map('intval', (array) ($_POST['required_skills'] ?? [])));
@@ -2050,6 +2054,7 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
             'ai_route_group'              => $aiRouteGroup,
             'ai_dup_check_enabled'        => $aiDupCheck,
             'ai_dup_threshold'            => $aiDupThreshold,
+            'ai_similar_check_enabled'    => $aiSimilarCheck,
             'show_to_location_visibility' => $showToLocVis,
             'require_resolution_on_close' => $requireResolution,
             'sort_order'                  => $order,
@@ -4942,9 +4947,7 @@ $router->get('/admin/tickets/{id}', function (array $p) {
         'aiClassification' => $aiClassification, 'aiSkillsForOverride' => $aiSkillsForOverride,
         'aiGroupClassification' => $aiGroupClassification,
         'aiEnabled' => getSetting('ai_enabled', '0') === '1',
-        'similarEnabled' => getSetting('ai_enabled', '0') === '1'
-            && getSetting('ai_similar_enabled', '0') === '1'
-            && !$isConfidential,
+        'similarEnabled' => similarTicketsEnabledForType($db, $ticket['type_id'] !== null ? (int) $ticket['type_id'] : null),
         'csat' => $csat,
     ]);
 });

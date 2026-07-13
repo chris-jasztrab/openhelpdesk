@@ -122,6 +122,20 @@ $aiWarning = $aiWarning ?? null;
 
             <div class="mb-3">
                 <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="ai_similar_check_enabled" name="ai_similar_check_enabled" value="1"
+                           <?= (int) old('ai_similar_check_enabled', (string) ($editing['ai_similar_check_enabled'] ?? '1')) ? 'checked' : '' ?>>
+                    <label class="form-check-label fw-semibold" for="ai_similar_check_enabled">
+                        <i class="bi bi-diagram-3 me-1"></i>Show similar past tickets to agents
+                    </label>
+                </div>
+                <div class="form-text">
+                    When an agent or admin opens a ticket of this type, AI searches the whole ticket history (including resolved and closed tickets) for ones describing the same or a related problem and lists them with a relevance note.
+                    Turn this off for types where past-ticket suggestions aren't useful. Confidential ticket types are NEVER scanned. Requires the feature to be enabled globally at <a href="/admin/settings/ai">Admin → Settings → AI Classification</a>.
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <div class="form-check">
                     <input type="checkbox" class="form-check-input" id="show_to_location_visibility" name="show_to_location_visibility" value="1"
                            <?= (int) old('show_to_location_visibility', (string) ($editing['show_to_location_visibility'] ?? '1')) ? 'checked' : '' ?>>
                     <label class="form-check-label fw-semibold" for="show_to_location_visibility">
@@ -266,6 +280,19 @@ document.getElementById('name').addEventListener('input', function() {
     if (confCb) confCb.addEventListener('change', toggle);
     toggle();
 })();
+// Similar-ticket lookup is likewise incompatible with Confidential — those
+// bodies are never sent to a third-party provider.
+(function() {
+    var confCb    = document.getElementById('is_confidential');
+    var similarCb = document.getElementById('ai_similar_check_enabled');
+    if (!similarCb) return;
+    function toggle() {
+        if (confCb && confCb.checked) { similarCb.checked = false; similarCb.disabled = true; }
+        else if (similarCb.disabled) { similarCb.disabled = false; }
+    }
+    if (confCb) confCb.addEventListener('change', toggle);
+    toggle();
+})();
 </script>
 
 <?php if ($aiWarning !== null): ?>
@@ -282,8 +309,8 @@ document.getElementById('name').addEventListener('input', function() {
             </div>
             <div class="modal-body py-4">
                 <p class="mb-3">
-                    This ticket type turns on an AI feature &mdash; <strong>"No Wrong Door" group routing</strong>
-                    and/or <strong>duplicate detection</strong> &mdash; but AI isn't working right now:
+                    This ticket type turns on an AI feature &mdash; <strong>"No Wrong Door" group routing</strong>,
+                    <strong>duplicate detection</strong>, and/or <strong>similar past tickets</strong> &mdash; but AI isn't working right now:
                 </p>
                 <div class="alert alert-warning small mb-3"><?= e($aiWarning) ?></div>
                 <p class="mb-2 fw-semibold">Enable and test AI, or read how these features work:</p>

@@ -14,6 +14,7 @@ $columns = [
     'is_confidential'     => 'Confidential',
     'ai_route_group'      => 'AI route to group',
     'ai_dup_check'        => 'AI dup-check',
+    'ai_similar_check'    => 'AI similar tickets',
     'show_to_loc_vis'     => 'Show "To" / Location',
     'custom_dup_thr'      => 'Custom dup threshold',
     'custom_stale_thr'    => 'Custom stale threshold',
@@ -89,6 +90,7 @@ function tt_cell_no(): string  { return '<span class="mx-off">&minus;</span>'; }
                     <td class="tt-c"><?= !empty($t['is_confidential']) ? tt_cell_yes() : tt_cell_no() ?></td>
                     <td class="tt-c"><?= !empty($t['ai_route_group']) ? tt_cell_yes() : tt_cell_no() ?></td>
                     <td class="tt-c"><?= $dupOn ? tt_cell_yes() : tt_cell_no() ?></td>
+                    <td class="tt-c"><?= (int) ($t['ai_similar_check_enabled'] ?? 1) === 1 ? tt_cell_yes() : tt_cell_no() ?></td>
                     <td class="tt-c"><?= !empty($t['show_to_location_visibility']) ? tt_cell_yes() : tt_cell_no() ?></td>
                     <td class="tt-c">
                         <?php if ($custThr): ?>

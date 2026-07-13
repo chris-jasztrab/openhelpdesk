@@ -260,7 +260,7 @@ $sentimentColors = [
                 <label class="form-check-label" for="ai_similar_enabled">
                     Show <strong>similar past tickets</strong> to agents on the ticket view
                 </label>
-                <div class="form-text">When an agent opens a ticket, search the whole ticket history for tickets describing the same or a related problem (including resolved and closed ones) and list them with an AI note on how each relates. Confidential ticket types are never sent to the provider. Runs once per ticket and is cached.</div>
+                <div class="form-text">When an agent opens a ticket, search the whole ticket history for tickets describing the same or a related problem (including resolved and closed ones) and list them with an AI note on how each relates. Confidential ticket types are never sent to the provider. Runs once per ticket and is cached. This is the master switch; you can also turn the panel off for individual ticket types under <a href="/admin/types">Admin → Ticket Types</a>.</div>
             </div>
         </div>
     </div>

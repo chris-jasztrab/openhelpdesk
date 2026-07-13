@@ -765,6 +765,7 @@ CREATE TABLE IF NOT EXISTS `ticket_types` (
   `ai_route_group` tinyint(1) NOT NULL DEFAULT 0,
   `ai_dup_check_enabled` tinyint(1) NOT NULL DEFAULT 0,
   `ai_dup_threshold` decimal(3,2) NOT NULL DEFAULT 0.75,
+  `ai_similar_check_enabled` tinyint(1) NOT NULL DEFAULT 1,
   `show_to_location_visibility` tinyint(1) NOT NULL DEFAULT 1,
   `require_resolution_on_close` tinyint(1) NOT NULL DEFAULT 0,
   `sort_order` int(10) unsigned NOT NULL DEFAULT 0,

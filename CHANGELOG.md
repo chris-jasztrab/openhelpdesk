@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.149.0 &mdash; 2026-07-13
+
+### Added
+- **Per-ticket-type control for the "similar past tickets" panel.** The agent/admin similar-tickets assist (2.148.0) could only be switched on or off globally. Each ticket type now has its own <strong>"Show similar past tickets to agents"</strong> toggle (<strong>Admin &rarr; Ticket Types &rarr; edit a type</strong>), so a helpdesk can keep the feature on but suppress it for types where past-ticket suggestions aren't useful. The global switch at <strong>Settings &rarr; AI Classification</strong> remains the master on/off; the per-type toggle only narrows it. New column <code>ticket_types.ai_similar_check_enabled</code> (migration 068) defaults to <strong>on</strong>, so an install that already enabled the feature keeps showing it on every non-confidential type until an admin turns specific types off. Confidential types are always excluded (their bodies are never sent to the provider), and the toggle auto-disables when a type is marked confidential — mirroring duplicate detection and "No Wrong Door" routing. The Ticket Types settings matrix gains an "AI similar tickets" column.
+
 ## 2.148.5 &mdash; 2026-07-13
 
 ### Fixed

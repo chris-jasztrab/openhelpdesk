@@ -1431,11 +1431,10 @@ $router->get('/agent/tickets/{id}', function (array $p) {
     $csat = $csatStmt->fetch() ?: null;
 
     // "Similar past tickets" agent assist — only when the feature is on and
-    // this ticket is eligible (non-confidential). The panel fetches results
-    // async so the LLM rerank never blocks the ticket page render.
-    $similarEnabled = getSetting('ai_enabled', '0') === '1'
-        && getSetting('ai_similar_enabled', '0') === '1'
-        && !$isConfidential;
+    // this ticket's type is eligible (non-confidential and not switched off for
+    // the type). The panel fetches results async so the LLM rerank never blocks
+    // the ticket page render.
+    $similarEnabled = similarTicketsEnabledForType($db, $ticket['type_id'] !== null ? (int) $ticket['type_id'] : null);
 
     render('agent/tickets/view', ['ticket' => $ticket, 'timeline' => $timeline, 'agents' => $agents, 'assignableByGroup' => $assignableByGroup, 'priorities' => $priorities, 'ticketTypes' => $ticketTypes, 'attachments' => $attachments, 'ccUsers' => $ccUsers, 'groups' => $groups, 'customFields' => $customFields, 'fieldValues' => $fieldValues, 'fieldOptions' => $fieldOptions, 'isWatching' => $isWatching, 'isConfidential' => $isConfidential, 'escalationHistory' => $escalationHistory, 'hasEscalationPath' => $hasEscalationPath, 'nextEscalationStep' => $nextEscalationStep, 'fromFloor' => $fromFloor, 'embedMode' => $fromFloor, 'csat' => $csat, 'similarEnabled' => $similarEnabled]);
 });
