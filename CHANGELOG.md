@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.148.4 &mdash; 2026-07-13
+
+### Changed
+- **Tour now scrolls the page slowly so you can see it move.** Replaces the directional pill added in 2.148.3, which read as clutter. Driver.js jumps between steps with the browser&rsquo;s native smooth scroll, which is usually so fast the user never registers that the page moved and loses their place. While the tour is running (portal and agent), that scroll is now an eased ~0.5&ndash;1s animation (duration scales with distance, capped so it never drags), so the page visibly glides to the next step and the spotlight and popover track along with it. Implemented by wrapping <code>scrollIntoView</code> only for the duration of the tour and restoring it when the tour ends. No change to the tour flow.
+
 ## 2.148.3 &mdash; 2026-07-13
 
 ### Changed

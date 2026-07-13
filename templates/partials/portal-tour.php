@@ -74,51 +74,46 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
         setTimeout(kill, 10000);
     }
 
-    // ── Scroll cue ──────────────────────────────────────────────────────
-    // Driver.js scrolls the page to each step, but its smooth scroll is often
-    // fast enough that the user's eye stays on the popover and never registers
-    // that the page MOVED. When a step is far enough off-screen to need a real
-    // jump, show a brief "↓ Scrolling down…" pill so the movement is explicit.
-    function ensureCueStyles() {
-        if (document.getElementById('ld-tour-cue-style')) return;
-        var s = document.createElement('style');
-        s.id = 'ld-tour-cue-style';
-        s.textContent = '@keyframes ld-tour-bob{0%,100%{transform:translateY(-3px)}50%{transform:translateY(3px)}}';
-        document.head.appendChild(s);
+    // ── Slow, visible scrolling ─────────────────────────────────────────
+    // Driver.js scrolls the page to each step with the browser's native smooth
+    // scroll, which is usually so fast the user never sees the page move and
+    // loses their place. While the tour is running we replace that one scroll
+    // call with a slower eased animation, so the movement is obvious. Driver
+    // repositions the spotlight and popover on every scroll event, so they
+    // track the page as it glides down (or up) to the next step.
+    var _nativeScrollIntoView = Element.prototype.scrollIntoView;
+    var _slowScrollRAF = null;
+    function _easeInOutQuad(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+    function slowScrollIntoView(opts) {
+        var el = this;
+        if (_slowScrollRAF) { cancelAnimationFrame(_slowScrollRAF); _slowScrollRAF = null; }
+        var vh    = window.innerHeight || document.documentElement.clientHeight;
+        var rect  = el.getBoundingClientRect();
+        var startY = window.pageYOffset || document.documentElement.scrollTop || 0;
+        var block = opts && opts.block;
+        var targetTop = (block === 'start' || el.offsetHeight > vh)
+            ? startY + rect.top - 24
+            : startY + rect.top - Math.max(24, (vh - el.offsetHeight) / 2);
+        var maxY = Math.max(0, (document.documentElement.scrollHeight || 0) - vh);
+        targetTop = Math.max(0, Math.min(targetTop, maxY));
+        var dist = targetTop - startY;
+        if (Math.abs(dist) < 4) return;   // already in place — nothing to animate
+        // Scale duration with distance so short hops stay snappy and long jumps
+        // read clearly, capped so the tour never feels sluggish.
+        var duration = Math.min(1000, Math.max(450, Math.abs(dist) * 1.4));
+        var t0 = null;
+        function frame(ts) {
+            if (t0 === null) t0 = ts;
+            var p = Math.min(1, (ts - t0) / duration);
+            window.scrollTo(0, startY + dist * _easeInOutQuad(p));
+            _slowScrollRAF = (p < 1) ? requestAnimationFrame(frame) : null;
+        }
+        _slowScrollRAF = requestAnimationFrame(frame);
     }
-    function showScrollCue(direction) {
-        ensureCueStyles();
-        var old = document.getElementById('ld-tour-scroll-cue');
-        if (old) old.remove();
-        var up  = direction === 'up';
-        var cue = document.createElement('div');
-        cue.id = 'ld-tour-scroll-cue';
-        cue.setAttribute('role', 'status');
-        cue.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);' +
-            (up ? 'top:1rem;' : 'bottom:1rem;') +
-            'z-index:2147483001;background:#0f172a;color:#fff;padding:.5rem .95rem;' +
-            'border-radius:999px;box-shadow:0 8px 24px rgba(2,6,23,.35);font-size:.85rem;' +
-            'font-weight:600;display:flex;gap:.55rem;align-items:center;pointer-events:none;' +
-            'opacity:1;transition:opacity .2s ease;';
-        cue.innerHTML =
-            '<span style="font-size:1.1rem;line-height:1;display:inline-block;' +
-            'animation:ld-tour-bob .6s ease-in-out infinite;">' + (up ? '↑' : '↓') + '</span>' +
-            '<span>Scrolling ' + (up ? 'up' : 'down') + ' the page…</span>';
-        document.body.appendChild(cue);
-        setTimeout(function () {
-            cue.style.opacity = '0';
-            setTimeout(function () { if (cue.parentNode) cue.remove(); }, 220);
-        }, 1100);
-    }
-    // Called before Driver.js scrolls (rect still reflects the pre-scroll
-    // position). Only cue element-anchored steps that are genuinely off-screen.
-    function maybeCueScroll(element, step) {
-        if (!element || !step || typeof step.element !== 'string') return;
-        var rect = element.getBoundingClientRect();
-        var vh   = window.innerHeight || document.documentElement.clientHeight;
-        var THRESH = 80;   // ignore trivial nudges that don't read as "scrolling"
-        if (rect.top >= vh - THRESH)      showScrollCue('down');
-        else if (rect.bottom <= THRESH)   showScrollCue('up');
+    function enableSlowScroll()  { Element.prototype.scrollIntoView = slowScrollIntoView; }
+    function disableSlowScroll() {
+        Element.prototype.scrollIntoView = _nativeScrollIntoView;
+        if (_slowScrollRAF) { cancelAnimationFrame(_slowScrollRAF); _slowScrollRAF = null; }
     }
 
     // ── Which section (if any) belongs on this page ─────────────────────
@@ -855,14 +850,9 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
         doneBtnText:    tourSection === 'profile' ? 'Finish' : 'Continue →',
         steps:          steps,
 
-        // Fires just before Driver.js scrolls to the step — flash a directional
-        // cue when the jump is big enough that the user might miss the movement.
-        onHighlightStarted: function (element, step) {
-            maybeCueScroll(element, step);
-        },
-
         onDestroyStarted: function () {
             removeFakeBanner();
+            disableSlowScroll();
 
             // The tour itself is navigating to the next section — keep state.
             if (isNavigating) { driverObj.destroy(); return; }
@@ -889,6 +879,7 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
         ssDel(RESUME);
     }
 
+    enableSlowScroll();
     driverObj.drive(startIndex);
 })();
 </script>
