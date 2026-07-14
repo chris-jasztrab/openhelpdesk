@@ -336,6 +336,22 @@ function handleInstall(): void
             ('Critical', '#dc3545', 4)");
         $messages[] = ['ok', 'Default ticket priorities seeded.'];
 
+        // 4a. Seed the 7 system ticket statuses. schema.sql ships the
+        //     ticket_statuses table empty; migration 041 (which seeds it) is
+        //     stamped-not-run on a fresh install, so seed it here.
+        //     Mirrors database/migrations/041_ticket_statuses.php — keep in sync.
+        $pdo->exec("INSERT IGNORE INTO ticket_statuses
+            (slug, label, bucket, pauses_sla, sort_order, color,
+             is_default_new, is_default_resolved, is_default_closed, is_system, is_active) VALUES
+            ('open',                   'Open',                   'open',   0, 1, '#0d6efd', 1, 0, 0, 1, 1),
+            ('in_progress',            'In Progress',            'open',   0, 2, '#0dcaf0', 0, 0, 0, 1, 1),
+            ('pending',                'Pending',                'open',   1, 3, '#ffc107', 0, 0, 0, 1, 1),
+            ('waiting_on_customer',    'Waiting on Customer',    'open',   1, 4, '#fd7e14', 0, 0, 0, 1, 1),
+            ('waiting_on_third_party', 'Waiting on Third Party', 'open',   1, 5, '#6f42c1', 0, 0, 0, 1, 1),
+            ('resolved',               'Resolved',               'closed', 0, 6, '#198754', 0, 1, 0, 1, 1),
+            ('closed',                 'Closed',                 'closed', 0, 7, '#6c757d', 0, 0, 1, 1, 1)");
+        $messages[] = ['ok', 'Default ticket statuses seeded.'];
+
         // 4b. Seed built-in permission levels (roles), the permission catalog,
         //     and the grants that reproduce each role's default capabilities.
         //     Mirrors database/migrations/042_roles_permissions.php — keep the

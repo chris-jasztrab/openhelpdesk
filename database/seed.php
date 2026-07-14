@@ -165,6 +165,31 @@ try {
     }
     echo "[OK] 4 priorities seeded.\n";
 
+    // ── Ticket Statuses ────────────────────────────────────────────
+    // The 7 system statuses. schema.sql ships the ticket_statuses table but
+    // no rows, and migration 041 (which seeds them) is stamped-not-run above,
+    // so seed them here — mirroring migration 041. Keep the two in sync.
+    $statusStmt = $pdo->prepare(
+        "INSERT IGNORE INTO ticket_statuses
+            (slug, label, bucket, pauses_sla, sort_order, color,
+             is_default_new, is_default_resolved, is_default_closed, is_system, is_active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1)"
+    );
+    $statuses = [
+        // [slug, label, bucket, pauses_sla, sort, color, def_new, def_res, def_closed]
+        ['open',                   'Open',                   'open',   0, 1, '#0d6efd', 1, 0, 0],
+        ['in_progress',            'In Progress',            'open',   0, 2, '#0dcaf0', 0, 0, 0],
+        ['pending',                'Pending',                'open',   1, 3, '#ffc107', 0, 0, 0],
+        ['waiting_on_customer',    'Waiting on Customer',    'open',   1, 4, '#fd7e14', 0, 0, 0],
+        ['waiting_on_third_party', 'Waiting on Third Party', 'open',   1, 5, '#6f42c1', 0, 0, 0],
+        ['resolved',               'Resolved',               'closed', 0, 6, '#198754', 0, 1, 0],
+        ['closed',                 'Closed',                 'closed', 0, 7, '#6c757d', 0, 0, 1],
+    ];
+    foreach ($statuses as $s) {
+        $statusStmt->execute($s);
+    }
+    echo "[OK] 7 ticket statuses seeded.\n";
+
     // ── Ticket Types ───────────────────────────────────────────────
     $typeStmt = $pdo->prepare('INSERT INTO ticket_types (name, sort_order) VALUES (?, ?)');
     $types = [

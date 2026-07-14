@@ -4444,16 +4444,30 @@ function notifyGroupMembers(PDO $db, int $ticketId): void
     if (!emailNotifyEnabled('agent_new_ticket')) {
         return;
     }
-    // Fetch the ticket
+    // Fetch the ticket. Pull the type's confidential flag + group so we can gate
+    // recipients and redact the body below.
     $tStmt = $db->prepare(
-        'SELECT t.subject, t.description, t.type_id, t.location_id, t.priority_id, t.created_by
-         FROM tickets t WHERE t.id = ?'
+        'SELECT t.subject, t.description, t.type_id, t.location_id, t.priority_id, t.created_by,
+                COALESCE(tt.is_confidential, 0) AS is_confidential, tt.group_id AS conf_group_id
+         FROM tickets t
+         LEFT JOIN ticket_types tt ON tt.id = t.type_id
+         WHERE t.id = ?'
     );
     $tStmt->execute([$ticketId]);
     $ticket = $tStmt->fetch();
     if (!$ticket) {
         return;
     }
+
+    // Confidential tickets must never broadcast their subject/body to the
+    // site-wide notify_new_ticket audience. Restrict recipients to the
+    // confidential type's group and redact the content to a bare link.
+    $isConfidential = (int) $ticket['is_confidential'] === 1;
+    $confGroupId    = $ticket['conf_group_id'] !== null ? (int) $ticket['conf_group_id'] : null;
+    $subjectForEmail = $isConfidential ? '[Confidential ticket]' : $ticket['subject'];
+    $descForEmail    = $isConfidential
+        ? 'The contents of this ticket are confidential. Open the ticket to view it.'
+        : $ticket['description'];
 
     // Submitter name
     $uStmt = $db->prepare('SELECT first_name, last_name FROM users WHERE id = ?');
@@ -4501,6 +4515,15 @@ function notifyGroupMembers(PDO $db, int $ticketId): void
         }
     }
 
+    // Fail closed for confidential tickets: keep only recipients who are members
+    // of the confidential group (the users authorized to see the content). If the
+    // type has no group, nobody outside the creator may be notified.
+    if ($isConfidential) {
+        $members = array_filter($members, static function ($m) use ($db, $confGroupId) {
+            return $confGroupId !== null && in_array($confGroupId, userGroupIds($db, (int) $m['id']), true);
+        });
+    }
+
     $appUrl = env('APP_URL', 'http://localhost:8000');
     $slaTokens = slaEmailTokens($db, $ticket['type_id'] ? (int) $ticket['type_id'] : null, $ticket['priority_id'] ? (int) $ticket['priority_id'] : null);
 
@@ -4511,7 +4534,7 @@ function notifyGroupMembers(PDO $db, int $ticketId): void
             (int) $user['id'],
             $ticketId,
             'new_ticket',
-            $ticket['subject'],
+            $subjectForEmail,
             (int) $ticket['created_by']
         );
         if (!(bool) ($user['notify_group_new_ticket'] ?? 1)) {
@@ -4527,7 +4550,7 @@ function notifyGroupMembers(PDO $db, int $ticketId): void
 
         $tpl = getEmailTpl('ticket-new-group', [
             'ticket_id'  => $ticketId,
-            'subject'    => $ticket['subject'],
+            'subject'    => $subjectForEmail,
             'type'       => $typeName,
             'location'   => $locationName,
             'priority'   => $priorityName,
@@ -4539,8 +4562,8 @@ function notifyGroupMembers(PDO $db, int $ticketId): void
 
         $emailHtml = renderEmail('ticket-opened-group', [
             'ticketId'      => $ticketId,
-            'subject'       => $ticket['subject'],
-            'description'   => $ticket['description'],
+            'subject'       => $subjectForEmail,
+            'description'   => $descForEmail,
             'typeName'      => $typeName,
             'locationName'  => $locationName,
             'priorityName'  => $priorityName,
@@ -4675,14 +4698,27 @@ function notifyAssignedGroup(PDO $db, int $ticketId, int $groupId): void
     $groupName = $gStmt->fetchColumn() ?: '';
 
     $tStmt = $db->prepare(
-        'SELECT t.subject, t.description, t.type_id, t.priority_id, t.created_by
-         FROM tickets t WHERE t.id = ?'
+        'SELECT t.subject, t.description, t.type_id, t.priority_id, t.created_by,
+                COALESCE(tt.is_confidential, 0) AS is_confidential, tt.group_id AS conf_group_id
+         FROM tickets t
+         LEFT JOIN ticket_types tt ON tt.id = t.type_id
+         WHERE t.id = ?'
     );
     $tStmt->execute([$ticketId]);
     $ticket = $tStmt->fetch();
     if (!$ticket) {
         return;
     }
+
+    // Redact confidential content out of the group email — email is a lower-trust
+    // channel, so even authorized members get a bare link and open the ticket to
+    // read it. Recipients are gated to the confidential group below.
+    $isConfidential = (int) $ticket['is_confidential'] === 1;
+    $confGroupId    = $ticket['conf_group_id'] !== null ? (int) $ticket['conf_group_id'] : null;
+    $subjectForEmail = $isConfidential ? '[Confidential ticket]' : $ticket['subject'];
+    $descForEmail    = $isConfidential
+        ? 'The contents of this ticket are confidential. Open the ticket to view it.'
+        : $ticket['description'];
 
     $uStmt = $db->prepare('SELECT first_name, last_name FROM users WHERE id = ?');
     $uStmt->execute([$ticket['created_by']]);
@@ -4708,10 +4744,20 @@ function notifyAssignedGroup(PDO $db, int $ticketId, int $groupId): void
          WHERE gum.group_id = ?'
     );
     $mStmt->execute([$groupId]);
+    $groupMembers = $mStmt->fetchAll();
     $appUrl = env('APP_URL', 'http://localhost:8000');
     $slaTokens = slaEmailTokens($db, $ticket['type_id'] ? (int) $ticket['type_id'] : null, $ticket['priority_id'] ? (int) $ticket['priority_id'] : null);
 
-    foreach ($mStmt->fetchAll() as $member) {
+    // Fail closed for confidential tickets: only members of the confidential
+    // group may be told about it (e.g. a confidential ticket reassigned to a
+    // non-confidential group must not notify that group).
+    if ($isConfidential) {
+        $groupMembers = array_filter($groupMembers, static function ($m) use ($db, $confGroupId) {
+            return $confGroupId !== null && in_array($confGroupId, userGroupIds($db, (int) $m['id']), true);
+        });
+    }
+
+    foreach ($groupMembers as $member) {
         if ((int) $member['id'] === Auth::id()) {
             continue; // skip the person making the change
         }
@@ -4729,7 +4775,7 @@ function notifyAssignedGroup(PDO $db, int $ticketId, int $groupId): void
 
         $tpl = getEmailTpl('ticket_assigned_group', [
             'ticket_id'   => $ticketId,
-            'subject'     => $ticket['subject'],
+            'subject'     => $subjectForEmail,
             'group'       => $groupName,
             'type'        => $typeName,
             'priority'    => $priorityName,
@@ -4741,8 +4787,8 @@ function notifyAssignedGroup(PDO $db, int $ticketId, int $groupId): void
 
         $emailHtml = renderEmail('ticket-assigned-group', [
             'ticketId'      => $ticketId,
-            'subject'       => $ticket['subject'],
-            'description'   => $ticket['description'],
+            'subject'       => $subjectForEmail,
+            'description'   => $descForEmail,
             'groupName'     => $groupName,
             'typeName'      => $typeName,
             'priorityName'  => $priorityName,
