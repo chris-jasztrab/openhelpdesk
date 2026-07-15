@@ -346,9 +346,26 @@ $statusOptions = ticketStatusLabelMap();
 // ── Per-type form layout: reorder + show/hide + required toggling ──
 (function() {
     var formLayouts = <?= json_encode($formLayouts ?? new stdClass()) ?>;
+    // [typeId => [allowed priority id, ...]] for types that restrict priorities.
+    var typePriorities = <?= json_encode((object) ($typePriorityMap ?? [])) ?>;
     var typeSelect  = document.getElementById('type_id');
     var dynRoot     = document.getElementById('dynamic-fields');
     if (!typeSelect || !dynRoot) return;
+
+    // Show only the priorities the selected type allows; reset the picker if the
+    // current selection is no longer offered. Types with no entry are unrestricted.
+    function filterPriorities() {
+        var priSel = document.getElementById('priority_id');
+        if (!priSel) return;
+        var allowed = typePriorities[String(parseInt(typeSelect.value) || 0)] || null;
+        Array.prototype.forEach.call(priSel.options, function(opt) {
+            if (opt.value === '') return;
+            var ok = !allowed || allowed.indexOf(parseInt(opt.value)) !== -1;
+            opt.hidden   = !ok;
+            opt.disabled = !ok;
+            if (!ok && opt.selected) priSel.value = '';
+        });
+    }
 
     function setRequired(wrap, required) {
         wrap.querySelectorAll('.field-required-star').forEach(function(el) {
@@ -362,6 +379,7 @@ $statusOptions = ticketStatusLabelMap();
     }
 
     function applyLayout() {
+        filterPriorities();
         var selectedType = parseInt(typeSelect.value) || 0;
         var layout = formLayouts[selectedType] || [];
         var visByKey = {};

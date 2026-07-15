@@ -11,6 +11,12 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.151.0 &mdash; 2026-07-15
+
+### Added
+- **Ticket types can now restrict which priorities they offer.** Some types map to departments that don't use the full priority scale (e.g. a team that only ever triages Low / Medium / High and never Critical). Each type gains an <strong>Available Priorities</strong> section (<strong>Admin &rarr; Ticket Types &rarr; edit a type</strong>) where you check the priorities that type should offer. Leaving <strong>all</strong> checked keeps the type unrestricted — every priority, including any added later, is offered (the pre-upgrade behaviour, so existing installs are unaffected). The restriction is enforced on the priority picker of all three New Ticket forms (portal, agent, admin) and the ticket-detail priority picker, which now filter to the selected type's allowed set and reset an out-of-range selection when the type changes, plus server-side validation on ticket create and update so a stale or hand-crafted request can't set a disallowed priority. Existing tickets keep their current priority even if it's later removed from the type — it's shown but never silently dropped. New join table <code>ticket_type_priorities</code> (migration 069); no rows for a type means "unrestricted".
+- **Per-ticket-type business hours for SLA timers.** Some ticket types map to departments that don't keep the branch's hours — e.g. a back-office team working 9AM–5PM Mon–Fri while the floor is open evenings and weekends. Each type's tab on <strong>Admin &rarr; Settings &rarr; SLA Policies</strong> now has a <strong>"Use custom business hours for this type"</strong> override with its own weekly open/close schedule; when set, SLA response/resolution timers for that type count only those hours. Timezone always follows the global <strong>Business Hours</strong> setting — the override changes open/close hours only. Leaving the toggle off inherits the global schedule (unchanged behaviour). New column <code>ticket_types.business_hours_schedule</code> (migration 070, NULL = inherit); <code>Sla::getBusinessSchedule()</code> takes an optional type id and is threaded through SLA initialization, priority/type-change recalculation, and pause/resume.
+
 ## 2.150.1 &mdash; 2026-07-13
 
 ### Fixed

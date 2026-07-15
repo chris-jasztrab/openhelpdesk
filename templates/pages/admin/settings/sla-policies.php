@@ -95,6 +95,14 @@ $breadcrumbs  = [
                 <!-- Per-type tabs -->
                 <?php foreach ($types as $type): ?>
                 <div class="tab-pane fade" id="sla-pane-<?= $type['id'] ?>" role="tabpanel" aria-labelledby="sla-tab-<?= $type['id'] ?>">
+                    <?php
+                    // Decode this type's business-hours override (NULL = inherit global).
+                    $rawTs = $type['business_hours_schedule'] ?? null;
+                    $typeSchedule = (is_string($rawTs) && trim($rawTs) !== '')
+                        ? (json_decode($rawTs, true) ?: null)
+                        : null;
+                    renderTypeBusinessHours((int) $type['id'], is_array($typeSchedule) ? $typeSchedule : null, $globalSchedule);
+                    ?>
                     <p class="text-muted small mb-3">Override SLA targets for <strong><?= e($type['name']) ?></strong> tickets. Leave at 0 to use the default policy.</p>
                     <?php renderSlaPriorityTable($priorities, $policies[(int) $type['id']] ?? [], (int) $type['id'], $policies[0] ?? []); ?>
                 </div>
@@ -119,6 +127,88 @@ $breadcrumbs  = [
 <?php endif; ?>
 
 <?php
+/**
+ * Render the per-type business-hours override panel for a type tab. When the
+ * toggle is off the type inherits the global business hours; when on, the SLA
+ * timers for this type count only the weekly hours entered here. Timezone
+ * always follows the global Business Hours setting.
+ *
+ * @param int         $typeId         The ticket type id
+ * @param array|null  $typeSchedule   The type's stored schedule (null = inherit)
+ * @param array       $globalSchedule Global schedule, used to prefill defaults
+ */
+function renderTypeBusinessHours(int $typeId, ?array $typeSchedule, array $globalSchedule): void {
+    $days = [
+        'mon' => 'Monday', 'tue' => 'Tuesday', 'wed' => 'Wednesday', 'thu' => 'Thursday',
+        'fri' => 'Friday', 'sat' => 'Saturday', 'sun' => 'Sunday',
+    ];
+    $enabled = $typeSchedule !== null;
+    $src     = $enabled ? $typeSchedule : $globalSchedule;
+?>
+    <div class="border rounded p-3 mb-4">
+        <div class="form-check form-switch mb-1">
+            <input class="form-check-input type-hours-toggle" type="checkbox" role="switch"
+                   id="th_enabled_<?= $typeId ?>" name="type_hours[<?= $typeId ?>][enabled]" value="1"
+                   data-type="<?= $typeId ?>" <?= $enabled ? 'checked' : '' ?>>
+            <label class="form-check-label fw-semibold" for="th_enabled_<?= $typeId ?>">
+                <i class="bi bi-clock-history me-1"></i>Use custom business hours for this type
+            </label>
+        </div>
+        <p class="text-muted small mb-2">
+            For a department that doesn't keep the branch's hours &mdash; e.g. a back-office team that
+            only works 9AM&ndash;5PM. SLA timers for this type then count only the hours below.
+            Timezone always follows the global <a href="/admin/settings/business-hours">Business Hours</a> setting.
+            Leave off to inherit the global schedule.
+        </p>
+        <div class="type-hours-body" id="th_body_<?= $typeId ?>" style="<?= $enabled ? '' : 'display:none;' ?>">
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0" style="max-width:520px;">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width:120px">Day</th>
+                            <th style="width:60px">Open</th>
+                            <th>Start</th>
+                            <th>End</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($days as $key => $label):
+                            $dd     = $src[$key] ?? null;
+                            $active = is_array($dd) && count($dd) >= 2;
+                            $startV = $active ? $dd[0] : '09:00';
+                            $endV   = $active ? $dd[1] : '17:00';
+                            $grp    = "th_time_{$typeId}_{$key}";
+                        ?>
+                        <tr>
+                            <td class="fw-semibold"><?= e($label) ?></td>
+                            <td>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input th-day-toggle" type="checkbox"
+                                           name="type_hours[<?= $typeId ?>][days][<?= $key ?>][active]" value="1"
+                                           id="th_<?= $typeId ?>_<?= $key ?>" data-target="<?= $grp ?>"
+                                           <?= $active ? 'checked' : '' ?>>
+                                </div>
+                            </td>
+                            <td>
+                                <input type="time" class="form-control form-control-sm th-time" data-group="<?= $grp ?>"
+                                       name="type_hours[<?= $typeId ?>][days][<?= $key ?>][start]"
+                                       value="<?= e($startV) ?>" <?= $active ? '' : 'disabled' ?>>
+                            </td>
+                            <td>
+                                <input type="time" class="form-control form-control-sm th-time" data-group="<?= $grp ?>"
+                                       name="type_hours[<?= $typeId ?>][days][<?= $key ?>][end]"
+                                       value="<?= e($endV) ?>" <?= $active ? '' : 'disabled' ?>>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+<?php
+}
+
 /**
  * Render the priority grid table for a given type tab.
  *
@@ -232,6 +322,22 @@ function formatMins(m) {
     if (r > 0) parts.push(r + 'm');
     return parts.join(' ');
 }
+// Per-type business-hours override: toggle the schedule table, and enable/disable
+// each day's time inputs from its Open switch.
+document.querySelectorAll('.type-hours-toggle').forEach(function(t) {
+    t.addEventListener('change', function() {
+        var body = document.getElementById('th_body_' + this.dataset.type);
+        if (body) body.style.display = this.checked ? '' : 'none';
+    });
+});
+document.querySelectorAll('.th-day-toggle').forEach(function(t) {
+    t.addEventListener('change', function() {
+        var group = this.dataset.target;
+        document.querySelectorAll('.th-time[data-group="' + group + '"]').forEach(function(inp) {
+            inp.disabled = !t.checked;
+        });
+    });
+});
 document.querySelectorAll('.sla-input').forEach(function(input) {
     input.addEventListener('input', function() {
         var target = document.getElementById(this.dataset.target);

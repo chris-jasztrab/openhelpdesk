@@ -221,6 +221,42 @@ $aiWarning = $aiWarning ?? null;
                 <?php endif; ?>
             </div>
 
+            <div class="mb-3">
+                <label class="form-label fw-semibold">
+                    <i class="bi bi-flag me-1"></i>Available Priorities
+                </label>
+                <?php if (empty($priorities)): ?>
+                    <div class="alert alert-info py-2 mb-0 small">
+                        No priorities defined yet. <a href="/admin/priorities/create">Create a priority</a> first.
+                    </div>
+                <?php else: ?>
+                    <?php
+                    // Empty $typePriorityIds means "unrestricted" — every priority is
+                    // offered, so pre-check them all. A non-empty set restricts to
+                    // exactly those priorities.
+                    $typePriorityIds = $typePriorityIds ?? [];
+                    $restricted      = $typePriorityIds !== [];
+                    ?>
+                    <div class="row g-2">
+                        <?php foreach ($priorities as $pri): ?>
+                        <div class="col-md-6">
+                            <div class="form-check border rounded p-2 ps-4">
+                                <input class="form-check-input" type="checkbox" name="priorities[]"
+                                       value="<?= (int) $pri['id'] ?>" id="tprio_<?= (int) $pri['id'] ?>"
+                                       <?= (!$restricted || in_array((int) $pri['id'], $typePriorityIds, true)) ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="tprio_<?= (int) $pri['id'] ?>">
+                                    <span class="badge" style="background:<?= e($pri['color']) ?>;"><?= e($pri['name']) ?></span>
+                                </label>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <div class="form-text">
+                        Choose which priorities requesters and agents can pick for this type. Leave <strong>all</strong> checked to offer every priority (including any added later). Uncheck the ones a department doesn't use — e.g. a team that only triages Low / Medium / High. Existing tickets keep their current priority even if it's later unchecked.
+                    </div>
+                <?php endif; ?>
+            </div>
+
             <hr class="my-4">
 
             <div class="d-flex gap-2">

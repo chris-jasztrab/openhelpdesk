@@ -748,6 +748,14 @@ CREATE TABLE IF NOT EXISTS `ticket_timeline` (
   CONSTRAINT `ticket_timeline_ibfk_1` FOREIGN KEY (`ticket_id`) REFERENCES `tickets` (`id`) ON DELETE CASCADE,
   CONSTRAINT `ticket_timeline_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS `ticket_type_priorities` (
+  `type_id` int(10) unsigned NOT NULL,
+  `priority_id` int(10) unsigned NOT NULL,
+  PRIMARY KEY (`type_id`,`priority_id`),
+  KEY `idx_ttp_priority` (`priority_id`),
+  CONSTRAINT `fk_ttp_type` FOREIGN KEY (`type_id`) REFERENCES `ticket_types` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_ttp_priority` FOREIGN KEY (`priority_id`) REFERENCES `ticket_priorities` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE IF NOT EXISTS `ticket_type_skill_map` (
   `ticket_type_id` int(10) unsigned NOT NULL,
   `skill_id` int(10) unsigned NOT NULL,
@@ -772,6 +780,7 @@ CREATE TABLE IF NOT EXISTS `ticket_types` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `stale_threshold_hours` int(10) unsigned DEFAULT NULL,
+  `business_hours_schedule` text DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `fk_ticket_types_group` (`group_id`),
   CONSTRAINT `fk_ticket_types_group` FOREIGN KEY (`group_id`) REFERENCES `groups` (`id`) ON DELETE SET NULL

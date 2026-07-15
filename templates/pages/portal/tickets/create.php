@@ -308,9 +308,27 @@ endif; ?>
 // ── Per-type form layout: reorder + show/hide + required toggling ──
 (function() {
     var formLayouts = <?= json_encode($formLayouts) ?>;
+    // [typeId => [allowed priority id, ...]] for types that restrict priorities.
+    var typePriorities = <?= json_encode((object) ($typePriorityMap ?? [])) ?>;
     var typeSelect  = document.getElementById('type_id');
     var dynRoot     = document.getElementById('dynamic-fields');
     if (!typeSelect || !dynRoot) return;
+
+    // Show only the priorities the selected type allows. A type with no entry in
+    // typePriorities is unrestricted (all options shown). If the currently
+    // selected priority is no longer allowed, reset the picker to blank.
+    function filterPriorities() {
+        var priSel  = document.getElementById('priority_id');
+        if (!priSel) return;
+        var allowed = typePriorities[String(parseInt(typeSelect.value) || 0)] || null;
+        Array.prototype.forEach.call(priSel.options, function(opt) {
+            if (opt.value === '') return; // keep the "let team decide" option
+            var ok = !allowed || allowed.indexOf(parseInt(opt.value)) !== -1;
+            opt.hidden   = !ok;
+            opt.disabled = !ok;
+            if (!ok && opt.selected) priSel.value = '';
+        });
+    }
 
     function setRequired(wrap, required) {
         // Toggle the visible asterisk
@@ -335,6 +353,7 @@ endif; ?>
     }
 
     function applyLayout() {
+        filterPriorities();
         var selectedType = parseInt(typeSelect.value) || 0;
         var layout = formLayouts[selectedType] || [];
 

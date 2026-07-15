@@ -904,6 +904,7 @@ $router->get('/agent/tickets/create', function () {
         'customFields'  => $customFields,
         'fieldOptions'  => $fieldOptions,
         'formLayouts'   => $formLayouts,
+        'typePriorityMap' => typePriorityMap($db),
     ]);
 });
 
@@ -1436,7 +1437,7 @@ $router->get('/agent/tickets/{id}', function (array $p) {
     // the ticket page render.
     $similarEnabled = similarTicketsEnabledForType($db, $ticket['type_id'] !== null ? (int) $ticket['type_id'] : null);
 
-    render('agent/tickets/view', ['ticket' => $ticket, 'timeline' => $timeline, 'agents' => $agents, 'assignableByGroup' => $assignableByGroup, 'priorities' => $priorities, 'ticketTypes' => $ticketTypes, 'attachments' => $attachments, 'ccUsers' => $ccUsers, 'groups' => $groups, 'customFields' => $customFields, 'fieldValues' => $fieldValues, 'fieldOptions' => $fieldOptions, 'isWatching' => $isWatching, 'isConfidential' => $isConfidential, 'escalationHistory' => $escalationHistory, 'hasEscalationPath' => $hasEscalationPath, 'nextEscalationStep' => $nextEscalationStep, 'fromFloor' => $fromFloor, 'embedMode' => $fromFloor, 'csat' => $csat, 'similarEnabled' => $similarEnabled]);
+    render('agent/tickets/view', ['ticket' => $ticket, 'timeline' => $timeline, 'agents' => $agents, 'assignableByGroup' => $assignableByGroup, 'priorities' => $priorities, 'ticketTypes' => $ticketTypes, 'attachments' => $attachments, 'ccUsers' => $ccUsers, 'groups' => $groups, 'customFields' => $customFields, 'fieldValues' => $fieldValues, 'fieldOptions' => $fieldOptions, 'isWatching' => $isWatching, 'isConfidential' => $isConfidential, 'escalationHistory' => $escalationHistory, 'hasEscalationPath' => $hasEscalationPath, 'nextEscalationStep' => $nextEscalationStep, 'fromFloor' => $fromFloor, 'embedMode' => $fromFloor, 'csat' => $csat, 'similarEnabled' => $similarEnabled, 'typePriorityMap' => typePriorityMap($db)]);
 });
 
 /* ==================================================================
@@ -2174,6 +2175,16 @@ $router->post('/agent/tickets/{id}/update', function (array $p) {
     $newPriorityRaw = $_POST['priority_id'] ?? '';
     $newPriority = $newPriorityRaw === '' ? null : (int) $newPriorityRaw;
     $oldPriority = $ticket['priority_id'] ? (int) $ticket['priority_id'] : null;
+    // The type that will be in effect after this save (type change is applied
+    // below). Validate the chosen priority against it, and skip the priority
+    // change if it isn't offered by that type — other field changes still apply.
+    $effectiveTypeId = array_key_exists('type_id', $_POST)
+        ? ($_POST['type_id'] === '' ? null : (int) $_POST['type_id'])
+        : ($ticket['type_id'] ? (int) $ticket['type_id'] : null);
+    if ($newPriority !== $oldPriority && !priorityAllowedForType($db, $effectiveTypeId, $newPriority)) {
+        flash('error', 'Priority was not changed: that priority is not available for this ticket type.');
+        $newPriority = $oldPriority;
+    }
     if ($newPriority !== $oldPriority) {
         $db->prepare('UPDATE tickets SET priority_id = ? WHERE id = ?')->execute([$newPriority, $id]);
 

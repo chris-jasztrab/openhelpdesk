@@ -287,6 +287,7 @@ $router->get('/portal/tickets/create', function () {
         'types'                => $types,
         'locations'            => $locations,
         'priorities'           => $priorities,
+        'typePriorityMap'      => typePriorityMap($db),
         'tags'                 => $tags,
         'userLocationId'       => $userLocationId,
         'userLocationName'     => $userLocationName,
@@ -362,6 +363,14 @@ $router->post('/portal/tickets/create', function () {
     } elseif ($priorityVis === 'required' && $priorityId === null) {
         flashInput($_POST);
         flash('error', getSetting('sys_field_label_priority', 'Priority') . ' is required.');
+        redirect('/portal/tickets/create');
+    }
+
+    // Enforce the type's available-priorities restriction server-side (the JS
+    // picker hides disallowed options, but never trust the client).
+    if (!priorityAllowedForType($db, $typeId, $priorityId)) {
+        flashInput($_POST);
+        flash('error', 'That ' . getSetting('sys_field_label_priority', 'priority') . ' is not available for the selected ticket type.');
         redirect('/portal/tickets/create');
     }
 

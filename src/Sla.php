@@ -36,13 +36,38 @@ class Sla
      * Get the configured business schedule (timezone + weekly hours).
      * Returns null if not configured.
      *
+     * When $typeId is given and that ticket type has its own business-hours
+     * override (ticket_types.business_hours_schedule), the override's weekly
+     * hours are used instead of the global schedule. The timezone is always the
+     * global one — a per-type override changes open/close hours only. This lets
+     * a department that works 9–5 have its SLA timers count different hours than
+     * the branch it belongs to.
+     *
      * @return array{tz: string, schedule: array<string, array{0: string, 1: string}|null>}|null
      */
-    public static function getBusinessSchedule(): ?array
+    public static function getBusinessSchedule(?int $typeId = null, ?PDO $db = null): ?array
     {
         $tz = getSetting('business_hours_timezone');
+        if ($tz === '') {
+            return null;
+        }
+
+        // Per-type override (weekly hours only; timezone always inherits global).
+        if ($typeId !== null) {
+            $db ??= Database::connect();
+            $stmt = $db->prepare('SELECT business_hours_schedule FROM ticket_types WHERE id = ?');
+            $stmt->execute([$typeId]);
+            $typeJson = $stmt->fetchColumn();
+            if (is_string($typeJson) && trim($typeJson) !== '') {
+                $typeSchedule = json_decode($typeJson, true);
+                if (is_array($typeSchedule) && $typeSchedule !== []) {
+                    return ['tz' => $tz, 'schedule' => $typeSchedule];
+                }
+            }
+        }
+
         $json = getSetting('business_hours_schedule');
-        if ($tz === '' || $json === '') {
+        if ($json === '') {
             return null;
         }
         $schedule = json_decode($json, true);
@@ -315,7 +340,7 @@ class Sla
             return; // SLA disabled site-wide
         }
 
-        $biz = self::getBusinessSchedule();
+        $biz = self::getBusinessSchedule($typeId, $db);
         if ($biz === null) {
             return; // No business hours configured
         }
@@ -388,7 +413,7 @@ class Sla
             return;
         }
 
-        $biz = self::getBusinessSchedule();
+        $biz = self::getBusinessSchedule(isset($ticket['type_id']) ? (int) $ticket['type_id'] : null, $db);
         if ($biz === null) {
             // Just clear the pause without extending
             $db->prepare('UPDATE tickets SET sla_paused_at = NULL WHERE id = ?')->execute([$ticketId]);
@@ -447,7 +472,7 @@ class Sla
             return; // SLA disabled site-wide
         }
 
-        $biz = self::getBusinessSchedule();
+        $biz = self::getBusinessSchedule($typeId, $db);
         if ($biz === null) {
             return;
         }
@@ -507,7 +532,7 @@ class Sla
             return; // SLA disabled site-wide
         }
 
-        $biz = self::getBusinessSchedule();
+        $biz = self::getBusinessSchedule($newTypeId, $db);
         if ($biz === null) {
             return;
         }

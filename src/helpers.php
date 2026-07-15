@@ -516,6 +516,112 @@ function getDefaultPriorityId(PDO $db): ?int
 }
 
 /**
+ * Priority ids a ticket type is restricted to. An empty array means the type
+ * is UNRESTRICTED — every priority is available (this is the default; a type
+ * with no rows in ticket_type_priorities offers all priorities). A non-empty
+ * array is the exact set of allowed priority ids.
+ *
+ * @return int[]
+ */
+function typePriorityIds(PDO $db, ?int $typeId): array
+{
+    if ($typeId === null) {
+        return [];
+    }
+    static $cache = [];
+    if (!array_key_exists($typeId, $cache)) {
+        $stmt = $db->prepare(
+            'SELECT priority_id FROM ticket_type_priorities WHERE type_id = ?'
+        );
+        $stmt->execute([$typeId]);
+        $cache[$typeId] = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    }
+    return $cache[$typeId];
+}
+
+/**
+ * Whether $priorityId may be used on a ticket of $typeId. A null priority is
+ * always allowed (it means "unset — let the team decide"), and a type with no
+ * restriction allows every priority.
+ */
+function priorityAllowedForType(PDO $db, ?int $typeId, ?int $priorityId): bool
+{
+    if ($priorityId === null) {
+        return true;
+    }
+    $allowed = typePriorityIds($db, $typeId);
+    return $allowed === [] || in_array($priorityId, $allowed, true);
+}
+
+/**
+ * Map of [type_id => [priority_id, ...]] for every type that RESTRICTS its
+ * priorities. Types with no restriction are omitted. Emitted to the New Ticket
+ * and ticket-detail forms so the priority picker can be filtered client-side
+ * when the type changes.
+ *
+ * @return array<int, int[]>
+ */
+function typePriorityMap(PDO $db): array
+{
+    $rows = $db->query(
+        'SELECT type_id, priority_id FROM ticket_type_priorities'
+    )->fetchAll(PDO::FETCH_ASSOC);
+    $map = [];
+    foreach ($rows as $r) {
+        $map[(int) $r['type_id']][] = (int) $r['priority_id'];
+    }
+    return $map;
+}
+
+/**
+ * Parse a submitted priorities[] payload into the effective restricted set for
+ * a ticket type. Returns [] when the type should be UNRESTRICTED — i.e. nothing
+ * was submitted, or every existing priority was checked (so priorities added
+ * later are offered automatically too). Otherwise returns the submitted
+ * priority ids that actually exist, in canonical (sort_order) order.
+ *
+ * @param mixed $posted Raw $_POST['priorities'] (array of ids or null)
+ * @return int[]
+ */
+function normalizeTypePriorityIds(PDO $db, $posted): array
+{
+    $all = array_map(
+        'intval',
+        $db->query('SELECT id FROM ticket_priorities ORDER BY sort_order, id')->fetchAll(PDO::FETCH_COLUMN)
+    );
+    if ($all === []) {
+        return [];
+    }
+    $submitted = array_map('intval', (array) ($posted ?? []));
+    $chosen = array_values(array_filter(
+        $all,
+        static fn(int $id): bool => in_array($id, $submitted, true)
+    ));
+    // Empty selection or all-of-them → unrestricted (offer every priority).
+    if ($chosen === [] || count($chosen) === count($all)) {
+        return [];
+    }
+    return $chosen;
+}
+
+/**
+ * Persist a ticket type's available-priorities restriction from a submitted
+ * priorities[] payload. An unrestricted result clears the join rows so the
+ * type offers every priority.
+ */
+function saveTypeAvailablePriorities(PDO $db, int $typeId, $posted): void
+{
+    $chosen = normalizeTypePriorityIds($db, $posted);
+    $db->prepare('DELETE FROM ticket_type_priorities WHERE type_id = ?')->execute([$typeId]);
+    if ($chosen !== []) {
+        $ins = $db->prepare('INSERT INTO ticket_type_priorities (type_id, priority_id) VALUES (?, ?)');
+        foreach ($chosen as $pid) {
+            $ins->execute([$typeId, $pid]);
+        }
+    }
+}
+
+/**
  * Custom field ids that appear on each ticket type — used to filter
  * options/etc. queries. Returns [type_id => [field_id, ...]].
  */

@@ -1817,7 +1817,8 @@ $router->get('/admin/types/create', function () {
     $db     = Database::connect();
     $groups = $db->query('SELECT id, name FROM `groups` ORDER BY sort_order, name')->fetchAll();
     $skills = $db->query('SELECT id, name FROM agent_skills ORDER BY sort_order, name')->fetchAll();
-    render('admin/types/form', ['editing' => null, 'groups' => $groups, 'skills' => $skills, 'requiredSkillIds' => []]);
+    $priorities = $db->query('SELECT id, name, color FROM ticket_priorities ORDER BY sort_order, id')->fetchAll();
+    render('admin/types/form', ['editing' => null, 'groups' => $groups, 'skills' => $skills, 'requiredSkillIds' => [], 'priorities' => $priorities, 'typePriorityIds' => []]);
 });
 
 $router->post('/admin/types/create', function () {
@@ -1862,11 +1863,14 @@ $router->post('/admin/types/create', function () {
         flashInput($_POST);
         $groups = $db->query('SELECT id, name FROM `groups` ORDER BY sort_order, name')->fetchAll();
         $skills = $db->query('SELECT id, name FROM agent_skills ORDER BY sort_order, name')->fetchAll();
+        $priorities = $db->query('SELECT id, name, color FROM ticket_priorities ORDER BY sort_order, id')->fetchAll();
         render('admin/types/form', [
             'editing'          => null,
             'groups'           => $groups,
             'skills'           => $skills,
             'requiredSkillIds' => array_filter(array_map('intval', (array) ($_POST['required_skills'] ?? []))),
+            'priorities'       => $priorities,
+            'typePriorityIds'  => normalizeTypePriorityIds($db, $_POST['priorities'] ?? null),
             'aiWarning'        => $aiReason,
         ]);
     }
@@ -1880,6 +1884,7 @@ $router->post('/admin/types/create', function () {
             $stmt->execute([$typeId, $sid]);
         }
     }
+    saveTypeAvailablePriorities($db, $typeId, $_POST['priorities'] ?? null);
     logAudit(
         'ticket_type.created',
         $typeId,
@@ -1911,7 +1916,15 @@ $router->get('/admin/types/{id}/edit', function (array $p) {
     $rsStmt = $db->prepare('SELECT skill_id FROM ticket_type_skill_map WHERE ticket_type_id = ?');
     $rsStmt->execute([(int) $p['id']]);
     $requiredSkillIds = array_map('intval', $rsStmt->fetchAll(PDO::FETCH_COLUMN));
-    render('admin/types/form', ['editing' => $editing, 'groups' => $groups, 'skills' => $skills, 'requiredSkillIds' => $requiredSkillIds]);
+    $priorities = $db->query('SELECT id, name, color FROM ticket_priorities ORDER BY sort_order, id')->fetchAll();
+    render('admin/types/form', [
+        'editing'          => $editing,
+        'groups'           => $groups,
+        'skills'           => $skills,
+        'requiredSkillIds' => $requiredSkillIds,
+        'priorities'       => $priorities,
+        'typePriorityIds'  => typePriorityIds($db, (int) $p['id']),
+    ]);
 });
 
 $router->post('/admin/types/{id}/edit', function (array $p) {
@@ -1959,11 +1972,14 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
         $editing = $editStmt->fetch() ?: null;
         $groups  = $db->query('SELECT id, name FROM `groups` ORDER BY sort_order, name')->fetchAll();
         $skills  = $db->query('SELECT id, name FROM agent_skills ORDER BY sort_order, name')->fetchAll();
+        $priorities = $db->query('SELECT id, name, color FROM ticket_priorities ORDER BY sort_order, id')->fetchAll();
         render('admin/types/form', [
             'editing'          => $editing,
             'groups'           => $groups,
             'skills'           => $skills,
             'requiredSkillIds' => array_filter(array_map('intval', (array) ($_POST['required_skills'] ?? []))),
+            'priorities'       => $priorities,
+            'typePriorityIds'  => normalizeTypePriorityIds($db, $_POST['priorities'] ?? null),
             'aiWarning'        => $aiReason,
         ]);
     }
@@ -2048,6 +2064,9 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
             $sStmt->execute([$id, $sid]);
         }
     }
+
+    // Available priorities for this type (empty/all → unrestricted).
+    saveTypeAvailablePriorities($db, $id, $_POST['priorities'] ?? null);
 
     logAuditChange(
         'ticket_type.updated',
@@ -4252,6 +4271,7 @@ $router->get('/admin/tickets/create', function () {
         'customFields'  => $customFields,
         'fieldOptions'  => $fieldOptions,
         'formLayouts'   => $formLayouts,
+        'typePriorityMap' => typePriorityMap($db),
     ]);
 });
 
@@ -4305,6 +4325,13 @@ $router->post('/admin/tickets/create', function () {
     // priority on creation.
     if ($typeId && resolveFieldVisibility($db, $typeId, 'system', 'priority') === 'hidden') {
         $priId = getDefaultPriorityId($db);
+    }
+    // Enforce the type's available-priorities restriction server-side.
+    if (!priorityAllowedForType($db, $typeId, $priId)) {
+        flashInput($_POST);
+        flash('error', 'That priority is not available for the selected ticket type.');
+        $redirectBase = (Auth::isStaff() && !Auth::isAdmin()) ? '/agent' : '/admin';
+        redirect("{$redirectBase}/tickets/create");
     }
     $db->prepare(
         'INSERT INTO tickets (subject, description, created_by, submitted_by, type_id, location_id, status, priority_id, assigned_to, group_id, due_date)
@@ -4957,6 +4984,7 @@ $router->get('/admin/tickets/{id}', function (array $p) {
         'aiEnabled' => getSetting('ai_enabled', '0') === '1',
         'similarEnabled' => similarTicketsEnabledForType($db, $ticket['type_id'] !== null ? (int) $ticket['type_id'] : null),
         'csat' => $csat,
+        'typePriorityMap' => typePriorityMap($db),
     ]);
 });
 
@@ -5694,6 +5722,16 @@ $router->post('/admin/tickets/{id}/update', function (array $p) {
     $newPriorityRaw = $_POST['priority_id'] ?? '';
     $newPriority = $newPriorityRaw === '' ? null : (int) $newPriorityRaw;
     $oldPriority = $ticket['priority_id'] ? (int) $ticket['priority_id'] : null;
+    // Validate against the type that will be in effect after this save (the type
+    // change is applied below). Skip a disallowed priority change; other field
+    // changes in this submit still apply.
+    $effectiveTypeId = array_key_exists('type_id', $_POST)
+        ? ($_POST['type_id'] === '' ? null : (int) $_POST['type_id'])
+        : ($ticket['type_id'] ? (int) $ticket['type_id'] : null);
+    if ($newPriority !== $oldPriority && !priorityAllowedForType($db, $effectiveTypeId, $newPriority)) {
+        flash('error', 'Priority was not changed: that priority is not available for this ticket type.');
+        $newPriority = $oldPriority;
+    }
     if ($newPriority !== $oldPriority) {
         $db->prepare('UPDATE tickets SET priority_id = ? WHERE id = ?')->execute([$newPriority, $id]);
 
@@ -7485,7 +7523,19 @@ $router->get('/admin/settings/sla-policies', function () {
         $policies[$typeKey][(int) $row['priority_id']] = $row;
     }
 
-    render('admin/settings/sla-policies', ['priorities' => $priorities, 'policies' => $policies, 'types' => $types]);
+    // Global business hours — used as the default the per-type overrides fall
+    // back to, and to prefill the override editor before it's customised.
+    $globalJson     = getSetting('business_hours_schedule');
+    $globalSchedule = $globalJson !== '' ? (json_decode($globalJson, true) ?: []) : [];
+    $globalTimezone = getSetting('business_hours_timezone');
+
+    render('admin/settings/sla-policies', [
+        'priorities'     => $priorities,
+        'policies'       => $policies,
+        'types'          => $types,
+        'globalSchedule' => $globalSchedule,
+        'globalTimezone' => $globalTimezone,
+    ]);
 });
 
 $router->post('/admin/settings/sla-policies', function () {
@@ -7537,6 +7587,44 @@ $router->post('/admin/settings/sla-policies', function () {
         null,
         'sla_policy',
         'rules_written=' . $rowsWritten
+    );
+
+    // Per-type business-hours overrides. `type_hours[<typeId>][enabled]` gates
+    // whether the type keeps its own weekly schedule; when off we store NULL so
+    // the type inherits the global business hours. Timezone always inherits.
+    $typeHours = is_array($_POST['type_hours'] ?? null) ? $_POST['type_hours'] : [];
+    $validTypeIds = array_map('intval', $db->query('SELECT id FROM ticket_types')->fetchAll(PDO::FETCH_COLUMN));
+    $setHours = $db->prepare('UPDATE ticket_types SET business_hours_schedule = ? WHERE id = ?');
+    $hoursOverridden = 0;
+    foreach ($typeHours as $typeKey => $conf) {
+        $typeId = (int) $typeKey;
+        if (!in_array($typeId, $validTypeIds, true)) {
+            continue;
+        }
+        if (empty($conf['enabled'])) {
+            $setHours->execute([null, $typeId]);
+            continue;
+        }
+        $days = is_array($conf['days'] ?? null) ? $conf['days'] : [];
+        $schedule = [];
+        foreach (Sla::DAY_KEYS as $day) {
+            if (!empty($days[$day]['active'])) {
+                $start = preg_match('/^\d{2}:\d{2}$/', $days[$day]['start'] ?? '') ? $days[$day]['start'] : '09:00';
+                $end   = preg_match('/^\d{2}:\d{2}$/', $days[$day]['end'] ?? '')   ? $days[$day]['end']   : '17:00';
+                $schedule[$day] = [$start, $end];
+            } else {
+                $schedule[$day] = null;
+            }
+        }
+        $setHours->execute([json_encode($schedule), $typeId]);
+        $hoursOverridden++;
+    }
+
+    logAudit(
+        'sla.type_business_hours_saved',
+        null,
+        'sla_policy',
+        'types_with_override=' . $hoursOverridden
     );
 
     flash('success', 'SLA policies saved.');

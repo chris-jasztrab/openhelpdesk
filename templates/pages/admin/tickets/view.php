@@ -1850,6 +1850,31 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
     });
 })();
 
+/* ── Filter the priority picker by the selected ticket type ──
+   Types can restrict which priorities they offer. On load we keep whatever the
+   ticket already has (even if that priority is no longer offered) so it's never
+   silently dropped; when the type is CHANGED, an out-of-range selection resets
+   to None. */
+(function () {
+    var typePriorities = <?= json_encode((object) ($typePriorityMap ?? [])) ?>;
+    var typeSel = document.getElementById('type_id');
+    var priSel  = document.getElementById('priority_id');
+    if (!typeSel || !priSel) return;
+    function filterPriorities(reset) {
+        var allowed = typePriorities[String(parseInt(typeSel.value) || 0)] || null;
+        Array.prototype.forEach.call(priSel.options, function (opt) {
+            if (opt.value === '') return; // keep the "None" option
+            var ok = !allowed || allowed.indexOf(parseInt(opt.value)) !== -1;
+            if (!ok && opt.selected && !reset) { opt.hidden = false; opt.disabled = false; return; }
+            opt.hidden   = !ok;
+            opt.disabled = !ok;
+            if (!ok && opt.selected && reset) priSel.value = '';
+        });
+    }
+    typeSel.addEventListener('change', function () { filterPriorities(true); });
+    filterPriorities(false);
+})();
+
 /* ── Resolution-note-on-close gate (require_resolution_on_close types) ──
    Parallel to the agent ticket view. Intercepts the Update form when the owner
    closes without a comment; offers a scaffolded note or a logged reason. Both
