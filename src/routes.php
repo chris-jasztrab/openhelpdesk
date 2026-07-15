@@ -641,6 +641,12 @@ $router->post('/api/tickets/{id}/set-priority', function (array $p) {
         $ps->execute([$priorityId]);
         $prow = $ps->fetch();
         if (!$prow) { http_response_code(422); echo json_encode(['error' => 'Invalid priority']); exit; }
+        // The ticket type may restrict which priorities it offers.
+        if (!priorityAllowedForType($db, $ticket['type_id'] ? (int) $ticket['type_id'] : null, $priorityId)) {
+            http_response_code(422);
+            echo json_encode(['error' => 'That priority is not available for this ticket type.']);
+            exit;
+        }
         $priorityName  = $prow['name'];
         $priorityColor = $prow['color'];
     }
@@ -3335,7 +3341,7 @@ $router->get('/agent', function () {
 
     // Recent tickets (open/in_progress/pending)
     $stmt = $db->prepare(
-        "SELECT t.id, t.subject, t.status, t.created_at, t.group_id, t.sla_state, t.due_date,
+        "SELECT t.id, t.subject, t.status, t.created_at, t.group_id, t.type_id, t.sla_state, t.due_date,
                 tp.name AS priority_name, tp.color AS priority_color,
                 tt.name AS type_name, tt.color AS type_color, tt.is_confidential AS type_confidential, tt.group_id AS type_group_id,
                 g.name AS group_name,
@@ -3409,6 +3415,7 @@ $router->get('/agent', function () {
         'groupAgents'        => $dashGroupAgents,
         'allAgentsForAssign' => $dashAllAgents,
         'visibleColumns'     => $dashVisibleColumns,
+        'typePriorityMap'    => typePriorityMap($db),
     ]);
 });
 

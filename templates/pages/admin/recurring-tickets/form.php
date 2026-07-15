@@ -334,3 +334,5 @@ $pickedActive    = $isEdit
     refresh();
 })();
 </script>
+
+<?php require ROOT_DIR . '/templates/partials/type-priority-filter.php'; ?>

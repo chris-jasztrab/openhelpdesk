@@ -248,3 +248,5 @@ ClassicEditor.create(document.querySelector('#tpl-body-editor'), {
     });
 }).catch(console.error);
 </script>
+
+<?php require ROOT_DIR . '/templates/partials/type-priority-filter.php'; ?>

@@ -605,6 +605,37 @@ function normalizeTypePriorityIds(PDO $db, $posted): array
 }
 
 /**
+ * Split a set of ticket ids into those whose ticket type permits $priorityId
+ * and a count of those it doesn't. A null priority (clearing) is allowed on
+ * every ticket. Used by bulk priority changes, where the selected tickets may
+ * span types with different available-priority sets.
+ *
+ * @param int[] $ticketIds
+ * @return array{0: int[], 1: int} [allowed ticket ids, skipped count]
+ */
+function filterTicketIdsForPriority(PDO $db, array $ticketIds, ?int $priorityId): array
+{
+    $ticketIds = array_values(array_map('intval', $ticketIds));
+    if ($priorityId === null || $ticketIds === []) {
+        return [$ticketIds, 0];
+    }
+    $ph = implode(',', array_fill(0, count($ticketIds), '?'));
+    $stmt = $db->prepare("SELECT id, type_id FROM tickets WHERE id IN ($ph)");
+    $stmt->execute($ticketIds);
+    $allowed = [];
+    $skipped = 0;
+    while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $tid = $r['type_id'] !== null ? (int) $r['type_id'] : null;
+        if (priorityAllowedForType($db, $tid, $priorityId)) {
+            $allowed[] = (int) $r['id'];
+        } else {
+            $skipped++;
+        }
+    }
+    return [$allowed, $skipped];
+}
+
+/**
  * Persist a ticket type's available-priorities restriction from a submitted
  * priorities[] payload. An unrestricted result clears the join rows so the
  * type offers every priority.

@@ -176,7 +176,7 @@ $dir  = $dir ?? 'desc';
                     <?php endif; ?>
                     <?php if (in_array('priority', $visibleColumns)): ?>
                     <td style="white-space:nowrap;">
-                        <span class="d-inline-flex align-items-center gap-1 quick-priority-wrap" data-ticket-id="<?= (int)$t['id'] ?>">
+                        <span class="d-inline-flex align-items-center gap-1 quick-priority-wrap" data-ticket-id="<?= (int)$t['id'] ?>" data-type-id="<?= (int)($t['type_id'] ?? 0) ?>">
                             <span class="quick-priority-badge"><?php if ($t['priority_name']): ?><span class="badge" style="background:<?= e($t['priority_color']) ?>;"><?= e($t['priority_name']) ?></span><?php else: ?><span class="text-muted">—</span><?php endif; ?></span>
                             <button class="btn btn-link btn-sm p-0 border-0 text-muted quick-priority-btn" type="button" title="Change priority" style="line-height:1;"><i class="bi bi-chevron-down" style="font-size:0.65rem;"></i></button>
                         </span>
@@ -263,6 +263,8 @@ $dir  = $dir ?? 'desc';
     var quickTypes      = <?= json_encode(array_values(array_map(fn($t) => ['id' => (int)$t['id'], 'name' => $t['name'], 'color' => $t['color'] ?: '#6c757d', 'group_id' => $t['group_id'] ? (int)$t['group_id'] : null], $types))) ?>;
     var quickGroups     = <?= json_encode(array_values(array_map(fn($g) => ['id' => (int)$g['id'], 'name' => $g['name']], $groups))) ?>;
     var quickPriorities = <?= json_encode(array_values(array_map(fn($pr) => ['id' => (int)$pr['id'], 'name' => $pr['name'], 'color' => $pr['color'] ?: '#6c757d'], $priorities))) ?>;
+    // [typeId => [allowed priority id, ...]] for types that restrict priorities.
+    var quickTypePriorities = <?= json_encode((object) ($typePriorityMap ?? [])) ?>;
     var quickStatuses   = <?= json_encode(array_values(array_map(fn($s) => ['slug' => $s['slug'], 'label' => $s['label'], 'color' => $s['color'] ?: '#6c757d', 'text_color' => ticketStatusTextColor($s['color'] ?: '#6c757d')], ticketActiveStatuses()))) ?>;
     var quickGroupAgents = <?= json_encode(array_map(fn($agents) => array_values($agents), $groupAgents)) ?>;
     var quickAllAgents  = <?= json_encode(array_values(array_map(fn($a) => ['id' => (int)$a['id'], 'name' => $a['name']], $allAgentsForAssign))) ?>;
@@ -312,10 +314,13 @@ $dir  = $dir ?? 'desc';
                 html += '<li><a class="dropdown-item quick-menu-item" href="#" data-kind="status" data-val="' + esc(st.slug) + '" data-ticket-id="' + esc(ticketId) + '"><span class="badge" style="background-color:' + safeColor(st.color) + ';color:' + safeColor(st.text_color) + ';">' + esc(st.label) + '</span></a></li>';
             });
         } else if (kind === 'priority') {
+            // Restrict to the priorities this ticket's type offers (null = all).
+            var allowedPri = quickTypePriorities[String(parseInt(wrapEl && wrapEl.dataset.typeId) || 0)] || null;
+            var priList = quickPriorities.filter(function (pr) { return !allowedPri || allowedPri.indexOf(pr.id) !== -1; });
             html += '<li><a class="dropdown-item quick-menu-item" href="#" data-kind="priority" data-val="" data-ticket-id="' + esc(ticketId) + '"><span class="text-muted">None</span></a></li>';
-            if (quickPriorities.length) {
+            if (priList.length) {
                 html += '<li><hr class="dropdown-divider"></li>';
-                quickPriorities.forEach(function (pr) {
+                priList.forEach(function (pr) {
                     html += '<li><a class="dropdown-item quick-menu-item" href="#" data-kind="priority" data-val="' + esc(pr.id) + '" data-ticket-id="' + esc(ticketId) + '"><span class="badge" style="background:' + safeColor(pr.color) + ';">' + esc(pr.name) + '</span></a></li>';
                 });
             }
@@ -399,6 +404,9 @@ $dir  = $dir ?? 'desc';
                         var newAgents = (tp && tp.group_id && quickGroupAgents[tp.group_id]) ? quickGroupAgents[tp.group_id] : quickAllAgents;
                         var assignBtn = document.querySelector('.quick-assign-wrap[data-ticket-id="' + ticketId + '"] .quick-assign-btn');
                         if (assignBtn) { assignBtn.dataset.agents = JSON.stringify(newAgents); }
+                        // Keep the priority menu's type in sync so it filters correctly next open.
+                        var priWrapT = document.querySelector('.quick-priority-wrap[data-ticket-id="' + ticketId + '"]');
+                        if (priWrapT) { priWrapT.dataset.typeId = (val === '' ? '0' : String(parseInt(val, 10))); }
                     }
                 }).catch(function () {});
             } else if (kind === 'group') {
@@ -452,13 +460,15 @@ $dir  = $dir ?? 'desc';
                     method: 'POST',
                     headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
                     body: JSON.stringify({priority_id: val === '' ? null : parseInt(val, 10)})
-                }).then(function (r) { return r.json(); }).then(function (data) {
-                    if (data.success) {
-                        if (data.priority_name) {
-                            priorityBadge.innerHTML = '<span class="badge" style="background:' + safeColor(data.priority_color || '#6c757d') + ';">' + esc(data.priority_name) + '</span>';
+                }).then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); }).then(function (res) {
+                    if (res.ok && res.data.success) {
+                        if (res.data.priority_name) {
+                            priorityBadge.innerHTML = '<span class="badge" style="background:' + safeColor(res.data.priority_color || '#6c757d') + ';">' + esc(res.data.priority_name) + '</span>';
                         } else {
                             priorityBadge.innerHTML = '<span class="text-muted">—</span>';
                         }
+                    } else if (res.data && res.data.error) {
+                        alert(res.data.error);
                     }
                 }).catch(function () {});
             }

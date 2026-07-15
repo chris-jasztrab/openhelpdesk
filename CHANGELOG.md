@@ -11,6 +11,15 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.151.1 &mdash; 2026-07-15
+
+### Changed
+- **The per-type priority restriction (2.151.0) is now enforced everywhere a priority can be set, not just the New Ticket forms and ticket detail.** Staff can no longer pick a priority a ticket type doesn't offer through any surface:
+  - **Inline quick-priority menus** (agent ticket list, admin ticket list, agent dashboard) now list only the priorities the row's type allows, and refresh that set when the type is quick-changed in the same row. The <code>/api/tickets/{id}/set-priority</code> endpoint rejects a disallowed priority with a 422 and the menu surfaces the message.
+  - **Bulk "set priority"** (agent + admin) applies the priority only to selected tickets whose type permits it and reports how many were skipped, instead of forcing it onto every ticket (selections can span types with different allowed sets).
+  - **Ticket split** (agent + admin), **recurring-ticket schedules** (create + edit), and **ticket templates** (create + edit) now filter their priority picker to the chosen type and validate server-side on save.
+  - New shared partial <code>templates/partials/type-priority-filter.php</code> drives the client-side filtering on the standalone forms; new helper <code>filterTicketIdsForPriority()</code> backs the bulk skip. Existing records keep a now-disallowed stored priority (shown, never silently dropped); it only resets when the type is actively changed.
+
 ## 2.151.0 &mdash; 2026-07-15
 
 ### Added

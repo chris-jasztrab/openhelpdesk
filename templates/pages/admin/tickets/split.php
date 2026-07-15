@@ -181,3 +181,5 @@ document.querySelectorAll('.comment-row').forEach(row => {
     });
 });
 </script>
+
+<?php require ROOT_DIR . '/templates/partials/type-priority-filter.php'; ?>

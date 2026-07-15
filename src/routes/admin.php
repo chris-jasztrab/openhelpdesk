@@ -3176,7 +3176,7 @@ $router->get('/admin/ticket-templates/create', function () {
     $db         = Database::connect();
     $types      = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
     $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
-    render('admin/ticket-templates/form', ['types' => $types, 'priorities' => $priorities]);
+    render('admin/ticket-templates/form', ['types' => $types, 'priorities' => $priorities, 'typePriorityMap' => typePriorityMap($db)]);
 });
 
 $router->post('/admin/ticket-templates/create', function () {
@@ -3200,6 +3200,11 @@ $router->post('/admin/ticket-templates/create', function () {
     }
 
     $db = Database::connect();
+    if (!priorityAllowedForType($db, $typeId, $priId)) {
+        flash('error', 'That priority is not available for the selected ticket type.');
+        flashInput($_POST);
+        redirect('/admin/ticket-templates/create');
+    }
     $db->prepare(
         'INSERT INTO ticket_templates (name, description, subject, body, type_id, priority_id, is_shared, created_by)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
@@ -3233,7 +3238,7 @@ $router->get('/admin/ticket-templates/{id}/edit', function (array $p) {
     }
     $types      = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
     $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
-    render('admin/ticket-templates/form', ['editing' => $editing, 'types' => $types, 'priorities' => $priorities]);
+    render('admin/ticket-templates/form', ['editing' => $editing, 'types' => $types, 'priorities' => $priorities, 'typePriorityMap' => typePriorityMap($db)]);
 });
 
 $router->post('/admin/ticket-templates/{id}/edit', function (array $p) {
@@ -3261,6 +3266,11 @@ $router->post('/admin/ticket-templates/{id}/edit', function (array $p) {
 
     if ($name === '') {
         flash('error', 'Template name is required.');
+        flashInput($_POST);
+        redirect("/admin/ticket-templates/{$id}/edit");
+    }
+    if (!priorityAllowedForType($db, $typeId, $priId)) {
+        flash('error', 'That priority is not available for the selected ticket type.');
         flashInput($_POST);
         redirect("/admin/ticket-templates/{$id}/edit");
     }
@@ -3397,6 +3407,7 @@ $router->get('/admin/recurring-tickets/create', function () {
         'groups'     => $groups,
         'agents'     => $agents,
         'allUsers'   => $allUsers,
+        'typePriorityMap' => typePriorityMap($db),
     ]);
 });
 
@@ -3410,6 +3421,11 @@ $router->post('/admin/recurring-tickets/create', function () {
     $row = _recurringPostToRow();
     if ($row['name'] === '' || $row['subject'] === '' || $row['body'] === '') {
         flash('error', 'Schedule name, ticket subject and ticket description are required.');
+        flashInput($_POST);
+        redirect('/admin/recurring-tickets/create');
+    }
+    if (!priorityAllowedForType(Database::connect(), $row['type_id'], $row['priority_id'])) {
+        flash('error', 'That priority is not available for the selected ticket type.');
         flashInput($_POST);
         redirect('/admin/recurring-tickets/create');
     }
@@ -3480,6 +3496,7 @@ $router->get('/admin/recurring-tickets/{id}/edit', function (array $p) {
         'groups'     => $groups,
         'agents'     => $agents,
         'allUsers'   => $allUsers,
+        'typePriorityMap' => typePriorityMap($db),
     ]);
 });
 
@@ -3503,6 +3520,11 @@ $router->post('/admin/recurring-tickets/{id}/edit', function (array $p) {
     $row = _recurringPostToRow();
     if ($row['name'] === '' || $row['subject'] === '' || $row['body'] === '') {
         flash('error', 'Schedule name, ticket subject and ticket description are required.');
+        flashInput($_POST);
+        redirect("/admin/recurring-tickets/{$id}/edit");
+    }
+    if (!priorityAllowedForType($db, $row['type_id'], $row['priority_id'])) {
+        flash('error', 'That priority is not available for the selected ticket type.');
         flashInput($_POST);
         redirect("/admin/recurring-tickets/{$id}/edit");
     }
@@ -3837,6 +3859,7 @@ $router->get('/admin/tickets', function () {
         'defaultFilterUrl'     => $defaultFilterUrl,
         'confidentialTypeIds'  => $confidentialTypeIds,
         'adminGroupIds'        => $adminGroupIds,
+        'typePriorityMap'      => typePriorityMap($db),
     ]);
 });
 
@@ -4583,15 +4606,24 @@ $router->post('/admin/tickets/bulk', function () {
                 $chk->execute([$priorityId]);
                 if (!$chk->fetchColumn()) { flash('error', 'Invalid priority.'); redirect('/admin/tickets'); }
             }
-            $db->prepare("UPDATE tickets SET priority_id = ? WHERE id IN ({$placeholders})")
-               ->execute(array_merge([$priorityId], $ticketIds));
+            // Skip tickets whose type doesn't offer this priority (mixed-type selections).
+            [$applyIds, $skipped] = filterTicketIdsForPriority($db, $ticketIds, $priorityId);
+            if ($applyIds) {
+                $ph = implode(',', array_fill(0, count($applyIds), '?'));
+                $db->prepare("UPDATE tickets SET priority_id = ? WHERE id IN ({$ph})")
+                   ->execute(array_merge([$priorityId], $applyIds));
+            }
             logAudit(
                 'ticket.bulk_priority_changed',
                 $priorityId,
                 'ticket',
-                'count=' . count($ticketIds) . '; priority_id=' . ($priorityId ?? 'none') . '; ids=' . implode(',', $ticketIds)
+                'count=' . count($applyIds) . '; skipped=' . $skipped . '; priority_id=' . ($priorityId ?? 'none') . '; ids=' . implode(',', $applyIds)
             );
-            flash('success', count($ticketIds) . ' ticket(s) updated.');
+            if ($skipped > 0) {
+                flash('info', count($applyIds) . ' ticket(s) updated; ' . $skipped . ' skipped because that priority is not available for their ticket type.');
+            } else {
+                flash('success', count($applyIds) . ' ticket(s) updated.');
+            }
             break;
 
         case 'group':
@@ -5304,7 +5336,8 @@ $router->get('/admin/tickets/{id}/split', function (array $p) {
     $types      = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
     $groups     = $db->query('SELECT * FROM `groups` ORDER BY sort_order, name')->fetchAll();
 
-    render('admin/tickets/split', compact('ticket', 'comments', 'agents', 'priorities', 'types', 'groups'));
+    $typePriorityMap = typePriorityMap($db);
+    render('admin/tickets/split', compact('ticket', 'comments', 'agents', 'priorities', 'types', 'groups', 'typePriorityMap'));
 });
 
 $router->post('/admin/tickets/{id}/split', function (array $p) {
@@ -5342,6 +5375,12 @@ $router->post('/admin/tickets/{id}/split', function (array $p) {
     if (requiresConfidentialReAuth($db, $sourceTicket)) {
         flash('error', 'Re-authenticate to access this confidential ticket before splitting.');
         redirect("/admin/tickets/{$sourceId}");
+    }
+
+    if (!priorityAllowedForType($db, $typeId, $priId)) {
+        flashInput($_POST);
+        flash('error', 'That priority is not available for the selected ticket type.');
+        redirect("/admin/tickets/{$sourceId}/split");
     }
 
     $newId = null;

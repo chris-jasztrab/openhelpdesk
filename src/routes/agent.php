@@ -507,6 +507,7 @@ $router->get('/agent/tickets', function () {
         'defaultFilterUrl'   => $defaultFilterUrl,
         'confidentialTypeIds' => $confidentialTypeIds,
         'adminGroupIds'       => $adminGroupIds,
+        'typePriorityMap'     => typePriorityMap($db),
     ]);
 });
 
@@ -1036,15 +1037,24 @@ $router->post('/agent/tickets/bulk', function () {
                 $chk->execute([$priorityId]);
                 if (!$chk->fetchColumn()) { flash('error', 'Invalid priority.'); redirect('/agent/tickets'); }
             }
-            $db->prepare("UPDATE tickets SET priority_id = ? WHERE id IN ({$placeholders})")
-               ->execute(array_merge([$priorityId], $ticketIds));
+            // Skip tickets whose type doesn't offer this priority (mixed-type selections).
+            [$applyIds, $skipped] = filterTicketIdsForPriority($db, $ticketIds, $priorityId);
+            if ($applyIds) {
+                $ph = implode(',', array_fill(0, count($applyIds), '?'));
+                $db->prepare("UPDATE tickets SET priority_id = ? WHERE id IN ({$ph})")
+                   ->execute(array_merge([$priorityId], $applyIds));
+            }
             logAudit(
                 'ticket.bulk_priority_changed',
                 $priorityId,
                 'ticket',
-                'count=' . count($ticketIds) . '; priority_id=' . ($priorityId ?? 'none') . '; ids=' . implode(',', $ticketIds)
+                'count=' . count($applyIds) . '; skipped=' . $skipped . '; priority_id=' . ($priorityId ?? 'none') . '; ids=' . implode(',', $applyIds)
             );
-            flash('success', count($ticketIds) . ' ticket(s) updated.');
+            if ($skipped > 0) {
+                flash('info', count($applyIds) . ' ticket(s) updated; ' . $skipped . ' skipped because that priority is not available for their ticket type.');
+            } else {
+                flash('success', count($applyIds) . ' ticket(s) updated.');
+            }
             break;
 
         case 'group':
@@ -1741,7 +1751,8 @@ $router->get('/agent/tickets/{id}/split', function (array $p) {
     $types      = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
     $groups     = $db->query('SELECT * FROM `groups` ORDER BY sort_order, name')->fetchAll();
 
-    render('agent/tickets/split', compact('ticket', 'comments', 'agents', 'priorities', 'types', 'groups'));
+    $typePriorityMap = typePriorityMap($db);
+    render('agent/tickets/split', compact('ticket', 'comments', 'agents', 'priorities', 'types', 'groups', 'typePriorityMap'));
 });
 
 $router->post('/agent/tickets/{id}/split', function (array $p) {
@@ -1781,6 +1792,12 @@ $router->post('/agent/tickets/{id}/split', function (array $p) {
     if (requiresConfidentialReAuth($db, $sourceTicket)) {
         flash('error', 'Re-authenticate to access this confidential ticket before splitting.');
         redirect("/agent/tickets/{$sourceId}");
+    }
+
+    if (!priorityAllowedForType($db, $typeId, $priId)) {
+        flashInput($_POST);
+        flash('error', 'That priority is not available for the selected ticket type.');
+        redirect("/agent/tickets/{$sourceId}/split");
     }
 
     $newId = null;
