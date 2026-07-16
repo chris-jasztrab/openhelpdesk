@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.151.2 &mdash; 2026-07-16
+
+### Fixed
+- **SLA policies: setting only the resolution time (or only the first-response time) for a priority no longer silently discards it.** The save handler wrote a policy row only when <em>both</em> the first-response and resolution boxes were filled, so entering a resolution while leaving first response blank (or vice versa) dropped the whole row — the change appeared not to save. A row now saves whenever <em>either</em> field is set; the blank field is backfilled from the default (type-agnostic) policy for that priority, falling back to the built-in defaults (60m response / 480m resolution) when the default row leaves it blank too. A row with both fields blank is still treated as "no override" and skipped so the type inherits the default policy.
+
 ## 2.151.1 &mdash; 2026-07-15
 
 ### Changed
