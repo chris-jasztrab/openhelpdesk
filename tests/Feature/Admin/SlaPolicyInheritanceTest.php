@@ -27,8 +27,12 @@ class SlaPolicyInheritanceTest extends TestCase
 
     private PDO $db;
     private array $snapshot = [];
+    private array $typePrioritySnapshot = [];
     private int $typeId;
     private int $priorityId;
+
+    /** @var int[] every priority id, in display order */
+    private array $priorityIds = [];
 
     protected function setUp(): void
     {
@@ -38,14 +42,20 @@ class SlaPolicyInheritanceTest extends TestCase
         $this->snapshot = $this->db->query(
             'SELECT type_id, priority_id, first_response_minutes, resolution_minutes, counted_days FROM sla_policies'
         )->fetchAll(PDO::FETCH_ASSOC);
+        $this->typePrioritySnapshot = $this->db->query(
+            'SELECT type_id, priority_id FROM ticket_type_priorities'
+        )->fetchAll(PDO::FETCH_ASSOC);
 
         $typeId = $this->db->query('SELECT id FROM ticket_types ORDER BY id LIMIT 1')->fetchColumn();
-        $priorityId = $this->db->query('SELECT id FROM ticket_priorities ORDER BY sort_order LIMIT 1')->fetchColumn();
-        if ($typeId === false || $priorityId === false) {
+        $this->priorityIds = array_map(
+            'intval',
+            $this->db->query('SELECT id FROM ticket_priorities ORDER BY sort_order, id')->fetchAll(PDO::FETCH_COLUMN)
+        );
+        if ($typeId === false || $this->priorityIds === []) {
             $this->markTestSkipped('Needs at least one ticket type and one priority.');
         }
         $this->typeId = (int) $typeId;
-        $this->priorityId = (int) $priorityId;
+        $this->priorityId = $this->priorityIds[0];
     }
 
     protected function tearDown(): void
@@ -62,6 +72,12 @@ class SlaPolicyInheritanceTest extends TestCase
                 $row['resolution_minutes'],
                 $row['counted_days'],
             ]);
+        }
+
+        $this->db->exec('DELETE FROM ticket_type_priorities');
+        $insertTp = $this->db->prepare('INSERT INTO ticket_type_priorities (type_id, priority_id) VALUES (?, ?)');
+        foreach ($this->typePrioritySnapshot as $row) {
+            $insertTp->execute([$row['type_id'], $row['priority_id']]);
         }
     }
 
@@ -206,7 +222,74 @@ class SlaPolicyInheritanceTest extends TestCase
         $this->assertNull(Sla::findPolicy($this->db, $this->typeId, $this->priorityId));
     }
 
+    // ── Per-type priority restriction ─────────────────────────────────────────
+
+    /**
+     * A type tab lists only the priorities the type offers — a priority it does
+     * not offer can never reach one of its tickets, so it has no policy to set.
+     */
+    public function test_a_type_tab_omits_priorities_the_type_does_not_offer(): void
+    {
+        if (count($this->priorityIds) < 2) {
+            $this->markTestSkipped('Needs at least two priorities to restrict one away.');
+        }
+        [$allowed, $denied] = $this->priorityIds;
+        $this->restrictTypeTo([$allowed]);
+
+        $r = $this->get($this->adminClient(), self::PATH);
+        $this->assertOk($r);
+        $this->assertSee(
+            "policies[{$this->typeId}][{$allowed}][first_response_minutes]",
+            $r,
+            ' — an offered priority must still have inputs on the type tab'
+        );
+        $this->assertNotSee(
+            "policies[{$this->typeId}][{$denied}][first_response_minutes]",
+            $r,
+            ' — a priority the type does not offer must not be listed on its tab'
+        );
+        // The Default tab is type-agnostic and keeps every priority.
+        $this->assertSee("policies[0][{$denied}][first_response_minutes]", $r, ' — the Default tab lists all priorities');
+    }
+
+    /** A hand-built POST cannot store a policy for a priority the type refuses. */
+    public function test_a_policy_for_an_unoffered_priority_is_rejected(): void
+    {
+        if (count($this->priorityIds) < 2) {
+            $this->markTestSkipped('Needs at least two priorities to restrict one away.');
+        }
+        [$allowed, $denied] = $this->priorityIds;
+        $this->restrictTypeTo([$allowed]);
+
+        $r = $this->post($this->adminClient(), self::PATH, [
+            'policies' => [
+                (string) $this->typeId => [
+                    (string) $allowed => ['first_response_minutes' => '3h', 'resolution_minutes' => ''],
+                    (string) $denied  => ['first_response_minutes' => '2h', 'resolution_minutes' => '9h'],
+                ],
+            ],
+        ]);
+        $this->assertOk($r);
+
+        $stmt = $this->db->prepare('SELECT priority_id FROM sla_policies WHERE type_id = ?');
+        $stmt->execute([$this->typeId]);
+        $stored = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+
+        $this->assertContains($allowed, $stored, ' — the offered priority still saves');
+        $this->assertNotContains($denied, $stored, ' — a policy for an unoffered priority must not be stored');
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /** @param int[] $priorityIds */
+    private function restrictTypeTo(array $priorityIds): void
+    {
+        $this->db->prepare('DELETE FROM ticket_type_priorities WHERE type_id = ?')->execute([$this->typeId]);
+        $insert = $this->db->prepare('INSERT INTO ticket_type_priorities (type_id, priority_id) VALUES (?, ?)');
+        foreach ($priorityIds as $pid) {
+            $insert->execute([$this->typeId, $pid]);
+        }
+    }
 
     private function seed(?int $typeId, int $firstResponse, int $resolution, ?string $countedDays): void
     {

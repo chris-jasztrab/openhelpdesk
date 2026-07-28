@@ -11,6 +11,12 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.151.4 &mdash; 2026-07-28
+
+### Changed
+- **A ticket type's SLA tab now lists only the priorities that type offers.** A type restricted to (say) Medium and High no longer shows Low and Critical rows there — a priority the type doesn't offer can never be set on one of its tickets, so it had no policy worth configuring. Unrestricted types and the Default tab still list every priority. The tab links to the type's Available Priorities setting so the restriction is easy to find.
+- The save handler ignores a submitted policy for a priority its type doesn't offer, so a hand-built POST can't store an unreachable rule.
+
 ## 2.151.3 &mdash; 2026-07-28
 
 ### Fixed

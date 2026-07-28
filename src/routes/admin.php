@@ -7569,11 +7569,14 @@ $router->get('/admin/settings/sla-policies', function () {
     $globalTimezone = getSetting('business_hours_timezone');
 
     render('admin/settings/sla-policies', [
-        'priorities'     => $priorities,
-        'policies'       => $policies,
-        'types'          => $types,
-        'globalSchedule' => $globalSchedule,
-        'globalTimezone' => $globalTimezone,
+        'priorities'      => $priorities,
+        'policies'        => $policies,
+        'types'           => $types,
+        // [type_id => allowed priority ids] for types that restrict theirs, so a
+        // type tab lists only the priorities its tickets can actually be given.
+        'typePriorityMap' => typePriorityMap($db),
+        'globalSchedule'  => $globalSchedule,
+        'globalTimezone'  => $globalTimezone,
     ]);
 });
 
@@ -7621,6 +7624,12 @@ $router->post('/admin/settings/sla-policies', function () {
         $typeId = (int) $typeKey === 0 ? null : (int) $typeKey;
         foreach ($priorities as $priorityId => $data) {
             $priorityId = (int) $priorityId;
+            // A priority the type doesn't offer can never reach one of its
+            // tickets, so don't store a policy for it. The page omits those rows
+            // from the type's tab; this keeps a hand-built POST from adding one.
+            if (!priorityAllowedForType($db, $typeId, $priorityId)) {
+                continue;
+            }
             // Inputs accept d/h/m (e.g. "8h", "2d", "90m"); bare numbers are minutes.
             // A blank field is stored as 0, which Sla::findPolicy() reads as
             // "inherit" — the default policy's value for a type row, or no

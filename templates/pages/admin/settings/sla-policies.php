@@ -102,9 +102,31 @@ $breadcrumbs  = [
                         ? (json_decode($rawTs, true) ?: null)
                         : null;
                     renderTypeBusinessHours((int) $type['id'], is_array($typeSchedule) ? $typeSchedule : null, $globalSchedule);
+
+                    // Only the priorities this type offers. A type with no entry in
+                    // the map is unrestricted, so it lists every priority.
+                    $allowedIds = $typePriorityMap[(int) $type['id']] ?? [];
+                    $typeRows = $allowedIds === []
+                        ? $priorities
+                        : array_values(array_filter(
+                            $priorities,
+                            static fn(array $p): bool => in_array((int) $p['id'], $allowedIds, true)
+                        ));
                     ?>
-                    <p class="text-muted small mb-3">Override SLA targets for <strong><?= e($type['name']) ?></strong> tickets. Leave a box empty to keep using the default policy's value for it.</p>
-                    <?php renderSlaPriorityTable($priorities, $policies[(int) $type['id']] ?? [], (int) $type['id'], $policies[0] ?? []); ?>
+                    <p class="text-muted small mb-3">
+                        Override SLA targets for <strong><?= e($type['name']) ?></strong> tickets. Leave a box empty to keep using the default policy's value for it.
+                        <?php if ($allowedIds !== []): ?>
+                            Only the priorities this type offers are listed &mdash;
+                            <a href="/admin/types/<?= (int) $type['id'] ?>/edit">change its available priorities</a>.
+                        <?php endif; ?>
+                    </p>
+                    <?php if ($typeRows === []): ?>
+                    <div class="alert alert-info mb-0">
+                        <i class="bi bi-info-circle me-1"></i>This type offers no priorities, so it has no SLA targets to set.
+                    </div>
+                    <?php else: ?>
+                    <?php renderSlaPriorityTable($typeRows, $policies[(int) $type['id']] ?? [], (int) $type['id'], $policies[0] ?? []); ?>
+                    <?php endif; ?>
                 </div>
                 <?php endforeach; ?>
             </div>
