@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.151.6 &mdash; 2026-07-28
+
+### Fixed
+- **The "Add field" button in the Form Builder is readable again.** The rule that gives the add-field buttons a solid white fill also hit the primary button, which keeps white text — so its icon, label and caret were white on white and the button looked like an empty box. The white fill now applies only to the outline button beside it.
+
 ## 2.151.5 &mdash; 2026-07-28
 
 ### Fixed

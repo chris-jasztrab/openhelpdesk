@@ -206,7 +206,10 @@ $sysDefaults = systemFieldDefaults();
         background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: .5rem;
         margin-top: 1rem;
     }
-    .add-field-actions .btn-add {
+    /* Solid white fill so an outline button reads as a card against the dashed
+       panel. Must not hit .btn-primary — that keeps its white text, so a white
+       background made the "Add field" label invisible. */
+    .add-field-actions .btn-add:not(.btn-primary) {
         background: #fff;
     }
 
