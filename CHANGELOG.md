@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.151.5 &mdash; 2026-07-28
+
+### Fixed
+- **Text Block fields on a ticket form no longer show a white strip behind their text.** Text authored in — or, far more often, pasted into — a Text Block's editor carries an inline white `background-color`, which painted a white band behind the words on the block's light grey panel. Inner backgrounds inside a text block are now flattened so the text always sits on the panel's own surface. Note: this also flattens a background colour applied on purpose with the editor's highlight button.
+
 ## 2.151.4 &mdash; 2026-07-28
 
 ### Changed

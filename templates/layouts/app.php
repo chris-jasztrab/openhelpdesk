@@ -31,6 +31,13 @@
             background-color: var(--ld-timeline-system-bg) !important;
             border-left: 3px solid var(--ld-timeline-system-accent) !important;
         }
+        /* Text Block fields render on a light grey panel (.bg-light). Content
+           authored in — or, more often, pasted into — the CKEditor for that
+           field carries an inline white background-color, which paints a white
+           strip behind the words on an otherwise grey block. Flatten inner
+           backgrounds so the text always sits on the panel's own surface.
+           !important because the offending declaration is inline. */
+        .ld-text-block * { background-color: transparent !important; }
         /* When an admin hides AI notes, the rows stay in the DOM but are
            visually removed. !important so the "show older updates" collapser,
            which sets an inline display style, cannot reveal a hidden AI row. */
