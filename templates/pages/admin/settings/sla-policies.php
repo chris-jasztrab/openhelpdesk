@@ -103,7 +103,7 @@ $breadcrumbs  = [
                         : null;
                     renderTypeBusinessHours((int) $type['id'], is_array($typeSchedule) ? $typeSchedule : null, $globalSchedule);
                     ?>
-                    <p class="text-muted small mb-3">Override SLA targets for <strong><?= e($type['name']) ?></strong> tickets. Leave at 0 to use the default policy.</p>
+                    <p class="text-muted small mb-3">Override SLA targets for <strong><?= e($type['name']) ?></strong> tickets. Leave a box empty to keep using the default policy's value for it.</p>
                     <?php renderSlaPriorityTable($priorities, $policies[(int) $type['id']] ?? [], (int) $type['id'], $policies[0] ?? []); ?>
                 </div>
                 <?php endforeach; ?>
@@ -113,9 +113,11 @@ $breadcrumbs  = [
 
             <div class="d-flex justify-content-between align-items-center">
                 <div class="form-text">
-                    Set both values to 0 (or leave empty) to disable SLA for a priority. Type-specific values of 0 inherit the default.
+                    Leave a box empty to disable that target; on a type tab an empty box inherits the default policy's value,
+                    so the type follows the default as you change it.
                     Times count only business hours, and only on the days selected under <strong>SLA counts on</strong> &mdash;
                     deselect a day (e.g. Sunday) to freeze the timer then, even if you're open that day.
+                    A day change saves on its own &mdash; you don't need to fill in the times to keep it.
                 </div>
                 <button type="submit" class="btn text-white" style="background:var(--ld-primary);">
                     <i class="bi bi-check-lg me-1"></i>Save Policies
@@ -242,7 +244,11 @@ function renderSlaPriorityTable(array $priorities, array $typePolicies, int $typ
                 $defRes = $defPolicy ? (int) $defPolicy['resolution_minutes'] : 0;
                 $uid = $typeKey . '_' . $pri['id'];
                 // Which weekdays this policy's timer counts. NULL/unset → all days.
-                $counted = $policy ? Sla::parseCountedDays($policy['counted_days'] ?? null) : null;
+                // A type with no policy row of its own follows the default row's
+                // days, so show those rather than implying "all days".
+                $counted = Sla::parseCountedDays(
+                    ($policy ?? $defPolicy)['counted_days'] ?? null
+                );
                 $dayLabels = ['mon' => 'M', 'tue' => 'T', 'wed' => 'W', 'thu' => 'T', 'fri' => 'F', 'sat' => 'S', 'sun' => 'S'];
                 $dayNames  = ['mon' => 'Monday', 'tue' => 'Tuesday', 'wed' => 'Wednesday', 'thu' => 'Thursday', 'fri' => 'Friday', 'sat' => 'Saturday', 'sun' => 'Sunday'];
                 ?>
@@ -269,14 +275,31 @@ function renderSlaPriorityTable(array $priorities, array $typePolicies, int $typ
                                data-default-val="<?= $defRes ?>">
                     </td>
                     <td class="text-muted small">
-                        <?php if (!$isDefault && $frMin === 0 && $resMin === 0 && ($defFr > 0 || $defRes > 0)): ?>
-                            <span id="fr_<?= $uid ?>" class="text-info"><?= $defFr > 0 ? formatDuration($defFr) : '—' ?></span> /
-                            <span id="res_<?= $uid ?>" class="text-info"><?= $defRes > 0 ? formatDuration($defRes) : '—' ?></span>
-                            <span class="badge bg-info bg-opacity-10 text-info ms-1">default</span>
-                        <?php else: ?>
-                            <span id="fr_<?= $uid ?>"><?= $frMin > 0 ? formatDuration($frMin) : '—' ?></span> /
-                            <span id="res_<?= $uid ?>"><?= $resMin > 0 ? formatDuration($resMin) : '—' ?></span>
-                        <?php endif; ?>
+                        <?php
+                        // Each leg is shown on its own: a blank box inherits that
+                        // one value from the default policy (highlighted), which
+                        // matches what Sla::findPolicy() resolves at runtime.
+                        $legs = [
+                            'fr_'  . $uid => [$frMin,  $defFr],
+                            'res_' . $uid => [$resMin, $defRes],
+                        ];
+                        $inherited = false;
+                        $rendered = [];
+                        foreach ($legs as $spanId => [$own, $default]) {
+                            if ($own > 0) {
+                                $rendered[] = '<span id="' . $spanId . '">' . formatDuration($own) . '</span>';
+                            } elseif (!$isDefault && $default > 0) {
+                                $inherited = true;
+                                $rendered[] = '<span id="' . $spanId . '" class="text-info">' . formatDuration($default) . '</span>';
+                            } else {
+                                $rendered[] = '<span id="' . $spanId . '">—</span>';
+                            }
+                        }
+                        echo implode(' / ', $rendered);
+                        if ($inherited) {
+                            echo ' <span class="badge bg-info bg-opacity-10 text-info ms-1">default</span>';
+                        }
+                        ?>
                     </td>
                     <td>
                         <div class="btn-group btn-group-sm sla-day-group" role="group" aria-label="Days this SLA counts">

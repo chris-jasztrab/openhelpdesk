@@ -7594,15 +7594,26 @@ $router->post('/admin/settings/sla-policies', function () {
         'INSERT INTO sla_policies (type_id, priority_id, first_response_minutes, resolution_minutes, counted_days) VALUES (?, ?, ?, ?, ?)'
     );
 
-    // Parse the submitted default-policy (type_id NULL) durations up front so a
-    // type row that fills in only one of the two fields can inherit the other
-    // from the default instead of being silently dropped.
-    $defaultFr  = [];
-    $defaultRes = [];
+    // Collect the checked weekdays of a submitted row in canonical order.
+    // All-seven (or none submitted) becomes NULL, meaning "count every
+    // business-open day".
+    $countedCsvOf = static function (array $data): ?string {
+        $submitted = is_array($data['days'] ?? null) ? $data['days'] : [];
+        $days = array_values(array_filter(
+            Sla::DAY_KEYS,
+            static fn(string $d): bool => !empty($submitted[$d])
+        ));
+        return ($days === [] || count($days) === count(Sla::DAY_KEYS))
+            ? null
+            : implode(',', $days);
+    };
+
+    // Parse the submitted default-policy (type_id NULL) row up front. A type row
+    // is only worth storing when it differs from this, so the type keeps
+    // inheriting the default as the default changes.
+    $defaultDays = [];
     foreach (($policiesData['0'] ?? []) as $priorityId => $data) {
-        $pid = (int) $priorityId;
-        $defaultFr[$pid]  = parseDurationToMinutes((string) ($data['first_response_minutes'] ?? ''), 'm') ?? 0;
-        $defaultRes[$pid] = parseDurationToMinutes((string) ($data['resolution_minutes']     ?? ''), 'm') ?? 0;
+        $defaultDays[(int) $priorityId] = $countedCsvOf($data);
     }
 
     $rowsWritten = 0;
@@ -7611,35 +7622,25 @@ $router->post('/admin/settings/sla-policies', function () {
         foreach ($priorities as $priorityId => $data) {
             $priorityId = (int) $priorityId;
             // Inputs accept d/h/m (e.g. "8h", "2d", "90m"); bare numbers are minutes.
+            // A blank field is stored as 0, which Sla::findPolicy() reads as
+            // "inherit" — the default policy's value for a type row, or no
+            // target at all on the default row itself.
             $firstResponse = parseDurationToMinutes((string) ($data['first_response_minutes'] ?? ''), 'm') ?? 0;
             $resolution    = parseDurationToMinutes((string) ($data['resolution_minutes']     ?? ''), 'm') ?? 0;
+            $countedCsv    = $countedCsvOf($data);
 
-            // A row with neither field set is "no override" — skip it so the type
-            // falls back to the default policy (or the priority just has no SLA).
-            if ($firstResponse <= 0 && $resolution <= 0) {
+            // Decide whether this row says anything. Durations always do. A row
+            // with no durations still counts when its day selection differs from
+            // what it would otherwise inherit — that's a days-only override, and
+            // dropping it here is what used to make day changes on a type tab
+            // look like they didn't save.
+            $inheritedDays = $typeId !== null ? ($defaultDays[$priorityId] ?? null) : null;
+            $hasOverride = $firstResponse > 0
+                || $resolution > 0
+                || $countedCsv !== $inheritedDays;
+            if (!$hasOverride) {
                 continue;
             }
-            // Backfill a blank field so a partial entry still saves. A type row
-            // inherits the missing field from the default policy for this
-            // priority; the default row (and any priority with no default of its
-            // own) falls back to the column defaults (60m response / 480m resolve).
-            if ($firstResponse <= 0) {
-                $firstResponse = ($typeId !== null ? ($defaultFr[$priorityId] ?? 0) : 0) ?: 60;
-            }
-            if ($resolution <= 0) {
-                $resolution = ($typeId !== null ? ($defaultRes[$priorityId] ?? 0) : 0) ?: 480;
-            }
-
-            // Collect the checked weekdays in canonical order. All-seven (or none
-            // submitted) is stored as NULL meaning "count every business-open day".
-            $submittedDays = is_array($data['days'] ?? null) ? $data['days'] : [];
-            $countedDays = array_values(array_filter(
-                Sla::DAY_KEYS,
-                static fn(string $d): bool => !empty($submittedDays[$d])
-            ));
-            $countedCsv = ($countedDays === [] || count($countedDays) === count(Sla::DAY_KEYS))
-                ? null
-                : implode(',', $countedDays);
 
             $insert->execute([$typeId, $priorityId, $firstResponse, $resolution, $countedCsv]);
             $rowsWritten++;

@@ -3654,10 +3654,21 @@ function slaEmailTokens(PDO $db, ?int $typeId, ?int $priorityId): array
     if (!$policy) {
         return $empty;
     }
-    $response   = formatSlaDuration((int) $policy['first_response_minutes']);
-    $resolution = formatSlaDuration((int) $policy['resolution_minutes']);
+    // A policy can set only one of the two targets — describe just what it sets
+    // rather than promising a "0 minutes" deadline.
+    $responseMinutes   = (int) $policy['first_response_minutes'];
+    $resolutionMinutes = (int) $policy['resolution_minutes'];
+    $response   = $responseMinutes   > 0 ? formatSlaDuration($responseMinutes)   : '';
+    $resolution = $resolutionMinutes > 0 ? formatSlaDuration($resolutionMinutes) : '';
+    if ($response !== '' && $resolution !== '') {
+        $sentence = "First response within {$response} and resolution within {$resolution} (business hours)";
+    } elseif ($response !== '') {
+        $sentence = "First response within {$response} (business hours)";
+    } else {
+        $sentence = "Resolution within {$resolution} (business hours)";
+    }
     return [
-        'sla'            => "First response within {$response} and resolution within {$resolution} (business hours)",
+        'sla'            => $sentence,
         'sla_response'   => $response,
         'sla_resolution' => $resolution,
     ];

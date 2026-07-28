@@ -307,27 +307,84 @@ class Sla
 
     /**
      * Find the best-matching SLA policy for a type+priority combination.
-     * Checks for a type-specific policy first, then falls back to the default (NULL type).
+     *
+     * Inheritance is per field, not per row: a type-specific policy overrides
+     * the default (type_id IS NULL) policy only for the values it actually
+     * sets. A duration of 0 on the type row means "inherit the default", which
+     * is what the settings UI promises — so a type can restrict the counted
+     * days (or override just the resolution target) while still following the
+     * default policy's other durations as they change.
+     *
+     * counted_days comes from the type row whenever one exists (NULL there
+     * means "count every business-open day" for this type), otherwise from the
+     * default row.
+     *
+     * Returns null when neither row exists, or when both durations resolve to
+     * 0 — there is then no target to time against, so the ticket gets no SLA.
      */
     public static function findPolicy(PDO $db, ?int $typeId, int $priorityId): ?array
     {
+        $stmt = $db->prepare(
+            'SELECT first_response_minutes, resolution_minutes, counted_days FROM sla_policies WHERE type_id IS NULL AND priority_id = ?'
+        );
+        $stmt->execute([$priorityId]);
+        $default = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+
+        $typeRow = null;
         if ($typeId !== null) {
             $stmt = $db->prepare(
                 'SELECT first_response_minutes, resolution_minutes, counted_days FROM sla_policies WHERE type_id = ? AND priority_id = ?'
             );
             $stmt->execute([$typeId, $priorityId]);
-            $policy = $stmt->fetch(PDO::FETCH_ASSOC);
-            if ($policy) {
-                return $policy;
-            }
+            $typeRow = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
         }
-        // Fallback: default policy (type_id IS NULL)
-        $stmt = $db->prepare(
-            'SELECT first_response_minutes, resolution_minutes, counted_days FROM sla_policies WHERE type_id IS NULL AND priority_id = ?'
-        );
-        $stmt->execute([$priorityId]);
-        $policy = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $policy ?: null;
+
+        if ($typeRow === null && $default === null) {
+            return null;
+        }
+
+        $firstResponse = (int) ($typeRow['first_response_minutes'] ?? 0)
+            ?: (int) ($default['first_response_minutes'] ?? 0);
+        $resolution = (int) ($typeRow['resolution_minutes'] ?? 0)
+            ?: (int) ($default['resolution_minutes'] ?? 0);
+
+        if ($firstResponse <= 0 && $resolution <= 0) {
+            return null;
+        }
+
+        return [
+            'first_response_minutes' => $firstResponse,
+            'resolution_minutes'     => $resolution,
+            'counted_days'           => $typeRow !== null
+                ? ($typeRow['counted_days'] ?? null)
+                : ($default['counted_days'] ?? null),
+        ];
+    }
+
+    /**
+     * Compute a policy's two due dates from a starting point.
+     *
+     * A duration of 0 means the policy sets no target for that leg, which
+     * yields NULL rather than "due immediately" — so a priority can carry a
+     * resolution target with no first-response target (or vice versa).
+     *
+     * @param array $sla      Policy row from findPolicy()
+     * @param array $biz      Business schedule from getBusinessSchedule()
+     * @param array $excluded Holiday dates excluded from SLA
+     * @return array{0: ?string, 1: ?string} [first_response_due_at, resolution_due_at]
+     */
+    private static function dueDatesFor(array $sla, DateTimeImmutable $from, array $biz, array $excluded): array
+    {
+        $countedDays = self::parseCountedDays($sla['counted_days'] ?? null);
+        $due = [];
+        foreach (['first_response_minutes', 'resolution_minutes'] as $field) {
+            $minutes = (int) ($sla[$field] ?? 0);
+            $due[] = $minutes > 0
+                ? self::addBusinessMinutes($from, $minutes, $biz['tz'], $biz['schedule'], $excluded, $countedDays)
+                    ->format('Y-m-d H:i:s')
+                : null;
+        }
+        return $due;
     }
 
     /**
@@ -351,29 +408,24 @@ class Sla
         }
 
         $excluded = self::getExcludedDates($db);
-        $countedDays = self::parseCountedDays($sla['counted_days'] ?? null);
         $now = new DateTimeImmutable('now', new DateTimeZone($biz['tz']));
-        $responseDue = self::addBusinessMinutes($now, (int) $sla['first_response_minutes'], $biz['tz'], $biz['schedule'], $excluded, $countedDays);
-        $resolutionDue = self::addBusinessMinutes($now, (int) $sla['resolution_minutes'], $biz['tz'], $biz['schedule'], $excluded, $countedDays);
+        [$responseDue, $resolutionDue] = self::dueDatesFor($sla, $now, $biz, $excluded);
 
         $db->prepare(
             'UPDATE tickets SET first_response_due_at = ?, resolution_due_at = ?, sla_state = ? WHERE id = ?'
-        )->execute([
-            $responseDue->format('Y-m-d H:i:s'),
-            $resolutionDue->format('Y-m-d H:i:s'),
-            'on_track',
-            $ticketId,
-        ]);
+        )->execute([$responseDue, $resolutionDue, 'on_track', $ticketId]);
 
-        // Add internal timeline entry
-        $details = sprintf(
-            'SLA initialized: First response due by %s, Resolution due by %s',
-            $responseDue->format('M j, Y g:i A'),
-            $resolutionDue->format('M j, Y g:i A')
-        );
+        // Add internal timeline entry — naming only the targets the policy sets.
+        $parts = [];
+        if ($responseDue !== null) {
+            $parts[] = 'First response due by ' . (new DateTimeImmutable($responseDue))->format('M j, Y g:i A');
+        }
+        if ($resolutionDue !== null) {
+            $parts[] = 'Resolution due by ' . (new DateTimeImmutable($resolutionDue))->format('M j, Y g:i A');
+        }
         $db->prepare(
             'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, ?, ?, 1)'
-        )->execute([$ticketId, 'sla_set', $details]);
+        )->execute([$ticketId, 'sla_set', 'SLA initialized: ' . implode(', ', $parts)]);
     }
 
     /**
@@ -496,18 +548,12 @@ class Sla
         }
 
         $excluded = self::getExcludedDates($db);
-        $countedDays = self::parseCountedDays($sla['counted_days'] ?? null);
         $createdAt = new DateTimeImmutable($ticket['created_at'], new DateTimeZone($biz['tz']));
-        $responseDue = self::addBusinessMinutes($createdAt, (int) $sla['first_response_minutes'], $biz['tz'], $biz['schedule'], $excluded, $countedDays);
-        $resolutionDue = self::addBusinessMinutes($createdAt, (int) $sla['resolution_minutes'], $biz['tz'], $biz['schedule'], $excluded, $countedDays);
+        [$responseDue, $resolutionDue] = self::dueDatesFor($sla, $createdAt, $biz, $excluded);
 
         $db->prepare(
             'UPDATE tickets SET first_response_due_at = ?, resolution_due_at = ? WHERE id = ?'
-        )->execute([
-            $responseDue->format('Y-m-d H:i:s'),
-            $resolutionDue->format('Y-m-d H:i:s'),
-            $ticketId,
-        ]);
+        )->execute([$responseDue, $resolutionDue, $ticketId]);
 
         // Recalculate state immediately
         $stmt = $db->prepare(
@@ -557,18 +603,12 @@ class Sla
 
         // Recalculate from ticket creation time
         $excluded = self::getExcludedDates($db);
-        $countedDays = self::parseCountedDays($sla['counted_days'] ?? null);
         $createdAt = new DateTimeImmutable($ticket['created_at'], new DateTimeZone($biz['tz']));
-        $responseDue = self::addBusinessMinutes($createdAt, (int) $sla['first_response_minutes'], $biz['tz'], $biz['schedule'], $excluded, $countedDays);
-        $resolutionDue = self::addBusinessMinutes($createdAt, (int) $sla['resolution_minutes'], $biz['tz'], $biz['schedule'], $excluded, $countedDays);
+        [$responseDue, $resolutionDue] = self::dueDatesFor($sla, $createdAt, $biz, $excluded);
 
         $db->prepare(
             'UPDATE tickets SET first_response_due_at = ?, resolution_due_at = ? WHERE id = ?'
-        )->execute([
-            $responseDue->format('Y-m-d H:i:s'),
-            $resolutionDue->format('Y-m-d H:i:s'),
-            $ticketId,
-        ]);
+        )->execute([$responseDue, $resolutionDue, $ticketId]);
 
         // Recalculate state immediately
         $stmt = $db->prepare(

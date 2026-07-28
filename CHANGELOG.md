@@ -11,6 +11,16 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.151.3 &mdash; 2026-07-28
+
+### Fixed
+- **SLA policies: changing only "SLA counts on" for a ticket type now saves.** On a type tab (Facilities, Customer Experience, any type), deselecting days while leaving both duration boxes blank was discarded by the save handler — it only wrote a row when a duration was filled in, so the page reported "SLA policies saved." while the day change vanished on reload. A days-only override is now stored on its own.
+- **A blank duration box on a type tab inherits the default policy's value instead of freezing a copy of it.** Type-specific policies now inherit field by field, which is what the page has always promised: an empty box stores 0, and `Sla::findPolicy()` resolves 0 to the default policy's current value at runtime. Editing a default target therefore moves every type that inherits it, rather than leaving stale snapshots behind (the 2.151.2 fix backfilled the blank field at save time, which froze it).
+
+### Changed
+- **A priority can now carry just one SLA target.** With only a resolution time set, `first_response_due_at` is left empty instead of being filled with a stand-in 60-minute deadline, and the ticket timeline note and `{{sla}}` email token describe only the target that exists. A priority with no targets anywhere gets no SLA at all rather than a deadline of "right now".
+- Ticket types with no policy row of their own now show the default policy's counted days on their tab, matching the days their SLA timer actually counts.
+
 ## 2.151.2 &mdash; 2026-07-16
 
 ### Fixed
