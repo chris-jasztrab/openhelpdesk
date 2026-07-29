@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.154.1 &mdash; 2026-07-29
+
+### Fixed
+- **The single-instance lock now actually holds between a scheduled run and a manual one.** Scheduled runs come from whichever account owns the crontab — on this server, root — while the Run now buttons run as the web server user. The lock directory was created by whoever got there first and left unreadable to the other, so the second account fell through to "running without an instance lock" and the protection quietly evaporated. The directory is now created sticky world-writable (as `/tmp` is) and the lock files `0666`, so both accounts can contend for the same file. Found on the production box, where root's cron had already created the directory before the web user ever saw it.
+  - `/tmp` would be the conventional place for these, but Apache on Ubuntu runs under systemd `PrivateTmp=true` — the web process and root's cron get separate `/tmp` namespaces and would never see each other's lock at all.
+  - **After upgrading, delete `storage/locks/` once** so it is recreated with the right permissions. It is runtime state; anything in it is safe to remove.
+
 ## 2.154.0 &mdash; 2026-07-29
 
 ### Added

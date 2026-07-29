@@ -103,23 +103,46 @@ final class CronRun
     /**
      * Take an exclusive, non-blocking lock keyed on the script name. Exits the
      * process (75) rather than returning if another copy holds it.
+     *
+     * Permissions matter more than they look here. Scheduled runs come from
+     * whichever account owns the crontab — commonly root — while manual runs
+     * come from the web server user (www-data). For the lock to mean anything
+     * both must be able to open the SAME file, so the directory is sticky
+     * world-writable (like /tmp) and the lock file is 0666. Without that, the
+     * second account silently falls through to "running without an instance
+     * lock" and the mutual exclusion quietly evaporates.
+     *
+     * /tmp would be the conventional home for this, but Apache on Ubuntu runs
+     * with systemd PrivateTmp=true, so the web process and root's cron would get
+     * different /tmp namespaces and never see each other's lock at all. The
+     * files are empty, are never read or executed, and storage/ sits outside the
+     * document root, so a shared directory here is the lesser evil.
      */
     private static function acquireLock(string $scriptName): void
     {
         $lockDir = ROOT_DIR . '/storage/locks';
-        if (!is_dir($lockDir) && !@mkdir($lockDir, 0775, true) && !is_dir($lockDir)) {
-            // Can't create the lock directory (read-only deploy, bad perms).
-            // Locking is a safety net, not the job — carry on unlocked rather
-            // than refusing to run at all.
-            self::emit('WARN: could not create ' . $lockDir . ' — running without an instance lock.');
-            return;
+        if (!is_dir($lockDir)) {
+            if (!@mkdir($lockDir, 0777, true) && !is_dir($lockDir)) {
+                // Can't create the lock directory (read-only deploy, bad perms).
+                // Locking is a safety net, not the job — carry on unlocked rather
+                // than refusing to run at all.
+                self::emit('WARN: could not create ' . $lockDir . ' — running without an instance lock.');
+                return;
+            }
+            // mkdir's mode is masked by umask, so set it explicitly. The sticky
+            // bit stops one account deleting another's lock file.
+            @chmod($lockDir, 01777);
         }
 
         $lockFile = $lockDir . '/' . preg_replace('/[^a-zA-Z0-9._-]/', '_', $scriptName) . '.lock';
+        $existed  = is_file($lockFile);
         $handle   = @fopen($lockFile, 'c');
         if ($handle === false) {
             self::emit('WARN: could not open ' . $lockFile . ' — running without an instance lock.');
             return;
+        }
+        if (!$existed) {
+            @chmod($lockFile, 0666); // so the other account can lock it too
         }
 
         if (!flock($handle, LOCK_EX | LOCK_NB)) {
