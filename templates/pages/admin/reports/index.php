@@ -12,7 +12,7 @@ $breadcrumbs  = [
         <h2 class="fw-bold mb-1">Reports &amp; Analytics</h2>
         <p class="text-muted mb-0">Overview of key metrics for the current period</p>
     </div>
-    <?php if (Auth::isAdmin()): ?>
+    <?php if (canScheduleReports()): ?>
     <a href="/admin/settings/scheduled-reports" class="btn btn-outline-secondary btn-sm">
         <i class="bi bi-envelope-paper me-1"></i>Scheduled Reports
     </a>

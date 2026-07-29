@@ -228,9 +228,31 @@ class Auth
         }
     }
 
-    /** Emit the shared 403 page and stop. */
+    /**
+     * Deny the current request.
+     *
+     * People get told why and bounced to their own dashboard — a dead-end 403
+     * page strands them with no way back. Machine callers (fetch/XHR, /api)
+     * still get a real 403 status with a JSON body so their error handling
+     * works, and the bare 403 page survives as a last resort for the one case
+     * a redirect can't serve: the dashboard itself denying us, which would
+     * otherwise redirect forever.
+     */
     private static function forbid(): never
     {
+        if (self::expectsJson()) {
+            http_response_code(403);
+            header('Content-Type: application/json');
+            echo json_encode(['error' => 'You do not have permission to do that.']);
+            exit;
+        }
+
+        $home = roleLandingPath(self::role());
+        if (currentPath() !== $home) {
+            flash('error', 'You do not have permission to access that page.');
+            redirect($home);
+        }
+
         http_response_code(403);
         echo '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">';
         echo '<title>403 Forbidden</title>';
@@ -238,7 +260,31 @@ class Auth
         echo '</head><body class="d-flex align-items-center justify-content-center" style="min-height:100vh;background:#f1f5f9">';
         echo '<div class="text-center"><h1 class="display-1 fw-bold text-danger">403</h1>';
         echo '<p class="lead text-muted">You do not have permission to access this page.</p>';
-        echo '<a href="/" class="btn btn-primary">Go Home</a></div></body></html>';
+        echo '<a href="/logout" class="btn btn-primary">Sign out</a></div></body></html>';
         exit;
+    }
+
+    /**
+     * True when the caller is script, not browser chrome — an XHR/fetch with
+     * an explicit hint, or anything under /api. Those callers need a 403 they
+     * can parse, not a redirect to an HTML dashboard.
+     */
+    private static function expectsJson(): bool
+    {
+        if (strcasecmp((string) ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? ''), 'xmlhttprequest') === 0) {
+            return true;
+        }
+        $accept = (string) ($_SERVER['HTTP_ACCEPT'] ?? '');
+        if (stripos($accept, 'application/json') !== false && stripos($accept, 'text/html') === false) {
+            return true;
+        }
+        // Browsers label the request's destination: 'document' for a real
+        // navigation or form post, 'empty' for fetch()/XHR. Anything that
+        // isn't a navigation can't act on a redirect, so it gets the 403.
+        $dest = (string) ($_SERVER['HTTP_SEC_FETCH_DEST'] ?? '');
+        if ($dest !== '' && $dest !== 'document') {
+            return true;
+        }
+        return str_starts_with(currentPath(), '/api/');
     }
 }

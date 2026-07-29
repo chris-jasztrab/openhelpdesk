@@ -21,11 +21,15 @@ $breadcrumbs  = [
     <i class="bi bi-calendar3 text-muted"></i>
     <?php require ROOT_DIR . '/templates/partials/report-date-range.php'; ?>
     <button type="submit" class="btn btn-sm text-white" style="background:var(--ld-primary);">Apply</button>
+    <?php if (canScheduleReports()): ?>
     <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#scheduleReportModal">
         <i class="bi bi-calendar-plus me-1"></i>Schedule
     </button>
+    <?php endif; ?>
 </form>
+<?php if (canScheduleReports()): ?>
 <?php require ROOT_DIR . '/templates/partials/schedule-report-modal.php'; ?>
+<?php endif; ?>
 
 <!-- Chart -->
 <div class="card border-0 shadow-sm mb-4">

@@ -43,12 +43,16 @@ $csatExtDash   = trim(getSetting('csat_external_dashboard_url', ''));
     <form class="d-inline-flex align-items-center gap-2 ms-3">
         <?php require ROOT_DIR . '/templates/partials/report-date-range.php'; ?>
         <button type="submit" class="btn btn-sm text-white" style="background:var(--ld-primary);">Apply</button>
+        <?php if (canScheduleReports()): ?>
         <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#scheduleReportModal">
             <i class="bi bi-calendar-plus me-1"></i>Schedule
         </button>
+        <?php endif; ?>
     </form>
 </div>
+<?php if (canScheduleReports()): ?>
 <?php require ROOT_DIR . '/templates/partials/schedule-report-modal.php'; ?>
+<?php endif; ?>
 
 <!-- KPI Cards -->
 <div class="row g-4 mb-4">

@@ -11,6 +11,18 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.152.0 &mdash; 2026-07-29
+
+### Added
+- **Anyone who can read a report can now schedule it.** Scheduling was gated behind "Manage automations & escalations", so power users — who can open every report — could not put one on a timer. Report viewers now get full access to Scheduled Reports (create, edit, enable/disable, delete), and the settings nav shows them the page. Automation managers keep access as before.
+
+### Changed
+- **Being denied a page now tells you so and takes you to your own dashboard.** Opening a page your role can't access showed a dead-end "403 Forbidden" screen whose only link went to the site root. Instead you land on your dashboard with a "You do not have permission to access that page." banner. Scripted callers (fetch/XHR, `/api`) still receive a real 403 with a JSON body so their error handling keeps working.
+
+### Fixed
+- **Buttons for actions you can't perform are no longer shown.** The "Schedule" button on all ten report pages, and the "Scheduled Reports" link on the reports index, rendered for every role that could see the page — clicking through produced a 403. They now appear only for roles that may actually schedule.
+- **Settings search no longer returns pages you can't open.** The search box in Settings indexed every setting regardless of role, so a non-admin could find and click straight into a page they had no permission for. Results are now filtered by the same permission map that hides the nav items.
+
 ## 2.151.7 &mdash; 2026-07-29
 
 ### Fixed

@@ -132,7 +132,7 @@ $settingsNavPerm = static function (string $url): string {
         '/admin/settings/escalations'       => 'automations.manage',
         '/admin/settings/stale-tickets'     => 'automations.manage',
         '/admin/settings/oof'               => 'automations.manage|oof.view',
-        '/admin/settings/scheduled-reports' => 'automations.manage',
+        '/admin/settings/scheduled-reports' => 'automations.manage|reports.view',
         '/admin/settings/cron-jobs'         => 'automations.manage',
         '/admin/settings/ticket-statuses'   => 'workflows.manage',
         '/admin/settings/import-users'      => 'users.manage',
@@ -169,24 +169,34 @@ $settingsNavPerm = static function (string $url): string {
     }
     return $best;
 };
+// True when the current role may open the page at $url.
+$settingsNavAllows = static function (string $url) use ($settingsNavPerm): bool {
+    $perm = $settingsNavPerm($url);
+    if ($perm === '@admin') return Auth::isAdmin();
+    if ($perm === '@staff') return Auth::isStaff();
+    // A '|'-joined value means "any of these permissions" (e.g. a page that
+    // managers configure but read-only roles may also open).
+    foreach (explode('|', $perm) as $p) {
+        if (Auth::can($p)) return true;
+    }
+    return false;
+};
 foreach ($settingsNavGroups as $grpKey => $grpItems) {
-    $settingsNavGroups[$grpKey] = array_values(array_filter($grpItems, static function (array $it) use ($settingsNavPerm) {
-        $perm = $settingsNavPerm($it['url']);
-        if ($perm === '@admin') return Auth::isAdmin();
-        if ($perm === '@staff') return Auth::isStaff();
-        // A '|'-joined value means "any of these permissions" (e.g. a page that
-        // managers configure but read-only roles may also open).
-        foreach (explode('|', $perm) as $p) {
-            if (Auth::can($p)) return true;
-        }
-        return false;
-    }));
+    $settingsNavGroups[$grpKey] = array_values(array_filter(
+        $grpItems,
+        static fn (array $it): bool => $settingsNavAllows($it['url'])
+    ));
     if (empty($settingsNavGroups[$grpKey])) {
         unset($settingsNavGroups[$grpKey]);
     }
 }
 $currentPath          = currentPath();
-$settingsSearchIndex  = require ROOT_DIR . '/config/settings_index.php';
+// Filter search hits the same way as the nav itself — a result the role can't
+// open is a dead end, so it shouldn't be findable.
+$settingsSearchIndex  = array_values(array_filter(
+    require ROOT_DIR . '/config/settings_index.php',
+    static fn (array $e): bool => $settingsNavAllows((string) ($e['page_url'] ?? ''))
+));
 
 // Pick a single active URL via longest-prefix match, so a sub-page like
 // /admin/types/matrix doesn't also highlight its parent /admin/types.

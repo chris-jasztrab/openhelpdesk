@@ -12198,20 +12198,20 @@ $router->get('/admin/reports/custom', function () {
  * ================================================================== */
 
 $router->get('/admin/settings/scheduled-reports', function () {
-    Auth::requirePermission('automations.manage');
+    Auth::requirePermission('reports.view', 'automations.manage');
     $db      = Database::connect();
     $reports = $db->query('SELECT * FROM scheduled_reports ORDER BY name')->fetchAll();
     render('admin/settings/scheduled-reports', compact('reports'));
 });
 
 $router->get('/admin/settings/scheduled-reports/create', function () {
-    Auth::requirePermission('automations.manage');
+    Auth::requirePermission('reports.view', 'automations.manage');
     $report = null;
     render('admin/settings/scheduled-reports-form', compact('report'));
 });
 
 $router->post('/admin/settings/scheduled-reports/create', function () {
-    Auth::requirePermission('automations.manage');
+    Auth::requirePermission('reports.view', 'automations.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/scheduled-reports');
@@ -12252,7 +12252,7 @@ $router->post('/admin/settings/scheduled-reports/create', function () {
 });
 
 $router->get('/admin/settings/scheduled-reports/{id}/edit', function (array $vars) {
-    Auth::requirePermission('automations.manage');
+    Auth::requirePermission('reports.view', 'automations.manage');
     $db     = Database::connect();
     $stmt   = $db->prepare('SELECT * FROM scheduled_reports WHERE id = ?');
     $stmt->execute([(int)$vars['id']]);
@@ -12262,7 +12262,7 @@ $router->get('/admin/settings/scheduled-reports/{id}/edit', function (array $var
 });
 
 $router->post('/admin/settings/scheduled-reports/{id}/edit', function (array $vars) {
-    Auth::requirePermission('automations.manage');
+    Auth::requirePermission('reports.view', 'automations.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/scheduled-reports');
@@ -12308,7 +12308,7 @@ $router->post('/admin/settings/scheduled-reports/{id}/edit', function (array $va
 });
 
 $router->post('/admin/settings/scheduled-reports/{id}/delete', function (array $vars) {
-    Auth::requirePermission('automations.manage');
+    Auth::requirePermission('reports.view', 'automations.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/scheduled-reports');
@@ -12325,7 +12325,7 @@ $router->post('/admin/settings/scheduled-reports/{id}/delete', function (array $
 });
 
 $router->post('/admin/settings/scheduled-reports/{id}/toggle', function (array $vars) {
-    Auth::requirePermission('automations.manage');
+    Auth::requirePermission('reports.view', 'automations.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/scheduled-reports');

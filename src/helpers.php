@@ -7997,6 +7997,22 @@ function roleIsStaff(?string $slug): bool
     return $r !== null && $r['is_staff'];
 }
 
+/**
+ * May the current user create and manage emailed report schedules?
+ *
+ * Anyone who can read a report can schedule it — a schedule is just that same
+ * report on a timer, so gating it separately only produced buttons that 403'd.
+ * Automation managers keep access for the case where they configure the jobs
+ * without reading the reports themselves.
+ *
+ * Keep in step with the `Auth::requirePermission()` calls on the
+ * /admin/settings/scheduled-reports routes.
+ */
+function canScheduleReports(): bool
+{
+    return Auth::can('reports.view') || Auth::can('automations.manage');
+}
+
 /** Where the home route ('/') should send this role. Unknown → portal. */
 function roleLandingPath(?string $slug): string
 {

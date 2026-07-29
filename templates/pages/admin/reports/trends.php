@@ -22,9 +22,11 @@ $breadcrumbs  = [
     <?php require ROOT_DIR . '/templates/partials/report-date-range.php'; ?>
     <input type="hidden" name="group_by" value="<?= e($groupBy) ?>">
     <button type="submit" class="btn btn-sm text-white" style="background:var(--ld-primary);">Apply</button>
+    <?php if (canScheduleReports()): ?>
     <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#scheduleReportModal">
         <i class="bi bi-calendar-plus me-1"></i>Schedule
     </button>
+    <?php endif; ?>
     <div class="ms-2 d-flex gap-1">
         <a href="?from=<?= urlencode($from) ?>&to=<?= urlencode($to) ?>&group_by=type"
            class="btn btn-sm <?= $groupBy === 'type' ? 'btn-primary' : 'btn-outline-secondary' ?>">
@@ -75,4 +77,6 @@ new Chart(document.getElementById('trendsChart'), {
 });
 </script>
 <?php endif; ?>
+<?php if (canScheduleReports()): ?>
 <?php require ROOT_DIR . '/templates/partials/schedule-report-modal.php'; ?>
+<?php endif; ?>
