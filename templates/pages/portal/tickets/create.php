@@ -263,6 +263,7 @@ endif; ?>
                      data-field-kind="custom"
                      data-field-key="<?= (int) $cf['id'] ?>"
                      data-field-id="<?= (int) $cf['id'] ?>"
+                     data-field-type="<?= e($cf['field_type']) ?>"
                      <?= $isAbsent ? 'style="display:none;"' : '' ?>>
                     <?php
                     // The shared custom-field partial expects $cf, $cfKey, $cfOpts.
@@ -368,8 +369,12 @@ endif; ?>
             var key  = wrap.dataset.fieldKey;
             var v    = visByKey[kind + '|' + key];
             if (!selectedType) {
-                // No type chosen yet — show everything as optional preview
-                wrap.style.display = '';
+                // No type chosen yet — show input fields as an optional preview, but
+                // keep content-only blocks (text blocks / images) hidden: they are
+                // written for one specific type and stack up as noise otherwise.
+                var contentOnly = kind === 'custom' &&
+                    (wrap.dataset.fieldType === 'text_block' || wrap.dataset.fieldType === 'image');
+                wrap.style.display = contentOnly ? 'none' : '';
                 setRequired(wrap, false);
                 return;
             }

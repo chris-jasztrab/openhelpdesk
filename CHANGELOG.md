@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.151.7 &mdash; 2026-07-29
+
+### Fixed
+- **The new-request form no longer stacks up every ticket type's Text Blocks before a type is chosen.** With no type selected the form shows its fields as an optional preview, which also dumped every type's Text Block and image content onto the page at once — a customer opening the form saw eight "Priority Examples" panels belonging to eight different types. Content-only fields now stay hidden until a ticket type is picked, so only that type's blocks appear. Input fields still preview as before.
+
 ## 2.151.6 &mdash; 2026-07-28
 
 ### Fixed
