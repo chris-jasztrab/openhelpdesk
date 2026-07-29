@@ -32,7 +32,13 @@ $typeLabels = [
     <div>
         <h5 class="fw-semibold mb-1"><i class="bi bi-envelope-paper me-2"></i>Scheduled Reports</h5>
         <p class="text-muted mb-0" style="font-size:.875rem;">
-            Automatically email report summaries to managers on a daily, weekly, or monthly cadence.
+            <?php if ($seesAll): ?>
+                Automatically email report summaries on a daily, weekly, or monthly cadence.
+                As an admin you see every schedule, whoever created it.
+            <?php else: ?>
+                Automatically email report summaries on a daily, weekly, or monthly cadence.
+                You see and manage the schedules you created.
+            <?php endif; ?>
         </p>
     </div>
     <a href="/admin/settings/scheduled-reports/create" class="btn text-white btn-sm" style="background:var(--ld-primary);">
@@ -44,7 +50,7 @@ $typeLabels = [
 <div class="card border-0 shadow-sm mb-4">
     <div class="card-body text-center py-5 text-muted">
         <i class="bi bi-envelope-paper fs-1 d-block mb-3 opacity-25"></i>
-        <p class="mb-3">No scheduled reports yet.</p>
+        <p class="mb-3"><?= $seesAll ? 'No scheduled reports yet.' : "You haven't scheduled any reports yet." ?></p>
         <a href="/admin/settings/scheduled-reports/create" class="btn text-white btn-sm" style="background:var(--ld-primary);">
             <i class="bi bi-plus-lg me-1"></i>Create your first schedule
         </a>
@@ -56,12 +62,10 @@ $typeLabels = [
         <table class="table table-hover mb-0 align-middle">
             <thead class="table-light">
                 <tr>
-                    <th>Name</th>
-                    <th>Report Type</th>
+                    <th>Report</th>
+                    <th>Cadence</th>
+                    <th>Created By</th>
                     <th>Recipients</th>
-                    <th>Frequency</th>
-                    <th>Send Day</th>
-                    <th>Date Range</th>
                     <th>Last Sent</th>
                     <th style="width:80px;">Enabled</th>
                     <th style="width:120px;"></th>
@@ -70,19 +74,38 @@ $typeLabels = [
             <tbody>
             <?php foreach ($reports as $report):
                 $recipients = json_decode($report['recipients'], true) ?: [];
-                $dayLabels  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+                $dayLabels  = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+                // One plain-English cadence line beats three columns of parts.
                 if ($report['frequency'] === 'daily') {
-                    $sendDayDisplay = '—';
+                    $cadence = 'Every day';
                 } elseif ($report['frequency'] === 'weekly') {
-                    $sendDayDisplay = $dayLabels[(int)$report['send_day']] ?? $report['send_day'];
+                    $cadence = 'Every ' . ($dayLabels[(int)$report['send_day']] ?? $report['send_day']);
                 } else {
-                    $sendDayDisplay = 'Day ' . $report['send_day'];
+                    $cadence = 'Monthly on day ' . (int)$report['send_day'];
                 }
                 $dateRangeDays = (int)($report['date_range_days'] ?? 30);
+                $isMine        = (int)($report['created_by'] ?? 0) === (int)Auth::id();
+                $creatorName   = trim((string)($report['creator_name'] ?? ''));
             ?>
             <tr class="<?= $report['is_enabled'] ? '' : 'opacity-50' ?>">
-                <td class="fw-semibold"><?= e($report['name']) ?></td>
-                <td><span class="badge bg-light text-dark border"><?= e($typeLabels[$report['report_type']] ?? $report['report_type']) ?></span></td>
+                <td>
+                    <div class="fw-semibold"><?= e($report['name']) ?></div>
+                    <span class="badge bg-light text-dark border fw-normal"><?= e($typeLabels[$report['report_type']] ?? $report['report_type']) ?></span>
+                </td>
+                <td>
+                    <div><?= e($cadence) ?></div>
+                    <div class="text-muted small">Covers previous <?= $dateRangeDays ?> days</div>
+                </td>
+                <td class="small">
+                    <?php if ($isMine): ?>
+                        <span class="badge rounded-pill text-bg-secondary fw-normal">You</span>
+                    <?php elseif ($creatorName !== ''): ?>
+                        <div><?= e($creatorName) ?></div>
+                        <div class="text-muted" style="font-size:.75rem;"><?= e((string)($report['creator_email'] ?? '')) ?></div>
+                    <?php else: ?>
+                        <span class="text-muted" title="The account that created this schedule no longer exists">No owner</span>
+                    <?php endif; ?>
+                </td>
                 <td class="small text-muted" style="max-width:200px;">
                     <?php foreach (array_slice($recipients, 0, 2) as $email): ?>
                         <div><?= e($email) ?></div>
@@ -91,9 +114,6 @@ $typeLabels = [
                         <div class="text-muted">+<?= count($recipients) - 2 ?> more</div>
                     <?php endif; ?>
                 </td>
-                <td class="text-capitalize"><?= e($report['frequency']) ?></td>
-                <td><?= e($sendDayDisplay) ?></td>
-                <td class="text-muted small">Prev. <?= $dateRangeDays ?>d</td>
                 <td class="text-muted small">
                     <?= $report['last_sent_at'] ? date('M j, Y', strtotime($report['last_sent_at'])) : '—' ?>
                 </td>
@@ -125,7 +145,8 @@ $typeLabels = [
 </div>
 <?php endif; ?>
 
-<!-- Cron setup -->
+<!-- Cron setup — server-side wiring, so only admins can act on it -->
+<?php if (Auth::isAdmin()): ?>
 <div class="card border-0 shadow-sm">
     <div class="card-header bg-white py-3">
         <h6 class="mb-0 fw-semibold"><i class="bi bi-clock me-2"></i>Cron Setup</h6>
@@ -143,6 +164,7 @@ $typeLabels = [
         </p>
     </div>
 </div>
+<?php endif; ?>
 
 <!-- Delete Scheduled Report Modal -->
 <div class="modal fade" id="deleteReportModal" tabindex="-1" aria-labelledby="deleteReportModalLabel" aria-hidden="true">

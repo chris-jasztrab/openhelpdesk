@@ -12197,11 +12197,46 @@ $router->get('/admin/reports/custom', function () {
  * ADMIN – Settings: Scheduled Reports
  * ================================================================== */
 
+/**
+ * Load one schedule, or null when the current user has no business with it.
+ *
+ * Deliberately collapses "no such row" and "someone else's row" into the same
+ * null: a non-admin probing ids shouldn't be able to tell which schedules
+ * exist. Callers turn null into the shared 404.
+ */
+$loadScheduledReport = static function (int $id): ?array {
+    $stmt = Database::connect()->prepare('SELECT * FROM scheduled_reports WHERE id = ?');
+    $stmt->execute([$id]);
+    $report = $stmt->fetch(\PDO::FETCH_ASSOC);
+    if (!$report || !canManageScheduledReport($report)) {
+        return null;
+    }
+    return $report;
+};
+
 $router->get('/admin/settings/scheduled-reports', function () {
     Auth::requirePermission('reports.view', 'automations.manage');
-    $db      = Database::connect();
-    $reports = $db->query('SELECT * FROM scheduled_reports ORDER BY name')->fetchAll();
-    render('admin/settings/scheduled-reports', compact('reports'));
+    $db = Database::connect();
+
+    // Your own schedules only — admins get everyone's, with the owner named so
+    // they can tell whose mail is going out.
+    $sql = "SELECT sr.*,
+                   TRIM(CONCAT(COALESCE(u.first_name,''), ' ', COALESCE(u.last_name,''))) AS creator_name,
+                   u.email AS creator_email
+            FROM scheduled_reports sr
+            LEFT JOIN users u ON u.id = sr.created_by";
+    if (Auth::isAdmin()) {
+        $reports = $db->query($sql . ' ORDER BY sr.name')->fetchAll();
+    } else {
+        $stmt = $db->prepare($sql . ' WHERE sr.created_by = ? ORDER BY sr.name');
+        $stmt->execute([Auth::id()]);
+        $reports = $stmt->fetchAll();
+    }
+
+    render('admin/settings/scheduled-reports', [
+        'reports'   => $reports,
+        'seesAll'   => Auth::isAdmin(),
+    ]);
 });
 
 $router->get('/admin/settings/scheduled-reports/create', function () {
@@ -12236,9 +12271,9 @@ $router->post('/admin/settings/scheduled-reports/create', function () {
     }
 
     $db->prepare(
-        'INSERT INTO scheduled_reports (name, report_type, recipients, frequency, send_day, date_range_days, is_enabled)
-         VALUES (?, ?, ?, ?, ?, ?, ?)'
-    )->execute([$name, $reportType, json_encode(array_values($recipients)), $frequency, $sendDay, $dateRangeDays, $enabled]);
+        'INSERT INTO scheduled_reports (created_by, name, report_type, recipients, frequency, send_day, date_range_days, is_enabled)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    )->execute([Auth::id(), $name, $reportType, json_encode(array_values($recipients)), $frequency, $sendDay, $dateRangeDays, $enabled]);
     $newId = (int) $db->lastInsertId();
     logAudit(
         'scheduled_report.created',
@@ -12251,17 +12286,14 @@ $router->post('/admin/settings/scheduled-reports/create', function () {
     redirect('/admin/settings/scheduled-reports');
 });
 
-$router->get('/admin/settings/scheduled-reports/{id}/edit', function (array $vars) {
+$router->get('/admin/settings/scheduled-reports/{id}/edit', function (array $vars) use ($loadScheduledReport) {
     Auth::requirePermission('reports.view', 'automations.manage');
-    $db     = Database::connect();
-    $stmt   = $db->prepare('SELECT * FROM scheduled_reports WHERE id = ?');
-    $stmt->execute([(int)$vars['id']]);
-    $report = $stmt->fetch();
+    $report = $loadScheduledReport((int) $vars['id']);
     if (!$report) { http_response_code(404); echo 'Not found'; exit; }
     render('admin/settings/scheduled-reports-form', compact('report'));
 });
 
-$router->post('/admin/settings/scheduled-reports/{id}/edit', function (array $vars) {
+$router->post('/admin/settings/scheduled-reports/{id}/edit', function (array $vars) use ($loadScheduledReport) {
     Auth::requirePermission('reports.view', 'automations.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -12269,6 +12301,8 @@ $router->post('/admin/settings/scheduled-reports/{id}/edit', function (array $va
     }
     $db             = Database::connect();
     $id             = (int)$vars['id'];
+    $existing       = $loadScheduledReport($id);
+    if (!$existing) { http_response_code(404); echo 'Not found'; exit; }
     $name           = trim($_POST['name'] ?? '');
     $allowedTypes   = ['overview','agent_performance','ticket_volume','response_times','sla',
                        'unresolved','lifecycle','location','csat','workload','trends','fcr'];
@@ -12287,9 +12321,12 @@ $router->post('/admin/settings/scheduled-reports/{id}/edit', function (array $va
         redirect("/admin/settings/scheduled-reports/{$id}/edit");
     }
 
-    $priorRpt = $db->prepare('SELECT name, report_type, frequency, is_enabled FROM scheduled_reports WHERE id = ?');
-    $priorRpt->execute([$id]);
-    $rptPrior = $priorRpt->fetch(\PDO::FETCH_ASSOC) ?: [];
+    $rptPrior = [
+        'name'        => $existing['name'],
+        'report_type' => $existing['report_type'],
+        'frequency'   => $existing['frequency'],
+        'is_enabled'  => $existing['is_enabled'],
+    ];
 
     $db->prepare(
         'UPDATE scheduled_reports SET name=?, report_type=?, recipients=?, frequency=?, send_day=?, date_range_days=?, is_enabled=? WHERE id=?'
@@ -12307,33 +12344,31 @@ $router->post('/admin/settings/scheduled-reports/{id}/edit', function (array $va
     redirect('/admin/settings/scheduled-reports');
 });
 
-$router->post('/admin/settings/scheduled-reports/{id}/delete', function (array $vars) {
+$router->post('/admin/settings/scheduled-reports/{id}/delete', function (array $vars) use ($loadScheduledReport) {
     Auth::requirePermission('reports.view', 'automations.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/scheduled-reports');
     }
-    $id   = (int) $vars['id'];
-    $db   = Database::connect();
-    $nm   = $db->prepare('SELECT name FROM scheduled_reports WHERE id = ?');
-    $nm->execute([$id]);
-    $rname = (string) ($nm->fetchColumn() ?: '');
+    $id     = (int) $vars['id'];
+    $report = $loadScheduledReport($id);
+    if (!$report) { http_response_code(404); echo 'Not found'; exit; }
+    $db    = Database::connect();
+    $rname = (string) $report['name'];
     $db->prepare('DELETE FROM scheduled_reports WHERE id = ?')->execute([$id]);
     logAudit('scheduled_report.deleted', $id, 'scheduled_report', 'name=' . $rname);
     flash('success', 'Scheduled report deleted.');
     redirect('/admin/settings/scheduled-reports');
 });
 
-$router->post('/admin/settings/scheduled-reports/{id}/toggle', function (array $vars) {
+$router->post('/admin/settings/scheduled-reports/{id}/toggle', function (array $vars) use ($loadScheduledReport) {
     Auth::requirePermission('reports.view', 'automations.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/scheduled-reports');
     }
-    $db   = Database::connect();
-    $stmt = $db->prepare('SELECT is_enabled FROM scheduled_reports WHERE id = ?');
-    $stmt->execute([(int)$vars['id']]);
-    $row  = $stmt->fetch();
+    $db  = Database::connect();
+    $row = $loadScheduledReport((int) $vars['id']);
     if (!$row) { redirect('/admin/settings/scheduled-reports'); }
     $newState = $row['is_enabled'] ? 0 : 1;
     $db->prepare('UPDATE scheduled_reports SET is_enabled = ? WHERE id = ?')

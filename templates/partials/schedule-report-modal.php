@@ -82,10 +82,12 @@
 
                     <!-- Recipients -->
                     <div class="mb-3">
-                        <label class="form-label fw-semibold small" for="schedRecipients">Recipients <span class="text-danger">*</span></label>
-                        <textarea name="recipients" id="schedRecipients" class="form-control form-control-sm" rows="3"
-                                  placeholder="manager@example.com&#10;director@example.com" required></textarea>
-                        <div class="form-text">One email address per line.</div>
+                        <?php
+                        $emailListId    = 'schedRecipients';
+                        $emailListValue = (string) (Auth::user()['email'] ?? '');
+                        $emailListHelp  = 'Type an address and press Enter, or paste a whole list.';
+                        require ROOT_DIR . '/templates/partials/email-list-input.php';
+                        ?>
                     </div>
 
                     <!-- Enabled -->

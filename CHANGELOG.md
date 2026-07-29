@@ -11,6 +11,20 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.153.0 &mdash; 2026-07-29
+
+### Added
+- **A scheduled report now belongs to the person who created it.** Your Scheduled Reports list shows the schedules you made and nothing else; admins still see every schedule, with a **Created By** column naming the owner. Editing, enabling/disabling and deleting are restricted to a schedule's owner (and admins) — reaching someone else's by URL returns Not Found, which also means a non-admin can't discover which schedules exist by probing ids.
+- **Recipients are entered as chips instead of a raw textarea.** Type an address and press Enter, comma, semicolon or space to commit it; paste a whole list from a spreadsheet or an Outlook `To:` line and it splits into individual addresses; Backspace removes the last one; an **Add me** button fills in your own address. Malformed addresses turn red and block saving instead of being silently dropped at send time. Used by both the Scheduled Reports form and the quick "Schedule" modal on every report page.
+- **Report emails now say which schedule they came from and who set it up**, so a recipient who didn't create the schedule knows who to ask to be taken off it.
+
+### Changed
+- **The Cron Setup panel on Scheduled Reports is admin-only.** It documents server-side crontab wiring, including filesystem paths, that a non-admin can't act on.
+- **Cadence reads as one plain-English column.** The separate Frequency / Send Day / Date Range columns are now a single "Every Monday — covers previous 30 days", which also unclutters a table that had grown to nine columns.
+
+### Migration
+- `071_scheduled_reports_created_by.php` adds `scheduled_reports.created_by` (FK to `users`, `ON DELETE SET NULL` so a departing owner's schedule keeps running as ownerless/admin-only rather than vanishing). **Pre-existing schedules are deleted** — their recipient lists were written when the list was shared and editable by anyone with access, so they can't be attributed to one owner. Recreate any schedules you still want.
+
 ## 2.152.0 &mdash; 2026-07-29
 
 ### Added

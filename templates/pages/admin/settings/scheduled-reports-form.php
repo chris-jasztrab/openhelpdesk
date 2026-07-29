@@ -129,11 +129,12 @@ $allReportTypes  = [
 
                 <!-- Recipients -->
                 <div class="col-12">
-                    <label class="form-label fw-semibold">Recipients <span class="text-danger">*</span></label>
-                    <textarea name="recipients" class="form-control" rows="4"
-                              placeholder="one@example.com&#10;two@example.com"
-                              required><?= e($recipients) ?></textarea>
-                    <div class="form-text">Enter one email address per line.</div>
+                    <?php
+                    $emailListId    = 'reportRecipients';
+                    $emailListValue = $recipients;
+                    $emailListHelp  = 'Who receives this report. Type an address and press Enter, or paste a whole list.';
+                    require ROOT_DIR . '/templates/partials/email-list-input.php';
+                    ?>
                 </div>
             </div>
         </div>

@@ -35,8 +35,15 @@ logLine('Scheduled report processor started.');
 
 $db = Database::connect();
 
-// Load all enabled scheduled reports
-$reports = $db->query('SELECT * FROM scheduled_reports WHERE is_enabled = 1')->fetchAll();
+// Load all enabled scheduled reports, with whoever set each one up — recipients
+// who didn't create the schedule need to know whose it is to get off it.
+$reports = $db->query(
+    "SELECT sr.*,
+            TRIM(CONCAT(COALESCE(u.first_name,''), ' ', COALESCE(u.last_name,''))) AS creator_name
+     FROM scheduled_reports sr
+     LEFT JOIN users u ON u.id = sr.created_by
+     WHERE sr.is_enabled = 1"
+)->fetchAll();
 
 if (empty($reports)) {
     logLine('No enabled scheduled reports. Exiting.');
@@ -393,7 +400,9 @@ foreach ($reports as $report) {
     $appName    = getSetting('app_name', 'OpenHelpDesk');
     $appUrl     = env('APP_URL', 'http://localhost');
     $brandColor = getSetting('branding_primary_color', '#4f46e5');
-    $footerText = "Sent by {$appName} · Scheduled Reports";
+    $creator    = trim((string) ($report['creator_name'] ?? ''));
+    $footerText = "Sent by {$appName} · \"{$name}\""
+        . ($creator !== '' ? ", a report schedule set up by {$creator}" : '');
     $typeLabels = [
         'overview'          => 'Overview',
         'agent_performance' => 'Agent Performance',

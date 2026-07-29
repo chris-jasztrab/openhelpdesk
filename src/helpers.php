@@ -8013,6 +8013,23 @@ function canScheduleReports(): bool
     return Auth::can('reports.view') || Auth::can('automations.manage');
 }
 
+/**
+ * May the current user open/edit/delete this one scheduled report?
+ *
+ * A schedule is personal: its creator manages it, admins manage everyone's.
+ * An ownerless row (`created_by` NULL — a schedule whose creator's account was
+ * deleted) is admin-only, so it can be reassigned or retired deliberately
+ * rather than being adopted by whoever finds it.
+ */
+function canManageScheduledReport(array $report): bool
+{
+    if (Auth::isAdmin()) {
+        return true;
+    }
+    $owner = $report['created_by'] ?? null;
+    return $owner !== null && (int) $owner === (int) Auth::id();
+}
+
 /** Where the home route ('/') should send this role. Unknown → portal. */
 function roleLandingPath(?string $slug): string
 {

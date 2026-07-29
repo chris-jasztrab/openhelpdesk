@@ -501,6 +501,7 @@ CREATE TABLE IF NOT EXISTS `saved_filters` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE IF NOT EXISTS `scheduled_reports` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `created_by` int(10) unsigned DEFAULT NULL,
   `name` varchar(255) NOT NULL,
   `report_type` varchar(50) NOT NULL DEFAULT 'overview',
   `recipients` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL CHECK (json_valid(`recipients`)),
@@ -511,7 +512,9 @@ CREATE TABLE IF NOT EXISTS `scheduled_reports` (
   `is_enabled` tinyint(1) NOT NULL DEFAULT 1,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  KEY `idx_scheduled_reports_created_by` (`created_by`),
+  CONSTRAINT `fk_scheduled_reports_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE IF NOT EXISTS `settings` (
   `setting_key` varchar(100) NOT NULL,
