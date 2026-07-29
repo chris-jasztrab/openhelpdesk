@@ -8,182 +8,30 @@ $breadcrumbs  = [
     ['label' => 'Cron Jobs'],
 ];
 
+// The job list, the crontab/schtasks commands and the status check all live in
+// src/CronJobs.php — the run endpoint needs the same data, and two copies of it
+// would drift apart.
+$cronJobs = CronJobs::all();
+
 // Detected platform — drives the default-selected tab. Both platforms'
 // commands are always rendered; the tab only controls which one is visible.
-$isWindows = stripos(PHP_OS, 'WIN') === 0;
+$isWindows       = stripos(PHP_OS, 'WIN') === 0;
+$defaultPlatform = $isWindows ? 'windows' : 'linux';
 
-// ── Path/binary helpers ─────────────────────────────────────────────
-// When we know the install lives on this OS, we emit its real absolute paths
-// (copy-and-paste ready). When we're showing the *other* platform's tab, we
-// fall back to a conventional placeholder so the command is at least shaped
-// correctly — the user replaces the path with their own.
-$linuxRoot   = $isWindows ? '/var/www/openhelpdesk'       : rtrim(ROOT_DIR, '/');
-$linuxPhp    = 'php';
+// Can this server spawn a job at all? Drives whether the run buttons are live
+// or disabled-with-an-explanation.
+$runnable = CronJobs::runnability();
 
-$windowsRoot = $isWindows ? str_replace('/', '\\', rtrim(ROOT_DIR, '/')) : 'C:\\xampp\\htdocs\\freshwpl';
-$windowsPhp  = $isWindows ? str_replace('/', '\\', PHP_BINARY)           : 'C:\\xampp\\php\\php.exe';
+// Worth saying out loud on the confirmation dialogs: a live run of a
+// mail-sending job won't actually mail anyone while the kill switch is off.
+$mailDisabled = env('MAIL_ENABLED', 'true') === 'false';
 
-// Linux cron line: `*/5 * * * * php /path/script.php >> /path/log 2>&1`
-$buildLinux = static function (string $cron, string $scriptRel, string $logRel)
-    use ($linuxRoot, $linuxPhp): string {
-    $script = $linuxRoot . '/' . $scriptRel;
-    $log    = $linuxRoot . '/' . $logRel;
-    return $cron . ' ' . $linuxPhp . ' ' . $script . ' >> ' . $log . ' 2>&1';
-};
-
-// Windows schtasks command. The `/TR "'php' 'script'"` pattern (single quotes
-// inside double quotes) is schtasks' supported way to embed two
-// space-containing paths in one /TR value, and it parses identically in
-// cmd.exe and PowerShell. /F overwrites an existing task with the same name.
-$buildWindows = static function (string $schedArgs, string $scriptRel, string $taskName)
-    use ($windowsRoot, $windowsPhp): string {
-    $script = $windowsRoot . '\\' . str_replace('/', '\\', $scriptRel);
-    return sprintf(
-        "schtasks /Create /TN \"%s\" /TR \"'%s' '%s'\" %s /F",
-        $taskName,
-        $windowsPhp,
-        $script,
-        $schedArgs
-    );
-};
-
-$cronJobs = [
-    [
-        'title'            => 'SLA Recalculation',
-        'icon'             => 'bi-stopwatch',
-        'description'      => 'Recalculates SLA status (breached / at-risk) for all active tickets. Should run frequently so SLA breaches are detected promptly.',
-        'frequency'        => 'Every 5 minutes',
-        'interval_seconds' => 300,
-        'cron_linux'       => $buildLinux('*/5 * * * *', 'public/sla-cron.php', 'storage/logs/sla-cron.log'),
-        'cron_windows'     => $buildWindows('/SC MINUTE /MO 5', 'public/sla-cron.php', 'OpenHelpDesk SLA Recalculation'),
-        'log_linux'        => $linuxRoot . '/storage/logs/sla-cron.log',
-        'log_windows'      => $windowsRoot . '\\storage\\logs\\sla-cron.log',
-        'required'         => true,
-        'note'             => 'Can also be triggered via HTTP: <code>GET /sla-cron.php?token=YOUR_SECRET_TOKEN</code>. Set <code>SLA_CRON_TOKEN</code> in your <code>.env</code> file when using HTTP mode.',
-    ],
-    [
-        'title'            => 'Inbound Email Replies',
-        'icon'             => 'bi-envelope-arrow-down',
-        'description'      => 'Polls the configured Microsoft 365 mailbox via the Graph API for new replies and appends them to the matching ticket timeline.',
-        'frequency'        => 'Every 5 minutes',
-        'interval_seconds' => 300,
-        'cron_linux'       => $buildLinux('*/5 * * * *', 'scripts/process-replies.php', 'storage/logs/graph-mail.log'),
-        'cron_windows'     => $buildWindows('/SC MINUTE /MO 5', 'scripts/process-replies.php', 'OpenHelpDesk Inbound Email'),
-        'log_linux'        => $linuxRoot . '/storage/logs/graph-mail.log',
-        'log_windows'      => $windowsRoot . '\\storage\\logs\\graph-mail.log',
-        'required'         => false,
-        'note'             => 'Only required if you have Microsoft Graph / inbound email configured in Admin → Settings → Email / SMTP.',
-    ],
-    [
-        'title'            => 'Escalation Rules',
-        'icon'             => 'bi-alarm',
-        'description'      => 'Evaluates all enabled escalation rules against open tickets and fires any configured actions (reassign, notify, change priority, etc.).',
-        'frequency'        => 'Every 15 minutes',
-        'interval_seconds' => 900,
-        'cron_linux'       => $buildLinux('*/15 * * * *', 'scripts/process-escalations.php', 'storage/logs/escalations.log'),
-        'cron_windows'     => $buildWindows('/SC MINUTE /MO 15', 'scripts/process-escalations.php', 'OpenHelpDesk Escalations'),
-        'log_linux'        => $linuxRoot . '/storage/logs/escalations.log',
-        'log_windows'      => $windowsRoot . '\\storage\\logs\\escalations.log',
-        'required'         => false,
-        'note'             => 'Only required if you have escalation rules configured in Admin → Settings → Escalations.',
-    ],
-    [
-        'title'            => 'Scheduled Reports',
-        'icon'             => 'bi-envelope-paper',
-        'description'      => 'Checks for any scheduled reports that are due and emails summaries to the configured recipients.',
-        'frequency'        => 'Every 30 minutes',
-        'interval_seconds' => 1800,
-        'cron_linux'       => $buildLinux('*/30 * * * *', 'scripts/process-scheduled-reports.php', 'storage/logs/scheduled-reports.log'),
-        'cron_windows'     => $buildWindows('/SC MINUTE /MO 30', 'scripts/process-scheduled-reports.php', 'OpenHelpDesk Scheduled Reports'),
-        'log_linux'        => $linuxRoot . '/storage/logs/scheduled-reports.log',
-        'log_windows'      => $windowsRoot . '\\storage\\logs\\scheduled-reports.log',
-        'required'         => false,
-        'note'             => 'Only required if you have scheduled reports configured in Admin → Reports → Scheduled Reports.',
-    ],
-    [
-        'title'            => 'Recurring / Preventive-Maintenance Tickets',
-        'icon'             => 'bi-arrow-repeat',
-        'description'      => 'Mints tickets from active recurring schedules whose <code>next_run_at</code> has passed (e.g. monthly toner audit, quarterly HVAC, annual fire inspection), then advances each schedule to its next firing slot.',
-        'frequency'        => 'Every 15 minutes',
-        'interval_seconds' => 900,
-        'cron_linux'       => $buildLinux('*/15 * * * *', 'scripts/process-recurring-tickets.php', 'storage/logs/recurring-tickets.log'),
-        'cron_windows'     => $buildWindows('/SC MINUTE /MO 15', 'scripts/process-recurring-tickets.php', 'OpenHelpDesk Recurring Tickets'),
-        'log_linux'        => $linuxRoot . '/storage/logs/recurring-tickets.log',
-        'log_windows'      => $windowsRoot . '\\storage\\logs\\recurring-tickets.log',
-        'required'         => false,
-        'note'             => 'Only required if you have recurring schedules configured in Admin → Recurring Tickets. Missed-tick safe — does not back-fill if cron pauses.',
-    ],
-    [
-        'title'            => 'Stale Ticket Notifications',
-        'icon'             => 'bi-hourglass-split',
-        'description'      => 'Finds active tickets that have had no activity for longer than the configured stale threshold and emails both the assigned agent and the requester. Skips resolved, closed, and waiting-on-customer/third-party statuses.',
-        'frequency'        => 'Every hour',
-        'interval_seconds' => 3600,
-        'cron_linux'       => $buildLinux('0 * * * *', 'scripts/process-stale-tickets.php', 'storage/logs/stale-tickets.log'),
-        'cron_windows'     => $buildWindows('/SC HOURLY', 'scripts/process-stale-tickets.php', 'OpenHelpDesk Stale Tickets'),
-        'log_linux'        => $linuxRoot . '/storage/logs/stale-tickets.log',
-        'log_windows'      => $windowsRoot . '\\storage\\logs\\stale-tickets.log',
-        'required'         => false,
-        'note'             => 'Configure the threshold and per-type overrides in Admin → Settings → Stale Tickets.',
-    ],
-    [
-        'title'            => 'Out-of-Office Coverage',
-        'icon'             => 'bi-person-x',
-        'description'      => 'Reads each group member\'s Outlook out-of-office state via Microsoft Graph, then reassigns away agents\' unanswered tickets to an available colleague — or auto-replies the requester when there is nobody to reassign to (single-person groups).',
-        'frequency'        => 'Every 15 minutes',
-        'interval_seconds' => 900,
-        'cron_linux'       => $buildLinux('*/15 * * * *', 'scripts/process-oof-coverage.php', 'storage/logs/oof-coverage.log'),
-        'cron_windows'     => $buildWindows('/SC MINUTE /MO 15', 'scripts/process-oof-coverage.php', 'OpenHelpDesk OOF Coverage'),
-        'log_linux'        => $linuxRoot . '/storage/logs/oof-coverage.log',
-        'log_windows'      => $windowsRoot . '\\storage\\logs\\oof-coverage.log',
-        'required'         => false,
-        'note'             => 'Only required if you have enabled Out-of-Office coverage in Admin → Settings → Out of Office. Requires the <code>MailboxSettings.Read</code> Graph permission.',
-    ],
-    [
-        'title'            => 'App Secret Expiry Reminders',
-        'icon'             => 'bi-key',
-        'description'      => 'Sends email reminders to all administrators when the Microsoft Graph app secret is approaching its expiry date. Reminds at 30 days, 7 days, and on the day of expiry.',
-        'frequency'        => 'Once daily',
-        'interval_seconds' => 86400,
-        'cron_linux'       => $buildLinux('0 8 * * *', 'scripts/process-secret-reminders.php', 'storage/logs/secret-reminders.log'),
-        'cron_windows'     => $buildWindows('/SC DAILY /ST 08:00', 'scripts/process-secret-reminders.php', 'OpenHelpDesk Secret Reminders'),
-        'log_linux'        => $linuxRoot . '/storage/logs/secret-reminders.log',
-        'log_windows'      => $windowsRoot . '\\storage\\logs\\secret-reminders.log',
-        'required'         => false,
-        'note'             => 'Only required if you have a Microsoft Graph app secret expiry date configured in Admin → Settings → Email / SMTP.',
-    ],
-];
-
-// ── Helpers for the "last run" status badge ─────────────────────────
 $fmtAgo = static function (int $seconds): string {
     if ($seconds < 60)    return $seconds . 's ago';
     if ($seconds < 3600)  return (int) floor($seconds / 60)   . 'm ago';
     if ($seconds < 86400) return (int) floor($seconds / 3600) . 'h ago';
     return (int) floor($seconds / 86400) . 'd ago';
 };
-
-// Status checking only makes sense for THIS server's log file — i.e. the
-// platform we're actually running on. We don't know the remote machine's log
-// state if a Linux admin is viewing the Windows tab from a Linux server.
-$cronStatus = static function (array $job) use ($isWindows): array {
-    $path = $isWindows ? ($job['log_windows'] ?? '') : ($job['log_linux'] ?? '');
-    if ($path === '' || !is_file($path)) {
-        return ['status' => 'missing', 'age' => null, 'mtime' => null];
-    }
-    $mtime = @filemtime($path);
-    if ($mtime === false) {
-        return ['status' => 'missing', 'age' => null, 'mtime' => null];
-    }
-    $age       = max(0, time() - $mtime);
-    $threshold = (int) (($job['interval_seconds'] ?? 3600) * 2);
-    return [
-        'status' => $age <= $threshold ? 'ok' : 'stale',
-        'age'    => $age,
-        'mtime'  => $mtime,
-    ];
-};
-
-$defaultPlatform = $isWindows ? 'windows' : 'linux';
 ?>
 <div class="mb-4">
     <h2 class="fw-bold mb-0">Settings</h2>
@@ -197,6 +45,7 @@ $defaultPlatform = $isWindows ? 'windows' : 'linux';
         These background scripts must be scheduled on your server for certain features to function automatically.
         Choose your platform below to see the matching commands &mdash; <strong>Linux/macOS</strong> uses
         <code>crontab</code> and <strong>Windows</strong> uses <code>schtasks</code> (Task Scheduler).
+        You can also run any job right now with the buttons on each card.
     </p>
 </div>
 
@@ -221,7 +70,7 @@ $defaultPlatform = $isWindows ? 'windows' : 'linux';
 <?php
 $summary = ['ok' => 0, 'stale' => 0, 'missing' => 0];
 foreach ($cronJobs as $j) {
-    $summary[$cronStatus($j)['status']]++;
+    $summary[CronJobs::status($j)['status']]++;
 }
 ?>
 <div class="row g-3 mb-4">
@@ -269,6 +118,29 @@ foreach ($cronJobs as $j) {
     </div>
 </div>
 
+<div class="alert alert-secondary d-flex gap-3 align-items-start mb-4">
+    <i class="bi bi-play-circle-fill fs-5 mt-1 flex-shrink-0"></i>
+    <div class="small">
+        <strong>Running a job by hand.</strong>
+        <strong>Dry run</strong> executes the job for real but throws the result away: every database change is rolled
+        back when it finishes and every email is listed instead of sent. It's safe to use at any time, and it's the
+        way to see what a job <em>would</em> do before letting it near real recipients.
+        <strong>Run for real</strong> is the genuine thing &mdash; it sends email, creates tickets, and reassigns work
+        exactly as the scheduled run would.
+        Either way a job can't run twice at once: if the scheduled copy is mid-flight, your run steps aside and says so.
+        <?php if (!$runnable['ok']): ?>
+        <div class="mt-2 text-danger">
+            <i class="bi bi-x-circle me-1"></i><strong>Not available on this server:</strong> <?= e($runnable['reason']) ?>
+        </div>
+        <?php elseif ($mailDisabled): ?>
+        <div class="mt-2">
+            <i class="bi bi-envelope-slash me-1"></i>Outbound mail is currently switched off on this server
+            (<code>MAIL_ENABLED=false</code>), so even a real run won't deliver email.
+        </div>
+        <?php endif; ?>
+    </div>
+</div>
+
 <!-- Linux-only instruction banner -->
 <div class="alert alert-info d-flex gap-3 align-items-start mb-4 platform-linux <?= $defaultPlatform === 'linux' ? '' : 'd-none' ?>">
     <i class="bi bi-info-circle-fill fs-5 mt-1 flex-shrink-0"></i>
@@ -312,9 +184,9 @@ foreach ($cronJobs as $j) {
     </div>
 </div>
 
-<?php foreach ($cronJobs as $idx => $job): ?>
+<?php foreach ($cronJobs as $key => $job): ?>
     <?php
-    $st     = $cronStatus($job);
+    $st     = CronJobs::status($job);
     $ageStr = $st['age'] !== null ? $fmtAgo((int) $st['age']) : '';
     $mtStr  = $st['mtime'] !== null ? date('Y-m-d H:i:s', (int) $st['mtime']) : '';
     ?>
@@ -388,17 +260,49 @@ foreach ($cronJobs as $j) {
         <?php endif; ?>
 
         <div class="mt-3 pt-3 border-top d-flex flex-wrap gap-3 align-items-center justify-content-between">
-            <span class="text-muted small platform-linux <?= $defaultPlatform === 'linux' ? '' : 'd-none' ?>">
-                <i class="bi bi-file-text me-1"></i>Log file: <code><?= e($job['log_linux']) ?></code>
-            </span>
-            <span class="text-muted small platform-windows <?= $defaultPlatform === 'windows' ? '' : 'd-none' ?>">
-                <i class="bi bi-file-text me-1"></i>Log file: <code><?= e($job['log_windows']) ?></code>
-            </span>
-            <?php if ($st['mtime'] !== null): ?>
-            <span class="text-muted small"><i class="bi bi-clock-history me-1"></i>Last run: <?= e($mtStr) ?></span>
-            <?php else: ?>
-            <span class="text-muted small fst-italic"><i class="bi bi-clock-history me-1"></i>No runs recorded</span>
-            <?php endif; ?>
+            <div class="d-flex flex-column gap-1">
+                <span class="text-muted small platform-linux <?= $defaultPlatform === 'linux' ? '' : 'd-none' ?>">
+                    <i class="bi bi-file-text me-1"></i>Log file: <code><?= e($job['log_linux']) ?></code>
+                </span>
+                <span class="text-muted small platform-windows <?= $defaultPlatform === 'windows' ? '' : 'd-none' ?>">
+                    <i class="bi bi-file-text me-1"></i>Log file: <code><?= e($job['log_windows']) ?></code>
+                </span>
+                <?php if ($st['mtime'] !== null): ?>
+                <span class="text-muted small"><i class="bi bi-clock-history me-1"></i>Last run: <?= e($mtStr) ?></span>
+                <?php else: ?>
+                <span class="text-muted small fst-italic"><i class="bi bi-clock-history me-1"></i>No runs recorded</span>
+                <?php endif; ?>
+            </div>
+
+            <!-- Run controls. Dry run is the plain click; the real thing is one
+                 level down in the dropdown and always confirms first. -->
+            <div class="btn-group btn-group-sm flex-shrink-0" role="group"
+                 <?= $runnable['ok'] ? '' : 'title="' . e($runnable['reason']) . '"' ?>>
+                <button type="button"
+                        class="btn btn-outline-primary cron-run-btn"
+                        data-key="<?= e($key) ?>"
+                        data-mode="dry"
+                        <?= $runnable['ok'] ? '' : 'disabled' ?>>
+                    <i class="bi bi-eyeglasses me-1"></i>Dry run
+                </button>
+                <button type="button"
+                        class="btn btn-outline-primary dropdown-toggle dropdown-toggle-split"
+                        data-bs-toggle="dropdown"
+                        aria-expanded="false"
+                        <?= $runnable['ok'] ? '' : 'disabled' ?>>
+                    <span class="visually-hidden">More run options</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li>
+                        <button type="button" class="dropdown-item text-danger cron-confirm-btn"
+                                data-key="<?= e($key) ?>"
+                                data-title="<?= e($job['title']) ?>"
+                                data-mail="<?= $job['sends_mail'] ? '1' : '0' ?>">
+                            <i class="bi bi-exclamation-triangle me-1"></i>Run for real&hellip;
+                        </button>
+                    </li>
+                </ul>
+            </div>
         </div>
     </div>
 </div>
@@ -445,6 +349,72 @@ foreach ($cronJobs as $j) {
     </div>
 </div>
 
+<!-- Confirmation before a live run -->
+<div class="modal fade" id="cronConfirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-exclamation-triangle-fill text-danger me-2"></i>Run this job for real?</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-3">
+                    <strong id="cronConfirmTitle"></strong> will run immediately with full effect &mdash; the same as its
+                    scheduled run. Database changes are kept.
+                </p>
+                <div id="cronConfirmMail" class="d-none">
+                    <div class="alert alert-danger small">
+                        <i class="bi bi-envelope-exclamation me-1"></i>
+                        <strong>This job sends email to real people.</strong>
+                        <?php if ($mailDisabled): ?>
+                            Outbound mail is currently switched off on this server, so nothing will actually be
+                            delivered &mdash; but that safety net disappears the moment mail is re-enabled.
+                        <?php else: ?>
+                            Outbound mail is <strong>enabled</strong> on this server. Recipients will receive it.
+                        <?php endif; ?>
+                        If you haven't dry-run it yet, cancel and do that first.
+                    </div>
+                    <div class="form-check mb-0">
+                        <input class="form-check-input" type="checkbox" id="cronConfirmAck">
+                        <label class="form-check-label small" for="cronConfirmAck">
+                            I understand this may email real recipients.
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="cronConfirmGo">
+                    <i class="bi bi-play-fill me-1"></i>Run it for real
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Run output -->
+<div class="modal fade" id="cronOutputModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="cronOutputTitle">Run output</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="cronOutputStatus" class="mb-3"></div>
+                <pre id="cronOutputBody" class="bg-light border rounded p-3 small mb-0"
+                     style="white-space:pre-wrap;word-break:break-word;max-height:50vh;overflow:auto;"></pre>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary d-none" id="cronOutputReload">
+                    <i class="bi bi-arrow-clockwise me-1"></i>Refresh page
+                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 // Platform toggle — flips d-none on every .platform-linux / .platform-windows
 // element on the page. Cheap, no per-element state, no framework needed.
@@ -480,6 +450,130 @@ function copyBlock(btn) {
         setTimeout(function () { icon.className = 'bi bi-clipboard'; }, 2000);
     });
 }
+
+/* ── Run a job now ────────────────────────────────────────────────────
+   Dry run posts straight through. A live run goes via the confirm modal,
+   which for mail-sending jobs also needs the acknowledgement ticked.
+
+   Waits for DOMContentLoaded: the layout loads bootstrap.bundle.min.js at the
+   end of <body>, after this block, so `bootstrap` isn't defined yet at parse
+   time and constructing the modals here would throw. */
+document.addEventListener('DOMContentLoaded', function () {
+    const csrfToken   = document.querySelector('meta[name="csrf-token"]').content;
+    const confirmEl   = document.getElementById('cronConfirmModal');
+    const outputEl    = document.getElementById('cronOutputModal');
+    const confirmModal = new bootstrap.Modal(confirmEl);
+    const outputModal  = new bootstrap.Modal(outputEl);
+
+    const ackWrap   = document.getElementById('cronConfirmMail');
+    const ackBox    = document.getElementById('cronConfirmAck');
+    const goBtn     = document.getElementById('cronConfirmGo');
+    const reloadBtn = document.getElementById('cronOutputReload');
+
+    let pending = null; // { key, button }
+
+    reloadBtn.addEventListener('click', function () { window.location.reload(); });
+
+    document.querySelectorAll('.cron-run-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () { run(btn.dataset.key, 'dry', btn); });
+    });
+
+    document.querySelectorAll('.cron-confirm-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const sendsMail = btn.dataset.mail === '1';
+            pending = { key: btn.dataset.key, button: btn };
+            document.getElementById('cronConfirmTitle').textContent = btn.dataset.title;
+            ackWrap.classList.toggle('d-none', !sendsMail);
+            ackBox.checked = false;
+            goBtn.disabled = sendsMail;
+            confirmModal.show();
+        });
+    });
+
+    ackBox.addEventListener('change', function () { goBtn.disabled = !ackBox.checked; });
+
+    goBtn.addEventListener('click', function () {
+        if (!pending) return;
+        confirmModal.hide();
+        run(pending.key, 'live', pending.button);
+        pending = null;
+    });
+
+    function run(key, mode, btn) {
+        // The request blocks for as long as the job takes, so lock the button
+        // and say what's happening rather than leaving the page looking idle.
+        const original = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Running…';
+
+        fetch('/admin/settings/cron-jobs/run', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-Token': csrfToken
+            },
+            body: JSON.stringify({ key: key, mode: mode })
+        })
+            .then(function (r) { return r.json(); })
+            .then(function (j) { showResult(j, mode); })
+            .catch(function () {
+                showResult({ success: false, error: 'The request failed before the job reported back. Check the job\'s log file on the server.' }, mode);
+            })
+            .finally(function () {
+                btn.disabled = false;
+                btn.innerHTML = original;
+            });
+    }
+
+    function showResult(j, mode) {
+        const isLive = mode === 'live';
+        document.getElementById('cronOutputTitle').textContent =
+            (j.title ? j.title + ' — ' : '') + (isLive ? 'real run' : 'dry run');
+
+        let status;
+        if (j.error) {
+            status = '<div class="alert alert-danger mb-0 small"><i class="bi bi-x-circle me-1"></i>' + escapeHtml(j.error) + '</div>';
+        } else if (j.already_running) {
+            status = '<div class="alert alert-warning mb-0 small"><i class="bi bi-hourglass-split me-1"></i>'
+                   + 'This job is already running (most likely its scheduled copy). Nothing was run — try again in a moment.</div>';
+        } else if (j.timed_out) {
+            status = '<div class="alert alert-danger mb-0 small"><i class="bi bi-stopwatch me-1"></i>'
+                   + 'The job exceeded its time limit after ' + j.duration + 's and was stopped. '
+                   + (isLive ? 'It may have completed part of its work — check the log file.' : 'Nothing was saved.')
+                   + '</div>';
+        } else if (j.success) {
+            status = '<div class="alert alert-success mb-0 small"><i class="bi bi-check-circle me-1"></i>'
+                   + 'Finished in ' + j.duration + 's. '
+                   + (isLive ? 'Changes were saved.' : 'Nothing was saved and no email was sent.')
+                   + '</div>';
+        } else {
+            status = '<div class="alert alert-warning mb-0 small"><i class="bi bi-exclamation-triangle me-1"></i>'
+                   + 'The job exited with code ' + j.exit_code + ' after ' + j.duration + 's. See the output below.</div>';
+        }
+
+        if (j.truncated) {
+            status += '<div class="text-muted small mt-2">Output was long and has been truncated — see the log file for the rest.</div>';
+        }
+
+        document.getElementById('cronOutputStatus').innerHTML = status;
+        document.getElementById('cronOutputBody').textContent = (j.output && j.output.trim() !== '')
+            ? j.output
+            : '(the job produced no output)';
+
+        // Only a real run changes the badges/last-run times on this page.
+        reloadBtn.classList.toggle('d-none', !(isLive && !j.error));
+
+        outputModal.show();
+    }
+
+    function escapeHtml(s) {
+        const div = document.createElement('div');
+        div.textContent = s;
+        return div.innerHTML;
+    }
+});
 </script>
 
 <?php require ROOT_DIR . '/templates/partials/settings-nav-end.php'; ?>

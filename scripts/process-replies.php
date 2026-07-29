@@ -24,8 +24,10 @@ require_once ROOT_DIR . '/vendor/autoload.php';
 require_once ROOT_DIR . '/src/helpers.php';
 require_once ROOT_DIR . '/src/Database.php';
 require_once ROOT_DIR . '/src/graph.php';   // curlGet/Post/Patch + getAccessToken
+require_once ROOT_DIR . '/src/CronRun.php';
 
 loadEnv(ROOT_DIR . '/.env');
+CronRun::boot($argv ?? []);
 
 // ─── Logging helper ───────────────────────────────────────────────────────────
 function logMsg(string $level, string $msg): void
@@ -472,6 +474,15 @@ function getUnreadMessages(string $token, string $mailbox): ?array
  */
 function markMessageRead(string $token, string $mailbox, string $messageId): void
 {
+    // Marking a message read lives in Microsoft's mailbox, not our database, so
+    // no transaction rollback can undo it. A dry run that marked messages read
+    // would consume the inbox and the next real run would never see those
+    // replies — so skip it and say so.
+    if (CronRun::isDryRun()) {
+        CronRun::noteSkipped("marking message {$messageId} as read in {$mailbox}");
+        return;
+    }
+
     // @ is valid in the URL path; message IDs may contain + and = which are safe to encode.
     $url = 'https://graph.microsoft.com/v1.0/users/' . $mailbox . '/messages/' . rawurlencode($messageId);
 

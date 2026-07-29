@@ -18,6 +18,9 @@ kb_articles.csv
 /storage/pwa/*
 !/storage/pwa/.gitkeep
 /storage/attachments/*
+# Single-instance lock files for the cron scripts (see src/CronRun.php) —
+# runtime state, recreated on demand.
+/storage/locks/
 .phpunit.result.cache
 test-results*.txt
 

@@ -12,6 +12,7 @@ require_once ROOT_DIR . '/src/Sla.php';
 require_once ROOT_DIR . '/src/Holidays.php';
 require_once ROOT_DIR . '/src/AI.php';
 require_once ROOT_DIR . '/src/RecurringTickets.php';
+require_once ROOT_DIR . '/src/CronJobs.php';
 require_once ROOT_DIR . '/src/PWA.php';
 require_once ROOT_DIR . '/src/Dashboard.php';
 require_once ROOT_DIR . '/src/Teams.php';

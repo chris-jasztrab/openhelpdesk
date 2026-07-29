@@ -37,8 +37,10 @@ define('ROOT_DIR', dirname(__DIR__));
 require_once ROOT_DIR . '/vendor/autoload.php';
 require_once ROOT_DIR . '/src/helpers.php';
 require_once ROOT_DIR . '/src/Database.php';
+require_once ROOT_DIR . '/src/CronRun.php';
 
 loadEnv(ROOT_DIR . '/.env');
+CronRun::boot($argv ?? []);
 
 // ─── Logging helper (defined before graph.php so it uses this timestamped one) ─
 function logMsg(string $level, string $msg): void

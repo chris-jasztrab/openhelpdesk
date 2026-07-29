@@ -3411,6 +3411,17 @@ function emailContent(string $content): string
  */
 function sendMail(string $toEmail, string $toName, string $subject, string $htmlBody, string $textBody = '', ?int $ticketId = null, array $attachments = [], bool $transactional = false): string|false
 {
+    // Dry-run interception, ahead of every other check including the
+    // transactional bypass below — a --dry-run of a cron script must not be able
+    // to deliver anything, ever. Returns a fake Message-ID (not false) so the
+    // caller takes its "sent" branch and the dry run reports the same counts a
+    // live run would. class_exists() guard: CronRun is only loaded by the cron
+    // scripts, never in the web request path.
+    if (class_exists('CronRun', false) && CronRun::isDryRun()) {
+        CronRun::noteSuppressedMail($toEmail, $subject);
+        return '<dry-run-not-sent@localhost>';
+    }
+
     // Outbound-mail kill switch. Dev and test instances set MAIL_ENABLED=false
     // in .env so running the suite (or local dev) never delivers real mail to
     // real recipients — the helpdesk DB carries live SMTP credentials, so a

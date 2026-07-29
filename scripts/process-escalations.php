@@ -18,8 +18,10 @@ require_once ROOT_DIR . '/vendor/autoload.php';
 require_once ROOT_DIR . '/src/helpers.php';
 require_once ROOT_DIR . '/src/Database.php';
 require_once ROOT_DIR . '/src/Sla.php';
+require_once ROOT_DIR . '/src/CronRun.php';
 
 loadEnv(ROOT_DIR . '/.env');
+CronRun::boot($argv ?? []);
 
 $startTime = microtime(true);
 $logLines  = [];
@@ -132,11 +134,17 @@ $elapsed = round(microtime(true) - $startTime, 2);
 logLine("Done. {$totalFired} escalation(s) fired in {$elapsed}s.");
 
 // ── Persist log to file ───────────────────────────────────────────
-$logDir  = ROOT_DIR . '/storage/logs';
-$logFile = $logDir . '/escalations.log';
-if (!is_dir($logDir)) {
-    @mkdir($logDir, 0755, true);
+// Skipped on a dry run: the log file's modified time is what drives the
+// Running / Stale / Not configured badge on Admin → Settings → Cron Jobs, so
+// writing to it would make an unscheduled job look scheduled. A dry run leaves
+// no trace here — it reports to stdout and to storage/logs/cron-manual-runs.log.
+if (!CronRun::isDryRun()) {
+    $logDir  = ROOT_DIR . '/storage/logs';
+    $logFile = $logDir . '/escalations.log';
+    if (!is_dir($logDir)) {
+        @mkdir($logDir, 0755, true);
+    }
+    @file_put_contents($logFile, implode(PHP_EOL, $logLines) . PHP_EOL, FILE_APPEND);
 }
-@file_put_contents($logFile, implode(PHP_EOL, $logLines) . PHP_EOL, FILE_APPEND);
 
 exit(0);

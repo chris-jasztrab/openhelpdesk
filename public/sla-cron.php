@@ -19,8 +19,13 @@ require_once ROOT_DIR . '/vendor/autoload.php';
 require_once ROOT_DIR . '/src/helpers.php';
 require_once ROOT_DIR . '/src/Database.php';
 require_once ROOT_DIR . '/src/Sla.php';
+require_once ROOT_DIR . '/src/CronRun.php';
 
 loadEnv(ROOT_DIR . '/.env');
+
+// CLI only: honours --dry-run and takes the single-instance lock. A no-op on
+// the HTTP token path below, which keeps its original behaviour.
+CronRun::boot($argv ?? []);
 
 // Security: if called via web, require a token
 if (php_sapi_name() !== 'cli') {

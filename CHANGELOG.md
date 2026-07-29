@@ -11,6 +11,25 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.154.0 &mdash; 2026-07-29
+
+### Added
+- **Run any cron job on demand from Admin → Settings → Cron Jobs.** Each job card gains a **Dry run** button and, one level down in its dropdown, **Run for real**. Output comes back in a modal, so you no longer need shell access to find out whether a job works.
+- **Dry run shows you what a job would do without doing any of it.** The job executes its real code path start to finish — same queries, same decisions, same log lines — but its database writes happen inside a transaction that is never committed, and every email is listed as `WOULD EMAIL …` instead of being sent. It leaves no trace: nothing is saved, no mail goes out, and the job's log file isn't touched (so a preview can't make an unscheduled job look scheduled). Dry-run the Stale Ticket Notifier before its first live run and you'll see exactly how many people it's about to email.
+  - Side effects that a rollback can't reverse are skipped and reported: a dry run of Inbound Email Replies reads the mailbox but does not mark messages as read, so the next real run still sees every reply.
+- **Run for real always confirms first**, naming the job, and for the six jobs that send email it additionally requires ticking an acknowledgement — and tells you whether outbound mail is currently enabled on this server. Live runs are written to the job's own log with a `MANUAL RUN by <you>` marker.
+- **Every manual run is recorded** in `storage/logs/cron-manual-runs.log` — who ran what, dry or live, exit code and duration.
+
+### Changed
+- **A cron script now refuses to run twice at once.** Each one takes a lock on its own name and exits immediately (code 75) if another copy is already going. This stops a manual run from colliding with the scheduled run mid-flight and double-sending — both passes would otherwise check the dedup table before either wrote to it — and also fixes the pre-existing case of a slow job overlapping its own next tick.
+- The job list, its crontab/schtasks commands and the status check moved out of the settings template into `src/CronJobs.php`, so the page and the run endpoint read one list instead of two copies.
+
+### Configuration
+- New optional `PHP_CLI_BINARY` in `.env`: the full path to the PHP **command-line** binary used to launch a job on demand. Leave it blank to auto-detect. Set it if the buttons report that no CLI binary was found — under Apache/mod_php or php-fpm, `PHP_BINARY` is the web server's own executable and can't run a script. The buttons render disabled with the reason shown when the binary is missing or `proc_open()` is blocked by `disable_functions`, rather than failing mysteriously.
+
+### Notes
+- A dry run holds row locks on everything it touches until it finishes, so dry-running a slow job on a busy server can briefly block writers on those same rows. The jobs here are short; it's worth knowing before you reach for it during a rush.
+
 ## 2.153.0 &mdash; 2026-07-29
 
 ### Added

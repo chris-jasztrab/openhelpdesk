@@ -9226,6 +9226,68 @@ $router->get('/admin/settings/cron-jobs', function () {
     render('admin/settings/cron-jobs');
 });
 
+/**
+ * Run one cron job now, without waiting for its schedule.
+ *
+ * mode=dry (the default) previews: the job runs its real code path but its
+ * database writes are rolled back and its email is reported instead of sent.
+ * mode=live is the real thing and the UI confirms first.
+ *
+ * The job is resolved from CronJobs::all() by key, so the request never supplies
+ * a path — an unknown key is a 404, not a spawn.
+ */
+$router->post('/admin/settings/cron-jobs/run', function () {
+    Auth::requirePermission('automations.manage');
+    requireJsonCsrf();
+    header('Content-Type: application/json');
+
+    $body = json_decode((string) file_get_contents('php://input'), true) ?: [];
+    $key  = (string) ($body['key'] ?? '');
+    $live = ($body['mode'] ?? 'dry') === 'live';
+
+    $job = CronJobs::find($key);
+    if ($job === null) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Unknown cron job.']);
+        return;
+    }
+
+    $runnable = CronJobs::runnability();
+    if (!$runnable['ok']) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => $runnable['reason']]);
+        return;
+    }
+
+    // We block for up to the job's timeout. Release the session lock first or
+    // the whole site stalls for this user until the job finishes — every other
+    // request from their browser would queue behind our open session file.
+    $actor = Auth::user()['email'] ?? 'unknown';
+    session_write_close();
+    @set_time_limit((int) $job['timeout'] + 30);
+    ignore_user_abort(true);
+
+    try {
+        $result = CronJobs::run($job, $live, (string) $actor);
+    } catch (Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        return;
+    }
+
+    echo json_encode([
+        'success'         => $result['success'],
+        'mode'            => $live ? 'live' : 'dry',
+        'title'           => $job['title'],
+        'exit_code'       => $result['exit_code'],
+        'duration'        => $result['duration'],
+        'timed_out'       => $result['timed_out'],
+        'already_running' => $result['already_running'],
+        'truncated'       => $result['truncated'],
+        'output'          => $result['output'],
+    ]);
+});
+
 /* ==================================================================
  * ADMIN – Settings: Automations
  * ================================================================== */

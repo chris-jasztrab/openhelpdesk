@@ -30,8 +30,10 @@ require_once ROOT_DIR . '/src/Sla.php';
 require_once ROOT_DIR . '/src/Holidays.php';
 require_once ROOT_DIR . '/src/AI.php';
 require_once ROOT_DIR . '/src/RecurringTickets.php';
+require_once ROOT_DIR . '/src/CronRun.php';
 
 loadEnv(ROOT_DIR . '/.env');
+CronRun::boot($argv ?? []);
 
 $startTime = microtime(true);
 
