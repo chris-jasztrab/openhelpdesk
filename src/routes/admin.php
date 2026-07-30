@@ -7285,7 +7285,7 @@ $router->get('/admin/settings/email-notifications', function () {
     $keys = [
         'agent_new_ticket', 'agent_assigned_group', 'agent_assigned_agent',
         'agent_requester_reply', 'agent_note_added',
-        'ticket_stale_agent',
+        'ticket_stale_agent', 'ticket_stale_manager',
         'requester_new_ticket', 'requester_ticket_assigned', 'requester_agent_comment',
         'requester_ticket_resolved', 'requester_ticket_closed',
         'ticket_stale_requester',
@@ -7294,7 +7294,7 @@ $router->get('/admin/settings/email-notifications', function () {
 
     $settings = [];
     foreach ($keys as $k) {
-        $settings[$k] = getSetting('email_notify:' . $k, '1');
+        $settings[$k] = getSetting('email_notify:' . $k, emailNotifyDefault($k));
     }
 
     render('admin/settings/email-notifications', ['settings' => $settings]);
@@ -7310,7 +7310,7 @@ $router->post('/admin/settings/email-notifications', function () {
     $keys = [
         'agent_new_ticket', 'agent_assigned_group', 'agent_assigned_agent',
         'agent_requester_reply', 'agent_note_added',
-        'ticket_stale_agent',
+        'ticket_stale_agent', 'ticket_stale_manager',
         'requester_new_ticket', 'requester_ticket_assigned', 'requester_agent_comment',
         'requester_ticket_resolved', 'requester_ticket_closed',
         'ticket_stale_requester',
@@ -7320,7 +7320,7 @@ $router->post('/admin/settings/email-notifications', function () {
     $before = [];
     $after  = [];
     foreach ($keys as $k) {
-        $before[$k] = getSetting('email_notify:' . $k, '1');
+        $before[$k] = getSetting('email_notify:' . $k, emailNotifyDefault($k));
         $after[$k]  = isset($_POST[$k]) ? '1' : '0';
         setSetting('email_notify:' . $k, $after[$k]);
     }
@@ -13729,6 +13729,7 @@ $router->get('/admin/settings/stale-tickets', function () {
         'stale_scope'                         => getSetting('stale_scope', 'all'),
         'stale_scope_cutoff'                  => getSetting('stale_scope_cutoff', ''),
         'email_notify:ticket_stale_agent'     => getSetting('email_notify:ticket_stale_agent', '1'),
+        'email_notify:ticket_stale_manager'   => getSetting('email_notify:ticket_stale_manager', '0'),
         'email_notify:ticket_stale_requester' => getSetting('email_notify:ticket_stale_requester', '1'),
     ];
 
@@ -13736,7 +13737,26 @@ $router->get('/admin/settings/stale-tickets', function () {
         'SELECT id, name, color, stale_threshold_minutes FROM ticket_types ORDER BY sort_order, name'
     )->fetchAll();
 
-    render('admin/settings/stale-tickets', ['settings' => $settings, 'types' => $types]);
+    // Surface the dead ends up front: a type with no default group, or whose
+    // group has nobody flagged is_manager, silently reaches nobody when the
+    // manager toggle is on. Cheaper to warn here than to wonder why the cron
+    // log says "0 manager alerts".
+    $typesWithoutManager = $db->query(
+        'SELECT tt.name
+           FROM ticket_types tt
+          WHERE tt.group_id IS NULL
+             OR NOT EXISTS (
+                 SELECT 1 FROM group_user_map gum
+                  WHERE gum.group_id = tt.group_id AND gum.is_manager = 1
+             )
+          ORDER BY tt.sort_order, tt.name'
+    )->fetchAll(PDO::FETCH_COLUMN);
+
+    render('admin/settings/stale-tickets', [
+        'settings'            => $settings,
+        'types'               => $types,
+        'typesWithoutManager' => $typesWithoutManager,
+    ]);
 });
 
 $router->post('/admin/settings/stale-tickets', function () {
@@ -13757,6 +13777,7 @@ $router->post('/admin/settings/stale-tickets', function () {
         'stale_scope'                         => getSetting('stale_scope', 'all'),
         'stale_scope_cutoff'                  => getSetting('stale_scope_cutoff', ''),
         'email_notify:ticket_stale_agent'    => getSetting('email_notify:ticket_stale_agent', '1'),
+        'email_notify:ticket_stale_manager'   => getSetting('email_notify:ticket_stale_manager', '0'),
         'email_notify:ticket_stale_requester' => getSetting('email_notify:ticket_stale_requester', '1'),
     ];
 
@@ -13778,6 +13799,7 @@ $router->post('/admin/settings/stale-tickets', function () {
     setSetting('stale_scope',             $scope);
     setSetting('stale_scope_cutoff',      $cutoff);
     setSetting('email_notify:ticket_stale_agent',     isset($_POST['notify_agent'])     ? '1' : '0');
+    setSetting('email_notify:ticket_stale_manager',   isset($_POST['notify_manager'])   ? '1' : '0');
     setSetting('email_notify:ticket_stale_requester', isset($_POST['notify_requester']) ? '1' : '0');
 
     logAuditChange(
@@ -13791,6 +13813,7 @@ $router->post('/admin/settings/stale-tickets', function () {
             'stale_scope'                         => $scope,
             'stale_scope_cutoff'                  => $cutoff,
             'email_notify:ticket_stale_agent'    => isset($_POST['notify_agent'])     ? '1' : '0',
+            'email_notify:ticket_stale_manager'   => isset($_POST['notify_manager'])   ? '1' : '0',
             'email_notify:ticket_stale_requester' => isset($_POST['notify_requester']) ? '1' : '0',
         ]
     );

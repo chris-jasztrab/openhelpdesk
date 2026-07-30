@@ -116,6 +116,20 @@ $on = function (string $key) use ($settings): string {
                     </div>
                 </li>
 
+                <li class="list-group-item px-4 py-3">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="fw-semibold">Ticket Stale — Group Manager</div>
+                            <div class="text-muted" style="font-size:.875rem;">Also notify the manager(s) of the stale ticket's group &mdash; the ticket's own group, or the default group on its ticket type. Managers are group members flagged <strong>Manager</strong> in <a href="/admin/groups">Groups</a>. Off by default. Configure in <a href="/admin/settings/stale-tickets">Stale Tickets</a>.</div>
+                        </div>
+                        <div class="form-check form-switch ms-4 mt-1">
+                            <input class="form-check-input" type="checkbox" role="switch"
+                                   id="ticket_stale_manager" name="ticket_stale_manager"
+                                   <?= $on('ticket_stale_manager') ?>>
+                        </div>
+                    </div>
+                </li>
+
             </ul>
         </div>
     </div>

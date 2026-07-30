@@ -11,6 +11,17 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.155.0 &mdash; 2026-07-30
+
+### Added
+- **Stale tickets can now notify the group's manager.** A third toggle joins the assigned-agent and requester switches under **Admin → Settings → Stale Tickets → Email notifications**: *Notify the group manager(s) for the ticket's type*. When a ticket goes stale it emails everyone flagged **Manager** on the responsible group, so a supervisor learns that something in their department has been sitting untouched without having to go looking for it.
+  - **Who counts as the manager** — the existing per-member **Manager** checkbox in **Admin → Groups → edit**. Nothing new to configure and a group can have several; all of them get the email. There is deliberately no separate "manager" field on a ticket type — the group is already the department, and one source of truth beats two that can disagree.
+  - **Which group** — the ticket's own group. Only if a ticket somehow has none does it fall back to the default group configured on the ticket's type. A ticket moved to another team therefore surfaces to *that* team's manager, not the one the type was originally pointed at.
+  - **Nobody is mailed twice.** An unassigned stale ticket already emails every member of its group, and a manager is one of those members — so a manager who received the agent alert is skipped for the manager alert.
+  - **The settings page names the gaps.** Ticket types that would reach no manager — no default group, or a group with nobody flagged Manager — are listed inline under the toggle, so a silent "0 manager alerts" in the cron log doesn't have to be diagnosed after the fact.
+  - Uses its own email template with the group, current owner (or a highlighted **Unassigned**), type, priority and submitter. The per-ticket timeline entry and the run log both report how many managers were alerted.
+- **Off by default.** Every other `email_notify:*` key is treated as ON when its row is missing, which is right for existing mail but wrong for a new class of recipient — it would start mailing managers the moment this deploys. Migration **072** writes an explicit `0`, and `emailNotifyDefault()` now holds the per-key default so this stays true on a fresh install.
+
 ## 2.154.1 &mdash; 2026-07-29
 
 ### Fixed

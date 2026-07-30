@@ -198,6 +198,11 @@ return [
      'section' => 'Agent Notifications', 'anchor' => 'ticket_stale_agent',
      'keywords' => 'stale aging idle inactivity'],
 
+    ['label' => 'Notify: Stale Ticket — Group Manager', 'description' => 'Notify the group manager(s) when a ticket goes stale',
+     'group' => 'Email', 'page_label' => 'Email Notifications', 'page_url' => '/admin/settings/email-notifications',
+     'section' => 'Agent Notifications', 'anchor' => 'ticket_stale_manager',
+     'keywords' => 'stale aging idle inactivity manager supervisor department group'],
+
     ['label' => 'Requester: New Ticket Confirmation', 'description' => 'Send confirmation email to the ticket creator',
      'group' => 'Email', 'page_label' => 'Email Notifications', 'page_url' => '/admin/settings/email-notifications',
      'section' => 'Ticket Requester Notifications', 'anchor' => 'requester_new_ticket',
@@ -483,6 +488,11 @@ return [
      'group' => 'Automation', 'page_label' => 'Stale Tickets', 'page_url' => '/admin/settings/stale-tickets',
      'section' => 'Email notifications', 'anchor' => 'notify_agent',
      'keywords' => 'stale notify agent'],
+
+    ['label' => 'Notify Group Manager (stale)', 'description' => 'Send stale alert to the manager(s) of the ticket type\'s group',
+     'group' => 'Automation', 'page_label' => 'Stale Tickets', 'page_url' => '/admin/settings/stale-tickets',
+     'section' => 'Email notifications', 'anchor' => 'notify_manager',
+     'keywords' => 'stale notify manager supervisor department group ticket type escalate oversight'],
 
     ['label' => 'Notify Requester (stale)',     'description' => 'Reassure requester that ticket is not forgotten',
      'group' => 'Automation', 'page_label' => 'Stale Tickets', 'page_url' => '/admin/settings/stale-tickets',

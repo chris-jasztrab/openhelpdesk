@@ -345,7 +345,7 @@ For step-by-step diagrams of every strategy, the master flow that runs on every 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-hourglass-split text-warning me-2"></i>What It Does</h5>
-<p class="text-muted mb-2">When a ticket has had <em>no</em> activity for longer than the configured threshold and is in a status that's still waiting on your team, OpenHelpDesk emails the assigned agent (or all group members if unassigned) and reassures the requester that they haven't been forgotten.</p>
+<p class="text-muted mb-2">When a ticket has had <em>no</em> activity for longer than the configured threshold and is in a status that's still waiting on your team, OpenHelpDesk emails the assigned agent (or all group members if unassigned), optionally the manager(s) of the ticket's group, and reassures the requester that they haven't been forgotten.</p>
 <p class="text-muted mb-0">Tickets in <strong>Waiting on Customer</strong>, <strong>Waiting on Third Party</strong>, <strong>Resolved</strong>, or <strong>Closed</strong> are intentionally ignored — the clock only runs when the ball is in your court.</p>
 </div>
 </div>
@@ -359,6 +359,7 @@ For step-by-step diagrams of every strategy, the master flow that runs on every 
     <li><strong>Re-notify after</strong> — minimum gap between repeat stale notifications on the same ticket, so the same nag doesn't fire on every cron run. Default <code>24h</code>. Also accepts day/hour/minute durations.</li>
     <li><strong>Coverage</strong> — <em>Retroactive</em> (default) evaluates every open ticket, including ones created before stale notifications were turned on; expect a burst of email on the first run if you have an old backlog. <em>New tickets only</em> stamps a cutoff timestamp when you save and only tickets created after it are ever eligible — the existing backlog stays quiet. Re-saving settings keeps the cutoff; switching to Retroactive and back stamps a new one.</li>
     <li><strong>Notify the assigned agent</strong> — toggle on/off. When the ticket is unassigned, the email goes to every member of the ticket's group instead.</li>
+    <li><strong>Notify the group manager(s)</strong> — toggle on/off, <strong>off by default</strong>. Emails everyone flagged <strong>Manager</strong> on the ticket's group (<a href="/admin/groups">Admin → Groups</a> → edit → per-member Manager checkbox), so a group can have several. The group is the ticket's own group; if the ticket somehow has none, the default group configured on its <a href="/admin/types">ticket type</a> is used instead. A manager who already received the agent alert above — which happens when the ticket is unassigned and the whole group is emailed — is not mailed twice. The settings page warns you which ticket types would reach nobody because they have no default group or their group has no manager flagged.</li>
     <li><strong>Notify the requester</strong> — toggle on/off for the "we haven't forgotten you" email.</li>
 </ul>
 <h6 class="fw-semibold mt-3 mb-2">Per-Type Overrides (editable inline)</h6>

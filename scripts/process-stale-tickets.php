@@ -5,7 +5,8 @@
  *
  * Finds active tickets that have had no update for longer than the
  * configured stale threshold and emails the assigned agent (or group)
- * plus the requester. Re-notifications are rate-limited via the
+ * plus the requester, and — when the toggle is on — the manager(s) of the
+ * ticket's group. Re-notifications are rate-limited via the
  * ticket_timeline `stale_notification_sent` entry so we don't spam.
  *
  * When a ticket's type + priority matches an SLA policy, idle time is
@@ -109,6 +110,7 @@ $countedCache = [];
 
 $notified = 0;
 $skipped  = 0;
+$managersNotified = 0;
 $belowCountedThreshold = 0;
 
 foreach ($tickets as $ticket) {
@@ -160,20 +162,24 @@ foreach ($tickets as $ticket) {
     }
 
     try {
-        notifyStaleTicketAgent($db, $ticket, $hoursSinceUpdate, $thresholdHours);
+        $agentIds     = notifyStaleTicketAgent($db, $ticket, $hoursSinceUpdate, $thresholdHours);
+        $managerCount = notifyStaleTicketManager($db, $ticket, $hoursSinceUpdate, $thresholdHours, $agentIds);
         notifyStaleTicketRequester($db, $ticket, $hoursSinceUpdate);
 
         $details = 'No activity for ' . formatDuration($minsSinceUpdate)
             . ($onSlaDays ? ' on SLA-counted days' : '')
-            . ' (threshold ' . formatDuration($thresholdMins) . '). Notified agent and requester.';
+            . ' (threshold ' . formatDuration($thresholdMins) . '). Notified agent and requester'
+            . ($managerCount > 0 ? ", plus {$managerCount} group manager(s)" : '') . '.';
         $db->prepare(
             "INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal)
              VALUES (?, NULL, 'stale_notification_sent', ?, 1)"
         )->execute([$ticketId, $details]);
 
         $notified++;
+        $managersNotified += $managerCount;
         logLine("Ticket #{$ticketId}: notified (" . formatDuration($minsSinceUpdate) . ' / ' . formatDuration($thresholdMins)
-            . ($onSlaDays ? ', SLA-counted days' : '') . ').');
+            . ($onSlaDays ? ', SLA-counted days' : '')
+            . ($managerCount > 0 ? ", {$managerCount} manager(s)" : '') . ').');
     } catch (\Throwable $e) {
         logLine("ERROR on ticket #{$ticketId}: " . $e->getMessage());
     }
@@ -235,7 +241,7 @@ if ($defaultGroupId > 0) {
 }
 
 $elapsed = round(microtime(true) - $startTime, 2);
-logLine("Done. Notified: {$notified}, skipped (cooldown): {$skipped}, below threshold on SLA-counted days: {$belowCountedThreshold}, no-group swept: {$noGroupSwept}. Took {$elapsed}s.");
+logLine("Done. Notified: {$notified}, manager alerts: {$managersNotified}, skipped (cooldown): {$skipped}, below threshold on SLA-counted days: {$belowCountedThreshold}, no-group swept: {$noGroupSwept}. Took {$elapsed}s.");
 
 // ── Persist log to file ───────────────────────────────────────────
 // Not on a dry run — the log's mtime drives the status badge on the Cron Jobs

@@ -201,6 +201,7 @@ $breadcrumbs  = [['label' => 'Admin', 'url' => '/admin'], ['label' => 'Docs']];
         ["Escalation watcher 403 access notification email link", "/admin/docs/automations#escalation-paths", "Automations and Escalations"],
         ["Escalate button visibility always show only after SLA breach hide", "/admin/docs/automations#escalation-paths", "Automations and Escalations"],
         ["Stale ticket notifications threshold reminder cron", "/admin/docs/automations#stale-tickets", "Automations and Escalations"],
+        ["Stale ticket notify group manager supervisor department", "/admin/docs/automations#stale-tickets", "Automations and Escalations"],
         ["Stale recheck hours re-notify dedup", "/admin/docs/automations#stale-tickets", "Automations and Escalations"],
         ["Per-type stale threshold override ticket type edit inline table blank disable", "/admin/docs/automations#stale-tickets", "Automations and Escalations"],
         ["Out of office OOF coverage vacation away agent reassign auto-reply Outlook automatic replies Microsoft Graph MailboxSettings.Read single person group", "/admin/docs/automations#oof-coverage", "Automations and Escalations"],

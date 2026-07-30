@@ -3767,6 +3767,11 @@ function getEmailTpl(string $name, array $rawTokens, ?int $groupId = null): arra
             'intro'   => 'A ticket assigned to you has had no activity for {{hours_since_update}} hours.',
             'button'  => 'View Ticket',
         ],
+        'ticket_stale_manager' => [
+            'subject' => '[Ticket #{{ticket_id}}] Stale in {{group}} — {{hours_since_update}}h without activity: {{subject}}',
+            'intro'   => 'A ticket in a group you manage has had no activity for {{hours_since_update}} hours. Current owner: {{assignee}}.',
+            'button'  => 'View Ticket',
+        ],
         'ticket_stale_requester' => [
             'subject' => '[Ticket #{{ticket_id}}] Status update: {{subject}}',
             'intro'   => 'We wanted to let you know that we\'re still tracking your ticket, even though there\'s no new update yet.',
@@ -3860,12 +3865,28 @@ function renderEmail(string $template, array $data = []): string
 }
 
 /**
+ * The out-of-the-box state for an email_notify:* key when no row exists yet.
+ *
+ * Historically every notification type defaulted to ON, which is the right
+ * call for the classic agent/requester mail — an upgrade shouldn't silently
+ * mute it. New recipient classes are the opposite: defaulting them ON would
+ * mail people who never asked for it the moment the code lands.
+ */
+function emailNotifyDefault(string $type): string
+{
+    return match ($type) {
+        'ticket_stale_manager' => '0',
+        default                => '1',
+    };
+}
+
+/**
  * Check whether a notification type is globally enabled by the admin.
- * Defaults to enabled (returns true) if no setting has been saved yet.
+ * Defaults per emailNotifyDefault() if no setting has been saved yet.
  */
 function emailNotifyEnabled(string $type): bool
 {
-    return getSetting('email_notify:' . $type, '1') !== '0';
+    return getSetting('email_notify:' . $type, emailNotifyDefault($type)) !== '0';
 }
 
 /**
@@ -7416,11 +7437,17 @@ function staleThresholdMinutesForType(PDO $db, ?int $typeId): int
 /**
  * Email the assigned agent (or all members of the assigned group) that a
  * ticket has gone stale. Respects global + per-user notification prefs.
+ *
+ * Returns the user IDs actually emailed, so notifyStaleTicketManager() can
+ * skip anyone who already got this alert — a group's manager is also one of
+ * its members, so an unassigned ticket would otherwise mail them twice.
+ *
+ * @return int[]
  */
-function notifyStaleTicketAgent(PDO $db, array $ticket, int $hoursSinceUpdate, int $thresholdHours): void
+function notifyStaleTicketAgent(PDO $db, array $ticket, int $hoursSinceUpdate, int $thresholdHours): array
 {
     if (!emailNotifyEnabled('ticket_stale_agent')) {
-        return;
+        return [];
     }
 
     $ticketId = (int) $ticket['id'];
@@ -7470,11 +7497,12 @@ function notifyStaleTicketAgent(PDO $db, array $ticket, int $hoursSinceUpdate, i
     }
 
     if (empty($recipients)) {
-        return;
+        return [];
     }
 
     $appUrl      = env('APP_URL', 'http://localhost:8000');
     $statusLabel = ticketStatusLabel((string) $ticket['status']);
+    $notifiedIds = [];
 
     foreach ($recipients as $agent) {
         $rolePrefix = match ($agent['role']) {
@@ -7519,7 +7547,150 @@ function notifyStaleTicketAgent(PDO $db, array $ticket, int $hoursSinceUpdate, i
             '',
             $ticketId
         );
+        $notifiedIds[] = (int) $agent['id'];
     }
+
+    return $notifiedIds;
+}
+
+/**
+ * Email the manager(s) of the group behind a stale ticket.
+ *
+ * "The group" is the ticket's own group_id, falling back to the default group
+ * configured on the ticket's type when the ticket has none — the type's group
+ * is what an admin actually curates, and a ticket that has been moved to
+ * another group should surface to that group's manager instead.
+ *
+ * Managers are group members flagged is_manager = 1 (Admin → Groups → edit →
+ * per-member Manager checkbox), so a group can have several.
+ *
+ * Off unless the admin opts in — see emailNotifyDefault().
+ *
+ * @param  int[] $excludeUserIds Users already emailed by the agent alert.
+ * @return int   Number of managers emailed.
+ */
+function notifyStaleTicketManager(
+    PDO $db,
+    array $ticket,
+    int $hoursSinceUpdate,
+    int $thresholdHours,
+    array $excludeUserIds = []
+): int {
+    if (!emailNotifyEnabled('ticket_stale_manager')) {
+        return 0;
+    }
+
+    $ticketId = (int) $ticket['id'];
+
+    $groupId = !empty($ticket['group_id']) ? (int) $ticket['group_id'] : 0;
+    if ($groupId === 0 && !empty($ticket['type_id'])) {
+        $g = $db->prepare('SELECT group_id FROM ticket_types WHERE id = ?');
+        $g->execute([(int) $ticket['type_id']]);
+        $groupId = (int) ($g->fetchColumn() ?: 0);
+    }
+    if ($groupId === 0) {
+        return 0;
+    }
+
+    $m = $db->prepare(
+        'SELECT u.id, u.first_name, u.last_name, u.email, u.role
+         FROM group_user_map gum
+         JOIN users u ON u.id = gum.user_id
+         WHERE gum.group_id = ? AND gum.is_manager = 1'
+    );
+    $m->execute([$groupId]);
+    $managers = $m->fetchAll();
+    if (empty($managers)) {
+        return 0;
+    }
+
+    $exclude = array_map('intval', $excludeUserIds);
+
+    $groupName = '';
+    $gn = $db->prepare('SELECT name FROM `groups` WHERE id = ?');
+    $gn->execute([$groupId]);
+    $groupName = (string) ($gn->fetchColumn() ?: '');
+
+    $typeName = $priorityName = $submitterName = $assigneeName = '';
+    if (!empty($ticket['type_id'])) {
+        $s = $db->prepare('SELECT name FROM ticket_types WHERE id = ?');
+        $s->execute([(int) $ticket['type_id']]);
+        $typeName = (string) ($s->fetchColumn() ?: '');
+    }
+    if (!empty($ticket['priority_id'])) {
+        $s = $db->prepare('SELECT name FROM ticket_priorities WHERE id = ?');
+        $s->execute([(int) $ticket['priority_id']]);
+        $priorityName = (string) ($s->fetchColumn() ?: '');
+    }
+    if (!empty($ticket['created_by'])) {
+        $s = $db->prepare('SELECT first_name, last_name FROM users WHERE id = ?');
+        $s->execute([(int) $ticket['created_by']]);
+        $row = $s->fetch();
+        $submitterName = $row ? trim($row['first_name'] . ' ' . $row['last_name']) : '';
+    }
+    if (!empty($ticket['assigned_to'])) {
+        $s = $db->prepare('SELECT first_name, last_name FROM users WHERE id = ?');
+        $s->execute([(int) $ticket['assigned_to']]);
+        $row = $s->fetch();
+        $assigneeName = $row ? trim($row['first_name'] . ' ' . $row['last_name']) : '';
+    }
+
+    $appUrl      = env('APP_URL', 'http://localhost:8000');
+    $statusLabel = ticketStatusLabel((string) $ticket['status']);
+    $sent        = 0;
+
+    foreach ($managers as $manager) {
+        if (in_array((int) $manager['id'], $exclude, true)) {
+            continue; // already got the agent-facing stale alert
+        }
+
+        $rolePrefix = $manager['role'] === 'admin' ? '/admin' : '/agent';
+        $ticketUrl  = $appUrl . $rolePrefix . '/tickets/' . $ticketId;
+
+        $tpl = getEmailTpl('ticket_stale_manager', [
+            'ticket_id'          => $ticketId,
+            'subject'            => $ticket['subject'],
+            'type'               => $typeName,
+            'priority'           => $priorityName,
+            'group'              => $groupName,
+            'submitter'          => $submitterName,
+            'assignee'           => $assigneeName !== '' ? $assigneeName : 'Unassigned',
+            'hours_since_update' => (string) $hoursSinceUpdate,
+            'threshold_hours'    => (string) $thresholdHours,
+            'user_name'          => $manager['first_name'] . ' ' . $manager['last_name'],
+            'first_name'         => $manager['first_name'],
+            'last_name'          => $manager['last_name'],
+        ]);
+
+        $emailHtml = renderEmail('ticket-stale-manager', [
+            'ticketId'         => $ticketId,
+            'subject'          => $ticket['subject'],
+            'typeName'         => $typeName,
+            'priorityName'     => $priorityName,
+            'groupName'        => $groupName,
+            'submitterName'    => $submitterName,
+            'assigneeName'     => $assigneeName,
+            'hoursSinceUpdate' => $hoursSinceUpdate,
+            'thresholdHours'   => $thresholdHours,
+            'statusLabel'      => $statusLabel,
+            'ticketUrl'        => $ticketUrl,
+            'introText'        => $tpl['intro'],
+            'buttonLabel'      => $tpl['button'],
+            'footerText'       => $tpl['footer'],
+        ]);
+
+        sendMail(
+            $manager['email'],
+            $manager['first_name'] . ' ' . $manager['last_name'],
+            $tpl['subject'],
+            $emailHtml,
+            '',
+            $ticketId
+        );
+        $sent++;
+    }
+
+    return $sent;
 }
 
 /**

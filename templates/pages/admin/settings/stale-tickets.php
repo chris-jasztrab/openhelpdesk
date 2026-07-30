@@ -11,6 +11,8 @@ $breadcrumbs  = [
 $runOutput = $_SESSION['_stale_run'] ?? null;
 unset($_SESSION['_stale_run']);
 
+$typesWithoutManager ??= [];
+
 $thresholdMins = (int) ($settings['stale_threshold_minutes'] ?? 4320);
 $recheckMins   = (int) ($settings['stale_recheck_minutes']   ?? 1440);
 $scope         = ($settings['stale_scope'] ?? 'all') === 'new' ? 'new' : 'all';
@@ -89,6 +91,27 @@ $scopeCutoff   = (string) ($settings['stale_scope_cutoff'] ?? '');
                        <?= ($settings['email_notify:ticket_stale_agent'] ?? '1') === '1' ? 'checked' : '' ?>>
                 <label class="form-check-label" for="notify_agent">
                     Notify the assigned agent (or group members if unassigned)
+                </label>
+            </div>
+            <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" role="switch"
+                       id="notify_manager" name="notify_manager"
+                       <?= ($settings['email_notify:ticket_stale_manager'] ?? '0') === '1' ? 'checked' : '' ?>>
+                <label class="form-check-label" for="notify_manager">
+                    Notify the group manager(s) for the ticket's type
+                    <span class="d-block text-muted small mt-1">
+                        Uses the ticket's group &mdash; or, if the ticket has none, the default group set on its
+                        <a href="/admin/types">ticket type</a> &mdash; and emails every member of that group flagged
+                        <strong>Manager</strong> in <a href="/admin/groups">Groups</a>. A manager who already received the
+                        agent alert above is not emailed twice.
+                        <?php if (!empty($typesWithoutManager)): ?>
+                            <span class="d-block text-warning-emphasis mt-1">
+                                <i class="bi bi-exclamation-triangle me-1"></i>No manager will be reached for:
+                                <strong><?= e(implode(', ', $typesWithoutManager)) ?></strong>
+                                &mdash; those types either have no default group or their group has no manager flagged.
+                            </span>
+                        <?php endif; ?>
+                    </span>
                 </label>
             </div>
             <div class="form-check form-switch">
