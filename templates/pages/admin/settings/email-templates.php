@@ -363,14 +363,14 @@ foreach ($groups as $grp) {
                 <div class="col-lg-4">
                     <div class="bg-light border rounded p-3">
                         <h6 class="fw-semibold mb-2"><i class="bi bi-braces me-1"></i>Available Tokens</h6>
-                        <p class="text-muted small mb-3">Click a token to copy it. Tokens work in the Subject and Intro fields.</p>
+                        <p class="text-muted small mb-3">Click into a field, then click a token to insert it at your cursor. Tokens work in every field on this tab.</p>
                         <div class="d-flex flex-column gap-2">
                             <?php foreach ($tokenSets['group_alerts'] as $tok): ?>
                             <div class="d-flex align-items-start gap-2">
                                 <code class="token-chip bg-white border rounded px-2 py-1 small flex-shrink-0"
-                                      style="cursor:pointer; user-select:all;"
-                                      title="Click to copy"
-                                      onclick="copyToken(this)"><?= e($tok['token']) ?></code>
+                                      style="cursor:pointer;"
+                                      title="Click to insert at your cursor"
+                                      onclick="insertToken(this)"><?= e($tok['token']) ?></code>
                                 <span class="text-muted small pt-1"><?= e($tok['desc']) ?></span>
                             </div>
                             <?php endforeach; ?>
@@ -533,14 +533,14 @@ foreach ($groups as $grp) {
             <div class="col-lg-4">
                 <div class="bg-light border rounded p-3">
                     <h6 class="fw-semibold mb-2"><i class="bi bi-braces me-1"></i>Available Tokens</h6>
-                    <p class="text-muted small mb-3">Click a token to copy it. Tokens work in the Subject and Intro fields.</p>
+                    <p class="text-muted small mb-3">Click into a field, then click a token to insert it at your cursor. Tokens work in every field on this tab.</p>
                     <div class="d-flex flex-column gap-2">
                         <?php foreach ($tokenSets[$activeTab] as $tok): ?>
                         <div class="d-flex align-items-start gap-2">
                             <code class="token-chip bg-white border rounded px-2 py-1 small flex-shrink-0"
-                                  style="cursor:pointer; user-select:all;"
-                                  title="Click to copy"
-                                  onclick="copyToken(this)"><?= e($tok['token']) ?></code>
+                                  style="cursor:pointer;"
+                                  title="Click to insert at your cursor"
+                                  onclick="insertToken(this)"><?= e($tok['token']) ?></code>
                             <span class="text-muted small pt-1"><?= e($tok['desc']) ?></span>
                         </div>
                         <?php endforeach; ?>
@@ -593,14 +593,92 @@ foreach ($groups as $grp) {
 {"imports":{"ckeditor5":"/assets/vendor/ckeditor5/ckeditor5.js","ckeditor5/":"/assets/vendor/ckeditor5/"}}
 </script>
 <script>
-function copyToken(el) {
-    const text = el.textContent.trim();
-    navigator.clipboard.writeText(text).then(() => {
-        const orig = el.style.background;
-        el.style.background = '#d1fae5';
-        setTimeout(() => { el.style.background = orig; }, 800);
+/**
+ * Click a token chip to drop it in at the cursor.
+ *
+ * Three kinds of target on this page: plain <input>s (Subject, Button Label),
+ * a plain <textarea> (Message Body), and the CKEditor instance that replaces
+ * the Intro textarea. We remember whichever was focused last and insert there.
+ */
+window.TokenInserter = (function () {
+    let lastField = null;   // last focused plain input/textarea
+    let lastWasEditor = false;
+    let editor = null;      // CKEditor instance, registered by the module below
+
+    // Track focus rather than asking CKEditor: its editable is a contenteditable
+    // div, so one focusin listener covers every target type.
+    document.addEventListener('focusin', function (e) {
+        const el = e.target;
+        if (!el || !el.closest) { return; }
+        if (el.closest('.ck-editor__editable')) {
+            lastWasEditor = true;
+            return;
+        }
+        // #intro-editor is the source textarea CKEditor hides — never a target.
+        if (el.matches('input[type="text"], textarea') && el.id !== 'intro-editor') {
+            lastField = el;
+            lastWasEditor = false;
+        }
     });
-}
+
+    function insertIntoField(el, text) {
+        const start = el.selectionStart !== null ? el.selectionStart : el.value.length;
+        const end   = el.selectionEnd   !== null ? el.selectionEnd   : el.value.length;
+        el.value = el.value.slice(0, start) + text + el.value.slice(end);
+        const caret = start + text.length;
+        el.focus();
+        try { el.setSelectionRange(caret, caret); } catch (err) { /* non-text input */ }
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    function insertIntoEditor(text) {
+        editor.model.change(function (writer) {
+            editor.model.insertContent(writer.createText(text));
+        });
+        editor.editing.view.focus();
+    }
+
+    function flash(chip) {
+        const orig = chip.style.background;
+        chip.style.background = '#d1fae5';
+        setTimeout(function () { chip.style.background = orig; }, 500);
+    }
+
+    return {
+        registerEditor: function (ed) { editor = ed; },
+        insert: function (chip) {
+            const text = chip.textContent.trim();
+
+            if (lastWasEditor && editor) {
+                insertIntoEditor(text);
+                flash(chip);
+                return;
+            }
+            if (lastField && document.contains(lastField)) {
+                insertIntoField(lastField, text);
+                flash(chip);
+                return;
+            }
+            // Nothing focused yet — fall back to the field most tokens go in
+            // (the intro), then the first text field in the form. Better than
+            // a click that appears to do nothing.
+            if (editor) {
+                insertIntoEditor(text);
+                flash(chip);
+                return;
+            }
+            const first = document.querySelector('form input[type="text"], form textarea');
+            if (first) {
+                insertIntoField(first, text);
+                flash(chip);
+            }
+        }
+    };
+})();
+
+// Kept so any cached copy of this page keeps working.
+function copyToken(el) { window.TokenInserter.insert(el); }
+function insertToken(el) { window.TokenInserter.insert(el); }
 </script>
 <script type="module">
 import {
@@ -624,6 +702,10 @@ if (ta) {
             defaultProtocol: 'https://'
         }
     }).then(editor => {
+        // Let the token chips insert into the rich-text intro too.
+        if (window.TokenInserter) {
+            window.TokenInserter.registerEditor(editor);
+        }
         const form = ta.form || ta.closest('form');
         if (form) {
             form.addEventListener('submit', () => {

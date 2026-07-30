@@ -11,6 +11,15 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.157.0 &mdash; 2026-07-30
+
+### Changed
+- **Token chips on the Email Templates page now insert at your cursor instead of copying to the clipboard.** Click into whichever field you're writing, put the cursor where the value belongs, then click the token — it drops in at that spot, the caret lands just after it, and focus stays in the field so you can keep typing. Previously a click only copied the token and you had to paste it yourself.
+  - Works in all three kinds of field on the page: the plain inputs (Subject, Button Label), the plain textarea (Message Body), and the rich-text Intro editor. Insertion into the rich-text field goes through CKEditor's model rather than the hidden source textarea, so it lands at the real caret rather than at the end.
+  - **Text you have selected is replaced.** Highlight a placeholder word and click a token to swap it out.
+  - If no field has been touched yet, the token goes to the Intro editor — the field most tokens end up in — rather than a click that seems to do nothing.
+  - The chips are no longer `user-select:all`, since selecting-to-copy is no longer the point; you can still select the text manually if you want it on the clipboard.
+
 ## 2.156.0 &mdash; 2026-07-30
 
 ### Added
