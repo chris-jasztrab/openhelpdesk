@@ -11,6 +11,16 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.159.0 &mdash; 2026-07-30
+
+### Added
+- **A search box at the top of Current Label Values on the Labels page.** The list is 156 rows long, so finding the one word you want to rename meant scrolling or using the browser's own find. Type in the box and the table filters as you go — no button to press, no page reload.
+  - **Matches keys *and* values**, so you can search either `portal.status` or the wording your users actually see ("Submitted"). Handy when you know the phrase that's wrong but not which key produces it.
+  - **Space-separated terms all have to match**, in any order and either field — `portal open` finds `portal.status.open` without you having to type the dots. 
+  - A count under the box reads *Showing 3 of 156 labels* so a narrow filter can't be mistaken for a short list, and a **No labels match your search** row replaces an empty table.
+  - **Clear** with the ✕ button or by pressing Escape in the box. Focus returns to the search field so you can immediately type something else.
+  - Filtering and inline editing work together: search down to the row you want, click its value, edit it. The value is read live rather than cached, so a row you just renamed is still findable by its new wording.
+
 ## 2.158.0 &mdash; 2026-07-30
 
 ### Added

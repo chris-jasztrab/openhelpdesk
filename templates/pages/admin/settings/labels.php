@@ -136,7 +136,20 @@ unset($defaults['_readme']);
                 </span>
             </div>
             <div class="card-body p-0">
-                <p class="text-muted small px-3 pt-3 mb-0">
+                <div class="px-3 pt-3">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                        <input type="search" class="form-control border-start-0 ps-0" id="labelSearch"
+                               placeholder="Search keys and values&hellip;" autocomplete="off"
+                               aria-label="Search labels" aria-describedby="labelSearchCount">
+                        <button class="btn btn-outline-secondary d-none" type="button"
+                                id="labelSearchClear" title="Clear search" aria-label="Clear search">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
+                    <div class="form-text mb-0" id="labelSearchCount" role="status" aria-live="polite"></div>
+                </div>
+                <p class="text-muted small px-3 pt-2 mb-0">
                     <i class="bi bi-pencil-square me-1"></i>Click a value to edit it. It saves when you click away.
                     Clear the box to restore the built-in wording.
                 </p>
@@ -166,6 +179,11 @@ unset($defaults['_readme']);
                             </td>
                         </tr>
                         <?php endforeach; ?>
+                        <tr id="labelNoMatch" class="d-none">
+                            <td colspan="2" class="text-center text-muted py-4">
+                                <i class="bi bi-search me-1"></i>No labels match your search.
+                            </td>
+                        </tr>
                         </tbody>
                     </table>
                 </div>
@@ -199,6 +217,11 @@ unset($defaults['_readme']);
         border-radius: .25rem;
     }
     .ld-label-input.is-saving { opacity: .6; }
+    /* We supply our own clear button, so hide the native one type="search" adds. */
+    #labelSearch::-webkit-search-cancel-button {
+        -webkit-appearance: none;
+        appearance: none;
+    }
 </style>
 
 <script>
@@ -308,6 +331,60 @@ unset($defaults['_readme']);
         span.replaceWith(input);
         input.focus();
         input.select();
+    }
+
+    /* ── Search / filter ──────────────────────────────────────────
+       Matches against the key and the currently displayed value. Space-
+       separated terms must all match somewhere in the row, so "portal
+       open" finds portal.status.open. The value is read live rather than
+       cached, so a row stays findable by whatever it was just renamed to. */
+    var search      = document.getElementById('labelSearch');
+    var searchClear = document.getElementById('labelSearchClear');
+    var searchCount = document.getElementById('labelSearchCount');
+    var noMatch     = document.getElementById('labelNoMatch');
+    var rows        = Array.prototype.slice.call(table.querySelectorAll('tbody tr[data-label-key]'));
+
+    function haystack(row) {
+        // Mid-edit the span is swapped out for an input — read whichever is there.
+        var el = row.querySelector('.ld-label-value') || row.querySelector('.ld-label-input');
+        var value = el ? (el.value !== undefined ? el.value : el.textContent) : '';
+        return (row.dataset.labelKey + ' ' + value).toLowerCase();
+    }
+
+    function filter() {
+        var terms = search.value.toLowerCase().split(/\s+/).filter(Boolean);
+        var shown = 0;
+
+        rows.forEach(function (row) {
+            var hay = haystack(row);
+            var hit = terms.every(function (t) { return hay.indexOf(t) !== -1; });
+            row.classList.toggle('d-none', !hit);
+            if (hit) shown++;
+        });
+
+        noMatch.classList.toggle('d-none', shown > 0);
+        searchClear.classList.toggle('d-none', terms.length === 0);
+        searchCount.textContent = terms.length === 0
+            ? ''
+            : 'Showing ' + shown + ' of ' + rows.length + ' labels.';
+    }
+
+    if (search) {
+        search.addEventListener('input', filter);
+        searchClear.addEventListener('click', function () {
+            search.value = '';
+            filter();
+            search.focus();
+        });
+        // Escape clears the box rather than leaving a filter you can't see.
+        search.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Escape' && search.value !== '') {
+                ev.preventDefault();
+                search.value = '';
+                filter();
+            }
+        });
+        filter();   // browsers can restore a typed value on back-navigation
     }
 
     table.addEventListener('click', function (ev) {
