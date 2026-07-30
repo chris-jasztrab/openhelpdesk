@@ -85,7 +85,7 @@ $sortParams = array_filter($filters, fn($v) => $v !== '' && $v !== 'mine');
                     <a href="?<?= http_build_query(array_merge(array_filter($filters, fn($v) => $v !== '' && $v !== 'mine'), ['scope' => 'location'])) ?>"
                        class="btn <?= $filters['scope'] === 'location' ? 'text-white' : 'btn-outline-secondary' ?>"
                        <?= $filters['scope'] === 'location' ? 'style="background:var(--ld-primary);"' : '' ?>>
-                        <i class="bi bi-building me-1"></i>My Location
+                        <i class="bi bi-building me-1"></i>My <?= e(label('location.singular', 'Location')) ?>
                     </a>
                 </div>
             </div>

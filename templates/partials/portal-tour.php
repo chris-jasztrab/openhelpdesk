@@ -28,6 +28,9 @@
  */
 $_portalTourCsrf     = csrfToken();
 $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
+// Admins can rename "Location" (Branch / Site / Campus) under Settings → Labels.
+// HTML-escaped here because the popover title/description are rendered as HTML.
+$_portalTourLocLabel = e(label('location.singular', 'Location'));
 ?>
 <script>
 (function () {
@@ -40,6 +43,7 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
     var autoShow  = <?= $_portalTourAutoShow ?>;
     var path      = window.location.pathname;
     var csrfToken = <?= json_encode($_portalTourCsrf) ?>;
+    var locLabel  = <?= json_encode($_portalTourLocLabel) ?>;
 
     function store() { try { return window.sessionStorage; } catch (e) { return null; } }
     function ssGet(k) { var s = store(); return s ? s.getItem(k) : null; }
@@ -385,9 +389,9 @@ $_portalTourAutoShow = ($autoShowTour ?? false) ? 'true' : 'false';
             steps.push({
                 element: '#tour-portal-scope',
                 popover: {
-                    title:       '🏢 My Location',
+                    title:       '🏢 My ' + locLabel,
                     description: 'Your account can also see requests from your whole branch. <strong>Go ahead and click ' +
-                                 '"My Location"</strong> to view what <em>anyone</em> at your branch has reported — handy for checking ' +
+                                 '"My ' + locLabel + '"</strong> to view what <em>anyone</em> at your branch has reported — handy for checking ' +
                                  'whether someone already submitted the problem you\'re about to report, or for following an issue a ' +
                                  'colleague opened. You can open those tickets and even comment on them.<br><br>' +
                                  'The tour will keep going after the page refreshes. (Requests in confidential categories never appear here.)',

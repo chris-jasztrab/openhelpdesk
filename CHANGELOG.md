@@ -11,6 +11,18 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.158.0 &mdash; 2026-07-30
+
+### Added
+- **Labels are editable in place — no more download-edit-upload round trip for one word.** In **Admin → Settings → Labels**, click any value in the **Current Label Values** list and it turns into a text field. Click away and it saves on its own; the row's **custom** badge and the *N customised* count in the card header update from the response, so you can see the change took without reloading. The download/upload flow is untouched and still the right tool for renaming a lot of things at once.
+  - **Clearing the box restores the built-in wording.** So does typing the default value back in — either way the key is dropped from `custom_labels` rather than stored as a redundant copy, which is what keeps the *customised* count honest.
+  - **Enter** saves (via the same blur path, so there's one code path, not two) and **Escape** reverts without sending a request. The value is also reachable by keyboard: it's focusable, and Enter or Space opens the editor.
+  - **A failed save leaves the field open** with the reason beside it, so the value you typed isn't lost to a validation error or a dropped connection. Values are capped at 255 characters and unknown keys are rejected server-side.
+  - **Every inline edit is written to the audit log** as `labels.updated`, with the key and the before→after values in the detail column — e.g. `ticket.singular: Ticket→Issue`. Reverting to the default logs the reverse. The endpoint requires `settings.manage` and a valid CSRF token, same as the upload route.
+
+### Fixed
+- **The portal's "My Location" toggle now follows the Location label.** Rename *Location* to *Branch* under **Admin → Settings → Labels** and the button on **My Requests** reads **My Branch**. It had been hard-coded, which was odd next to the *My Requests* button beside it — that one already went through the label system — and directly contradicted the setup tour, which advertises renaming Location to "Branch, Site, Campus". The same hard-coded wording is fixed in the two other places it appeared: the portal tour step that points at the toggle, and the **Help → Tracking Your Requests** page that describes it.
+
 ## 2.157.0 &mdash; 2026-07-30
 
 ### Changed

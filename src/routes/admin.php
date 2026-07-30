@@ -9218,6 +9218,60 @@ $router->post('/admin/settings/labels/upload', function () {
     redirect('/admin/settings/labels?saved=1');
 });
 
+// Inline edit of a single label from the "Current Label Values" table.
+// Body: { key, value }. A value equal to the default (or blank) clears the
+// override rather than storing a redundant copy, which keeps custom_labels
+// small and lets the "custom" badge stay accurate.
+$router->post('/admin/settings/labels/inline', function () {
+    Auth::requirePermission('settings.manage');
+    header('Content-Type: application/json');
+    requireJsonCsrf();
+
+    $body  = json_decode(file_get_contents('php://input'), true);
+    $key   = (string) ($body['key'] ?? '');
+    $value = trim((string) ($body['value'] ?? ''));
+
+    $defaultFile = ROOT_DIR . '/config/labels.default.json';
+    $defaults    = is_file($defaultFile)
+        ? (json_decode(file_get_contents($defaultFile), true) ?: [])
+        : [];
+
+    if ($key === '_readme' || !array_key_exists($key, $defaults)) {
+        echo json_encode(['success' => false, 'error' => 'Unknown label key.']);
+        exit;
+    }
+    if (mb_strlen($value) > 255) {
+        echo json_encode(['success' => false, 'error' => 'Too long (max 255 characters).']);
+        exit;
+    }
+
+    $custom   = json_decode(getSetting('custom_labels', '{}'), true) ?: [];
+    $oldValue = $custom[$key] ?? $defaults[$key];
+
+    // Blank reverts to the built-in wording; so does typing the default back in.
+    if ($value === '' || $value === $defaults[$key]) {
+        unset($custom[$key]);
+        $newValue = $defaults[$key];
+    } else {
+        $custom[$key] = $value;
+        $newValue = $value;
+    }
+
+    if ($newValue !== $oldValue) {
+        setSetting('custom_labels', json_encode($custom));
+        logAuditChange('labels.updated', null, 'setting', [$key => $oldValue], [$key => $newValue]);
+    }
+
+    echo json_encode([
+        'success'   => true,
+        'value'     => $newValue,
+        'is_custom' => array_key_exists($key, $custom),
+        'default'   => $defaults[$key],
+        'custom'    => count($custom),
+    ]);
+    exit;
+});
+
 $router->post('/admin/settings/labels/reset', function () {
     Auth::requirePermission('settings.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {

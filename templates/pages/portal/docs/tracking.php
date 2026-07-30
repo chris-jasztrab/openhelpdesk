@@ -48,7 +48,7 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/portal/help'], ['label' => 'Trac
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-building text-primary me-2"></i>Requests From Your Whole Branch</h5>
-<p class="text-muted mb-0">Some accounts can also see requests submitted by anyone at their branch. If you have this, a <strong>My Location</strong> option appears on the <em>My Requests</em> page. It's handy for checking whether a colleague already reported the problem you're about to submit, or for following an issue someone else opened &mdash; you can open those requests and even comment on them. <span class="text-muted small">(Requests in confidential categories never appear here.)</span></p>
+<p class="text-muted mb-0">Some accounts can also see requests submitted by anyone at their branch. If you have this, a <strong>My <?= e(label('location.singular', 'Location')) ?></strong> option appears on the <em>My Requests</em> page. It's handy for checking whether a colleague already reported the problem you're about to submit, or for following an issue someone else opened &mdash; you can open those requests and even comment on them. <span class="text-muted small">(Requests in confidential categories never appear here.)</span></p>
 </div>
 </div>
 
