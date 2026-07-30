@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.155.1 &mdash; 2026-07-30
+
+### Changed
+- **Explained the stale-ticket manager toggle properly.** The help text under *Notify the group manager(s) for the ticket's type* said it "uses the ticket's group — or, if the ticket has none, the default group set on its ticket type", which describes the code rather than the behaviour and left the obvious question unanswered: where is that default group set? It now says the field's actual name and location (**Ticket Types → edit a type → Default Group**), explains that a ticket's group and its type's Default Group are normally the same thing because the app keeps them in step in both directions, and notes that the fallback exists only for a ticket carrying no group at all. Same correction applied to the Email Notifications page and the Automations admin doc, where the doc entry now spells out the group/type relationship in full. No behaviour change.
+
 ## 2.155.0 &mdash; 2026-07-30
 
 ### Added

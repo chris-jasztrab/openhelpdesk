@@ -100,15 +100,28 @@ $scopeCutoff   = (string) ($settings['stale_scope_cutoff'] ?? '');
                 <label class="form-check-label" for="notify_manager">
                     Notify the group manager(s) for the ticket's type
                     <span class="d-block text-muted small mt-1">
-                        Uses the ticket's group &mdash; or, if the ticket has none, the default group set on its
-                        <a href="/admin/types">ticket type</a> &mdash; and emails every member of that group flagged
-                        <strong>Manager</strong> in <a href="/admin/groups">Groups</a>. A manager who already received the
-                        agent alert above is not emailed twice.
+                        Emails the people who manage the department a stale ticket belongs to &mdash; the members of the
+                        ticket's group ticked <strong>Manager</strong> under
+                        <a href="/admin/groups">Groups &rarr; edit a group</a>. A group can have more than one manager;
+                        they all get the email.
+                    </span>
+                    <span class="d-block text-muted small mt-1">
+                        <strong>Which group?</strong> Every ticket belongs to one, and it starts out as the
+                        <strong>Default Group</strong> of its ticket type &mdash; set per type under
+                        <a href="/admin/types">Ticket Types &rarr; edit a type &rarr; Default Group</a>. OpenHelpDesk keeps
+                        the two in step (re-type a ticket and it moves into the new type's group), so this is normally
+                        just "the manager of that type's group". The alert follows the ticket rather than the type,
+                        so a ticket an agent has moved into a different group notifies <em>that</em> group's manager
+                        instead. Only a ticket carrying no group at all has to fall back to its type's Default Group.
+                    </span>
+                    <span class="d-block text-muted small mt-1">
+                        A manager who already received the agent alert above &mdash; which happens when the ticket is
+                        unassigned and the whole group is emailed &mdash; is not emailed twice.
                         <?php if (!empty($typesWithoutManager)): ?>
                             <span class="d-block text-warning-emphasis mt-1">
-                                <i class="bi bi-exclamation-triangle me-1"></i>No manager will be reached for:
+                                <i class="bi bi-exclamation-triangle me-1"></i>Nobody will be emailed for tickets of type:
                                 <strong><?= e(implode(', ', $typesWithoutManager)) ?></strong>
-                                &mdash; those types either have no default group or their group has no manager flagged.
+                                &mdash; each of those either has no Default Group, or its group has no member ticked Manager.
                             </span>
                         <?php endif; ?>
                     </span>

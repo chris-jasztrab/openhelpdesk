@@ -120,7 +120,7 @@ $on = function (string $key) use ($settings): string {
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
                             <div class="fw-semibold">Ticket Stale — Group Manager</div>
-                            <div class="text-muted" style="font-size:.875rem;">Also notify the manager(s) of the stale ticket's group &mdash; the ticket's own group, or the default group on its ticket type. Managers are group members flagged <strong>Manager</strong> in <a href="/admin/groups">Groups</a>. Off by default. Configure in <a href="/admin/settings/stale-tickets">Stale Tickets</a>.</div>
+                            <div class="text-muted" style="font-size:.875rem;">Also notify whoever manages the department a stale ticket belongs to &mdash; the members of the ticket's group ticked <strong>Manager</strong> under <a href="/admin/groups">Groups</a>. A ticket's group comes from the <strong>Default Group</strong> on its <a href="/admin/types">ticket type</a>. Off by default. Configure in <a href="/admin/settings/stale-tickets">Stale Tickets</a>.</div>
                         </div>
                         <div class="form-check form-switch ms-4 mt-1">
                             <input class="form-check-input" type="checkbox" role="switch"
