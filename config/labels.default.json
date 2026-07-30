@@ -50,14 +50,6 @@
   "type.singular": "Type",
   "type.plural": "Types",
 
-  "status.open": "Open",
-  "status.in_progress": "In Progress",
-  "status.pending": "Pending",
-  "status.waiting_on_customer": "Waiting on Customer",
-  "status.waiting_on_third_party": "Waiting on 3rd Party",
-  "status.resolved": "Resolved",
-  "status.closed": "Closed",
-
   "role.admin": "Admin",
   "role.agent": "Agent",
   "role.user": "User",
@@ -97,6 +89,13 @@
 
   "portal.field.priority_label": "How urgent is this?",
   "portal.field.priority_help": "Pick a level if you know — otherwise leave blank and our team will set it.",
+
+  "portal.solution.available": "Answer available",
+  "portal.solution.badge": "Answer",
+  "portal.solution.posted_by": "posted by",
+  "portal.solution.staff": "our team",
+  "portal.solution.on": "on",
+  "portal.solution.go": "Go to answer",
 
   "portal.what_next.title": "What happens next?",
   "portal.what_next.line1": "Your request is in the queue.",

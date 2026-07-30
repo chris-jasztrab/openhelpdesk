@@ -11,6 +11,21 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.160.0 &mdash; 2026-07-30
+
+### Fixed
+- **The Labels page was advertising 121 labels that do nothing.** Mapping every key in `labels.default.json` against every `label()` callsite showed that only 35 of 156 were actually read by the app. The rest existed in the file and appeared on the page, but no template or route ever looked them up — so renaming them had no effect anywhere, silently. The page's own instructions demonstrated the problem: it offered *'rename "Ticket" to "Issue", "Agent" to "Staff"'* as the example, and both of those keys were inert. An admin's first attempt at the feature was guaranteed to appear broken.
+- **Six labels that do work were unreachable.** `portal.solution.available`, `.badge`, `.posted_by`, `.staff`, `.on` and `.go` — the wording on the green answer banner a requester sees once staff post a solution — were called in code but missing from `labels.default.json`, so they never appeared on the page, and both the upload validator and the inline editor rejected them as unknown keys. They're in the template file now.
+
+### Added
+- **Current Label Values is grouped by where the labels appear**, with a plain-English note on every wired-up key saying exactly where it surfaces — "Admin icon rail — second item", "the priority question on the portal request form", "status badge and filter dropdown on the portal request list, dashboard and request page". Six sections: Organisation, Staff navigation, Portal navigation, Portal status wording, Portal requests & actions, Portal request page. The header carries a **41 wired up** badge.
+- **The inert keys are quarantined in a collapsed "Not wired up yet" section**, sub-grouped by key family (`action.*`, `field.*`, `ticket.*`, …) and labelled for what they are: present in the file, read by nothing, renaming them changes nothing. They stay editable — a stored value will take effect if the key is ever hooked up — but nobody will spend ten minutes renaming one expecting a result. Searching reveals matching inert rows even while the section is collapsed, so a search can't report "no matches" for a key that's sitting right there.
+  - Section headings hide themselves when a filter empties them, and their counts switch to *matched / total* while filtering so a heading can't claim more rows than are on screen.
+- **A test that stops this from happening again.** `tests/Feature/Admin/LabelMetaTest.php` scans the codebase for `label()` calls and fails if the metadata and the callsites disagree in either direction — a key that's read but undocumented (which would be shown to admins as inert), or a documented key nothing calls anymore. It also fails on any dynamic `label($var)` call, since that would escape the analysis and get mislabelled. The wired/inert split is derived from the presence of a `where` note, so the note and the truth can't drift apart quietly.
+
+### Changed
+- **`status.*` retired from the label file (7 keys).** Staff-side status names have come from the `ticket_statuses` table since configurable statuses shipped in v2.61.4; `portal.status.*` overrides them for end users. The keys were dead weight pointing at the wrong place. Uploading an older `labels.json` that still contains them now succeeds with an informational notice naming where that wording lives instead (**Admin → Settings → Ticket Statuses**) — retired keys are skipped rather than failing validation, so a file downloaded before the upgrade keeps working.
+
 ## 2.159.0 &mdash; 2026-07-30
 
 ### Added

@@ -11,16 +11,76 @@ $breadcrumbs  = [
 // Errors from a previous upload attempt (stored in session by the route)
 $uploadErrors  = $_SESSION['label_upload_errors']  ?? [];
 $uploadPreview = $_SESSION['label_upload_preview'] ?? null;
-unset($_SESSION['label_upload_errors'], $_SESSION['label_upload_preview']);
+$uploadNotices = $_SESSION['label_upload_notices'] ?? [];
+unset($_SESSION['label_upload_errors'], $_SESSION['label_upload_preview'], $_SESSION['label_upload_notices']);
 
 // Load defaults for the "current values" table
 $defaultFile  = ROOT_DIR . '/config/labels.default.json';
 $defaults     = is_file($defaultFile) ? (json_decode(file_get_contents($defaultFile), true) ?: []) : [];
 $custom       = json_decode(getSetting('custom_labels', '{}'), true) ?: [];
-$merged       = array_merge($defaults, $custom);
 
 // Strip the readme key from display
 unset($defaults['_readme']);
+
+// Presentation metadata — see config/labels.meta.php for the contract.
+// A key with a `where` note is wired up; a key absent from meta['keys'] is
+// inert (present in the JSON but never read by label()), so it gets shown
+// separately rather than passed off as something a rename would affect.
+$labelMeta   = require ROOT_DIR . '/config/labels.meta.php';
+$metaKeys    = $labelMeta['keys']   ?? [];
+$metaGroups  = $labelMeta['groups'] ?? [];
+
+$grouped = [];
+foreach ($metaGroups as $gid => $g) {
+    $grouped[$gid] = [];
+}
+$inert = [];
+foreach ($defaults as $key => $defaultValue) {
+    $gid = $metaKeys[$key]['group'] ?? null;
+    if ($gid !== null && isset($grouped[$gid])) {
+        $grouped[$gid][$key] = $defaultValue;
+    } else {
+        $inert[$key] = $defaultValue;
+    }
+}
+
+// Inert keys are sub-grouped by their key prefix purely so the long list
+// scans; no metadata to maintain, it falls out of the naming convention.
+$inertFamilies = [];
+foreach ($inert as $key => $defaultValue) {
+    $family = strpos($key, '.') !== false ? substr($key, 0, strpos($key, '.')) : $key;
+    $inertFamilies[$family][$key] = $defaultValue;
+}
+ksort($inertFamilies);
+
+$wiredCount = count($metaKeys);
+$inertCount = count($inert);
+
+/**
+ * One row of the label table. $where is null for inert keys.
+ */
+$renderLabelRow = function (string $key, string $defaultValue, ?string $where, array $custom, bool $isInert): void {
+    $isCustom     = array_key_exists($key, $custom);
+    $currentValue = $isCustom ? $custom[$key] : $defaultValue;
+    ?>
+    <tr class="<?= $isCustom ? 'table-warning' : '' ?>"
+        data-label-key="<?= e($key) ?>"
+        data-label-default="<?= e($defaultValue) ?>"
+        <?= $isInert ? 'data-label-inert="1"' : '' ?>>
+        <td class="font-monospace small text-muted align-top"><?= e($key) ?></td>
+        <td class="small">
+            <span class="ld-label-value" role="button" tabindex="0"
+                  title="Click to edit"><?= e($currentValue) ?></span>
+            <span class="badge bg-warning text-dark ms-1 ld-label-custom-badge<?= $isCustom ? '' : ' d-none' ?>"
+                  title="Default: <?= e($defaultValue) ?>">custom</span>
+            <span class="ld-label-state ms-1 small"></span>
+            <?php if ($where !== null): ?>
+            <div class="ld-label-where text-muted mt-1"><?= e($where) ?></div>
+            <?php endif; ?>
+        </td>
+    </tr>
+    <?php
+};
 ?>
 <div class="mb-4">
     <h2 class="fw-bold mb-0">Settings</h2>
@@ -31,9 +91,16 @@ unset($defaults['_readme']);
 <div class="mb-4">
     <h5 class="fw-semibold mb-1"><i class="bi bi-translate me-2"></i>Label Customisation</h5>
     <p class="text-muted mb-0" style="font-size:.875rem;">
-        Change any terminology in the app — rename "Ticket" to "Issue", "Agent" to "Staff", and so on.
-        Click any value in the list on the right to edit it in place, or download the template,
-        edit it in bulk, and upload it back.
+        Change the terminology your users see — rename "Location" to "Branch", reword the plain-English
+        statuses on the portal, retitle the navigation. Click any value in the list on the right to edit it
+        in place, or download the template, edit it in bulk, and upload it back.
+        <br>
+        <span class="d-inline-block mt-1">
+            <i class="bi bi-info-circle me-1"></i><strong><?= $wiredCount ?></strong> labels are wired up and
+            grouped by where they appear. The other <strong><?= $inertCount ?></strong> are listed at the bottom
+            under <em>Not wired up yet</em> — they exist in the template file but nothing reads them, so
+            renaming those has no effect anywhere in the app.
+        </span>
     </p>
 </div>
 
@@ -61,6 +128,18 @@ unset($defaults['_readme']);
 
 <?php if (isset($_GET['saved'])): ?>
 <div class="alert alert-success"><i class="bi bi-check-circle me-2"></i>Labels updated successfully.</div>
+<?php endif; ?>
+
+<?php if (!empty($uploadNotices)): ?>
+<div class="alert alert-info">
+    <h6 class="fw-semibold mb-2"><i class="bi bi-info-circle me-2"></i>Some keys in your file are no longer used.</h6>
+    <ul class="mb-0 ps-3 small">
+        <?php foreach ($uploadNotices as $notice): ?>
+        <li><?= e($notice) ?></li>
+        <?php endforeach; ?>
+    </ul>
+    <p class="mb-0 mt-2 small">Everything else in the file was applied. Download a fresh template to stop seeing this.</p>
+</div>
 <?php endif; ?>
 
 <?php if (isset($_GET['reset'])): ?>
@@ -131,9 +210,12 @@ unset($defaults['_readme']);
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white py-3 d-flex align-items-center justify-content-between">
                 <h6 class="mb-0 fw-semibold"><i class="bi bi-list-ul me-2"></i>Current Label Values</h6>
-                <span class="badge bg-warning text-dark<?= empty($custom) ? ' d-none' : '' ?>" id="labelCustomCount">
-                    <?= count($custom) ?> customised
-                </span>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-success-subtle text-success-emphasis"><?= $wiredCount ?> wired up</span>
+                    <span class="badge bg-warning text-dark<?= empty($custom) ? ' d-none' : '' ?>" id="labelCustomCount">
+                        <?= count($custom) ?> customised
+                    </span>
+                </div>
             </div>
             <div class="card-body p-0">
                 <div class="px-3 pt-3">
@@ -162,23 +244,54 @@ unset($defaults['_readme']);
                             </tr>
                         </thead>
                         <tbody>
-                        <?php foreach ($defaults as $key => $defaultValue):
-                            $isCustom      = array_key_exists($key, $custom);
-                            $currentValue  = $isCustom ? $custom[$key] : $defaultValue;
-                        ?>
-                        <tr class="<?= $isCustom ? 'table-warning' : '' ?>"
-                            data-label-key="<?= e($key) ?>"
-                            data-label-default="<?= e($defaultValue) ?>">
-                            <td class="font-monospace small text-muted"><?= e($key) ?></td>
-                            <td class="small">
-                                <span class="ld-label-value" role="button" tabindex="0"
-                                      title="Click to edit"><?= e($currentValue) ?></span>
-                                <span class="badge bg-warning text-dark ms-1 ld-label-custom-badge<?= $isCustom ? '' : ' d-none' ?>"
-                                      title="Default: <?= e($defaultValue) ?>">custom</span>
-                                <span class="ld-label-state ms-1 small"></span>
+                        <?php foreach ($metaGroups as $gid => $group):
+                            if (empty($grouped[$gid])) continue; ?>
+                        <tr class="ld-label-group" data-label-group="<?= e($gid) ?>">
+                            <td colspan="2" class="bg-light py-2">
+                                <span class="fw-semibold small"><?= e($group['title']) ?></span>
+                                <span class="badge bg-secondary-subtle text-secondary-emphasis ms-1 ld-label-group-count"
+                                      data-total="<?= count($grouped[$gid]) ?>"><?= count($grouped[$gid]) ?></span>
+                                <?php if (!empty($group['blurb'])): ?>
+                                <div class="text-muted mt-1" style="font-size:.75rem;"><?= e($group['blurb']) ?></div>
+                                <?php endif; ?>
                             </td>
                         </tr>
+                            <?php foreach ($grouped[$gid] as $key => $defaultValue): ?>
+                                <?php $renderLabelRow($key, $defaultValue, $metaKeys[$key]['where'] ?? null, $custom, false); ?>
+                            <?php endforeach; ?>
                         <?php endforeach; ?>
+
+                        <?php if ($inertCount > 0): ?>
+                        <tr class="ld-label-group" data-label-group="__inert__">
+                            <td colspan="2" class="bg-light py-2">
+                                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none fw-semibold"
+                                        id="labelInertToggle" aria-expanded="false" aria-controls="labelTable">
+                                    <i class="bi bi-chevron-right me-1" id="labelInertChevron"></i>Not wired up yet
+                                    <span class="badge bg-secondary-subtle text-secondary-emphasis ms-1"><?= $inertCount ?></span>
+                                </button>
+                                <div class="text-muted mt-1" style="font-size:.75rem;">
+                                    These keys exist in the label file but nothing in the app reads them, so renaming
+                                    them changes nothing. They're listed for completeness — and because they're the
+                                    shortlist for what to wire up next. You can still edit them; the value is stored
+                                    and will take effect if the key is ever hooked up.
+                                </div>
+                            </td>
+                        </tr>
+                            <?php foreach ($inertFamilies as $family => $familyKeys): ?>
+                            <tr class="ld-label-group ld-label-family" data-label-group="__inert__"
+                                data-label-inert-group="1">
+                                <td colspan="2" class="py-1 ps-4">
+                                    <span class="font-monospace small text-muted"><?= e($family) ?>.*</span>
+                                    <span class="badge bg-secondary-subtle text-secondary-emphasis ms-1 ld-label-group-count"
+                                          data-total="<?= count($familyKeys) ?>"><?= count($familyKeys) ?></span>
+                                </td>
+                            </tr>
+                                <?php foreach ($familyKeys as $key => $defaultValue): ?>
+                                    <?php $renderLabelRow($key, $defaultValue, null, $custom, true); ?>
+                                <?php endforeach; ?>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+
                         <tr id="labelNoMatch" class="d-none">
                             <td colspan="2" class="text-center text-muted py-4">
                                 <i class="bi bi-search me-1"></i>No labels match your search.
@@ -217,6 +330,15 @@ unset($defaults['_readme']);
         border-radius: .25rem;
     }
     .ld-label-input.is-saving { opacity: .6; }
+    .ld-label-where {
+        font-size: .75rem;
+        line-height: 1.35;
+        max-width: 34rem;
+    }
+    .ld-label-where::before {
+        content: '\21B3\00A0';          /* ↳ — a literal glyph, not an icon-font codepoint */
+        opacity: .6;
+    }
     /* We supply our own clear button, so hide the native one type="search" adds. */
     #labelSearch::-webkit-search-cancel-button {
         -webkit-appearance: none;
@@ -333,16 +455,50 @@ unset($defaults['_readme']);
         input.select();
     }
 
-    /* ── Search / filter ──────────────────────────────────────────
-       Matches against the key and the currently displayed value. Space-
-       separated terms must all match somewhere in the row, so "portal
-       open" finds portal.status.open. The value is read live rather than
-       cached, so a row stays findable by whatever it was just renamed to. */
-    var search      = document.getElementById('labelSearch');
-    var searchClear = document.getElementById('labelSearchClear');
-    var searchCount = document.getElementById('labelSearchCount');
-    var noMatch     = document.getElementById('labelNoMatch');
-    var rows        = Array.prototype.slice.call(table.querySelectorAll('tbody tr[data-label-key]'));
+    /* ── Search / filter + the collapsed "not wired up" section ───
+       Row visibility has two independent inputs — whether the row matches
+       the search, and whether the inert section is expanded — so both are
+       resolved in one pass rather than by two functions fighting over the
+       same d-none class.
+
+       Matching is on the key and the currently displayed value; the value
+       is read live rather than cached, so a row stays findable by whatever
+       it was just renamed to. Space-separated terms must all match, which
+       is what lets "portal open" find portal.status.open.
+
+       A search reveals matching inert rows even while the section is
+       collapsed — otherwise searching for a key would report "no matches"
+       for something that's sitting right there. */
+    var search       = document.getElementById('labelSearch');
+    var searchClear  = document.getElementById('labelSearchClear');
+    var searchCount  = document.getElementById('labelSearchCount');
+    var noMatch      = document.getElementById('labelNoMatch');
+    var inertToggle  = document.getElementById('labelInertToggle');
+    var inertChevron = document.getElementById('labelInertChevron');
+    var rows         = Array.prototype.slice.call(table.querySelectorAll('tbody tr[data-label-key]'));
+    var inertOpen    = false;
+
+    // Group the rows under their heading row so a heading can hide itself
+    // when everything beneath it is filtered out.
+    var sections = [];
+    (function buildSections() {
+        var current = null;
+        Array.prototype.forEach.call(table.querySelectorAll('tbody > tr'), function (tr) {
+            if (tr.id === 'labelNoMatch') return;
+            if (tr.classList.contains('ld-label-group')) {
+                current = {
+                    header: tr,
+                    rows:   [],
+                    // The "Not wired up yet" heading owns the toggle and has no
+                    // rows directly under it — the family sub-headings do.
+                    master: tr.dataset.labelGroup === '__inert__' && !tr.dataset.labelInertGroup
+                };
+                sections.push(current);
+                return;
+            }
+            if (tr.dataset.labelKey && current) current.rows.push(tr);
+        });
+    })();
 
     function haystack(row) {
         // Mid-edit the span is swapped out for an input — read whichever is there.
@@ -351,29 +507,67 @@ unset($defaults['_readme']);
         return (row.dataset.labelKey + ' ' + value).toLowerCase();
     }
 
-    function filter() {
-        var terms = search.value.toLowerCase().split(/\s+/).filter(Boolean);
-        var shown = 0;
+    function apply() {
+        var terms  = search ? search.value.toLowerCase().split(/\s+/).filter(Boolean) : [];
+        var active = terms.length > 0;
+        var shown = 0, inertShown = 0;
 
         rows.forEach(function (row) {
             var hay = haystack(row);
             var hit = terms.every(function (t) { return hay.indexOf(t) !== -1; });
-            row.classList.toggle('d-none', !hit);
-            if (hit) shown++;
+            var isInert = row.dataset.labelInert === '1';
+            var visible = hit && (!isInert || inertOpen || active);
+            row.classList.toggle('d-none', !visible);
+            if (visible) {
+                shown++;
+                if (isInert) inertShown++;
+            }
+        });
+
+        sections.forEach(function (s) {
+            var hits = s.rows.filter(function (r) { return !r.classList.contains('d-none'); }).length;
+            var visible = s.master
+                // Keep the toggle reachable unless a search rules the whole section out.
+                ? !(active && inertShown === 0)
+                : hits > 0;
+            s.header.classList.toggle('d-none', !visible);
+
+            // While filtering, the heading count would otherwise claim more rows
+            // than are on screen.
+            var badge = s.header.querySelector('.ld-label-group-count');
+            if (badge) {
+                var total = badge.dataset.total;
+                badge.textContent = active && !s.master ? hits + ' / ' + total : total;
+            }
         });
 
         noMatch.classList.toggle('d-none', shown > 0);
-        searchClear.classList.toggle('d-none', terms.length === 0);
-        searchCount.textContent = terms.length === 0
-            ? ''
-            : 'Showing ' + shown + ' of ' + rows.length + ' labels.';
+        if (searchClear) searchClear.classList.toggle('d-none', !active);
+        if (searchCount) {
+            searchCount.textContent = active
+                ? 'Showing ' + shown + ' of ' + rows.length + ' labels.'
+                : '';
+        }
+        if (inertChevron) {
+            var expanded = inertOpen || (active && inertShown > 0);
+            inertChevron.classList.toggle('bi-chevron-down', expanded);
+            inertChevron.classList.toggle('bi-chevron-right', !expanded);
+            inertToggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        }
+    }
+
+    if (inertToggle) {
+        inertToggle.addEventListener('click', function () {
+            inertOpen = !inertOpen;
+            apply();
+        });
     }
 
     if (search) {
-        search.addEventListener('input', filter);
+        search.addEventListener('input', apply);
         searchClear.addEventListener('click', function () {
             search.value = '';
-            filter();
+            apply();
             search.focus();
         });
         // Escape clears the box rather than leaving a filter you can't see.
@@ -381,11 +575,11 @@ unset($defaults['_readme']);
             if (ev.key === 'Escape' && search.value !== '') {
                 ev.preventDefault();
                 search.value = '';
-                filter();
+                apply();
             }
         });
-        filter();   // browsers can restore a typed value on back-navigation
     }
+    apply();   // collapses the inert section, and honours a value the browser restored
 
     table.addEventListener('click', function (ev) {
         var span = ev.target.closest('.ld-label-value');

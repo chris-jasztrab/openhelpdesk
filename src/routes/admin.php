@@ -9182,11 +9182,22 @@ $router->post('/admin/settings/labels/upload', function () {
         ? (json_decode(file_get_contents($defaultFile), true) ?: [])
         : [];
 
+    // Keys removed from the template in a past release. An admin re-uploading
+    // a labels.json they downloaded before the upgrade shouldn't hit a wall of
+    // validation errors for keys we ourselves deleted — drop them with a note.
+    $labelMeta = require ROOT_DIR . '/config/labels.meta.php';
+    $retired   = $labelMeta['retired'] ?? [];
+
     $errors   = [];
+    $notices  = [];
     $custom   = [];
 
     foreach ($uploaded as $key => $value) {
         if ($key === '_readme') {
+            continue;
+        }
+        if (isset($retired[$key])) {
+            $notices[] = "Ignored retired key \"$key\" — that wording is now set under {$retired[$key]}.";
             continue;
         }
         if (!array_key_exists($key, $defaults)) {
@@ -9215,6 +9226,9 @@ $router->post('/admin/settings/labels/upload', function () {
 
     setSetting('custom_labels', json_encode($custom));
     logAudit('labels.uploaded', null, null, 'custom_keys=' . count($custom));
+    if (!empty($notices)) {
+        $_SESSION['label_upload_notices'] = $notices;
+    }
     redirect('/admin/settings/labels?saved=1');
 });
 
