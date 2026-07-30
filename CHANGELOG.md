@@ -11,6 +11,14 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.156.0 &mdash; 2026-07-30
+
+### Added
+- **The stale-ticket emails are editable in the UI at last.** Three new tabs under **Admin → Settings → Email Templates** — **Stale &mdash; Requester**, **Stale &mdash; Agent** and **Stale &mdash; Manager**. Each gets the usual Subject / Intro / Button fields, a token legend, a live subject preview and a Reset to Defaults button. Previously the only way to reword any of them was to edit PHP: `getEmailTpl()` already honoured `email_subject_*` / `email_intro_*` / `email_button_*` settings rows for these keys, but nothing in the interface ever wrote them.
+- **"Message Body" — a new editable field for the main paragraph.** The "you haven't been forgotten" sentence in the requester email was hard-coded in the template, so a tab alone still wouldn't have let you change the words people actually complain about. `getEmailTpl()` now resolves a fourth part, `body`, from `email_body_<template>` with the same token substitution and escaping as the intro; blank lines you type are preserved as line breaks. Leave the field empty to keep the default, or put a single space in it to drop the paragraph from the email entirely.
+  - Only templates whose layout renders a body paragraph show the field — currently just the requester email. The list lives in one place, `EMAIL_TPL_BODY_TABS` in `src/helpers.php`, so the editor and the save route can't disagree about which templates have one.
+  - `body` is returned as `''` for every other template, so passing it into a layout that ignores it is harmless.
+
 ## 2.155.1 &mdash; 2026-07-30
 
 ### Changed

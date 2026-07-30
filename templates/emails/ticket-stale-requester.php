@@ -45,10 +45,11 @@
                 </tr>
             </table>
 
+            <?php if (!empty($bodyText)): ?>
             <p style="margin:0 0 24px; font-size:14px; color:#334155; line-height:1.6;">
-                You haven't been forgotten — your ticket is still in our queue and will be picked up as soon as possible.
-                If you have any additional information that might help, please reply to this ticket to add it to the record.
+                <?= $bodyText ?>
             </p>
+            <?php endif; ?>
 
             <table cellpadding="0" cellspacing="0">
                 <tr>

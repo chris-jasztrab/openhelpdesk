@@ -3686,9 +3686,20 @@ function slaEmailTokens(PDO $db, ?int $typeId, ?int $priorityId): array
 }
 
 /**
+ * Email templates whose layout renders an editable main paragraph below the
+ * status box, exposed as "Message Body" on the Email Templates page.
+ *
+ * Adding a key here is not enough on its own — the template's own defaults in
+ * getEmailTpl() need a 'body' entry, and its file in templates/emails/ has to
+ * actually echo $bodyText.
+ */
+const EMAIL_TPL_BODY_TABS = ['ticket_stale_requester'];
+
+/**
  * Resolve the customisable parts of an outgoing email (subject, intro text,
- * button label, footer text) from admin settings, falling back to hard-coded
- * defaults. Token values are HTML-escaped when placed into HTML fields.
+ * message body, button label, footer text) from admin settings, falling back
+ * to hard-coded defaults. Token values are HTML-escaped when placed into
+ * HTML fields.
  *
  * @param string $name       Template slug: 'ticket-created', 'ticket-updated', or 'ticket-merged'
  * @param array  $rawTokens  Raw (unescaped) values keyed by token name (without braces)
@@ -3776,6 +3787,9 @@ function getEmailTpl(string $name, array $rawTokens, ?int $groupId = null): arra
             'subject' => '[Ticket #{{ticket_id}}] Status update: {{subject}}',
             'intro'   => 'We wanted to let you know that we\'re still tracking your ticket, even though there\'s no new update yet.',
             'button'  => 'View Ticket',
+            // Second paragraph, below the status box. Only templates whose
+            // layout renders {{body}} declare one — see the 'body' part below.
+            'body'    => 'You haven\'t been forgotten — your ticket is still in our queue and will be picked up as soon as possible. If you have any additional information that might help, please reply to this ticket to add it to the record.',
         ],
         'ticket_status_resolved' => [
             'subject' => '[Ticket #{{ticket_id}}] Resolved: {{subject}}',
@@ -3823,6 +3837,11 @@ function getEmailTpl(string $name, array $rawTokens, ?int $groupId = null): arra
                   ?: getSetting("email_intro_{$key}")   ?: $d['intro'];
     $button     = ($g ? getSetting("email_button_{$key}{$g}") : null)
                   ?: getSetting("email_button_{$key}")  ?: $d['button'];
+    // 'body' — an optional second paragraph for layouts that have one to
+    // render (currently the stale-requester email). Empty string for every
+    // other template, so passing it through a layout that ignores it is safe.
+    $bodyTpl    = ($g ? getSetting("email_body_{$key}{$g}") : null)
+                  ?: getSetting("email_body_{$key}")    ?: ($d['body'] ?? '');
     $footer     = getSetting('email_footer_text')    ?: 'This is an automated message from OpenHelpDesk. Please do not reply directly to this email.';
 
     // Add common token aliases so custom templates using alternative names still work
@@ -3845,9 +3864,15 @@ function getEmailTpl(string $name, array $rawTokens, ?int $groupId = null): arra
     }
     $intro = applyEmailTokens($introTpl, $safeTokens);
 
+    // Body: same escaping rules as the intro. nl2br() so an admin who types a
+    // blank line between sentences gets the break they expect in the email —
+    // this is a multi-line field, unlike the one-line intro.
+    $body = $bodyTpl !== '' ? nl2br(applyEmailTokens($bodyTpl, $safeTokens)) : '';
+
     return [
         'subject' => $subject,
         'intro'   => $intro,  // already HTML-safe
+        'body'    => $body,   // already HTML-safe; '' when the template has none
         'button'  => htmlspecialchars($button, ENT_QUOTES, 'UTF-8'),
         'footer'  => htmlspecialchars($footer, ENT_QUOTES, 'UTF-8'),
     ];
@@ -7747,6 +7772,7 @@ function notifyStaleTicketRequester(PDO $db, array $ticket, int $hoursSinceUpdat
         'hoursSinceUpdate' => $hoursSinceUpdate,
         'ticketUrl'        => $ticketUrl,
         'introText'        => $tpl['intro'],
+        'bodyText'         => $tpl['body'],
         'buttonLabel'      => $tpl['button'],
         'footerText'       => $tpl['footer'],
     ]);

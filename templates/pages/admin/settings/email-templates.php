@@ -104,7 +104,46 @@ $tokenSets = [
         ['token' => '{{subject}}',      'desc' => 'Ticket subject line'],
         ['token' => '{{rule_name}}',    'desc' => 'Name of the escalation rule that triggered'],
     ],
+    'ticket_stale_requester' => [
+        ['token' => '{{first_name}}',         'desc' => 'Requester\'s first name'],
+        ['token' => '{{last_name}}',          'desc' => 'Requester\'s last name'],
+        ['token' => '{{user_name}}',          'desc' => 'Requester\'s full name (first + last)'],
+        ['token' => '{{ticket_id}}',          'desc' => 'Ticket number'],
+        ['token' => '{{subject}}',            'desc' => 'Ticket subject line'],
+        ['token' => '{{hours_since_update}}', 'desc' => 'Whole hours since the ticket last had any activity'],
+    ],
+    'ticket_stale_agent' => [
+        ['token' => '{{first_name}}',         'desc' => 'Agent\'s first name'],
+        ['token' => '{{last_name}}',          'desc' => 'Agent\'s last name'],
+        ['token' => '{{user_name}}',          'desc' => 'Agent\'s full name (first + last)'],
+        ['token' => '{{ticket_id}}',          'desc' => 'Ticket number'],
+        ['token' => '{{subject}}',            'desc' => 'Ticket subject line'],
+        ['token' => '{{type}}',               'desc' => 'Ticket type (if set)'],
+        ['token' => '{{priority}}',           'desc' => 'Priority name (if set)'],
+        ['token' => '{{submitter}}',          'desc' => 'Full name of the person who submitted the ticket'],
+        ['token' => '{{hours_since_update}}', 'desc' => 'Whole hours since the ticket last had any activity'],
+        ['token' => '{{threshold_hours}}',    'desc' => 'The stale threshold in hours that this ticket passed'],
+    ],
+    'ticket_stale_manager' => [
+        ['token' => '{{first_name}}',         'desc' => 'Manager\'s first name'],
+        ['token' => '{{last_name}}',          'desc' => 'Manager\'s last name'],
+        ['token' => '{{user_name}}',          'desc' => 'Manager\'s full name (first + last)'],
+        ['token' => '{{ticket_id}}',          'desc' => 'Ticket number'],
+        ['token' => '{{subject}}',            'desc' => 'Ticket subject line'],
+        ['token' => '{{group}}',              'desc' => 'Name of the group the ticket belongs to (the department being alerted)'],
+        ['token' => '{{assignee}}',           'desc' => 'Agent currently holding the ticket, or "Unassigned"'],
+        ['token' => '{{type}}',               'desc' => 'Ticket type (if set)'],
+        ['token' => '{{priority}}',           'desc' => 'Priority name (if set)'],
+        ['token' => '{{submitter}}',          'desc' => 'Full name of the person who submitted the ticket'],
+        ['token' => '{{hours_since_update}}', 'desc' => 'Whole hours since the ticket last had any activity'],
+        ['token' => '{{threshold_hours}}',    'desc' => 'The stale threshold in hours that this ticket passed'],
+    ],
 ];
+
+// Tabs whose email layout renders a paragraph below the status box, editable
+// as "Message Body". Defined in helpers.php so the save route and this page
+// can't disagree about which templates have one.
+$bodyTabs = EMAIL_TPL_BODY_TABS;
 
 $defaults = [
     'ticket_created' => [
@@ -151,6 +190,23 @@ $defaults = [
         'intro'   => 'An escalation rule has been triggered for a ticket that requires your attention.',
         'button'  => 'View Ticket',
     ],
+    // Keep these three in step with the same keys in getEmailTpl()'s $defaults.
+    'ticket_stale_requester' => [
+        'subject' => '[Ticket #{{ticket_id}}] Status update: {{subject}}',
+        'intro'   => 'We wanted to let you know that we\'re still tracking your ticket, even though there\'s no new update yet.',
+        'button'  => 'View Ticket',
+        'body'    => 'You haven\'t been forgotten — your ticket is still in our queue and will be picked up as soon as possible. If you have any additional information that might help, please reply to this ticket to add it to the record.',
+    ],
+    'ticket_stale_agent' => [
+        'subject' => '[Ticket #{{ticket_id}}] Stale — {{hours_since_update}}h without activity: {{subject}}',
+        'intro'   => 'A ticket assigned to you has had no activity for {{hours_since_update}} hours.',
+        'button'  => 'View Ticket',
+    ],
+    'ticket_stale_manager' => [
+        'subject' => '[Ticket #{{ticket_id}}] Stale in {{group}} — {{hours_since_update}}h without activity: {{subject}}',
+        'intro'   => 'A ticket in a group you manage has had no activity for {{hours_since_update}} hours. Current owner: {{assignee}}.',
+        'button'  => 'View Ticket',
+    ],
 ];
 
 $defaultFooter = 'This is an automated message from OpenHelpDesk. Please do not reply directly to this email.';
@@ -165,6 +221,9 @@ $tabs = [
     'ticket_assigned_agent' => ['label' => 'Agent Assigned',      'icon' => 'bi-person-check'],
     'ticket_assigned_group' => ['label' => 'Group Assigned',      'icon' => 'bi-people-fill'],
     'escalation_alert'      => ['label' => 'Escalation Alert',    'icon' => 'bi-exclamation-triangle'],
+    'ticket_stale_requester' => ['label' => 'Stale — Requester',  'icon' => 'bi-hourglass-split'],
+    'ticket_stale_agent'     => ['label' => 'Stale — Agent',      'icon' => 'bi-hourglass'],
+    'ticket_stale_manager'   => ['label' => 'Stale — Manager',    'icon' => 'bi-person-badge'],
 ];
 
 $activeTab = $_GET['tab'] ?? 'ticket_created';
@@ -344,25 +403,31 @@ foreach ($groups as $grp) {
         <?php
         // Field values + placeholders depend on whether we're editing the global
         // template or a single group's override.
+        $hasBody = in_array($activeTab, $bodyTabs, true);
         if ($isPerGroupTab && $gid > 0) {
             $fldSubject = $groupValues["email_subject_{$activeTab}"] ?? '';
             $fldIntro   = $groupValues["email_intro_{$activeTab}"] ?? '';
             $fldButton  = $groupValues["email_button_{$activeTab}"] ?? '';
+            $fldBody    = $groupValues["email_body_{$activeTab}"] ?? '';
             // Placeholder = what the group inherits when a field is left blank:
             // the global custom value if set, else the hard-coded default.
             $phSubject  = $tplValues["email_subject_{$activeTab}"] ?: $defaults[$activeTab]['subject'];
             $phIntro    = $tplValues["email_intro_{$activeTab}"]   ?: $defaults[$activeTab]['intro'];
             $phButton   = ($tplValues["email_button_{$activeTab}"] ?? '') ?: ($defaults[$activeTab]['button'] ?? '');
-            $hasCustom  = !empty($fldSubject) || !empty($fldIntro) || ($activeTab !== 'csat_survey' && !empty($fldButton));
+            $phBody     = ($tplValues["email_body_{$activeTab}"] ?? '')   ?: ($defaults[$activeTab]['body'] ?? '');
         } else {
             $fldSubject = $tplValues["email_subject_{$activeTab}"] ?? '';
             $fldIntro   = $tplValues["email_intro_{$activeTab}"] ?? '';
             $fldButton  = $tplValues["email_button_{$activeTab}"] ?? '';
+            $fldBody    = $tplValues["email_body_{$activeTab}"] ?? '';
             $phSubject  = $defaults[$activeTab]['subject'];
             $phIntro    = $defaults[$activeTab]['intro'];
             $phButton   = $defaults[$activeTab]['button'] ?? '';
-            $hasCustom  = !empty($fldSubject) || !empty($fldIntro) || ($activeTab !== 'csat_survey' && !empty($fldButton));
+            $phBody     = $defaults[$activeTab]['body'] ?? '';
         }
+        $hasCustom = !empty($fldSubject) || !empty($fldIntro)
+                     || ($activeTab !== 'csat_survey' && !empty($fldButton))
+                     || ($hasBody && !empty($fldBody));
         ?>
 
         <?php if ($isPerGroupTab): ?>
@@ -419,6 +484,20 @@ foreach ($groups as $grp) {
                             <?= $gid > 0 ? 'Leave blank to inherit the global default.' : 'Leave blank to use the default.' ?>
                         </div>
                     </div>
+
+                    <?php if ($hasBody): ?>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Message Body</label>
+                        <textarea class="form-control" name="email_body_<?= e($activeTab) ?>"
+                                  rows="5"
+                                  placeholder="<?= e($phBody) ?>"><?= e($fldBody) ?></textarea>
+                        <div class="form-text">
+                            The main paragraph, shown below the status box and above the button — this is the
+                            &ldquo;you haven&rsquo;t been forgotten&rdquo; wording. Blank lines are kept as line breaks.
+                            <?= $gid > 0 ? 'Leave blank to inherit the global default.' : 'Leave the field empty to use the default shown as placeholder; clear it and type a single space to remove the paragraph entirely.' ?>
+                        </div>
+                    </div>
+                    <?php endif; ?>
 
                     <?php if ($activeTab !== 'csat_survey'): ?>
                     <div class="mb-4" style="max-width:300px;">
@@ -488,6 +567,9 @@ foreach ($groups as $grp) {
                     'ticket_assigned_agent' => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working', 'type' => 'Hardware', 'priority' => 'High', 'submitter' => 'Jordan Lee', 'sla' => 'First response within 4 hours and resolution within 16 hours (business hours)', 'sla_response' => '4 hours', 'sla_resolution' => '16 hours'],
                     'ticket_assigned_group' => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working', 'group' => 'IT Support', 'type' => 'Hardware', 'priority' => 'High', 'submitter' => 'Jordan Lee', 'sla' => 'First response within 4 hours and resolution within 16 hours (business hours)', 'sla_response' => '4 hours', 'sla_resolution' => '16 hours'],
                     'escalation_alert'      => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working', 'rule_name' => 'Overdue after 24h'],
+                    'ticket_stale_requester' => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working', 'hours_since_update' => '96'],
+                    'ticket_stale_agent'     => ['first_name' => 'Jane', 'last_name' => 'Smith', 'user_name' => 'Jane Smith', 'ticket_id' => '42', 'subject' => 'Printer not working', 'type' => 'Hardware', 'priority' => 'High', 'submitter' => 'Alex Johnson', 'hours_since_update' => '96', 'threshold_hours' => '72'],
+                    'ticket_stale_manager'   => ['first_name' => 'Dana', 'last_name' => 'Reyes', 'user_name' => 'Dana Reyes', 'ticket_id' => '42', 'subject' => 'Printer not working', 'group' => 'IT Support', 'assignee' => 'Jane Smith', 'type' => 'Hardware', 'priority' => 'High', 'submitter' => 'Alex Johnson', 'hours_since_update' => '96', 'threshold_hours' => '72'],
                 ];
                 $preview = $subjectTpl;
                 foreach (($previewTokens[$activeTab] ?? []) as $k => $v) {

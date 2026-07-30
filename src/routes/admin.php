@@ -7154,6 +7154,10 @@ $router->get('/admin/settings/email-templates', function () {
         'email_subject_ticket_assigned_agent', 'email_intro_ticket_assigned_agent', 'email_button_ticket_assigned_agent',
         'email_subject_ticket_assigned_group', 'email_intro_ticket_assigned_group', 'email_button_ticket_assigned_group',
         'email_subject_escalation_alert',      'email_intro_escalation_alert',      'email_button_escalation_alert',
+        'email_subject_ticket_stale_requester', 'email_intro_ticket_stale_requester', 'email_button_ticket_stale_requester',
+        'email_body_ticket_stale_requester',
+        'email_subject_ticket_stale_agent',     'email_intro_ticket_stale_agent',     'email_button_ticket_stale_agent',
+        'email_subject_ticket_stale_manager',   'email_intro_ticket_stale_manager',   'email_button_ticket_stale_manager',
         'email_footer_text',
     ];
     $tplValues = [];
@@ -7229,12 +7233,15 @@ $router->post('/admin/settings/email-templates', function () {
     $groupQs      = $scoped ? '&group=' . $gid : '';
 
     // Reset buttons clear settings back to default (empty = use hardcoded default)
-    if (isset($_POST['reset_template']) && in_array($_POST['reset_template'], ['ticket_created', 'ticket_updated', 'ticket_merged', 'csat_survey', 'ticket_reminder', 'group_alerts', 'ticket_assigned_agent', 'ticket_assigned_group', 'escalation_alert'], true)) {
+    if (isset($_POST['reset_template']) && in_array($_POST['reset_template'], ['ticket_created', 'ticket_updated', 'ticket_merged', 'csat_survey', 'ticket_reminder', 'group_alerts', 'ticket_assigned_agent', 'ticket_assigned_group', 'escalation_alert', 'ticket_stale_requester', 'ticket_stale_agent', 'ticket_stale_manager'], true)) {
         $tpl = $_POST['reset_template'];
         setSetting("email_subject_{$tpl}{$suffix}", '');
         setSetting("email_intro_{$tpl}{$suffix}", '');
         if ($tpl !== 'csat_survey') {
             setSetting("email_button_{$tpl}{$suffix}", '');
+        }
+        if (in_array($tpl, EMAIL_TPL_BODY_TABS, true)) {
+            setSetting("email_body_{$tpl}{$suffix}", '');
         }
         logAudit('email_template.reset', null, null, 'template=' . $tpl . ($scoped ? ' group=' . $gid : ''));
         flash('success', $scoped ? 'Group override reset — this group now inherits the default.' : 'Email template reset to defaults.');
@@ -7256,10 +7263,15 @@ $router->post('/admin/settings/email-templates', function () {
         setSetting('email_intro_group_alerts',   trim($_POST['email_intro_group_alerts']   ?? ''));
         setSetting('email_button_group_alerts',  trim($_POST['email_button_group_alerts']  ?? ''));
         flash('success', 'Group alerts settings saved.');
-    } elseif (in_array($tab, ['ticket_assigned_agent', 'ticket_assigned_group', 'escalation_alert'], true)) {
+    } elseif (in_array($tab, ['ticket_assigned_agent', 'ticket_assigned_group', 'escalation_alert', 'ticket_stale_requester', 'ticket_stale_agent', 'ticket_stale_manager'], true)) {
         setSetting("email_subject_{$tab}", trim($_POST["email_subject_{$tab}"] ?? ''));
         setSetting("email_intro_{$tab}",   trim($_POST["email_intro_{$tab}"]   ?? ''));
         setSetting("email_button_{$tab}",  trim($_POST["email_button_{$tab}"]  ?? ''));
+        if (in_array($tab, EMAIL_TPL_BODY_TABS, true)) {
+            // Not trimmed to '' — a lone space is how an admin deliberately
+            // blanks the paragraph, since '' means "fall back to the default".
+            setSetting("email_body_{$tab}", rtrim($_POST["email_body_{$tab}"] ?? '', "\r\n"));
+        }
         flash('success', 'Email template saved.');
     } elseif (in_array($tab, ['ticket_created', 'ticket_updated', 'ticket_merged', 'csat_survey', 'ticket_reminder'], true)) {
         setSetting("email_subject_{$tab}{$suffix}", trim($_POST["email_subject_{$tab}"] ?? ''));
