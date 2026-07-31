@@ -11,6 +11,15 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.160.3 &mdash; 2026-07-31
+
+### Fixed
+- **Three ticket-list filters had no index and were scanning the whole table on every page load.** Migration 046 covered the default view and the status filter; *due today*, the SLA-state filter and *resolved today* were left behind. Migration `074_tickets_filter_indexes.php` adds them, following the same reasoning 046 used:
+  - **`due_date`** — indexed alone. It backs both the *due today* equality filter and a sortable column in the agent list, the admin list and the admin export, with no one dominant secondary sort worth pairing it with.
+  - **`(sla_state, created_at)`** — composite on purpose. `sla_state` holds only `on_track`/`warning`/`breached`/NULL, so an index on it alone is too low-cardinality for the optimiser to choose over a scan; adding `created_at` lets the single index both narrow the filter and supply the list's default `ORDER BY created_at DESC`.
+  - **`(status, updated_at)`** — the *resolved today* filter is an equality on `status` plus a same-day bound on `updated_at`, so `status` leads and `updated_at` takes the range.
+  - No standalone `updated_at` index: it is not offered as a sort column anywhere, so it would carry write cost for no read.
+
 ## 2.160.2 &mdash; 2026-07-31
 
 ### Fixed
