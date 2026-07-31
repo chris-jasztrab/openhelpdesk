@@ -17,6 +17,21 @@
 --   2. Update this file too, so a fresh install lands on the current
 --      shape on its first pass.
 --
+-- Step 2 is NOT optional and NOT self-correcting. After applying this file the
+-- installer records every migration filename in `schema_migrations` as an
+-- already-applied baseline without running any of them (see step 4 of
+-- `public/install/index.php` -- some migrations are destructive and would crash
+-- against this snapshot). On a fresh install this file is therefore the only
+-- thing that decides the database's shape: whatever it omits stays omitted, the
+-- runner never revisits it, and nothing raises an error. The failure shows up
+-- later as a 500 on some unrelated page -- or, if a column was renamed here and
+-- the old name was left in place, as a feature that installs cleanly and then
+-- fails at runtime.
+--
+-- `tests/Feature/SchemaParityTest.php` enforces this: it builds a scratch
+-- database from this file and diffs tables, column types and indexes against a
+-- migration-built one. Run it after editing.
+--
 -- Generated from a `mysqldump --no-data` of the canonical schema with
 -- `IF NOT EXISTS` added; preserves engine, charset, collation, and
 -- foreign keys exactly as MySQL stores them.

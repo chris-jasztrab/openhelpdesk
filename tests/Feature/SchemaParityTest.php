@@ -20,10 +20,21 @@ use PHPUnit\Framework\TestCase;
  * `kanban_*` tables), `tickets.status` left as the ENUM that configurable
  * statuses replaced in v2.60.0, and the ticket-list indexes from v2.65.0.
  *
- * Drift here is nasty because it is invisible on the developer's own machine —
- * their database came from migrations and is correct. It only surfaces for
- * someone doing a fresh install, as a 500 on whichever page touches the missing
- * object.
+ * What makes this load-bearing rather than cosmetic is step 4 of the installer
+ * (`public/install/index.php`): after applying schema.sql it inserts *every*
+ * migration filename into `schema_migrations` as an already-applied baseline,
+ * without running any of them — deliberately, because some (006) are
+ * destructive and would crash against the post-snapshot state. So on a fresh
+ * install schema.sql is not merely a shortcut, it is the only thing that
+ * decides the database's shape, and anything it omits is omitted permanently.
+ * The migration runner will never revisit it, so there is no self-healing path
+ * and no error — just a table or column that quietly does not exist.
+ *
+ * Drift here is also invisible on the developer's own machine, because their
+ * database came from migrations and is correct. It surfaces only for someone
+ * doing a fresh install, as a 500 on whichever page touches the missing object,
+ * or — worse, when a column was renamed and schema.sql kept the old name — as
+ * a feature that installs fine and then fails at runtime.
  *
  * This test closes the loop by building a scratch database from schema.sql and
  * diffing its shape against the live (migration-built) one: tables, then
@@ -79,7 +90,7 @@ class SchemaParityTest extends TestCase
                 'CREATE DATABASE `' . self::SCRATCH_DB . '` '
                 . 'CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
             );
-        } catch (\PDOException $e) {
+        } catch (\PDOException) {
             return; // no privilege — every test self-skips via requireBuilt()
         }
 
