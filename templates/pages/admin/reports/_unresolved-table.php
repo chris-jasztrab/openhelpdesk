@@ -35,6 +35,12 @@ $hasFilters = $statusFilter !== '' || $ageFilter !== null;
         </div>
 
         <div class="d-flex align-items-center gap-2">
+            <?php
+            // Lives in the partial rather than the page shell so each AJAX
+            // drilldown re-renders the link with the filters that are actually
+            // active — $_GET here is the drilled request.
+            require ROOT_DIR . '/templates/partials/report-export-csv.php';
+            ?>
             <label for="unresolvedPerPage" class="text-muted small mb-0">Show</label>
             <select id="unresolvedPerPage" name="per_page" class="form-select form-select-sm" style="width:auto;">
                 <?php foreach ([10, 25, 50, 100] as $opt): ?>

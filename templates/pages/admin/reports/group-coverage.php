@@ -52,7 +52,8 @@ $roleBadge = static function (string $role): string {
     </div>
 </div>
 
-<div class="d-flex justify-content-end mb-3">
+<div class="d-flex justify-content-end gap-2 mb-3">
+    <?php require ROOT_DIR . '/templates/partials/report-export-csv.php'; ?>
     <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.print()">
         <i class="bi bi-printer me-1"></i>Print
     </button>

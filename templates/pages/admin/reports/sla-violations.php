@@ -35,6 +35,7 @@ $breadcrumbs  = [
         <i class="bi bi-calendar-plus me-1"></i>Schedule
     </button>
     <?php endif; ?>
+    <?php require ROOT_DIR . '/templates/partials/report-export-csv.php'; ?>
 </form>
 <?php if (canScheduleReports()): ?>
 <?php require ROOT_DIR . '/templates/partials/schedule-report-modal.php'; ?>

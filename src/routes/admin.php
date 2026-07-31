@@ -10301,6 +10301,24 @@ $router->get('/admin/reports/agent-performance', function () {
     }
     unset($a);
 
+    // Sits after the rows are built but before render(), so the export always
+    // reflects whatever ?range/from/to the page itself would have shown.
+    if (($_GET['export'] ?? '') === 'csv') {
+        reportCsvOut(
+            "agent-performance-{$from}-to-{$to}.csv",
+            ['Agent', 'Assigned', 'Resolved', 'Open', 'Avg First Response', 'Avg Resolution', 'SLA Compliance %'],
+            array_map(fn($a) => [
+                $a['agent_name'],
+                $a['assigned'],
+                $a['resolved'],
+                $a['open_count'],
+                $a['avg_first_response'],
+                $a['avg_resolution'],
+                $a['sla_compliance'],
+            ], $agents)
+        );
+    }
+
     render('admin/reports/agent-performance', compact('from', 'to', 'range', 'agents'));
 });
 
@@ -10554,6 +10572,31 @@ $router->get('/admin/reports/sla-violations', function () {
 
     $totalViolations = count($violations);
 
+    if (($_GET['export'] ?? '') === 'csv') {
+        reportCsvOut(
+            "sla-violations-{$from}-to-{$to}.csv",
+            ['ID', 'Subject', 'Status', 'Priority', 'Agent', 'Breach', 'Overdue By', 'Created'],
+            array_map(function ($v) {
+                // The on-screen "Breach" cell is two independent badges; flatten
+                // them to one comma-joined column so the CSV stays one row/ticket.
+                $breach = array_filter([
+                    $v['response_breached']   ? 'Response'   : null,
+                    $v['resolution_breached'] ? 'Resolution' : null,
+                ]);
+                return [
+                    $v['id'],
+                    $v['subject'],
+                    ticketStatusLabel($v['status']),
+                    $v['priority_name'] ?? 'None',
+                    $v['agent_name'] ?? 'Unassigned',
+                    implode(', ', $breach),
+                    $v['worst_overdue_min'] > 0 ? formatMinutes((float) $v['worst_overdue_min']) : '',
+                    $v['created_at'] ? date('Y-m-d H:i', strtotime($v['created_at'])) : '',
+                ];
+            }, $violations)
+        );
+    }
+
     render('admin/reports/sla-violations', compact(
         'from', 'to', 'range', 'violations', 'totalViolations',
         'responseCount', 'resolutionCount', 'openCount'
@@ -10598,6 +10641,41 @@ $router->get('/admin/reports/unresolved', function () {
             $where .= " AND TIMESTAMPDIFF(HOUR, t.created_at, NOW()) < ?";
             $params[] = $maxH;
         }
+    }
+
+    // ── CSV export ─────────────────────────────────────────────────
+    // Deliberately short-circuits *before* the paginated query rather than just
+    // before render(): a spreadsheet containing only the 25 rows of whichever
+    // page the manager happened to be on is worse than useless. Same $where, no
+    // LIMIT, so the download is every ticket the active filters match.
+    if (($_GET['export'] ?? '') === 'csv') {
+        $exportStmt = $db->prepare(
+            "SELECT t.id, t.subject, t.status, t.created_at, t.sla_state,
+                    tp.name AS priority_name,
+                    CONCAT(a.first_name, ' ', a.last_name) AS agent_name
+             FROM tickets t
+             LEFT JOIN ticket_priorities tp ON t.priority_id = tp.id
+             LEFT JOIN users a ON t.assigned_to = a.id
+             WHERE $where
+             ORDER BY t.created_at ASC"
+        );
+        $exportStmt->execute($params);
+
+        $nowTs = time();
+        reportCsvOut(
+            'unresolved-tickets-' . date('Y-m-d') . '.csv',
+            ['ID', 'Subject', 'Status', 'Priority', 'Agent', 'SLA', 'Age', 'Created'],
+            array_map(fn($r) => [
+                $r['id'],
+                $r['subject'],
+                ticketStatusLabel($r['status']),
+                $r['priority_name'] ?? 'None',
+                $r['agent_name'] ?? 'Unassigned',
+                $r['sla_state'] ?? '',
+                formatMinutes(($nowTs - strtotime($r['created_at'])) / 60),
+                date('Y-m-d H:i', strtotime($r['created_at'])),
+            ], $exportStmt->fetchAll())
+        );
     }
 
     // ── Paginated, filtered ticket page ────────────────────────────
@@ -10915,6 +10993,22 @@ $router->get('/admin/reports/location', function () {
             ? round(($loc['sla_total'] - $loc['sla_breached']) / $loc['sla_total'] * 100) : 100;
     }
     unset($loc);
+
+    if (($_GET['export'] ?? '') === 'csv') {
+        reportCsvOut(
+            "tickets-by-location-{$from}-to-{$to}.csv",
+            ['Location', 'Total', 'Open', 'Resolved', 'Resolution Rate %', 'Avg Resolution', 'SLA Compliance %'],
+            array_map(fn($loc) => [
+                $loc['location_name'],
+                $loc['total'],
+                $loc['open_count'],
+                $loc['resolved'],
+                $loc['resolution_rate'],
+                $loc['avg_resolution'],
+                $loc['sla_compliance'],
+            ], $locations)
+        );
+    }
 
     render('admin/reports/location', compact('from', 'to', 'range', 'locations'));
 });
@@ -12242,6 +12336,26 @@ $router->get('/admin/reports/group-coverage', function () {
          ORDER BY tt.sort_order, tt.name, u.last_name, u.first_name"
     )->fetchAll();
 
+    // The page nests members under type sections; the CSV keeps the query's flat
+    // shape (one row per type/member) because that is what pivots in a
+    // spreadsheet. Types with no group or no members still emit a row with blank
+    // member columns — an unstaffed type is exactly the gap this report exists
+    // to expose, so it must not vanish from the download.
+    if (($_GET['export'] ?? '') === 'csv') {
+        reportCsvOut(
+            'group-coverage-' . date('Y-m-d') . '.csv',
+            ['Ticket Type', 'Default Group', 'Member', 'Email', 'Role', 'Group Manager'],
+            array_map(fn($r) => [
+                $r['type_name'],
+                $r['group_name'] ?? 'No default group assigned',
+                $r['member_name'] ?? '',
+                $r['member_email'] ?? '',
+                $r['user_role'] ?? '',
+                $r['user_id'] === null ? '' : ((int) $r['is_manager'] === 1 ? 'Yes' : 'No'),
+            ], $rows)
+        );
+    }
+
     render('admin/reports/group-coverage', compact('rows'));
 });
 
@@ -12327,6 +12441,16 @@ $router->get('/admin/reports/custom', function () {
             }
             $rows[] = ['label' => $row['grp_label'], 'raw' => $row['value'] ?? 0, 'display' => $displayVal];
         }
+    }
+
+    // Only exportable once a metric + group-by have actually been chosen —
+    // otherwise $rows is empty and the download would be a header-only file.
+    if (($_GET['export'] ?? '') === 'csv' && $metric && $groupBy) {
+        reportCsvOut(
+            "custom-report-{$groupBy}-{$metric}-{$from}-to-{$to}.csv",
+            [$groupByOptions[$groupBy], $metricLabel],
+            array_map(fn($r) => [$r['label'], $r['display']], $rows)
+        );
     }
 
     render('admin/reports/custom', compact(

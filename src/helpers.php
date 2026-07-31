@@ -337,6 +337,56 @@ function fputcsvSafe($handle, array $row): void
     fputcsv($handle, array_map('csvCell', $row));
 }
 
+/**
+ * Stream an already-materialised table as a CSV download and stop the request.
+ *
+ * The report pages all end in a render() call with their rows already in memory,
+ * so there is nothing to stream lazily — the win here is that every report gets
+ * byte-identical headers, the Excel BOM, and formula-injection escaping without
+ * each route re-deriving them. Callers must apply their own permission gate
+ * first; this helper deliberately knows nothing about auth.
+ *
+ * Terminates the request, so it must be the last thing a route does.
+ */
+function reportCsvOut(string $filename, array $headers, array $rows): never
+{
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+
+    $out = fopen('php://output', 'w');
+
+    // BOM for Excel UTF-8 compatibility
+    fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
+
+    if (!empty($headers)) {
+        fputcsv($out, $headers);
+    }
+    foreach ($rows as $row) {
+        fputcsvSafe($out, array_values((array) $row));
+    }
+
+    fclose($out);
+    exit;
+}
+
+/**
+ * Rebuild the current report URL with `export=csv` appended.
+ *
+ * Reports export exactly what the filters on screen resolve to, so the button
+ * just re-requests the same querystring. Pagination and the AJAX flag are
+ * dropped: a spreadsheet of "page 3 of 12" is useless, and the export ignores
+ * LIMIT anyway.
+ */
+function reportExportCsvUrl(): string
+{
+    $params = $_GET;
+    unset($params['page'], $params['per_page'], $params['ajax'], $params['export']);
+    $params['export'] = 'csv';
+    return currentPath() . '?' . http_build_query($params);
+}
+
 /* ── Output helpers ───────────────────────────────────────────── */
 
 function e(?string $value): string

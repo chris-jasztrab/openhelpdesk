@@ -95,8 +95,9 @@ $breadcrumbs  = [
 
 <!-- Table -->
 <div class="card border-0 shadow-sm">
-    <div class="card-header bg-white border-bottom">
+    <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
         <h5 class="mb-0 fw-semibold"><i class="bi bi-table me-2"></i>Data Table</h5>
+        <?php require ROOT_DIR . '/templates/partials/report-export-csv.php'; ?>
     </div>
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
