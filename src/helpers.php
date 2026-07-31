@@ -187,6 +187,38 @@ function safeRedirectPath(?string $url, string $fallback = '/'): string
     return $url;
 }
 
+/**
+ * Read a query-string parameter that must be a single scalar, never an array.
+ *
+ * PHP turns `?sort[]=x` into an array, and using an array as an array offset is
+ * a fatal `TypeError: Illegal offset type` in PHP 8 — including inside `isset()`
+ * and on the left of `??`, neither of which suppresses it. So the usual
+ * whitelist idioms
+ *
+ *     $orderCol = $sortableColumns[$_GET['sort'] ?? 'created_at'] ?? 'default';
+ *     $sort     = isset($sortableColumns[$_GET['sort'] ?? '']) ? ... : ...;
+ *
+ * both 500 on `?sort[]=x` rather than falling back. The whitelist still makes
+ * them injection-safe; they just crash before they get there.
+ *
+ * Returns $default for a missing value, an array, or anything else non-scalar.
+ */
+function requestScalar(string $key, string $default = ''): string
+{
+    $value = $_GET[$key] ?? null;
+
+    if (is_string($value)) {
+        return $value;
+    }
+    // Numeric/bool values arrive as strings from a query string, but be explicit
+    // so a caller passing a non-GET array through this cannot surprise us.
+    if (is_int($value) || is_float($value) || is_bool($value)) {
+        return (string) $value;
+    }
+
+    return $default;
+}
+
 function render(string $view, array $data = []): never
 {
     // Defaults

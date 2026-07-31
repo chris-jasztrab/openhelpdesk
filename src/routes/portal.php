@@ -91,8 +91,8 @@ $router->get('/portal/tickets', function () {
         'agent'      => 'a.first_name',
         'created_at' => 't.created_at',
     ];
-    $sort = $_GET['sort'] ?? 'created_at';
-    $dir  = strtolower($_GET['dir'] ?? 'desc') === 'asc' ? 'ASC' : 'DESC';
+    $sort = requestScalar('sort', 'created_at');
+    $dir  = strtolower(requestScalar('dir', 'desc')) === 'asc' ? 'ASC' : 'DESC';
     $orderCol = $sortableColumns[$sort] ?? 't.created_at';
 
     // Pagination

@@ -3347,8 +3347,8 @@ $router->get('/agent', function () {
         'created_at' => 't.created_at',
         'due_date'   => 't.due_date',
     ];
-    $sort     = isset($sortableColumns[$_GET['sort'] ?? '']) ? $_GET['sort'] : 'created_at';
-    $dir      = strtolower($_GET['dir'] ?? 'desc') === 'asc' ? 'ASC' : 'DESC';
+    $sort     = isset($sortableColumns[requestScalar('sort')]) ? requestScalar('sort') : 'created_at';
+    $dir      = strtolower(requestScalar('dir', 'desc')) === 'asc' ? 'ASC' : 'DESC';
     $orderCol = $sortableColumns[$sort];
 
     // Recent tickets (open/in_progress/pending)

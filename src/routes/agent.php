@@ -392,8 +392,8 @@ $router->get('/agent/tickets', function () {
         'created_at' => 't.created_at',
         'due_date'   => 't.due_date',
     ];
-    $sort = $_GET['sort'] ?? 'created_at';
-    $dir  = strtolower($_GET['dir'] ?? 'desc') === 'asc' ? 'ASC' : 'DESC';
+    $sort = requestScalar('sort', 'created_at');
+    $dir  = strtolower(requestScalar('dir', 'desc')) === 'asc' ? 'ASC' : 'DESC';
     $orderCol = $sortableColumns[$sort] ?? 't.created_at';
 
     // Pagination
@@ -609,8 +609,8 @@ $router->get('/agent/tickets/export', function () {
         'created_at' => 't.created_at',
         'due_date'   => 't.due_date',
     ];
-    $orderCol = $sortableColumns[$_GET['sort'] ?? 'created_at'] ?? 't.created_at';
-    $dir      = strtolower($_GET['dir'] ?? 'desc') === 'asc' ? 'ASC' : 'DESC';
+    $orderCol = $sortableColumns[requestScalar('sort', 'created_at')] ?? 't.created_at';
+    $dir      = strtolower(requestScalar('dir', 'desc')) === 'asc' ? 'ASC' : 'DESC';
 
     $stmt = $db->prepare(
         "SELECT t.id, t.subject, t.status, t.created_at, t.due_date, t.sla_state,

@@ -724,8 +724,8 @@ $router->get('/api/v1/tickets', function () {
 
     // Sort
     $validSorts = ['created_at', 'updated_at', 'subject', 'status', 'priority_id'];
-    $sort       = in_array($_GET['sort'] ?? '', $validSorts, true) ? $_GET['sort'] : 'updated_at';
-    $dir        = strtolower($_GET['dir'] ?? '') === 'asc' ? 'ASC' : 'DESC';
+    $sort       = in_array(requestScalar('sort'), $validSorts, true) ? requestScalar('sort') : 'updated_at';
+    $dir        = strtolower(requestScalar('dir')) === 'asc' ? 'ASC' : 'DESC';
 
     $dataStmt = $db->prepare(
         "SELECT t.id, t.subject, t.status, t.priority_id, t.type_id, t.location_id,

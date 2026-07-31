@@ -835,8 +835,8 @@ $router->get('/admin/users', function () {
         'location'   => 'l.name',
         'created_at' => 'u.created_at',
     ];
-    $sort = $_GET['sort'] ?? 'created_at';
-    $dir  = strtolower($_GET['dir'] ?? 'desc') === 'asc' ? 'ASC' : 'DESC';
+    $sort = requestScalar('sort', 'created_at');
+    $dir  = strtolower(requestScalar('dir', 'desc')) === 'asc' ? 'ASC' : 'DESC';
     $orderCol = $sortableColumns[$sort] ?? 'u.created_at';
 
     $sql .= " ORDER BY {$orderCol} {$dir}";
@@ -3758,8 +3758,8 @@ $router->get('/admin/tickets', function () {
         'created_at' => 't.created_at',
         'due_date'   => 't.due_date',
     ];
-    $sort = $_GET['sort'] ?? 'created_at';
-    $dir  = strtolower($_GET['dir'] ?? 'desc') === 'asc' ? 'ASC' : 'DESC';
+    $sort = requestScalar('sort', 'created_at');
+    $dir  = strtolower(requestScalar('dir', 'desc')) === 'asc' ? 'ASC' : 'DESC';
     $orderCol = $sortableColumns[$sort] ?? 't.created_at';
 
     // Pagination
@@ -3902,8 +3902,8 @@ $router->get('/admin/tickets/export', function () {
         'created_at' => 't.created_at',
         'due_date'   => 't.due_date',
     ];
-    $sort     = $_GET['sort'] ?? 'created_at';
-    $dir      = strtolower($_GET['dir'] ?? 'desc') === 'asc' ? 'ASC' : 'DESC';
+    $sort     = requestScalar('sort', 'created_at');
+    $dir      = strtolower(requestScalar('dir', 'desc')) === 'asc' ? 'ASC' : 'DESC';
     $orderCol = $sortableColumns[$sort] ?? 't.created_at';
 
     $sql = "SELECT t.*,
