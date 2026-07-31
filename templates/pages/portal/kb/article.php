@@ -79,6 +79,8 @@ function sendFeedback(rating) {
 
     var form = new URLSearchParams();
     form.append('rating', rating);
+    // The vote endpoint verifies CSRF like every other cookie-auth POST.
+    form.append('_token', <?= json_encode(csrfToken()) ?>);
 
     fetch('<?= $kbBase ?>/articles/<?= e($article['slug']) ?>/feedback', {
         method: 'POST',

@@ -2985,6 +2985,18 @@ $router->get('/kb/articles/{slug}', function (array $p) {
 $router->post('/kb/articles/{slug}/feedback', function (array $p) {
     header('Content-Type: application/json');
 
+    // Guest route, but still CSRF-guarded. There is no login to ride here, so
+    // this is not the classic session-riding case — but the vote *is* recorded
+    // against the visitor's session (see the kb_voted dedup below), which means
+    // a session already exists and a token can be issued and checked. Guarding
+    // it stops a third-party page from silently spending a reader's one vote on
+    // an article they never saw, which is the only thing the dedup protects.
+    if (!verifyCsrf($_SERVER['HTTP_X_CSRF_TOKEN'] ?? ($_POST['_token'] ?? ''))) {
+        http_response_code(403);
+        echo json_encode(['status' => 'error', 'message' => 'Invalid request.']);
+        exit;
+    }
+
     $rating = (int)($_POST['rating'] ?? 0);
     if (!in_array($rating, [1, -1], true)) {
         echo json_encode(['status' => 'error', 'message' => 'Invalid rating.']);

@@ -233,10 +233,20 @@ function csrfField(): string
 
 function verifyCsrf(?string $token): bool
 {
-    if ($token === null) {
+    if ($token === null || $token === '') {
         return false;
     }
-    return hash_equals($_SESSION['csrf_token'] ?? '', $token);
+    // Fail closed when this session has never been issued a token. Without this,
+    // hash_equals('', '') is TRUE, so a request supplying no token at all passed
+    // the check on any session where csrfToken() had not run yet. That never
+    // mattered for the authenticated forms (rendering them issues a token), but
+    // it silently neutered the guard on guest endpoints, where a fresh visitor's
+    // session is empty by definition.
+    $expected = $_SESSION['csrf_token'] ?? '';
+    if ($expected === '') {
+        return false;
+    }
+    return hash_equals($expected, $token);
 }
 
 /**

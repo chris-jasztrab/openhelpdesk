@@ -2661,6 +2661,16 @@ $router->post('/agent/kb/articles/{slug}/feedback', function (array $p) {
     Auth::requireStaff();
     header('Content-Type: application/json');
 
+    // Cookie-authenticated state change, so it needs the same CSRF guard every
+    // other POST in this file has. Without it any page an agent visits could
+    // silently cast (and, via the upsert, overwrite) their KB votes. Accepts the
+    // token from either transport, matching /portal/tickets/check-duplicates.
+    if (!verifyCsrf($_SERVER['HTTP_X_CSRF_TOKEN'] ?? ($_POST['_token'] ?? ''))) {
+        http_response_code(403);
+        echo json_encode(['status' => 'error', 'message' => 'Invalid request.']);
+        exit;
+    }
+
     $rating = (int)($_POST['rating'] ?? 0);
     if (!in_array($rating, [1, -1], true)) {
         echo json_encode(['status' => 'error', 'message' => 'Invalid rating.']);

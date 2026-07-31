@@ -90,6 +90,9 @@ function sendFeedback(rating) {
 
     var form = new URLSearchParams();
     form.append('rating', rating);
+    // Public page, but the vote is still tied to this visitor's session, so it
+    // carries a token like every other POST. csrfToken() issues one on render.
+    form.append('_token', <?= json_encode(csrfToken()) ?>);
 
     fetch('/kb/articles/<?= e($article['slug']) ?>/feedback', {
         method: 'POST',
