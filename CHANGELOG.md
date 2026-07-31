@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.161.3 &mdash; 2026-07-31
+
+### Fixed
+- **Production was swallowing every fatal error without a trace.** `src/bootstrap.php` set `error_reporting(0)` whenever `APP_DEBUG` was off, and a level of `0` suppresses the *log* as well as the screen — `log_errors` has nothing left to write. The result: a 500 on production produced a bare "HTTP ERROR 500" in the browser and **no entry anywhere** — not in `/var/log/apache2/error.log`, not in `storage/logs/`. Diagnosing a production fault meant reproducing it somewhere else and hoping the environments matched. Production now keeps `display_errors` off (unchanged — users still never see a stack trace) but reports `E_ALL` to a log, and errors are directed to `storage/logs/php-error.log` when that directory exists. No behaviour change for `APP_DEBUG=true`.
+
 ## 2.161.2 &mdash; 2026-07-31
 
 ### Documentation

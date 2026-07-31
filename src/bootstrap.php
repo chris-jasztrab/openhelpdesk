@@ -25,13 +25,23 @@ define('UPLOAD_MAX_SIZE', (int) env('UPLOAD_MAX_SIZE', '20971520'));
 define('UPLOAD_ALLOWED_TYPES', array_map('trim', explode(',', env('UPLOAD_ALLOWED_TYPES', 'application/pdf,image/jpeg,image/png'))));
 define('ATTACHMENT_STORAGE_PATH', ROOT_DIR . '/storage/attachments/');
 
-// Error reporting
+// Error reporting.
+//
+// Production hides errors from the browser but must still RECORD them. The old
+// `error_reporting(0)` suppressed the log as well as the screen — log_errors has
+// no effect on a level that reports nothing — so every production fatal became a
+// bare "HTTP ERROR 500" with no trace anywhere on the box. Keep display off,
+// turn the log on.
 if (env('APP_DEBUG', 'false') === 'true') {
     ini_set('display_errors', '1');
     error_reporting(E_ALL);
 } else {
     ini_set('display_errors', '0');
-    error_reporting(0);
+    error_reporting(E_ALL);
+}
+ini_set('log_errors', '1');
+if (is_dir(ROOT_DIR . '/storage/logs')) {
+    ini_set('error_log', ROOT_DIR . '/storage/logs/php-error.log');
 }
 
 // Run any pending database migrations automatically
