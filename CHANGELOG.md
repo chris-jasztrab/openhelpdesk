@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.161.2 &mdash; 2026-07-31
+
+### Documentation
+- **README's AI feature list was missing AI Similar Past Tickets.** The feature shipped in 2.148.0 (migration `067_ai_similar_tickets`) and 2.149.2's entry claims it "added a matching bullet to the readme's AI Features list" — but that edit was left sitting uncommitted in the working tree and never actually landed, so for the last two and a half weeks the one document a prospective reader judges the project by understated what the AI triage does. Committing it now, unchanged. No code change.
+
 ## 2.161.1 &mdash; 2026-07-31
 
 ### Fixed
