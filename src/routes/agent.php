@@ -511,6 +511,187 @@ $router->get('/agent/tickets', function () {
     ]);
 });
 
+/* ── Export Tickets (CSV) ─────────────────────────────────────────── */
+
+/**
+ * Agent-side counterpart to /admin/tickets/export.
+ *
+ * Registered before /agent/tickets/{id} so "export" is not swallowed as an id.
+ *
+ * SECURITY: unlike the admin export, this route MUST AND in
+ * ticketStaffVisibilitySql(). The admin version omits it because admins see
+ * everything by definition; here it is the only thing standing between an agent
+ * and every confidential / out-of-group ticket in the system. buildTicketFilterQuery()
+ * knows nothing about visibility — it only translates the user's own filters —
+ * so dropping the predicate would silently turn this into a full-database dump.
+ */
+$router->get('/agent/tickets/export', function () {
+    Auth::requireStaff();
+    $db = Database::connect();
+
+    // Filter set is deliberately the *same* set /agent/tickets reads, so the file
+    // can never contain rows the list would have hidden (or vice versa). 'mine'
+    // is a UI-only alias the shared builder doesn't know, so resolve it here.
+    $fAgent = array_values(array_filter(array_map('trim', (array) ($_GET['agent'] ?? []))));
+    $fAgent = array_map(fn($v) => $v === 'mine' ? (string) Auth::id() : $v, $fAgent);
+
+    $filterResult = buildTicketFilterQuery([
+        'status'   => $_GET['status']   ?? [],
+        'priority' => $_GET['priority'] ?? [],
+        'type'     => $_GET['type']     ?? [],
+        'location' => $_GET['location'] ?? [],
+        'agent'    => $fAgent,
+        'group'    => $_GET['group']    ?? [],
+        'q'        => trim($_GET['q'] ?? ''),
+        'watched'  => !empty($_GET['watched']) ? '1' : '',
+    ]);
+    $params = $filterResult['params'];
+
+    // Extra conditions the shared builder has no concept of: the wallboard
+    // drill-downs and the agent-only quick filters.
+    $conds = [];
+    if (!empty($_GET['resolved_today'])) {
+        $conds[] = "t.status = 'resolved'
+                    AND t.updated_at >= CURDATE() AND t.updated_at < CURDATE() + INTERVAL 1 DAY";
+    }
+    if (!empty($_GET['escalated_to_me'])) {
+        $conds[]  = 't.assigned_to = ? AND t.escalation_level > 0 AND '
+                  . ticketStatusSqlIn(ticketOpenBucketSlugs(), 't.status');
+        $params[] = Auth::id();
+    }
+    if (!empty($_GET['created_today'])) {
+        $conds[] = 't.created_at >= CURDATE() AND t.created_at < CURDATE() + INTERVAL 1 DAY';
+    }
+    if (!empty($_GET['due_today'])) {
+        $conds[] = 't.due_date = CURDATE()';
+    }
+    if (in_array($_GET['sla'] ?? '', ['breached', 'warning'], true)) {
+        $conds[]  = 't.sla_state = ?';
+        $params[] = $_GET['sla'];
+    }
+    $createdWithin = max(0, min(365, (int) ($_GET['created_within'] ?? 0)));
+    if ($createdWithin > 0) {
+        $conds[]  = 't.created_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY)';
+        $params[] = $createdWithin;
+    }
+
+    // Fail-closed visibility, always last so it is impossible to overlook.
+    $vis     = ticketStaffVisibilitySql($db, (int) Auth::id(), Auth::role(), 't');
+    $conds[] = $vis['sql'];
+    $params  = array_merge($params, $vis['params']);
+
+    // $filterResult['where'] already carries its own leading " WHERE " (or is
+    // empty); $conds is never empty because the visibility predicate is in it.
+    $whereClause = $filterResult['where'] === ''
+        ? ' WHERE ' . implode(' AND ', $conds)
+        : $filterResult['where'] . ' AND ' . implode(' AND ', $conds);
+
+    // Sorting — same whitelist as the list page.
+    $sortableColumns = [
+        'id'         => 't.id',
+        'subject'    => 't.subject',
+        'status'     => 't.status',
+        'priority'   => 'tp.sort_order',
+        'type'       => 'tt.name',
+        'agent'      => 'a.first_name',
+        'creator'    => 'c.first_name',
+        'group'      => 'g.name',
+        'location'   => 'l.name',
+        'created_at' => 't.created_at',
+        'due_date'   => 't.due_date',
+    ];
+    $orderCol = $sortableColumns[$_GET['sort'] ?? 'created_at'] ?? 't.created_at';
+    $dir      = strtolower($_GET['dir'] ?? 'desc') === 'asc' ? 'ASC' : 'DESC';
+
+    $stmt = $db->prepare(
+        "SELECT t.id, t.subject, t.status, t.created_at, t.due_date, t.sla_state,
+                tp.name AS priority_name,
+                l.name  AS location_name,
+                tt.name AS type_name,
+                tt.is_confidential AS type_confidential, tt.group_id AS type_group_id,
+                g.name  AS group_name,
+                CONCAT(c.first_name, ' ', c.last_name) AS creator_name,
+                CONCAT(a.first_name, ' ', a.last_name) AS agent_name,
+                tags.tag_list
+         FROM tickets t
+         LEFT JOIN ticket_priorities tp ON t.priority_id = tp.id
+         LEFT JOIN ticket_types tt     ON t.type_id     = tt.id
+         LEFT JOIN locations l         ON t.location_id  = l.id
+         LEFT JOIN users c             ON t.created_by   = c.id
+         LEFT JOIN users a             ON t.assigned_to  = a.id
+         LEFT JOIN `groups` g          ON t.group_id     = g.id
+         LEFT JOIN (
+             SELECT ttm.ticket_id, GROUP_CONCAT(tg.name SEPARATOR ', ') AS tag_list
+             FROM ticket_tag_map ttm
+             JOIN ticket_tags tg ON ttm.tag_id = tg.id
+             GROUP BY ttm.ticket_id
+         ) tags ON tags.ticket_id = t.id"
+        . $whereClause
+        . " ORDER BY {$orderCol} {$dir}"
+    );
+    $stmt->execute($params);
+
+    // Admins reach this route too (requireStaff), and for them the visibility
+    // predicate is 1=1 — so they need the same confidential redaction
+    // /admin/tickets/export applies. Non-admins skip it: the predicate above has
+    // already decided what they may see, and re-redacting here would blank out
+    // rows they legitimately own (e.g. a confidential ticket they created).
+    $redactGroups = null;
+    if (Auth::isAdmin()) {
+        $gs = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
+        $gs->execute([Auth::id()]);
+        $redactGroups = array_map('intval', $gs->fetchAll(PDO::FETCH_COLUMN));
+    }
+
+    $filename = 'tickets-export-' . date('Y-m-d') . '.csv';
+
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+
+    $out = fopen('php://output', 'w');
+
+    // BOM for Excel UTF-8 compatibility
+    fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
+
+    fputcsv($out, [
+        'ID', 'Subject', 'Status', 'Priority', 'Type', 'Location',
+        'Group', 'Assigned To', 'Created By', 'Tags',
+        'Created', 'Due Date', 'SLA State',
+    ]);
+
+    // Streaming a large export can take a while; drop the session lock so the
+    // agent's other tabs stay responsive meanwhile.
+    session_write_close();
+
+    while ($row = $stmt->fetch()) {
+        $redact = $redactGroups !== null
+            && !empty($row['type_confidential'])
+            && !empty($row['type_group_id'])
+            && !in_array((int) $row['type_group_id'], $redactGroups, true);
+
+        fputcsvSafe($out, [
+            $row['id'],
+            $redact ? '[Confidential]' : $row['subject'],
+            ticketStatusLabel($row['status']),
+            $row['priority_name'] ?? '',
+            $row['type_name'] ?? '',
+            $row['location_name'] ?? '',
+            $row['group_name'] ?? '',
+            $redact ? '—' : ($row['agent_name'] ?? 'Unassigned'),
+            $redact ? '—' : ($row['creator_name'] ?? ''),
+            $redact ? '' : ($row['tag_list'] ?? ''),
+            $row['created_at'] ? date('Y-m-d H:i', strtotime($row['created_at'])) : '',
+            $row['due_date'] ? date('Y-m-d H:i', strtotime($row['due_date'])) : '',
+            $row['sla_state'] ?? '',
+        ]);
+    }
+
+    fclose($out);
+    exit;
+});
+
 /* ── Open tickets for one user (from the inbox-view person card) ───── */
 
 $router->get('/agent/tickets/by-user/{userId}', function (array $p) {

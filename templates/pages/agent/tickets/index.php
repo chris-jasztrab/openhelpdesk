@@ -125,6 +125,17 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
             </div>
         </div>
         <?php endif; ?>
+        <?php
+            // Carry the active filters and sort onto the export so the download
+            // matches what's on screen. Empty values are dropped by array_filter;
+            // http_build_query keeps the array-valued filters as status[]=… etc,
+            // which is exactly the shape the export route reads back.
+            $exportParams = array_filter($filters, fn($v) => is_array($v) ? !empty($v) : $v !== '');
+            if (!empty($sort)) { $exportParams['sort'] = $sort; $exportParams['dir'] = $dir; }
+        ?>
+        <a href="/agent/tickets/export<?= !empty($exportParams) ? '?' . http_build_query($exportParams) : '' ?>" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-download me-1"></i>Export CSV
+        </a>
         <?php if (Auth::can('ticket_templates.manage')): ?>
         <a id="tour-templates-link" href="/admin/ticket-templates" class="btn btn-sm btn-outline-secondary">
             <i class="bi bi-collection me-1"></i>Templates
