@@ -11,6 +11,19 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.160.2 &mdash; 2026-07-31
+
+### Fixed
+- **A fresh install was missing six tables, five columns and two indexes.** `database/schema.sql` is what a brand-new install imports, and it had drifted badly from what the migration chain actually produces. The file's own header states the rule — new table or column means writing *both* the guarded migration and the schema.sql entry — but nothing checked, and the drift is invisible to anyone whose database came from migrations. It only breaks for someone installing from scratch, as a 500 on whatever page touches the missing object.
+  - **Six absent tables:** `ticket_statuses`, `ticket_drafts`, `agent_oof_status`, `kanban_boards`, `kanban_buckets`, `kanban_card_placements`. A fresh install had no configurable statuses, no draft autosave, no out-of-office coverage, and no Kanban at all.
+  - **Two columns still under their pre-rename names:** `escalation_rules.cooldown_hours` and `ticket_types.stale_threshold_hours`, both since renamed to `*_minutes`. This is the worst kind of drift — the table exists and the install succeeds, then escalation cooldowns and stale-ticket thresholds fail at runtime against a column name the code stopped using.
+  - **Three missing columns:** `users.is_external`, `users.totp_last_step` (two-factor replay protection), and `tickets.oof_autoreply_at`.
+  - **Two missing indexes:** `tickets.idx_tickets_status_created` / `idx_tickets_created_at` (see 2.160.1) and `ticket_presence.idx_ticket_presence_last_seen`.
+
+### Added
+- **`tests/Feature/SchemaParityTest.php` makes this class of bug self-detecting.** It builds a scratch database from `schema.sql` alone, then diffs its shape against the live migration-built one — tables, then columns by declared `COLUMN_TYPE`, then indexes by ordered column list. Comparing `COLUMN_TYPE` rather than just column names is what catches an ENUM that should be a `VARCHAR(64)`; comparing ordered index columns is what catches a composite index whose columns are the wrong way round. Structure only — it never reads or writes application rows, and it drops the scratch database afterwards. Where the MySQL user cannot `CREATE DATABASE` it skips instead of failing, so a restricted CI environment doesn't report a false problem.
+  - Five of the six drift items above were found *by this test*, after a manual table-level comparison had already reported the schema clean.
+
 ## 2.160.1 &mdash; 2026-07-31
 
 ### Fixed

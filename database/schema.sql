@@ -24,6 +24,19 @@
 
 SET FOREIGN_KEY_CHECKS = 0;
 
+CREATE TABLE IF NOT EXISTS `agent_oof_status` (
+  `user_id` int(10) unsigned NOT NULL,
+  `status` varchar(20) NOT NULL DEFAULT 'disabled',
+  `scheduled_start` datetime DEFAULT NULL,
+  `scheduled_end` datetime DEFAULT NULL,
+  `external_message` mediumtext DEFAULT NULL,
+  `is_oof` tinyint(1) NOT NULL DEFAULT 0,
+  `checked_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`user_id`),
+  KEY `idx_agent_oof_is_oof` (`is_oof`),
+  CONSTRAINT `fk_agent_oof_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `agent_skills` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `name` varchar(100) NOT NULL,
@@ -238,7 +251,7 @@ CREATE TABLE IF NOT EXISTS `escalation_rules` (
   `name` varchar(255) NOT NULL,
   `conditions` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL CHECK (json_valid(`conditions`)),
   `actions` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL CHECK (json_valid(`actions`)),
-  `cooldown_hours` int(10) unsigned NOT NULL DEFAULT 0,
+  `cooldown_minutes` int(10) unsigned NOT NULL DEFAULT 0,
   `is_enabled` tinyint(1) NOT NULL DEFAULT 1,
   `sort_order` int(10) unsigned NOT NULL DEFAULT 0,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
@@ -280,6 +293,44 @@ CREATE TABLE IF NOT EXISTS `holidays` (
   UNIQUE KEY `uq_holiday_date` (`holiday_date`),
   KEY `idx_holiday_date` (`holiday_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS `kanban_boards` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` int(10) unsigned NOT NULL,
+  `name` varchar(100) NOT NULL,
+  `is_shared` tinyint(1) NOT NULL DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_owner` (`user_id`),
+  KEY `idx_shared` (`is_shared`),
+  CONSTRAINT `fk_kanban_boards_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `kanban_buckets` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `board_id` int(10) unsigned NOT NULL,
+  `name` varchar(100) NOT NULL,
+  `color` varchar(7) NOT NULL DEFAULT '#6c757d',
+  `sort_order` int(10) unsigned NOT NULL DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_board` (`board_id`,`sort_order`),
+  CONSTRAINT `fk_kanban_buckets_board` FOREIGN KEY (`board_id`) REFERENCES `kanban_boards` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `kanban_card_placements` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `bucket_id` int(10) unsigned NOT NULL,
+  `ticket_id` int(10) unsigned NOT NULL,
+  `sort_order` int(10) unsigned NOT NULL DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_bucket_ticket` (`bucket_id`,`ticket_id`),
+  KEY `idx_ticket` (`ticket_id`),
+  CONSTRAINT `fk_kanban_place_bucket` FOREIGN KEY (`bucket_id`) REFERENCES `kanban_buckets` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_kanban_place_ticket` FOREIGN KEY (`ticket_id`) REFERENCES `tickets` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `kb_article_ratings` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `article_id` int(10) unsigned NOT NULL,
@@ -601,6 +652,20 @@ CREATE TABLE IF NOT EXISTS `ticket_cc` (
   CONSTRAINT `ticket_cc_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `ticket_cc_ibfk_3` FOREIGN KEY (`added_by`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS `ticket_drafts` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` int(10) unsigned NOT NULL,
+  `context` varchar(32) NOT NULL,
+  `ticket_id` int(10) unsigned NOT NULL DEFAULT 0,
+  `payload` mediumtext NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_ticket_drafts` (`user_id`,`context`,`ticket_id`),
+  KEY `idx_ticket_drafts_updated` (`updated_at`),
+  CONSTRAINT `fk_ticket_drafts_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `ticket_escalation_steps` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `ticket_type_id` int(10) unsigned NOT NULL,
@@ -689,6 +754,7 @@ CREATE TABLE IF NOT EXISTS `ticket_presence` (
   `activity` varchar(16) NOT NULL DEFAULT 'viewing',
   PRIMARY KEY (`ticket_id`,`user_id`),
   KEY `user_id` (`user_id`),
+  KEY `idx_ticket_presence_last_seen` (`last_seen`),
   CONSTRAINT `ticket_presence_ibfk_1` FOREIGN KEY (`ticket_id`) REFERENCES `tickets` (`id`) ON DELETE CASCADE,
   CONSTRAINT `ticket_presence_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -701,6 +767,26 @@ CREATE TABLE IF NOT EXISTS `ticket_priorities` (
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS `ticket_statuses` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `slug` varchar(64) NOT NULL,
+  `label` varchar(64) NOT NULL,
+  `bucket` enum('open','closed') NOT NULL DEFAULT 'open',
+  `pauses_sla` tinyint(1) NOT NULL DEFAULT 0,
+  `sort_order` int(10) unsigned NOT NULL DEFAULT 0,
+  `color` varchar(7) NOT NULL DEFAULT '#6c757d',
+  `is_default_new` tinyint(1) NOT NULL DEFAULT 0,
+  `is_default_resolved` tinyint(1) NOT NULL DEFAULT 0,
+  `is_default_closed` tinyint(1) NOT NULL DEFAULT 0,
+  `is_system` tinyint(1) NOT NULL DEFAULT 0,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_ticket_statuses_slug` (`slug`),
+  KEY `idx_ticket_statuses_bucket_active` (`bucket`,`is_active`,`sort_order`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `ticket_tag_map` (
   `ticket_id` int(10) unsigned NOT NULL,
   `tag_id` int(10) unsigned NOT NULL,
@@ -782,7 +868,7 @@ CREATE TABLE IF NOT EXISTS `ticket_types` (
   `sort_order` int(10) unsigned NOT NULL DEFAULT 0,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `stale_threshold_hours` int(10) unsigned DEFAULT NULL,
+  `stale_threshold_minutes` int(10) unsigned DEFAULT NULL,
   `business_hours_schedule` text DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `fk_ticket_types_group` (`group_id`),
@@ -810,7 +896,7 @@ CREATE TABLE IF NOT EXISTS `tickets` (
   `due_date` date DEFAULT NULL,
   `type_id` int(10) unsigned DEFAULT NULL,
   `location_id` int(10) unsigned DEFAULT NULL,
-  `status` enum('open','in_progress','pending','waiting_on_customer','waiting_on_third_party','resolved','closed') NOT NULL DEFAULT 'open',
+  `status` varchar(64) NOT NULL DEFAULT 'open',
   `priority_id` int(10) unsigned DEFAULT NULL,
   `assigned_to` int(10) unsigned DEFAULT NULL,
   `escalation_level` tinyint(3) unsigned NOT NULL DEFAULT 0,
@@ -826,6 +912,7 @@ CREATE TABLE IF NOT EXISTS `tickets` (
   `ai_classification_id` int(10) unsigned DEFAULT NULL,
   `ai_sentiment` varchar(32) DEFAULT NULL,
   `ai_group_classification_id` int(10) unsigned DEFAULT NULL,
+  `oof_autoreply_at` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `created_by` (`created_by`),
   KEY `type_id` (`type_id`),
@@ -839,6 +926,8 @@ CREATE TABLE IF NOT EXISTS `tickets` (
   KEY `idx_ai_sentiment` (`ai_sentiment`),
   KEY `idx_tickets_submitted_by` (`submitted_by`),
   KEY `fk_tickets_ai_group_classification` (`ai_group_classification_id`),
+  KEY `idx_tickets_status_created` (`status`,`created_at`),
+  KEY `idx_tickets_created_at` (`created_at`),
   FULLTEXT KEY `ft_tickets_subject_description` (`subject`,`description`),
   CONSTRAINT `fk_tickets_ai_classification` FOREIGN KEY (`ai_classification_id`) REFERENCES `ai_classifications` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_tickets_ai_group_classification` FOREIGN KEY (`ai_group_classification_id`) REFERENCES `ai_group_classifications` (`id`) ON DELETE SET NULL,
@@ -876,6 +965,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `email` varchar(255) NOT NULL,
   `password` varchar(255) NOT NULL,
   `role` varchar(64) NOT NULL DEFAULT 'user',
+  `is_external` tinyint(1) NOT NULL DEFAULT 0,
   `avatar` varchar(255) DEFAULT NULL,
   `azure_oid` varchar(128) DEFAULT NULL,
   `work_phone` varchar(50) DEFAULT NULL,
@@ -895,6 +985,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `notify_ticket_closed` tinyint(1) NOT NULL DEFAULT 1,
   `notify_ticket_assigned` tinyint(1) NOT NULL DEFAULT 1,
   `totp_secret` varchar(64) DEFAULT NULL,
+  `totp_last_step` bigint(20) DEFAULT NULL,
   `totp_enabled` tinyint(1) NOT NULL DEFAULT 0,
   `show_agent_tour` tinyint(1) NOT NULL DEFAULT 1,
   `show_portal_tour` tinyint(1) NOT NULL DEFAULT 1,
