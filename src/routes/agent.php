@@ -208,6 +208,15 @@ $router->get('/agent/tickets', function () {
     $where  = [];
     $params = [];
 
+    // Drop status values that no longer exist in the lookup table, matching
+    // buildTicketFilterQuery(). Every other ticket list in the app goes through
+    // that helper and normalises here; this list built its predicate by hand and
+    // did not, so the two disagreed whenever a slug was unrecognised — a saved
+    // filter or bookmark naming a since-deleted status returned nothing here
+    // while /agent/tickets/export, sharing the helper, returned everything.
+    if (!empty($fStatus)) {
+        $fStatus = array_values(array_intersect($fStatus, ticketStatusSlugs()));
+    }
     if (!empty($fStatus)) {
         $placeholders = implode(',', array_fill(0, count($fStatus), '?'));
         $where[]  = 't.status IN (' . $placeholders . ')';
