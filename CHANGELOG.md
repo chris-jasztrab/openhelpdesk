@@ -11,6 +11,23 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.161.1 &mdash; 2026-07-31
+
+### Fixed
+- **Every sortable list returned a 500 for `?sort[]=x`.** PHP parses that into an array, and using an array as an array offset is a fatal `TypeError` in PHP 8 — including inside `isset()` and on the left of `??`, neither of which suppresses it. Both idioms in the codebase crashed, including the one that looked like the hardened version:
+  ```php
+  $sortableColumns[$_GET['sort'] ?? 'created_at'] ?? 'default';   // TypeError
+  isset($sortableColumns[$_GET['sort'] ?? ''])                    // also TypeError
+  ```
+  `?dir[]=x` failed the same way through `strtolower()`. Fifteen callsites across the public, admin, agent, portal and API routes were affected. This was never an injection risk — the column whitelists are real and the direction is coerced to literal `ASC`/`DESC` — the requests simply died before reaching the whitelist. Reads now go through a new `requestScalar()` helper that returns the default for anything non-scalar.
+- **The agent ticket list and its CSV export disagreed about unrecognised status slugs**, in the worse direction: the list showed nothing while the export returned every ticket the agent could see. Exporting a bookmark or saved filter that named a since-deleted status produced a file far wider than the screen it came from, with nothing to indicate the filter had been dropped. The export normalises unknown slugs away via `buildTicketFilterQuery()` — deliberately, so `status[]=open&status[]=deleted_slug` still returns open tickets instead of silently returning zero — but the agent list built its `status IN (...)` by hand and applied the slugs verbatim. The list now uses the same normalisation. Consistency only: the visibility predicate was applied on both sides throughout, so the export never contained tickets the agent could not see.
+- **Two create-ticket tests rotated their fixtures instead of removing them.** Both cleaned up with `SELECT id … LIMIT 1` and no `ORDER BY`, so each run deleted an older leftover and left its own new row behind. The count stayed flat — which is why it looked healthy — while the pool never drained and the orphan ids changed on every run.
+
+### Known issues (found this sprint, not fixed)
+- **PHP and MySQL disagree about the current date by ~6 hours.** Nothing calls `date_default_timezone_set()`, so PHP uses the `php.ini` timezone while MySQL uses system local time. `reportDateRange()` builds report windows with PHP `date()` and compares them against MySQL timestamps, and two report CSV filenames are stamped with PHP `date('Y-m-d')` — so for a few hours each day a "today" report and its filename can name different days. Left alone deliberately: aligning them is a configuration decision that also touches SLA timers, business hours and holidays, and picking the wrong authority would silently shift those.
+- **`POST /survey/{token}` performs no CSRF check.** Its only guard is the unguessable 64-hex token in the path, which limits the practical risk — an attacker who knows the token can act directly anyway — but it is the one remaining unguarded cookie-session POST.
+- The `DATE(col) = CURDATE()` non-sargable pattern fixed in the agent list (2.161.0) still exists behind the dashboard and wallboard counters in `src/Dashboard.php`, `src/routes.php` and `src/routes/api.php`.
+
 ## 2.161.0 &mdash; 2026-07-31
 
 ### Security
