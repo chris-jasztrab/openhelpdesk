@@ -151,12 +151,16 @@ class TicketsTest extends TestCase
         $code = $r->getStatusCode();
         $this->assertTrue($code === 200 || $code === 302, "Agent create ticket: expected 200/302, got $code");
 
+        // Remove every match, not just one — see the note on the same cleanup in
+        // tests/Feature/Admin/TicketsTest.php. A bare `LIMIT 1` with no ORDER BY
+        // deleted an older leftover and left this run's own row behind, so the
+        // count held steady while the pool never actually drained.
         $db  = \Database::connect();
-        $row = $db->prepare("SELECT id FROM tickets WHERE subject = '[TEST] Agent-created ticket' LIMIT 1");
+        $row = $db->prepare("SELECT id FROM tickets WHERE subject = '[TEST] Agent-created ticket'");
         $row->execute();
-        if ($t = $row->fetch()) {
-            $db->prepare('DELETE FROM ticket_timeline WHERE ticket_id = ?')->execute([$t['id']]);
-            $db->prepare('DELETE FROM tickets WHERE id = ?')->execute([$t['id']]);
+        foreach ($row->fetchAll(\PDO::FETCH_COLUMN) as $id) {
+            $db->prepare('DELETE FROM ticket_timeline WHERE ticket_id = ?')->execute([$id]);
+            $db->prepare('DELETE FROM tickets WHERE id = ?')->execute([$id]);
         }
     }
 

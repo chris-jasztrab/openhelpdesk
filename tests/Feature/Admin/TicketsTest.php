@@ -111,13 +111,20 @@ class TicketsTest extends TestCase
         $code = $r->getStatusCode();
         $this->assertTrue($code === 200 || $code === 302, "Expected 200 or redirect, got $code");
 
-        // Clean up created ticket
+        // Clean up created ticket.
+        //
+        // Every match is removed, not just one. This used to be a bare
+        // `LIMIT 1` with no ORDER BY, so each run deleted whichever row MySQL
+        // happened to return first — typically an *older* leftover — and left
+        // the row it had just created. The net count stayed flat, which is why
+        // it looked like it was working, but the pool never drained and the
+        // orphans' ids changed on every run.
         $db  = \Database::connect();
-        $row = $db->prepare("SELECT id FROM tickets WHERE subject = '[TEST] Admin-created ticket' LIMIT 1");
+        $row = $db->prepare("SELECT id FROM tickets WHERE subject = '[TEST] Admin-created ticket'");
         $row->execute();
-        if ($t = $row->fetch()) {
-            $db->prepare('DELETE FROM ticket_timeline WHERE ticket_id = ?')->execute([$t['id']]);
-            $db->prepare('DELETE FROM tickets WHERE id = ?')->execute([$t['id']]);
+        foreach ($row->fetchAll(\PDO::FETCH_COLUMN) as $id) {
+            $db->prepare('DELETE FROM ticket_timeline WHERE ticket_id = ?')->execute([$id]);
+            $db->prepare('DELETE FROM tickets WHERE id = ?')->execute([$id]);
         }
     }
 
