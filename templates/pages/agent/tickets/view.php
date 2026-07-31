@@ -261,7 +261,12 @@ $resolutionClosedSlugs  = ticketClosedBucketSlugs();
                 <?php foreach ($standaloneAttachments as $att): ?>
                 <a href="/agent/attachments/<?= $att['id'] ?>/download"
                    class="list-group-item list-group-item-action d-flex align-items-center gap-3 <?= !empty($att['is_internal']) ? 'bg-warning bg-opacity-10' : '' ?>">
+                    <?php if (attachmentIsImage($att['mime_type'])): ?>
+                    <?php $attUrl = '/agent/attachments/' . $att['id'] . '/download'; $attThumbMax = 96; ?>
+                    <?php require ROOT_DIR . '/templates/partials/attachment-thumb.php'; ?>
+                    <?php else: ?>
                     <i class="bi <?= getFileIcon($att['mime_type']) ?> fs-4"></i>
+                    <?php endif; ?>
                     <div class="flex-grow-1">
                         <div class="fw-semibold">
                             <?= e($att['original_name']) ?>
@@ -449,12 +454,23 @@ $resolutionClosedSlugs  = ticketClosedBucketSlugs();
                                 <?php if (!empty($attachmentsByTimeline[$entry['id']])): ?>
                                 <div class="mt-2 d-flex flex-wrap gap-2">
                                     <?php foreach ($attachmentsByTimeline[$entry['id']] as $att): ?>
+                                    <?php if (attachmentIsImage($att['mime_type'])): ?>
+                                    <?php $attUrl = '/agent/attachments/' . $att['id'] . '/download'; $attThumbMax = 220; ?>
+                                    <a href="<?= e($attUrl) ?>"
+                                       class="d-inline-flex flex-column align-items-start gap-1 text-decoration-none small text-dark">
+                                        <?php require ROOT_DIR . '/templates/partials/attachment-thumb.php'; ?>
+                                        <span class="text-muted">
+                                            <?= e($att['original_name']) ?> (<?= formatFileSize($att['file_size']) ?>)
+                                        </span>
+                                    </a>
+                                    <?php else: ?>
                                     <a href="/agent/attachments/<?= $att['id'] ?>/download"
                                        class="d-inline-flex align-items-center gap-1 text-decoration-none border rounded px-2 py-1 small bg-light text-dark">
                                         <i class="bi <?= getFileIcon($att['mime_type']) ?>"></i>
                                         <?= e($att['original_name']) ?>
                                         <span class="text-muted">(<?= formatFileSize($att['file_size']) ?>)</span>
                                     </a>
+                                    <?php endif; ?>
                                     <?php endforeach; ?>
                                 </div>
                                 <?php endif; ?>

@@ -1224,6 +1224,31 @@ function saveAttachments(PDO $db, int $ticketId, ?int $timelineId, int $uploaded
     }
 }
 
+/**
+ * May this attachment be shown as an inline <img> preview?
+ *
+ * "image/*" minus SVG. SVG is a *document* format that can carry inline
+ * <script>, and this app's CSP allows script-src 'self' 'unsafe-inline' — so an
+ * SVG served from our own origin would execute. safeUploadExtension() already
+ * refuses to store one as .svg for the same reason, but UPLOAD_ALLOWED_TYPES is
+ * env-configurable, so an operator could still let one in. Excluding it here
+ * keeps the preview path safe no matter how the server is configured.
+ *
+ * Note the previews deliberately do NOT need a Content-Disposition change: the
+ * download routes keep sending `attachment`, and browsers honour that only for
+ * top-level navigation, not for <img> subresources (verified in Chromium).
+ * Switching those routes to `inline` would have re-opened the exact
+ * HTML/SVG-upload XSS hole the attachment disposition exists to close.
+ */
+function attachmentIsImage(?string $mime): bool
+{
+    $mime = strtolower(trim((string) $mime));
+    if (!str_starts_with($mime, 'image/')) {
+        return false;
+    }
+    return !in_array($mime, ['image/svg+xml', 'image/svg'], true);
+}
+
 function formatFileSize(int $bytes): string
 {
     if ($bytes >= 1048576) {
