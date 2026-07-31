@@ -28,19 +28,37 @@ class KnowledgeBaseTest extends TestCase
 
     public function test_create_and_delete_category(): void
     {
-        $slug = 'test-cat-' . time();
-        $r    = $this->post($this->adminClient(), '/admin/kb/categories/create', [
+        $db = \Database::connect();
+
+        // Identify the new row by "id greater than anything that existed before"
+        // rather than by the slug we submit. The create route derives the slug
+        // from the *name* and appends its own uniquifier, so the submitted slug
+        // never appears in the table. Matching on it silently found nothing,
+        // which skipped the delete below and leaked one category per run — while
+        // the test still passed, because nothing asserted either step worked.
+        $maxIdBefore = (int) $db->query('SELECT COALESCE(MAX(id), 0) FROM kb_categories')->fetchColumn();
+
+        $r = $this->post($this->adminClient(), '/admin/kb/categories/create', [
             'name' => '[TEST] KB Category',
-            'slug' => $slug,
+            'slug' => 'test-cat-' . time(),
         ]);
         $this->assertTrue(in_array($r->getStatusCode(), [200, 302]));
 
-        $db  = \Database::connect();
-        $row = $db->prepare("SELECT id FROM kb_categories WHERE slug = ? LIMIT 1");
-        $row->execute([$slug]);
-        if ($cat = $row->fetch()) {
-            $this->post($this->adminClient(), '/admin/kb/categories/' . $cat['id'] . '/delete', []);
-        }
+        $row = $db->prepare('SELECT id FROM kb_categories WHERE id > ? ORDER BY id DESC LIMIT 1');
+        $row->execute([$maxIdBefore]);
+        $cat = $row->fetch();
+
+        $this->assertNotFalse($cat, 'Creating a KB category should insert a row');
+
+        $this->post($this->adminClient(), '/admin/kb/categories/' . $cat['id'] . '/delete', []);
+
+        $gone = $db->prepare('SELECT COUNT(*) FROM kb_categories WHERE id = ?');
+        $gone->execute([$cat['id']]);
+        $this->assertSame(
+            0,
+            (int) $gone->fetchColumn(),
+            'Deleting the category should remove it — otherwise this test leaks a row on every run'
+        );
     }
 
     // ── Folders ───────────────────────────────────────────────────────────────
