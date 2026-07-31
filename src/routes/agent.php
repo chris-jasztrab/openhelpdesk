@@ -286,8 +286,14 @@ $router->get('/agent/tickets', function () {
         $params[] = Auth::id();
     }
 
+    // Half-open range rather than DATE(col) = CURDATE(): wrapping the column in a
+    // function makes the predicate non-sargable, so MySQL cannot use an index on
+    // it and falls back to evaluating every row. The two forms select exactly the
+    // same rows — CURDATE() coerces to today 00:00:00 against a TIMESTAMP, and
+    // both columns are NOT NULL so there is no NULL edge case either way.
     if ($fResolvedToday) {
-        $where[] = "t.status = 'resolved' AND DATE(t.updated_at) = CURDATE()";
+        $where[] = "t.status = 'resolved'
+                    AND t.updated_at >= CURDATE() AND t.updated_at < CURDATE() + INTERVAL 1 DAY";
     }
 
     if ($fEscalatedToMe) {
@@ -296,9 +302,12 @@ $router->get('/agent/tickets', function () {
     }
 
     if ($fCreatedToday) {
-        $where[] = 'DATE(t.created_at) = CURDATE()';
+        // Same sargability fix as resolved_today above. tickets.created_at is
+        // indexed, so this one can actually use the index instead of scanning.
+        $where[] = 't.created_at >= CURDATE() AND t.created_at < CURDATE() + INTERVAL 1 DAY';
     }
     if ($fDueToday) {
+        // Already sargable — due_date is a DATE column, so no wrapping function.
         $where[] = 't.due_date = CURDATE()';
     }
     if ($fSla !== '') {
