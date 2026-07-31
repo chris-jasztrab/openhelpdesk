@@ -11,6 +11,16 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.160.1 &mdash; 2026-07-31
+
+### Fixed
+- **Custom ticket statuses could silently fail to save, and the ticket list had no index to stand on.** On databases built by importing `database/schema.sql` instead of by running the migration chain, `tickets.status` was still the original 7-value ENUM that configurable statuses replaced back in v2.60.0, and none of the ticket-list indexes from v2.65.0 existed. Both migrations were recorded as applied, so the runner would never revisit them — the drift was permanent and silent. The visible symptoms were a custom status saving as an empty string on a non-strict MySQL server, and every ticket-list query doing a full table scan plus a filesort, on the single busiest query path in the app.
+  - Migration `073_repair_status_schema_drift.php` re-asserts the intended end state rather than trying to rewind history: it widens `status` to `VARCHAR(64)` only if it is still an ENUM, restores `idx_tickets_status_created (status, created_at)` and `idx_tickets_created_at (created_at)`, and drops the superseded single-column `idx_tickets_status`. Every step is guarded by `information_schema`, so it is a no-op on a correctly-migrated database and a repair on a drifted one. The widening cannot lose data — every stored value is one of the seven ENUM labels, all already seeded into `ticket_statuses`.
+  - This also fixes five test failures that had been attributed to stale expectations. Two of them (`TicketStatusesTest` reassign-and-delete) were the truncation bug reporting itself honestly: the suite wrote a status and read back `''`.
+
+### Added
+- **`phpunit.risky.xml`**, so the suite can be pointed at a non-default instance without editing the committed config. `phpunit.xml` pins `TEST_BASE_URL` to `:8000`; the feature tests log in as fixture users and create real tickets, so running them while that port belongs to a different instance writes into the wrong database. The value is set `force="true"` here so it cannot be silently inherited from the environment.
+
 ## 2.160.0 &mdash; 2026-07-30
 
 ### Fixed
