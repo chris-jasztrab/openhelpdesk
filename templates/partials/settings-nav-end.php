@@ -272,19 +272,37 @@ window.__settingsSearchIndex = <?= json_encode($settingsSearchIndex, JSON_UNESCA
     });
 
     // Global shortcuts — "/" or Ctrl/Cmd+K to focus, anywhere outside an input.
+    //
+    // Registered in the CAPTURE phase so it runs before navbar.php's bubble-phase
+    // document handler, which also claims "/". Both are live on every settings
+    // page (navbar.php is included near the top of the layout, this partial at the
+    // end), so previously pressing "/" focused the navbar search — which opens its
+    // dropdown on focus — and then this handler stole the focus back, stranding an
+    // open dropdown with nothing focused in it. Capturing plus
+    // stopImmediatePropagation() means the navbar handler never runs at all, and
+    // does not depend on which script happened to register first.
     document.addEventListener('keydown', function (e) {
-        var tag = (e.target && e.target.tagName || '').toLowerCase();
-        var typing = tag === 'input' || tag === 'textarea' || tag === 'select' || (e.target && e.target.isContentEditable);
-        if (!typing && e.key === '/') {
+        // WCAG 2.1.4 — only fire single-key shortcuts when no input/editor is
+        // focused and no modifier is held. Tested against document.activeElement
+        // rather than e.target: keystrokes in an element that does not itself
+        // handle keydown still bubble with e.target set to that element, but
+        // activeElement is what actually has the caret.
+        var ae     = document.activeElement;
+        var tag    = ae && ae.tagName;
+        var typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (ae && ae.isContentEditable);
+
+        if (e.key === '/' && !e.altKey && !e.ctrlKey && !e.metaKey && !typing) {
             e.preventDefault();
+            e.stopImmediatePropagation();
             input.focus();
             input.select();
-        } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        } else if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'k') {
             e.preventDefault();
+            e.stopImmediatePropagation();
             input.focus();
             input.select();
         }
-    });
+    }, true);
 
     // ----- Flash-highlight the target setting on landing (e.g. /admin/settings#smtp_host) -----
     function flashHash() {
