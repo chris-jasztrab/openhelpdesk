@@ -408,6 +408,15 @@ $router->post('/portal/tickets/create', function () {
         }
     }
 
+    // Move pasted screenshots out of the HTML and into attachment storage before
+    // the INSERT — `description` is TEXT, and a base64 data URI overflows it.
+    $description = inlineImagesToAttachments($description, $inlineAtt, $inlineRejected);
+    if (textColumnOverflows($description)) {
+        flashInput($_POST);
+        flash('error', 'That description is too long to save. Please shorten it.');
+        redirect('/portal/tickets/create');
+    }
+
     $stmt = $db->prepare(
         'INSERT INTO tickets (subject, description, browser_info, os_info, created_by, type_id, location_id, status, priority_id, assigned_to, group_id)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
@@ -418,6 +427,11 @@ $router->post('/portal/tickets/create', function () {
         Auth::id(), $typeId, $locationId, ticketDefaultNewStatusSlug(), $priorityId, $assignedTo, $groupId,
     ]);
     $ticketId = (int) $db->lastInsertId();
+
+    saveAttachments($db, $ticketId, null, Auth::id(), $inlineAtt);
+    foreach ($inlineRejected as $why) {
+        flash('error', $why);
+    }
 
     // The ticket is in — clear the submitter's autosaved draft of this form.
     ticketDraftDelete($db, Auth::id(), 'portal_create');
@@ -766,10 +780,23 @@ $router->post('/portal/tickets/{id}/comment', function (array $p) {
         redirect('/portal/tickets');
     }
 
+    // Move pasted screenshots out of the HTML and into attachment storage before
+    // the INSERT — `details` is TEXT, and a base64 data URI overflows it.
+    $message = inlineImagesToAttachments($message, $inlineAtt, $inlineRejected);
+    if (textColumnOverflows($message)) {
+        flash('error', 'That comment is too long to save. Please shorten it.');
+        redirect("/portal/tickets/{$id}");
+    }
+
     $db->prepare(
         'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
     )->execute([$id, Auth::id(), 'comment', $message]);
     $timelineId = (int) $db->lastInsertId();
+
+    saveAttachments($db, $id, $timelineId, Auth::id(), $inlineAtt);
+    foreach ($inlineRejected as $why) {
+        flash('error', $why);
+    }
 
     // The comment is in — clear the user's autosaved draft for this ticket.
     ticketDraftDelete($db, Auth::id(), 'portal_reply', $id);
@@ -890,6 +917,17 @@ $router->post('/portal/tickets/{id}/edit', function (array $p) {
         redirect("/portal/tickets/{$id}/edit");
     }
 
+    // Move pasted screenshots out of the HTML and into attachment storage before
+    // the UPDATE — `description` is TEXT, and a base64 data URI overflows it.
+    // Runs before the change comparison below so a newly pasted image registers
+    // as a change. Re-saving an unedited body is a no-op: it now holds
+    // /attachments/img/ URLs rather than data URIs, so nothing is re-extracted.
+    $description = inlineImagesToAttachments($description, $inlineAtt, $inlineRejected);
+    if (textColumnOverflows($description)) {
+        flash('error', 'That description is too long to save. Please shorten it.');
+        redirect("/portal/tickets/{$id}/edit");
+    }
+
     // Build audit trail before updating
     $changes = [];
     if ($subject !== $ticket['subject']) {
@@ -906,6 +944,11 @@ $router->post('/portal/tickets/{id}/edit', function (array $p) {
 
     $db->prepare('UPDATE tickets SET subject = ?, description = ?, updated_at = NOW() WHERE id = ?')
        ->execute([$subject, $description, $id]);
+
+    saveAttachments($db, $id, null, $uid, $inlineAtt);
+    foreach ($inlineRejected as $why) {
+        flash('error', $why);
+    }
 
     // Internal audit trail entry — visible to admins/agents only
     $db->prepare(

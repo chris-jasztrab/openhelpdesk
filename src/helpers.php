@@ -1291,6 +1291,183 @@ function attachmentIsImage(?string $mime): bool
     return !in_array($mime, ['image/svg+xml', 'image/svg'], true);
 }
 
+/**
+ * Should this attachment render as a thumbnail in an attachment list?
+ *
+ * attachmentIsImage() answers "are these bytes safe to put in an <img>", which
+ * the inline-image route depends on and which must stay true regardless of any
+ * display preference. This adds the operator's choice on top, and is what the
+ * ticket templates gate on.
+ *
+ * Defaults to on, matching the behaviour shipped in 2.161.0 — an install that
+ * has never visited the setting sees no change. Turning it off only affects the
+ * attachment *list*; an image pasted into a description or reply is part of the
+ * message body and still renders where the author put it.
+ */
+function attachmentShowsThumb(?string $mime): bool
+{
+    return attachmentIsImage($mime) && getSetting('attachment_image_previews', '1') === '1';
+}
+
+/**
+ * Would this value overflow a MySQL TEXT column?
+ *
+ * TEXT is 65,535 *bytes*, not characters, and production runs with
+ * STRICT_TRANS_TABLES — an over-length value is error 1406, not a silent
+ * truncation, which reaches the user as an uncaught PDOException and a bare
+ * HTTP 500. inlineImagesToAttachments() removes the usual cause (megabytes of
+ * base64), but a merely enormous paste of text can still get there, so callers
+ * check this and flash a real message instead.
+ */
+function textColumnOverflows(?string $value, int $maxBytes = 65535): bool
+{
+    return strlen((string) $value) > $maxBytes;
+}
+
+/**
+ * Filename token for an inline image: dot-free, so the URL carries no extension.
+ *
+ * The URL must not end in `.png`/`.jpg`. PHP's built-in server (used for local
+ * dev and the test harness) intercepts any path with a known static extension
+ * and 404s it before the router script runs, so an extension-bearing URL works
+ * under Apache but is dead everywhere else. A dot-free token sidesteps the whole
+ * class of server-specific static-file handling.
+ *
+ * The extension still goes on the file ON DISK via safeUploadExtension() — that
+ * is a real security control and is untouched. It is only absent from the URL.
+ */
+function inlineImageToken(): string
+{
+    return 'att_' . bin2hex(random_bytes(16));
+}
+
+/**
+ * URL that renders a stored attachment as an image, in any panel.
+ *
+ * Deliberately keyed on the filename token rather than the row id: the rewrite
+ * in inlineImagesToAttachments() has to bake a URL into the HTML *before* the
+ * ticket (and therefore the attachment row) exists, and the token is the one
+ * identifier we generate ourselves up front. It also has to be panel-neutral —
+ * the same description HTML is rendered to admins, agents and portal users, so
+ * a baked-in /admin/... link would 403 for the requester who wrote it.
+ */
+function inlineImageUrl(string $token): string
+{
+    return '/attachments/img/' . rawurlencode($token);
+}
+
+/**
+ * Convert base64 `data:` image URIs in rich-text HTML into real attachments.
+ *
+ * CKEditor's Base64UploadAdapter inlines a pasted or dropped image straight
+ * into the field as `<img src="data:image/png;base64,...">`. `description` and
+ * `details` are TEXT (65,535 bytes) and MySQL runs in STRICT_TRANS_TABLES, so
+ * anything past ~48 KB of original image was not truncated — it was rejected
+ * outright with a 1406, surfacing as an uncaught PDOException and a bare HTTP
+ * 500. Every pasted screenshot hit this; no ticket in production has ever
+ * successfully stored one.
+ *
+ * So the bytes go where bytes belong: each data URI is decoded, validated, and
+ * written to attachment storage exactly like a file-picker upload, and the src
+ * is rewritten to point at it. What lands in the column is a ~40-byte URL.
+ *
+ * Validation deliberately ignores the MIME the data URI *claims* and sniffs the
+ * decoded bytes instead — the claimed type is attacker-controlled text. The
+ * sniffed type must then pass both attachmentIsImage() (so no SVG, which can
+ * carry inline <script>) and the operator's UPLOAD_ALLOWED_TYPES allow-list, and
+ * the decoded size must fit UPLOAD_MAX_SIZE.
+ *
+ * An image that fails any of those checks is *removed* rather than left in
+ * place: leaving it would put the oversized data URI straight back into the
+ * INSERT and reproduce the original 500. The caller is told via $rejected so it
+ * can flash a message instead of silently eating the paste.
+ *
+ * $saved and $rejected are deliberately untyped: they are pure out-parameters,
+ * callers pass fresh undeclared variables, and PHP rejects an undefined variable
+ * against a typed by-reference parameter with "must be of type array, null
+ * given". Both are unconditionally assigned below before anything reads them.
+ *
+ * @param string $html      Rich-text body from the editor.
+ * @param array  $saved     OUT — rows for saveAttachments(), same shape as
+ *                          handleAttachmentUploads() returns.
+ * @param array  $rejected  OUT — human-readable reason per dropped image.
+ * @return string           HTML with every data: image src rewritten.
+ */
+function inlineImagesToAttachments(string $html, &$saved = null, &$rejected = null): string
+{
+    $saved    = [];
+    $rejected = [];
+
+    if (stripos($html, 'data:image/') === false) {
+        return $html;
+    }
+
+    // A single pasted screenshot is megabytes of base64 in one token. The
+    // character class below excludes the quote that terminates it, so the match
+    // is unambiguous and the possessive quantifier stops PCRE from walking back
+    // through it — without that, a large paste blows pcre.backtrack_limit and
+    // preg_replace_callback returns null instead of matching.
+    $pattern = '/(<img\b[^>]*?\bsrc\s*=\s*)(["\'])\s*data:([a-z0-9.+\/-]+)\s*;\s*base64\s*,([A-Za-z0-9+\/=\s]++)\2/i';
+
+    $index  = 0;
+    $result = preg_replace_callback($pattern, function (array $m) use (&$saved, &$rejected, &$index) {
+        $index++;
+        $claimed = strtolower(trim($m[3]));
+        $binary  = base64_decode(preg_replace('/\s+/', '', $m[4]), true);
+
+        $drop = static function (string $why) use (&$rejected, $index): string {
+            $rejected[] = "Image {$index}: {$why}";
+            return '';                       // strips the whole src="..." attribute
+        };
+
+        if ($binary === false || $binary === '') {
+            return $drop('could not be decoded.');
+        }
+        if (strlen($binary) > UPLOAD_MAX_SIZE) {
+            return $drop('is larger than the ' . formatFileSize(UPLOAD_MAX_SIZE) . ' upload limit.');
+        }
+
+        // Sniff the real type; never trust the type the data URI announces.
+        $mime = (string) (new finfo(FILEINFO_MIME_TYPE))->buffer($binary);
+        if ($mime === '' || !attachmentIsImage($mime)) {
+            return $drop('is not a supported image (detected ' . ($mime ?: $claimed) . ').');
+        }
+        if (!in_array($mime, UPLOAD_ALLOWED_TYPES, true)) {
+            return $drop("type {$mime} is not permitted here.");
+        }
+
+        $ext        = safeUploadExtension($mime, '');
+        $token      = inlineImageToken();
+        $storedName = $token . '.' . $ext;
+
+        if (!is_dir(ATTACHMENT_STORAGE_PATH) && !mkdir(ATTACHMENT_STORAGE_PATH, 0755, true)) {
+            return $drop('could not be stored on the server.');
+        }
+        if (file_put_contents(ATTACHMENT_STORAGE_PATH . $storedName, $binary) === false) {
+            return $drop('could not be written to storage.');
+        }
+
+        $saved[] = [
+            'original_name' => 'pasted-image-' . $index . '.' . $ext,
+            'stored_name'   => $storedName,
+            'mime_type'     => $mime,
+            'file_size'     => strlen($binary),
+        ];
+
+        return $m[1] . $m[2] . e(inlineImageUrl($token)) . $m[2];
+    }, $html);
+
+    // preg_replace_callback returns null on PCRE failure. Returning the original
+    // HTML there would hand the caller the very data URIs it asked us to remove,
+    // so fail closed: strip them and report, rather than re-triggering the 500.
+    if ($result === null) {
+        $rejected[] = 'Pasted images could not be processed and were removed.';
+        return (string) preg_replace('/\bsrc\s*=\s*(["\'])\s*data:[^"\']*+\1/i', '', $html);
+    }
+
+    return $result;
+}
+
 function formatFileSize(int $bytes): string
 {
     if ($bytes >= 1048576) {

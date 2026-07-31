@@ -2149,10 +2149,23 @@ $router->post('/agent/tickets/{id}/comment', function (array $p) {
     }
     _agentRequireTicketAccess($db, $commentTicket);
 
+    // Move pasted screenshots out of the HTML and into attachment storage before
+    // the INSERT — `details` is TEXT, and a base64 data URI overflows it.
+    $message = inlineImagesToAttachments($message, $inlineAtt, $inlineRejected);
+    if (textColumnOverflows($message)) {
+        flash('error', 'That reply is too long to save. Please shorten it.');
+        redirect("/agent/tickets/{$id}");
+    }
+
     $db->prepare(
         'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, ?)'
     )->execute([$id, Auth::id(), 'comment', $message, $isInternal]);
     $timelineId = (int) $db->lastInsertId();
+
+    saveAttachments($db, $id, $timelineId, Auth::id(), $inlineAtt);
+    foreach ($inlineRejected as $why) {
+        flash('error', $why);
+    }
 
     // The reply is in — clear the agent's autosaved draft for this ticket.
     ticketDraftDelete($db, Auth::id(), 'reply', $id);

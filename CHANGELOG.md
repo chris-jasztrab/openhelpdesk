@@ -11,6 +11,24 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.162.0 &mdash; 2026-07-31
+
+### Fixed
+- **Pasting an image into a ticket returned HTTP 500.** Reported from production: attaching an image to a ticket failed outright. The editor (CKEditor 5, with `Base64UploadAdapter` enabled in seven templates) inlines a pasted or dropped image into the field as `<img src="data:image/png;base64,…">`. `tickets.description` and `ticket_timeline.details` are `TEXT` &mdash; 65,535 **bytes** &mdash; and production runs `STRICT_TRANS_TABLES`, so anything past roughly 48 KB of original image was not truncated but **rejected**, MySQL error 1406, surfacing as an uncaught `PDOException` and a bare 500. A typical screenshot is 100 KB&ndash;2 MB, i.e. 133 KB&ndash;2.7 MB once base64-encoded, so this failed every single time. No ticket in the production database has ever successfully stored a pasted image. The staff create form makes it worse: it has no file input at all, so the editor was the *only* way for staff to attach an image to a new ticket.
+
+  Pasted images are now decoded, validated and written to attachment storage before the insert, exactly like a file-picker upload, and the `src` is rewritten to point at them. What lands in the column is a ~40-byte URL instead of megabytes of base64. Wired into all six affected paths: staff create, admin reply, agent reply, portal create, portal reply, and portal edit. A 264 KB pasted PNG now stores a 156-byte description and one 264 KB attachment, round-tripping byte-for-byte.
+
+  Validation ignores the MIME the data URI *claims* &mdash; that is attacker-controlled text &mdash; and sniffs the decoded bytes instead. The sniffed type must pass both `attachmentIsImage()` (so never SVG, which can carry inline `<script>` under the app's `script-src 'unsafe-inline'` CSP) and the operator's `UPLOAD_ALLOWED_TYPES`, and must fit `UPLOAD_MAX_SIZE`. Anything failing those checks is removed from the body rather than left in place &mdash; leaving it would put the oversized data URI straight back into the insert and reproduce the original 500 &mdash; and the author is told why.
+
+- **A too-long body no longer 500s at all.** `textColumnOverflows()` now guards every one of those six paths, so an enormous paste that is *not* an image gets a "too long to save, please shorten it" message instead of an uncaught database exception.
+
+### Added
+- **Pasted images become real attachments.** They render inline where they were pasted *and* appear in the ticket's attachment list with a thumbnail, so an image is downloadable from one predictable place no matter how it was added. They are served by a new panel-neutral route, `GET /attachments/img/{token}`, because the same body HTML is rendered to admins, agents and the requester &mdash; a baked-in `/admin/...` link would 403 for the portal user who wrote it. Access mirrors the existing per-panel download routes exactly: staff go through `_apiRequireTicketAccess()` plus the admin confidential re-auth window, everyone else gets the portal rule (own ticket, or a non-confidential ticket at their location with `can_view_location_tickets`), and an image hanging off an internal note is never served to a requester. `Content-Disposition` stays `attachment`, as on the existing routes &mdash; browsers apply it to navigation, not to `<img>` subresources, so switching to `inline` would have re-opened the HTML/SVG XSS hole for no gain.
+
+  The URL carries an extension-free token rather than the stored filename. PHP's built-in server &mdash; used for local development and the test harness &mdash; intercepts any path with a known static extension and 404s it before the router runs, so an extension-bearing URL works under Apache but is dead everywhere else. The extension is still applied to the file **on disk** via `safeUploadExtension()`; it is only absent from the URL.
+
+- **Setting: Attachments &rarr; "Show image attachment previews".** The inline thumbnail preview added in 2.161.0 was hard-wired on with no way to switch it off. It now has a toggle, defaulting to **on** so existing installs see no change. It gates the attachment *list* only &mdash; an image pasted into a description or reply is part of the message body and still renders where its author put it, which the settings page says on the page rather than leaving it to be discovered.
+
 ## 2.161.3 &mdash; 2026-07-31
 
 ### Fixed

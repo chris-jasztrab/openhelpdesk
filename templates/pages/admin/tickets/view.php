@@ -209,7 +209,7 @@ $resolutionClosedSlugs  = ticketClosedBucketSlugs();
                 <?php foreach ($standaloneAttachments as $att): ?>
                 <a href="/admin/attachments/<?= $att['id'] ?>/download"
                    class="list-group-item list-group-item-action d-flex align-items-center gap-3 <?= !empty($att['is_internal']) ? 'bg-warning bg-opacity-10' : '' ?>">
-                    <?php if (attachmentIsImage($att['mime_type'])): ?>
+                    <?php if (attachmentShowsThumb($att['mime_type'])): ?>
                     <?php $attUrl = '/admin/attachments/' . $att['id'] . '/download'; $attThumbMax = 96; ?>
                     <?php require ROOT_DIR . '/templates/partials/attachment-thumb.php'; ?>
                     <?php else: ?>
@@ -396,7 +396,7 @@ $resolutionClosedSlugs  = ticketClosedBucketSlugs();
                                 <?php if (!empty($attachmentsByTimeline[$entry['id']])): ?>
                                 <div class="mt-2 d-flex flex-wrap gap-2">
                                     <?php foreach ($attachmentsByTimeline[$entry['id']] as $att): ?>
-                                    <?php if (attachmentIsImage($att['mime_type'])): ?>
+                                    <?php if (attachmentShowsThumb($att['mime_type'])): ?>
                                     <?php $attUrl = '/admin/attachments/' . $att['id'] . '/download'; $attThumbMax = 220; ?>
                                     <a href="<?= e($attUrl) ?>"
                                        class="d-inline-flex flex-column align-items-start gap-1 text-decoration-none small text-dark">

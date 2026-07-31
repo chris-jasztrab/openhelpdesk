@@ -12,7 +12,7 @@
  *   $attUrl         panel-appropriate download URL for this attachment
  *   $attThumbMax    optional max height in px (default 96)
  *
- * Callers must gate on attachmentIsImage($att['mime_type']) — this partial
+ * Callers must gate on attachmentShowsThumb($att['mime_type']) — this partial
  * assumes that check has already passed.
  *
  * The download route still sends Content-Disposition: attachment; browsers apply

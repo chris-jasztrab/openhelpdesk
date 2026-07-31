@@ -4356,11 +4356,29 @@ $router->post('/admin/tickets/create', function () {
         $redirectBase = (Auth::isStaff() && !Auth::isAdmin()) ? '/agent' : '/admin';
         redirect("{$redirectBase}/tickets/create");
     }
+    // Pasted screenshots arrive as multi-megabyte base64 data URIs inside $desc.
+    // There is no file input on this form, so the editor is the only way staff
+    // can attach an image — move the bytes to attachment storage before the
+    // INSERT, or `description` (TEXT) overflows and MySQL strict mode rejects
+    // the whole ticket with a 1406.
+    $desc = inlineImagesToAttachments($desc, $inlineAtt, $inlineRejected);
+    if (textColumnOverflows($desc)) {
+        flashInput($_POST);
+        flash('error', 'That description is too long to save. Please shorten it.');
+        $redirectBase = (Auth::isStaff() && !Auth::isAdmin()) ? '/agent' : '/admin';
+        redirect("{$redirectBase}/tickets/create");
+    }
+
     $db->prepare(
         'INSERT INTO tickets (subject, description, created_by, submitted_by, type_id, location_id, status, priority_id, assigned_to, group_id, due_date)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     )->execute([$subject, $desc, $createdBy, $submittedBy, $typeId, $locationId, $status, $priId, $assignedTo, $groupId, $dueDate]);
     $ticketId = (int) $db->lastInsertId();
+
+    saveAttachments($db, $ticketId, null, Auth::id(), $inlineAtt);
+    foreach ($inlineRejected as $why) {
+        flash('error', $why);
+    }
 
     // The ticket is in — clear the submitter's autosaved draft of this form.
     ticketDraftDelete($db, Auth::id(), 'ticket_create');
@@ -5534,10 +5552,23 @@ $router->post('/admin/tickets/{id}/comment', function (array $p) {
         redirect('/admin/tickets');
     }
 
+    // Move pasted screenshots out of the HTML and into attachment storage before
+    // the INSERT — `details` is TEXT, and a base64 data URI overflows it.
+    $message = inlineImagesToAttachments($message, $inlineAtt, $inlineRejected);
+    if (textColumnOverflows($message)) {
+        flash('error', 'That reply is too long to save. Please shorten it.');
+        redirect("/admin/tickets/{$id}");
+    }
+
     $db->prepare(
         'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, ?)'
     )->execute([$id, Auth::id(), 'comment', $message, $isInternal]);
     $timelineId = (int) $db->lastInsertId();
+
+    saveAttachments($db, $id, $timelineId, Auth::id(), $inlineAtt);
+    foreach ($inlineRejected as $why) {
+        flash('error', $why);
+    }
 
     // The reply is in — clear the admin's autosaved draft for this ticket.
     ticketDraftDelete($db, Auth::id(), 'reply', $id);
@@ -11137,6 +11168,38 @@ $router->post('/admin/settings/undo-send', function () {
 
     flash('success', 'Undo send settings saved.');
     redirect('/admin/settings/undo-send');
+});
+
+/* ==================================================================
+ * ADMIN – Attachment display
+ *
+ * Whether image attachments render as inline thumbnails or stay as plain
+ * download links. Defaults to on (the behaviour shipped in 2.161.0), so
+ * existing installs see no change until an admin turns it off.
+ * ================================================================== */
+
+$router->get('/admin/settings/attachments', function () {
+    Auth::requirePermission('settings.manage');
+    $settings = [
+        'attachment_image_previews' => getSetting('attachment_image_previews', '1'),
+    ];
+    render('admin/settings/attachments', compact('settings'));
+});
+
+$router->post('/admin/settings/attachments', function () {
+    Auth::requirePermission('settings.manage');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/attachments');
+    }
+
+    $before = ['attachment_image_previews' => getSetting('attachment_image_previews', '1')];
+    $after  = ['attachment_image_previews' => isset($_POST['attachment_image_previews']) ? '1' : '0'];
+    setSetting('attachment_image_previews', $after['attachment_image_previews']);
+    logAuditChange('attachments.settings_changed', null, null, $before, $after);
+
+    flash('success', 'Attachment settings saved.');
+    redirect('/admin/settings/attachments');
 });
 
 /* ==================================================================

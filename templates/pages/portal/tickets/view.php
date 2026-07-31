@@ -352,7 +352,7 @@ if ($solutionTimelineId > 0) {
                    class="list-group-item list-group-item-action d-flex align-items-center gap-3">
                     <?php // Demo mode's attachment rows are fabricated (id 0, no file on disk),
                           // so a thumbnail there would just be a broken image. ?>
-                    <?php if (!$demoMode && attachmentIsImage($att['mime_type'])): ?>
+                    <?php if (!$demoMode && attachmentShowsThumb($att['mime_type'])): ?>
                     <?php $attUrl = '/portal/attachments/' . $att['id'] . '/download'; $attThumbMax = 96; ?>
                     <?php require ROOT_DIR . '/templates/partials/attachment-thumb.php'; ?>
                     <?php else: ?>

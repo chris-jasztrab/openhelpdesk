@@ -77,6 +77,8 @@ $settingsNavGroups = [
          'keywords' => 'satisfaction feedback rating score survey'],
         ['label' => 'Undo Send',        'url' => '/admin/settings/undo-send',        'icon' => 'bi-arrow-counterclockwise',
          'keywords' => 'undo unsend recall delay grace countdown send cancel oops'],
+        ['label' => 'Attachments',      'url' => '/admin/settings/attachments',      'icon' => 'bi-paperclip',
+         'keywords' => 'attachment image preview thumbnail inline picture screenshot photo download'],
     ],
     'Automation' => [
         ['label' => 'Automations',        'url' => '/admin/settings/automations',        'icon' => 'bi-lightning',

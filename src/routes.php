@@ -100,6 +100,123 @@ function _apiRequireTicketAccess(PDO $db, int $ticketId): void
 }
 
 /* ------------------------------------------------------------------
+ * Inline image for a rich-text body (panel-neutral)
+ * ------------------------------------------------------------------
+ * Serves an image attachment referenced from inside a ticket description or
+ * timeline entry, for whoever is allowed to read that ticket.
+ *
+ * Why this exists separately from the three /{panel}/attachments/{id}/download
+ * routes: the HTML is written once and rendered to admins, agents AND the
+ * requester, so the src baked into it cannot belong to one panel. A
+ * /admin/... link would 403 for the portal user who pasted the image.
+ *
+ * Keyed on stored_name rather than row id because inlineImagesToAttachments()
+ * has to write the URL into the HTML before the ticket — and so the attachment
+ * row — exists. stored_name is generated server-side by uniqid(), never taken
+ * from user input, and is re-validated against that shape below before it goes
+ * anywhere near the filesystem.
+ *
+ * Access mirrors the panel routes exactly: staff go through
+ * _apiRequireTicketAccess() (plus the admin confidential re-auth gate), and
+ * everyone else gets the portal rule — own ticket, or a non-confidential ticket
+ * at their location with can_view_location_tickets — and never an image that
+ * hangs off an internal note.
+ *
+ * Content-Disposition stays `attachment`, exactly as the download routes send
+ * it: browsers apply the disposition to navigation, not to <img> subresources,
+ * so the image still renders while a direct hit on the URL still downloads
+ * rather than displays. Switching to `inline` would re-open the HTML/SVG XSS
+ * hole that disposition exists to close. Only real raster images are served at
+ * all — attachmentIsImage() excludes SVG.
+ * ------------------------------------------------------------------ */
+$router->get('/attachments/img/{name}', function (array $p) {
+    Auth::requireAuth();
+
+    $fail = static function (int $code): void {
+        http_response_code($code);
+        exit;
+    };
+
+    // Must be exactly the token inlineImageToken() mints: 'att_' + 32 hex chars,
+    // no dots and no extension. Anything else never reaches the filesystem.
+    $token = (string) ($p['name'] ?? '');
+    if (!preg_match('/^att_[0-9a-f]{32}$/', $token)) {
+        $fail(404);
+    }
+
+    // The file on disk keeps its extension (safeUploadExtension), so resolve the
+    // dot-free token by prefix. '_' is a LIKE wildcard and the token contains
+    // one, so it is escaped — otherwise 'att_x' would also match 'attax'.
+    $likePrefix = str_replace(['!', '_', '%'], ['!!', '!_', '!%'], $token) . '.%';
+
+    $db   = Database::connect();
+    $stmt = $db->prepare(
+        "SELECT ta.*, t.created_by, t.location_id, t.type_id, tl.is_internal
+         FROM ticket_attachments ta
+         JOIN tickets t ON ta.ticket_id = t.id
+         LEFT JOIN ticket_timeline tl ON ta.timeline_id = tl.id
+         WHERE ta.stored_name LIKE ? ESCAPE '!'
+         LIMIT 1"
+    );
+    $stmt->execute([$likePrefix]);
+    $att = $stmt->fetch();
+    if (!$att || !attachmentIsImage($att['mime_type'])) {
+        $fail(404);
+    }
+
+    $ticketId = (int) $att['ticket_id'];
+    if (Auth::isStaff()) {
+        // Exits 403 itself when the agent has no business with this ticket.
+        _apiRequireTicketAccess($db, $ticketId);
+        // Same confidential re-auth window the admin download route enforces.
+        if (Auth::isAdmin() && requiresConfidentialReAuth($db, ['id' => $ticketId, 'type_id' => $att['type_id']])) {
+            $granted = $_SESSION["confidential_access_{$ticketId}"] ?? 0;
+            if (!$granted || (time() - $granted) > 300) {
+                $fail(403);
+            }
+        }
+    } else {
+        if (!empty($att['is_internal'])) {
+            $fail(403); // internal note — never visible to the requester
+        }
+        $permStmt = $db->prepare('SELECT can_view_location_tickets, location_id FROM users WHERE id = ?');
+        $permStmt->execute([Auth::id()]);
+        $perms = $permStmt->fetch() ?: ['can_view_location_tickets' => 0, 'location_id' => null];
+
+        $allowed = (int) $att['created_by'] === (int) Auth::id();
+        if (!$allowed && !empty($perms['can_view_location_tickets']) && !empty($perms['location_id'])
+            && (int) $att['location_id'] === (int) $perms['location_id']) {
+            $vis = $db->prepare(
+                'SELECT 1 FROM ticket_types ct
+                 WHERE ct.id = ? AND (ct.is_confidential = 1 OR ct.show_to_location_visibility = 0)'
+            );
+            $vis->execute([$att['type_id']]);
+            $allowed = !$vis->fetchColumn();
+        }
+        if (!$allowed) {
+            $fail(403);
+        }
+    }
+
+    $filePath = ATTACHMENT_STORAGE_PATH . $att['stored_name'];
+    if (!is_file($filePath)) {
+        $fail(404);
+    }
+
+    // Release the session lock before streaming — a ticket body with several
+    // images fires several of these at once, and they must not serialize.
+    session_write_close();
+
+    header('Content-Type: ' . $att['mime_type']);
+    header('X-Content-Type-Options: nosniff');
+    header('Content-Disposition: attachment; filename="' . str_replace('"', '\\"', $att['original_name']) . '"');
+    header('Content-Length: ' . (string) filesize($filePath));
+    header('Cache-Control: private, max-age=604800');
+    readfile($filePath);
+    exit;
+});
+
+/* ------------------------------------------------------------------
  * Ticket Tag Management (JSON API)
  * ------------------------------------------------------------------ */
 $router->post('/api/tickets/{id}/tags', function (array $p) {
