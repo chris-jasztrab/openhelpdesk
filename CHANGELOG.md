@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.166.0 &mdash; 2026-08-04
+
+### Added
+- **Group picker on the Add User form, plus a no-group confirmation.** Creating an agent left them in no group, which means they log in to empty ticket lists &mdash; the fix was a second trip to Settings → Groups that was easy to forget. The Group Membership picker from the edit form is now on **Add User** too: hidden while the level is End User, revealed the moment you pick any staff level, and the groups you tick are assigned as part of the create.
+
+  Saving a staff user with no group now raises a modal instead of a browser confirm. It names the person and the level, spells out the three consequences (no tickets visible at all, never picked by auto-assignment, no new-ticket notifications), and offers **Pick a group** or **Create without a group** &mdash; the choice is still the admin's. Ticking a group after being warned re-arms the check rather than remembering the override. The same modal covers the edit form, worded "Save without a group". Levels that already see all tickets keep their own existing warning, and a user with Location Ticket Visibility isn't warned, because in neither case is "sees nothing" true.
+
 ## 2.165.0 &mdash; 2026-08-04
 
 ### Added

@@ -309,6 +309,52 @@ class UsersTest extends TestCase
         }
     }
 
+    public function test_create_user_form_offers_group_picker_collapsed(): void
+    {
+        $r    = $this->get($this->adminClient(), '/admin/users/create');
+        $html = (string) $r->getBody();
+        $this->assertStringContainsString('name="groups[]"', $html,
+            'Create form must offer the group picker so a new agent can be placed in a group immediately');
+        $this->assertStringContainsString('id="groupMembership" class="d-none"', $html,
+            'Picker starts collapsed — the default permission level is an end user');
+        $this->assertStringContainsString('id="noGroupModal"', $html,
+            'Create form must carry the no-group confirmation modal');
+    }
+
+    public function test_create_staff_user_with_group_assigns_membership(): void
+    {
+        $gid   = $this->safeGroupId();
+        $email = 'test_grouped_' . time() . '@test.local';
+
+        $this->post($this->adminClient(), '/admin/users/create', [
+            'first_name'      => 'Grouped',
+            'last_name'       => 'Agent',
+            'email'           => $email,
+            'password'        => DatabaseSeeder::password(),
+            'role'            => 'agent',
+            '_groups_present' => '1',
+            'groups'          => [(string) $gid],
+        ]);
+
+        $db   = \Database::connect();
+        $stmt = $db->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
+        $stmt->execute([$email]);
+        $newId = (int) $stmt->fetchColumn();
+
+        try {
+            $this->assertNotSame(0, $newId, 'User should have been created');
+            $map = $db->prepare('SELECT group_id FROM group_user_map WHERE user_id = ?');
+            $map->execute([$newId]);
+            $this->assertSame([$gid], array_map('intval', $map->fetchAll(\PDO::FETCH_COLUMN)),
+                'Groups picked on the create form should be assigned to the new user');
+        } finally {
+            if ($newId !== 0) {
+                $db->prepare('DELETE FROM group_user_map WHERE user_id = ?')->execute([$newId]);
+                $db->prepare('DELETE FROM users WHERE id = ?')->execute([$newId]);
+            }
+        }
+    }
+
     public function test_edit_non_staff_user_hides_group_picker_by_default(): void
     {
         $r    = $this->get($this->adminClient(), '/admin/users/' . DatabaseSeeder::$portalId . '/edit');

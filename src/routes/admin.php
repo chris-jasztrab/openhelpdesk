@@ -861,8 +861,24 @@ $router->get('/admin/users', function () {
 
 $router->get('/admin/users/create', function () {
     Auth::requirePermission('users.manage');
-    $locations = Database::connect()->query('SELECT * FROM locations ORDER BY name')->fetchAll();
-    render('admin/users/form', ['locations' => $locations, 'editing' => null]);
+    $db        = Database::connect();
+    $locations = $db->query('SELECT * FROM locations ORDER BY name')->fetchAll();
+
+    // Same group picker as the edit form — a staff user with no group can see no
+    // tickets, so the fix belongs at the moment of creation, not on a second trip.
+    $canManageGroups = Auth::can('groups.manage');
+    $allGroups       = $canManageGroups ? $db->query(
+        'SELECT g.id, g.name, g.description, g.is_confidential,
+                (SELECT COUNT(*) FROM group_user_map m WHERE m.group_id = g.id) AS member_count
+         FROM `groups` g ORDER BY g.sort_order, g.name'
+    )->fetchAll() : [];
+
+    render('admin/users/form', [
+        'locations'       => $locations,
+        'editing'         => null,
+        'allGroups'       => $allGroups,
+        'canManageGroups' => $canManageGroups,
+    ]);
 });
 
 $router->post('/admin/users/create', function () {
@@ -916,6 +932,26 @@ $router->post('/admin/users/create', function () {
         flashInput($_POST);
         redirect('/admin/users/create');
     }
+
+    // Group membership picked on the create form. Same guards as the edit route:
+    // the presence marker keeps API/import callers out of it, and only staff
+    // levels can hold membership.
+    if (isset($_POST['_groups_present']) && Auth::can('groups.manage') && roleIsStaff($role)) {
+        $postedGroups   = isset($_POST['groups']) && is_array($_POST['groups']) ? $_POST['groups'] : [];
+        $postedManagers = isset($_POST['group_managers']) && is_array($_POST['group_managers']) ? $_POST['group_managers'] : [];
+        $groupChanges   = syncUserGroupMemberships(
+            $db,
+            $newId,
+            array_map('intval', $postedGroups),
+            array_map('intval', $postedManagers),
+            "{$fn} {$ln} <{$email}>"
+        );
+        if ($groupChanges['added']) {
+            flash('success', 'User created successfully — added to ' . $groupChanges['added']
+                . ' group' . ($groupChanges['added'] === 1 ? '' : 's') . '.');
+        }
+    }
+
     redirect('/admin/users');
 });
 

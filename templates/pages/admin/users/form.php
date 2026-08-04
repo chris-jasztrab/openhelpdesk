@@ -147,12 +147,14 @@ $targetOutranksEditor = $isEdit && !Auth::isAdmin()
             // ── Group membership ──────────────────────────────────────────────
             // Editable inline when the editor can also manage groups; otherwise
             // it stays the read-only summary with a pointer to Settings → Groups.
-            $canEditGroups   = $isEdit && !empty($canManageGroups);
+            // On create the block starts collapsed and JS reveals it as soon as a
+            // staff permission level is picked.
+            $canEditGroups   = !empty($canManageGroups);
             $storedIsStaff   = $isEdit && roleIsStaff($editing['role'] ?? null);
-            $selectedGroups  = $isEdit ? array_map('intval', oldList('groups', $memberGroupIds ?? [])) : [];
-            $selectedMgrs    = $isEdit ? array_map('intval', oldList('group_managers', $managerGroupIds ?? [])) : [];
+            $selectedGroups  = array_map('intval', oldList('groups', $memberGroupIds ?? []));
+            $selectedMgrs    = array_map('intval', oldList('group_managers', $managerGroupIds ?? []));
             ?>
-            <?php if ($isEdit): ?>
+            <?php if ($canEditGroups || $isEdit): ?>
             <hr class="my-4">
             <div id="groupMembership" class="<?= $storedIsStaff ? '' : 'd-none' ?>">
                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-1">
@@ -247,7 +249,7 @@ $targetOutranksEditor = $isEdit && !Auth::isAdmin()
                         <i class="bi bi-info-circle me-1"></i>No groups exist yet.
                         <a href="/admin/groups/create">Create one</a> to start scoping ticket visibility.
                     </div>
-                <?php elseif (!empty($userGroups)): ?>
+                <?php elseif (!empty($userGroups ?? [])): ?>
                     <div class="d-flex flex-wrap gap-2 mb-1">
                         <?php foreach ($userGroups as $g): ?>
                             <span class="badge" style="background:var(--ld-primary);font-size:.8rem;">
@@ -303,6 +305,45 @@ if ($storedSlug !== '' && !isset($roleCaps[$storedSlug])) {
     ];
 }
 ?>
+<!-- No-group confirmation: a staff user with no group can't see any tickets -->
+<div class="modal fade" id="noGroupModal" tabindex="-1" aria-labelledby="noGroupModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header" style="background:linear-gradient(135deg,#92400e,#b45309); color:#fff;">
+                <h5 class="modal-title fw-bold" id="noGroupModalLabel">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>No Group Selected
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2">
+                    <span id="noGroupWho">This user</span> is being <span id="noGroupVerb">created</span> with the
+                    <strong><span id="noGroupLevel">staff</span></strong> permission level but no group membership.
+                </p>
+                <p class="mb-2 text-muted small">Group membership is what scopes ticket visibility, so without one:</p>
+                <ul class="mb-3">
+                    <li>They will see <strong>no tickets at all</strong> — empty ticket lists and an empty dashboard.</li>
+                    <li>They can't be picked by any group's auto-assignment rotation.</li>
+                    <li>They won't receive new-ticket notifications for any group.</li>
+                </ul>
+                <div class="alert alert-info mb-0 py-2 small">
+                    <i class="bi bi-info-circle me-1"></i>
+                    They can still log in, and you can add groups at any time from this page or from
+                    <strong>Settings → Groups</strong>.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn text-white" style="background:var(--ld-primary);" data-bs-dismiss="modal">
+                    <i class="bi bi-people me-1"></i>Pick a group
+                </button>
+                <button type="button" class="btn btn-outline-warning" id="confirmNoGroupBtn">
+                    <span id="noGroupConfirmLabel">Create without a group</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Confirm-add-to-confidential-group modal (mirrors the group edit page) -->
 <div class="modal fade" id="userConfidentialAddModal" tabindex="-1" aria-labelledby="userConfidentialAddModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
@@ -459,9 +500,48 @@ if ($storedSlug !== '' && !isset($roleCaps[$storedSlug])) {
     refresh();
 
     // ── Submit guards ─────────────────────────────────────────────────────────
+    const isEdit = <?= $isEdit ? 'true' : 'false' ?>;
+
     let confidentialConfirmed = false;
     const modalEl = document.getElementById('userConfidentialAddModal');
     let modalInstance = null;
+
+    let noGroupConfirmed = false;
+    const noGroupEl = document.getElementById('noGroupModal');
+    let noGroupModal = null;
+
+    function showNoGroupModal(slug) {
+        const fn    = (form.querySelector('#first_name') || {}).value || '';
+        const ln    = (form.querySelector('#last_name') || {}).value || '';
+        const name  = (fn + ' ' + ln).trim();
+        const roleEl2 = form.querySelector('#role');
+        const level = roleEl2 && roleEl2.selectedOptions && roleEl2.selectedOptions.length
+            ? roleEl2.selectedOptions[0].textContent.trim()
+            : slug;
+
+        document.getElementById('noGroupWho').textContent   = name !== '' ? name : 'This user';
+        document.getElementById('noGroupVerb').textContent  = isEdit ? 'saved' : 'created';
+        document.getElementById('noGroupLevel').textContent = level;
+        document.getElementById('noGroupConfirmLabel').textContent =
+            isEdit ? 'Save without a group' : 'Create without a group';
+
+        if (!noGroupModal) noGroupModal = new bootstrap.Modal(noGroupEl);
+        noGroupModal.show();
+    }
+
+    const noGroupBtn = document.getElementById('confirmNoGroupBtn');
+    if (noGroupBtn) {
+        noGroupBtn.addEventListener('click', function () {
+            noGroupConfirmed = true;
+            if (noGroupModal) noGroupModal.hide();
+            form.submit();
+        });
+    }
+
+    // Picking a group after being warned re-arms the guard for the next attempt.
+    memberCbs.forEach(function (cb) {
+        cb.addEventListener('change', function () { noGroupConfirmed = false; });
+    });
 
     form.addEventListener('submit', function (e) {
         const slug = currentRole();
@@ -474,12 +554,20 @@ if ($storedSlug !== '' && !isset($roleCaps[$storedSlug])) {
                     e.preventDefault();
                     return;
                 }
-            } else {
-                // Warn about an elevated user who can't actually see any tickets.
-                const locVis    = form.querySelector('#can_view_location_tickets');
-                const hasLocVis = locVis && locVis.checked;
+            } else if (!noGroupConfirmed) {
+                // A staff level with no group sees nothing at all — make the
+                // consequences explicit, but let them go ahead if they mean it.
+                const locVis     = form.querySelector('#can_view_location_tickets');
+                const hasLocVis  = locVis && locVis.checked;
                 const groupCount = totalGroups ? selectedIds().length : savedCount;
                 if (cap.isStaff && groupCount === 0 && !hasLocVis) {
+                    // Only offer the modal when there is a picker to send them
+                    // back to; otherwise fall back to a plain confirm.
+                    if (totalGroups > 0 && noGroupEl && window.bootstrap) {
+                        e.preventDefault();
+                        showNoGroupModal(slug);
+                        return;
+                    }
                     if (!confirm('This user has a staff permission level but belongs to no group and has no “view all” access. They will be able to log in but will not see any tickets. Continue?')) {
                         e.preventDefault();
                         return;
