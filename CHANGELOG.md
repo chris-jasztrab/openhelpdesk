@@ -11,6 +11,15 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.165.0 &mdash; 2026-08-04
+
+### Added
+- **Edit group membership from the user's own edit page.** Putting an agent in three groups meant opening all three groups and hunting for their name in the member grid &mdash; the relationship was only editable from the group side. The Group Membership block on **Admin → Users → Edit** is now a live picker instead of a row of read-only badges: one card per group with its member count, a lock icon on confidential groups, a link out to the group's own settings, and the same **Manager** sub-checkbox the group form has. A filter box appears once there are more than six groups.
+
+  It reacts to the permission level in the same form: hidden for end users, revealed the moment you pick a staff level (so you can promote and assign groups in one save), and it warns live when a staff user would be left in no group at all &mdash; wording that adapts to whether the level already sees all tickets or has Location visibility. Saving reports what changed ("added to 2 groups"), and unsaved picks now survive a validation bounce such as a duplicate email.
+
+  Writes are a diff, not a delete-and-reinsert, so every other member of each group (and their manager flags) is untouched. All the group-page safeguards are mirrored: adding someone to a confidential group confirms in a modal first and emails every existing member, the attempt is audited before any write, and each change lands in the group's history as `group.members_changed` / `group.managers_changed`. Editing here needs **Manage groups** on top of **Manage users** &mdash; otherwise the list stays read-only. Posts that never rendered the picker (API, import scripts) are ignored rather than treated as "remove from all groups".
+
 ## 2.164.0 &mdash; 2026-08-04
 
 ### Added

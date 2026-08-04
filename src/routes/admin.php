@@ -1048,17 +1048,47 @@ $router->get('/admin/users/{id}/edit', function (array $p) {
         redirect('/admin/users');
     }
     $locations  = $db->query('SELECT * FROM locations ORDER BY name')->fetchAll();
-    $userGroups = [];
-    if (roleIsStaff($editing['role'])) {
-        $gStmt = $db->prepare(
-            'SELECT g.id, g.name FROM `groups` g
-             JOIN group_user_map gum ON gum.group_id = g.id
-             WHERE gum.user_id = ? ORDER BY g.name'
-        );
-        $gStmt->execute([(int) $p['id']]);
-        $userGroups = $gStmt->fetchAll();
+
+    // Group membership is editable straight from this page, but only for an
+    // editor who is also allowed to manage groups — otherwise it stays the
+    // read-only summary it has always been.
+    $canManageGroups  = Auth::can('groups.manage');
+    $userGroups       = [];
+    $allGroups        = [];
+    $memberGroupIds   = [];
+    $managerGroupIds  = [];
+
+    $gStmt = $db->prepare(
+        'SELECT g.id, g.name, gum.is_manager FROM `groups` g
+         JOIN group_user_map gum ON gum.group_id = g.id
+         WHERE gum.user_id = ? ORDER BY g.sort_order, g.name'
+    );
+    $gStmt->execute([(int) $p['id']]);
+    foreach ($gStmt->fetchAll() as $row) {
+        $userGroups[]     = $row;
+        $memberGroupIds[] = (int) $row['id'];
+        if ((int) $row['is_manager'] === 1) {
+            $managerGroupIds[] = (int) $row['id'];
+        }
     }
-    render('admin/users/form', ['locations' => $locations, 'editing' => $editing, 'userGroups' => $userGroups]);
+
+    if ($canManageGroups) {
+        $allGroups = $db->query(
+            'SELECT g.id, g.name, g.description, g.is_confidential,
+                    (SELECT COUNT(*) FROM group_user_map m WHERE m.group_id = g.id) AS member_count
+             FROM `groups` g ORDER BY g.sort_order, g.name'
+        )->fetchAll();
+    }
+
+    render('admin/users/form', [
+        'locations'        => $locations,
+        'editing'          => $editing,
+        'userGroups'       => $userGroups,
+        'allGroups'        => $allGroups,
+        'memberGroupIds'   => $memberGroupIds,
+        'managerGroupIds'  => $managerGroupIds,
+        'canManageGroups'  => $canManageGroups,
+    ]);
 });
 
 $router->post('/admin/users/{id}/edit', function (array $p) {
@@ -1151,6 +1181,31 @@ $router->post('/admin/users/{id}/edit', function (array $p) {
         flashInput($_POST);
         redirect("/admin/users/{$id}/edit");
     }
+
+    // Group membership, edited inline on this page. `_groups_present` marks a
+    // submission that actually rendered the picker — without it an API or CSV
+    // caller that omits `groups[]` would silently strip the user from every
+    // group. Non-staff levels can't hold membership, so their posts are ignored.
+    if (isset($_POST['_groups_present']) && Auth::can('groups.manage') && roleIsStaff($role)) {
+        $postedGroups   = isset($_POST['groups']) && is_array($_POST['groups']) ? $_POST['groups'] : [];
+        $postedManagers = isset($_POST['group_managers']) && is_array($_POST['group_managers']) ? $_POST['group_managers'] : [];
+        $groupChanges   = syncUserGroupMemberships(
+            $db,
+            $id,
+            array_map('intval', $postedGroups),
+            array_map('intval', $postedManagers),
+            "{$fn} {$ln} <{$email}>"
+        );
+
+        $parts = [];
+        if ($groupChanges['added'])    { $parts[] = 'added to ' . $groupChanges['added'] . ' group' . ($groupChanges['added'] === 1 ? '' : 's'); }
+        if ($groupChanges['removed'])  { $parts[] = 'removed from ' . $groupChanges['removed'] . ' group' . ($groupChanges['removed'] === 1 ? '' : 's'); }
+        if ($groupChanges['managers']) { $parts[] = 'manager rights changed on ' . $groupChanges['managers'] . ' group' . ($groupChanges['managers'] === 1 ? '' : 's'); }
+        if ($parts) {
+            flash('success', 'User updated successfully — ' . implode(', ', $parts) . '.');
+        }
+    }
+
     redirect('/admin/users');
 });
 

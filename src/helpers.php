@@ -858,6 +858,17 @@ function old(string $key, string $default = ''): string
     return (string) ($_SESSION['_old_input'][$key] ?? $default);
 }
 
+/**
+ * old() for checkbox groups (name="foo[]"). Returns the flashed array when the
+ * form bounced back on a validation error, otherwise $default — so multi-select
+ * choices survive the redirect instead of silently reverting to saved state.
+ */
+function oldList(string $key, array $default = []): array
+{
+    $val = $_SESSION['_old_input'][$key] ?? null;
+    return is_array($val) ? array_values($val) : $default;
+}
+
 /* ── Notification helpers ────────────────────────────────────── */
 
 function notificationCount(): int
@@ -6693,6 +6704,174 @@ function notifyConfidentialGroupMembership(PDO $db, int $groupId, array $addedUs
         $actorName . ' (ID: ' . Auth::id() . ') added ' . count($addedUsers)
             . ' member(s) to confidential group "' . $group['name'] . '": ' . $addedNamesText
     );
+}
+
+/**
+ * Sync one user's group memberships from the "other side" of the relationship —
+ * i.e. from the user edit form rather than the group edit form.
+ *
+ * The group form owns the whole membership row set for a single group and can
+ * safely DELETE-then-INSERT. Here the opposite is true: we own the whole group
+ * set for a single user, so we diff instead, leaving every other member of each
+ * group (and their is_manager flags) untouched.
+ *
+ * Mirrors the group form's side effects so membership changes are audited and
+ * alerted identically no matter which page they were made from:
+ *   - confidential add/remove attempts are logged BEFORE any write
+ *   - members of a confidential group are emailed when someone is added
+ *     (silent when the group had no prior members, per the confidential spec)
+ *   - a group.members_changed entry is written per affected group
+ *
+ * @param PDO   $db
+ * @param int   $userId          The user being edited
+ * @param int[] $groupIds        Group IDs the user should belong to after the save
+ * @param int[] $managerGroupIds Subset of $groupIds where the user is a group manager
+ * @param string $userLabel      "First Last <email>" for the audit trail
+ * @return array{added:int,removed:int,managers:int} What actually changed, for the flash message
+ */
+function syncUserGroupMemberships(PDO $db, int $userId, array $groupIds, array $managerGroupIds, string $userLabel): array
+{
+    // Only real groups, no duplicates. Anything unknown is dropped rather than
+    // erroring — a stale form can't create phantom membership rows.
+    $valid = array_map('intval', $db->query('SELECT id FROM `groups`')->fetchAll(PDO::FETCH_COLUMN));
+    $want  = array_values(array_intersect(array_unique(array_map('intval', $groupIds)), $valid));
+    $wantManager = array_intersect(array_unique(array_map('intval', $managerGroupIds)), $want);
+
+    $priorStmt = $db->prepare('SELECT group_id, is_manager FROM group_user_map WHERE user_id = ?');
+    $priorStmt->execute([$userId]);
+    $prior = [];
+    foreach ($priorStmt->fetchAll() as $row) {
+        $prior[(int) $row['group_id']] = (int) $row['is_manager'];
+    }
+    $priorIds = array_keys($prior);
+
+    $added   = array_values(array_diff($want, $priorIds));
+    $removed = array_values(array_diff($priorIds, $want));
+
+    // is_manager flips on groups the user is (and stays) a member of
+    $managerFlips = [];
+    foreach (array_intersect($want, $priorIds) as $gid) {
+        $shouldManage = in_array($gid, $wantManager, true) ? 1 : 0;
+        if ($shouldManage !== $prior[$gid]) {
+            $managerFlips[$gid] = $shouldManage;
+        }
+    }
+
+    $summary = ['added' => count($added), 'removed' => count($removed), 'managers' => count($managerFlips)];
+    if (!$added && !$removed && !$managerFlips) {
+        return $summary;
+    }
+
+    // Group names + confidential flags for everything we're about to touch
+    $touched = array_values(array_unique(array_merge($added, $removed, array_keys($managerFlips))));
+    $ph      = implode(',', array_fill(0, count($touched), '?'));
+    $gStmt   = $db->prepare("SELECT id, name, is_confidential FROM `groups` WHERE id IN ($ph)");
+    $gStmt->execute($touched);
+    $groups = [];
+    foreach ($gStmt->fetchAll() as $g) {
+        $groups[(int) $g['id']] = $g;
+    }
+
+    $actor = Auth::fullName() . ' (ID: ' . Auth::id() . ')';
+
+    // Audit the ATTEMPT on confidential groups before writing anything, so the
+    // record survives a failure part-way through.
+    foreach ($added as $gid) {
+        if (!empty($groups[$gid]['is_confidential'])) {
+            logAudit(
+                'confidential_group_member_add_attempted',
+                $gid,
+                'group',
+                $actor . ' is attempting to add 1 member to confidential group "'
+                    . $groups[$gid]['name'] . '" (ID: ' . $gid . '): ' . $userLabel
+                    . ' — via the user edit page'
+            );
+        }
+    }
+    foreach ($removed as $gid) {
+        if (!empty($groups[$gid]['is_confidential'])) {
+            logAudit(
+                'confidential_group_member_remove_attempted',
+                $gid,
+                'group',
+                $actor . ' is attempting to remove 1 member from confidential group "'
+                    . $groups[$gid]['name'] . '" (ID: ' . $gid . '): ' . $userLabel
+                    . ' — via the user edit page'
+            );
+        }
+    }
+
+    // Did each group we're adding to already have members? Decides whether the
+    // confidential alert fires (the first member of an empty group is silent).
+    $hadMembers = [];
+    if ($added) {
+        $cStmt = $db->prepare('SELECT COUNT(*) FROM group_user_map WHERE group_id = ?');
+        foreach ($added as $gid) {
+            $cStmt->execute([$gid]);
+            $hadMembers[$gid] = (int) $cStmt->fetchColumn() > 0;
+        }
+    }
+
+    if ($removed) {
+        $rph = implode(',', array_fill(0, count($removed), '?'));
+        $db->prepare("DELETE FROM group_user_map WHERE user_id = ? AND group_id IN ($rph)")
+            ->execute(array_merge([$userId], $removed));
+    }
+    if ($added) {
+        $ins = $db->prepare('INSERT INTO group_user_map (group_id, user_id, is_manager) VALUES (?, ?, ?)');
+        foreach ($added as $gid) {
+            $ins->execute([$gid, $userId, in_array($gid, $wantManager, true) ? 1 : 0]);
+        }
+    }
+    if ($managerFlips) {
+        $upd = $db->prepare('UPDATE group_user_map SET is_manager = ? WHERE user_id = ? AND group_id = ?');
+        foreach ($managerFlips as $gid => $flag) {
+            $upd->execute([$flag, $userId, $gid]);
+        }
+    }
+
+    // One audit entry per affected group, keyed to the group so it shows up in
+    // that group's history the same way an edit from the group page would.
+    foreach ($added as $gid) {
+        logAudit(
+            'group.members_changed',
+            $gid,
+            'group',
+            $actor . ' added ' . $userLabel . ' to group "' . $groups[$gid]['name']
+                . '" (ID: ' . $gid . ')'
+                . (in_array($gid, $wantManager, true) ? ' as a group manager' : '')
+                . ' — via the user edit page'
+        );
+    }
+    foreach ($removed as $gid) {
+        logAudit(
+            'group.members_changed',
+            $gid,
+            'group',
+            $actor . ' removed ' . $userLabel . ' from group "' . $groups[$gid]['name']
+                . '" (ID: ' . $gid . ') — via the user edit page'
+        );
+    }
+    foreach ($managerFlips as $gid => $flag) {
+        logAudit(
+            'group.managers_changed',
+            $gid,
+            'group',
+            $actor . ($flag ? ' granted ' : ' revoked ') . $userLabel
+                . ' manager rights on group "' . $groups[$gid]['name']
+                . '" (ID: ' . $gid . ') — via the user edit page'
+        );
+    }
+
+    // Confidential alerts last — after the rows exist, so the new member is
+    // included in the recipient list exactly as the group form does it.
+    foreach ($added as $gid) {
+        if (!empty($groups[$gid]['is_confidential']) && !empty($hadMembers[$gid])) {
+            notifyConfidentialGroupMembership($db, $gid, [$userId]);
+        }
+    }
+
+    return $summary;
 }
 
 /**

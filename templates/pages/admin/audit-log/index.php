@@ -47,6 +47,7 @@ $actionColors = [
     'ticket.merged'               => 'info',
     'ticket.escalated'            => 'danger',
     'group.managers_changed'      => 'warning',
+    'group.members_changed'       => 'warning',
     'ai.settings_changed'         => 'warning',
     'ai.classification_override'  => 'warning',
     'ai.backfill_run'             => 'primary',

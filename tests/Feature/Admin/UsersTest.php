@@ -203,6 +203,121 @@ class UsersTest extends TestCase
         $this->assertTrue($code === 200 || $code === 302, "Edit user: expected 200/302, got $code");
     }
 
+    // ── Group membership from the user edit page ───────────────────────────────
+
+    /** Lowest-id non-confidential group, so these tests never trigger a confidential alert. */
+    private function safeGroupId(): int
+    {
+        $id = (int) \Database::connect()
+            ->query('SELECT id FROM `groups` WHERE is_confidential = 0 ORDER BY id LIMIT 1')
+            ->fetchColumn();
+        if ($id === 0) {
+            $this->markTestSkipped('No non-confidential group exists to test against.');
+        }
+        return $id;
+    }
+
+    private function clearAgentGroups(): void
+    {
+        $stmt = \Database::connect()->prepare('DELETE FROM group_user_map WHERE user_id = ?');
+        $stmt->execute([DatabaseSeeder::$agentId]);
+    }
+
+    /** Membership rows for the seeded agent, as group_id => is_manager. */
+    private function agentGroupMap(): array
+    {
+        $stmt = \Database::connect()->prepare('SELECT group_id, is_manager FROM group_user_map WHERE user_id = ?');
+        $stmt->execute([DatabaseSeeder::$agentId]);
+        $map = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $map[(int) $row['group_id']] = (int) $row['is_manager'];
+        }
+        return $map;
+    }
+
+    public function test_edit_staff_user_form_shows_group_picker(): void
+    {
+        $r    = $this->get($this->adminClient(), '/admin/users/' . DatabaseSeeder::$agentId . '/edit');
+        $html = (string) $r->getBody();
+        $this->assertStringContainsString('Group Membership', $html);
+        $this->assertStringContainsString('name="groups[]"', $html,
+            'Edit user form must expose editable group checkboxes');
+        $this->assertStringContainsString('name="_groups_present"', $html,
+            'The picker must post its presence marker so omitted groups are not treated as a wipe');
+    }
+
+    public function test_edit_user_adds_and_removes_group_membership(): void
+    {
+        $gid  = $this->safeGroupId();
+        $base = [
+            'first_name' => 'TestAgent',
+            'last_name'  => 'User',
+            'email'      => DatabaseSeeder::AGENT_EMAIL,
+            'role'       => 'agent',
+        ];
+
+        try {
+            // Add, flagged as a group manager
+            $this->post($this->adminClient(), '/admin/users/' . DatabaseSeeder::$agentId . '/edit', $base + [
+                '_groups_present' => '1',
+                'groups'          => [(string) $gid],
+                'group_managers'  => [(string) $gid],
+            ]);
+            $this->assertSame([$gid => 1], $this->agentGroupMap(),
+                'Saving the user form should add the membership row with is_manager set');
+
+            // Same post minus the manager flag → member stays, manager is revoked
+            $this->post($this->adminClient(), '/admin/users/' . DatabaseSeeder::$agentId . '/edit', $base + [
+                '_groups_present' => '1',
+                'groups'          => [(string) $gid],
+            ]);
+            $this->assertSame([$gid => 0], $this->agentGroupMap(),
+                'Unticking Manager should clear is_manager without dropping membership');
+
+            // No groups posted, but the marker is present → membership removed
+            $this->post($this->adminClient(), '/admin/users/' . DatabaseSeeder::$agentId . '/edit', $base + [
+                '_groups_present' => '1',
+            ]);
+            $this->assertSame([], $this->agentGroupMap(),
+                'Clearing every checkbox should remove the membership');
+        } finally {
+            // The visibility tests rely on the seeded agent having no groups.
+            $this->clearAgentGroups();
+        }
+    }
+
+    public function test_edit_user_without_picker_marker_leaves_groups_alone(): void
+    {
+        $gid = $this->safeGroupId();
+        $db  = \Database::connect();
+        $db->prepare('INSERT INTO group_user_map (group_id, user_id, is_manager) VALUES (?, ?, 0)')
+            ->execute([$gid, DatabaseSeeder::$agentId]);
+
+        try {
+            // A caller that never rendered the picker (API, import script) must not
+            // strip membership just because it omitted groups[].
+            $this->post($this->adminClient(), '/admin/users/' . DatabaseSeeder::$agentId . '/edit', [
+                'first_name' => 'TestAgent',
+                'last_name'  => 'User',
+                'email'      => DatabaseSeeder::AGENT_EMAIL,
+                'role'       => 'agent',
+            ]);
+            $this->assertSame([$gid => 0], $this->agentGroupMap(),
+                'Membership must survive a post that omits the group picker entirely');
+        } finally {
+            $this->clearAgentGroups();
+        }
+    }
+
+    public function test_edit_non_staff_user_hides_group_picker_by_default(): void
+    {
+        $r    = $this->get($this->adminClient(), '/admin/users/' . DatabaseSeeder::$portalId . '/edit');
+        $html = (string) $r->getBody();
+        // Rendered but collapsed — it appears client-side if the level is raised to staff.
+        $this->assertStringContainsString('id="groupMembership" class="d-none"', $html,
+            'Group picker must start hidden for a non-staff permission level');
+    }
+
     // ── Role enforcement ──────────────────────────────────────────────────────
 
     public function test_agent_cannot_access_user_list(): void

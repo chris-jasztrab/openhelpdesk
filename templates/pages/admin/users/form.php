@@ -143,27 +143,130 @@ $targetOutranksEditor = $isEdit && !Auth::isAdmin()
                 <?php endif; ?>
             </div>
 
-            <?php if ($isEdit && in_array($editing['role'] ?? '', ['agent', 'admin', 'power_user'])): ?>
+            <?php
+            // ── Group membership ──────────────────────────────────────────────
+            // Editable inline when the editor can also manage groups; otherwise
+            // it stays the read-only summary with a pointer to Settings → Groups.
+            $canEditGroups   = $isEdit && !empty($canManageGroups);
+            $storedIsStaff   = $isEdit && roleIsStaff($editing['role'] ?? null);
+            $selectedGroups  = $isEdit ? array_map('intval', oldList('groups', $memberGroupIds ?? [])) : [];
+            $selectedMgrs    = $isEdit ? array_map('intval', oldList('group_managers', $managerGroupIds ?? [])) : [];
+            ?>
+            <?php if ($isEdit): ?>
             <hr class="my-4">
-            <div>
-                <label class="form-label fw-semibold">Group Membership</label>
-                <?php if (!empty($userGroups)): ?>
-                    <div class="d-flex flex-wrap gap-2 mb-1">
-                        <?php foreach ($userGroups as $g): ?>
-                            <a href="/admin/groups/<?= $g['id'] ?>/edit" class="badge text-decoration-none"
-                               style="background:var(--ld-primary);font-size:.8rem;">
-                                <i class="bi bi-people me-1"></i><?= e($g['name']) ?>
-                            </a>
+            <div id="groupMembership" class="<?= $storedIsStaff ? '' : 'd-none' ?>">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-1">
+                    <label class="form-label fw-semibold mb-0">
+                        <i class="bi bi-people me-1"></i>Group Membership
+                        <span class="badge rounded-pill text-bg-light border ms-1" id="groupCountBadge"></span>
+                    </label>
+                    <?php if ($canEditGroups && !empty($allGroups)): ?>
+                    <div class="d-flex align-items-center gap-2">
+                        <?php if (count($allGroups) > 6): ?>
+                        <input type="search" class="form-control form-control-sm" id="groupFilter"
+                               placeholder="Filter groups…" style="max-width:190px;" autocomplete="off">
+                        <?php endif; ?>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="groupClearBtn">Clear</button>
+                        <a href="/admin/groups" class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener">
+                            <i class="bi bi-gear me-1"></i>All groups
+                        </a>
+                    </div>
+                    <?php endif; ?>
+                </div>
+                <p class="text-muted small mb-2">
+                    Group membership decides which tickets this user can see and which auto-assignment
+                    rotations they take part in.
+                    <?php if ($canEditGroups): ?>Tick <strong>Manager</strong> to let them manage the group's skills without admin access — see <a href="/admin/docs/users#group-managers" target="_blank" rel="noopener">Group Managers</a>.<?php endif; ?>
+                </p>
+
+                <?php if ($canEditGroups && !empty($allGroups)): ?>
+                    <input type="hidden" name="_groups_present" value="1">
+
+                    <div id="groupConfidentialWarning" class="alert alert-warning py-2 small d-none">
+                        <i class="bi bi-shield-lock-fill me-1"></i>
+                        <strong>Confidential group selected.</strong>
+                        On save, every existing member of that group is emailed the addition along with
+                        your name, email, IP and the timestamp. The attempt is recorded in the audit log.
+                    </div>
+
+                    <div class="row g-2">
+                        <?php foreach ($allGroups as $g): ?>
+                        <?php
+                        $gid       = (int) $g['id'];
+                        $isMember  = in_array($gid, $selectedGroups, true);
+                        $isManager = in_array($gid, $selectedMgrs, true);
+                        ?>
+                        <div class="col-md-6 col-lg-4 group-option"
+                             data-search="<?= e(mb_strtolower($g['name'] . ' ' . ($g['description'] ?? ''))) ?>">
+                            <div class="border rounded p-2 h-100">
+                                <div class="d-flex justify-content-between align-items-start gap-1">
+                                    <div class="form-check mb-0">
+                                        <input class="form-check-input group-cb" type="checkbox" name="groups[]"
+                                               value="<?= $gid ?>" id="group_<?= $gid ?>"
+                                               data-gid="<?= $gid ?>"
+                                               data-name="<?= e($g['name']) ?>"
+                                               data-confidential="<?= !empty($g['is_confidential']) ? '1' : '0' ?>"
+                                               <?= $isMember ? 'checked' : '' ?>>
+                                        <label class="form-check-label" for="group_<?= $gid ?>">
+                                            <span class="fw-semibold"><?= e($g['name']) ?></span>
+                                            <?php if (!empty($g['is_confidential'])): ?>
+                                                <i class="bi bi-shield-lock-fill text-warning ms-1"
+                                                   title="Confidential group"></i>
+                                            <?php endif; ?>
+                                            <span class="d-block text-muted" style="font-size:.75rem;">
+                                                <?= (int) $g['member_count'] ?> member<?= (int) $g['member_count'] === 1 ? '' : 's' ?>
+                                                <?php if (!empty($g['description'])): ?>
+                                                    · <?= e(mb_strimwidth($g['description'], 0, 48, '…')) ?>
+                                                <?php endif; ?>
+                                            </span>
+                                        </label>
+                                    </div>
+                                    <a href="/admin/groups/<?= $gid ?>/edit" target="_blank" rel="noopener"
+                                       class="text-muted" title="Open group settings">
+                                        <i class="bi bi-box-arrow-up-right small"></i>
+                                    </a>
+                                </div>
+                                <div class="form-check ms-4 mt-1">
+                                    <input class="form-check-input group-manager-cb" type="checkbox" name="group_managers[]"
+                                           value="<?= $gid ?>" id="group_manager_<?= $gid ?>"
+                                           data-gid="<?= $gid ?>"
+                                           <?= $isManager ? 'checked' : '' ?>
+                                           <?= $isMember ? '' : 'disabled' ?>>
+                                    <label class="form-check-label small text-muted" for="group_manager_<?= $gid ?>">
+                                        <i class="bi bi-stars" aria-hidden="true"></i> Manager
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
                         <?php endforeach; ?>
                     </div>
-                    <div class="form-text">This <?= $editing['role'] === 'admin' ? 'admin' : 'agent' ?> belongs to the groups shown above. Group membership controls which tickets they can see. Manage membership from <a href="/admin/groups">Admin → Settings → Groups</a>.</div>
-                <?php elseif (roleIsAdmin($editing['role'] ?? null) || roleCan($editing['role'] ?? null, 'tickets.view_all')): ?>
-                    <div class="text-muted small">Not a member of any groups — but this permission level can see <strong>all tickets</strong>.</div>
-                    <div class="form-text">Assign this user to groups from <a href="/admin/groups">Admin → Settings → Groups</a> to scope what they see.</div>
+                    <div class="small mt-2 d-none" id="groupNoneWarning"></div>
+                    <div class="text-muted small mt-2 d-none" id="groupFilterEmpty">No groups match that filter.</div>
+                <?php elseif ($canEditGroups): ?>
+                    <div class="alert alert-info mb-0 py-2 small">
+                        <i class="bi bi-info-circle me-1"></i>No groups exist yet.
+                        <a href="/admin/groups/create">Create one</a> to start scoping ticket visibility.
+                    </div>
+                <?php elseif (!empty($userGroups)): ?>
+                    <div class="d-flex flex-wrap gap-2 mb-1">
+                        <?php foreach ($userGroups as $g): ?>
+                            <span class="badge" style="background:var(--ld-primary);font-size:.8rem;">
+                                <i class="bi bi-people me-1"></i><?= e($g['name']) ?>
+                            </span>
+                        <?php endforeach; ?>
+                    </div>
+                    <div class="form-text">You need the “Manage groups” permission to change this.</div>
                 <?php else: ?>
-                    <div class="text-danger small"><i class="bi bi-exclamation-triangle-fill me-1"></i>Not a member of any groups — this user currently <strong>cannot see any tickets</strong>.</div>
-                    <div class="form-text">Add them to groups from <a href="/admin/groups">Admin → Settings → Groups</a>, or give them a permission level with the “View all tickets” permission.</div>
+                    <div class="text-muted small">Not a member of any groups.</div>
+                    <div class="form-text">You need the “Manage groups” permission to change this.</div>
                 <?php endif; ?>
+            </div>
+
+            <div id="groupDemotionNote" class="alert alert-warning py-2 small mt-3 d-none">
+                <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                This user still belongs to <strong><span id="groupDemotionCount">0</span></strong> group(s).
+                Permission levels below agent don't use group membership, and saving here won't remove those
+                rows — clear them from <a href="/admin/groups">Settings → Groups</a> if they should be gone.
             </div>
             <?php endif; ?>
 
@@ -189,36 +292,229 @@ foreach (array_keys($roleChoicesForActor) as $capSlug) {
         'isStaff' => roleIsStaff($capSlug),
     ];
 }
+// The edited user's own level may not be in the actor's assignable list (they
+// outrank the editor, so the select is locked). Include it anyway or the JS has
+// no capabilities to read and would wrongly hide the group picker.
+$storedSlug = $isEdit ? (string) ($editing['role'] ?? '') : '';
+if ($storedSlug !== '' && !isset($roleCaps[$storedSlug])) {
+    $roleCaps[$storedSlug] = [
+        'seesAll' => roleIsAdmin($storedSlug) || roleCan($storedSlug, 'tickets.view_all'),
+        'isStaff' => roleIsStaff($storedSlug),
+    ];
+}
 ?>
+<!-- Confirm-add-to-confidential-group modal (mirrors the group edit page) -->
+<div class="modal fade" id="userConfidentialAddModal" tabindex="-1" aria-labelledby="userConfidentialAddModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header" style="background:linear-gradient(135deg,#92400e,#b45309); color:#fff;">
+                <h5 class="modal-title fw-bold" id="userConfidentialAddModalLabel">
+                    <i class="bi bi-shield-lock-fill me-2"></i>Confidential Group — Confirm Addition
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2">You are about to add this user to <strong><span id="userConfidentialAddCount">0</span></strong> confidential group(s):</p>
+                <ul id="userConfidentialAddList" class="mb-3"></ul>
+                <div class="alert alert-warning mb-0">
+                    <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                    All <strong>current members</strong> of those groups will immediately receive an email alert
+                    naming this user, your name and email, your IP address, and the timestamp. The action and the
+                    attempt itself are recorded in the audit log.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning text-white" id="userConfirmConfidentialAddBtn">
+                    <i class="bi bi-check-lg me-1"></i>Confirm & Notify Members
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 (function () {
-    const caps       = <?= json_encode($roleCaps, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-    const groupCount = <?= (int) count($userGroups ?? []) ?>;
+    const caps = <?= json_encode($roleCaps, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     const form = document.querySelector('form[action="<?= e($action) ?>"]');
     if (!form) return;
 
-    form.addEventListener('submit', function (e) {
-        const roleSel = form.querySelector('#role');
-        const slug    = roleSel ? roleSel.value : null;
-        const cap     = slug && caps[slug] ? caps[slug] : null;
-        if (!cap) return;
+    // ── Group membership picker ───────────────────────────────────────────────
+    const section     = document.getElementById('groupMembership');
+    const memberCbs   = Array.from(form.querySelectorAll('.group-cb'));
+    const totalGroups = memberCbs.length;
+    // Membership as saved on the server, so we can tell a *new* confidential
+    // addition apart from one that was already there.
+    const savedIds    = <?= json_encode(array_map('intval', $memberGroupIds ?? [])) ?>;
+    const savedCount  = savedIds.length;
 
-        // Warn when granting all-ticket visibility (a privacy-sensitive level).
-        if (cap.seesAll) {
-            if (!confirm('This permission level can see ALL tickets in the system, across every group (confidential tickets excluded). Continue?')) {
-                e.preventDefault();
+    const countBadge   = document.getElementById('groupCountBadge');
+    const noneWarning  = document.getElementById('groupNoneWarning');
+    const confWarning  = document.getElementById('groupConfidentialWarning');
+    const demotionNote = document.getElementById('groupDemotionNote');
+
+    function currentRole() {
+        const el = form.elements['role'];
+        return el ? el.value : null;
+    }
+    function selectedIds() {
+        return memberCbs.filter(cb => cb.checked).map(cb => parseInt(cb.dataset.gid, 10));
+    }
+    function newConfidentialGroups() {
+        return memberCbs
+            .filter(cb => cb.checked
+                && cb.dataset.confidential === '1'
+                && savedIds.indexOf(parseInt(cb.dataset.gid, 10)) === -1)
+            .map(cb => cb.dataset.name);
+    }
+
+    // Manager only means something for an actual member — mirror the group form.
+    memberCbs.forEach(function (cb) {
+        const mgr = document.getElementById('group_manager_' + cb.dataset.gid);
+        cb.addEventListener('change', function () {
+            if (mgr) {
+                mgr.disabled = !cb.checked;
+                if (!cb.checked) mgr.checked = false;
             }
-            return;
+            refresh();
+        });
+    });
+
+    function refresh() {
+        const slug     = currentRole();
+        const cap      = slug && caps[slug] ? caps[slug] : null;
+        const isStaff  = cap ? cap.isStaff : false;
+        const seesAll  = cap ? cap.seesAll : false;
+        const selected = selectedIds();
+
+        // Only staff levels use group membership — hide the whole block otherwise,
+        // and point out any memberships that will be left dangling.
+        if (section) {
+            section.classList.toggle('d-none', !isStaff);
+        }
+        if (demotionNote) {
+            const show = !isStaff && savedCount > 0;
+            demotionNote.classList.toggle('d-none', !show);
+            const c = document.getElementById('groupDemotionCount');
+            if (c) c.textContent = savedCount;
+        }
+        if (!totalGroups) return;
+
+        if (countBadge) {
+            countBadge.textContent = selected.length + ' of ' + totalGroups + ' selected';
+        }
+        if (confWarning) {
+            confWarning.classList.toggle('d-none', newConfidentialGroups().length === 0);
+        }
+        if (noneWarning) {
+            const locVis    = form.querySelector('#can_view_location_tickets');
+            const hasLocVis = locVis && locVis.checked;
+            if (selected.length > 0 || !isStaff) {
+                noneWarning.classList.add('d-none');
+            } else if (seesAll) {
+                noneWarning.className = 'small mt-2 text-muted';
+                noneWarning.innerHTML = '<i class="bi bi-info-circle me-1"></i>No groups selected — this permission level can already see <strong>all tickets</strong>.';
+            } else if (hasLocVis) {
+                noneWarning.className = 'small mt-2 text-muted';
+                noneWarning.innerHTML = '<i class="bi bi-info-circle me-1"></i>No groups selected — this user will only see tickets for their assigned <?= e(label('location.singular', 'location')) ?>.';
+            } else {
+                noneWarning.className = 'small mt-2 text-danger';
+                noneWarning.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-1"></i>No groups selected — this user will <strong>not be able to see any tickets</strong>.';
+            }
+        }
+    }
+
+    const roleEl = form.elements['role'];
+    if (roleEl) roleEl.addEventListener('change', refresh);
+    const locVisEl = form.querySelector('#can_view_location_tickets');
+    if (locVisEl) locVisEl.addEventListener('change', refresh);
+
+    const clearBtn = document.getElementById('groupClearBtn');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', function () {
+            memberCbs.forEach(function (cb) {
+                cb.checked = false;
+                const mgr = document.getElementById('group_manager_' + cb.dataset.gid);
+                if (mgr) { mgr.checked = false; mgr.disabled = true; }
+            });
+            refresh();
+        });
+    }
+
+    const filterInput = document.getElementById('groupFilter');
+    if (filterInput) {
+        const empty = document.getElementById('groupFilterEmpty');
+        filterInput.addEventListener('input', function () {
+            const q = filterInput.value.trim().toLowerCase();
+            let shown = 0;
+            form.querySelectorAll('.group-option').forEach(function (opt) {
+                const hit = q === '' || (opt.dataset.search || '').indexOf(q) !== -1;
+                opt.classList.toggle('d-none', !hit);
+                if (hit) shown++;
+            });
+            if (empty) empty.classList.toggle('d-none', shown !== 0);
+        });
+    }
+
+    refresh();
+
+    // ── Submit guards ─────────────────────────────────────────────────────────
+    let confidentialConfirmed = false;
+    const modalEl = document.getElementById('userConfidentialAddModal');
+    let modalInstance = null;
+
+    form.addEventListener('submit', function (e) {
+        const slug = currentRole();
+        const cap  = slug && caps[slug] ? caps[slug] : null;
+
+        if (cap) {
+            // Warn when granting all-ticket visibility (a privacy-sensitive level).
+            if (cap.seesAll) {
+                if (!confirm('This permission level can see ALL tickets in the system, across every group (confidential tickets excluded). Continue?')) {
+                    e.preventDefault();
+                    return;
+                }
+            } else {
+                // Warn about an elevated user who can't actually see any tickets.
+                const locVis    = form.querySelector('#can_view_location_tickets');
+                const hasLocVis = locVis && locVis.checked;
+                const groupCount = totalGroups ? selectedIds().length : savedCount;
+                if (cap.isStaff && groupCount === 0 && !hasLocVis) {
+                    if (!confirm('This user has a staff permission level but belongs to no group and has no “view all” access. They will be able to log in but will not see any tickets. Continue?')) {
+                        e.preventDefault();
+                        return;
+                    }
+                }
+            }
         }
 
-        // Warn when creating an elevated user who can't actually see any tickets.
-        const locVis    = form.querySelector('#can_view_location_tickets');
-        const hasLocVis = locVis && locVis.checked;
-        if (cap.isStaff && groupCount === 0 && !hasLocVis) {
-            if (!confirm('This user has a staff permission level but belongs to no group and has no “view all” access. They will be able to log in but will not see any tickets. Continue?')) {
+        // Adding someone to a confidential group emails every existing member —
+        // make that explicit before it happens.
+        if (!confidentialConfirmed && cap && cap.isStaff && modalEl) {
+            const added = newConfidentialGroups();
+            if (added.length > 0) {
                 e.preventDefault();
+                document.getElementById('userConfidentialAddCount').textContent = added.length;
+                const list = document.getElementById('userConfidentialAddList');
+                list.innerHTML = '';
+                added.forEach(function (name) {
+                    const li = document.createElement('li');
+                    li.textContent = name;
+                    list.appendChild(li);
+                });
+                if (!modalInstance) modalInstance = new bootstrap.Modal(modalEl);
+                modalInstance.show();
             }
         }
     });
+
+    const confirmBtn = document.getElementById('userConfirmConfidentialAddBtn');
+    if (confirmBtn) {
+        confirmBtn.addEventListener('click', function () {
+            confidentialConfirmed = true;
+            if (modalInstance) modalInstance.hide();
+            form.submit();
+        });
+    }
 })();
 </script>

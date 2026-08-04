@@ -228,6 +228,19 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 </div>
 </div>
 
+<div class="card border-0 shadow-sm mb-4" id="group-membership">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-people text-primary me-2"></i>Group Membership</h5>
+<p class="text-muted mb-2">Membership can be edited from either side of the relationship, and both write the same rows:</p>
+<ul class="text-muted mb-2">
+    <li><strong>One group, many people</strong> — <a href="/admin/groups">Admin → Settings → Groups</a> → edit the group → Members.</li>
+    <li><strong>One person, many groups</strong> — <a href="/admin/users">Admin → Users</a> → edit the user → <strong>Group Membership</strong>. Faster when onboarding a new agent who belongs to several groups, or when someone changes departments.</li>
+</ul>
+<p class="text-muted mb-2">On the user form the block only applies to staff permission levels; it appears as soon as you pick one and hides again for end users. It shows each group's member count, flags <i class="bi bi-shield-lock-fill text-warning"></i> confidential groups, warns live when a staff user would end up in no group at all (they'd see no tickets), and carries the same <strong>Manager</strong> sub-checkbox as the group form.</p>
+<p class="text-muted mb-0">Editing membership here requires the <strong>Manage groups</strong> permission on top of <strong>Manage users</strong> — an editor with only the latter sees the list read-only. Changes are recorded as <code>group.members_changed</code> (and <code>group.managers_changed</code>) against the group, so a group's history is complete no matter which page the edit came from. Adding someone to a confidential group still confirms first and emails every existing member.</p>
+</div>
+</div>
+
 <div class="card border-0 shadow-sm mb-4" id="group-managers">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-stars text-primary me-2"></i>Group Managers</h5>
@@ -239,6 +252,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
     <li>In the Members section, every member row has a <strong>Manager</strong> sub-checkbox. Tick it for the people you want to delegate to.</li>
     <li>Save. The change is recorded as <code>group_managers_changed</code> in the audit log.</li>
 </ol>
+<p class="text-muted mb-3">The same flag is available from the other direction: edit the person at <a href="/admin/users"><strong>Admin → Users</strong></a> and use the <strong>Group Membership</strong> block described below.</p>
 <p class="text-muted mb-3">Multiple managers per group are supported — branch teams already have rotating leads, so flag as many as makes sense. Members must be ticked first; the Manager flag automatically clears if Member is unticked.</p>
 
 <h6 class="fw-semibold mt-3 mb-2">What a manager can do</h6>
