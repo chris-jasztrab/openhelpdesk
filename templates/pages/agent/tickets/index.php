@@ -14,7 +14,7 @@ if ($perPage !== 25) $sortParams['per_page'] = $perPage;
 
 // Applied-filter pills: build label + a "remove this one filter" URL for each active filter.
 $arrayFilterKeys = ['status', 'priority', 'type', 'location', 'agent', 'group'];
-$boolFilterKeys  = ['watched', 'has_attachment', 'resolved_today', 'escalated_to_me'];
+$boolFilterKeys  = ticketBoolFilterKeys('agent');
 $buildRemoveUrl = function (string $removeKey, $removeVal = null) use ($filters, $perPage, $arrayFilterKeys, $boolFilterKeys) {
     $params = [];
     foreach ($arrayFilterKeys as $k) {
@@ -51,6 +51,10 @@ if (!empty($filters['watched']))           $appliedPills[] = ['label' => 'My Wat
 if (!empty($filters['has_attachment']))    $appliedPills[] = ['label' => 'Has Attachment', 'url' => $buildRemoveUrl('has_attachment')];
 if (!empty($filters['resolved_today']))    $appliedPills[] = ['label' => 'Resolved Today', 'url' => $buildRemoveUrl('resolved_today')];
 if (!empty($filters['escalated_to_me']))   $appliedPills[] = ['label' => 'Escalated to Me', 'url' => $buildRemoveUrl('escalated_to_me')];
+// The wallboard drill-downs have no checkbox in the panel, so the pill is the
+// only thing telling an agent why the list is narrowed — and the only way out.
+if (!empty($filters['created_today']))     $appliedPills[] = ['label' => 'Created Today', 'url' => $buildRemoveUrl('created_today')];
+if (!empty($filters['due_today']))         $appliedPills[] = ['label' => 'Due Today', 'url' => $buildRemoveUrl('due_today')];
 $allColumns = ticketColumnDefinitions();
 if (!slaEnabled()) { unset($allColumns['sla']); }
 $colCount = 3 + count($visibleColumns); // checkbox + id + subject + visible toggleable columns
@@ -197,7 +201,7 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                 $sfUrl   = '/agent/tickets' . ($sfData ? '?' . http_build_query($sfData) : '');
                 $isOwner = ((int) $sf['user_id'] === Auth::id());
                 $isActive = true;
-                foreach (['q', 'watched', 'has_attachment'] as $fk) {
+                foreach (array_merge(['q'], $boolFilterKeys) as $fk) {
                     if (($sfData[$fk] ?? '') !== ($filters[$fk] ?? '')) { $isActive = false; break; }
                 }
                 if ($isActive) {

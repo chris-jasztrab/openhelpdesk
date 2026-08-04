@@ -6940,6 +6940,30 @@ function metaLocationIds(): array
 }
 
 /**
+ * The on/off ticket-list filters for a panel, in display order.
+ *
+ * One list, three consumers, which is the point: the save route decides what a
+ * saved filter round-trips, the applied-filter pills' "remove just this one" URLs
+ * must carry the others through, and the saved-filter list highlights the entry
+ * matching the current request. Those three disagreeing is invisible until a user
+ * saves a filter that silently loses a toggle, or removes one pill and loses
+ * another filter with it.
+ *
+ * `created_today` / `due_today` have no checkbox — they arrive from the wallboard
+ * drill-downs — but they behave exactly like the rest and belong here for the same
+ * reason. `sla` and `created_within` are deliberately absent: they are an enum and
+ * an integer, not toggles.
+ *
+ * @return list<string>
+ */
+function ticketBoolFilterKeys(string $panel = 'agent'): array
+{
+    return $panel === 'admin'
+        ? ['watched', 'has_attachment']
+        : ['watched', 'has_attachment', 'resolved_today', 'escalated_to_me', 'created_today', 'due_today'];
+}
+
+/**
  * Predicate for "this ticket has at least one attachment".
  *
  * EXISTS rather than a JOIN so a ticket with five files still counts once —

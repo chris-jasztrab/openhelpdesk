@@ -11,6 +11,21 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.163.1 &mdash; 2026-08-04
+
+### Fixed
+- **"Save Current Filter" silently dropped every on/off toggle.** The save routes stored only status/priority/type/location/agent/group and the search string, so you could tick "My Watched Tickets", save the filter, apply it a week later, and get an unwatched list back with nothing to indicate the filter had been saved incomplete. All of them now round-trip: `watched` and `has_attachment` on the admin panel, plus `resolved_today`, `escalated_to_me`, `created_today` and `due_today` on the agent panel. The browser was already POSTing them &mdash; the modal rebuilds its hidden inputs from the live URL &mdash; so the values were arriving at the server and being thrown away.
+
+  They are stored as the string `'1'`, not int `1`, which matters more than it looks: the templates decide which saved filter to highlight as *active* by strictly comparing the stored value against the request's own filter values, which are always strings. An int would parse, apply and filter correctly while the saved filter never lit up as active. Covered by a test that fails on exactly that substitution.
+
+- **Removing one applied-filter pill could take another filter with it.** The pill URLs, the save route and the active-filter highlight each carried their own hand-maintained list of which toggles exist, and the lists had already drifted. `created_today` / `due_today` were in none of them, so arriving from a wallboard drill-down and then removing any pill silently dropped the drill-down too. All three now read one `ticketBoolFilterKeys()` list.
+
+- **The wallboard drill-downs were invisible once applied.** `created_today` and `due_today` have no checkbox in the filter panel, and had no applied-filter pill either &mdash; so a drilled-down list looked like an ordinary one that was inexplicably short, with no way to clear the constraint except editing the URL. Both now get a removable pill like every other active filter.
+
+  `sla` and `created_within` remain unpersisted and unpilled: they are an enum and an integer rather than toggles, and want their own display treatment.
+
+---
+
 ## 2.163.0 &mdash; 2026-08-04
 
 ### Added

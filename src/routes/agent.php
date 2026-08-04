@@ -766,6 +766,15 @@ $router->post('/agent/tickets/filters/save', function () {
     if (trim($_POST['q'] ?? '') !== '') {
         $filterData['q'] = trim($_POST['q']);
     }
+    // Boolean toggles. Stored as the string '1' — not int 1 — because the
+    // templates decide which saved filter is the *active* one with a strict
+    // comparison against the request's own filter values, which are strings.
+    // An int here would make a saved filter never light up as active.
+    foreach (ticketBoolFilterKeys('agent') as $key) {
+        if (!empty($_POST[$key])) {
+            $filterData[$key] = '1';
+        }
+    }
 
     $db = Database::connect();
     $stmt = $db->prepare('INSERT INTO saved_filters (user_id, name, filters) VALUES (?, ?, ?)');

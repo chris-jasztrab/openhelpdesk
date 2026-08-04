@@ -14,7 +14,8 @@ $sortParams = array_filter($filters, fn($v) => is_array($v) ? !empty($v) : $v !=
 // Applied-filter pills: build label + a "remove this one filter" URL for each active filter.
 $arrayFilterKeys = ['status', 'priority', 'type', 'location', 'agent', 'group', 'requester'];
 $textFilterKeys  = ['q', 'date_from', 'date_to'];
-$buildRemoveUrl = function (string $removeKey, $removeVal = null) use ($filters, $perPage, $arrayFilterKeys, $textFilterKeys) {
+$boolFilterKeys  = ticketBoolFilterKeys('admin');
+$buildRemoveUrl = function (string $removeKey, $removeVal = null) use ($filters, $perPage, $arrayFilterKeys, $textFilterKeys, $boolFilterKeys) {
     $params = [];
     foreach ($arrayFilterKeys as $k) {
         $vals = array_map('strval', (array) ($filters[$k] ?? []));
@@ -26,8 +27,9 @@ $buildRemoveUrl = function (string $removeKey, $removeVal = null) use ($filters,
     foreach ($textFilterKeys as $k) {
         if ($k !== $removeKey && ($filters[$k] ?? '') !== '') $params[$k] = $filters[$k];
     }
-    if ($removeKey !== 'watched' && !empty($filters['watched'])) $params['watched'] = 1;
-    if ($removeKey !== 'has_attachment' && !empty($filters['has_attachment'])) $params['has_attachment'] = 1;
+    foreach ($boolFilterKeys as $k) {
+        if ($k !== $removeKey && !empty($filters[$k])) $params[$k] = 1;
+    }
     if ($perPage !== 25) $params['per_page'] = $perPage;
     $qs = http_build_query($params);
     return '/admin/tickets' . ($qs ? '?' . $qs : '');
@@ -206,7 +208,7 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                 $sfUrl   = '/admin/tickets' . ($sfData ? '?' . http_build_query($sfData) : '');
                 $isOwner = ((int) $sf['user_id'] === Auth::id());
                 $isActive = true;
-                foreach (['q', 'date_from', 'date_to', 'watched', 'has_attachment'] as $fk) {
+                foreach (array_merge($textFilterKeys, $boolFilterKeys) as $fk) {
                     if (($sfData[$fk] ?? '') !== ($filters[$fk] ?? '')) { $isActive = false; break; }
                 }
                 if ($isActive) {
