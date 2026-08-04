@@ -71,7 +71,8 @@ $statusOptions = ticketStatusLabelMap();
 <div class="row justify-content-center">
     <div class="col-lg-8">
 
-        <form method="POST" action="<?= e($formAction) ?>" id="admin-ticket-form">
+        <form method="POST" action="<?= e($formAction) ?>" id="admin-ticket-form"
+              enctype="multipart/form-data">
             <?= csrfField() ?>
             <input type="hidden" id="dup_matched_ids" name="_dup_matched_ids" value="">
 
@@ -228,7 +229,17 @@ $statusOptions = ticketStatusLabelMap();
                         </div>
                         <?php endif; ?>
                         <?php elseif ($sysKey === 'attachments'): ?>
-                        <!-- attachments aren't part of the staff create form today -->
+                        <div class="col-12 dynamic-field-wrap"
+                             data-field-kind="system" data-field-key="attachments" <?= $wrapStyle ?>>
+                            <label for="attachments" class="form-label fw-semibold">
+                                <?= e(getSetting('sys_field_label_attachments', 'Attachments')) ?>
+                                <span class="text-danger field-required-star" <?= $v === 'required' ? '' : 'style="display:none;"' ?>>*</span>
+                            </label>
+                            <input type="file" class="form-control" id="attachments" name="attachments[]" multiple>
+                            <div class="form-text">
+                                Max <?= UPLOAD_MAX_SIZE / 1024 / 1024 ?>MB per file. Allowed: PDF, images, Office documents, text, ZIP.
+                            </div>
+                        </div>
                         <?php endif; ?>
                         <?php endforeach; ?>
 
@@ -243,11 +254,17 @@ $statusOptions = ticketStatusLabelMap();
                             $v = $visOf('custom', (string) $cf['id']);
                             $isAbsent = $v === 'absent' || $v === 'hidden';
                             $cfRequired = $v === 'required';
+                            // Content-only fields (text blocks / images) are written for one
+                            // specific type. With no type chosen there's nothing to preview,
+                            // so keep them hidden instead of stacking every type's copy up.
+                            $isContentOnly = in_array($cf['field_type'], ['text_block', 'image'], true);
+                            if (!$initialTypeId && $isContentOnly) $isAbsent = true;
                         ?>
                         <div class="col-12 dynamic-field-wrap custom-field-col"
                              data-field-kind="custom"
                              data-field-key="<?= (int) $cf['id'] ?>"
                              data-field-id="<?= (int) $cf['id'] ?>"
+                             data-field-type="<?= e($cf['field_type']) ?>"
                              <?= $isAbsent ? 'style="display:none;"' : '' ?>>
                             <?php include ROOT_DIR . '/templates/partials/custom-field-input.php'; ?>
                         </div>
@@ -390,7 +407,12 @@ $statusOptions = ticketStatusLabelMap();
             var key  = wrap.dataset.fieldKey;
             var v    = visByKey[kind + '|' + key];
             if (!selectedType) {
-                wrap.style.display = '';
+                // No type chosen yet — show the input fields as an optional preview,
+                // but keep content-only blocks (text blocks / images) hidden: each is
+                // written for one type and they stack up as noise otherwise.
+                var contentOnly = kind === 'custom' &&
+                    (wrap.dataset.fieldType === 'text_block' || wrap.dataset.fieldType === 'image');
+                wrap.style.display = contentOnly ? 'none' : '';
                 setRequired(wrap, false);
                 return;
             }

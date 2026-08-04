@@ -11,6 +11,16 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.164.0 &mdash; 2026-08-04
+
+### Added
+- **Attachments box on the staff New Ticket form.** Agents and admins could only attach a file *after* the ticket existed &mdash; create it, open it, then upload through a reply. The create form now carries the same Attachments picker the portal has, and the files land on the ticket itself (no timeline row), exactly as a portal submission does. The success flash reports the count, and an image pasted into the description still routes through the inline-attachment path, so both sources end up in the same Attachments panel.
+
+  The field is driven by the per-type form layout like every other system field, so a ticket type that hides Attachments hides it here too &mdash; one config, both forms. Note the form is now `multipart/form-data`; the undo-send countdown and the "create anyway" duplicate override both re-submit natively, so a picked file survives either path.
+
+### Fixed
+- **Every ticket type's conditional text blocks rendered at once before a type was picked.** Opening the staff New Ticket form with Type still on "Unclassified" stacked up the Priority Examples block from *every* ticket type &mdash; on production that is eight of them in a row, most of a screen of guidance for types you hadn't chosen. Content-only fields (text blocks and images) are now hidden until a type is selected, then only that type's own blocks appear; real input fields keep previewing as optional the way they did. The portal form has behaved this way since the form builder shipped &mdash; the staff copy never got the same guard.
+
 ## 2.163.1 &mdash; 2026-08-04
 
 ### Fixed

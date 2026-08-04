@@ -4373,10 +4373,8 @@ $router->post('/admin/tickets/create', function () {
         redirect("{$redirectBase}/tickets/create");
     }
     // Pasted screenshots arrive as multi-megabyte base64 data URIs inside $desc.
-    // There is no file input on this form, so the editor is the only way staff
-    // can attach an image — move the bytes to attachment storage before the
-    // INSERT, or `description` (TEXT) overflows and MySQL strict mode rejects
-    // the whole ticket with a 1406.
+    // Move the bytes to attachment storage before the INSERT, or `description`
+    // (TEXT) overflows and MySQL strict mode rejects the whole ticket with a 1406.
     $desc = inlineImagesToAttachments($desc, $inlineAtt, $inlineRejected);
     if (textColumnOverflows($desc)) {
         flashInput($_POST);
@@ -4391,7 +4389,11 @@ $router->post('/admin/tickets/create', function () {
     )->execute([$subject, $desc, $createdBy, $submittedBy, $typeId, $locationId, $status, $priId, $assignedTo, $groupId, $dueDate]);
     $ticketId = (int) $db->lastInsertId();
 
-    saveAttachments($db, $ticketId, null, Auth::id(), $inlineAtt);
+    // Files picked in the form's Attachments box, plus any image the editor
+    // carried inline. Both land on the ticket itself (timeline_id NULL), same
+    // as the portal create form.
+    $uploaded = handleAttachmentUploads('attachments');
+    saveAttachments($db, $ticketId, null, Auth::id(), array_merge($inlineAtt, $uploaded));
     foreach ($inlineRejected as $why) {
         flash('error', $why);
     }
@@ -4507,7 +4509,11 @@ $router->post('/admin/tickets/create', function () {
         notifyRequesterTicketAssigned($db, $ticketId, $assignedTo);
     }
 
-    flash('success', 'Ticket #' . $ticketId . ' created.');
+    $msg = 'Ticket #' . $ticketId . ' created.';
+    if (!empty($uploaded)) {
+        $msg .= ' ' . count($uploaded) . ' file(s) attached.';
+    }
+    flash('success', $msg);
     $redirectBase = (Auth::isStaff() && !Auth::isAdmin()) ? '/agent' : '/admin';
     redirect("{$redirectBase}/tickets/{$ticketId}");
 });
