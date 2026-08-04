@@ -20,7 +20,8 @@ foreach (ticketActiveStatuses() as $__s) {
     $statusLabels[$__s['slug']] = $portalLabelOverrides[$__s['slug']] ?? $__s['label'];
 }
 unset($__s);
-$isDefault  = $filters['status'] === 'open' && $filters['priority'] === '' && $filters['q'] === '' && $filters['scope'] === 'mine';
+$isDefault  = $filters['status'] === 'open' && $filters['priority'] === '' && $filters['q'] === ''
+              && $filters['has_attachment'] === '' && $filters['scope'] === 'mine';
 $hasFilters = !$isDefault;
 $sortParams = array_filter($filters, fn($v) => $v !== '' && $v !== 'mine');
 ?>
@@ -63,6 +64,15 @@ $sortParams = array_filter($filters, fn($v) => $v !== '' && $v !== 'mine');
                     <option value="<?= $p['id'] ?>" <?= $filters['priority'] == $p['id'] ? 'selected' : '' ?>><?= e($p['name']) ?></option>
                     <?php endforeach; ?>
                 </select>
+            </div>
+            <div class="col-md-auto">
+                <div class="form-check mb-1">
+                    <input class="form-check-input" type="checkbox" id="portalHasAttachment"
+                           name="has_attachment" value="1" <?= $filters['has_attachment'] !== '' ? 'checked' : '' ?>>
+                    <label class="form-check-label small" for="portalHasAttachment">
+                        <i class="bi bi-paperclip me-1"></i>Has attachment
+                    </label>
+                </div>
             </div>
             <div class="col-md-auto d-flex gap-1">
                 <button type="submit" class="btn btn-sm text-white" style="background:var(--ld-primary);">

@@ -14,7 +14,7 @@ if ($perPage !== 25) $sortParams['per_page'] = $perPage;
 
 // Applied-filter pills: build label + a "remove this one filter" URL for each active filter.
 $arrayFilterKeys = ['status', 'priority', 'type', 'location', 'agent', 'group'];
-$boolFilterKeys  = ['watched', 'resolved_today', 'escalated_to_me'];
+$boolFilterKeys  = ['watched', 'has_attachment', 'resolved_today', 'escalated_to_me'];
 $buildRemoveUrl = function (string $removeKey, $removeVal = null) use ($filters, $perPage, $arrayFilterKeys, $boolFilterKeys) {
     $params = [];
     foreach ($arrayFilterKeys as $k) {
@@ -48,6 +48,7 @@ foreach ((array) ($filters['agent'] ?? []) as $v)    $appliedPills[] = ['label' 
 foreach ((array) ($filters['group'] ?? []) as $v)    $appliedPills[] = ['label' => 'Group: '    . ($groupMap[(string) $v] ?? $v), 'url' => $buildRemoveUrl('group', $v)];
 if (($filters['q'] ?? '') !== '')          $appliedPills[] = ['label' => 'Search: "' . $filters['q'] . '"', 'url' => $buildRemoveUrl('q')];
 if (!empty($filters['watched']))           $appliedPills[] = ['label' => 'My Watched Tickets', 'url' => $buildRemoveUrl('watched')];
+if (!empty($filters['has_attachment']))    $appliedPills[] = ['label' => 'Has Attachment', 'url' => $buildRemoveUrl('has_attachment')];
 if (!empty($filters['resolved_today']))    $appliedPills[] = ['label' => 'Resolved Today', 'url' => $buildRemoveUrl('resolved_today')];
 if (!empty($filters['escalated_to_me']))   $appliedPills[] = ['label' => 'Escalated to Me', 'url' => $buildRemoveUrl('escalated_to_me')];
 $allColumns = ticketColumnDefinitions();
@@ -196,7 +197,7 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                 $sfUrl   = '/agent/tickets' . ($sfData ? '?' . http_build_query($sfData) : '');
                 $isOwner = ((int) $sf['user_id'] === Auth::id());
                 $isActive = true;
-                foreach (['q', 'watched'] as $fk) {
+                foreach (['q', 'watched', 'has_attachment'] as $fk) {
                     if (($sfData[$fk] ?? '') !== ($filters[$fk] ?? '')) { $isActive = false; break; }
                 }
                 if ($isActive) {
@@ -362,6 +363,15 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                     <label class="filter-check-item">
                         <input type="checkbox" name="watched" value="1" <?= !empty($filters['watched']) ? 'checked' : '' ?>>
                         <span class="text-muted fst-italic"><i class="bi bi-eye me-1"></i>My Watched Tickets</span>
+                    </label>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label small fw-semibold mb-1">Attachments</label>
+                <div class="filter-checklist">
+                    <label class="filter-check-item">
+                        <input type="checkbox" name="has_attachment" value="1" <?= !empty($filters['has_attachment']) ? 'checked' : '' ?>>
+                        <span class="text-muted fst-italic"><i class="bi bi-paperclip me-1"></i>Has Attachment</span>
                     </label>
                 </div>
             </div>

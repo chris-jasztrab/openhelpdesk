@@ -943,6 +943,7 @@ $router->get('/admin/users/{id}', function (array $p) {
         'priority'=> array_map('strval', (array) ($_GET['priority'] ?? [])),
         'type'    => array_map('strval', (array) ($_GET['type'] ?? [])),
         'agent'   => array_map('strval', (array) ($_GET['agent'] ?? [])),
+        'has_attachment' => !empty($_GET['has_attachment']) ? '1' : '',
     ];
 
     // Options for filter panel
@@ -990,6 +991,10 @@ $router->get('/admin/users/{id}', function (array $p) {
             }
         }
         $where[] = '(' . implode(' OR ', $agentClauses) . ')';
+    }
+
+    if ($userTicketFilters['has_attachment'] !== '') {
+        $where[] = ticketHasAttachmentSql('t');
     }
 
     $tSql = "SELECT t.id, t.subject, t.status, t.created_at,
@@ -3703,6 +3708,7 @@ $router->get('/admin/tickets', function () {
         'date_from' => trim($_GET['date_from'] ?? ''),
         'date_to'   => trim($_GET['date_to'] ?? ''),
         'watched'   => !empty($_GET['watched']) ? '1' : '',
+        'has_attachment' => !empty($_GET['has_attachment']) ? '1' : '',
     ];
 
     // Resolve requester ids → names so applied-filter pills read correctly
@@ -3882,6 +3888,7 @@ $router->get('/admin/tickets/export', function () {
         'date_from' => trim($_GET['date_from'] ?? ''),
         'date_to'   => trim($_GET['date_to'] ?? ''),
         'watched'   => !empty($_GET['watched']) ? '1' : '',
+        'has_attachment' => !empty($_GET['has_attachment']) ? '1' : '',
     ];
 
     $filterResult = buildTicketFilterQuery($filters);

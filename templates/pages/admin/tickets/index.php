@@ -27,6 +27,7 @@ $buildRemoveUrl = function (string $removeKey, $removeVal = null) use ($filters,
         if ($k !== $removeKey && ($filters[$k] ?? '') !== '') $params[$k] = $filters[$k];
     }
     if ($removeKey !== 'watched' && !empty($filters['watched'])) $params['watched'] = 1;
+    if ($removeKey !== 'has_attachment' && !empty($filters['has_attachment'])) $params['has_attachment'] = 1;
     if ($perPage !== 25) $params['per_page'] = $perPage;
     $qs = http_build_query($params);
     return '/admin/tickets' . ($qs ? '?' . $qs : '');
@@ -51,6 +52,7 @@ if (($filters['q'] ?? '') !== '')         $appliedPills[] = ['label' => 'Search:
 if (($filters['date_from'] ?? '') !== '') $appliedPills[] = ['label' => 'From: ' . $filters['date_from'], 'url' => $buildRemoveUrl('date_from')];
 if (($filters['date_to'] ?? '') !== '')   $appliedPills[] = ['label' => 'To: '   . $filters['date_to'],   'url' => $buildRemoveUrl('date_to')];
 if (!empty($filters['watched']))          $appliedPills[] = ['label' => 'My Watched Tickets', 'url' => $buildRemoveUrl('watched')];
+if (!empty($filters['has_attachment']))   $appliedPills[] = ['label' => 'Has Attachment', 'url' => $buildRemoveUrl('has_attachment')];
 
 $allColumns = ticketColumnDefinitions();
 if (!slaEnabled()) { unset($allColumns['sla']); }
@@ -204,7 +206,7 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                 $sfUrl   = '/admin/tickets' . ($sfData ? '?' . http_build_query($sfData) : '');
                 $isOwner = ((int) $sf['user_id'] === Auth::id());
                 $isActive = true;
-                foreach (['q', 'date_from', 'date_to', 'watched'] as $fk) {
+                foreach (['q', 'date_from', 'date_to', 'watched', 'has_attachment'] as $fk) {
                     if (($sfData[$fk] ?? '') !== ($filters[$fk] ?? '')) { $isActive = false; break; }
                 }
                 if ($isActive) {
@@ -376,6 +378,15 @@ $currentUrl = '/admin/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                     <label class="filter-check-item">
                         <input type="checkbox" name="watched" value="1" <?= !empty($filters['watched']) ? 'checked' : '' ?>>
                         <span class="text-muted fst-italic"><i class="bi bi-eye me-1"></i>My Watched Tickets</span>
+                    </label>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label small fw-semibold mb-1">Attachments</label>
+                <div class="filter-checklist">
+                    <label class="filter-check-item">
+                        <input type="checkbox" name="has_attachment" value="1" <?= !empty($filters['has_attachment']) ? 'checked' : '' ?>>
+                        <span class="text-muted fst-italic"><i class="bi bi-paperclip me-1"></i>Has Attachment</span>
                     </label>
                 </div>
             </div>

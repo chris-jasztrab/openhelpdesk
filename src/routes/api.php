@@ -703,6 +703,12 @@ $router->get('/api/v1/tickets', function () {
         $where[] = 't.assigned_to IS NULL';
     }
 
+    // Non-staff callers never see attachments on internal notes, so those must
+    // not make a ticket match here either.
+    if (($_GET['has_attachment'] ?? '') === '1') {
+        $where[] = ticketHasAttachmentSql('t', !_apiIsStaff($user));
+    }
+
     $search = trim($_GET['search'] ?? '');
     if ($search !== '') {
         $where[]  = 't.subject LIKE ?';

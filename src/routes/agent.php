@@ -197,6 +197,7 @@ $router->get('/agent/tickets', function () {
     $fGroup    = array_values(array_filter(array_map('trim', (array) ($_GET['group']    ?? []))));
     $fSearch      = trim($_GET['q'] ?? '');
     $fWatched     = !empty($_GET['watched']) ? '1' : '';
+    $fHasAttachment = !empty($_GET['has_attachment']) ? '1' : '';
     $fResolvedToday = !empty($_GET['resolved_today']) ? '1' : '';
     $fEscalatedToMe = !empty($_GET['escalated_to_me']) ? '1' : '';
     // Drill-down filters used by the wallboard widgets (also valid stand-alone).
@@ -293,6 +294,10 @@ $router->get('/agent/tickets', function () {
     if ($fWatched) {
         $where[]  = 't.id IN (SELECT ticket_id FROM ticket_watchers WHERE user_id = ?)';
         $params[] = Auth::id();
+    }
+
+    if ($fHasAttachment) {
+        $where[] = ticketHasAttachmentSql('t');
     }
 
     // Half-open range rather than DATE(col) = CURDATE(): wrapping the column in a
@@ -472,6 +477,7 @@ $router->get('/agent/tickets', function () {
         'group'         => $fGroup,    // array
         'q'             => $fSearch,
         'watched'       => $fWatched,
+        'has_attachment' => $fHasAttachment,
         'resolved_today' => $fResolvedToday,
         'escalated_to_me' => $fEscalatedToMe,
         'created_today'  => $fCreatedToday,
@@ -562,6 +568,7 @@ $router->get('/agent/tickets/export', function () {
         'group'    => $_GET['group']    ?? [],
         'q'        => trim($_GET['q'] ?? ''),
         'watched'  => !empty($_GET['watched']) ? '1' : '',
+        'has_attachment' => !empty($_GET['has_attachment']) ? '1' : '',
     ]);
     $params = $filterResult['params'];
 

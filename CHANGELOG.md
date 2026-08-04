@@ -11,6 +11,19 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.163.0 &mdash; 2026-08-04
+
+### Added
+- **"Has attachment" ticket filter, on every ticket list that has filters.** Admin tickets, agent tickets, the ticket list on a user's admin profile page, and the portal's My Requests all gained the filter, and both CSV exports (`/admin/tickets/export`, `/agent/tickets/export`) honour it so a download still matches the list it was taken from. It combines with every existing filter, shows up as a removable "Has Attachment" pill in the applied-filters strip, and is picked up by the AJAX list refresh like any other checkbox. `GET /api/v1/tickets` accepts `has_attachment=1` as well, documented in `openapi.json`.
+
+  **On the portal, an attachment on an internal note does not count.** A requester never sees those files, so matching on them would have returned a request whose attachment list renders empty &mdash; a filter that looks broken, and a hint that staff had left a private note on the ticket. The portal and the API (for non-staff callers) therefore match only on requester-visible attachments; staff panels match on all of them. Staff and requester views of the same ticket can legitimately disagree about whether it "has an attachment", and that is the intended behaviour.
+
+  The predicate is a single shared `ticketHasAttachmentSql()` helper using `EXISTS`, not a join: a ticket with five files must be listed once, and joining `ticket_attachments` would have returned it five times &mdash; inflating the paginator's `COUNT(*)` and eating five of the page's `LIMIT` slots. It needs no new index; `ticket_attachments.ticket_id` is already keyed.
+
+  Note the filter is not persisted by **Save Current Filter**, which stores only status/priority/type/location/agent/group/search &mdash; the same pre-existing limitation that applies to "My Watched Tickets".
+
+---
+
 ## 2.162.0 &mdash; 2026-07-31
 
 ### Fixed

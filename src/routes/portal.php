@@ -15,6 +15,7 @@ $router->get('/portal/tickets', function () {
     $fPriority = trim($_GET['priority'] ?? '');
     $fSearch   = trim($_GET['q'] ?? '');
     $fScope    = trim($_GET['scope'] ?? 'mine'); // 'mine' or 'location'
+    $fHasAttachment = !empty($_GET['has_attachment']) ? '1' : '';
 
     $uid = Auth::id();
 
@@ -58,6 +59,11 @@ $router->get('/portal/tickets', function () {
     if ($fSearch !== '') {
         $where[]  = 't.subject LIKE ?';
         $params[] = '%' . $fSearch . '%';
+    }
+    if ($fHasAttachment !== '') {
+        // Requester-visible attachments only — internal-note files are hidden on
+        // this panel, so matching on them would look like a broken filter.
+        $where[] = ticketHasAttachmentSql('t', true);
     }
 
     $whereClause = ' WHERE ' . implode(' AND ', $where);
@@ -125,6 +131,7 @@ $router->get('/portal/tickets', function () {
         'priority' => $fPriority,
         'q'        => $fSearch,
         'scope'    => $fScope,
+        'has_attachment' => $fHasAttachment,
     ];
 
     // Tickets where this user has an unsent comment draft — marked in the list.

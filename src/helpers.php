@@ -6940,6 +6940,28 @@ function metaLocationIds(): array
 }
 
 /**
+ * Predicate for "this ticket has at least one attachment".
+ *
+ * EXISTS rather than a JOIN so a ticket with five files still counts once —
+ * joining ticket_attachments would multiply the row and break both the COUNT(*)
+ * used for pagination and the LIMIT on the list query.
+ *
+ * $visibleToRequester drops attachments hanging off an internal note. The portal
+ * already hides those, so without this a requester ticking "Has attachment" gets
+ * back tickets whose only file is on a note they cannot see — a filter that
+ * appears broken, and a hint that an internal note exists.
+ */
+function ticketHasAttachmentSql(string $alias = 't', bool $visibleToRequester = false): string
+{
+    $internal = $visibleToRequester
+        ? ' LEFT JOIN ticket_timeline tl ON ta.timeline_id = tl.id
+             WHERE (tl.is_internal IS NULL OR tl.is_internal = 0) AND ta.ticket_id = ' . $alias . '.id'
+        : ' WHERE ta.ticket_id = ' . $alias . '.id';
+
+    return 'EXISTS (SELECT 1 FROM ticket_attachments ta' . $internal . ')';
+}
+
+/**
  * Build WHERE clause and bindings for ticket filtering.
  * Returns ['where' => string, 'params' => array].
  */
@@ -6960,6 +6982,7 @@ function buildTicketFilterQuery(array $filters): array
     $fDateFrom = trim($filters['date_from'] ?? '');
     $fDateTo   = trim($filters['date_to'] ?? '');
     $fWatched  = !empty($filters['watched']);
+    $fHasAttachment = !empty($filters['has_attachment']);
 
     // Defensive: silently drop status values that no longer exist in the
     // lookup table. Saved filters from before a status was removed would
@@ -7056,6 +7079,11 @@ function buildTicketFilterQuery(array $filters): array
     if ($fWatched) {
         $where[]  = 't.id IN (SELECT ticket_id FROM ticket_watchers WHERE user_id = ?)';
         $params[] = Auth::id();
+    }
+
+    // Staff see attachments on internal notes, so no visibility carve-out here.
+    if ($fHasAttachment) {
+        $where[] = ticketHasAttachmentSql('t');
     }
 
     $whereClause = !empty($where) ? ' WHERE ' . implode(' AND ', $where) : '';

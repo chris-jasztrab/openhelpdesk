@@ -1157,6 +1157,18 @@
                         }
                     },
                     {
+                        "name": "has_attachment",
+                        "in": "query",
+                        "description": "Set to 1 to show only tickets with at least one attachment. For non-staff callers, attachments on internal notes are ignored.",
+                        "schema": {
+                            "type": "integer",
+                            "enum": [
+                                0,
+                                1
+                            ]
+                        }
+                    },
+                    {
                         "name": "search",
                         "in": "query",
                         "description": "Keyword search in ticket subject",
