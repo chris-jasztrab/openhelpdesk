@@ -11,6 +11,15 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.168.1 &mdash; 2026-08-10
+
+### Fixed
+- **SLA due dates are no longer skewed when Business Hours names a different timezone than the server.** SLA timers stored `first_response_due_at` and `resolution_due_at` formatted in the **business** timezone, but everything that reads them treats them as server local time &mdash; the ticket views parse them with a bare `new DateTimeImmutable()`, the ticket cards use `strtotime()`, and the SLA reports compare against SQL `NOW()`. Where the two timezones differed, every due date was wrong by the offset, in a way that produced no error and no warning: a business timezone behind the server marked brand-new tickets as **breached the instant they were created**, and one ahead of it silently handed out extra hours. The same mismatch ran in reverse when recalculating, where `created_at` &mdash; written by the database in server time &mdash; was being read back as if it were business time.
+
+  SLA now has one stated rule: everything it writes to the database is in server local time, and the business timezone governs only which wall-clock hours the timer is allowed to advance through. A migration re-expresses any already-stored due dates, and does nothing at all on installs where the two timezones already agree &mdash; which is every install that has never pointed Business Hours somewhere other than its own server.
+
+  This was latent rather than active: it only bites once someone changes the Business Hours timezone, which the settings page has always allowed.
+
 ## 2.168.0 &mdash; 2026-08-10
 
 ### Added

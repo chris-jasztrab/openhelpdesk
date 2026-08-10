@@ -73,12 +73,9 @@ class SlaImportBaselineTest extends TestCase
         // 24/7 hours, a 60-minute target is due exactly 60 minutes after the
         // baseline, whatever day the suite runs on.
         //
-        // The business timezone is pinned to PHP's own default deliberately.
-        // Sla stores due dates formatted in the business timezone but
-        // computeSlaState() reparses them in the PHP default timezone, so any
-        // difference between the two skews every SLA by the offset. That is a
-        // separate pre-existing bug; matching them here keeps these tests
-        // measuring the import baseline rather than that skew.
+        // The business timezone is pinned to PHP's own default so the expected
+        // due dates are easy to reason about. Divergence between the two is
+        // covered separately by SlaTimezoneSkewTest.
         \setSetting('sla_enabled', '1');
         \setSetting('business_hours_timezone', date_default_timezone_get());
         \setSetting('business_hours_schedule', json_encode([

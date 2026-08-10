@@ -2,10 +2,37 @@
 
 declare(strict_types=1);
 
+/**
+ * SLA timers.
+ *
+ * TIMEZONE CONTRACT — every datetime this class writes to the database is in
+ * **server local time** (PHP's date.timezone), matching how the rest of the app
+ * reads them: the ticket views parse `first_response_due_at` with a bare
+ * `new DateTimeImmutable()`, the ticket cards use `strtotime()`, and the SLA
+ * reports compare with SQL `NOW()`. None of those know what a business timezone
+ * is.
+ *
+ * The business timezone governs one thing only: which wall-clock hours the SLA
+ * timer is allowed to advance through. Arithmetic converts into it and back out
+ * again. Storing due dates in it instead skewed every comparison by the offset
+ * whenever it differed from the server's, which silently marked brand-new
+ * tickets as breached.
+ */
 class Sla
 {
     /** Canonical weekday order for counted_days, matching the business-hours schedule keys. */
     public const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+    /**
+     * The timezone every stored datetime is expressed in.
+     *
+     * Deliberately PHP's default rather than the business timezone — see the
+     * class-level timezone contract.
+     */
+    public static function storageTimezone(): DateTimeZone
+    {
+        return new DateTimeZone(date_default_timezone_get());
+    }
 
     /**
      * Parse a policy's stored counted_days CSV into a list of day keys.
@@ -432,8 +459,11 @@ class Sla
         $due = [];
         foreach (['first_response_minutes', 'resolution_minutes'] as $field) {
             $minutes = (int) ($sla[$field] ?? 0);
+            // addBusinessMinutes() returns the instant expressed in the business
+            // timezone; convert back to storage time before formatting.
             $due[] = $minutes > 0
                 ? self::addBusinessMinutes($from, $minutes, $biz['tz'], $biz['schedule'], $excluded, $countedDays)
+                    ->setTimezone(self::storageTimezone())
                     ->format('Y-m-d H:i:s')
                 : null;
         }
@@ -470,7 +500,7 @@ class Sla
         }
 
         $excluded = self::getExcludedDates($db);
-        $now = new DateTimeImmutable('now', new DateTimeZone($biz['tz']));
+        $now = new DateTimeImmutable('now', self::storageTimezone());
         [$responseDue, $resolutionDue] = self::dueDatesFor($sla, $now, $biz, $excluded);
 
         // Derive the real state rather than assuming 'on_track'. A backdated
@@ -572,7 +602,7 @@ class Sla
             return false; // No policy for this type+priority
         }
 
-        $from = $startFrom->setTimezone(new DateTimeZone($biz['tz']));
+        $from = $startFrom->setTimezone(self::storageTimezone());
         [$responseDue, $resolutionDue] = self::dueDatesFor($sla, $from, $biz, $ctx['excluded']);
 
         $startedAt = $from->format('Y-m-d H:i:s');
@@ -649,8 +679,9 @@ class Sla
                 $countedDays = self::parseCountedDays($policy['counted_days'] ?? null);
             }
         }
-        $pausedAt = new DateTimeImmutable($ticket['sla_paused_at'], new DateTimeZone($biz['tz']));
-        $now = new DateTimeImmutable('now', new DateTimeZone($biz['tz']));
+        // sla_paused_at was written by SQL NOW(), i.e. storage time.
+        $pausedAt = new DateTimeImmutable($ticket['sla_paused_at'], self::storageTimezone());
+        $now = new DateTimeImmutable('now', self::storageTimezone());
 
         // Calculate paused business minutes (holidays are excluded — they don't count as paused time either)
         $pausedMinutes = self::countBusinessMinutes($pausedAt, $now, $biz['tz'], $biz['schedule'], $excluded, $countedDays);
@@ -658,12 +689,12 @@ class Sla
         // Extend due dates
         $updates = [];
         if ($ticket['first_response_due_at'] !== null && empty($ticket['first_responded_at'])) {
-            $oldDue = new DateTimeImmutable($ticket['first_response_due_at'], new DateTimeZone($biz['tz']));
+            $oldDue = new DateTimeImmutable($ticket['first_response_due_at'], self::storageTimezone());
             $newDue = $oldDue->modify("+{$pausedMinutes} minutes");
             $updates['first_response_due_at'] = $newDue->format('Y-m-d H:i:s');
         }
         if ($ticket['resolution_due_at'] !== null) {
-            $oldDue = new DateTimeImmutable($ticket['resolution_due_at'], new DateTimeZone($biz['tz']));
+            $oldDue = new DateTimeImmutable($ticket['resolution_due_at'], self::storageTimezone());
             $newDue = $oldDue->modify("+{$pausedMinutes} minutes");
             $updates['resolution_due_at'] = $newDue->format('Y-m-d H:i:s');
         }
@@ -725,7 +756,7 @@ class Sla
         if ($baseline === null) {
             return;
         }
-        $createdAt = new DateTimeImmutable($baseline, new DateTimeZone($biz['tz']));
+        $createdAt = new DateTimeImmutable($baseline, self::storageTimezone());
         [$responseDue, $resolutionDue] = self::dueDatesFor($sla, $createdAt, $biz, $excluded);
 
         $db->prepare(
@@ -788,7 +819,7 @@ class Sla
         if ($baseline === null) {
             return;
         }
-        $createdAt = new DateTimeImmutable($baseline, new DateTimeZone($biz['tz']));
+        $createdAt = new DateTimeImmutable($baseline, self::storageTimezone());
         [$responseDue, $resolutionDue] = self::dueDatesFor($sla, $createdAt, $biz, $excluded);
 
         $db->prepare(
