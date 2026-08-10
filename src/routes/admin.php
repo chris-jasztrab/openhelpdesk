@@ -845,6 +845,20 @@ $router->get('/admin/users', function () {
     $stmt->execute($params);
     $users = $stmt->fetchAll();
 
+    // ── AJAX (toolbar search-as-you-type): emit just the table ─────
+    // Reuses the query above so a typed search respects whatever role/location
+    // filters and sort the admin already had applied.
+    if (!empty($_GET['ajax'])) {
+        $filterParams = [];
+        if (!empty($roleFilter))     $filterParams['role']     = $roleFilter;
+        if (!empty($locFilter))      $filterParams['location'] = $locFilter;
+        if ($q !== '')               $filterParams['q']        = $q;
+        if ($externalFilter)         $filterParams['external'] = '1';
+        $dir = strtolower($dir); // sortUrl()/sortIcon() compare against 'asc'
+        require ROOT_DIR . '/templates/pages/admin/users/_table.php';
+        exit;
+    }
+
     $locations = $db->query('SELECT * FROM locations ORDER BY name')->fetchAll();
 
     render('admin/users/index', [

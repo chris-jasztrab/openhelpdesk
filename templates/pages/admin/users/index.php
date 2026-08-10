@@ -12,14 +12,25 @@ if (!empty($locFilter))  $filterParams['location'] = $locFilter;
 if ($qFilter !== '')     $filterParams['q']        = $qFilter;
 if (!empty($externalFilter)) $filterParams['external'] = '1';
 $hasFilters = !empty($filterParams);
+// Search lives in its own toolbar box now, so it shouldn't inflate the Filters
+// badge — that count is for the panel's role/location/contact-type checkboxes.
+$panelFilterCount = count(array_diff_key($filterParams, ['q' => null]));
 ?>
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <h2 class="fw-bold mb-0">Users</h2>
-    <div class="d-flex gap-2 align-items-center">
-        <span class="badge bg-secondary fs-6"><?= count($users) ?><?= $hasFilters ? ' filtered' : ' total' ?></span>
+    <div class="d-flex gap-2 align-items-center flex-wrap">
+        <span class="badge bg-secondary fs-6" id="userCountBadge"><?= count($users) ?><?= $hasFilters ? ' filtered' : ' total' ?></span>
+        <div class="position-relative">
+            <i class="bi bi-search position-absolute text-muted"
+               style="left:.6rem;top:50%;transform:translateY(-50%);font-size:.8rem;pointer-events:none;"></i>
+            <input type="search" class="form-control form-control-sm" id="userSearchBox"
+                   value="<?= e($qFilter) ?>" placeholder="Search users…" autocomplete="off"
+                   aria-label="Search users by name or email"
+                   style="width:220px;padding-left:1.9rem;">
+        </div>
         <button type="button" class="btn btn-sm btn-outline-secondary" id="filterPanelBtn" onclick="filterPanelToggle()">
             <i class="bi bi-funnel me-1"></i>Filters
-            <?php if ($hasFilters): ?><span class="badge bg-primary rounded-pill ms-1"><?= count($filterParams) ?></span><?php endif; ?>
+            <?php if ($panelFilterCount): ?><span class="badge bg-primary rounded-pill ms-1"><?= $panelFilterCount ?></span><?php endif; ?>
         </button>
         <a href="/admin/users/online" class="btn btn-sm btn-outline-secondary">
             <i class="bi bi-circle-fill text-success me-1" style="font-size:.6rem;"></i>Who's Online
@@ -44,11 +55,9 @@ $hasFilters = !empty($filterParams);
     </div>
     <div class="filter-panel-body">
         <form method="GET" action="/admin/users">
-            <div class="mb-3">
-                <label class="form-label small fw-semibold mb-1">Search</label>
-                <input type="text" class="form-control form-control-sm" name="q"
-                       value="<?= e($qFilter) ?>" placeholder="Name or email…">
-            </div>
+            <!-- Search moved to the toolbar box; carried through so applying a
+                 filter from here doesn't silently drop the typed term. -->
+            <input type="hidden" name="q" id="filterPanelQ" value="<?= e($qFilter) ?>">
             <div class="mb-3">
                 <label class="form-label small fw-semibold mb-1">Role</label>
                 <div class="filter-checklist">
@@ -96,80 +105,12 @@ $hasFilters = !empty($filterParams);
     </div>
 </div>
 
-<div class="card border-0 shadow-sm">
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead class="table-light">
-                <tr>
-                    <th style="width:50px"></th>
-                    <th><a href="<?= sortUrl('name', $sort, $dir, $filterParams, '/admin/users') ?>" class="text-decoration-none text-dark">Name <?= sortIcon('name', $sort, $dir) ?></a></th>
-                    <th><a href="<?= sortUrl('email', $sort, $dir, $filterParams, '/admin/users') ?>" class="text-decoration-none text-dark">Email <?= sortIcon('email', $sort, $dir) ?></a></th>
-                    <th><a href="<?= sortUrl('role', $sort, $dir, $filterParams, '/admin/users') ?>" class="text-decoration-none text-dark">Role <?= sortIcon('role', $sort, $dir) ?></a></th>
-                    <th>Phone</th>
-                    <th><a href="<?= sortUrl('location', $sort, $dir, $filterParams, '/admin/users') ?>" class="text-decoration-none text-dark"><?= label('location.singular') ?> <?= sortIcon('location', $sort, $dir) ?></a></th>
-                    <th><a href="<?= sortUrl('created_at', $sort, $dir, $filterParams, '/admin/users') ?>" class="text-decoration-none text-dark">Created <?= sortIcon('created_at', $sort, $dir) ?></a></th>
-                    <th style="width:110px">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php if (empty($users)): ?>
-                <tr><td colspan="8" class="text-center py-4 text-muted">No users found.</td></tr>
-                <?php else: ?>
-                    <?php foreach ($users as $u): ?>
-                    <tr style="cursor:pointer;" onclick="window.location='/admin/users/<?= $u['id'] ?>'">
-                        <td>
-                            <?php if ($u['avatar']): ?>
-                                <img src="/uploads/avatars/<?= e($u['avatar']) ?>" class="rounded-circle" width="36" height="36" style="object-fit:cover;">
-                            <?php else: ?>
-                                <div class="rounded-circle bg-primary bg-opacity-10 text-primary d-flex align-items-center justify-content-center fw-bold" style="width:36px;height:36px;font-size:.8rem;">
-                                    <?= strtoupper(mb_substr($u['first_name'], 0, 1) . mb_substr($u['last_name'], 0, 1)) ?>
-                                </div>
-                            <?php endif; ?>
-                        </td>
-                        <td class="fw-semibold">
-                            <a href="/admin/users/<?= $u['id'] ?>" class="text-decoration-none text-dark">
-                                <?= e($u['first_name'] . ' ' . $u['last_name']) ?>
-                            </a>
-                            <?php if (!empty($u['is_external'])): ?>
-                            <span class="badge bg-secondary-subtle text-secondary border" title="Auto-created when a ticket was forwarded to this address. Not a portal user.">External</span>
-                            <?php endif; ?>
-                        </td>
-                        <td><span class="text-muted"><?= e($u['email']) ?></span></td>
-                        <td>
-                            <?php
-                            $badgeColors = ['admin' => 'danger', 'agent' => 'primary', 'power_user' => 'info', 'user' => 'secondary'];
-                            $bc = $badgeColors[$u['role']] ?? 'secondary';
-                            ?>
-                            <span class="badge bg-<?= $bc ?>"><?= e(roleLabel($u['role'])) ?></span>
-                            <?php if (!roleIsAdmin($u['role']) && roleCan($u['role'], 'tickets.view_all')): ?>
-                            <span class="badge bg-warning text-dark" title="This permission level can see all tickets across every group (confidential excluded).">
-                                <i class="bi bi-eye-fill me-1"></i>Sees all tickets
-                            </span>
-                            <?php endif; ?>
-                        </td>
-                        <td><?= e($u['work_phone'] ?? '—') ?></td>
-                        <td><?= e($u['location_name'] ?? '—') ?></td>
-                        <td class="text-muted small"><?= date('M j, Y', strtotime($u['created_at'])) ?></td>
-                        <td>
-                            <div class="d-flex gap-1">
-                                <a href="/admin/users/<?= $u['id'] ?>/edit" class="btn btn-sm btn-outline-primary" title="Edit">
-                                    <i class="bi bi-pencil"></i>
-                                </a>
-                                <?php if ($u['id'] !== Auth::id() && roleAssignableBy(Auth::role(), $u['role'])): ?>
-                                <a href="/admin/users/<?= $u['id'] ?>?delete=1"
-                                   class="btn btn-sm btn-outline-danger" title="Delete"
-                                   onclick="event.stopPropagation()">
-                                    <i class="bi bi-trash"></i>
-                                </a>
-                                <?php endif; ?>
-                            </div>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                <?php endif; ?>
-            </tbody>
-        </table>
-    </div>
+<style>
+    #usersTableRegion.is-loading { opacity: .55; pointer-events: none; transition: opacity .12s ease; }
+</style>
+
+<div id="usersTableRegion">
+<?php require ROOT_DIR . '/templates/pages/admin/users/_table.php'; ?>
 </div>
 
 <script>
@@ -189,5 +130,83 @@ $hasFilters = !empty($filterParams);
     };
     window.filterPanelClose = filterPanelClose;
     if (sessionStorage.getItem('adminUserFilterPanelOpen') === '1') filterPanelOpen();
+})();
+
+/* ── Toolbar search-as-you-type ────────────────────────────────────────
+   Refetches the table partial from the same /admin/users route, so the
+   panel's role/location filters and the current sort still apply. */
+(function () {
+    var box    = document.getElementById('userSearchBox');
+    var region = document.getElementById('usersTableRegion');
+    var badge  = document.getElementById('userCountBadge');
+    var hiddenQ = document.getElementById('filterPanelQ');
+    if (!box || !region) return;
+
+    var DEBOUNCE_MS = 250;
+    var timer = null;
+    var inflight = null;
+    var lastSent = box.value;
+
+    function queryString(term, forAjax) {
+        var p = new URLSearchParams(window.location.search);
+        p.delete('reset');
+        p.delete('ajax');
+        if (term === '') p.delete('q'); else p.set('q', term);
+        if (forAjax) p.set('ajax', '1');
+        return p.toString();
+    }
+
+    async function search(term) {
+        if (inflight) inflight.abort();
+        inflight = new AbortController();
+        region.classList.add('is-loading');
+        try {
+            var res = await fetch('/admin/users?' + queryString(term, true), {
+                signal: inflight.signal,
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            region.innerHTML = await res.text();
+
+            var card = region.querySelector('[data-user-count]');
+            if (badge && card) {
+                var n = card.getAttribute('data-user-count');
+                // Any active filter (search included) means the count is a subset.
+                var filtered = term !== '' || /[?&](role|location|external)/.test(window.location.search);
+                badge.textContent = n + (filtered ? ' filtered' : ' total');
+            }
+            if (hiddenQ) hiddenQ.value = term;
+
+            // Keep the URL shareable/reloadable without stacking history entries
+            // for every keystroke.
+            var qs = queryString(term, false);
+            history.replaceState(null, '', '/admin/users' + (qs ? '?' + qs : ''));
+        } catch (err) {
+            if (err.name !== 'AbortError') console.error('user search failed', err);
+        } finally {
+            region.classList.remove('is-loading');
+        }
+    }
+
+    box.addEventListener('input', function () {
+        clearTimeout(timer);
+        var term = box.value.trim();
+        timer = setTimeout(function () {
+            if (term === lastSent) return;
+            lastSent = term;
+            search(term);
+        }, DEBOUNCE_MS);
+    });
+
+    // Enter shouldn't reload the page — results are already live.
+    box.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            clearTimeout(timer);
+            var term = box.value.trim();
+            lastSent = term;
+            search(term);
+        }
+    });
 })();
 </script>

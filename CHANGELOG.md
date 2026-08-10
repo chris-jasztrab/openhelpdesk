@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.167.0 &mdash; 2026-08-10
+
+### Added
+- **Search-as-you-type box on the Users toolbar.** Finding one person meant opening the Filters panel, typing into its Search field, and submitting a full page reload &mdash; three steps and a round trip for the single most common thing you do on that page. There's now a search box sitting on the same row as **Filters / Who's Online / Merge Users / Add User**, and the table refreshes as you type (250&nbsp;ms debounce, in-flight requests cancelled, so a five-letter name is one request rather than five).
+
+  It refetches from the same `/admin/users` route rather than a separate lookup, so a typed search still respects whatever role, location and contact-type filters are active, keeps the current sort, and the regenerated column headers carry the search term through when you re-sort. The count badge switches to "N filtered" live, the URL stays shareable and reloadable (`?q=…`, via `replaceState`, so one keystroke isn't one Back-button press), and pressing Enter no longer reloads the page. The now-redundant Search field was removed from the Filters panel &mdash; the term is carried through it as a hidden field, so applying a filter from the panel doesn't silently drop what you typed. Search also no longer inflates the Filters badge count, which is now just the panel's own checkboxes.
+
 ## 2.166.0 &mdash; 2026-08-04
 
 ### Added
