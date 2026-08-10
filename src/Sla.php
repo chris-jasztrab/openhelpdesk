@@ -168,6 +168,38 @@ class Sla
     }
 
     /**
+     * Is this ticket permanently outside SLA?
+     *
+     * Distinct from "has no due dates yet": an exempt ticket stays exempt across
+     * priority and type changes, so a legacy backlog imported without SLA can't
+     * be retroactively breached by someone editing a priority years later.
+     */
+    public static function isExempt(PDO $db, int $ticketId): bool
+    {
+        $stmt = $db->prepare('SELECT sla_exempt FROM tickets WHERE id = ?');
+        $stmt->execute([$ticketId]);
+        return (bool) $stmt->fetchColumn();
+    }
+
+    /**
+     * The instant a ticket's SLA clock started.
+     *
+     * Normally the creation time, but an imported ticket can be put under SLA
+     * from its import moment instead — its `created_at` may be years old, and
+     * measuring from that would put every due date in the past. Falls back to
+     * `created_at` for tickets predating the sla_started_at column.
+     */
+    public static function baselineFor(array $ticket): ?string
+    {
+        $started = $ticket['sla_started_at'] ?? null;
+        if (is_string($started) && $started !== '') {
+            return $started;
+        }
+        $created = $ticket['created_at'] ?? null;
+        return (is_string($created) && $created !== '') ? $created : null;
+    }
+
+    /**
      * Compute the SLA state for a single ticket.
      *
      * @param array $ticket Ticket row with SLA columns
@@ -175,6 +207,10 @@ class Sla
      */
     public static function computeSlaState(array $ticket): ?string
     {
+        if (!empty($ticket['sla_exempt'])) {
+            return null;
+        }
+
         $responseDue = $ticket['first_response_due_at'] ?? null;
         $resolutionDue = $ticket['resolution_due_at'] ?? null;
 
@@ -212,8 +248,15 @@ class Sla
             return 'breached';
         }
 
-        // Check for warning: within 80% of elapsed time for either SLA
-        $createdAt = new DateTimeImmutable($ticket['created_at']);
+        // Check for warning: within 80% of elapsed time for either SLA.
+        // Measured from the SLA baseline, not created_at — for an imported
+        // ticket put under SLA at import time those differ by years, and
+        // created_at would make every ticket read as 100% elapsed.
+        $baseline = self::baselineFor($ticket);
+        if ($baseline === null) {
+            return 'on_track';
+        }
+        $createdAt = new DateTimeImmutable($baseline);
 
         // First response warning
         if ($responseDue !== null && empty($ticket['first_responded_at'])) {
@@ -251,10 +294,11 @@ class Sla
 
         $openIn = ticketStatusSqlIn(ticketOpenBucketSlugs(), 'status');
         $stmt = $db->query(
-            "SELECT id, subject, assigned_to, created_at, first_response_due_at, resolution_due_at,
-                    first_responded_at, sla_state, sla_paused_at
+            "SELECT id, subject, assigned_to, created_at, sla_started_at, first_response_due_at, resolution_due_at,
+                    first_responded_at, sla_state, sla_paused_at, sla_exempt
              FROM tickets
              WHERE $openIn
+               AND sla_exempt = 0
                AND (first_response_due_at IS NOT NULL OR resolution_due_at IS NOT NULL)"
         );
 
@@ -266,6 +310,15 @@ class Sla
             if ($newState !== null && $newState !== ($ticket['sla_state'] ?? '')) {
                 $updateStmt->execute([$newState, $ticket['id']]);
                 $updated++;
+
+                // A ticket with no prior state isn't transitioning — this is its
+                // first-ever computation. Record the state but stay silent: a
+                // backlog put under SLA at its original open dates would
+                // otherwise fire a notification and a Teams post per ticket on
+                // the next cron run.
+                if (($ticket['sla_state'] ?? null) === null) {
+                    continue;
+                }
 
                 // On the transition *into* warning/breached, drop an in-app
                 // notification for the assigned agent so SLA risk surfaces on
@@ -397,6 +450,15 @@ class Sla
             return; // SLA disabled site-wide
         }
 
+        // One read for both the exemption check and the response timestamp an
+        // import may already have supplied.
+        $stmt = $db->prepare('SELECT sla_exempt, first_responded_at FROM tickets WHERE id = ?');
+        $stmt->execute([$ticketId]);
+        $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$existing || !empty($existing['sla_exempt'])) {
+            return; // Missing, or explicitly outside SLA
+        }
+
         $biz = self::getBusinessSchedule($typeId, $db);
         if ($biz === null) {
             return; // No business hours configured
@@ -411,9 +473,24 @@ class Sla
         $now = new DateTimeImmutable('now', new DateTimeZone($biz['tz']));
         [$responseDue, $resolutionDue] = self::dueDatesFor($sla, $now, $biz, $excluded);
 
+        // Derive the real state rather than assuming 'on_track'. A backdated
+        // import can land already-breached, and writing 'on_track' here would
+        // make the next recalculateAll() see a transition and fire a
+        // notification plus a Teams post for every ticket in the batch.
+        $startedAt = $now->format('Y-m-d H:i:s');
+        $state = self::computeSlaState([
+            'sla_started_at'        => $startedAt,
+            'created_at'            => $startedAt,
+            'first_response_due_at' => $responseDue,
+            'resolution_due_at'     => $resolutionDue,
+            'first_responded_at'    => $existing['first_responded_at'] ?? null,
+        ]) ?? 'on_track';
+
+        // Record the baseline so later recomputes measure from the same instant
+        // rather than falling back to created_at.
         $db->prepare(
-            'UPDATE tickets SET first_response_due_at = ?, resolution_due_at = ?, sla_state = ? WHERE id = ?'
-        )->execute([$responseDue, $resolutionDue, 'on_track', $ticketId]);
+            'UPDATE tickets SET sla_started_at = ?, first_response_due_at = ?, resolution_due_at = ?, sla_state = ? WHERE id = ?'
+        )->execute([$startedAt, $responseDue, $resolutionDue, $state, $ticketId]);
 
         // Add internal timeline entry — naming only the targets the policy sets.
         $parts = [];
@@ -429,12 +506,102 @@ class Sla
     }
 
     /**
+     * Build the lookup cache used by initializeForImportedTicket().
+     *
+     * A CSV import applies SLA to thousands of rows in one transaction. Going
+     * through initializeForTicket() would re-read the holiday list, the business
+     * schedule and the policy table once per ticket — five-ish queries times ten
+     * thousand rows. None of that data changes mid-import, so it is read once
+     * here and memoized for the whole run.
+     *
+     * @return array{excluded: string[], schedules: array, policies: array}
+     */
+    public static function makeImportContext(PDO $db): array
+    {
+        return [
+            'excluded'  => self::getExcludedDates($db),
+            'schedules' => [],
+            'policies'  => [],
+        ];
+    }
+
+    /**
+     * Apply an SLA clock to a freshly imported ticket.
+     *
+     * $startFrom is the baseline the clock counts from: pass the ticket's
+     * original creation time to reproduce its real historical SLA (expect
+     * breaches on an old backlog), or "now" to give the imported backlog a fresh
+     * window measured from the import.
+     *
+     * Unlike initializeForTicket() this writes no timeline row — one "SLA
+     * initialized" note per ticket across a ten-thousand-row import is noise —
+     * and it records the true state rather than assuming 'on_track', so the next
+     * recalculateAll() sees no transition and stays silent.
+     *
+     * @param array $ctx Cache from makeImportContext(), mutated in place
+     * @return bool True when an SLA clock was set
+     */
+    public static function initializeForImportedTicket(
+        PDO $db,
+        array &$ctx,
+        int $ticketId,
+        int $priorityId,
+        ?int $typeId,
+        DateTimeImmutable $startFrom,
+        ?string $firstRespondedAt = null
+    ): bool {
+        if (!slaEnabled()) {
+            return false;
+        }
+
+        $typeKey = $typeId === null ? 'null' : (string) $typeId;
+        if (!array_key_exists($typeKey, $ctx['schedules'])) {
+            $ctx['schedules'][$typeKey] = self::getBusinessSchedule($typeId, $db);
+        }
+        $biz = $ctx['schedules'][$typeKey];
+        if ($biz === null) {
+            return false; // No business hours configured
+        }
+
+        $policyKey = $typeKey . ':' . $priorityId;
+        if (!array_key_exists($policyKey, $ctx['policies'])) {
+            $ctx['policies'][$policyKey] = self::findPolicy($db, $typeId, $priorityId);
+        }
+        $sla = $ctx['policies'][$policyKey];
+        if (!$sla) {
+            return false; // No policy for this type+priority
+        }
+
+        $from = $startFrom->setTimezone(new DateTimeZone($biz['tz']));
+        [$responseDue, $resolutionDue] = self::dueDatesFor($sla, $from, $biz, $ctx['excluded']);
+
+        $startedAt = $from->format('Y-m-d H:i:s');
+        $state = self::computeSlaState([
+            'sla_started_at'        => $startedAt,
+            'created_at'            => $startedAt,
+            'first_response_due_at' => $responseDue,
+            'resolution_due_at'     => $resolutionDue,
+            'first_responded_at'    => $firstRespondedAt,
+        ]) ?? 'on_track';
+
+        $db->prepare(
+            'UPDATE tickets SET sla_started_at = ?, first_response_due_at = ?, resolution_due_at = ?, sla_state = ?, sla_exempt = 0 WHERE id = ?'
+        )->execute([$startedAt, $responseDue, $resolutionDue, $state, $ticketId]);
+
+        return true;
+    }
+
+    /**
      * Pause SLA timers when ticket enters pending status.
      */
     public static function pause(PDO $db, int $ticketId): void
     {
         if (!slaEnabled()) {
             return; // SLA disabled site-wide
+        }
+
+        if (self::isExempt($db, $ticketId)) {
+            return; // No timers to pause — and no "SLA paused" note to confuse anyone
         }
 
         $db->prepare('UPDATE tickets SET sla_paused_at = NOW() WHERE id = ? AND sla_paused_at IS NULL')
@@ -524,6 +691,10 @@ class Sla
             return; // SLA disabled site-wide
         }
 
+        if (self::isExempt($db, $ticketId)) {
+            return; // Explicitly outside SLA — never invent a clock retroactively
+        }
+
         $biz = self::getBusinessSchedule($typeId, $db);
         if ($biz === null) {
             return;
@@ -539,8 +710,10 @@ class Sla
             return;
         }
 
-        // Recalculate from ticket creation time
-        $stmt = $db->prepare('SELECT created_at, first_responded_at FROM tickets WHERE id = ?');
+        // Recalculate from the SLA baseline — not created_at, which on an
+        // imported ticket can be years old and would land both due dates in the
+        // past, flipping the ticket to breached the moment someone edits it.
+        $stmt = $db->prepare('SELECT created_at, sla_started_at, first_responded_at FROM tickets WHERE id = ?');
         $stmt->execute([$ticketId]);
         $ticket = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$ticket) {
@@ -548,7 +721,11 @@ class Sla
         }
 
         $excluded = self::getExcludedDates($db);
-        $createdAt = new DateTimeImmutable($ticket['created_at'], new DateTimeZone($biz['tz']));
+        $baseline = self::baselineFor($ticket);
+        if ($baseline === null) {
+            return;
+        }
+        $createdAt = new DateTimeImmutable($baseline, new DateTimeZone($biz['tz']));
         [$responseDue, $resolutionDue] = self::dueDatesFor($sla, $createdAt, $biz, $excluded);
 
         $db->prepare(
@@ -557,7 +734,7 @@ class Sla
 
         // Recalculate state immediately
         $stmt = $db->prepare(
-            'SELECT id, created_at, first_response_due_at, resolution_due_at, first_responded_at, sla_state, sla_paused_at FROM tickets WHERE id = ?'
+            'SELECT id, created_at, sla_started_at, first_response_due_at, resolution_due_at, first_responded_at, sla_state, sla_paused_at, sla_exempt FROM tickets WHERE id = ?'
         );
         $stmt->execute([$ticketId]);
         $updated = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -578,12 +755,16 @@ class Sla
             return; // SLA disabled site-wide
         }
 
+        if (self::isExempt($db, $ticketId)) {
+            return; // Explicitly outside SLA — never invent a clock retroactively
+        }
+
         $biz = self::getBusinessSchedule($newTypeId, $db);
         if ($biz === null) {
             return;
         }
 
-        $stmt = $db->prepare('SELECT created_at, priority_id, first_responded_at FROM tickets WHERE id = ?');
+        $stmt = $db->prepare('SELECT created_at, sla_started_at, priority_id, first_responded_at FROM tickets WHERE id = ?');
         $stmt->execute([$ticketId]);
         $ticket = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$ticket || empty($ticket['priority_id'])) {
@@ -601,9 +782,13 @@ class Sla
             return;
         }
 
-        // Recalculate from ticket creation time
+        // Recalculate from the SLA baseline, falling back to creation time
         $excluded = self::getExcludedDates($db);
-        $createdAt = new DateTimeImmutable($ticket['created_at'], new DateTimeZone($biz['tz']));
+        $baseline = self::baselineFor($ticket);
+        if ($baseline === null) {
+            return;
+        }
+        $createdAt = new DateTimeImmutable($baseline, new DateTimeZone($biz['tz']));
         [$responseDue, $resolutionDue] = self::dueDatesFor($sla, $createdAt, $biz, $excluded);
 
         $db->prepare(
@@ -612,7 +797,7 @@ class Sla
 
         // Recalculate state immediately
         $stmt = $db->prepare(
-            'SELECT id, created_at, first_response_due_at, resolution_due_at, first_responded_at, sla_state, sla_paused_at FROM tickets WHERE id = ?'
+            'SELECT id, created_at, sla_started_at, first_response_due_at, resolution_due_at, first_responded_at, sla_state, sla_paused_at, sla_exempt FROM tickets WHERE id = ?'
         );
         $stmt->execute([$ticketId]);
         $updated = $stmt->fetch(PDO::FETCH_ASSOC);

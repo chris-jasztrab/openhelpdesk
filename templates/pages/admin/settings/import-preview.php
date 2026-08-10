@@ -48,6 +48,26 @@ $breadcrumbs  = [
             </div>
         </div>
 
+        <?php
+        $slaChoice = $summary['sla_handling'] ?? 'exclude';
+        $slaNote = match ($slaChoice) {
+            'start_now'  => ['info', 'bi-stopwatch', 'SLA clocks start now',
+                'Every imported ticket with a priority gets a fresh SLA window measured from this import, not from its original open date.'],
+            'historical' => ['danger', 'bi-exclamation-octagon-fill', 'SLA applied from the original open date',
+                'Any still-open ticket already past its target will be imported in a breached state and will appear in SLA violation reports immediately.'],
+            default      => ['secondary', 'bi-slash-circle', 'Excluded from SLA tracking',
+                'These tickets get no SLA clock and stay out of SLA reports and compliance figures. Later priority or type changes will not start one.'],
+        };
+        ?>
+        <div class="alert alert-<?= e($slaNote[0]) ?> d-flex align-items-start mb-4" role="alert">
+            <i class="bi <?= e($slaNote[1]) ?> me-2 mt-1"></i>
+            <div>
+                <strong><?= e($slaNote[2]) ?></strong>
+                <div class="small mt-1"><?= e($slaNote[3]) ?></div>
+                <a href="/admin/settings/import/map" class="small">Change this</a>
+            </div>
+        </div>
+
         <?php if (!empty($summary['new_user_list']) || !empty($summary['new_agent_list']) || !empty($summary['new_location_list'])): ?>
         <div class="alert alert-warning d-flex align-items-start mb-4" role="alert">
             <i class="bi bi-exclamation-triangle-fill me-2 mt-1"></i>

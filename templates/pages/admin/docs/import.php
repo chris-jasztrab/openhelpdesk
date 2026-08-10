@@ -69,7 +69,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <h5 class="fw-semibold mb-3"><i class="bi bi-exclamation-triangle text-warning me-2"></i>Important Notes</h5>
 <ul class="text-muted mb-0">
     <li>Imported tickets do not trigger email notifications to requesters or agents.</li>
-    <li>SLA timers are not automatically initialised on imported tickets — they will be applied if the priority is changed after import.</li>
+    <li>The column-mapping step asks how SLA should treat the batch. <strong>Exclude from SLA</strong> (the default) gives them no timer and keeps them out of SLA reports and compliance figures — permanently, so a later priority or type change can't start one retroactively. <strong>Start SLA clocks now</strong> measures a fresh window from the moment of import. <strong>Apply from original open date</strong> reproduces each ticket's real historical SLA, which means any still-open ticket already past its target is imported in a breached state.</li>
     <li>The import cannot be undone from the UI — if you need to roll back, delete the imported tickets manually or restore your database backup.</li>
     <li>Test with a small sample file first to verify your column mapping is correct before importing a large dataset.</li>
 </ul>

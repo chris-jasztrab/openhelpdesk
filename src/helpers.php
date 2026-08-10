@@ -1605,9 +1605,24 @@ function organizationTypeLabel(string $slug): string
 
 /* ── Settings helpers ─────────────────────────────────────────── */
 
-function getSetting(string $key, string $default = ''): string
+/**
+ * Per-request memo behind getSetting()/setSetting().
+ *
+ * Returned by reference so both functions share one array — a setting written
+ * during a request must be visible to a later read in that same request, which
+ * a plain function-level static in getSetting() could never be.
+ *
+ * @return array<string, string>
+ */
+function &settingsCache(): array
 {
     static $cache = [];
+    return $cache;
+}
+
+function getSetting(string $key, string $default = ''): string
+{
+    $cache = &settingsCache();
     if (array_key_exists($key, $cache)) {
         return $cache[$key];
     }
@@ -1623,6 +1638,11 @@ function setSetting(string $key, string $value): void
     Database::connect()->prepare(
         'INSERT INTO settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)'
     )->execute([$key, $value]);
+
+    // Keep the memo in step with the row we just wrote, so code that saves a
+    // setting and then reads it back doesn't get the pre-save value.
+    $cache = &settingsCache();
+    $cache[$key] = $value;
 }
 
 /**

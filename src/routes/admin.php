@@ -8114,6 +8114,7 @@ $router->get('/admin/settings/import/map', function () {
         'systemFields' => $systemFields,
         'autoMapping'  => $autoMapping,
         'sampleRows'   => $sampleRows,
+        'slaHandling'  => $_SESSION['import_sla_handling'] ?? 'exclude',
     ]);
 });
 
@@ -8206,8 +8207,17 @@ $router->post('/admin/settings/import/map', function () {
         redirect('/admin/settings/import/map');
     }
 
-    $_SESSION['import_mapping'] = $userMapping;
+    // Default to 'exclude' on anything unrecognised — the conservative choice,
+    // and the one that matches how imports behaved before this was selectable.
+    $slaHandling = $_POST['sla_handling'] ?? 'exclude';
+    if (!in_array($slaHandling, ['exclude', 'start_now', 'historical'], true)) {
+        $slaHandling = 'exclude';
+    }
+
+    $_SESSION['import_mapping']      = $userMapping;
+    $_SESSION['import_sla_handling'] = $slaHandling;
     $_SESSION['import_summary'] = [
+        'sla_handling'      => $slaHandling,
         'total_tickets'     => $totalRows,
         'new_users'         => count($newUserEmails),
         'new_agents'        => count($newAgentNames),
@@ -8301,6 +8311,10 @@ $router->post('/admin/settings/import/confirm', function () {
     $delimiter   = $_SESSION['import_delimiter'] ?? ',';
     $fileHeaders = $_SESSION['import_headers'] ?? [];
     $userMapping = $_SESSION['import_mapping'] ?? [];
+    $slaHandling = $_SESSION['import_sla_handling'] ?? 'exclude';
+    if (!in_array($slaHandling, ['exclude', 'start_now', 'historical'], true)) {
+        $slaHandling = 'exclude';
+    }
 
     if ($importPath === '' || !file_exists($importPath) || empty($fileHeaders) || empty($userMapping)) {
         flash('error', 'No import data found. Please upload the CSV again.');
@@ -8388,10 +8402,16 @@ $router->post('/admin/settings/import/confirm', function () {
         );
         $insertLocation = $db->prepare('INSERT INTO locations (name) VALUES (?)');
         $insertType     = $db->prepare('INSERT INTO ticket_types (name, sort_order) VALUES (?, ?)');
+        // sla_exempt is set at insert time so the "exclude from SLA" choice is
+        // atomic with the row — a later priority or type edit then can't
+        // retroactively invent a breached clock from the legacy created_at.
         $insertTicket   = $db->prepare(
-            'INSERT INTO tickets (subject, description, legacy_id, created_by, created_at, due_date, type_id, location_id, status, priority_id, assigned_to, group_id, first_responded_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            'INSERT INTO tickets (subject, description, legacy_id, created_by, created_at, due_date, type_id, location_id, status, priority_id, assigned_to, group_id, first_responded_at, updated_at, sla_exempt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
+        $slaExempt   = $slaHandling === 'exclude' ? 1 : 0;
+        $slaCtx      = $slaHandling === 'exclude' ? [] : Sla::makeImportContext($db);
+        $slaApplied  = 0;
         $insertTimeline = $db->prepare(
             'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal, created_at) VALUES (?, ?, ?, ?, 0, ?)'
         );
@@ -8542,8 +8562,23 @@ $router->post('/admin/settings/import/confirm', function () {
                 $groupId,
                 $respondedAt,
                 $updatedAt,
+                $slaExempt,
             ]);
             $ticketId = (int) $db->lastInsertId();
+
+            // --- SLA clock ---
+            // 'historical' counts from the ticket's original open date, which
+            // reproduces its real SLA outcome; 'start_now' gives the backlog a
+            // fresh window from the import moment. Both need a priority to match
+            // a policy against, so an unprioritised row simply gets no clock.
+            if ($slaHandling !== 'exclude' && $priorityId !== null) {
+                $startFrom = $slaHandling === 'historical'
+                    ? new DateTimeImmutable($createdAt, new DateTimeZone('UTC'))
+                    : new DateTimeImmutable('now', new DateTimeZone('UTC'));
+                if (Sla::initializeForImportedTicket($db, $slaCtx, $ticketId, $priorityId, $typeId, $startFrom, $respondedAt)) {
+                    $slaApplied++;
+                }
+            }
 
             // --- Timeline entry ---
             $insertTimeline->execute([$ticketId, $creatorId, 'created', 'Ticket created (imported from legacy system).', $createdAt]);
@@ -8582,6 +8617,7 @@ $router->post('/admin/settings/import/confirm', function () {
         $_SESSION['import_headers'],
         $_SESSION['import_sample_rows'],
         $_SESSION['import_mapping'],
+        $_SESSION['import_sla_handling'],
         $_SESSION['import_summary'],
         $_SESSION['import_skipped_file']
     );
@@ -8607,12 +8643,18 @@ $router->post('/admin/settings/import/confirm', function () {
         null,
         'ticket',
         'imported=' . $imported . '; skipped=' . $skipped
+            . '; sla=' . $slaHandling . '; sla_applied=' . $slaApplied
     );
 
     $msg = "Successfully imported {$imported} ticket(s).";
     if ($skipped > 0) {
         $msg .= " {$skipped} row(s) were skipped — see the import page to download them.";
     }
+    $msg .= match ($slaHandling) {
+        'exclude'    => ' They are excluded from SLA tracking.',
+        'start_now'  => " SLA clocks started now on {$slaApplied} ticket(s).",
+        'historical' => " SLA applied from the original open date on {$slaApplied} ticket(s) — expect breaches on older tickets.",
+    };
     flash('success', $msg);
     redirect('/admin/tickets');
 });

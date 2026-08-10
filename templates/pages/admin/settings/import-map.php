@@ -76,6 +76,52 @@ $breadcrumbs  = [
                 </table>
             </div>
 
+            <div class="border rounded p-3 mb-4">
+                <div class="fw-semibold mb-1"><i class="bi bi-stopwatch me-2"></i>SLA handling</div>
+                <p class="text-muted small mb-3">
+                    Imported tickets carry their original open date. Choose what that means for SLA timers.
+                </p>
+
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="radio" name="sla_handling" id="sla_exclude"
+                           value="exclude" <?= ($slaHandling ?? 'exclude') === 'exclude' ? 'checked' : '' ?>>
+                    <label class="form-check-label" for="sla_exclude">
+                        <span class="fw-semibold">Exclude from SLA</span>
+                        <span class="badge bg-secondary ms-1">Recommended</span>
+                        <div class="text-muted small">
+                            No SLA clock, now or later. These tickets stay out of SLA reports and
+                            compliance figures, and a future priority or type change won't
+                            retroactively breach them.
+                        </div>
+                    </label>
+                </div>
+
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="radio" name="sla_handling" id="sla_start_now"
+                           value="start_now" <?= ($slaHandling ?? '') === 'start_now' ? 'checked' : '' ?>>
+                    <label class="form-check-label" for="sla_start_now">
+                        <span class="fw-semibold">Start SLA clocks now</span>
+                        <div class="text-muted small">
+                            Treats the backlog as if it arrived today. Nothing is instantly breached
+                            and agents get a full response window, but SLA figures won't reflect how
+                            long these tickets really waited.
+                        </div>
+                    </label>
+                </div>
+
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="sla_handling" id="sla_historical"
+                           value="historical" <?= ($slaHandling ?? '') === 'historical' ? 'checked' : '' ?>>
+                    <label class="form-check-label" for="sla_historical">
+                        <span class="fw-semibold">Apply from original open date</span>
+                        <div class="text-muted small">
+                            Reproduces each ticket's real historical SLA. Accurate for reporting —
+                            but any still-open ticket older than its target lands already breached.
+                        </div>
+                    </label>
+                </div>
+            </div>
+
             <div class="d-flex gap-2">
                 <button type="submit" class="btn text-white" style="background:var(--ld-primary);">
                     <i class="bi bi-eye me-1"></i>Apply &amp; Preview

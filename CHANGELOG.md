@@ -11,6 +11,18 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.168.0 &mdash; 2026-08-10
+
+### Added
+- **Ticket imports now decide, explicitly, what SLA should do with the batch.** A CSV import brings in tickets carrying their original open date, often years old, and until now the importer simply never set the SLA columns. That had two consequences nobody had chosen. The imported backlog was silently absent from every SLA report and from the compliance percentage &mdash; on a 9,762-ticket import, "SLA compliance" was measuring the 19 tickets that weren't imported. And because the exclusion was only "no due dates yet" rather than a recorded decision, the first person to change a ticket's priority or type re-derived its due dates from `created_at`; on a ticket opened in 2022 that landed both targets years in the past and flipped it straight to breached. A bulk priority change or an automation with a *set priority* action could do that to hundreds of tickets in one click.
+
+  The column-mapping step now carries an **SLA handling** choice. **Exclude from SLA** is the default and matches how imports have always behaved, except that it's now permanent: the tickets are marked exempt, and every recompute path refuses to start a clock on them however they're later edited. **Start SLA clocks now** treats the backlog as if it landed today, giving agents a real response window. **Apply from original open date** reproduces each ticket's true historical SLA for honest reporting &mdash; and says plainly on the preview screen that still-open tickets past their target will import already breached. The preview screen shows the pending choice either way, so nobody confirms a large import without seeing it.
+
+### Fixed
+- **SLA timers no longer measure from the wrong instant on an imported ticket.** SLA arithmetic now counts from a new `sla_started_at` baseline rather than from `created_at`, which are the same moment for a normally-created ticket but can differ by years for an imported one. This also corrects the "approaching deadline" warning, which computes elapsed time as a fraction of the total window and previously read as 100% elapsed for any imported ticket the moment it got a clock.
+- **Saving a setting and reading it back in the same request now returns the new value.** `getSetting()` memoized each key for the life of the request but `setSetting()` only wrote the database row, so any code that saved a setting and then consulted it again during the same request acted on the pre-save value. The two now share one cache.
+- **A batch of tickets entering SLA at once no longer triggers a notification storm.** SLA state is now written truthfully when the clock is first set, instead of being recorded as *on track* and left for the next cron run to correct. Previously that correction registered as a transition into breach, firing an in-app notification and a Microsoft Teams post per ticket &mdash; so importing a large backlog under SLA would have posted thousands of times. Recalculation also stays silent on a ticket's first-ever computation, which is not a transition, and skips SLA-exempt tickets entirely.
+
 ## 2.167.0 &mdash; 2026-08-10
 
 ### Added
