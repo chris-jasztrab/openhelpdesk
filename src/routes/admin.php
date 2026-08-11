@@ -7505,6 +7505,17 @@ $router->post('/admin/settings/email-notifications', function () {
  * ADMIN – Business Hours Settings
  * ================================================================== */
 
+/* ==================================================================
+ * ADMIN – Server Time diagnostics (read-only)
+ * ================================================================== */
+
+$router->get('/admin/settings/time', function () {
+    Auth::requirePermission('settings.manage');
+    render('admin/settings/time', [
+        'diag' => TimeDiagnostics::collect(Database::connect()),
+    ]);
+});
+
 $router->get('/admin/settings/business-hours', function () {
     Auth::requirePermission('settings.manage');
     $timezone = getSetting('business_hours_timezone');

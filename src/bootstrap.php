@@ -9,6 +9,7 @@ require_once ROOT_DIR . '/src/Database.php';
 require_once ROOT_DIR . '/src/Auth.php';
 require_once ROOT_DIR . '/src/Router.php';
 require_once ROOT_DIR . '/src/Sla.php';
+require_once ROOT_DIR . '/src/TimeDiagnostics.php';
 require_once ROOT_DIR . '/src/Holidays.php';
 require_once ROOT_DIR . '/src/AI.php';
 require_once ROOT_DIR . '/src/RecurringTickets.php';

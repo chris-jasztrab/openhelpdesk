@@ -11,6 +11,15 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.169.0 &mdash; 2026-08-11
+
+### Added
+- **Settings → Scheduling → Server Time**, a read-only page that reads every clock the application depends on and says whether they agree. Time is configured in at least four independent places &mdash; the operating system, MySQL, PHP for the website, and PHP again for scheduled jobs, which loads a separate configuration file &mdash; and until now nothing surfaced a disagreement between them. That silence was the whole problem: a mismatch raises no error, it just writes timestamps that are wrong by a fixed amount. The two fixes in 2.168.1 and 2.168.2 both came from exactly this.
+
+  The page opens with a single verdict &mdash; all clocks agree, or the number that don't &mdash; followed by individual checks that each explain what was found and, where something is wrong, the specific command to fix it. Below that are the raw readings from every source, and a UTC cross-check that strips timezones away entirely so a genuine clock problem can be told apart from a configuration one. Those are separate faults with separate fixes: matching timezones can still sit on machines that disagree about the actual instant, which is an NTP problem rather than a settings one.
+
+  Comparisons are made on current UTC offset rather than timezone name, since two different names can describe the same offset and it is the offset that decides whether a stored timestamp survives the round trip. The page also states which differences are *fine*: a Business Hours timezone that differs from the server is supported and correct, because it governs only which hours SLA timers count. Nothing on the page changes any setting.
+
 ## 2.168.2 &mdash; 2026-08-11
 
 ### Fixed

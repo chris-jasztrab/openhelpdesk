@@ -19,6 +19,8 @@ $settingsNavGroups = [
          'keywords' => 'closed vacation off-day stat holiday'],
         ['label' => 'SLA Policies',   'url' => '/admin/settings/sla-policies',   'icon' => 'bi-stopwatch',
          'keywords' => 'service level agreement response resolution deadline breach'],
+        ['label' => 'Server Time',    'url' => '/admin/settings/time',           'icon' => 'bi-clock-history',
+         'keywords' => 'timezone clock utc offset mysql php cli drift ntp sync diagnostics server system date'],
     ],
     'Users & Access' => [
         ['label' => label('nav.users'),       'url' => '/admin/users',      'icon' => 'bi-people',

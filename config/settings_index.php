@@ -242,6 +242,14 @@ return [
      'keywords' => 'monday tuesday wednesday thursday friday saturday sunday hours open close shift'],
 
     // =======================================================================
+    // Server Time  (/admin/settings/time)
+    // =======================================================================
+    ['label' => 'Server Time',                  'description' => 'Compare the operating system, database and PHP clocks',
+     'group' => 'Scheduling', 'page_label' => 'Server Time', 'page_url' => '/admin/settings/time',
+     'section' => 'Server Time', 'anchor' => '',
+     'keywords' => 'timezone clock utc offset drift ntp sync mysql php cli cron diagnostics system date time'],
+
+    // =======================================================================
     // Holidays  (/admin/settings/holidays)
     // =======================================================================
     ['label' => 'Add Holiday Date',             'description' => 'Specific date the organization is closed',
