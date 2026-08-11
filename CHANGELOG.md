@@ -11,6 +11,17 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.168.2 &mdash; 2026-08-11
+
+### Fixed
+- **Imported ticket timestamps are no longer shifted by the server's UTC offset.** The CSV importer interpreted each row's date in the configured source timezone and then normalised it to **UTC** before storing it. But `tickets.created_at` and `updated_at` are MySQL `TIMESTAMP` columns, which read the literal they are given in the database session's timezone &mdash; so a value expressed in UTC was stored as though it were local, moving every imported ticket by the server's offset. On a Toronto server that is four hours: a ticket opened at 12:31 imported as 16:31, with nothing anywhere to indicate it had happened.
+
+  Parsing now yields **server local time**, matching the frame the rest of the database uses. The logic moved out of the import route into `parseImportDateTime()` so it can be tested directly, and the fallback path for unrecognised formats was switched from `gmdate()` to `date()` so it lands in the same frame as the main path.
+
+  Worth knowing: a source file whose timestamps carry their own UTC offset (ISO 8601, e.g. `2022-08-22T12:31:35-04:00`) has always been immune &mdash; PHP honours the stated offset and ignores the configured source timezone. If your legacy system can export that way, it removes the guesswork entirely.
+
+  Existing imported tickets were **not** affected on installs whose source timezone was left at the default `UTC`, since the conversion was then a no-op; no data migration is included, because a blanket shift would corrupt those correct rows.
+
 ## 2.168.1 &mdash; 2026-08-10
 
 ### Fixed

@@ -3350,6 +3350,42 @@ function formatInTimezone(?string $utcDatetime, string $timezone, string $format
 }
 
 /**
+ * Parse a timestamp from an imported file into a storable datetime string.
+ *
+ * $sourceTz is the timezone the *exporting* system wrote the value in. The
+ * result is the same instant expressed in **server local time**, which is the
+ * frame every datetime in this database uses: `tickets.created_at` and
+ * `updated_at` are MySQL TIMESTAMP columns, so MySQL reads the literal in its
+ * session timezone, and the DATETIME columns are read back by PHP with a bare
+ * `new DateTimeImmutable()`. Handing either one a UTC value instead shifts every
+ * imported timestamp by the server's UTC offset — four hours in Toronto — with
+ * no error to show for it.
+ *
+ * A $raw that carries its own offset (ISO 8601 such as
+ * "2022-08-22T12:31:35-04:00") wins over $sourceTz, because PHP ignores the
+ * supplied timezone when the string states one. That is the desirable case: an
+ * export with offsets needs no guessing at all.
+ *
+ * Returns null for an empty or unparseable value.
+ */
+function parseImportDateTime(string $raw, string $sourceTz = 'UTC'): ?string
+{
+    if (trim($raw) === '') {
+        return null;
+    }
+    try {
+        $dt = new DateTime($raw, new DateTimeZone($sourceTz));
+        $dt->setTimezone(new DateTimeZone(date_default_timezone_get()));
+        return $dt->format('Y-m-d H:i:s');
+    } catch (\Exception $e) {
+        // strtotime() resolves against server local time already, so date()
+        // (not gmdate()) keeps the fallback in the same frame as the happy path.
+        $ts = strtotime($raw);
+        return ($ts !== false && $ts > 0) ? date('Y-m-d H:i:s', $ts) : null;
+    }
+}
+
+/**
  * Returns the list of common timezone identifiers used across the app's
  * timezone selectors. Centralised here so all selectors stay in sync.
  */

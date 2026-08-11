@@ -8341,20 +8341,12 @@ $router->post('/admin/settings/import/confirm', function () {
         'waiting on third party' => 'waiting_on_third_party',
     ];
 
-    // Robust date parser — interprets $raw as a datetime in $sourceTz, stores as UTC.
-    // Pass the location's timezone as $sourceTz so imported timestamps from each
-    // location are correctly normalised to UTC for storage.
-    $parseDateTime = function (string $raw, string $sourceTz = 'UTC'): ?string {
-        if ($raw === '') return null;
-        try {
-            $dt = new DateTime($raw, new DateTimeZone($sourceTz));
-            $dt->setTimezone(new DateTimeZone('UTC'));
-            return $dt->format('Y-m-d H:i:s');
-        } catch (\Exception $e) {
-            $ts = strtotime($raw);
-            return ($ts !== false && $ts > 0) ? gmdate('Y-m-d H:i:s', $ts) : null;
-        }
-    };
+    // Interprets $raw as a datetime in $sourceTz and returns it in server local
+    // time — see parseImportDateTime(). Storing UTC here instead silently shifted
+    // every imported timestamp by the server's offset, because created_at and
+    // updated_at are TIMESTAMP columns that MySQL reads in its session timezone.
+    $parseDateTime = static fn (string $raw, string $sourceTz = 'UTC'): ?string
+        => parseImportDateTime($raw, $sourceTz);
     $parseDateOnly = function (string $raw): ?string {
         if ($raw === '') return null;
         $ts = strtotime($raw);
@@ -8541,7 +8533,7 @@ $router->post('/admin/settings/import/confirm', function () {
 
             // --- Parse dates — treat source timestamps as being in the location's timezone ---
             $locationTz  = getLocationTimezone($locationId);
-            $createdAt   = $parseDateTime($row['created_at'], $locationTz) ?? gmdate('Y-m-d H:i:s');
+            $createdAt   = $parseDateTime($row['created_at'], $locationTz) ?? date('Y-m-d H:i:s');
             $dueDate     = $parseDateOnly($row['due_date']);
             $updatedAt   = $parseDateTime($row['updated_at'], $locationTz) ?? $createdAt;
             $respondedAt = $parseDateTime($row['responded_at'], $locationTz);
@@ -8572,9 +8564,11 @@ $router->post('/admin/settings/import/confirm', function () {
             // fresh window from the import moment. Both need a priority to match
             // a policy against, so an unprioritised row simply gets no clock.
             if ($slaHandling !== 'exclude' && $priorityId !== null) {
+                // $createdAt is already server local time, matching the frame
+                // Sla stores in — parsing it as UTC would offset the whole clock.
                 $startFrom = $slaHandling === 'historical'
-                    ? new DateTimeImmutable($createdAt, new DateTimeZone('UTC'))
-                    : new DateTimeImmutable('now', new DateTimeZone('UTC'));
+                    ? new DateTimeImmutable($createdAt, Sla::storageTimezone())
+                    : new DateTimeImmutable('now', Sla::storageTimezone());
                 if (Sla::initializeForImportedTicket($db, $slaCtx, $ticketId, $priorityId, $typeId, $startFrom, $respondedAt)) {
                     $slaApplied++;
                 }
