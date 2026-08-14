@@ -2246,12 +2246,7 @@ $router->post('/agent/tickets/{id}/comment', function (array $p) {
             if ($statusAfter === $csatTrigger) {
                 sendCsatSurvey($db, $id);
             }
-            $pausingStatuses = ticketSlaPausingSlugs();
-            if (in_array($statusAfter, $pausingStatuses, true)) {
-                Sla::pause($db, $id);
-            } elseif (in_array($oldStatus, $pausingStatuses, true)) {
-                Sla::resume($db, $id);
-            }
+            Sla::onStatusChanged($db, $id, $oldStatus, $statusAfter);
             $base .= ' Status set to ' . ticketStatusLabel($statusAfter) . '.';
         }
     }
@@ -2393,12 +2388,7 @@ $router->post('/agent/tickets/{id}/update', function (array $p) {
             sendCsatSurvey($db, $id);
         }
 
-        $pausingStatuses = ticketSlaPausingSlugs();
-        if (in_array($newStatus, $pausingStatuses, true)) {
-            Sla::pause($db, $id);
-        } elseif (in_array($oldStatus, $pausingStatuses, true)) {
-            Sla::resume($db, $id);
-        }
+        Sla::onStatusChanged($db, $id, $oldStatus, $newStatus);
     }
 
     // Resolution-note capture for `require_resolution_on_close` types. The owner

@@ -11,6 +11,29 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.171.0 &mdash; 2026-08-14
+
+### Added
+- **Choose what reopening a closed ticket does to its SLA timers, per ticket type.** Reopening a closed or resolved ticket used to do nothing at all to its SLA, and that was never a decision anyone made. Closed tickets leave SLA scope because the recalculation only scans open tickets &mdash; not because anything was paused &mdash; so no time was ever credited on the way back in. A ticket closed six months ago and reopened today went straight back under the due dates it already had and turned up breached on the next recalculation, five minutes later.
+
+  There is now a **When a closed ticket is reopened** setting on **Settings → SLA Policies**, with four choices:
+
+  - **Keep the original due dates** &mdash; exactly today's behaviour, and the default, so nothing changes on upgrade until someone picks otherwise.
+  - **Resume** &mdash; both due dates move out by the *business hours* the ticket spent closed, so the agent gets back whatever working time was left when it closed. A weekend spent closed on a Mon–Fri schedule credits nothing, the same accounting a pause already uses.
+  - **Restart both clocks** &mdash; a fresh window measured from the reopen, and a new first response is required. The response time being cleared is written into the ticket history first, so it is recoverable rather than silently dropped.
+  - **Restart the resolution clock only** &mdash; a fresh resolution window, but a first response already given still counts, so that target does not re-apply.
+
+  Any **ticket type** can override the site-wide choice on its own settings page, which is the point: a type whose tickets are reopened routinely can restart while the rest of the desk keeps its original targets. The **Type Settings Matrix** gained an *SLA on reopen* column showing each type's effective behaviour &mdash; highlighted where the type overrides it, dimmed where it inherits &mdash; so the whole configuration is readable on one screen.
+
+  Resuming needs to know when a ticket was closed, which nothing recorded before now: `updated_at` moves on every later edit and the timeline holds only a formatted status string. A new `sla_closed_at` column captures it. It is deliberately **not** backfilled &mdash; for a ticket closed before this release the moment is genuinely unknown, and inventing one would credit back a wrong amount of time, so *Resume* falls back to keeping the original dates for those. Two other cases fall back the same way rather than guessing: an SLA-exempt ticket never gains a clock on reopen, and neither does a ticket that never had one.
+
+### Fixed
+- **Every path that changes a ticket's status now handles SLA the same way.** The pause-and-resume logic was copy-pasted across seven call sites &mdash; the agent and admin ticket pages, the portal, two API endpoints, the floor view, and the automation runner &mdash; and reopen handling has to fire from all of them. That shape is exactly how a behaviour ends up working in one interface and silently not in another, so all seven now call a single `Sla::onStatusChanged()`.
+
+  Consolidating fixed a real bug in the two API endpoints, which resumed based on the *new* status being an open non-pausing one rather than the *old* status having been a pausing one. Moving a ticket from a waiting status straight to closed therefore never resumed it, leaving it flagged as paused permanently &mdash; and a paused ticket keeps whatever SLA state it had, forever, so it could never breach or recover no matter what happened next.
+
+- **SLA pause and close timestamps are written from PHP's clock, not the database's.** `sla_paused_at` was written with SQL `NOW()` but read back as server local time, which are two different settings: MySQL's session timezone and PHP's `date.timezone`. On any install where those disagree, the difference was credited as time the ticket spent paused. This is the same class of fault as the two timezone fixes in 2.168.1 and 2.168.2, and it contradicted the rule the SLA code states about itself &mdash; that everything it writes is in server local time. Installs whose clocks already agree, which is every install that has followed the Server Time page, see identical results before and after.
+
 ## 2.170.0 &mdash; 2026-08-14
 
 ### Added

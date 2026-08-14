@@ -293,12 +293,7 @@ $router->post('/agent/floor/tickets/{id}/action', function (array $p) {
             )->execute([$id, $userId, 'status_changed', "Status changed from {$oldStatus} to {$newStatus} (floor)"]);
             notifyAgentStatusChanged($db, $id, $oldStatus, $newStatus, $userId);
 
-            $pausing = ticketSlaPausingSlugs();
-            if (in_array($newStatus, $pausing, true)) {
-                Sla::pause($db, $id);
-            } elseif (in_array($oldStatus, $pausing, true)) {
-                Sla::resume($db, $id);
-            }
+            Sla::onStatusChanged($db, $id, $oldStatus, $newStatus);
             if (in_array($newStatus, ticketClosedBucketSlugs(), true)) {
                 notifyRequesterStatusChanged($db, $id, $newStatus);
             }

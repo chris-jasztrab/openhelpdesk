@@ -885,6 +885,7 @@ CREATE TABLE IF NOT EXISTS `ticket_types` (
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `stale_threshold_minutes` int(10) unsigned DEFAULT NULL,
   `business_hours_schedule` text DEFAULT NULL,
+  `sla_reopen_behavior` varchar(24) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `fk_ticket_types_group` (`group_id`),
   CONSTRAINT `fk_ticket_types_group` FOREIGN KEY (`group_id`) REFERENCES `groups` (`id`) ON DELETE SET NULL
@@ -922,6 +923,7 @@ CREATE TABLE IF NOT EXISTS `tickets` (
   `first_responded_at` datetime DEFAULT NULL,
   `sla_state` enum('on_track','warning','breached') DEFAULT NULL,
   `sla_paused_at` datetime DEFAULT NULL,
+  `sla_closed_at` datetime DEFAULT NULL,
   `sla_exempt` tinyint(1) NOT NULL DEFAULT 0,
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `merged_into_ticket_id` int(10) unsigned DEFAULT NULL,

@@ -634,8 +634,14 @@ class Sla
             return; // No timers to pause — and no "SLA paused" note to confuse anyone
         }
 
-        $db->prepare('UPDATE tickets SET sla_paused_at = NOW() WHERE id = ? AND sla_paused_at IS NULL')
-            ->execute([$ticketId]);
+        // PHP's clock rather than SQL NOW(), for the same reason as markClosed():
+        // resume() reads this back via storageTimezone(), so writing MySQL's idea
+        // of "now" credits the gap between the two as paused time wherever the
+        // MySQL session timezone and PHP's date.timezone disagree.
+        $now = (new DateTimeImmutable('now', self::storageTimezone()))->format('Y-m-d H:i:s');
+
+        $db->prepare('UPDATE tickets SET sla_paused_at = ? WHERE id = ? AND sla_paused_at IS NULL')
+            ->execute([$now, $ticketId]);
 
         $db->prepare(
             'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, ?, ?, 1)'
@@ -679,7 +685,10 @@ class Sla
                 $countedDays = self::parseCountedDays($policy['counted_days'] ?? null);
             }
         }
-        // sla_paused_at was written by SQL NOW(), i.e. storage time.
+        // pause() writes sla_paused_at from PHP's clock in storageTimezone(), so it
+        // reads back in the same frame. Rows paused before 2.171.0 were written by
+        // SQL NOW() instead and are off by the MySQL-vs-PHP offset, which is zero
+        // on any install whose clocks agree.
         $pausedAt = new DateTimeImmutable($ticket['sla_paused_at'], self::storageTimezone());
         $now = new DateTimeImmutable('now', self::storageTimezone());
 
@@ -711,6 +720,308 @@ class Sla
         $db->prepare(
             'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, ?, ?, 1)'
         )->execute([$ticketId, 'sla_resumed', "SLA timers resumed (paused {$pausedMinutes} business minutes)"]);
+    }
+
+    /** Every value `sla_reopen_behavior` may hold. See REOPEN_* below. */
+    public const REOPEN_BEHAVIORS = ['keep', 'resume', 'restart', 'restart_resolution'];
+
+    /**
+     * What should happen to a ticket's SLA clock when it is reopened.
+     *
+     * Per-type override wins; otherwise the global `sla_reopen_behavior` setting;
+     * otherwise 'keep'. Mirrors staleThresholdMinutesForType() — NULL on the type
+     * row means "inherit", which is why the column is nullable rather than
+     * carrying its own default.
+     *
+     * An unrecognised stored value degrades to 'keep' rather than throwing: 'keep'
+     * is the pre-2.171 behaviour, so a typo in the database leaves the ticket
+     * exactly as this version's predecessor would have.
+     */
+    public static function reopenBehaviorFor(PDO $db, ?int $typeId): string
+    {
+        if ($typeId) {
+            $stmt = $db->prepare('SELECT sla_reopen_behavior FROM ticket_types WHERE id = ?');
+            $stmt->execute([$typeId]);
+            $val = $stmt->fetchColumn();
+            if (is_string($val) && in_array($val, self::REOPEN_BEHAVIORS, true)) {
+                return $val;
+            }
+        }
+
+        $global = (string) getSetting('sla_reopen_behavior', 'keep');
+        return in_array($global, self::REOPEN_BEHAVIORS, true) ? $global : 'keep';
+    }
+
+    /**
+     * Stamp the moment a ticket entered a closed status.
+     *
+     * This is what 'resume' measures its credit from, and nothing else in the
+     * schema records it: `updated_at` moves on every subsequent edit and the
+     * timeline only holds a formatted 'X → Resolved' string. Written only when the
+     * ticket actually has a clock to credit, so a never-SLA'd or exempt ticket
+     * doesn't accumulate a meaningless timestamp.
+     */
+    public static function markClosed(PDO $db, int $ticketId): void
+    {
+        if (!slaEnabled()) {
+            return;
+        }
+
+        // PHP's clock, not SQL NOW(). The class contract is that everything Sla
+        // writes is in server local time per storageTimezone() — MySQL's session
+        // timezone is a different setting, and onReopened() reads this column back
+        // as storage time. Where the two disagree, NOW() would credit the
+        // difference as time spent closed. See Settings → Scheduling → Server Time.
+        $now = (new DateTimeImmutable('now', self::storageTimezone()))->format('Y-m-d H:i:s');
+
+        $db->prepare(
+            'UPDATE tickets SET sla_closed_at = ?
+              WHERE id = ?
+                AND sla_closed_at IS NULL
+                AND sla_exempt = 0
+                AND (first_response_due_at IS NOT NULL OR resolution_due_at IS NOT NULL)'
+        )->execute([$now, $ticketId]);
+    }
+
+    /**
+     * Apply the configured SLA behaviour when a closed ticket is reopened.
+     *
+     * Before this existed, a reopen did nothing: the ticket went straight back
+     * under its original due dates, so one closed six months ago breached on the
+     * next cron run. That is still available as 'keep', but it is now a choice
+     * rather than the only outcome. See reopenBehaviorFor() for resolution order.
+     *
+     *   keep                original due dates, untouched
+     *   resume              both due dates pushed out by the business minutes the
+     *                       ticket spent closed — the same accounting resume()
+     *                       applies to a pause, so a weekend spent closed on a
+     *                       Mon–Fri schedule credits nothing
+     *   restart             fresh clock from now, and first_responded_at cleared
+     *                       so the reopened ticket needs a new first response
+     *   restart_resolution  fresh clock from now, first_responded_at left intact
+     *                       so the response leg stays satisfied
+     *
+     * Always clears sla_closed_at, whatever the behaviour — leaving it set would
+     * make the next close a no-op and silently break the credit on the reopen
+     * after that.
+     */
+    public static function onReopened(PDO $db, int $ticketId): void
+    {
+        if (!slaEnabled()) {
+            return;
+        }
+
+        $stmt = $db->prepare(
+            'SELECT type_id, priority_id, sla_exempt, sla_closed_at, sla_started_at, created_at,
+                    first_response_due_at, resolution_due_at, first_responded_at
+             FROM tickets WHERE id = ?'
+        );
+        $stmt->execute([$ticketId]);
+        $ticket = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$ticket) {
+            return;
+        }
+
+        $clearClosedAt = static function () use ($db, $ticketId): void {
+            $db->prepare('UPDATE tickets SET sla_closed_at = NULL WHERE id = ?')->execute([$ticketId]);
+        };
+
+        // An exempt ticket has no clock to resume or restart, and inventing one
+        // here would reintroduce exactly the retroactive breach sla_exempt exists
+        // to prevent.
+        if (!empty($ticket['sla_exempt'])) {
+            $clearClosedAt();
+            return;
+        }
+
+        // Nothing was ever timed on this ticket — a reopen is not the moment to
+        // start, or every closed no-priority ticket would acquire a clock the
+        // first time someone reopened it.
+        if ($ticket['first_response_due_at'] === null && $ticket['resolution_due_at'] === null) {
+            $clearClosedAt();
+            return;
+        }
+
+        $typeId   = isset($ticket['type_id']) ? (int) $ticket['type_id'] : null;
+        $behavior = self::reopenBehaviorFor($db, $typeId);
+
+        if ($behavior === 'keep') {
+            $clearClosedAt();
+            return;
+        }
+
+        $biz = self::getBusinessSchedule($typeId, $db);
+        if ($biz === null) {
+            $clearClosedAt();
+            return; // No business hours configured — nothing to measure against
+        }
+
+        $policy = !empty($ticket['priority_id'])
+            ? self::findPolicy($db, $typeId, (int) $ticket['priority_id'])
+            : null;
+        $countedDays = $policy ? self::parseCountedDays($policy['counted_days'] ?? null) : null;
+        $excluded    = self::getExcludedDates($db);
+        $now         = new DateTimeImmutable('now', self::storageTimezone());
+
+        if ($behavior === 'resume') {
+            // Unknown closed-at means unknown credit. Tickets closed before the
+            // sla_closed_at column existed land here, and guessing from
+            // updated_at would push due dates out by an arbitrary amount.
+            if (empty($ticket['sla_closed_at'])) {
+                $clearClosedAt();
+                return;
+            }
+
+            $closedAt = new DateTimeImmutable($ticket['sla_closed_at'], self::storageTimezone());
+            $minutes  = self::countBusinessMinutes($closedAt, $now, $biz['tz'], $biz['schedule'], $excluded, $countedDays);
+
+            $updates = [];
+            // Same guard resume() uses: a response already given needs no extension.
+            if ($ticket['first_response_due_at'] !== null && empty($ticket['first_responded_at'])) {
+                $updates['first_response_due_at'] = (new DateTimeImmutable($ticket['first_response_due_at'], self::storageTimezone()))
+                    ->modify("+{$minutes} minutes")->format('Y-m-d H:i:s');
+            }
+            if ($ticket['resolution_due_at'] !== null) {
+                $updates['resolution_due_at'] = (new DateTimeImmutable($ticket['resolution_due_at'], self::storageTimezone()))
+                    ->modify("+{$minutes} minutes")->format('Y-m-d H:i:s');
+            }
+
+            self::writeReopenUpdate($db, $ticketId, $updates, $ticket, $now);
+            self::logReopen($db, $ticketId, "SLA timers resumed on reopen (closed {$minutes} business minutes)");
+            return;
+        }
+
+        // 'restart' / 'restart_resolution' — a fresh window measured from now.
+        // Both legs are recomputed; the difference is only whether the response
+        // leg is live again, which first_responded_at decides.
+        if (!$policy) {
+            // No policy to measure a new window against (no priority, or none
+            // configured for this type+priority). Leave the existing dates alone
+            // rather than clearing them, which would drop the ticket out of SLA.
+            $clearClosedAt();
+            return;
+        }
+
+        [$responseDue, $resolutionDue] = self::dueDatesFor($policy, $now, $biz, $excluded);
+        $updates = [
+            'sla_started_at'        => $now->format('Y-m-d H:i:s'),
+            'first_response_due_at' => $responseDue,
+            'resolution_due_at'     => $resolutionDue,
+        ];
+
+        $note = 'SLA restarted on reopen';
+        if ($behavior === 'restart') {
+            $updates['first_responded_at'] = null;
+            if (!empty($ticket['first_responded_at'])) {
+                // Recorded here because the column is about to be cleared — the
+                // timeline becomes the only remaining record of it.
+                $note .= ' (previous first response ' . $ticket['first_responded_at'] . ', response clock reset)';
+            } else {
+                $note .= ' (response clock reset)';
+            }
+        } else {
+            $note .= ' (resolution clock only; first response stays met)';
+        }
+
+        self::writeReopenUpdate($db, $ticketId, $updates, $ticket, $now);
+        self::logReopen($db, $ticketId, $note);
+    }
+
+    /**
+     * Persist a reopen's column changes plus the resulting sla_state, and clear
+     * sla_closed_at, in one statement.
+     *
+     * State is written here rather than left for the next recalculateAll() for the
+     * same reason initializeForImportedTicket() writes it: a row whose state is
+     * corrected by cron instead registers as a transition into warning/breached
+     * and fires a notification and a Teams post. On a bulk reopen that is one of
+     * each per ticket.
+     */
+    private static function writeReopenUpdate(
+        PDO $db,
+        int $ticketId,
+        array $updates,
+        array $ticket,
+        DateTimeImmutable $now
+    ): void {
+        $merged = array_merge($ticket, $updates);
+        $state  = self::computeSlaState([
+            'sla_started_at'        => $merged['sla_started_at'] ?? null,
+            'created_at'            => $merged['created_at'] ?? null,
+            'first_response_due_at' => $merged['first_response_due_at'] ?? null,
+            'resolution_due_at'     => $merged['resolution_due_at'] ?? null,
+            'first_responded_at'    => $merged['first_responded_at'] ?? null,
+            'sla_exempt'            => $merged['sla_exempt'] ?? 0,
+        ]);
+
+        $setParts = ['sla_closed_at = NULL'];
+        $params   = [];
+        foreach ($updates as $col => $val) {
+            $setParts[] = "{$col} = ?";
+            $params[]   = $val;
+        }
+        if ($state !== null) {
+            $setParts[] = 'sla_state = ?';
+            $params[]   = $state;
+        }
+        $params[] = $ticketId;
+
+        $db->prepare('UPDATE tickets SET ' . implode(', ', $setParts) . ' WHERE id = ?')->execute($params);
+    }
+
+    private static function logReopen(PDO $db, int $ticketId, string $details): void
+    {
+        $db->prepare(
+            'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, ?, ?, 1)'
+        )->execute([$ticketId, 'sla_reopened', $details]);
+    }
+
+    /**
+     * The single entry point for everything SLA does on a status change.
+     *
+     * This used to be an `if (pauses) pause() elseif (was paused) resume()` block
+     * copy-pasted across seven call sites — agent, admin, portal, API (two), floor,
+     * and the automation runner. Reopen handling has to fire from every one of
+     * those, and the parallel-copy pattern is exactly how a behaviour ends up
+     * working in the agent UI and silently not in the API.
+     *
+     * Order matters: a closed → pending transition is both a reopen and a pause,
+     * and the reopen must resolve the new due dates before the pause freezes them.
+     * Leaving a pausing status resumes regardless of destination, including
+     * straight to closed — otherwise sla_paused_at stays set forever and
+     * computeSlaState() returns the frozen state for good.
+     */
+    public static function onStatusChanged(PDO $db, int $ticketId, ?string $oldStatus, string $newStatus): void
+    {
+        if (!slaEnabled()) {
+            return;
+        }
+        if ($oldStatus === $newStatus) {
+            return;
+        }
+
+        $pausing = ticketSlaPausingSlugs();
+        $closed  = ticketClosedBucketSlugs();
+
+        $wasClosed = $oldStatus !== null && in_array($oldStatus, $closed, true);
+        $isClosed  = in_array($newStatus, $closed, true);
+
+        // Leaving a pausing status: settle the pause first, so the paused minutes
+        // are credited against the due dates a reopen may then replace.
+        if ($oldStatus !== null && in_array($oldStatus, $pausing, true)) {
+            self::resume($db, $ticketId);
+        }
+
+        if ($wasClosed && !$isClosed) {
+            self::onReopened($db, $ticketId);
+        }
+
+        if ($isClosed) {
+            self::markClosed($db, $ticketId);
+        } elseif (in_array($newStatus, $pausing, true)) {
+            self::pause($db, $ticketId);
+        }
     }
 
     /**

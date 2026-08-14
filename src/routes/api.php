@@ -1021,9 +1021,6 @@ $router->post('/api/v1/tickets/{id}/update', function (array $p) {
     $changes = [];
 
     $validStatuses    = ticketActiveStatusSlugs();
-    $slaStatusPause   = ticketSlaPausingSlugs();
-    // "Resume" set = open-bucket slugs that don't pause SLA.
-    $slaStatusResume  = array_values(array_diff(ticketOpenBucketSlugs(), $slaStatusPause));
 
     // ── Status ────────────────────────────────────────────────────────────────
     if (array_key_exists('status', $input)) {
@@ -1045,12 +1042,8 @@ $router->post('/api/v1/tickets/{id}/update', function (array $p) {
             if ($newStatus === getSetting('csat_trigger_status', 'resolved')) {
                 sendCsatSurvey($db, $ticketId);
             }
-            // SLA pause/resume
-            if (in_array($newStatus, $slaStatusPause, true)) {
-                Sla::pause($db, $ticketId);
-            } elseif (in_array($newStatus, $slaStatusResume, true)) {
-                Sla::resume($db, $ticketId);
-            }
+            // SLA pause/resume/close/reopen
+            Sla::onStatusChanged($db, $ticketId, $oldStatus, $newStatus);
         }
     }
 
@@ -1301,8 +1294,6 @@ $router->post('/api/v1/tickets/{id}/replies', function (array $p) {
 
     // Optional: change status after reply (agent/admin only)
     $validStatuses   = ticketActiveStatusSlugs();
-    $slaStatusPause  = ticketSlaPausingSlugs();
-    $slaStatusResume = array_values(array_diff(ticketOpenBucketSlugs(), $slaStatusPause));
 
     if (_apiIsStaff($user)) {
         $statusAfter = $input['status_after'] ?? '';
@@ -1319,11 +1310,7 @@ $router->post('/api/v1/tickets/{id}/replies', function (array $p) {
             if ($statusAfter === getSetting('csat_trigger_status', 'resolved')) {
                 sendCsatSurvey($db, $ticketId);
             }
-            if (in_array($statusAfter, $slaStatusPause, true)) {
-                Sla::pause($db, $ticketId);
-            } elseif (in_array($statusAfter, $slaStatusResume, true)) {
-                Sla::resume($db, $ticketId);
-            }
+            Sla::onStatusChanged($db, $ticketId, $oldStatus, $statusAfter);
         }
     }
 

@@ -195,6 +195,42 @@ $aiWarning = $aiWarning ?? null;
             </div>
 
             <div class="mb-3">
+                <label for="sla_reopen_behavior" class="form-label fw-semibold">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i>SLA on Reopen
+                </label>
+                <?php
+                $reopenLabels  = slaReopenBehaviorLabels();
+                $reopenCurrent = (string) old('sla_reopen_behavior', $editing['sla_reopen_behavior'] ?? '');
+                $reopenGlobal  = (string) getSetting('sla_reopen_behavior', 'keep');
+                $reopenGlobalLabel = $reopenLabels[$reopenGlobal]['short'] ?? 'Keep original';
+                ?>
+                <select class="form-select" id="sla_reopen_behavior" name="sla_reopen_behavior">
+                    <option value="" <?= $reopenCurrent === '' ? 'selected' : '' ?>>
+                        Use global setting (<?= e($reopenGlobalLabel) ?>)
+                    </option>
+                    <?php foreach ($reopenLabels as $key => $meta): ?>
+                    <option value="<?= e($key) ?>" <?= $reopenCurrent === $key ? 'selected' : '' ?>>
+                        <?= e($meta['label']) ?>
+                    </option>
+                    <?php endforeach; ?>
+                </select>
+                <div class="form-text">
+                    What happens to the SLA timers when a <strong>closed or resolved</strong> ticket of this type is
+                    reopened. Leave on the global setting unless this type needs to differ
+                    (Admin → Settings → SLA Policies).
+                    <ul class="mb-0 mt-1 ps-3">
+                        <?php foreach ($reopenLabels as $meta): ?>
+                        <li><strong><?= e($meta['short']) ?></strong> &mdash; <?= e($meta['help']) ?></li>
+                        <?php endforeach; ?>
+                    </ul>
+                    <div class="mt-1">
+                        Resuming needs to know when the ticket was closed, which is only recorded from
+                        v2.171.0 onward &mdash; a ticket closed before then falls back to keeping its original dates.
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-3">
                 <label class="form-label fw-semibold">
                     <i class="bi bi-mortarboard me-1"></i>Required Skills
                 </label>

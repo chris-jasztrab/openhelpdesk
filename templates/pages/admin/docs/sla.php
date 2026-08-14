@@ -82,7 +82,23 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-pause-circle text-primary me-2"></i>Pausing &amp; Resuming</h5>
 <p class="text-muted mb-2">SLA timers can be paused when a ticket is in <strong>Pending</strong> status (waiting on the requester). When the ticket moves back to <strong>Open</strong> or <strong>In Progress</strong>, the timer automatically resumes.</p>
-<p class="text-muted mb-0">Pause and resume events are recorded in the ticket timeline with timestamps so you have a full audit trail.</p>
+<p class="text-muted mb-2">Pause and resume events are recorded in the ticket timeline with timestamps so you have a full audit trail.</p>
+<p class="text-muted mb-0">Which statuses pause the timer is configurable &mdash; each status carries a <strong>pauses SLA</strong> switch on <a href="/admin/settings/ticket-statuses">Settings → Ticket Statuses</a>. Out of the box that is Pending, Waiting on Customer and Waiting on Third Party.</p>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-arrow-counterclockwise text-primary me-2"></i>Closing &amp; Reopening</h5>
+<p class="text-muted mb-2">Closed and resolved tickets are <strong>not</strong> paused &mdash; they drop out of SLA scope entirely, because recalculation only looks at open tickets. A closed ticket can never newly breach, and no escalation rule can fire on one. Its last computed SLA state stays frozen on the record, so a ticket that was already breached when it closed still counts as a breach in reports.</p>
+<p class="text-muted mb-2">Because closing doesn't pause, reopening doesn't automatically credit the time back. What it does instead is up to you, via <strong>When a closed ticket is reopened</strong> on <a href="/admin/settings/sla-policies">Settings → SLA Policies</a>:</p>
+<ul class="text-muted mb-2">
+    <li><strong>Keep the original due dates</strong> &mdash; the reopened ticket goes back under the targets it already had. Expect a ticket closed long ago to be breached immediately. This is the default.</li>
+    <li><strong>Resume</strong> &mdash; both due dates move out by the business hours the ticket spent closed.</li>
+    <li><strong>Restart both clocks</strong> &mdash; a fresh window from the reopen, and a new first response is required.</li>
+    <li><strong>Restart the resolution clock only</strong> &mdash; a fresh resolution window, but the first response already given still counts.</li>
+</ul>
+<p class="text-muted mb-0">Each <a href="/admin/types">ticket type</a> can override the site-wide choice, and the <a href="/admin/types/matrix">Type Settings Matrix</a> shows every type's effective setting at a glance. Resuming needs to know when a ticket was closed, which is recorded only from v2.171.0 onward &mdash; anything closed before then keeps its original dates instead.</p>
 </div>
 </div>
 

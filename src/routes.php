@@ -705,13 +705,8 @@ $router->post('/api/tickets/{id}/set-status', function (array $p) {
             sendCsatSurvey($db, $ticketId);
         }
 
-        // SLA pause/resume
-        $pausingStatuses = ticketSlaPausingSlugs();
-        if (in_array($newStatus, $pausingStatuses, true)) {
-            Sla::pause($db, $ticketId);
-        } elseif (in_array($oldStatus, $pausingStatuses, true)) {
-            Sla::resume($db, $ticketId);
-        }
+        // SLA pause/resume/close/reopen
+        Sla::onStatusChanged($db, $ticketId, $oldStatus, $newStatus);
 
         runAutomations($db, $ticketId, 'ticket_updated');
     }

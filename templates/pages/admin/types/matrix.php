@@ -18,10 +18,17 @@ $columns = [
     'show_to_loc_vis'     => 'Show "To" / Location',
     'custom_dup_thr'      => 'Custom dup threshold',
     'custom_stale_thr'    => 'Custom stale threshold',
+    'sla_on_reopen'       => 'SLA on reopen',
 ];
 
 function tt_cell_yes(): string { return '<span class="mx-on">&#10003;</span>'; }
 function tt_cell_no(): string  { return '<span class="mx-off">&minus;</span>'; }
+
+$reopenLabels = slaReopenBehaviorLabels();
+$reopenGlobal = (string) getSetting('sla_reopen_behavior', 'keep');
+if (!isset($reopenLabels[$reopenGlobal])) {
+    $reopenGlobal = 'keep';
+}
 ?>
 <div class="mb-4 d-print-none">
     <h2 class="fw-bold mb-0">Settings</h2>
@@ -76,6 +83,14 @@ function tt_cell_no(): string  { return '<span class="mx-off">&minus;</span>'; }
                     $custThr = $dupOn && abs($thr - 0.75) > 0.001;
                     $stale   = $t['stale_threshold_minutes'];
                     $custSt  = $stale !== null;
+                    // Shows the effective behaviour, not just whether it is
+                    // overridden — "what happens on reopen" is the question this
+                    // row is being read to answer, and "inherited" alone doesn't
+                    // answer it. Inherited values are dimmed to keep the override
+                    // visible at a glance.
+                    $reopen      = $t['sla_reopen_behavior'] ?? null;
+                    $reopenOwn   = is_string($reopen) && isset($reopenLabels[$reopen]);
+                    $reopenKey   = $reopenOwn ? $reopen : $reopenGlobal;
                 ?>
                 <tr>
                     <td class="tt-id text-muted"><?= (int) $t['id'] ?></td>
@@ -106,6 +121,13 @@ function tt_cell_no(): string  { return '<span class="mx-off">&minus;</span>'; }
                             <?= tt_cell_no() ?>
                         <?php endif; ?>
                     </td>
+                    <td class="tt-c">
+                        <span class="<?= $reopenOwn ? 'mx-on' : 'text-muted' ?>"
+                              title="sla_reopen_behavior<?= $reopenOwn ? '' : ' (inherited from the global setting)' ?>"
+                              style="white-space:nowrap;font-size:.8rem;">
+                            <?= e($reopenLabels[$reopenKey]['short'] ?? 'Keep original') ?>
+                        </span>
+                    </td>
                 </tr>
                 <?php endforeach; ?>
                 </tbody>
@@ -116,6 +138,10 @@ function tt_cell_no(): string  { return '<span class="mx-off">&minus;</span>'; }
             <span><span class="mx-off">&minus;</span> not enabled</span>
             <span>&middot; "Custom dup threshold" = <code>ai_dup_threshold</code> &ne; 0.75 (default).</span>
             <span>&middot; "Custom stale threshold" = a per-type override of the site-wide stale-ticket cutoff.</span>
+            <span>&middot; "SLA on reopen" shows the effective behaviour &mdash;
+                <span class="mx-on">highlighted</span> where the type overrides it,
+                <span class="text-muted">dimmed</span> where it inherits the global default
+                (<?= e($reopenLabels[$reopenGlobal]['short']) ?>).</span>
         </div>
         <?php endif; ?>
     </div>

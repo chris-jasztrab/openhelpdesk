@@ -133,6 +133,40 @@ $breadcrumbs  = [
 
             <hr class="my-4">
 
+            <div class="mb-4">
+                <label for="sla_reopen_behavior" class="form-label fw-semibold">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i>When a closed ticket is reopened
+                </label>
+                <?php $reopenLabels = slaReopenBehaviorLabels(); ?>
+                <select class="form-select" id="sla_reopen_behavior" name="sla_reopen_behavior" style="max-width:32rem;">
+                    <?php foreach ($reopenLabels as $key => $meta): ?>
+                    <option value="<?= e($key) ?>" <?= ($reopenBehavior ?? 'keep') === $key ? 'selected' : '' ?>>
+                        <?= e($meta['label']) ?>
+                    </option>
+                    <?php endforeach; ?>
+                </select>
+                <div class="form-text">
+                    Reopening a <strong>closed or resolved</strong> ticket used to leave its SLA untouched, which put it
+                    straight back under the targets it already had &mdash; so a ticket closed months ago
+                    breached within minutes. That is still available as <em>Keep the original due dates</em>,
+                    but it is now a choice.
+                    <ul class="mb-0 mt-1 ps-3">
+                        <?php foreach ($reopenLabels as $meta): ?>
+                        <li><strong><?= e($meta['short']) ?></strong> &mdash; <?= e($meta['help']) ?></li>
+                        <?php endforeach; ?>
+                    </ul>
+                    <div class="mt-1">
+                        This is the site-wide default. Any ticket type can override it on its own settings page
+                        (<a href="/admin/types">Ticket Types</a>), and the
+                        <a href="/admin/types/matrix">Type Settings Matrix</a> shows which ones do.
+                        Resuming needs to know when a ticket was closed, which is recorded only from v2.171.0
+                        onward &mdash; anything closed before then keeps its original dates instead.
+                    </div>
+                </div>
+            </div>
+
+            <hr class="my-4">
+
             <div class="d-flex justify-content-between align-items-center">
                 <div class="form-text">
                     Leave a box empty to disable that target; on a type tab an empty box inherits the default policy's value,

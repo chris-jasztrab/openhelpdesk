@@ -5907,7 +5907,6 @@ function runEscalationRule(\PDO $db, array $rule, array $ticket): void
     )->execute([$ticketId, 'escalation_triggered', "Escalation rule \"{$ruleName}\" triggered"]);
 
     $validStatuses   = ticketActiveStatusSlugs();
-    $pausingStatuses = ticketSlaPausingSlugs();
 
     foreach ($actions as $act) {
         $actionType = $act['action'] ?? '';
@@ -5962,11 +5961,7 @@ function runEscalationRule(\PDO $db, array $rule, array $ticket): void
                 $db->prepare('UPDATE tickets SET status = ? WHERE id = ?')->execute([$actionVal, $ticketId]);
                 $db->prepare('INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, ?, ?, 1)')
                    ->execute([$ticketId, 'status_changed', "Status changed from {$oldStatus} to {$actionVal} by escalation rule"]);
-                if (in_array($actionVal, $pausingStatuses, true)) {
-                    \Sla::pause($db, $ticketId);
-                } elseif (in_array($oldStatus, $pausingStatuses, true)) {
-                    \Sla::resume($db, $ticketId);
-                }
+                \Sla::onStatusChanged($db, $ticketId, $oldStatus, $actionVal);
                 break;
 
             case 'add_internal_note':
@@ -7545,12 +7540,7 @@ function runAutomations(PDO $db, int $ticketId, string $triggerEvent): void
                     }
                     $oldStatus = $ticket['status'];
                     $db->prepare('UPDATE tickets SET status = ? WHERE id = ?')->execute([$val, $ticketId]);
-                    $pausingStatuses = ticketSlaPausingSlugs();
-                    if (in_array($val, $pausingStatuses, true)) {
-                        Sla::pause($db, $ticketId);
-                    } elseif (in_array($oldStatus, $pausingStatuses, true)) {
-                        Sla::resume($db, $ticketId);
-                    }
+                    Sla::onStatusChanged($db, $ticketId, $oldStatus, $val);
                     $db->prepare(
                         'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, ?, ?, 1)'
                     )->execute([$ticketId, 'automation', "Automation '{$auto['name']}': Status set to {$val}"]);
@@ -8077,6 +8067,46 @@ function ticketStaffVisibilitySql(PDO $db, int $userId, ?string $role, string $t
 }
 
 /* ── Stale ticket notifications ─────────────────────────────────────── */
+
+/**
+ * Human labels and help text for the SLA reopen behaviours.
+ *
+ * Single source for the ticket-type form, the Type Settings Matrix and the
+ * global default on the SLA Policies page, so the four options can't drift into
+ * describing themselves differently in three places. Keys match
+ * Sla::REOPEN_BEHAVIORS.
+ *
+ * @return array<string, array{label: string, help: string, short: string}>
+ */
+function slaReopenBehaviorLabels(): array
+{
+    return [
+        'keep' => [
+            'label' => 'Keep the original due dates',
+            'short' => 'Keep original',
+            'help'  => 'The reopened ticket goes back under the targets it already had. '
+                     . 'A ticket closed long ago is likely to be breached immediately.',
+        ],
+        'resume' => [
+            'label' => 'Resume — credit the time it spent closed',
+            'short' => 'Resume',
+            'help'  => 'Both due dates move out by the business hours the ticket spent closed, '
+                     . 'so the agent gets back whatever working time was left when it closed.',
+        ],
+        'restart' => [
+            'label' => 'Restart both clocks',
+            'short' => 'Restart both',
+            'help'  => 'A fresh window measured from the reopen, and a new first response is '
+                     . 'required — the previous response time is recorded in the ticket history.',
+        ],
+        'restart_resolution' => [
+            'label' => 'Restart the resolution clock only',
+            'short' => 'Restart resolution',
+            'help'  => 'A fresh resolution window measured from the reopen, but the first '
+                     . 'response already given still counts, so that target does not re-apply.',
+        ],
+    ];
+}
 
 /**
  * Resolve the effective stale threshold (minutes) for a ticket.

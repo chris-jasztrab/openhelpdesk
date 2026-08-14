@@ -1953,6 +1953,11 @@ $router->post('/admin/types/create', function () {
     // Stale threshold accepts d/h/m; a bare number means hours (legacy unit).
     $staleRaw       = trim((string) ($_POST['stale_threshold_minutes'] ?? ''));
     $staleMinutes   = $staleRaw === '' ? null : max(0, parseDurationToMinutes($staleRaw, 'h') ?? 0);
+    // NULL means "inherit the global sla_reopen_behavior setting", same as the
+    // stale threshold above. Anything unrecognised becomes NULL rather than a
+    // stored value the resolver would silently ignore.
+    $reopenRaw      = trim((string) ($_POST['sla_reopen_behavior'] ?? ''));
+    $reopenBehavior = in_array($reopenRaw, Sla::REOPEN_BEHAVIORS, true) ? $reopenRaw : null;
     $skillIds       = array_filter(array_map('intval', (array) ($_POST['required_skills'] ?? [])));
     if ($name === '') {
         flashInput($_POST);
@@ -1985,8 +1990,8 @@ $router->post('/admin/types/create', function () {
         ]);
     }
 
-    $db->prepare('INSERT INTO ticket_types (name, color, group_id, is_confidential, ai_route_group, ai_dup_check_enabled, ai_dup_threshold, ai_similar_check_enabled, show_to_location_visibility, require_resolution_on_close, sort_order, stale_threshold_minutes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $aiSimilarCheck, $showToLocVis, $requireResolution, $order, $staleMinutes]);
+    $db->prepare('INSERT INTO ticket_types (name, color, group_id, is_confidential, ai_route_group, ai_dup_check_enabled, ai_dup_threshold, ai_similar_check_enabled, show_to_location_visibility, require_resolution_on_close, sort_order, stale_threshold_minutes, sla_reopen_behavior) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $aiSimilarCheck, $showToLocVis, $requireResolution, $order, $staleMinutes, $reopenBehavior]);
     $typeId = (int) $db->lastInsertId();
     if ($skillIds) {
         $stmt = $db->prepare('INSERT IGNORE INTO ticket_type_skill_map (ticket_type_id, skill_id) VALUES (?, ?)');
@@ -2060,6 +2065,11 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
     // Stale threshold accepts d/h/m; a bare number means hours (legacy unit).
     $staleRaw       = trim((string) ($_POST['stale_threshold_minutes'] ?? ''));
     $staleMinutes   = $staleRaw === '' ? null : max(0, parseDurationToMinutes($staleRaw, 'h') ?? 0);
+    // NULL means "inherit the global sla_reopen_behavior setting", same as the
+    // stale threshold above. Anything unrecognised becomes NULL rather than a
+    // stored value the resolver would silently ignore.
+    $reopenRaw      = trim((string) ($_POST['sla_reopen_behavior'] ?? ''));
+    $reopenBehavior = in_array($reopenRaw, Sla::REOPEN_BEHAVIORS, true) ? $reopenRaw : null;
     if ($name === '') {
         flashInput($_POST);
         flash('error', 'Type name is required.');
@@ -2111,6 +2121,7 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
                 'sort_order' => (string) $order,
                 'group_id'  => $groupId ? (string) $groupId : '',
                 'stale_threshold_minutes' => $staleMinutes === null ? '' : (string) $staleMinutes,
+                'sla_reopen_behavior' => $reopenBehavior ?? '',
                 'show_to_location_visibility' => $showToLocVis ? '1' : '',
                 'ai_route_group' => $aiRouteGroup ? '1' : '',
                 'ai_dup_check_enabled' => $aiDupCheck ? '1' : '',
@@ -2156,14 +2167,14 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
     // not just the confidential flag we already snapshotted above.
     $fullPriorStmt = $db->prepare(
         'SELECT name, color, group_id, is_confidential, ai_route_group, ai_dup_check_enabled,
-                ai_dup_threshold, ai_similar_check_enabled, show_to_location_visibility, require_resolution_on_close, sort_order, stale_threshold_minutes
+                ai_dup_threshold, ai_similar_check_enabled, show_to_location_visibility, require_resolution_on_close, sort_order, stale_threshold_minutes, sla_reopen_behavior
          FROM ticket_types WHERE id = ?'
     );
     $fullPriorStmt->execute([$id]);
     $fullPrior = $fullPriorStmt->fetch(\PDO::FETCH_ASSOC) ?: [];
 
-    $db->prepare('UPDATE ticket_types SET name=?, color=?, group_id=?, is_confidential=?, ai_route_group=?, ai_dup_check_enabled=?, ai_dup_threshold=?, ai_similar_check_enabled=?, show_to_location_visibility=?, require_resolution_on_close=?, sort_order=?, stale_threshold_minutes=? WHERE id=?')
-        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $aiSimilarCheck, $showToLocVis, $requireResolution, $order, $staleMinutes, $id]);
+    $db->prepare('UPDATE ticket_types SET name=?, color=?, group_id=?, is_confidential=?, ai_route_group=?, ai_dup_check_enabled=?, ai_dup_threshold=?, ai_similar_check_enabled=?, show_to_location_visibility=?, require_resolution_on_close=?, sort_order=?, stale_threshold_minutes=?, sla_reopen_behavior=? WHERE id=?')
+        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $aiSimilarCheck, $showToLocVis, $requireResolution, $order, $staleMinutes, $reopenBehavior, $id]);
 
     // Required skills (used by Skill-Based group auto-assignment)
     $skillIds = array_filter(array_map('intval', (array) ($_POST['required_skills'] ?? [])));
@@ -2196,6 +2207,7 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
             'require_resolution_on_close' => $requireResolution,
             'sort_order'                  => $order,
             'stale_threshold_minutes'     => $staleMinutes,
+            'sla_reopen_behavior'         => $reopenBehavior,
         ]
     );
 
@@ -5759,12 +5771,7 @@ $router->post('/admin/tickets/{id}/comment', function (array $p) {
             if ($statusAfter === $csatTrigger) {
                 sendCsatSurvey($db, $id);
             }
-            $pausingStatuses = ticketSlaPausingSlugs();
-            if (in_array($statusAfter, $pausingStatuses, true)) {
-                Sla::pause($db, $id);
-            } elseif (in_array($oldStatus, $pausingStatuses, true)) {
-                Sla::resume($db, $id);
-            }
+            Sla::onStatusChanged($db, $id, $oldStatus, $statusAfter);
             if (in_array($statusAfter, ticketClosedBucketSlugs(), true)) {
                 notifyRequesterStatusChanged($db, $id, $statusAfter);
             }
@@ -5893,13 +5900,9 @@ $router->post('/admin/tickets/{id}/update', function (array $p) {
             notifyRequesterStatusChanged($db, $id, $newStatus);
         }
 
-        // SLA: pause on waiting statuses, resume when leaving them
-        $pausingStatuses = ticketSlaPausingSlugs();
-        if (in_array($newStatus, $pausingStatuses, true)) {
-            Sla::pause($db, $id);
-        } elseif (in_array($oldStatus, $pausingStatuses, true)) {
-            Sla::resume($db, $id);
-        }
+        // SLA: pause on waiting statuses, resume when leaving them, and apply the
+        // type's configured reopen behaviour when coming back from closed.
+        Sla::onStatusChanged($db, $id, $oldStatus, $newStatus);
     }
 
     // Resolution-note capture for `require_resolution_on_close` types — mirrors
@@ -7758,6 +7761,7 @@ $router->get('/admin/settings/sla-policies', function () {
         'typePriorityMap' => typePriorityMap($db),
         'globalSchedule'  => $globalSchedule,
         'globalTimezone'  => $globalTimezone,
+        'reopenBehavior'  => Sla::reopenBehaviorFor($db, null),
     ]);
 });
 
@@ -7881,6 +7885,14 @@ $router->post('/admin/settings/sla-policies', function () {
         'sla_policy',
         'types_with_override=' . $hoursOverridden
     );
+
+    // Global default for what a reopen does to the clock. Per-type overrides live
+    // on the ticket type itself; this is the value a type inherits when its own
+    // sla_reopen_behavior is NULL.
+    $reopenRaw = trim((string) ($_POST['sla_reopen_behavior'] ?? ''));
+    if (in_array($reopenRaw, Sla::REOPEN_BEHAVIORS, true)) {
+        setSetting('sla_reopen_behavior', $reopenRaw);
+    }
 
     flash('success', 'SLA policies saved.');
     redirect('/admin/settings/sla-policies');
@@ -9944,12 +9956,7 @@ $router->post('/admin/settings/automations/{id}/run', function (array $p) {
                     }
                     $oldStatus = $ticket['status'];
                     $db->prepare('UPDATE tickets SET status = ? WHERE id = ?')->execute([$val, $ticket['id']]);
-                    $pausingStatuses = ticketSlaPausingSlugs();
-                    if (in_array($val, $pausingStatuses, true)) {
-                        Sla::pause($db, $ticket['id']);
-                    } elseif (in_array($oldStatus, $pausingStatuses, true)) {
-                        Sla::resume($db, $ticket['id']);
-                    }
+                    Sla::onStatusChanged($db, (int) $ticket['id'], $oldStatus, $val);
                     $db->prepare(
                         'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, ?, ?, 1)'
                     )->execute([$ticket['id'], 'automation', "Automation '{$auto['name']}' (manual run): Status set to {$val}"]);
