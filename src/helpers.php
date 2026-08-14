@@ -3386,6 +3386,61 @@ function parseImportDateTime(string $raw, string $sourceTz = 'UTC'): ?string
 }
 
 /**
+ * Decide whether one imported row is inside the SLA scope the admin picked.
+ *
+ * "Start SLA clocks now" and "Apply from the original open date" used to apply
+ * to every row in the file, which is the wrong granularity for a real backlog:
+ * one legacy type is usually years old and worthless to time against, while the
+ * rest of the file is recent and worth tracking. This narrows the chosen
+ * handling with two independent filters, ANDed — an opted-in set of ticket types
+ * and an "opened on or after" cutoff. A row outside either is imported
+ * SLA-exempt instead.
+ *
+ * Both filters are nullable, and null means "no filter". That is what a post
+ * which never rendered the picker sends (a script, or a future API caller), and
+ * it reproduces the pre-2.170 behaviour of applying the handling file-wide
+ * rather than reading a missing field as "exclude everything".
+ *
+ * $allowedTypeKeys is keyed by **lowercased source label**, with '' as the
+ * bucket for rows whose type cell is blank. Matching on the label rather than a
+ * resolved `type_id` is deliberate: the label is what the admin ticked on the
+ * preview screen, and for a type the file is about to create there is no id to
+ * match against yet.
+ *
+ * $createdAt is the row's date **after** parseImportDateTime() has converted it
+ * out of the source timezone, which is the value the ticket is actually stored
+ * with — so the cutoff filters on the same reading the ticket will show. At the
+ * boundary that can differ from the raw CSV text by the source offset: a row
+ * reading 2025-12-31 23:00 in a source timezone behind the server passes a
+ * 2026-01-01 cutoff, because by then it is 2026 in the frame that gets stored.
+ *
+ * @param array<string,mixed>|null $allowedTypeKeys Ticked types, or null for all
+ * @param string|null $startOnOrAfter 'Y-m-d H:i:s' in server local time, or null
+ * @param string|null $createdAt      Row's parsed created_at, same frame
+ */
+function importSlaScopeAllows(
+    ?array $allowedTypeKeys,
+    ?string $startOnOrAfter,
+    string $sourceType,
+    ?string $createdAt
+): bool {
+    if ($allowedTypeKeys !== null
+        && !array_key_exists(strtolower(trim($sourceType)), $allowedTypeKeys)) {
+        return false;
+    }
+
+    if ($startOnOrAfter !== null) {
+        // Both sides are 'Y-m-d H:i:s' in server local time, so a plain string
+        // comparison already orders them correctly — no parsing needed.
+        if ($createdAt === null || $createdAt < $startOnOrAfter) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/**
  * Returns the list of common timezone identifiers used across the app's
  * timezone selectors. Centralised here so all selectors stay in sync.
  */

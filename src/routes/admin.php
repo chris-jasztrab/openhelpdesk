@@ -8178,6 +8178,19 @@ $router->post('/admin/settings/import/map', function () {
     $newAgentNames    = [];
     $newLocationNames = [];
 
+    // Per-type row counts and open-date ranges, for the SLA scope picker on the
+    // preview screen. The range is the part that earns its keep: "this type is
+    // 3,000 tickets, all opened between 2019 and 2021" is the fact that decides
+    // whether it should be timed against an SLA at all.
+    //
+    // Capped, because a mis-mapped Type column (pointed at Subject, say) would
+    // otherwise put one entry per row in the session and render thousands of
+    // checkboxes. Past the cap the picker is suppressed rather than truncated —
+    // a half-populated list of types would read as the whole list.
+    $typeStatsLimit  = 60;
+    $typeStats       = [];
+    $typeStatsCapped = false;
+
     // Stream the file row-by-row — never load all rows into memory
     while (($csvRow = fgetcsv($handle, 0, $delimiter)) !== false) {
         if (count(array_filter($csvRow, fn($v) => trim($v) !== '')) === 0) {
@@ -8198,6 +8211,33 @@ $router->post('/admin/settings/import/map', function () {
             continue;
         }
         $totalRows++;
+
+        $typeRaw = $get('type');
+        $typeKey = strtolower($typeRaw);
+        if (!isset($typeStats[$typeKey])) {
+            if (count($typeStats) >= $typeStatsLimit) {
+                $typeStatsCapped = true;
+                $typeKey = null;
+            } else {
+                $typeStats[$typeKey] = ['label' => $typeRaw, 'count' => 0, 'oldest' => null, 'newest' => null];
+            }
+        }
+        if ($typeKey !== null) {
+            $typeStats[$typeKey]['count']++;
+            // Server local time on both sides of the comparison, so the strings
+            // sort chronologically. This is a display range, so it parses against
+            // the server timezone rather than resolving each row's location tz the
+            // way the confirm step does.
+            $createdLocal = parseImportDateTime($get('created_at'), date_default_timezone_get());
+            if ($createdLocal !== null) {
+                if ($typeStats[$typeKey]['oldest'] === null || $createdLocal < $typeStats[$typeKey]['oldest']) {
+                    $typeStats[$typeKey]['oldest'] = $createdLocal;
+                }
+                if ($typeStats[$typeKey]['newest'] === null || $createdLocal > $typeStats[$typeKey]['newest']) {
+                    $typeStats[$typeKey]['newest'] = $createdLocal;
+                }
+            }
+        }
 
         if (!isset($existingUsers[$email])) {
             $newUserEmails[$email] = $get('full_name');
@@ -8225,10 +8265,15 @@ $router->post('/admin/settings/import/map', function () {
         $slaHandling = 'exclude';
     }
 
+    // Biggest types first — those are the ones a wrong SLA decision hurts most.
+    uasort($typeStats, fn (array $a, array $b) => $b['count'] <=> $a['count']);
+
     $_SESSION['import_mapping']      = $userMapping;
     $_SESSION['import_sla_handling'] = $slaHandling;
     $_SESSION['import_summary'] = [
         'sla_handling'      => $slaHandling,
+        'type_stats'        => $typeStats,
+        'type_stats_capped' => $typeStatsCapped,
         'total_tickets'     => $totalRows,
         'new_users'         => count($newUserEmails),
         'new_agents'        => count($newAgentNames),
@@ -8327,6 +8372,25 @@ $router->post('/admin/settings/import/confirm', function () {
         $slaHandling = 'exclude';
     }
 
+    // Which rows the chosen SLA handling actually applies to — see
+    // importSlaScopeAllows(). Both filters stay null unless the preview screen
+    // rendered the picker and said so, so a post without these fields keeps
+    // applying the handling to the whole file rather than exempting everything.
+    $slaAllowedTypes    = null;
+    $slaStartOnOrAfter  = null;
+    if (!empty($_POST['sla_scope_present'])) {
+        $ticked = array_map(
+            static fn ($v): string => strtolower(trim((string) $v)),
+            (array) ($_POST['sla_types'] ?? [])
+        );
+        $slaAllowedTypes = array_fill_keys($ticked, true);
+
+        $rawCutoff = trim((string) ($_POST['sla_start_after'] ?? ''));
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $rawCutoff)) {
+            $slaStartOnOrAfter = $rawCutoff . ' 00:00:00';
+        }
+    }
+
     if ($importPath === '' || !file_exists($importPath) || empty($fileHeaders) || empty($userMapping)) {
         flash('error', 'No import data found. Please upload the CSV again.');
         redirect('/admin/settings/import');
@@ -8405,16 +8469,21 @@ $router->post('/admin/settings/import/confirm', function () {
         );
         $insertLocation = $db->prepare('INSERT INTO locations (name) VALUES (?)');
         $insertType     = $db->prepare('INSERT INTO ticket_types (name, sort_order) VALUES (?, ?)');
-        // sla_exempt is set at insert time so the "exclude from SLA" choice is
-        // atomic with the row — a later priority or type edit then can't
-        // retroactively invent a breached clock from the legacy created_at.
+        // Every row is inserted sla_exempt = 1 and only the rows that actually
+        // get a clock are flipped back to 0, by the UPDATE inside
+        // initializeForImportedTicket(). Exempt-by-default is the safe end of
+        // the switch: an imported ticket left non-exempt with no due dates gets
+        // its clock invented from the legacy created_at by the first priority or
+        // type edit, which lands both targets years in the past. So a row the
+        // scope excluded, a row with no priority, and a row whose type+priority
+        // matches no policy all end up permanently out of SLA rather than armed.
         $insertTicket   = $db->prepare(
             'INSERT INTO tickets (subject, description, legacy_id, created_by, created_at, due_date, type_id, location_id, status, priority_id, assigned_to, group_id, first_responded_at, updated_at, sla_exempt)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)'
         );
-        $slaExempt   = $slaHandling === 'exclude' ? 1 : 0;
         $slaCtx      = $slaHandling === 'exclude' ? [] : Sla::makeImportContext($db);
         $slaApplied  = 0;
+        $slaScopedOut = 0;
         $insertTimeline = $db->prepare(
             'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal, created_at) VALUES (?, ?, ?, ?, 0, ?)'
         );
@@ -8565,7 +8634,6 @@ $router->post('/admin/settings/import/confirm', function () {
                 $groupId,
                 $respondedAt,
                 $updatedAt,
-                $slaExempt,
             ]);
             $ticketId = (int) $db->lastInsertId();
 
@@ -8574,14 +8642,22 @@ $router->post('/admin/settings/import/confirm', function () {
             // reproduces its real SLA outcome; 'start_now' gives the backlog a
             // fresh window from the import moment. Both need a priority to match
             // a policy against, so an unprioritised row simply gets no clock.
-            if ($slaHandling !== 'exclude' && $priorityId !== null) {
-                // $createdAt is already server local time, matching the frame
-                // Sla stores in — parsing it as UTC would offset the whole clock.
-                $startFrom = $slaHandling === 'historical'
-                    ? new DateTimeImmutable($createdAt, Sla::storageTimezone())
-                    : new DateTimeImmutable('now', Sla::storageTimezone());
-                if (Sla::initializeForImportedTicket($db, $slaCtx, $ticketId, $priorityId, $typeId, $startFrom, $respondedAt)) {
-                    $slaApplied++;
+            //
+            // The type/date scope narrows either choice further: a legacy type
+            // that is all years old can sit the SLA out while the rest of the
+            // same file is timed normally.
+            if ($slaHandling !== 'exclude') {
+                if (!importSlaScopeAllows($slaAllowedTypes, $slaStartOnOrAfter, $row['type'], $createdAt)) {
+                    $slaScopedOut++;
+                } elseif ($priorityId !== null) {
+                    // $createdAt is already server local time, matching the frame
+                    // Sla stores in — parsing it as UTC would offset the whole clock.
+                    $startFrom = $slaHandling === 'historical'
+                        ? new DateTimeImmutable($createdAt, Sla::storageTimezone())
+                        : new DateTimeImmutable('now', Sla::storageTimezone());
+                    if (Sla::initializeForImportedTicket($db, $slaCtx, $ticketId, $priorityId, $typeId, $startFrom, $respondedAt)) {
+                        $slaApplied++;
+                    }
                 }
             }
 
@@ -8649,6 +8725,11 @@ $router->post('/admin/settings/import/confirm', function () {
         'ticket',
         'imported=' . $imported . '; skipped=' . $skipped
             . '; sla=' . $slaHandling . '; sla_applied=' . $slaApplied
+            . '; sla_scoped_out=' . $slaScopedOut
+            . '; sla_types=' . ($slaAllowedTypes === null
+                ? 'all'
+                : count($slaAllowedTypes) . ':' . implode('|', array_keys($slaAllowedTypes)))
+            . '; sla_start_after=' . ($slaStartOnOrAfter ?? 'none')
     );
 
     $msg = "Successfully imported {$imported} ticket(s).";
@@ -8660,6 +8741,14 @@ $router->post('/admin/settings/import/confirm', function () {
         'start_now'  => " SLA clocks started now on {$slaApplied} ticket(s).",
         'historical' => " SLA applied from the original open date on {$slaApplied} ticket(s) — expect breaches on older tickets.",
     };
+    // Named explicitly rather than left as a gap between "imported" and
+    // "SLA applied" — the whole point of the scope is that you can see it worked.
+    if ($slaHandling !== 'exclude' && ($slaScopedOut > 0 || $imported > $slaApplied)) {
+        $msg .= ' ' . ($imported - $slaApplied) . ' ticket(s) were imported SLA-exempt';
+        $msg .= $slaScopedOut > 0
+            ? " ({$slaScopedOut} outside the type/date scope you chose)."
+            : ' (no priority, or no SLA policy for their type and priority).';
+    }
     flash('success', $msg);
     redirect('/admin/tickets');
 });

@@ -11,6 +11,22 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.170.0 &mdash; 2026-08-14
+
+### Added
+- **Ticket imports can now start SLA clocks on part of a file instead of all of it.** The SLA handling choice added in 2.168.0 was all-or-nothing per import, which is the wrong granularity for a real backlog. A legacy export usually contains one type &mdash; an archive category, a logging category &mdash; that is thousands of rows deep and years old, alongside recent tickets that genuinely should be timed. The only way to treat them differently was to split the CSV by hand before importing, which is not a serious option at ten thousand rows.
+
+  The preview screen now carries a **Which tickets get an SLA clock** panel, shown whenever the chosen handling is one that starts clocks. It lists every ticket type found in the file with its row count and the range of open dates it spans, each with a checkbox, plus an optional **only start clocks on tickets opened on or after** date. The two filters apply together: a ticket gets a clock only if its type is ticked *and* it is newer than the cutoff. Everything else is imported SLA-exempt &mdash; permanently, so a later priority or type edit can't start a clock on it either.
+
+  The date range per type is the part that makes the decision possible: "3,412 rows, opened between Mar 2016 and Nov 2020" is the fact that tells you a type has no business being timed against a service target, and it wasn't visible anywhere before confirming an import. A live count under the panel reports how many tickets are in the ticked types, and the completion message and audit entry both state how many rows were imported exempt and how many of those the scope excluded &mdash; a filter you can't confirm afterwards isn't worth much.
+
+  The cutoff compares against each row's open date *after* conversion out of the source timezone, since that is the reading the ticket is stored and displayed with. At the boundary that can differ from the raw CSV text by the source offset.
+
+  Two cases deliberately don't offer the panel. Choosing **Exclude from SLA** already covers the whole file, so narrowing it would be a choice with no effect. And a mapped Ticket Type column holding more than 60 distinct values &mdash; which in practice means it is pointed at the wrong CSV column, often Subject &mdash; suppresses the picker with a warning and a link back to the mapping step, rather than rendering a truncated list of types that would read as the complete one.
+
+### Fixed
+- **An imported ticket that gets no SLA clock is now marked exempt rather than left armed.** Under "start clocks now" or "apply from the original open date", a row that couldn't actually be given a clock &mdash; no priority mapped, or no SLA policy for its type and priority &mdash; was imported non-exempt with no due dates. That is the same latent state 2.168.0 removed for the *excluded* case: the first person to change the ticket's priority or type re-derived its due dates from the legacy `created_at`, landing both targets years in the past and flipping a years-old ticket straight to breached. Every imported row now starts exempt and only the rows that genuinely receive a clock are switched back, so "no clock" and "will never get a clock" are the same state again. The completion message names the count and its reason.
+
 ## 2.169.0 &mdash; 2026-08-11
 
 ### Added
