@@ -510,7 +510,14 @@ function seedDefaultLayoutForType(PDO $db, int $typeId): void
  *   'label_override' => ?string,
  *   'label'          => string                  (resolved — override OR default),
  *   'field'          => ?array                  (ticket_form_fields row for custom; null for system),
+ *   'condition_json' => ?string                 (raw stored condition, or null),
+ *   'condition'      => ?array                  (parsed condition; null = always show),
  * ]
+ *
+ * Note that $visibleOnly filters on the stored `visibility` only — it does NOT
+ * evaluate conditions, which depend on who is asking and what they have typed
+ * so far. Callers rendering or validating a real submission should pass the
+ * layout through resolveLayoutVisibility().
  *
  * If $visibleOnly is true, rows with visibility = 'hidden' are dropped — use
  * this when rendering the actual ticket-create form. Pass false for the
@@ -523,6 +530,7 @@ function getFormLayoutForType(PDO $db, ?int $typeId, bool $visibleOnly = false):
     }
     $stmt = $db->prepare(
         'SELECT l.type_id, l.field_kind, l.field_key, l.sort_order, l.visibility, l.label_override,
+                l.condition_json,
                 f.id AS field_id, f.field_type, f.label AS field_label, f.placeholder, f.config
          FROM ticket_type_form_layout l
          LEFT JOIN ticket_form_fields f
@@ -565,6 +573,8 @@ function getFormLayoutForType(PDO $db, ?int $typeId, bool $visibleOnly = false):
             'label_override' => $r['label_override'],
             'label'          => $r['label_override'] ?: $defaultLabel,
             'field'          => $field,
+            'condition_json' => $r['condition_json'],
+            'condition'      => parseFieldCondition($r['condition_json']),
         ];
     }
     return $out;
@@ -590,6 +600,232 @@ function resolveFieldVisibility(PDO $db, ?int $typeId, string $kind, string $key
         $cache[$ck] = $stmt->fetchColumn() ?: 'hidden';
     }
     return $cache[$ck];
+}
+
+/* ── Form builder: conditional fields ──────────────────────────── */
+
+/**
+ * Operators a 'field' condition may use. `filled` and `empty` ignore the
+ * condition's `value`.
+ */
+const FIELD_CONDITION_OPS = ['equals', 'not_equals', 'filled', 'empty'];
+
+/**
+ * Whether a user account is flagged as shared — a login used by more than one
+ * person, where the session may well not belong to whoever is at the keyboard.
+ *
+ * Read from the database rather than the session on purpose: the session array
+ * is built at login and would not reflect an admin flagging the account until
+ * the user signed out and back in, which for a permanently-signed-in shared
+ * workstation could be never.
+ */
+function userIsSharedAccount(PDO $db, ?int $userId): bool
+{
+    if (!$userId) {
+        return false;
+    }
+    static $cache = [];
+    if (!array_key_exists($userId, $cache)) {
+        $stmt = $db->prepare('SELECT is_shared_account FROM users WHERE id = ?');
+        $stmt->execute([$userId]);
+        $cache[$userId] = (int) $stmt->fetchColumn() === 1;
+    }
+    return $cache[$userId];
+}
+
+/**
+ * Validate a submitted `user_picker` value. Returns the user id, or null if it
+ * isn't one that the picker could legitimately have offered.
+ *
+ * The browser only ever posts an id it got from /api/user-search, so this is
+ * the guard against a hand-crafted POST naming somebody the picker excludes —
+ * an external requester, or another shared account, neither of which is a
+ * person you can attribute a ticket to.
+ */
+function validUserPickerId(PDO $db, $raw): ?int
+{
+    $raw = (string) ($raw ?? '');
+    if ($raw === '' || !ctype_digit($raw)) {
+        return null;
+    }
+    $stmt = $db->prepare(
+        'SELECT id FROM users WHERE id = ? AND is_external = 0 AND is_shared_account = 0'
+    );
+    $stmt->execute([(int) $raw]);
+    $id = $stmt->fetchColumn();
+    return $id ? (int) $id : null;
+}
+
+/**
+ * Resolve a stored `user_picker` value for display. Returns null when the value
+ * is empty or points at a user who no longer exists.
+ *
+ * The name and address are read live rather than copied into the ticket at
+ * submission, so a ticket raised by someone who has since married, changed
+ * department or changed address still shows how to reach them today. The
+ * trade-off is that a deleted user leaves the field blank — see the caller,
+ * which renders that the same as an unanswered field.
+ *
+ * @return array{id:int, name:string, email:string}|null
+ */
+function userPickerDisplay(PDO $db, $value): ?array
+{
+    $value = (string) ($value ?? '');
+    if ($value === '' || !ctype_digit($value)) {
+        return null;
+    }
+    static $cache = [];
+    $id = (int) $value;
+    if (!array_key_exists($id, $cache)) {
+        $stmt = $db->prepare('SELECT id, first_name, last_name, email FROM users WHERE id = ?');
+        $stmt->execute([$id]);
+        $row = $stmt->fetch();
+        $cache[$id] = $row ? [
+            'id'    => (int) $row['id'],
+            'name'  => trim($row['first_name'] . ' ' . $row['last_name']),
+            'email' => (string) $row['email'],
+        ] : null;
+    }
+    return $cache[$id];
+}
+
+/**
+ * Parse and validate a layout row's stored condition. Returns null for "no
+ * condition — always show", which is also what anything malformed produces:
+ * a field with an unreadable condition should appear on the form rather than
+ * silently disappear from it.
+ *
+ * @return array{type:string, field?:string, op?:string, value?:string}|null
+ */
+function parseFieldCondition(?string $json): ?array
+{
+    if ($json === null || trim($json) === '') {
+        return null;
+    }
+    $c = json_decode($json, true);
+    if (!is_array($c) || empty($c['type'])) {
+        return null;
+    }
+
+    if ($c['type'] === 'shared_account') {
+        return ['type' => 'shared_account'];
+    }
+
+    if ($c['type'] === 'field') {
+        $field = (string) ($c['field'] ?? '');
+        $op    = (string) ($c['op'] ?? 'equals');
+        if ($field === '' || !in_array($op, FIELD_CONDITION_OPS, true)) {
+            return null;
+        }
+        return [
+            'type'  => 'field',
+            'field' => $field,
+            'op'    => $op,
+            'value' => (string) ($c['value'] ?? ''),
+        ];
+    }
+
+    return null;
+}
+
+/**
+ * Reduce a submitted custom field to the single scalar its conditions compare
+ * against. Multi-input field types collapse to the part that decides whether
+ * the field counts as answered.
+ */
+function customFieldPostedValue(array $field, array $post): string
+{
+    $key  = 'field_' . $field['id'];
+    $type = $field['field_type'];
+
+    if ($type === 'checkbox') {
+        return isset($post[$key]) ? '1' : '0';
+    }
+    if ($type === 'dependent') {
+        return trim((string) ($post[$key . '_l1'] ?? ''));
+    }
+    if ($type === 'date_range') {
+        return trim((string) ($post[$key . '_from'] ?? ''));
+    }
+    if ($type === 'cc') {
+        $ids = array_filter(array_map('intval', (array) ($post['cc_field_' . $field['id']] ?? [])));
+        return $ids ? (string) reset($ids) : '';
+    }
+    return trim((string) ($post[$key] ?? ''));
+}
+
+/**
+ * Evaluate one parsed condition.
+ *
+ * $postedByFieldId is [custom field id => scalar submitted value], built with
+ * customFieldPostedValue(). A condition pointing at a field that isn't on this
+ * form reads as an empty value, so `equals` fails and `empty` passes — the
+ * field it guards stays hidden unless something explicitly matched.
+ *
+ * This is a single non-recursive pass: it compares stored/submitted values and
+ * never re-evaluates the source field's own condition. That is what makes a
+ * cycle (A shows B, B shows A) harmless rather than something needing detection.
+ *
+ * $actorId is whoever is filling in the form — the session user, not the
+ * ticket's requester. For a shared login the two differ by design: an agent
+ * raising a ticket on someone else's behalf is not on a shared workstation
+ * just because the person they are helping is.
+ */
+function evaluateFieldCondition(PDO $db, ?array $cond, array $postedByFieldId, ?int $actorId): bool
+{
+    if ($cond === null) {
+        return true;
+    }
+
+    if ($cond['type'] === 'shared_account') {
+        return userIsSharedAccount($db, $actorId);
+    }
+
+    if ($cond['type'] === 'field') {
+        $actual = (string) ($postedByFieldId[(int) $cond['field']] ?? '');
+        switch ($cond['op']) {
+            case 'filled':     return $actual !== '' && $actual !== '0';
+            case 'empty':      return $actual === '' || $actual === '0';
+            case 'not_equals': return $actual !== $cond['value'];
+            case 'equals':
+            default:           return $actual === $cond['value'];
+        }
+    }
+
+    return true;
+}
+
+/**
+ * Resolve a whole ticket-type layout against a submitted payload, returning
+ * ['kind|key' => 'required'|'optional'|'hidden'] where any row whose condition
+ * did not pass has been forced to 'hidden'.
+ *
+ * Conditions narrow, never widen: a row already set to hidden stays hidden
+ * whatever its condition says.
+ */
+function resolveLayoutVisibility(PDO $db, array $layout, array $post, ?int $actorId): array
+{
+    // Submitted values first, so field-to-field conditions have something to
+    // compare against regardless of the order rows appear in.
+    $postedByFieldId = [];
+    foreach ($layout as $row) {
+        if ($row['kind'] === 'custom' && $row['field'] !== null) {
+            $postedByFieldId[(int) $row['field']['id']] = customFieldPostedValue($row['field'], $post);
+        }
+    }
+
+    $out = [];
+    foreach ($layout as $row) {
+        $vis = $row['visibility'];
+        if ($vis !== 'hidden') {
+            $cond = parseFieldCondition($row['condition_json'] ?? null);
+            if (!evaluateFieldCondition($db, $cond, $postedByFieldId, $actorId)) {
+                $vis = 'hidden';
+            }
+        }
+        $out[$row['kind'] . '|' . $row['key']] = $vis;
+    }
+    return $out;
 }
 
 /**
@@ -814,6 +1050,9 @@ function customFieldHasDisplayValue(string $fieldType, $value, array $options = 
             if ((int) $o['id'] === (int) $value) return true;
         }
         return false;
+    }
+    if ($fieldType === 'user_picker') {
+        return userPickerDisplay(Database::connect(), $value) !== null;
     }
     if ($fieldType === 'dependent') {
         $dep = json_decode($value, true) ?: [];

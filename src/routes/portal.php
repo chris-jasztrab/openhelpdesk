@@ -217,6 +217,7 @@ $router->get('/portal/tickets/create', function () {
                 'sort_order' => $row['sort_order'],
                 'visibility' => $row['visibility'],
                 'label'      => $row['label'],
+                'condition'  => $row['condition'],
             ];
             if ($row['kind'] === 'custom' && $row['field'] && !isset($seenCustomIds[$row['field']['id']])) {
                 $seenCustomIds[$row['field']['id']] = true;
@@ -306,6 +307,7 @@ $router->get('/portal/tickets/create', function () {
         'preselectedTypeId'    => $preselectedTypeId,
         'embedMode'            => $embedMode,
         'tourMode'             => $tourMode,
+        'isSharedAccount'      => userIsSharedAccount($db, Auth::id()),
         'noWrongDoorTypeNames' => $noWrongDoorTypeNames,
     ]);
 });
@@ -359,11 +361,12 @@ $router->post('/portal/tickets/create', function () {
 
     // Resolve this ticket type's form layout server-side and validate
     // against it, ignoring whatever the client did or didn't render.
+    // Conditions are folded in here, so a field whose condition did not pass is
+    // indistinguishable from a hidden one for the rest of this handler: not
+    // required, and not saved. Evaluated against the session user, who is the
+    // person actually filling the form in.
     $typeLayout = $typeId ? getFormLayoutForType($db, $typeId, false) : [];
-    $visByKey = [];
-    foreach ($typeLayout as $r) {
-        $visByKey[$r['kind'] . '|' . $r['key']] = $r['visibility'];
-    }
+    $visByKey   = resolveLayoutVisibility($db, $typeLayout, $_POST, Auth::id());
     $priorityVis = $visByKey['system|priority'] ?? 'optional';
     if ($priorityVis === 'hidden') {
         $priorityId = getDefaultPriorityId($db);
@@ -395,10 +398,14 @@ $router->post('/portal/tickets/create', function () {
     $customRowsForType = array_values(array_filter($typeLayout, fn($r) => $r['kind'] === 'custom' && $r['field'] !== null));
     foreach ($customRowsForType as $row) {
         $cf = $row['field'];
-        if ($row['visibility'] !== 'required') continue;
+        if (($visByKey[$row['kind'] . '|' . $row['key']] ?? 'hidden') !== 'required') continue;
         if (in_array($cf['field_type'], ['text_block', 'image'], true)) continue; // display-only, no value
         $key = 'field_' . $cf['id'];
-        if ($cf['field_type'] === 'cc') {
+        if ($cf['field_type'] === 'user_picker') {
+            // A half-typed name arrives as an empty id — treat it as missing
+            // rather than storing text that joins to nothing.
+            $missing = !ctype_digit((string) ($_POST[$key] ?? ''));
+        } elseif ($cf['field_type'] === 'cc') {
             $ccIds = array_filter(array_map('intval', (array) ($_POST['cc_field_' . $cf['id']] ?? [])));
             $missing = empty($ccIds);
         } elseif ($cf['field_type'] === 'dependent') {
@@ -484,7 +491,8 @@ $router->post('/portal/tickets/create', function () {
         fn($r) => $r['field'],
         array_filter(
             $typeLayout,
-            fn($r) => $r['kind'] === 'custom' && $r['field'] !== null && $r['visibility'] !== 'hidden'
+            fn($r) => $r['kind'] === 'custom' && $r['field'] !== null
+                && ($visByKey[$r['kind'] . '|' . $r['key']] ?? 'hidden') !== 'hidden'
         )
     ));
     if (!empty($visibleCustomFields)) {
@@ -508,6 +516,10 @@ $router->post('/portal/tickets/create', function () {
                 $val = json_encode(['from' => $from, 'to' => $to]);
             } elseif ($cf['field_type'] === 'checkbox') {
                 $val = isset($_POST[$key]) ? '1' : '0';
+            } elseif ($cf['field_type'] === 'user_picker') {
+                $pickedId = validUserPickerId($db, $_POST[$key] ?? null);
+                if ($pickedId === null) continue;
+                $val = (string) $pickedId;
             } else {
                 $val = $_POST[$key] ?? null;
                 if ($val === null || trim($val) === '') continue;

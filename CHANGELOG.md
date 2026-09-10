@@ -11,6 +11,26 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.172.0 &mdash; 2026-09-10
+
+### Added
+- **Ask a shared login who is actually at the keyboard.** On a shared computer people forget to sign out, and the next person to raise a ticket raises it as whoever is still signed in to Office 365 &mdash; so the ticket says *Circulation Desk* and the desk has no idea who to go back to. Three pieces now close that loop.
+
+  A user account can be marked **Shared account** on its record in Settings → Users. It is a label and nothing else: it grants no access, removes none, and changes nothing about how that account signs in or what it can see. What it does is give the rest of the system something to react to.
+
+  The **form builder** gained conditions. Every field on a ticket type now has a **Show when…** setting alongside its required/optional/hidden pill, with two tests available: *the person is signed in to a shared account*, and *another field on this form has a particular answer* (is exactly / is not / has any answer / is blank). Conditions are per ticket type, so the same field can be unconditional on one type and gated on another.
+
+  A condition can only ever **remove** a field, never add one. A field set to Hidden stays hidden whatever its condition says, and a field whose condition does not hold is treated as absent: not shown, not required, and its value not saved even if one is posted anyway. That last part is decided on the server, not in the browser, so hand-editing the page to reveal a gated field and submitting it writes nothing.
+
+  Finally, a new **Person** field type. It autocompletes against the staff directory as you type and stores the chosen person's *account*, not the text you typed &mdash; which is the entire point. A typed name gives you "sarah", "S. Chen" and the occasional "asdf", none of which join to anything; an account resolves to a current name and a working email address every time the ticket is opened, and keeps doing so after somebody changes their name or their address. Agents see the name and address on the ticket, both clickable. Half-typed text that was never picked from the list submits as blank rather than as a wrong guess, and the form says so while you are still typing.
+
+  Put together: tick **Shared account** on the desk login, add a **Person** field to the ticket types you care about, and set its condition to *shared account*. Staff signed in as themselves see the form exactly as they do today.
+
+  The directory lookup behind the Person field is a new endpoint rather than the existing CC search, which is staff-only and would have returned nothing on the portal &mdash; where this feature has to work. It is narrower in exchange: users flagged external can neither call it nor appear in its results, so an outside requester who arrived by email cannot read the staff directory through it, and shared accounts are excluded from results as well, since a shared login is never the answer to "who are you".
+
+### Fixed
+- **Typing in a custom field no longer loses characters.** The ticket form re-sorts its fields whenever the layout is re-evaluated, and re-sorting physically moves each field's container in the page, which drops focus from whatever is inside it. Re-evaluating on every keystroke &mdash; needed so a field gated on another field appears as soon as its trigger is answered &mdash; therefore ate characters mid-word. The order depends only on the ticket type, so the sort now runs when the type changes and never on a keystroke.
+
 ## 2.171.1 &mdash; 2026-09-10
 
 ### Fixed

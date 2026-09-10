@@ -109,6 +109,39 @@ $requiredAttr = ($portalMode && $cfRequired) ? 'required' : '';
            placeholder="<?= e($cf['placeholder'] ?? '') ?>"
            value="<?= e(old($cfKey)) ?>" <?= $requiredAttr ?>>
 
+    <?php elseif ($cf['field_type'] === 'user_picker'):
+        // Stores the chosen user's id, never the typed text — the typed text is
+        // only ever a search box. old() holds the id after a failed submit, so
+        // the label has to be resolved back for redisplay.
+        $upId    = (string) old($cfKey);
+        $upLabel = '';
+        if ($upId !== '' && ctype_digit($upId)) {
+            $upStmt = Database::connect()->prepare(
+                'SELECT CONCAT(first_name, " ", last_name) AS n, email FROM users WHERE id = ?'
+            );
+            $upStmt->execute([(int) $upId]);
+            if ($upRow = $upStmt->fetch()) {
+                $upLabel = $upRow['n'] . ' <' . $upRow['email'] . '>';
+            } else {
+                $upId = '';   // stale id — don't redisplay a user that's gone
+            }
+        }
+    ?>
+    <div class="position-relative user-picker" data-field-id="<?= (int) $cf['id'] ?>" style="max-width:400px;">
+        <input type="text" class="form-control user-picker-search"
+               id="up_input_<?= (int) $cf['id'] ?>"
+               placeholder="<?= e($cf['placeholder'] ?: 'Start typing a name…') ?>"
+               value="<?= e($upLabel) ?>" autocomplete="off"
+               <?= $cfRequired ? 'data-required="1"' : '' ?>>
+        <input type="hidden" class="user-picker-value" name="<?= e($cfKey) ?>"
+               id="up_value_<?= (int) $cf['id'] ?>" value="<?= e($upId) ?>">
+        <div id="up_drop_<?= (int) $cf['id'] ?>" class="mention-dropdown"
+             style="display:none;position:absolute;top:100%;left:0;z-index:1050;width:100%;"></div>
+    </div>
+    <div class="form-text user-picker-hint" id="up_hint_<?= (int) $cf['id'] ?>">
+        Pick a name from the list so the ticket is linked to the right person.
+    </div>
+
     <?php elseif ($cf['field_type'] === 'cc'): ?>
     <div id="cc_badges_<?= (int) $cf['id'] ?>" class="d-flex flex-wrap gap-2 mb-2"></div>
     <div id="cc_hidden_<?= (int) $cf['id'] ?>"></div>

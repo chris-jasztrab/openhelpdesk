@@ -15,6 +15,18 @@ $fieldTypeMeta = [
     'image'      => ['label' => 'Image',           'icon' => 'bi-image'],
     'cc'         => ['label' => 'CC',              'icon' => 'bi-people'],
     'date_range' => ['label' => 'Date Range',      'icon' => 'bi-calendar-range'],
+    'user_picker'=> ['label' => 'Person',          'icon' => 'bi-person-badge'],
+];
+
+// Conditions an admin can put in front of a field. Keys match the `type` /
+// `op` values in ticket_type_form_layout.condition_json, and the PHP and JS
+// evaluators (evaluateFieldCondition / FieldConditions.evaluate).
+$conditionSources = [];   // filled per selected type below; the condition modal reads it
+$conditionOps = [
+    'equals'     => 'is exactly',
+    'not_equals' => 'is not',
+    'filled'     => 'has any answer',
+    'empty'      => 'is blank',
 ];
 
 $systemFieldMeta = [
@@ -181,6 +193,19 @@ $sysDefaults = systemFieldDefaults();
     .vis-pill[data-vis="hidden"]   { background: #f1f5f9; color: #475569; border-color: #cbd5e1; }
     .vis-pill:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(15,23,42,.08); }
     .vis-pill.is-locked { cursor: not-allowed; opacity: .6; }
+
+    /* Condition pill — only rendered when a field actually has one, so an
+       unconditional form looks exactly as it did before this existed. */
+    .cond-pill {
+        font-size: .7rem; font-weight: 600;
+        padding: .2rem .55rem; border-radius: 999px;
+        cursor: pointer; user-select: none;
+        background: #fef3c7; color: #92400e; border: 1px solid #fde68a;
+        display: inline-flex; align-items: center; gap: .25rem;
+        max-width: 15rem; overflow: hidden;
+        white-space: nowrap; text-overflow: ellipsis;
+    }
+    .cond-pill:hover { box-shadow: 0 2px 4px rgba(15,23,42,.08); }
 
     /* Action buttons in row */
     .field-row .row-action {
@@ -378,6 +403,28 @@ $sysDefaults = systemFieldDefaults();
             <div id="formCanvasList">
                 <?php
                 $bodyRows = array_filter($layout_, fn($r) => !($r['kind'] === 'system' && in_array($r['key'], ['subject', 'description'], true)));
+
+                // Fields on this type that another field's condition can point
+                // at. Display-only blocks are excluded — they hold no answer.
+                foreach ($layout_ as $r) {
+                    if ($r['kind'] !== 'custom' || !$r['field']) continue;
+                    if (in_array($r['field']['field_type'], ['text_block', 'image'], true)) continue;
+                    $conditionSources[(int) $r['field']['id']] = $r['label'];
+                }
+
+                // One-line plain-English rendering of a stored condition.
+                $describeCondition = function(?array $c) use ($conditionSources, $conditionOps): string {
+                    if (!$c) return '';
+                    if ($c['type'] === 'shared_account') {
+                        return 'shared accounts only';
+                    }
+                    $src = $conditionSources[(int) $c['field']] ?? 'a removed field';
+                    $op  = $conditionOps[$c['op']] ?? $c['op'];
+                    return in_array($c['op'], ['filled', 'empty'], true)
+                        ? $src . ' ' . $op
+                        : $src . ' ' . $op . ' "' . $c['value'] . '"';
+                };
+
                 foreach ($bodyRows as $row):
                     $kind = $row['kind'];
                     $key  = $row['key'];
@@ -419,6 +466,17 @@ $sysDefaults = systemFieldDefaults();
                           <?= $lockedVis ? 'title="This field can\'t be hidden or made optional."' : 'title="Click to cycle Required → Optional → Hidden"' ?>>
                         <?= ucfirst($vis) ?>
                     </span>
+                    <?php $condText = $describeCondition($row['condition'] ?? null); ?>
+                    <?php if ($condText !== ''): ?>
+                    <span class="cond-pill" title="Only shown when: <?= e($condText) ?>">
+                        <i class="bi bi-signpost-split"></i><?= e($condText) ?>
+                    </span>
+                    <?php endif; ?>
+                    <button class="row-action cond-row-btn" type="button"
+                            title="<?= $condText !== '' ? 'Edit when this field is shown' : 'Only show this field when…' ?>"
+                            data-condition="<?= e(json_encode($row['condition'] ?? null)) ?>">
+                        <i class="bi bi-signpost-split<?= $condText !== '' ? '-fill' : '' ?>"></i>
+                    </button>
                     <button class="row-action edit-row-btn" type="button" title="Rename / edit">
                         <i class="bi bi-pencil"></i>
                     </button>
@@ -492,6 +550,78 @@ $sysDefaults = systemFieldDefaults();
         <div class="canvas-empty p-3"><small>No type selected.</small></div>
         <?php endif; ?>
     </aside>
+</div>
+
+<!-- ── Condition modal: "only show this field when…" ── -->
+<div class="modal fade" id="conditionModal" tabindex="-1" data-bs-focus="false">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Show <span id="condFieldName" class="fw-normal"></span> when…</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <select class="form-select" id="condType">
+                        <option value="">Always — no condition</option>
+                        <option value="shared_account">The person is signed in to a shared account</option>
+                        <option value="field">Another field on this form has a particular answer</option>
+                    </select>
+                </div>
+
+                <div id="condSharedHelp" class="alert alert-info small py-2 px-3 d-none">
+                    Shown only to people whose account is ticked as <strong>Shared account</strong> on
+                    <a href="/admin/users">their user record</a> — a service desk or a workstation login used
+                    by several people. Everyone signed in as themselves never sees this field.
+                </div>
+
+                <div id="condFieldRow" class="d-none">
+                    <div class="row g-2">
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold">Field</label>
+                            <select class="form-select form-select-sm" id="condSourceField">
+                                <?php foreach ($conditionSources as $sid => $slabel): ?>
+                                <option value="<?= (int) $sid ?>"><?= e($slabel) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label small fw-semibold">Test</label>
+                            <select class="form-select form-select-sm" id="condOp">
+                                <?php foreach ($conditionOps as $opKey => $opLabel): ?>
+                                <option value="<?= e($opKey) ?>"><?= e($opLabel) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-7" id="condValueWrap">
+                            <label class="form-label small fw-semibold">Value</label>
+                            <input type="text" class="form-control form-control-sm" id="condValue"
+                                   placeholder="Exact value to match">
+                            <div class="form-text">
+                                For a dropdown, this is the option's numeric id. A checkbox is
+                                <code>1</code> when ticked and <code>0</code> when not.
+                            </div>
+                        </div>
+                    </div>
+                    <?php if (empty($conditionSources)): ?>
+                    <div class="alert alert-warning small py-2 px-3 mt-2 mb-0">
+                        This type has no other answerable fields yet, so there is nothing to test against.
+                    </div>
+                    <?php endif; ?>
+                </div>
+
+                <div class="alert alert-secondary small py-2 px-3 mt-3 mb-0">
+                    A condition only ever <em>removes</em> a field. One set to <strong>Hidden</strong> stays
+                    hidden regardless, and a field whose condition does not hold is not required and is not
+                    saved — so nothing can be forced onto a form this way.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="condSaveBtn">Save</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- ── Field edit modal ── -->
@@ -719,6 +849,110 @@ $sysDefaults = systemFieldDefaults();
             reloadPreview();
         });
     });
+
+    /* ── Condition editor: "only show this field when…" ──
+       Saved per layout row, so the same field can be unconditional on one
+       ticket type and gated on another. A full page reload after saving keeps
+       the pill text, the icon and the preview honest without re-deriving the
+       plain-English summary here as well as in PHP. */
+    (function() {
+        var modalEl = document.getElementById('conditionModal');
+        if (!modalEl) return;
+        // Resolve the Modal lazily: this inline script runs before the layout's
+        // bootstrap bundle, so window.bootstrap is still undefined here and
+        // constructing it now would silently disable the whole editor. Same
+        // getOrCreateInstance pattern the other modals on this page use.
+        function getModal() { return bootstrap.Modal.getOrCreateInstance(modalEl); }
+        var typeSel    = document.getElementById('condType');
+        var sharedHelp = document.getElementById('condSharedHelp');
+        var fieldRow   = document.getElementById('condFieldRow');
+        var srcSel     = document.getElementById('condSourceField');
+        var opSel      = document.getElementById('condOp');
+        var valWrap    = document.getElementById('condValueWrap');
+        var valInput   = document.getElementById('condValue');
+        var nameSpan   = document.getElementById('condFieldName');
+        var activeRow  = null;
+
+        function syncVisibility() {
+            var t = typeSel.value;
+            sharedHelp.classList.toggle('d-none', t !== 'shared_account');
+            fieldRow.classList.toggle('d-none', t !== 'field');
+            // "has any answer" / "is blank" test presence, not a value.
+            var needsValue = opSel.value !== 'filled' && opSel.value !== 'empty';
+            valWrap.classList.toggle('d-none', !needsValue);
+        }
+        typeSel.addEventListener('change', syncVisibility);
+        opSel.addEventListener('change', syncVisibility);
+
+        canvas.addEventListener('click', function(e) {
+            var btn = e.target.closest('.cond-row-btn');
+            if (!btn) return;
+            activeRow = btn.closest('.field-row');
+
+            var existing = null;
+            try { existing = JSON.parse(btn.dataset.condition || 'null'); } catch (err) {}
+
+            var labelEl = activeRow.querySelector('.row-label-text');
+            nameSpan.textContent = '“' + (labelEl ? labelEl.textContent.trim() : 'this field') + '”';
+
+            // A field can't be gated on its own answer, so don't offer itself
+            // as a source. The server refuses it too; this stops anyone
+            // getting as far as trying.
+            var selfKey = activeRow.dataset.rowKind === 'custom' ? activeRow.dataset.rowKey : null;
+            var firstUsable = null;
+            Array.prototype.forEach.call(srcSel.options, function(o) {
+                var isSelf = selfKey !== null && o.value === selfKey;
+                o.hidden = isSelf;
+                o.disabled = isSelf;
+                if (!isSelf && firstUsable === null) firstUsable = o.value;
+            });
+
+            typeSel.value = existing ? existing.type : '';
+            if (existing && existing.type === 'field') {
+                srcSel.value   = String(existing.field);
+                opSel.value    = existing.op || 'equals';
+                valInput.value = existing.value || '';
+            } else {
+                srcSel.value   = firstUsable === null ? '' : firstUsable;
+                opSel.value    = 'equals';
+                valInput.value = '';
+            }
+            // A stored condition pointing at this row itself (or at a field
+            // since removed) leaves the picker on a disabled option — fall
+            // back so Save can't resubmit something invalid.
+            if (srcSel.selectedIndex < 0 || srcSel.options[srcSel.selectedIndex].disabled) {
+                srcSel.value = firstUsable === null ? '' : firstUsable;
+            }
+            syncVisibility();
+            getModal().show();
+        });
+
+        document.getElementById('condSaveBtn').addEventListener('click', function() {
+            if (!activeRow) return;
+            var condition = null;
+            if (typeSel.value === 'shared_account') {
+                condition = { type: 'shared_account' };
+            } else if (typeSel.value === 'field') {
+                if (!srcSel.value) { alert('Pick the field to test.'); return; }
+                condition = {
+                    type:  'field',
+                    field: srcSel.value,
+                    op:    opSel.value,
+                    value: valInput.value,
+                };
+            }
+
+            postJson('/admin/forms/' + typeId + '/layout/condition', {
+                kind: activeRow.dataset.rowKind,
+                key:  activeRow.dataset.rowKey,
+                condition: condition,
+            }).then(function(r) {
+                if (!r.success) { alert(r.error || 'Could not save the condition'); return; }
+                getModal().hide();
+                location.reload();
+            });
+        });
+    })();
 
     /* ── Add new field ── */
     document.querySelectorAll('.add-field-btn').forEach(function(btn) {

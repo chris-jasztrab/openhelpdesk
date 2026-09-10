@@ -139,9 +139,22 @@ endif; ?>
             $initialLayout = $formLayouts[$initialTypeId] ?? [];
 
             // Initial visibility lookup: 'system|priority' => 'required', etc.
+            //
+            // Conditions are folded in here too, but only the 'shared_account'
+            // kind — that one is knowable at render time and must not depend on
+            // JavaScript, or a shared login with scripting blocked would never
+            // be shown the field asking who they are. Field-to-field conditions
+            // have nothing to compare against on a blank form, so they are left
+            // to the layout driver below, which runs immediately on load.
             $initialVis = [];
             foreach ($initialLayout as $r) {
-                $initialVis[$r['kind'] . '|' . $r['key']] = $r['visibility'];
+                $vis  = $r['visibility'];
+                $cond = $r['condition'] ?? null;
+                if ($vis !== 'hidden' && $cond && ($cond['type'] ?? '') === 'shared_account'
+                    && empty($isSharedAccount)) {
+                    $vis = 'hidden';
+                }
+                $initialVis[$r['kind'] . '|' . $r['key']] = $vis;
             }
             $visOf = function(string $kind, string $key) use ($initialVis, $initialTypeId): string {
                 // Field not in this type's layout → 'absent' (hidden + skipped on submit)
@@ -305,6 +318,8 @@ endif; ?>
     </div>
 </div>
 
+<script src="/assets/js/field-conditions.js"></script>
+<script src="/assets/js/user-picker.js"></script>
 <script>
 // ── Per-type form layout: reorder + show/hide + required toggling ──
 (function() {
@@ -314,6 +329,36 @@ endif; ?>
     var typeSelect  = document.getElementById('type_id');
     var dynRoot     = document.getElementById('dynamic-fields');
     if (!typeSelect || !dynRoot) return;
+
+    // Context for conditional fields. isSharedAccount comes from the server —
+    // the browser is never asked to decide whether this login is a shared one.
+    var condCtx = {
+        dynRoot: dynRoot,
+        isSharedAccount: <?= !empty($isSharedAccount) ? 'true' : 'false' ?>
+    };
+    function conditionPasses(row) {
+        return !window.FieldConditions
+            || window.FieldConditions.evaluate(row.condition, condCtx);
+    }
+
+    // Before a type is picked the form shows every field as a neutral preview,
+    // and there is no layout row to read a condition from. Fall back to the
+    // union across all types: preview a field only if some type would show it
+    // right now. Without this a field gated on "shared account" would appear
+    // to everyone until they chose a type and then disappear again.
+    function previewable(kind, key) {
+        var seen = false;
+        for (var t in formLayouts) {
+            if (!Object.prototype.hasOwnProperty.call(formLayouts, t)) continue;
+            for (var i = 0; i < formLayouts[t].length; i++) {
+                var row = formLayouts[t][i];
+                if (row.kind !== kind || String(row.key) !== String(key)) continue;
+                seen = true;
+                if (row.visibility !== 'hidden' && conditionPasses(row)) return true;
+            }
+        }
+        return !seen;   // a field on no type at all keeps the old preview behaviour
+    }
 
     // Show only the priorities the selected type allows. A type with no entry in
     // typePriorities is unrestricted (all options shown). If the currently
@@ -353,14 +398,24 @@ endif; ?>
         });
     }
 
-    function applyLayout() {
+    // reorder: the sort pass physically moves wraps with appendChild, which
+    // blurs whatever is focused inside them and drops keystrokes mid-word. The
+    // order only depends on the ticket type, so re-sort when that changes and
+    // never on a keystroke — condition re-evaluation still runs every time.
+    function applyLayout(reorder) {
         filterPriorities();
         var selectedType = parseInt(typeSelect.value) || 0;
         var layout = formLayouts[selectedType] || [];
 
-        // Build a map: 'kind|key' → visibility for the selected type
+        // Build a map: 'kind|key' → visibility for the selected type. A row
+        // whose condition fails collapses to 'hidden' — the same treatment the
+        // server gives it, so what you can see and what will be saved agree.
         var visByKey = {};
-        layout.forEach(function(row) { visByKey[row.kind + '|' + row.key] = row.visibility; });
+        layout.forEach(function(row) {
+            var v = row.visibility;
+            if (v !== 'hidden' && !conditionPasses(row)) v = 'hidden';
+            visByKey[row.kind + '|' + row.key] = v;
+        });
 
         // Pass 1: show/hide each wrap + toggle required
         var wraps = dynRoot.querySelectorAll('.dynamic-field-wrap');
@@ -374,7 +429,7 @@ endif; ?>
                 // written for one specific type and stack up as noise otherwise.
                 var contentOnly = kind === 'custom' &&
                     (wrap.dataset.fieldType === 'text_block' || wrap.dataset.fieldType === 'image');
-                wrap.style.display = contentOnly ? 'none' : '';
+                wrap.style.display = (contentOnly || !previewable(kind, key)) ? 'none' : '';
                 setRequired(wrap, false);
                 return;
             }
@@ -388,7 +443,7 @@ endif; ?>
         });
 
         // Pass 2: reorder by layout sort_order (skip if no type selected)
-        if (!selectedType) return;
+        if (!selectedType || reorder === false) return;
         layout
             .slice()
             .sort(function(a, b) { return a.sort_order - b.sort_order; })
@@ -399,8 +454,13 @@ endif; ?>
             });
     }
 
-    typeSelect.addEventListener('change', applyLayout);
-    applyLayout();
+    typeSelect.addEventListener('change', function() { applyLayout(true); });
+    // Re-run when any field changes, so a field gated on another field appears
+    // as soon as its trigger is answered rather than on the next type change.
+    if (window.FieldConditions) {
+        window.FieldConditions.watch(dynRoot, function() { applyLayout(false); });
+    }
+    applyLayout(true);
 })();
 
 <?php if (!empty($sharedTemplates)): ?>

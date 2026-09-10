@@ -911,6 +911,7 @@ $router->post('/admin/users/create', function () {
     $phone           = trim($_POST['work_phone'] ?? '');
     $locId           = !empty($_POST['location_id']) ? (int) $_POST['location_id'] : null;
     $canViewLocTix   = !empty($_POST['can_view_location_tickets']) ? 1 : 0;
+    $isSharedAccount = !empty($_POST['is_shared_account']) ? 1 : 0;
 
     if ($fn === '' || $ln === '' || $email === '' || $password === '') {
         flashInput($_POST);
@@ -932,10 +933,10 @@ $router->post('/admin/users/create', function () {
     $db = Database::connect();
     try {
         $stmt = $db->prepare(
-            'INSERT INTO users (first_name, last_name, email, password, role, avatar, work_phone, location_id, can_view_location_tickets)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            'INSERT INTO users (first_name, last_name, email, password, role, avatar, work_phone, location_id, can_view_location_tickets, is_shared_account)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
-        $stmt->execute([$fn, $ln, $email, password_hash($password, PASSWORD_DEFAULT), $role, $avatar, $phone, $locId, $canViewLocTix]);
+        $stmt->execute([$fn, $ln, $email, password_hash($password, PASSWORD_DEFAULT), $role, $avatar, $phone, $locId, $canViewLocTix, $isSharedAccount]);
         $newId = (int) $db->lastInsertId();
         logAudit('user.create', $newId, 'user', "{$fn} {$ln} ({$email}), role={$role}");
         flash('success', 'User created successfully.');
@@ -1157,6 +1158,7 @@ $router->post('/admin/users/{id}/edit', function (array $p) {
     $phone         = trim($_POST['work_phone'] ?? '');
     $locId         = !empty($_POST['location_id']) ? (int) $_POST['location_id'] : null;
     $canViewLocTix = !empty($_POST['can_view_location_tickets']) ? 1 : 0;
+    $isSharedAcct  = !empty($_POST['is_shared_account']) ? 1 : 0;
 
     if ($fn === '' || $ln === '' || $email === '') {
         flashInput($_POST);
@@ -1213,14 +1215,14 @@ $router->post('/admin/users/{id}/edit', function (array $p) {
     try {
         if ($password !== '') {
             $stmt = $db->prepare(
-                'UPDATE users SET first_name=?, last_name=?, email=?, password=?, role=?, avatar=?, work_phone=?, location_id=?, can_view_location_tickets=? WHERE id=?'
+                'UPDATE users SET first_name=?, last_name=?, email=?, password=?, role=?, avatar=?, work_phone=?, location_id=?, can_view_location_tickets=?, is_shared_account=? WHERE id=?'
             );
-            $stmt->execute([$fn, $ln, $email, password_hash($password, PASSWORD_DEFAULT), $role, $avatar, $phone, $locId, $canViewLocTix, $id]);
+            $stmt->execute([$fn, $ln, $email, password_hash($password, PASSWORD_DEFAULT), $role, $avatar, $phone, $locId, $canViewLocTix, $isSharedAcct, $id]);
         } else {
             $stmt = $db->prepare(
-                'UPDATE users SET first_name=?, last_name=?, email=?, role=?, avatar=?, work_phone=?, location_id=?, can_view_location_tickets=? WHERE id=?'
+                'UPDATE users SET first_name=?, last_name=?, email=?, role=?, avatar=?, work_phone=?, location_id=?, can_view_location_tickets=?, is_shared_account=? WHERE id=?'
             );
-            $stmt->execute([$fn, $ln, $email, $role, $avatar, $phone, $locId, $canViewLocTix, $id]);
+            $stmt->execute([$fn, $ln, $email, $role, $avatar, $phone, $locId, $canViewLocTix, $isSharedAcct, $id]);
         }
         logAudit('user.update', $id, 'user', "{$fn} {$ln} ({$email}), role={$role}");
         flash('success', 'User updated successfully.');
@@ -4394,6 +4396,7 @@ $router->get('/admin/tickets/create', function () {
                 'sort_order' => $row['sort_order'],
                 'visibility' => $row['visibility'],
                 'label'      => $row['label'],
+                'condition'  => $row['condition'],
             ];
             if ($row['kind'] === 'custom' && $row['field'] && !isset($seenCustomIds[$row['field']['id']])) {
                 $seenCustomIds[$row['field']['id']] = true;
@@ -4428,6 +4431,7 @@ $router->get('/admin/tickets/create', function () {
         'fieldOptions'  => $fieldOptions,
         'formLayouts'   => $formLayouts,
         'typePriorityMap' => typePriorityMap($db),
+        'isSharedAccount' => userIsSharedAccount($db, Auth::id()),
     ]);
 });
 
@@ -4553,10 +4557,18 @@ $router->post('/admin/tickets/create', function () {
     }
     // Save custom field values (filtered by this ticket type's layout —
     // hidden fields are skipped so a stale value can't leak through).
-    $adminLayout = $typeId ? getFormLayoutForType($db, $typeId, true) : [];
+    // Conditions are evaluated against the session user — the person filling
+    // the form in — not the requester, who on this form may be someone else
+    // entirely when a ticket is raised on their behalf.
+    $adminLayout   = $typeId ? getFormLayoutForType($db, $typeId, false) : [];
+    $adminVisByKey = resolveLayoutVisibility($db, $adminLayout, $_POST, Auth::id());
     $adminCustomFields = array_values(array_map(
         fn($r) => $r['field'],
-        array_filter($adminLayout, fn($r) => $r['kind'] === 'custom' && $r['field'] !== null)
+        array_filter(
+            $adminLayout,
+            fn($r) => $r['kind'] === 'custom' && $r['field'] !== null
+                && ($adminVisByKey[$r['kind'] . '|' . $r['key']] ?? 'hidden') !== 'hidden'
+        )
     ));
     if (!empty($adminCustomFields)) {
         $cfSaveStmt = $db->prepare(
@@ -4579,6 +4591,10 @@ $router->post('/admin/tickets/create', function () {
                 $val = json_encode(['from' => $from, 'to' => $to]);
             } elseif ($cf['field_type'] === 'checkbox') {
                 $val = isset($_POST[$key]) ? '1' : '0';
+            } elseif ($cf['field_type'] === 'user_picker') {
+                $pickedId = validUserPickerId($db, $_POST[$key] ?? null);
+                if ($pickedId === null) continue;
+                $val = (string) $pickedId;
             } else {
                 $val = $_POST[$key] ?? null;
                 if ($val === null || trim($val) === '') continue;
@@ -13126,6 +13142,76 @@ $router->post('/admin/forms/{typeId}/layout/visibility', function (array $p) {
     exit;
 });
 
+/**
+ * Set (or clear) the condition in front of one field on one ticket type.
+ *
+ * A null condition clears it. Validation is deliberately strict here rather
+ * than at read time: parseFieldCondition() fails open so a corrupt row still
+ * renders its field, which is the right call for display but would let a
+ * malformed condition sit in the table looking as though it worked.
+ */
+$router->post('/admin/forms/{typeId}/layout/condition', function (array $p) {
+    Auth::requirePermission('workflows.manage');
+    header('Content-Type: application/json');
+    requireJsonCsrf();
+    $typeId = (int) $p['typeId'];
+    $body   = json_decode(file_get_contents('php://input'), true);
+    $kind   = $body['kind'] ?? '';
+    $key    = (string) ($body['key'] ?? '');
+    $cond   = $body['condition'] ?? null;
+
+    if (!in_array($kind, ['system', 'custom'], true) || $key === '') {
+        echo json_encode(['success' => false, 'error' => 'Bad input']); exit;
+    }
+
+    $db   = Database::connect();
+    $json = null;
+
+    if (is_array($cond)) {
+        $type = $cond['type'] ?? '';
+        if ($type === 'shared_account') {
+            $json = json_encode(['type' => 'shared_account']);
+        } elseif ($type === 'field') {
+            $srcId = (int) ($cond['field'] ?? 0);
+            $op    = (string) ($cond['op'] ?? 'equals');
+            if (!$srcId || !in_array($op, FIELD_CONDITION_OPS, true)) {
+                echo json_encode(['success' => false, 'error' => 'Pick a field and a test.']); exit;
+            }
+            // A field can't be gated on its own answer — it would have to be
+            // visible to be answered and answered to be visible.
+            if ($kind === 'custom' && (int) $key === $srcId) {
+                echo json_encode(['success' => false, 'error' => 'A field can\'t depend on its own answer.']); exit;
+            }
+            // The source has to be a field that actually exists on this type,
+            // or the condition can never be satisfied.
+            $srcCheck = $db->prepare(
+                'SELECT 1 FROM ticket_type_form_layout
+                 WHERE type_id = ? AND field_kind = "custom" AND field_key = ?'
+            );
+            $srcCheck->execute([$typeId, (string) $srcId]);
+            if (!$srcCheck->fetchColumn()) {
+                echo json_encode(['success' => false, 'error' => 'That field is not on this ticket type\'s form.']); exit;
+            }
+            $json = json_encode([
+                'type'  => 'field',
+                'field' => (string) $srcId,
+                'op'    => $op,
+                'value' => (string) ($cond['value'] ?? ''),
+            ]);
+        } else {
+            echo json_encode(['success' => false, 'error' => 'Unknown condition type']); exit;
+        }
+    }
+
+    $db->prepare(
+        'UPDATE ticket_type_form_layout SET condition_json = ?
+         WHERE type_id = ? AND field_kind = ? AND field_key = ?'
+    )->execute([$json, $typeId, $kind, $key]);
+
+    echo json_encode(['success' => true]);
+    exit;
+});
+
 // Update label override for a single row. Body: { kind, key, label_override }
 // Empty string clears the override (falls back to the field's default label).
 $router->post('/admin/forms/{typeId}/layout/label', function (array $p) {
@@ -13222,7 +13308,7 @@ $router->post('/admin/forms/{typeId}/field/create', function (array $p) {
     $typeId = (int) $p['typeId'];
     $body   = json_decode(file_get_contents('php://input'), true);
 
-    $allowed = ['text','textarea','checkbox','dropdown','date','number','decimal','dependent','text_block','image','cc','date_range'];
+    $allowed = ['text','textarea','checkbox','dropdown','date','number','decimal','dependent','text_block','image','cc','date_range','user_picker'];
     $fieldType = $body['field_type'] ?? '';
     $label     = trim((string) ($body['label'] ?? ''));
     if (!in_array($fieldType, $allowed, true)) {
@@ -13233,7 +13319,7 @@ $router->post('/admin/forms/{typeId}/field/create', function (array $p) {
             'text' => 'Text Field', 'textarea' => 'Multi-line Text', 'checkbox' => 'Checkbox',
             'dropdown' => 'Dropdown', 'date' => 'Date', 'number' => 'Number', 'decimal' => 'Decimal',
             'dependent' => 'Dependent Field', 'text_block' => 'Text Block', 'image' => 'Image',
-            'cc' => 'CC', 'date_range' => 'Date Range',
+            'cc' => 'CC', 'date_range' => 'Date Range', 'user_picker' => 'Person',
         ];
         $label = $labelMap[$fieldType];
     }

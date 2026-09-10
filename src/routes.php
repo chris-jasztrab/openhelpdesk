@@ -858,6 +858,52 @@ $router->get('/api/cc-search', function () {
     exit;
 });
 
+/**
+ * Directory lookup for `user_picker` custom fields.
+ *
+ * Separate from /api/cc-search, which is staff-only: this one has to answer for
+ * portal users, because the whole point of the field is a person on a shared
+ * login saying who they are. It is deliberately narrower than cc-search in
+ * exchange — external users can neither call it nor appear in its results, so
+ * the staff directory is not readable by someone who arrived via an emailed
+ * ticket, and the payload carries nothing beyond what the picker draws.
+ */
+$router->get('/api/user-search', function () {
+    Auth::requireAuth();
+    header('Content-Type: application/json');
+
+    $db = Database::connect();
+
+    $meStmt = $db->prepare('SELECT is_external FROM users WHERE id = ?');
+    $meStmt->execute([Auth::id()]);
+    if ((int) $meStmt->fetchColumn() === 1) {
+        http_response_code(403);
+        echo json_encode([]);
+        exit;
+    }
+
+    $q = trim($_GET['q'] ?? '');
+    if (strlen($q) < 2) {
+        echo json_encode([]);
+        exit;
+    }
+
+    $like = '%' . $q . '%';
+    $stmt = $db->prepare(
+        "SELECT id, first_name, last_name, email
+         FROM users
+         WHERE is_external = 0
+           AND is_shared_account = 0
+           AND (first_name LIKE ? OR last_name LIKE ? OR email LIKE ?
+                OR CONCAT(first_name, ' ', last_name) LIKE ?)
+         ORDER BY first_name, last_name
+         LIMIT 8"
+    );
+    $stmt->execute([$like, $like, $like, $like]);
+    echo json_encode($stmt->fetchAll());
+    exit;
+});
+
 /* ------------------------------------------------------------------
  * Ticket CC Management (JSON API)
  * ------------------------------------------------------------------ */

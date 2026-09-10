@@ -157,9 +157,19 @@ $statusOptions = ticketStatusLabelMap();
                     $portalMode = false;
                     $initialTypeId = (int) (old('type_id', '0'));
                     $initialLayout = $formLayouts[$initialTypeId] ?? [];
+                    // Shared-account conditions resolve server-side so the field
+                    // is correct without JavaScript; field-to-field conditions
+                    // have nothing to compare against yet and are left to the
+                    // layout driver, which runs on load.
                     $initialVis = [];
                     foreach ($initialLayout as $r) {
-                        $initialVis[$r['kind'] . '|' . $r['key']] = $r['visibility'];
+                        $vis  = $r['visibility'];
+                        $cond = $r['condition'] ?? null;
+                        if ($vis !== 'hidden' && $cond && ($cond['type'] ?? '') === 'shared_account'
+                            && empty($isSharedAccount)) {
+                            $vis = 'hidden';
+                        }
+                        $initialVis[$r['kind'] . '|' . $r['key']] = $vis;
                     }
                     $visOf = function(string $kind, string $key) use ($initialVis, $initialTypeId): string {
                         if (!$initialTypeId) return 'optional';
@@ -359,6 +369,8 @@ $statusOptions = ticketStatusLabelMap();
     </div>
 </div>
 
+<script src="/assets/js/field-conditions.js"></script>
+<script src="/assets/js/user-picker.js"></script>
 <script>
 // ── Per-type form layout: reorder + show/hide + required toggling ──
 (function() {
@@ -368,6 +380,33 @@ $statusOptions = ticketStatusLabelMap();
     var typeSelect  = document.getElementById('type_id');
     var dynRoot     = document.getElementById('dynamic-fields');
     if (!typeSelect || !dynRoot) return;
+
+    // Context for conditional fields. isSharedAccount is decided server-side.
+    var condCtx = {
+        dynRoot: dynRoot,
+        isSharedAccount: <?= !empty($isSharedAccount) ? 'true' : 'false' ?>
+    };
+    function conditionPasses(row) {
+        return !window.FieldConditions
+            || window.FieldConditions.evaluate(row.condition, condCtx);
+    }
+
+    // With no type picked there is no layout row to read a condition from, so
+    // preview a field only if some type would show it right now — otherwise a
+    // field gated on "shared account" flashes up for everyone.
+    function previewable(kind, key) {
+        var seen = false;
+        for (var t in formLayouts) {
+            if (!Object.prototype.hasOwnProperty.call(formLayouts, t)) continue;
+            for (var i = 0; i < formLayouts[t].length; i++) {
+                var row = formLayouts[t][i];
+                if (row.kind !== kind || String(row.key) !== String(key)) continue;
+                seen = true;
+                if (row.visibility !== 'hidden' && conditionPasses(row)) return true;
+            }
+        }
+        return !seen;
+    }
 
     // Show only the priorities the selected type allows; reset the picker if the
     // current selection is no longer offered. Types with no entry are unrestricted.
@@ -395,12 +434,21 @@ $statusOptions = ticketStatusLabelMap();
         });
     }
 
-    function applyLayout() {
+    // reorder: the sort pass moves wraps with appendChild, which blurs whatever
+    // is focused inside them and drops keystrokes mid-word. Order depends only
+    // on the ticket type, so re-sort on that and never on a keystroke.
+    function applyLayout(reorder) {
         filterPriorities();
         var selectedType = parseInt(typeSelect.value) || 0;
         var layout = formLayouts[selectedType] || [];
+        // A row whose condition fails collapses to 'hidden', matching what the
+        // server will do with the submission.
         var visByKey = {};
-        layout.forEach(function(row) { visByKey[row.kind + '|' + row.key] = row.visibility; });
+        layout.forEach(function(row) {
+            var v = row.visibility;
+            if (v !== 'hidden' && !conditionPasses(row)) v = 'hidden';
+            visByKey[row.kind + '|' + row.key] = v;
+        });
 
         dynRoot.querySelectorAll('.dynamic-field-wrap').forEach(function(wrap) {
             var kind = wrap.dataset.fieldKind;
@@ -412,7 +460,7 @@ $statusOptions = ticketStatusLabelMap();
                 // written for one type and they stack up as noise otherwise.
                 var contentOnly = kind === 'custom' &&
                     (wrap.dataset.fieldType === 'text_block' || wrap.dataset.fieldType === 'image');
-                wrap.style.display = contentOnly ? 'none' : '';
+                wrap.style.display = (contentOnly || !previewable(kind, key)) ? 'none' : '';
                 setRequired(wrap, false);
                 return;
             }
@@ -425,7 +473,7 @@ $statusOptions = ticketStatusLabelMap();
             setRequired(wrap, v === 'required');
         });
 
-        if (!selectedType) return;
+        if (!selectedType || reorder === false) return;
         layout
             .slice()
             .sort(function(a, b) { return a.sort_order - b.sort_order; })
@@ -436,8 +484,11 @@ $statusOptions = ticketStatusLabelMap();
             });
     }
 
-    typeSelect.addEventListener('change', applyLayout);
-    applyLayout();
+    typeSelect.addEventListener('change', function() { applyLayout(true); });
+    if (window.FieldConditions) {
+        window.FieldConditions.watch(dynRoot, function() { applyLayout(false); });
+    }
+    applyLayout(true);
 })();
 
 // ── Narrow the Assign-To list to the chosen type/group's members ──

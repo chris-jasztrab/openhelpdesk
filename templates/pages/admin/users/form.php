@@ -125,6 +125,24 @@ $targetOutranksEditor = $isEdit && !Auth::isAdmin()
                     <div class="form-text">When enabled, this user can view all tickets assigned to their <?= label('location.singular', 'location') ?> — even if they are not an agent or admin.</div>
                 </div>
 
+                <!-- Shared account -->
+                <div class="col-12">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch"
+                               id="is_shared_account" name="is_shared_account" value="1"
+                               <?= !empty(old('is_shared_account', $editing['is_shared_account'] ?? 0)) ? 'checked' : '' ?>>
+                        <label class="form-check-label fw-semibold" for="is_shared_account">
+                            Shared account
+                        </label>
+                    </div>
+                    <div class="form-text">
+                        Mark this if the login is used by more than one person — a service desk, a branch
+                        workstation, a staff-room PC left signed in. On its own this changes no access. It lets
+                        the <a href="/admin/workflows/ticket-fields">form builder</a> show extra fields only to
+                        people signed in this way, so you can ask who is actually raising the ticket.
+                    </div>
+                </div>
+
                 <!-- Avatar -->
                 <div class="col-md-6">
                     <label for="avatar" class="form-label fw-semibold">Avatar Image</label>

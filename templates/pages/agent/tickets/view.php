@@ -942,6 +942,15 @@ $resolutionClosedSlugs  = ticketClosedBucketSlugs();
                 <dd class="col-7 mb-2">
                     <?php if ($cf['field_type'] === 'checkbox'): ?>
                         <?= $cfVal === '1' ? 'Yes' : 'No' ?>
+                    <?php elseif ($cf['field_type'] === 'user_picker'):
+                        $upPerson = userPickerDisplay(Database::connect(), $cfVal);
+                    ?>
+                        <?php if ($upPerson): ?>
+                            <?= e($upPerson['name']) ?>
+                            <a href="mailto:<?= e($upPerson['email']) ?>" class="text-muted small d-block text-break"><?= e($upPerson['email']) ?></a>
+                        <?php else: ?>
+                            <span class="text-muted">&mdash;</span>
+                        <?php endif; ?>
                     <?php elseif ($cf['field_type'] === 'dropdown'): ?>
                         <?php
                             $selOpt = array_filter($cfOpts, fn($o) => (int)$o['id'] === (int)$cfVal);

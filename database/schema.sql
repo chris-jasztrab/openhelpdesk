@@ -740,7 +740,7 @@ CREATE TABLE IF NOT EXISTS `ticket_form_field_options` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE IF NOT EXISTS `ticket_form_fields` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
-  `field_type` enum('text','textarea','checkbox','dropdown','date','number','decimal','dependent','text_block','image','cc','date_range') NOT NULL,
+  `field_type` enum('text','textarea','checkbox','dropdown','date','number','decimal','dependent','text_block','image','cc','date_range','user_picker') NOT NULL,
   `label` varchar(255) NOT NULL,
   `placeholder` varchar(255) DEFAULT NULL,
   `config` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`config`)),
@@ -755,6 +755,7 @@ CREATE TABLE IF NOT EXISTS `ticket_type_form_layout` (
   `field_key` varchar(64) NOT NULL,
   `sort_order` int(11) NOT NULL DEFAULT 0,
   `visibility` enum('required','optional','hidden') NOT NULL DEFAULT 'optional',
+  `condition_json` longtext DEFAULT NULL,
   `label_override` varchar(255) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
@@ -989,6 +990,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `password` varchar(255) NOT NULL,
   `role` varchar(64) NOT NULL DEFAULT 'user',
   `is_external` tinyint(1) NOT NULL DEFAULT 0,
+  `is_shared_account` tinyint(1) NOT NULL DEFAULT 0,
   `avatar` varchar(255) DEFAULT NULL,
   `azure_oid` varchar(128) DEFAULT NULL,
   `work_phone` varchar(50) DEFAULT NULL,

@@ -309,6 +309,11 @@ if ($solutionTimelineId > 0) {
                     $cfOpts = $fieldOptions[$cf['id']] ?? [];
                     if ($cf['field_type'] === 'checkbox') {
                         $display = $raw === '1' ? 'Yes' : 'No';
+                    } elseif ($cf['field_type'] === 'user_picker') {
+                        // Name only here — the portal is the requester's own
+                        // view and has no reason to hand out addresses.
+                        $upPerson = userPickerDisplay(Database::connect(), $raw);
+                        $display  = $upPerson ? $upPerson['name'] : '';
                     } elseif ($cf['field_type'] === 'dropdown') {
                         $display = resolveOptLabel((int) $raw, $cfOpts);
                         if (!$display) $display = $raw;
