@@ -11,6 +11,15 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.171.1 &mdash; 2026-09-10
+
+### Fixed
+- **Custom fields filled in on the portal were silently thrown away.** The portal's ticket-create handler guarded its entire custom-field save block on a variable that was never assigned anywhere in the handler. An undefined variable is empty, so the guard was always false and the block never ran: every custom field a portal user filled in &mdash; text, dropdown, date, dependent, the lot &mdash; was discarded the moment the ticket was created, and any CC field on the portal form never reached `ticket_cc`, so those people were never added to the ticket and never notified.
+
+  Nothing surfaced this. The form rendered the fields, validated the required ones, accepted the submission and reported success; the values just never reached `ticket_field_values`. The admin create handler builds the equivalent list correctly and was unaffected, so the same form filled in by an agent saved fine &mdash; which is the kind of split that makes a report of it read as a mistake by the person filing it.
+
+  The portal handler now derives the list from the ticket type's own layout, the same way the admin one does, and excludes hidden fields so a stale value posted against a field the type doesn't show can't be written either. Tickets already created with dropped values cannot be recovered &mdash; the data never reached the database.
+
 ## 2.171.0 &mdash; 2026-08-14
 
 ### Added

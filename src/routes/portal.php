@@ -477,7 +477,16 @@ $router->post('/portal/tickets/create', function () {
         recordDupOverrideOnNewTicket($db, $ticketId, (int) Auth::id(), $dupOverrideCsv);
     }
 
-    // Save custom field values
+    // Save custom field values. Derived from this ticket type's layout rather
+    // than from the POST body, so a hidden field's stale value can't leak
+    // through — the same filtering the admin create handler applies.
+    $visibleCustomFields = array_values(array_map(
+        fn($r) => $r['field'],
+        array_filter(
+            $typeLayout,
+            fn($r) => $r['kind'] === 'custom' && $r['field'] !== null && $r['visibility'] !== 'hidden'
+        )
+    ));
     if (!empty($visibleCustomFields)) {
         $cfSaveStmt = $db->prepare(
             'INSERT INTO ticket_field_values (ticket_id, field_id, value) VALUES (?, ?, ?)
