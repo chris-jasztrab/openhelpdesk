@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.172.1 &mdash; 2026-10-01
+
+### Fixed
+- **The CC field on a form now actually autocompletes, everywhere.** Add a CC field to a ticket type and start typing a name or an email: matches appear after two characters, and Enter, Tab, a semicolon or a comma takes the highlighted one (or the first) and clears the box for the next person. Click a badge's × to drop someone.
+
+  Two things were broken before. On the portal the field searched an endpoint that only answered for staff, so a requester saw nothing however much they typed. On the agent/admin create form the field drew as a plain text box with no search behind it at all, and anything typed into it was thrown away on submit rather than saved as a CC. Both forms now share one script and the same directory lookup the Person field uses; the agent form's own CC box takes Tab, semicolon and comma too, and both kinds of CC survive an autosaved draft.
+
 ## 2.172.0 &mdash; 2026-09-10
 
 ### Added

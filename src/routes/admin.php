@@ -4601,6 +4601,14 @@ $router->post('/admin/tickets/create', function () {
             }
             $cfSaveStmt->execute([$ticketId, $cf['id'], $val]);
         }
+        // CC custom fields land in ticket_cc alongside the form's own CC box.
+        $ccInsert = $db->prepare('INSERT IGNORE INTO ticket_cc (ticket_id, user_id, added_by) VALUES (?, ?, ?)');
+        foreach ($adminCustomFields as $cf) {
+            if ($cf['field_type'] !== 'cc') continue;
+            foreach (array_unique(array_map('intval', (array) ($_POST['cc_field_' . $cf['id']] ?? []))) as $uid) {
+                if ($uid > 0) $ccInsert->execute([$ticketId, $uid, Auth::id()]);
+            }
+        }
     }
 
     // Timeline — record who actually clicked submit, and (when delegating)

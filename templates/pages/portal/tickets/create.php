@@ -320,6 +320,7 @@ endif; ?>
 
 <script src="/assets/js/field-conditions.js"></script>
 <script src="/assets/js/user-picker.js"></script>
+<script src="/assets/js/cc-field.js"></script>
 <script>
 // ── Per-type form layout: reorder + show/hide + required toggling ──
 (function() {
@@ -606,129 +607,6 @@ endif; ?>
 <?php
 $ccFields = array_filter($customFields, fn($f) => $f['field_type'] === 'cc');
 ?>
-<?php if (!empty($ccFields)): ?>
-// CC field autocomplete
-(function() {
-    function initCcField(fieldId, isRequired) {
-        var input  = document.getElementById('cc_input_' + fieldId);
-        var drop   = document.getElementById('cc_drop_' + fieldId);
-        var badges = document.getElementById('cc_badges_' + fieldId);
-        var hidden = document.getElementById('cc_hidden_' + fieldId);
-        var ccSet  = {};
-        var timer  = null;
-        var results = [];
-        var active  = -1;
-
-        function escH(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
-
-        function renderBadges() {
-            badges.innerHTML = '';
-            Object.values(ccSet).forEach(function(u) {
-                var b = document.createElement('span');
-                b.className = 'badge bg-secondary d-inline-flex align-items-center gap-1 py-1 px-2';
-                b.innerHTML = escH(u.first_name + ' ' + u.last_name)
-                            + ' <span class="opacity-75 small">&lt;' + escH(u.email) + '&gt;</span>'
-                            + ' <button type="button" class="btn-close btn-close-white ms-1" style="font-size:.55rem;" aria-label="Remove" data-uid="' + u.id + '"></button>';
-                b.querySelector('.btn-close').addEventListener('click', function() {
-                    delete ccSet[u.id]; renderBadges(); renderHidden();
-                });
-                badges.appendChild(b);
-            });
-            // Required validation: if required and no users selected, mark input invalid
-            if (isRequired) {
-                input.required = Object.keys(ccSet).length === 0;
-            }
-        }
-
-        function renderHidden() {
-            hidden.innerHTML = '';
-            Object.keys(ccSet).forEach(function(id) {
-                var inp = document.createElement('input');
-                inp.type = 'hidden';
-                inp.name = 'cc_field_' + fieldId + '[]';
-                inp.value = id;
-                hidden.appendChild(inp);
-            });
-        }
-
-        function addUser(u) {
-            if (ccSet[u.id]) { close(); input.value = ''; return; }
-            ccSet[u.id] = u; renderBadges(); renderHidden();
-            input.value = ''; close();
-        }
-
-        function close() {
-            drop.style.display = 'none'; drop.innerHTML = ''; active = -1; results = [];
-        }
-
-        function renderDrop(data) {
-            results = data; active = -1;
-            if (!data.length) { close(); return; }
-            var html = '';
-            data.forEach(function(u, i) {
-                html += '<div class="mention-item" data-index="' + i + '">'
-                      + '<span class="mention-name">' + escH(u.first_name + ' ' + u.last_name) + '</span> '
-                      + '<span class="text-muted" style="font-size:.75rem;">' + escH(u.email) + '</span>'
-                      + '</div>';
-            });
-            drop.innerHTML = html; drop.style.display = 'block';
-            drop.querySelectorAll('.mention-item').forEach(function(el) {
-                el.addEventListener('mousedown', function(ev) {
-                    ev.preventDefault(); addUser(data[parseInt(this.dataset.index)]);
-                });
-            });
-        }
-
-        function setActive(idx) {
-            active = idx;
-            drop.querySelectorAll('.mention-item').forEach(function(el, i) {
-                el.classList.toggle('active', i === idx);
-            });
-        }
-
-        input.addEventListener('input', function() {
-            clearTimeout(timer);
-            var q = this.value.trim();
-            if (q.length < 2) { close(); return; }
-            timer = setTimeout(function() {
-                fetch('/api/cc-search?q=' + encodeURIComponent(q))
-                    .then(function(r) { return r.json(); }).then(renderDrop);
-            }, 250);
-        });
-
-        input.addEventListener('keydown', function(ev) {
-            if (ev.key === 'ArrowDown') { ev.preventDefault(); setActive(Math.min(active + 1, results.length - 1)); }
-            else if (ev.key === 'ArrowUp') { ev.preventDefault(); setActive(Math.max(active - 1, 0)); }
-            else if (ev.key === 'Enter') { ev.preventDefault(); if (active >= 0 && results[active]) addUser(results[active]); }
-            else if (ev.key === 'Escape') { close(); }
-        });
-
-        document.addEventListener('click', function(ev) {
-            if (!input.contains(ev.target) && !drop.contains(ev.target)) close();
-        });
-
-        if (isRequired) { input.required = true; }
-
-        // Draft autosave hooks: per-field CC state lives in this closure, so
-        // the draft glue reads/rebuilds it through this registry.
-        window._ccFieldDraftHooks = window._ccFieldDraftHooks || {};
-        window._ccFieldDraftHooks[fieldId] = {
-            get: function () {
-                return Object.values(ccSet).map(function(u) {
-                    return { id: u.id, first_name: u.first_name, last_name: u.last_name, email: u.email };
-                });
-            },
-            add: addUser,
-        };
-    }
-
-    <?php foreach ($ccFields as $ccf): ?>
-    // Required state is now per-type and managed by the layout driver above
-    // (data-required attribute), so this init no longer takes a required arg.
-    initCcField(<?= (int) $ccf['id'] ?>, false);
-    <?php endforeach; ?>
-})();
-<?php endif; ?>
 
 <?php if (!empty($customFields)): ?>
 // Dependent field cascading dropdowns

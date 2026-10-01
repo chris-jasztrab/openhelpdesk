@@ -371,6 +371,7 @@ $statusOptions = ticketStatusLabelMap();
 
 <script src="/assets/js/field-conditions.js"></script>
 <script src="/assets/js/user-picker.js"></script>
+<script src="/assets/js/cc-field.js"></script>
 <script>
 // ── Per-type form layout: reorder + show/hide + required toggling ──
 (function() {
@@ -817,8 +818,13 @@ document.addEventListener('click', e => {
     ccInput.addEventListener('keydown', function(ev) {
         if (ev.key === 'ArrowDown') { ev.preventDefault(); ccSetActive(Math.min(ccActive + 1, ccResults.length - 1)); }
         else if (ev.key === 'ArrowUp') { ev.preventDefault(); ccSetActive(Math.max(ccActive - 1, 0)); }
-        else if (ev.key === 'Enter') { ev.preventDefault(); if (ccActive >= 0 && ccResults[ccActive]) ccAddUser(ccResults[ccActive]); }
         else if (ev.key === 'Escape') { ccClose(); }
+        else if (ev.key === 'Enter' || ev.key === 'Tab' || ev.key === ';' || ev.key === ',') {
+            // Tab with nothing to pick keeps its normal job of leaving the box.
+            if (ev.key === 'Tab' && !ccResults.length) return;
+            ev.preventDefault();
+            if (ccResults.length) ccAddUser(ccResults[ccActive >= 0 ? ccActive : 0]);
+        }
     });
 
     document.addEventListener('click', function(ev) {
@@ -1078,6 +1084,14 @@ ClassicEditor.create(document.querySelector('#admin-ticket-editor'), {
             const cc = window._ccDraftGet();
             if (cc.length) extras.cc = cc;
         }
+        if (window._ccFieldDraftHooks) {
+            const ccf = {};
+            Object.keys(window._ccFieldDraftHooks).forEach(fid => {
+                const users = window._ccFieldDraftHooks[fid].get();
+                if (users.length) ccf[fid] = users;
+            });
+            if (Object.keys(ccf).length) extras.ccFields = ccf;
+        }
         const obId = document.getElementById('on_behalf_of_id').value;
         if (obId) extras.onBehalf = { id: obId, label: document.getElementById('onBehalfBadge').textContent };
         return Object.keys(extras).length ? extras : null;
@@ -1086,6 +1100,12 @@ ClassicEditor.create(document.querySelector('#admin-ticket-editor'), {
     function applyExtras(extras) {
         (extras.tags || []).forEach(t => { if (typeof addTag === 'function') addTag(t); });
         if (extras.cc && window._ccDraftAdd) extras.cc.forEach(u => window._ccDraftAdd(u));
+        if (extras.ccFields && window._ccFieldDraftHooks) {
+            Object.keys(extras.ccFields).forEach(fid => {
+                const hook = window._ccFieldDraftHooks[fid];
+                if (hook) extras.ccFields[fid].forEach(u => hook.add(u));
+            });
+        }
         if (extras.onBehalf && extras.onBehalf.id) {
             document.getElementById('on_behalf_of_id').value = extras.onBehalf.id;
             document.getElementById('onBehalfBadge').textContent = extras.onBehalf.label || '';
@@ -1097,7 +1117,11 @@ ClassicEditor.create(document.querySelector('#admin-ticket-editor'), {
     const ticketDraft = TicketDraft.init({
         context:   'ticket_create',
         form:      form,
-        exclude:   ['description', 'tags[]', 'cc_user_ids[]', 'on_behalf_of_id'],
+        exclude:   ['description', 'tags[]', 'cc_user_ids[]', 'on_behalf_of_id'<?php
+            foreach ($customFields as $ccf) {
+                if ($ccf['field_type'] === 'cc') echo ", 'cc_field_" . (int) $ccf['id'] . "[]'";
+            }
+        ?>],
         getHtml:   () => editor.getData(),
         setHtml:   html => editor.setData(html),
         getExtras: draftExtras,
