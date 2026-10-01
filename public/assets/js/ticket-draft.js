@@ -55,6 +55,7 @@
         var timer         = null;
         var lastSaved     = null;   // JSON of the last state sent to the server
         var suppressUntil = 0;      // no autosaves while a submit is in flight
+        var discarded     = false;  // Discard clicked; the on-screen leftovers aren't a draft
         var statusEl      = null;
 
         if (opts.statusAnchor) {
@@ -144,7 +145,7 @@
         }
 
         function save(unloading) {
-            if (Date.now() < suppressUntil) return;
+            if (discarded || Date.now() < suppressUntil) return;
             var payload = capture();
             var empty   = isEmpty(payload);
             var state   = empty ? '' : JSON.stringify(payload);
@@ -181,10 +182,10 @@
         function clear() {
             clearTimeout(timer);
             lastSaved = '';
-            post('/drafts', JSON.stringify({ context: opts.context, ticket_id: ticketId, payload: null }), true)
-                .catch(function () {});
             hideNote();
             setStatus(null);
+            return post('/drafts', JSON.stringify({ context: opts.context, ticket_id: ticketId, payload: null }), true)
+                .catch(function () {});
         }
 
         function applyFields(fields) {
@@ -232,7 +233,7 @@
 
         hideNote(); // start hidden regardless of the template's markup
 
-        form.addEventListener('input', schedule);
+        form.addEventListener('input', function () { discarded = false; schedule(); });
         form.addEventListener('change', schedule);
 
         function goQuietForSubmit() {
@@ -256,8 +257,14 @@
 
         if (opts.discardBtn) {
             opts.discardBtn.addEventListener('click', function () {
-                clear();
-                if (opts.onDiscarded) opts.onDiscarded();
+                // Block autosave until the user types again — otherwise the
+                // create forms' reload fires pagehide, which flushes the
+                // still-filled form and resurrects the draft we just deleted.
+                // Wait for the delete so the reloaded page's GET can't race it.
+                discarded = true;
+                clear().then(function () {
+                    if (opts.onDiscarded) opts.onDiscarded();
+                });
             });
         }
 
@@ -265,7 +272,7 @@
 
         return {
             watchEditor: function (editor) {
-                editor.model.document.on('change:data', schedule);
+                editor.model.document.on('change:data', function () { discarded = false; schedule(); });
             },
             // Explicit flush (e.g. before opening the ticket in a new tab):
             // lift the post-submit quiet period — the user is still editing.

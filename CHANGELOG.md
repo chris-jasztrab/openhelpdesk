@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.172.2 &mdash; 2026-10-01
+
+### Fixed
+- **"Discard draft" on the new-ticket form now actually discards it.** Clicking Discard deleted the saved draft and reloaded the page, but the reload's page-hide autosave re-sent the still-filled form and brought the draft straight back, so the next new ticket opened with the old details. Autosave now stays off after Discard until you type again, and the page waits for the delete before reloading. Fixed in the shared draft script, so it covers the staff and portal create forms and the reply boxes.
+
 ## 2.172.1 &mdash; 2026-10-01
 
 ### Fixed
