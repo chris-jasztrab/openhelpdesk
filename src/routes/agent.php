@@ -1120,6 +1120,7 @@ $router->get('/agent/tickets/create', function () {
         'customFields'  => $customFields,
         'fieldOptions'  => $fieldOptions,
         'formLayouts'   => $formLayouts,
+        'slaNoticeMap'  => slaNoticeMap($db),
         'typePriorityMap' => typePriorityMap($db),
     ]);
 });

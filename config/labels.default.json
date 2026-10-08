@@ -89,6 +89,11 @@
 
   "portal.field.priority_label": "How urgent is this?",
   "portal.field.priority_help": "Pick a level if you know — otherwise leave blank and our team will set it.",
+  "sla.notice_title": "What happens next",
+  "sla.notice_intro": "Based on the priority of this request, here is when you can expect to hear from us:",
+  "sla.notice_response": "First response by",
+  "sla.notice_resolution": "Resolution by",
+  "sla.notice_footer": "These targets count business hours only.",
 
   "portal.solution.available": "Answer available",
   "portal.solution.badge": "Answer",

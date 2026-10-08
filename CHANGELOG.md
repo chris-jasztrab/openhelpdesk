@@ -11,6 +11,15 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.175.0 &mdash; 2026-10-08
+
+### Added
+- **SLA targets on the ticket forms.** A new **SLA notice** system field on the portal and staff create forms shows the first-response and resolution targets for the chosen ticket type + priority as soon as both are picked (e.g. "First response within 1 hour and resolution within 4 hours (business hours)"). It falls back to the type-independent policy when the type has no override, and stays hidden when no priority is chosen or no policy matches. Drag it anywhere on the form, hide it, or rename it per ticket type from Admin → Workflows → Form Builder like any other system field; the migration adds it directly after Priority on every existing type.
+- **"What happens next" modal after submitting.** When a new ticket starts SLA timers, the page the submitter lands on opens a modal with the actual due dates ("First response by Friday, Oct 9 at 10:30 AM"), computed from business hours and holidays. Nothing shows when no priority was chosen. Title, intro, row labels and footer are editable on the Labels page (`sla.notice_*`). No on/off setting: it appears only when SLA tracking is enabled and a policy matches.
+
+### Changed
+- `slaEmailTokens()` now builds its sentence through the shared `slaTargetSentence()` helper (same output as before).
+
 ## 2.174.0 &mdash; 2026-10-08
 
 ### Added

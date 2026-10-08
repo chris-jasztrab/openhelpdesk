@@ -35,6 +35,7 @@ $systemFieldMeta = [
     'ticket_type' => ['label' => 'Ticket Type', 'icon' => 'bi-tag'],
     'location'    => ['label' => 'Location',    'icon' => 'bi-geo-alt'],
     'priority'    => ['label' => 'Priority',    'icon' => 'bi-flag'],
+    'sla_notice'  => ['label' => 'SLA notice',  'icon' => 'bi-stopwatch'],
     'tags'        => ['label' => 'Tags',        'icon' => 'bi-hash'],
     'attachments' => ['label' => 'Attachments', 'icon' => 'bi-paperclip'],
 ];

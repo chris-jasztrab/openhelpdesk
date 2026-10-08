@@ -4470,6 +4470,7 @@ $router->get('/admin/tickets/create', function () {
         'customFields'  => $customFields,
         'fieldOptions'  => $fieldOptions,
         'formLayouts'   => $formLayouts,
+        'slaNoticeMap'  => slaNoticeMap($db),
         'typePriorityMap' => typePriorityMap($db),
         'isSharedAccount' => userIsSharedAccount($db, Auth::id()),
     ]);
@@ -4676,6 +4677,7 @@ $router->post('/admin/tickets/create', function () {
     // Initialize SLA timers if priority is set
     if ($priId) {
         Sla::initializeForTicket($db, $ticketId, $priId, $typeId);
+        flashSlaNotice($db, $ticketId);
     }
 
     // Notify group members watching new tickets
@@ -13663,7 +13665,7 @@ $router->post('/admin/forms/system-label', function () {
     $body  = json_decode(file_get_contents('php://input'), true);
     $field = (string) ($body['field'] ?? '');
     $label = trim((string) ($body['label'] ?? ''));
-    $allowed = ['subject', 'description', 'ticket_type', 'location', 'priority', 'tags', 'attachments'];
+    $allowed = SYSTEM_FIELD_KEYS;
     if (!in_array($field, $allowed, true)) {
         echo json_encode(['success' => false, 'error' => 'Invalid field']); exit;
     }

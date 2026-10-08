@@ -304,6 +304,7 @@ $router->get('/portal/tickets/create', function () {
         'fieldOptions'         => $fieldOptions,
         'sharedTemplates'      => $sharedTemplates,
         'formLayouts'          => $formLayouts,
+        'slaNoticeMap'         => slaNoticeMap($db),
         'preselectedTypeId'    => $preselectedTypeId,
         'embedMode'            => $embedMode,
         'tourMode'             => $tourMode,
@@ -560,6 +561,7 @@ $router->post('/portal/tickets/create', function () {
     // Initialize SLA timers if priority is set and SLA is configured
     if ($priorityId) {
         Sla::initializeForTicket($db, $ticketId, $priorityId, $typeId);
+        flashSlaNotice($db, $ticketId);
     }
 
     $msg = 'Help request #' . $ticketId . ' submitted.';

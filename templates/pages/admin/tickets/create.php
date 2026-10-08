@@ -179,7 +179,7 @@ $statusOptions = ticketStatusLabelMap();
 
                     <div id="dynamic-fields" class="row g-3 mt-0">
                         <?php
-                        $dynamicSystemOrder = ['location', 'priority', 'tags', 'attachments'];
+                        $dynamicSystemOrder = ['location', 'priority', 'sla_notice', 'tags', 'attachments'];
                         foreach ($dynamicSystemOrder as $sysKey):
                             $v = $visOf('system', $sysKey);
                             $isAbsent = $v === 'absent' || $v === 'hidden';
@@ -218,6 +218,14 @@ $statusOptions = ticketStatusLabelMap();
                                     </option>
                                 <?php endforeach; ?>
                             </select>
+                        </div>
+                        <?php elseif ($sysKey === 'sla_notice'): ?>
+                        <div class="col-12 dynamic-field-wrap"
+                             data-field-kind="system" data-field-key="sla_notice" <?= $wrapStyle ?>>
+                            <div class="alert alert-info py-2 mb-0 small" id="sla-notice" hidden role="status" aria-live="polite">
+                                <i class="bi bi-stopwatch me-1" aria-hidden="true"></i><strong><?= e(getSetting('sys_field_label_sla_notice', 'Service level targets')) ?>:</strong>
+                                <span id="sla-notice-text"></span>
+                            </div>
                         </div>
                         <?php elseif ($sysKey === 'tags'): ?>
                         <?php if (getSetting('tags_enabled', '1') === '1'): ?>
@@ -485,7 +493,22 @@ $statusOptions = ticketStatusLabelMap();
             });
     }
 
-    typeSelect.addEventListener('change', function() { applyLayout(true); });
+    // SLA notice: the targets for the chosen type + priority, or the
+    // type-independent defaults when the type has no override.
+    var slaMap = <?= json_encode($slaNoticeMap ?? [], JSON_FORCE_OBJECT) ?>;
+    var priSelect = document.getElementById('priority_id');
+    function updateSlaNotice() {
+        var box = document.getElementById('sla-notice');
+        if (!box || !priSelect) return;
+        var byType = slaMap[String(parseInt(typeSelect.value) || 0)] || {};
+        var s = byType[priSelect.value] || (slaMap['0'] || {})[priSelect.value] || '';
+        document.getElementById('sla-notice-text').textContent = s;
+        box.hidden = !s;
+    }
+    if (priSelect) priSelect.addEventListener('change', updateSlaNotice);
+    updateSlaNotice();
+
+    typeSelect.addEventListener('change', function() { applyLayout(true); updateSlaNotice(); });
     if (window.FieldConditions) {
         window.FieldConditions.watch(dynRoot, function() { applyLayout(false); });
     }
@@ -633,7 +656,11 @@ document.getElementById('templateSelect')?.addEventListener('change', function (
         document.getElementById('type_id').value = tpl.type_id;
         document.getElementById('type_id').dispatchEvent(new Event('change'));
     }
-    if (tpl.priority_id) document.getElementById('priority_id').value  = tpl.priority_id;
+    if (tpl.priority_id) {
+        var priSel = document.getElementById('priority_id');
+        priSel.value = tpl.priority_id;
+        priSel.dispatchEvent(new Event('change'));
+    }
 });
 
 <?php if (getSetting('tags_enabled', '1') === '1'): ?>

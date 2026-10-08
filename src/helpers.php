@@ -464,7 +464,7 @@ function isActive(string $path): bool
  * table allows admins to reorder them per ticket type, but these are the
  * only known keys — anything else is treated as a custom field id.
  */
-const SYSTEM_FIELD_KEYS = ['subject','description','ticket_type','location','priority','tags','attachments'];
+const SYSTEM_FIELD_KEYS = ['subject','description','ticket_type','location','priority','sla_notice','tags','attachments'];
 
 /**
  * Default presentation for a system field — the seed an admin gets the
@@ -478,6 +478,7 @@ function systemFieldDefaults(): array
         'ticket_type' => ['sort_order' => 100, 'visibility' => 'required', 'lockedVisibility' => true,  'lockedOrder' => false],
         'location'    => ['sort_order' => 200, 'visibility' => 'optional', 'lockedVisibility' => false, 'lockedOrder' => false],
         'priority'    => ['sort_order' => 300, 'visibility' => 'optional', 'lockedVisibility' => false, 'lockedOrder' => false],
+        'sla_notice'  => ['sort_order' => 350, 'visibility' => 'optional', 'lockedVisibility' => false, 'lockedOrder' => false],
         'tags'        => ['sort_order' => 400, 'visibility' => 'optional', 'lockedVisibility' => false, 'lockedOrder' => false],
         'attachments' => ['sort_order' => 900, 'visibility' => 'optional', 'lockedVisibility' => false, 'lockedOrder' => false],
     ];
@@ -549,7 +550,8 @@ function getFormLayoutForType(PDO $db, ?int $typeId, bool $visibleOnly = false):
         $key  = $r['field_key'];
 
         if ($kind === 'system') {
-            $defaultLabel = (string) getSetting('sys_field_label_' . $key, ucfirst(str_replace('_', ' ', $key)));
+            // Default label for a system field. getSetting() caches the first default it sees for a key, so this is THE default — the create forms inherit it.
+            $defaultLabel = (string) getSetting('sys_field_label_' . $key, $key === 'sla_notice' ? 'Service level targets' : ucfirst(str_replace('_', ' ', $key)));
         } else {
             $defaultLabel = (string) $r['field_label'];
         }
@@ -4324,20 +4326,102 @@ function slaEmailTokens(PDO $db, ?int $typeId, ?int $priorityId): array
     // rather than promising a "0 minutes" deadline.
     $responseMinutes   = (int) $policy['first_response_minutes'];
     $resolutionMinutes = (int) $policy['resolution_minutes'];
+    return [
+        'sla'            => slaTargetSentence($responseMinutes, $resolutionMinutes),
+        'sla_response'   => $responseMinutes   > 0 ? formatSlaDuration($responseMinutes)   : '',
+        'sla_resolution' => $resolutionMinutes > 0 ? formatSlaDuration($resolutionMinutes) : '',
+    ];
+}
+
+/**
+ * One-line description of a policy's targets, e.g. "First response within
+ * 4 hours and resolution within 48 hours (business hours)". Empty when
+ * neither target is set.
+ */
+function slaTargetSentence(int $responseMinutes, int $resolutionMinutes): string
+{
     $response   = $responseMinutes   > 0 ? formatSlaDuration($responseMinutes)   : '';
     $resolution = $resolutionMinutes > 0 ? formatSlaDuration($resolutionMinutes) : '';
     if ($response !== '' && $resolution !== '') {
-        $sentence = "First response within {$response} and resolution within {$resolution} (business hours)";
-    } elseif ($response !== '') {
-        $sentence = "First response within {$response} (business hours)";
-    } else {
-        $sentence = "Resolution within {$resolution} (business hours)";
+        return "First response within {$response} and resolution within {$resolution} (business hours)";
     }
-    return [
-        'sla'            => $sentence,
-        'sla_response'   => $response,
-        'sla_resolution' => $resolution,
-    ];
+    if ($response !== '') {
+        return "First response within {$response} (business hours)";
+    }
+    if ($resolution !== '') {
+        return "Resolution within {$resolution} (business hours)";
+    }
+    return '';
+}
+
+/**
+ * Target sentences for the SLA notice block on the ticket forms, keyed
+ * [typeId => [priorityId => sentence]]. Key 0 holds the type-independent
+ * defaults; the form falls back to it for a type with no override. Mirrors
+ * Sla::findPolicy()'s merge (a per-type row overrides only the targets it
+ * sets) without a query per combination. Empty when SLA tracking is off or
+ * business hours are not configured, so the block never shows.
+ */
+function slaNoticeMap(PDO $db): array
+{
+    if (!slaEnabled() || Sla::getBusinessSchedule() === null) {
+        return [];
+    }
+    $rows = $db->query(
+        'SELECT type_id, priority_id, first_response_minutes, resolution_minutes FROM sla_policies'
+    )->fetchAll(PDO::FETCH_ASSOC);
+    $defaults = [];
+    $byType   = [];
+    foreach ($rows as $r) {
+        if ($r['type_id'] === null) {
+            $defaults[(int) $r['priority_id']] = $r;
+        } else {
+            $byType[(int) $r['type_id']][(int) $r['priority_id']] = $r;
+        }
+    }
+    $map = [];
+    foreach ($defaults as $pid => $d) {
+        $s = slaTargetSentence((int) $d['first_response_minutes'], (int) $d['resolution_minutes']);
+        if ($s !== '') {
+            $map[0][$pid] = $s;
+        }
+    }
+    foreach ($byType as $typeId => $perPriority) {
+        foreach ($perPriority as $pid => $t) {
+            $d = $defaults[$pid] ?? [];
+            $s = slaTargetSentence(
+                (int) $t['first_response_minutes'] ?: (int) ($d['first_response_minutes'] ?? 0),
+                (int) $t['resolution_minutes']     ?: (int) ($d['resolution_minutes'] ?? 0)
+            );
+            if ($s !== '') {
+                $map[$typeId][$pid] = $s;
+            }
+        }
+    }
+    return $map;
+}
+
+/**
+ * After SLA timers start on a new ticket, queue the "here's when to expect
+ * us" modal for the page the submitter lands on (rendered by
+ * partials/flash.php). Silent when the ticket has no due dates.
+ */
+function flashSlaNotice(PDO $db, int $ticketId): void
+{
+    $stmt = $db->prepare('SELECT first_response_due_at, resolution_due_at FROM tickets WHERE id = ?');
+    $stmt->execute([$ticketId]);
+    $t = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$t) {
+        return;
+    }
+    $fmt = static fn (?string $d): string => $d ? date('l, M j \a\t g:i A', strtotime($d)) : '';
+    $notice = array_filter([
+        'response'   => $fmt($t['first_response_due_at']),
+        'resolution' => $fmt($t['resolution_due_at']),
+    ]);
+    if ($notice !== []) {
+        flash('sla_notice', json_encode($notice));
+    }
 }
 
 /**
