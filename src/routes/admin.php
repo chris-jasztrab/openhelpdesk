@@ -9972,6 +9972,7 @@ $router->post('/admin/settings/automations/{id}/run', function (array $p) {
             $action = $act['action'] ?? '';
             $val    = $act['value'] ?? '';
 
+            try {
             switch ($action) {
                 case 'set_group':
                     $groupId = $val === '' ? null : (int) $val;
@@ -10084,6 +10085,13 @@ $router->post('/admin/settings/automations/{id}/run', function (array $p) {
                         )->execute([$ticket['id'], 'automation', "Automation '{$auto['name']}' (manual run): CC'd {$ccName}"]);
                     }
                     break;
+            }
+            } catch (PDOException $e) {
+                // Same guard as runAutomations(): a stale target id skips the action instead of aborting the run.
+                error_log("Automation '{$auto['name']}' (manual run) action '{$action}' skipped: " . $e->getMessage());
+                $db->prepare(
+                    'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, ?, ?, 1)'
+                )->execute([$ticket['id'], 'automation', "Automation '{$auto['name']}' (manual run): could not apply '{$action}' (value '{$val}' no longer exists)"]);
             }
         }
         $affected++;

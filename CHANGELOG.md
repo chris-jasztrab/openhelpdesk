@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.175.1 &mdash; 2026-10-08
+
+### Fixed
+- **Ticket submit no longer 500s when an automation points at a missing record.** A rule whose Set ticket type / Set group / Assign to agent / Set priority target was deleted (or never existed) raised a foreign-key error from inside the automation runner, after the ticket was already saved, so the requester saw an HTTP 500 and no confirmation. Each action now runs under its own guard: a failing action is skipped, logged to `storage/logs/php-error.log`, and noted on the ticket timeline ("could not apply 'set_type' (value '9999' no longer exists)"); the rest of the rule and the request continue. Same guard on the Run Now path. Surfaced on prod on 2026-10-08 by a Set ticket type rule (added in 2.174.0) with a stale type id.
+
 ## 2.175.0 &mdash; 2026-10-08
 
 ### Added

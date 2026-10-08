@@ -7813,6 +7813,7 @@ function runAutomations(PDO $db, int $ticketId, string $triggerEvent): void
             $action = $act['action'] ?? '';
             $val    = $act['value'] ?? '';
 
+            try {
             switch ($action) {
                 case 'set_group':
                     $groupId = $val === '' ? null : (int) $val;
@@ -7929,6 +7930,14 @@ function runAutomations(PDO $db, int $ticketId, string $triggerEvent): void
                         notifyCcAdded($db, $ticketId, $ccUserId, "Automation \"{$auto['name']}\"", 0);
                     }
                     break;
+            }
+            } catch (PDOException $e) {
+                // ponytail: a stale target id (deleted type/group/agent) must not 500 the
+                // request that fired the rule; skip the action and leave a trace.
+                error_log("Automation '{$auto['name']}' action '{$action}' skipped: " . $e->getMessage());
+                $db->prepare(
+                    'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, ?, ?, 1)'
+                )->execute([$ticketId, 'automation', "Automation '{$auto['name']}': could not apply '{$action}' (value '{$val}' no longer exists)"]);
             }
         }
     }
