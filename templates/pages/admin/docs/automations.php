@@ -86,6 +86,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <h5 class="fw-semibold mb-3"><i class="bi bi-play-circle text-primary me-2"></i>Available Actions</h5>
 <ul class="text-muted mb-0">
     <li><strong>Assign to agent</strong> — assigns the ticket to a specific agent.</li>
+    <li><strong>Set ticket type</strong> — changes the ticket's type. Useful for tickets that arrived as "I don't know" and were routed to a group by AI: match on the group and set the type to go with it.</li>
     <li><strong>Set priority</strong> — changes the ticket's priority.</li>
     <li><strong>Set status</strong> — changes the ticket's status.</li>
     <li><strong>Add tag</strong> — adds a tag to the ticket.</li>

@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.174.0 &mdash; 2026-10-08
+
+### Added
+- **Automations can set the ticket type.** New **Set ticket type** action on Admin → Settings → Automations, alongside Set group and Assign to agent. Covers tickets that came in as "I don't know what type" and were routed to a group by AI: a rule matching on Group can now stamp the matching type so type-based rules, reports, and SLA targets pick them up. Writes a timeline entry and recalculates SLA due dates like a manual type change. Works on creation, on update, and via Run Now.
+
 ## 2.173.0 &mdash; 2026-10-08
 
 ### Added

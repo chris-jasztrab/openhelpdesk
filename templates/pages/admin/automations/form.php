@@ -29,6 +29,7 @@ $fieldOptions = [
 $actionOptions = [
     'set_group'       => $fieldOptions['group_id'],
     'set_assigned_to' => $fieldOptions['assigned_to'],
+    'set_type'        => $fieldOptions['type_id'],
     'set_priority'    => $fieldOptions['priority_id'],
     'set_status'      => $fieldOptions['status'],
     'add_tag'         => 'text',
@@ -156,7 +157,7 @@ if (!empty($existingConditions) && isset($existingConditions[0]['field'])) {
         equals: 'is', not_equals: 'is not', is_empty: 'is empty', is_not_empty: 'is not empty'
     };
     var actionLabels = {
-        set_group: 'Assign to group', set_assigned_to: 'Assign to agent',
+        set_group: 'Assign to group', set_assigned_to: 'Assign to agent', set_type: 'Set ticket type',
         set_priority: 'Set priority', set_status: 'Set status', add_tag: 'Add tag', add_cc: 'CC user'
     };
 

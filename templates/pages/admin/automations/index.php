@@ -40,6 +40,7 @@ $operatorLabels = [
 $actionLabels = [
     'set_group'       => 'Set group to',
     'set_assigned_to' => 'Assign to',
+    'set_type'        => 'Set type to',
     'set_priority'    => 'Set priority to',
     'set_status'      => 'Set status to',
     'add_tag'         => 'Add tag',

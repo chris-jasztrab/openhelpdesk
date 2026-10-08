@@ -7758,6 +7758,21 @@ function runAutomations(PDO $db, int $ticketId, string $triggerEvent): void
                     )->execute([$ticketId, 'automation', "Automation '{$auto['name']}': Assigned to {$agentName}"]);
                     break;
 
+                case 'set_type':
+                    $typeId = $val === '' ? null : (int) $val;
+                    $db->prepare('UPDATE tickets SET type_id = ? WHERE id = ?')->execute([$typeId, $ticketId]);
+                    $typeName = 'None';
+                    if ($typeId) {
+                        $s = $db->prepare('SELECT name FROM ticket_types WHERE id = ?');
+                        $s->execute([$typeId]);
+                        $typeName = $s->fetchColumn() ?: 'Unknown';
+                    }
+                    Sla::onTypeChanged($db, $ticketId, $typeId);
+                    $db->prepare(
+                        'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, ?, ?, 1)'
+                    )->execute([$ticketId, 'automation', "Automation '{$auto['name']}': Type set to {$typeName}"]);
+                    break;
+
                 case 'set_priority':
                     $priorityId = $val === '' ? null : (int) $val;
                     $db->prepare('UPDATE tickets SET priority_id = ? WHERE id = ?')->execute([$priorityId, $ticketId]);
