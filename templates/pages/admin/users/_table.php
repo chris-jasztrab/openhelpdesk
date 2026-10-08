@@ -6,10 +6,22 @@
 // Required vars: $users, $sort, $dir, $filterParams
 ?>
 <div class="card border-0 shadow-sm" data-user-count="<?= count($users) ?>">
+    <!-- Bulk action bar (shown when users are ticked) -->
+    <div id="userBulkBar" style="display:none;background:#eef2ff;border-bottom:1px solid #d1d9f0;padding:.5rem .75rem;align-items:center;gap:.5rem;flex-wrap:wrap;">
+        <span id="userBulkCount" class="text-muted small fw-semibold me-1">0 selected</span>
+        <span class="text-muted small"><?= label('location.singular') ?> Ticket Visibility:</span>
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="userBulkAction('location_visibility_on')">
+            <i class="bi bi-eye me-1"></i>Enable
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="userBulkAction('location_visibility_off')">
+            <i class="bi bi-eye-slash me-1"></i>Disable
+        </button>
+    </div>
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
             <thead class="table-light">
                 <tr>
+                    <th style="width:32px"><input type="checkbox" class="form-check-input" id="userSelectAll" aria-label="Select all users"></th>
                     <th style="width:50px"></th>
                     <th><a href="<?= sortUrl('name', $sort, $dir, $filterParams, '/admin/users') ?>" class="text-decoration-none text-dark">Name <?= sortIcon('name', $sort, $dir) ?></a></th>
                     <th><a href="<?= sortUrl('email', $sort, $dir, $filterParams, '/admin/users') ?>" class="text-decoration-none text-dark">Email <?= sortIcon('email', $sort, $dir) ?></a></th>
@@ -22,10 +34,13 @@
             </thead>
             <tbody>
                 <?php if (empty($users)): ?>
-                <tr><td colspan="8" class="text-center py-4 text-muted">No users found.</td></tr>
+                <tr><td colspan="9" class="text-center py-4 text-muted">No users found.</td></tr>
                 <?php else: ?>
                     <?php foreach ($users as $u): ?>
                     <tr style="cursor:pointer;" onclick="window.location='/admin/users/<?= $u['id'] ?>'">
+                        <td onclick="event.stopPropagation()">
+                            <input type="checkbox" class="form-check-input user-cb" value="<?= $u['id'] ?>" aria-label="Select <?= e($u['first_name'] . ' ' . $u['last_name']) ?>">
+                        </td>
                         <td>
                             <?php if ($u['avatar']): ?>
                                 <img src="/uploads/avatars/<?= e($u['avatar']) ?>" class="rounded-circle" width="36" height="36" style="object-fit:cover;">
@@ -57,7 +72,12 @@
                             <?php endif; ?>
                         </td>
                         <td><?= e($u['work_phone'] ?? '—') ?></td>
-                        <td><?= e($u['location_name'] ?? '—') ?></td>
+                        <td>
+                            <?= e($u['location_name'] ?? '—') ?>
+                            <?php if (!empty($u['can_view_location_tickets'])): ?>
+                            <i class="bi bi-eye text-primary ms-1" title="<?= label('location.singular') ?> Ticket Visibility enabled"></i>
+                            <?php endif; ?>
+                        </td>
                         <td class="text-muted small"><?= date('M j, Y', strtotime($u['created_at'])) ?></td>
                         <td>
                             <div class="d-flex gap-1">

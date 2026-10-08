@@ -190,6 +190,51 @@ class UsersTest extends TestCase
             'Edit user form must include the can_view_location_tickets (Location Ticket Visibility) toggle');
     }
 
+    // ── Bulk ──────────────────────────────────────────────────────────────────
+
+    public function test_user_list_has_bulk_location_visibility_bar(): void
+    {
+        $html = (string) $this->get($this->adminClient(), '/admin/users')->getBody();
+        $this->assertStringContainsString('userBulkBar', $html);
+        $this->assertStringContainsString("userBulkAction('location_visibility_on')", $html);
+        $this->assertStringContainsString('class="form-check-input user-cb"', $html);
+    }
+
+    public function test_bulk_toggles_location_visibility_on_then_off(): void
+    {
+        $db  = \Database::connect();
+        $ids = [DatabaseSeeder::$portalId, DatabaseSeeder::$agentId];
+        $read = function () use ($db, $ids): array {
+            $stmt = $db->prepare('SELECT id, can_view_location_tickets FROM users WHERE id IN (?, ?)');
+            $stmt->execute($ids);
+            $rows = array_map('intval', $stmt->fetchAll(\PDO::FETCH_KEY_PAIR));
+            ksort($rows);
+            return $rows;
+        };
+
+        $this->post($this->adminClient(), '/admin/users/bulk', ['action' => 'location_visibility_on', 'user_ids' => $ids]);
+        $want = [$ids[0] => 1, $ids[1] => 1]; ksort($want);
+        $this->assertSame($want, $read(), 'Both selected users should have the flag on');
+
+        $this->post($this->adminClient(), '/admin/users/bulk', ['action' => 'location_visibility_off', 'user_ids' => $ids]);
+        $want = [$ids[0] => 0, $ids[1] => 0]; ksort($want);
+        $this->assertSame($want, $read(), 'Both selected users should have the flag off again');
+    }
+
+    public function test_bulk_rejects_unknown_action(): void
+    {
+        $r = $this->post($this->adminClient(), '/admin/users/bulk', ['action' => 'role_admin', 'user_ids' => [DatabaseSeeder::$portalId]]);
+        $this->assertSee('Unknown bulk action', $r);
+    }
+
+    public function test_bulk_is_forbidden_for_agents(): void
+    {
+        \Database::connect()->exec('UPDATE users SET can_view_location_tickets = 0 WHERE id = ' . (int) DatabaseSeeder::$portalId);
+        $r = $this->post($this->agentClient(), '/admin/users/bulk', ['action' => 'location_visibility_on', 'user_ids' => [DatabaseSeeder::$portalId]], false);
+        $this->assertContains($r->getStatusCode(), [302, 403]);
+        $flag = (int) \Database::connect()->query('SELECT can_view_location_tickets FROM users WHERE id = ' . (int) DatabaseSeeder::$portalId)->fetchColumn();
+        $this->assertSame(0, $flag, 'Agent must not be able to bulk-change the flag');
+    }
     public function test_edit_user_updates_successfully(): void
     {
         $r = $this->post($this->adminClient(), '/admin/users/' . DatabaseSeeder::$portalId . '/edit', [

@@ -873,6 +873,46 @@ $router->get('/admin/users', function () {
     ]);
 });
 
+/**
+ * POST /admin/users/bulk — apply one flag change to every selected user.
+ * Select-all on the list ticks every row of the current (unpaginated,
+ * filtered) query, so "all users" is one click plus one button.
+ */
+$router->post('/admin/users/bulk', function () {
+    Auth::requirePermission('users.manage');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/users');
+    }
+
+    $action  = $_POST['action'] ?? '';
+    $userIds = array_values(array_filter(array_unique(array_map('intval', (array) ($_POST['user_ids'] ?? []))), fn($id) => $id > 0));
+    if (empty($userIds)) {
+        flash('error', 'No users selected.');
+        redirect('/admin/users');
+    }
+
+    // action => [column, value, label]
+    $actions = [
+        'location_visibility_on'  => ['can_view_location_tickets', 1, 'Location Ticket Visibility enabled'],
+        'location_visibility_off' => ['can_view_location_tickets', 0, 'Location Ticket Visibility disabled'],
+    ];
+    if (!isset($actions[$action])) {
+        flash('error', 'Unknown bulk action.');
+        redirect('/admin/users');
+    }
+    [$column, $value, $label] = $actions[$action];
+
+    $placeholders = implode(',', array_fill(0, count($userIds), '?'));
+    $stmt = Database::connect()->prepare("UPDATE users SET {$column} = ? WHERE id IN ({$placeholders})");
+    $stmt->execute(array_merge([$value], $userIds));
+    $n = $stmt->rowCount();
+
+    logAudit('user.bulk_updated', null, 'user', "{$column}={$value}; count=" . count($userIds) . '; ids=' . implode(',', $userIds));
+    flash('success', "{$label} on {$n} user" . ($n === 1 ? '' : 's') . '.');
+    redirect('/admin/users');
+});
+
 $router->get('/admin/users/create', function () {
     Auth::requirePermission('users.manage');
     $db        = Database::connect();

@@ -11,6 +11,10 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.173.0 &mdash; 2026-10-08
+
+### Added
+- **Bulk-set Location Ticket Visibility from the user list.** Every row on Admin → Users now has a checkbox, with a select-all in the header. Tick one or more (or everyone, filtered or not) and a bar appears with **Enable** / **Disable** for Location Ticket Visibility, so turning it on for every user is two clicks instead of editing each account. The Location column shows an eye icon on users who have it, and each run writes one audit entry listing the users touched. Admins only (`users.manage`).
 ## 2.172.2 &mdash; 2026-10-01
 
 ### Fixed

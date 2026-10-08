@@ -113,6 +113,55 @@ $panelFilterCount = count(array_diff_key($filterParams, ['q' => null]));
 <?php require ROOT_DIR . '/templates/pages/admin/users/_table.php'; ?>
 </div>
 
+<!-- Bulk actions form (submitted programmatically) -->
+<form id="userBulkForm" method="POST" action="/admin/users/bulk" class="d-none">
+    <?= csrfField() ?>
+    <input type="hidden" name="action" id="userBulkActionInput">
+</form>
+
+<script>
+/* ── Bulk selection ──────────────────────────────────────────────────────
+   Delegated and DOM-derived (no Set) so it survives the search box swapping
+   #usersTableRegion; a swap simply leaves nothing ticked. */
+(function () {
+    function rowCbs() { return Array.prototype.slice.call(document.querySelectorAll('.user-cb')); }
+    function refresh() {
+        var all = rowCbs();
+        var checked = all.filter(function (cb) { return cb.checked; });
+        var bar = document.getElementById('userBulkBar');
+        var cnt = document.getElementById('userBulkCount');
+        var sa  = document.getElementById('userSelectAll');
+        if (bar) bar.style.display = checked.length ? 'flex' : 'none';
+        if (cnt) cnt.textContent = checked.length + ' selected';
+        if (sa) {
+            sa.checked       = all.length > 0 && checked.length === all.length;
+            sa.indeterminate = checked.length > 0 && checked.length < all.length;
+        }
+    }
+    document.addEventListener('change', function (e) {
+        if (e.target.id === 'userSelectAll') {
+            rowCbs().forEach(function (cb) { cb.checked = e.target.checked; });
+            refresh();
+        } else if (e.target.classList.contains('user-cb')) {
+            refresh();
+        }
+    });
+    window.userBulkAction = function (action) {
+        var ids = rowCbs().filter(function (cb) { return cb.checked; }).map(function (cb) { return cb.value; });
+        if (!ids.length) return;
+        var form = document.getElementById('userBulkForm');
+        document.getElementById('userBulkActionInput').value = action;
+        form.querySelectorAll('input[name="user_ids[]"]').forEach(function (el) { el.remove(); });
+        ids.forEach(function (id) {
+            var inp = document.createElement('input');
+            inp.type = 'hidden'; inp.name = 'user_ids[]'; inp.value = id;
+            form.appendChild(inp);
+        });
+        form.submit();
+    };
+})();
+</script>
+
 <script>
 (function () {
     function filterPanelOpen() {
