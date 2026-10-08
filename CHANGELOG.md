@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.175.2 &mdash; 2026-10-08
+
+### Fixed
+- **Automation editor no longer silently re-points a rule whose target was deleted.** When a condition or action value referred to a ticket type, group, agent or location that no longer exists, the edit form showed the first item in the list as if it were selected, and saving quietly rewrote the rule to that item. The dropdown now shows "previous choice was deleted, pick again", is flagged red, and blocks saving until a real value is chosen. Found after the IT ticket type was removed on 2026-10-08 and a "Set ticket type" rule came back pointing at the wrong type.
+
 ## 2.175.1 &mdash; 2026-10-08
 
 ### Fixed

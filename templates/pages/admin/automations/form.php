@@ -186,12 +186,24 @@ if (!empty($existingConditions) && isset($existingConditions[0]['field'])) {
                 sel.appendChild(opt);
             }
         } else {
+            var matched = false;
             options.forEach(function(o) {
                 var opt = document.createElement('option');
                 opt.value = o.id; opt.textContent = o.label;
-                if (o.id === selectedVal) opt.selected = true;
+                if (o.id === selectedVal) { opt.selected = true; matched = true; }
                 sel.appendChild(opt);
             });
+            // The stored value points at a type/group/agent that has since been
+            // deleted. Without this the browser silently selects the first option
+            // and a save re-points the rule at whatever that happens to be.
+            if (selectedVal && !matched) {
+                var gone = document.createElement('option');
+                gone.value = ''; gone.selected = true; gone.disabled = true;
+                gone.textContent = '— previous choice was deleted, pick again —';
+                sel.insertBefore(gone, sel.firstChild);
+                sel.required = true;
+                sel.classList.add('is-invalid');
+            }
         }
         return sel;
     }
