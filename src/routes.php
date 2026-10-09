@@ -2352,7 +2352,7 @@ $router->post('/profile/setting', function () {
     }
 
     if ($field === 'ticket_view') {
-        if (!in_array((string) (Auth::user()['role'] ?? ''), ['agent', 'admin'], true)) {
+        if (!Auth::isStaff()) {
             http_response_code(403);
             echo json_encode(['ok' => false, 'message' => 'Not allowed.']);
             exit;

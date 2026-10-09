@@ -165,7 +165,7 @@ $breadcrumbs = [
                 <div class="card-body pb-1">
                     <p class="text-muted small mb-3">Choose which events you want to receive emails about.</p>
                     <?php
-                    $isAgent = in_array($user['role'], ['agent', 'admin'], true);
+                    $isAgent = roleIsStaff($user['role']);
 
                     if ($isAgent):
                         $agentOptions = [
@@ -311,7 +311,7 @@ $breadcrumbs = [
             </button>
         </form>
 
-        <?php if (in_array($user['role'], ['admin', 'agent'], true)): ?>
+        <?php if (roleIsStaff($user['role'])): ?>
         <!-- Two-Factor Authentication -->
         <div class="card border-0 shadow-sm mt-4">
             <div class="card-header bg-transparent fw-semibold">

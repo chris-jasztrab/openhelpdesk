@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.175.3 &mdash; 2026-10-09
+
+### Fixed
+- **Power users (and any custom staff role) can now switch the ticket list to Compact or Card view.** The view-switcher endpoint and the profile page still checked for the literal roles `agent`/`admin`, so a user moved to the Power User role got "Not allowed" when changing layout, saw the portal-style notification options instead of the staff ones, and had no Two-Factor Authentication section. All three now use the staff-role check from the RBAC system. Reported by Kelly Kipfer.
+
 ## 2.175.2 &mdash; 2026-10-08
 
 ### Fixed
