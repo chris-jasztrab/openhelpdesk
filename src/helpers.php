@@ -5442,8 +5442,9 @@ function notifyWatchers(PDO $db, int $ticketId, string $message, string $authorN
 }
 
 /**
- * Email all members of groups that have notify_new_ticket enabled when a ticket is created.
- * Skips members who have opted out via notify_group_new_ticket = 0.
+ * Email group members with notify_new_ticket enabled when a ticket is created.
+ * If the ticket type belongs to a group, only that group is notified; otherwise
+ * every opted-in group is. Skips members who have opted out via notify_group_new_ticket = 0.
  */
 function notifyGroupMembers(PDO $db, int $ticketId): void
 {
@@ -5499,8 +5500,14 @@ function notifyGroupMembers(PDO $db, int $ticketId): void
         $priorityName = $s->fetchColumn() ?: '';
     }
 
-    // Find all groups with notify_new_ticket = 1
-    $gStmt = $db->query('SELECT id FROM `groups` WHERE notify_new_ticket = 1');
+    // A ticket type tied to a group notifies only that group (if it opted in).
+    // Untyped / ungrouped tickets fall back to every group with the flag on.
+    if ($confGroupId !== null) {
+        $gStmt = $db->prepare('SELECT id FROM `groups` WHERE id = ? AND notify_new_ticket = 1');
+        $gStmt->execute([$confGroupId]);
+    } else {
+        $gStmt = $db->query('SELECT id FROM `groups` WHERE notify_new_ticket = 1');
+    }
     $groupIds = $gStmt->fetchAll(PDO::FETCH_COLUMN);
     if (empty($groupIds)) {
         return;

@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.176.1 &mdash; 2026-10-09
+
+### Fixed
+- **New-ticket group notifications are now scoped to the ticket type's group.** Previously every member of every group with "notify on new ticket" enabled was emailed for every new ticket, so a Finance group member received IT tickets. A ticket whose type is tied to a group now notifies only that group (when it has the flag on); tickets with no type or an ungrouped type still notify all opted-in groups.
+
 ## 2.176.0 &mdash; 2026-10-09
 
 ### Added
