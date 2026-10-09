@@ -515,7 +515,7 @@ if ($solutionTimelineId > 0) {
                                   placeholder="Add an update or ask a question..."></textarea>
                     </div>
                     <div class="mb-3">
-                        <input type="file" class="form-control" name="attachments[]" multiple>
+                        <input type="file" class="form-control" name="attachments[]" id="portalReplyFiles" multiple>
                         <div class="form-text">Max <?= UPLOAD_MAX_SIZE / 1024 / 1024 ?>MB per file</div>
                     </div>
                     <button type="submit" class="btn text-white" style="background:var(--ld-primary);"
@@ -543,6 +543,34 @@ if ($solutionTimelineId > 0) {
                         statusAnchor: ta,
                         onDiscarded:  function () { ta.value = ''; ta.focus(); },
                     });
+
+                    <?php if (!empty($warnNotRequester)): ?>
+                    // Not the requester (viewing via "My Location"): confirm
+                    // before they start typing or pick a file. One OK per page.
+                    // The modal markup and the bootstrap bundle both come after
+                    // this script in the page, so resolve them at click time.
+                    var files   = document.getElementById('portalReplyFiles');
+                    var warnOk  = false;
+                    var pending = null;
+                    function gate(el, e) {
+                        if (warnOk) return;
+                        e.preventDefault();
+                        el.blur();
+                        pending = el;
+                        bootstrap.Modal.getOrCreateInstance(document.getElementById('notRequesterModal')).show();
+                    }
+                    ta.addEventListener('focus', function (e) { gate(ta, e); });
+                    files.addEventListener('click', function (e) { gate(files, e); });
+                    document.addEventListener('click', function (e) {
+                        if (!e.target.closest('#notRequesterProceed')) return;
+                        var warnEl = document.getElementById('notRequesterModal');
+                        warnOk = true;
+                        warnEl.addEventListener('hidden.bs.modal', function () {
+                            if (pending === files) files.click(); else ta.focus();
+                        }, { once: true });
+                        bootstrap.Modal.getInstance(warnEl).hide();
+                    });
+                    <?php endif; ?>
 
                     // Undo send: hold the post behind the countdown toast. The
                     // expiry send uses the native form.submit(), which skips
@@ -628,6 +656,32 @@ if ($solutionTimelineId > 0) {
         <?php endif; ?>
     </div>
 </div>
+
+<?php if (!empty($warnNotRequester) && !$demoMode): ?>
+<!-- Not-the-requester warning (location-visible tickets) -->
+<div class="modal fade" id="notRequesterModal" tabindex="-1" aria-labelledby="notRequesterModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="notRequesterModalLabel">
+                    <i class="bi bi-info-circle me-2"></i>This isn't your ticket
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>You can see this ticket because it was opened at your <?= e(strtolower(label('location.singular', 'Location'))) ?>, but it wasn't opened by you.</p>
+                <p class="mb-0">Comments from many different people on one ticket get confusing for the person who opened it and for the staff working on it. If you have your own issue, please open a new ticket instead.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn text-white px-4" style="background:var(--ld-primary);" id="notRequesterProceed">
+                    I want to add a comment anyway
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <!-- Close Request Modal -->
 <div class="modal fade" id="closeTicketModal" tabindex="-1" aria-labelledby="closeTicketModalLabel" aria-hidden="true">

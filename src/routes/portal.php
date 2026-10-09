@@ -726,6 +726,16 @@ $router->get('/portal/tickets/{id}', function (array $p) {
 
     $isOwner = (int) $ticket['created_by'] === (int) $uid;
 
+    // Location-visible tickets are informational: warn before the viewer
+    // comments on one they didn't open. A requester whose own ticket was
+    // merged into this one is still a participant, so no warning for them.
+    $warnNotRequester = !$isOwner;
+    if ($warnNotRequester) {
+        $mStmt = $db->prepare('SELECT 1 FROM tickets WHERE merged_into_ticket_id = ? AND created_by = ? LIMIT 1');
+        $mStmt->execute([$ticket['id'], $uid]);
+        $warnNotRequester = !$mStmt->fetchColumn();
+    }
+
     // Escalation context (owners only — only the requester can escalate their own ticket)
     $hasEscalationPath  = false;
     $nextEscalationStep = null;
@@ -757,6 +767,7 @@ $router->get('/portal/tickets/{id}', function (array $p) {
         'fieldValues'        => $fieldValues,
         'fieldOptions'       => $fieldOptions,
         'isOwner'            => $isOwner,
+        'warnNotRequester'   => $warnNotRequester,
         'hasEscalationPath'  => $hasEscalationPath,
         'nextEscalationStep' => $nextEscalationStep,
         'fromFloor'          => $fromFloor,

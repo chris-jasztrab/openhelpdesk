@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.177.0 &mdash; 2026-10-09
+
+### Added
+- **Portal: confirm before commenting on a location-visible ticket you didn't open.** Tickets reached through the "My Location" toggle are informational. When the viewer isn't the requester and clicks into the comment box or the attachment picker, a modal explains the ticket wasn't opened by them and that comments from many people get confusing, with **Cancel** and **I want to add a comment anyway**. One confirmation per page load; requesters (including those whose own ticket was merged into this one) never see it.
+
 ## 2.176.1 &mdash; 2026-10-09
 
 ### Fixed
