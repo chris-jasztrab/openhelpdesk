@@ -11,6 +11,14 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.176.0 &mdash; 2026-10-09
+
+### Added
+- **Email Queue (Admin → Settings → Email → Email Queue).** Every email the helpdesk cannot deliver — because `MAIL_ENABLED=false`, SMTP is not configured, or the SMTP server rejected it — is now held in a `mail_queue` table instead of being dropped. The page lists the backlog (recipient, subject, ticket, reason, attempts) with two actions: **Send all now** delivers every queued email immediately (on purpose bypassing the kill switch, after a confirm) and removes the ones that succeed; **Flush queue** deletes everything unsent. Nothing drains the queue automatically, so turning mail back on can never blast a backlog by itself.
+
+### Changed
+- The Send Test Email failure message now says when the real cause is `MAIL_ENABLED=false`, and points at the queue, instead of the generic "check your SMTP settings".
+
 ## 2.175.3 &mdash; 2026-10-09
 
 ### Fixed

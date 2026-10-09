@@ -190,7 +190,7 @@ I've confirmed the fix is deployed and the user has verified it works.
         <tr>
             <td class="fw-semibold"><code>MAIL_ENABLED</code></td>
             <td><code>true</code></td>
-            <td class="text-muted">Master kill switch. When <code>false</code>, <strong>all</strong> outbound mail is silently skipped (each attempt is logged to <code>storage/logs/smtp.log</code>). Set to <code>false</code> on dev, staging, and test instances so they never deliver real mail; leave <code>true</code> on production.</td>
+            <td class="text-muted">Master kill switch. When <code>false</code>, <strong>all</strong> outbound mail is held in the <a href="/admin/settings/email-queue">Email Queue</a> instead of being delivered (each attempt is also logged to <code>storage/logs/smtp.log</code>). Nothing drains the queue automatically; an admin sends or flushes it by hand. Set to <code>false</code> on dev, staging, and test instances so they never deliver real mail; leave <code>true</code> on production.</td>
         </tr>
         <tr>
             <td class="fw-semibold"><code>MAIL_TRANSACTIONAL_ENABLED</code></td>

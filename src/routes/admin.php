@@ -7358,7 +7358,9 @@ $router->post('/admin/settings/test-email', function () {
     if ($result !== false) {
         flash('success', 'Test email sent to ' . $toEmail . '.');
     } else {
-        flash('error', 'Failed to send test email. Check your SMTP settings and server error log.');
+        flash('error', env('MAIL_ENABLED', 'true') === 'false'
+            ? 'Outbound mail is disabled (MAIL_ENABLED=false in .env). The test email was added to the Email Queue instead.'
+            : 'Failed to send test email. It was added to the Email Queue; check your SMTP settings and the error shown there.');
     }
 
     redirect('/admin/settings');
@@ -9672,6 +9674,50 @@ $router->post('/admin/settings/labels/reset', function () {
 /* ==================================================================
  * ADMIN – Settings: Cron Jobs
  * ================================================================== */
+
+/**
+ * Email queue — every email sendMail() could not deliver (kill switch off,
+ * SMTP unconfigured, SMTP error). Nothing drains it automatically.
+ */
+$router->get('/admin/settings/email-queue', function () {
+    Auth::requirePermission('settings.manage');
+    $db    = Database::connect();
+    $total = (int) $db->query('SELECT COUNT(*) FROM mail_queue')->fetchColumn();
+    $rows  = $db->query(
+        'SELECT id, to_email, to_name, subject, ticket_id, reason, attempts, last_error, created_at
+         FROM mail_queue ORDER BY id DESC LIMIT 500'
+    )->fetchAll(PDO::FETCH_ASSOC);
+    render('admin/settings/email-queue', ['rows' => $rows, 'total' => $total]);
+});
+
+// Deliberately bypasses MAIL_ENABLED: an admin pressed the button and confirmed.
+$router->post('/admin/settings/email-queue/send-all', function () {
+    Auth::requirePermission('settings.manage');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/email-queue');
+    }
+    // A big backlog can take minutes; don't hold the session lock or trip the time limit.
+    session_write_close();
+    @set_time_limit(0);
+    ignore_user_abort(true);
+    $r = mailQueueSendAll();
+    session_start();
+    flash($r['failed'] > 0 ? 'error' : 'success',
+        "Sent {$r['sent']} queued email(s)." . ($r['failed'] > 0 ? " {$r['failed']} failed and remain in the queue." : ''));
+    redirect('/admin/settings/email-queue');
+});
+
+$router->post('/admin/settings/email-queue/flush', function () {
+    Auth::requirePermission('settings.manage');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/email-queue');
+    }
+    $n = Database::connect()->exec('DELETE FROM mail_queue');
+    flash('success', "Flushed {$n} queued email(s). They will not be sent.");
+    redirect('/admin/settings/email-queue');
+});
 
 $router->get('/admin/settings/cron-jobs', function () {
     Auth::requirePermission('automations.manage');

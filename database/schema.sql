@@ -853,6 +853,25 @@ CREATE TABLE IF NOT EXISTS `ticket_timeline` (
   CONSTRAINT `ticket_timeline_ibfk_1` FOREIGN KEY (`ticket_id`) REFERENCES `tickets` (`id`) ON DELETE CASCADE,
   CONSTRAINT `ticket_timeline_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS `mail_queue` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `to_email` varchar(255) NOT NULL,
+  `to_name` varchar(255) NOT NULL DEFAULT '',
+  `subject` varchar(998) NOT NULL,
+  `html_body` mediumtext NOT NULL,
+  `text_body` mediumtext DEFAULT NULL,
+  `ticket_id` int(10) unsigned DEFAULT NULL,
+  `attachments` text DEFAULT NULL,
+  `transactional` tinyint(1) NOT NULL DEFAULT 0,
+  `reason` varchar(255) NOT NULL,
+  `attempts` int(10) unsigned NOT NULL DEFAULT 0,
+  `last_error` text DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `last_attempt_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_mail_queue_created` (`created_at`),
+  KEY `idx_mail_queue_ticket` (`ticket_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE IF NOT EXISTS `ticket_type_priorities` (
   `type_id` int(10) unsigned NOT NULL,
   `priority_id` int(10) unsigned NOT NULL,

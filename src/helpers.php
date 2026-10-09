@@ -4090,17 +4090,25 @@ function sendMail(string $toEmail, string $toName, string $subject, string $html
     // caller that passes $transactional=true is allowed through even while the
     // general kill switch is off — letting resets work without re-enabling all
     // the bulk ticket-notification mail.
+    //
+    // Anything that is NOT delivered here (kill switch, SMTP unconfigured, SMTP
+    // error) is parked in `mail_queue` so an admin can see the backlog and send
+    // or flush it from Settings → Email Queue. Nothing drains that table on its
+    // own, so flipping MAIL_ENABLED back on never blasts the backlog by itself.
+    $queueArgs = [$toEmail, $toName, $subject, $htmlBody, $textBody, $ticketId, $attachments, $transactional];
+
     if (env('MAIL_ENABLED', 'true') === 'false') {
         $transactionalAllowed = $transactional
             && env('MAIL_TRANSACTIONAL_ENABLED', 'false') === 'true';
 
         if (!$transactionalAllowed) {
-            $logDir = ROOT_DIR . '/storage/logs';
+            $queueId = mailQueuePush(...$queueArgs, reason: 'MAIL_ENABLED=false');
+            $logDir  = ROOT_DIR . '/storage/logs';
             if (is_dir($logDir)) {
                 file_put_contents(
                     $logDir . '/smtp.log',
-                    sprintf("[%s] sendMail() SKIPPED — MAIL_ENABLED=false — to=%s subject=%s\n",
-                        date('Y-m-d H:i:s'), $toEmail, $subject),
+                    sprintf("[%s] sendMail() SKIPPED — MAIL_ENABLED=false — queued id=%s to=%s subject=%s\n",
+                        date('Y-m-d H:i:s'), $queueId ?? '?', $toEmail, $subject),
                     FILE_APPEND | LOCK_EX
                 );
             }
@@ -4108,9 +4116,83 @@ function sendMail(string $toEmail, string $toName, string $subject, string $html
         }
     }
 
+    $result = smtpDeliver($toEmail, $toName, $subject, $htmlBody, $textBody, $ticketId, $attachments);
+    if ($result['messageId'] === false) {
+        mailQueuePush(...$queueArgs, reason: $result['error']);
+        return false;
+    }
+    return $result['messageId'];
+}
+
+/**
+ * Park an undeliverable email in `mail_queue`. Returns the new row id, or null
+ * if the table isn't there yet (migration not run) — queueing must never turn
+ * a skipped email into a 500.
+ */
+function mailQueuePush(string $toEmail, string $toName, string $subject, string $htmlBody, string $textBody, ?int $ticketId, array $attachments, bool $transactional, string $reason): ?int
+{
+    try {
+        $db = Database::connect();
+        $db->prepare(
+            'INSERT INTO mail_queue (to_email, to_name, subject, html_body, text_body, ticket_id, attachments, transactional, reason)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        )->execute([
+            $toEmail, $toName, $subject, $htmlBody, $textBody,
+            $ticketId,
+            $attachments ? json_encode(array_values($attachments)) : null,
+            $transactional ? 1 : 0,
+            mb_substr($reason, 0, 255),
+        ]);
+        return (int) $db->lastInsertId();
+    } catch (\Throwable $e) {
+        error_log('OpenHelpDesk mail queue insert failed: ' . $e->getMessage());
+        return null;
+    }
+}
+
+/**
+ * Attempt delivery of every queued email, oldest first. Bypasses the
+ * MAIL_ENABLED kill switch on purpose: this only runs when an admin presses
+ * "Send all now". Delivered rows are deleted; failures stay with the error.
+ *
+ * @return array{sent:int, failed:int}
+ */
+function mailQueueSendAll(): array
+{
+    $db   = Database::connect();
+    $rows = $db->query('SELECT * FROM mail_queue ORDER BY id ASC')->fetchAll(PDO::FETCH_ASSOC);
+    $del  = $db->prepare('DELETE FROM mail_queue WHERE id = ?');
+    $fail = $db->prepare('UPDATE mail_queue SET attempts = attempts + 1, last_error = ?, last_attempt_at = NOW() WHERE id = ?');
+    $sent = 0;
+    $failed = 0;
+    foreach ($rows as $row) {
+        $attachments = $row['attachments'] ? (json_decode($row['attachments'], true) ?: []) : [];
+        $r = smtpDeliver(
+            $row['to_email'], $row['to_name'], $row['subject'], $row['html_body'],
+            (string) $row['text_body'], $row['ticket_id'] !== null ? (int) $row['ticket_id'] : null, $attachments
+        );
+        if ($r['messageId'] !== false) {
+            $del->execute([$row['id']]);
+            $sent++;
+        } else {
+            $fail->execute([mb_substr($r['error'], 0, 2000), $row['id']]);
+            $failed++;
+        }
+    }
+    return ['sent' => $sent, 'failed' => $failed];
+}
+
+/**
+ * The actual SMTP conversation, with no kill switch and no queueing. Only
+ * sendMail() and mailQueueSendAll() should call this.
+ *
+ * @return array{messageId:string|false, error:string}
+ */
+function smtpDeliver(string $toEmail, string $toName, string $subject, string $htmlBody, string $textBody = '', ?int $ticketId = null, array $attachments = []): array
+{
     $host = getSetting('smtp_host');
     if ($host === '') {
-        return false; // SMTP not configured — silently skip
+        return ['messageId' => false, 'error' => 'SMTP host not configured'];
     }
 
     $port       = (int) getSetting('smtp_port', '587');
@@ -4121,7 +4203,7 @@ function sendMail(string $toEmail, string $toName, string $subject, string $html
     $fromName   = getSetting('mail_from_name', 'OpenHelpDesk');
 
     if ($fromAddr === '') {
-        return false;
+        return ['messageId' => false, 'error' => 'From address not configured'];
     }
 
     // Build a Message-ID for threading
@@ -4208,12 +4290,12 @@ function sendMail(string $toEmail, string $toName, string $subject, string $html
         file_put_contents($smtpLogFile,
             '[' . date('H:i:s') . '] SUCCESS messageId=' . $messageId . "\n",
             FILE_APPEND | LOCK_EX);
-        return $messageId;
+        return ['messageId' => $messageId, 'error' => ''];
     } catch (\PHPMailer\PHPMailer\Exception $e) {
         $err = '[' . date('H:i:s') . '] ERROR ' . $mail->ErrorInfo . "\n";
         file_put_contents($smtpLogFile, $err, FILE_APPEND | LOCK_EX);
         error_log('OpenHelpDesk mail error: ' . $mail->ErrorInfo);
-        return false;
+        return ['messageId' => false, 'error' => $mail->ErrorInfo ?: $e->getMessage()];
     }
 }
 

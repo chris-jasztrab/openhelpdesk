@@ -11,6 +11,8 @@ $settingsNavGroups = [
          'keywords' => 'template message body subject placeholder'],
         ['label' => 'Email Notifications', 'url' => '/admin/settings/email-notifications',  'icon' => 'bi-bell',
          'keywords' => 'notify alert subscribe trigger event'],
+        ['label' => 'Email Queue',         'url' => '/admin/settings/email-queue',          'icon' => 'bi-envelope-paper',
+         'keywords' => 'queue backlog outbox pending unsent retry flush mail_enabled disabled'],
     ],
     'Scheduling' => [
         ['label' => 'Business Hours', 'url' => '/admin/settings/business-hours', 'icon' => 'bi-clock',
