@@ -5510,8 +5510,9 @@ function notifyWatchers(PDO $db, int $ticketId, string $message, string $authorN
 
 /**
  * Email group members with notify_new_ticket enabled when a ticket is created.
- * If the ticket type belongs to a group, only that group is notified; otherwise
- * every opted-in group is. Skips members who have opted out via notify_group_new_ticket = 0.
+ * Only the ticket's own group is notified, or the ticket type's group when the
+ * ticket has none; if neither is set, every opted-in group is. Skips members who
+ * have opted out via notify_group_new_ticket = 0.
  */
 function notifyGroupMembers(PDO $db, int $ticketId): void
 {
@@ -5521,7 +5522,7 @@ function notifyGroupMembers(PDO $db, int $ticketId): void
     // Fetch the ticket. Pull the type's confidential flag + group so we can gate
     // recipients and redact the body below.
     $tStmt = $db->prepare(
-        'SELECT t.subject, t.description, t.type_id, t.location_id, t.priority_id, t.created_by,
+        'SELECT t.subject, t.description, t.type_id, t.location_id, t.priority_id, t.created_by, t.group_id,
                 COALESCE(tt.is_confidential, 0) AS is_confidential, tt.group_id AS conf_group_id
          FROM tickets t
          LEFT JOIN ticket_types tt ON tt.id = t.type_id
@@ -5567,11 +5568,15 @@ function notifyGroupMembers(PDO $db, int $ticketId): void
         $priorityName = $s->fetchColumn() ?: '';
     }
 
-    // A ticket type tied to a group notifies only that group (if it opted in).
-    // Untyped / ungrouped tickets fall back to every group with the flag on.
-    if ($confGroupId !== null) {
+    // The ticket's own group wins, then the type's group; either notifies only
+    // that group (if it opted in). Shared types like "Collections/Discover Job
+    // Requests" have no group, so keying off the type alone broadcast every
+    // ticket of that type to unrelated opted-in groups. Only a ticket with no
+    // group at all falls back to every group with the flag on.
+    $targetGroupId = $ticket['group_id'] !== null ? (int) $ticket['group_id'] : $confGroupId;
+    if ($targetGroupId !== null) {
         $gStmt = $db->prepare('SELECT id FROM `groups` WHERE id = ? AND notify_new_ticket = 1');
-        $gStmt->execute([$confGroupId]);
+        $gStmt->execute([$targetGroupId]);
     } else {
         $gStmt = $db->query('SELECT id FROM `groups` WHERE notify_new_ticket = 1');
     }

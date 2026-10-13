@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.180.1 &mdash; 2026-10-13
+
+### Fixed
+- **"New ticket" group emails go to the ticket's own group.** The alert picked its audience from the ticket type's group, and shared types with no group (Collections/Discover Job Requests, Customer Experience/Circulation, Deputy Tickets) fell back to emailing every group with "notify on new ticket" on, so Finance and IT were alerted about Collections tickets. The ticket's group now wins, then the type's group; only a ticket with neither still notifies every opted-in group.
+
 ## 2.180.0 &mdash; 2026-10-13
 
 ### Added

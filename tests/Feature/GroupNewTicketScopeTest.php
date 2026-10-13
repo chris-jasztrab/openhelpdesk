@@ -8,10 +8,11 @@ use Database;
 use Tests\Support\TestCase;
 
 /**
- * notifyGroupMembers() scoping (2.176.1).
+ * notifyGroupMembers() scoping (2.176.1, 2.180.1).
  *
- * A ticket whose type is tied to a group notifies only that group's members.
- * A ticket with no type still notifies every group with notify_new_ticket = 1.
+ * A ticket's own group wins over its type's group; either notifies only that
+ * group's members (if the group opted in). A ticket with no group and no
+ * grouped type still notifies every group with notify_new_ticket = 1.
  * Observed through mail_queue with the MAIL_ENABLED kill switch on.
  */
 class GroupNewTicketScopeTest extends TestCase
@@ -22,6 +23,7 @@ class GroupNewTicketScopeTest extends TestCase
 
     private static int $groupA;
     private static int $groupB;
+    private static int $groupOff;
     private static int $typeA;
     private static int $userA;
     private static int $userB;
@@ -42,6 +44,8 @@ class GroupNewTicketScopeTest extends TestCase
             $db->prepare('INSERT INTO group_user_map (group_id, user_id) VALUES (?, ?)')->execute([$gid, $uid]);
             if ($k === 'A') { self::$groupA = $gid; self::$userA = $uid; } else { self::$groupB = $gid; self::$userB = $uid; }
         }
+        $db->prepare('INSERT INTO `groups` (name, notify_new_ticket) VALUES (?, 0)')->execute([self::PREFIX . 'off']);
+        self::$groupOff = (int) $db->lastInsertId();
         $db->prepare('INSERT INTO ticket_types (name, group_id) VALUES (?, ?)')->execute([self::PREFIX . 'type', self::$groupA]);
         self::$typeA = (int) $db->lastInsertId();
         self::$creator = (int) $db->query('SELECT id FROM users ORDER BY id LIMIT 1')->fetchColumn();
@@ -66,12 +70,12 @@ class GroupNewTicketScopeTest extends TestCase
     }
 
     /** @return string[] recipient emails queued for the ticket */
-    private function recipientsFor(?int $typeId): array
+    private function recipientsFor(?int $typeId, ?int $groupId = null): array
     {
         $_ENV['MAIL_ENABLED'] = 'false';
         $db = Database::connect();
-        $db->prepare("INSERT INTO tickets (subject, description, created_by, status, type_id) VALUES (?, 'x', ?, 'open', ?)")
-           ->execute([self::PREFIX . ($typeId ? 'typed' : 'untyped'), self::$creator, $typeId]);
+        $db->prepare("INSERT INTO tickets (subject, description, created_by, status, type_id, group_id) VALUES (?, 'x', ?, 'open', ?, ?)")
+           ->execute([self::PREFIX . ($typeId ? 'typed' : 'untyped'), self::$creator, $typeId, $groupId]);
         $tid = (int) $db->lastInsertId();
         notifyGroupMembers($db, $tid);
         $stmt = $db->prepare('SELECT to_email FROM mail_queue WHERE ticket_id = ? ORDER BY to_email');
@@ -89,5 +93,16 @@ class GroupNewTicketScopeTest extends TestCase
         $got = $this->recipientsFor(null);
         $this->assertContains(self::EMAIL_A, $got);
         $this->assertContains(self::EMAIL_B, $got);
+    }
+
+    public function testTicketGroupWinsOverTypeGroup(): void
+    {
+        $this->assertSame([self::EMAIL_B], $this->recipientsFor(self::$typeA, self::$groupB));
+    }
+
+    /** Ticket #67737: ungrouped type, ticket in an opted-out group — no broadcast. */
+    public function testTicketInOptedOutGroupNotifiesNobody(): void
+    {
+        $this->assertSame([], $this->recipientsFor(null, self::$groupOff));
     }
 }
