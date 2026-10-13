@@ -22,13 +22,13 @@
  *   sudo -u www-data php scripts/import-freshdesk-conversations.php \
  *       --domain=example.freshdesk.com --key-file=/path/to/api-key [--apply] \
  *       [--type-field=cf_x] [--location-field=cf_y] [--alias="IT=Information Technology" ...] \
- *       [--ticket=<id>] [--from=<id>] [--limit=<n>]
+ *       [--ticket=<id>] [--from=<id>] [--to=<id>] [--newest-first] [--limit=<n>]
  *
  * --type-field / --location-field name the Freshdesk custom fields holding the
  * ticket type and location (default: Freshdesk's built-in type, no location).
  * --alias maps a Freshdesk type/location/group/priority name onto a local one.
- * Freshdesk ids are processed in order and progress is logged, so an
- * interrupted run resumes with --from.
+ * Freshdesk ids --from..--to are processed in order (--newest-first reverses
+ * it) and progress is logged with the flag that resumes an interrupted run.
  *
  * Safe to re-run: a created ticket is found again by legacy_id, each comment is
  * stamped with an invisible <!-- fd-conv:ID --> marker, and each attachment is
@@ -52,7 +52,7 @@ define('UPLOAD_MAX_SIZE', (int) env('UPLOAD_MAX_SIZE', '20971520'));
 define('UPLOAD_ALLOWED_TYPES', array_map('trim', explode(',', env('UPLOAD_ALLOWED_TYPES', 'application/pdf,image/jpeg,image/png'))));
 define('ATTACHMENT_STORAGE_PATH', ROOT_DIR . '/storage/attachments/');
 
-$opt    = getopt('', ['domain:', 'key-file:', 'apply', 'ticket:', 'from:', 'limit:', 'alias:', 'type-field:', 'location-field:']);
+$opt    = getopt('', ['domain:', 'key-file:', 'apply', 'ticket:', 'from:', 'to:', 'newest-first', 'limit:', 'alias:', 'type-field:', 'location-field:']);
 $domain = preg_replace('#^https?://|/.*$#', '', (string) ($opt['domain'] ?? ''));
 $key    = is_readable((string) ($opt['key-file'] ?? '')) ? trim((string) file_get_contents($opt['key-file'])) : '';
 $apply  = isset($opt['apply']);
@@ -374,7 +374,13 @@ $fdPriorities = [1 => 'Low', 2 => 'Medium', 3 => 'High', 4 => 'Urgent'];
 $newest       = fd('/tickets?order_by=created_at&order_type=desc&per_page=1&updated_since=2000-01-01T00:00:00Z');
 $maxId        = (int) ($newest[0]['id'] ?? 0);
 
-$ids = isset($opt['ticket']) ? [(int) $opt['ticket']] : range(max(1, (int) ($opt['from'] ?? 1)), $maxId);
+$newestFirst = isset($opt['newest-first']);
+$ids = isset($opt['ticket'])
+    ? [(int) $opt['ticket']]
+    : range(max(1, (int) ($opt['from'] ?? 1)), min($maxId, (int) ($opt['to'] ?? $maxId)));
+if ($newestFirst) {
+    $ids = array_reverse($ids);
+}
 if (isset($opt['limit'])) {
     $ids = array_slice($ids, 0, (int) $opt['limit']);
 }
@@ -631,7 +637,7 @@ foreach ($ids as $n => $fdId) {
     }
 
     if (($n + 1) % 100 === 0) {
-        out("… progress: fd {$fdId} done (" . ($n + 1) . '/' . count($ids) . ") — resume with --from=" . ($fdId + 1));
+        out("… progress: fd {$fdId} done (" . ($n + 1) . '/' . count($ids) . ') — resume with ' . ($newestFirst ? '--newest-first --to=' . ($fdId - 1) : '--from=' . ($fdId + 1)));
     }
 }
 

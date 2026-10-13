@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.179.0 &mdash; 2026-10-13
+
+### Added
+- **Freshdesk importer: `--newest-first` and `--to`.** A full import takes hours at Freshdesk's rate limit; `--newest-first` works from the most recent ticket backwards so current work lands first, and `--to` caps the range so an interrupted newest-first run resumes where it stopped (the progress log prints the exact flags).
+
 ## 2.178.1 &mdash; 2026-10-13
 
 ### Fixed
