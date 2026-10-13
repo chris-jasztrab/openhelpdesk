@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.178.1 &mdash; 2026-10-13
+
+### Fixed
+- **Freshdesk importer no longer skips tickets raised by a deleted Freshdesk user.** Freshdesk strips a deleted agent or contact to "Deleted Agent" with no email, which left those tickets (and their replies and attachments) un-importable. They are now created under one shared placeholder requester, "Deleted Freshdesk user" (`deleted-user@import.invalid`, a domain that can never receive mail).
+
 ## 2.178.0 &mdash; 2026-10-13
 
 ### Added

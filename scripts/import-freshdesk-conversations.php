@@ -448,10 +448,10 @@ foreach ($ids as $n => $fdId) {
         }
         if (!$here) {
             [$reqEmail, $reqName] = fdPerson((string) ($fdTicket['requester_id'] ?? '')) ?? [null, ''];
-            $requester = localUserId($db, $reqEmail, $reqName);
-            if ($requester === null) {
-                throw new RuntimeException('requester has no email address');
-            }
+            // Freshdesk wipes a deleted agent/contact down to "Deleted Agent" with no
+            // email; those tickets get one shared placeholder (.invalid never receives mail).
+            $requester = localUserId($db, $reqEmail, $reqName)
+                ?? localUserId($db, 'deleted-user@import.invalid', 'Deleted Freshdesk user');
         }
 
         if ($apply) {
