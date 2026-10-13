@@ -4127,6 +4127,20 @@ function emailContent(string $content): string
 }
 
 /**
+ * Addresses already emailed about a ticket during this request, lowercased and
+ * keyed for isset(). sendMail() records every ticket email; broadcasts such as
+ * notifyGroupMembers() skip anyone here so nobody gets two emails for one event.
+ */
+function ticketMailRecipients(int $ticketId, ?string $email = null): array
+{
+    static $sent = [];
+    if ($email !== null) {
+        $sent[$ticketId][strtolower($email)] = true;
+    }
+    return $sent[$ticketId] ?? [];
+}
+
+/**
  * Send an email via SMTP.
  *
  * @param array $attachments Optional file attachments, each ['path' => absolute
@@ -4135,6 +4149,10 @@ function emailContent(string $content): string
  */
 function sendMail(string $toEmail, string $toName, string $subject, string $htmlBody, string $textBody = '', ?int $ticketId = null, array $attachments = [], bool $transactional = false): string|false
 {
+    if ($ticketId !== null) {
+        ticketMailRecipients($ticketId, $toEmail);
+    }
+
     // Dry-run interception, ahead of every other check including the
     // transactional bypass below — a --dry-run of a cron script must not be able
     // to deliver anything, ever. Returns a fake Message-ID (not false) so the
@@ -5377,10 +5395,14 @@ function notifyCcAdded(PDO $db, int $ticketId, int $userId, string $addedByName,
         return;
     }
 
-    $ticket = $db->prepare('SELECT subject, group_id FROM tickets WHERE id = ?');
+    $ticket = $db->prepare('SELECT subject, group_id, created_by FROM tickets WHERE id = ?');
     $ticket->execute([$ticketId]);
     $ticketRow = $ticket->fetch();
     if (!$ticketRow) return;
+    // The requester already gets every requester email; a CC rule that matches
+    // their own ticket would otherwise email them twice. notifyCcUsers() skips
+    // the creator for the same reason.
+    if ((int) $ticketRow['created_by'] === $userId) return;
 
     $userStmt = $db->prepare(
         'SELECT id, first_name, last_name, email, role, notify_ticket_cc FROM users WHERE id = ?'
@@ -5522,7 +5544,7 @@ function notifyGroupMembers(PDO $db, int $ticketId): void
     // Fetch the ticket. Pull the type's confidential flag + group so we can gate
     // recipients and redact the body below.
     $tStmt = $db->prepare(
-        'SELECT t.subject, t.description, t.type_id, t.location_id, t.priority_id, t.created_by, t.group_id,
+        'SELECT t.subject, t.description, t.type_id, t.location_id, t.priority_id, t.created_by, t.group_id, t.assigned_to,
                 COALESCE(tt.is_confidential, 0) AS is_confidential, tt.group_id AS conf_group_id
          FROM tickets t
          LEFT JOIN ticket_types tt ON tt.id = t.type_id
@@ -5609,10 +5631,20 @@ function notifyGroupMembers(PDO $db, int $ticketId): void
         });
     }
 
+    // People directly on the ticket get their own email, so the broadcast skips
+    // them: the requester and assignee (whichever order the caller sends those
+    // in), plus anyone already emailed about it this request, e.g. a CC rule.
+    $directIds = array_map('intval', array_filter([$ticket['created_by'], $ticket['assigned_to']]));
+    $members = array_filter($members, static fn($m) => !in_array((int) $m['id'], $directIds, true));
+    $alreadyEmailed = ticketMailRecipients($ticketId);
+
     $appUrl = env('APP_URL', 'http://localhost:8000');
     $slaTokens = slaEmailTokens($db, $ticket['type_id'] ? (int) $ticket['type_id'] : null, $ticket['priority_id'] ? (int) $ticket['priority_id'] : null);
 
     foreach ($members as $user) {
+        if (isset($alreadyEmailed[strtolower((string) $user['email'])])) {
+            continue;
+        }
         // In-app "New Ticket" alert for group members — independent of email opt-out.
         createNotification(
             $db,

@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.180.2 &mdash; 2026-10-13
+
+### Fixed
+- **No more duplicate emails when a ticket is opened.** A CC automation that matched the requester's own ticket (e.g. a branch supervisor CC'd on every ticket from their branch, opening one themselves) sent them a "You were added as a CC" email on top of their "ticket received" confirmation; it now skips the requester. The "New ticket" group alert also skips the requester, the assignee, and anyone already emailed about the ticket in the same request (such as a CC rule), so a person who is both CC'd and in the notified group gets one email instead of two.
+
 ## 2.180.1 &mdash; 2026-10-13
 
 ### Fixed
