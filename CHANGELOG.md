@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.179.1 &mdash; 2026-10-13
+
+### Fixed
+- **AI Token Usage report now counts similar-ticket matching.** The report summed skill classification, group routing and duplicate detection but left out the similar-tickets AI calls, so totals were understated. They now appear as a "Similar tickets" source.
+
 ## 2.179.0 &mdash; 2026-10-13
 
 ### Added

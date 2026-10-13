@@ -12567,12 +12567,14 @@ $router->get('/admin/reports/ai-usage', function () {
     $cmpTo   = (!empty($_GET['cmp_to'])   && strtotime((string) $_GET['cmp_to']))   ? date('Y-m-d', strtotime((string) $_GET['cmp_to']))   : $autoPrevTo;
     $cmpFrom = (!empty($_GET['cmp_from']) && strtotime((string) $_GET['cmp_from'])) ? date('Y-m-d', strtotime((string) $_GET['cmp_from'])) : $autoPrevFrom;
 
-    // All three AI-classification tables share the same token columns.
+    // All four AI-classification tables share the same token columns.
     $union = "SELECT prompt_tokens, output_tokens, created_at, provider, model, 'Skill classification' AS source FROM ai_classifications
               UNION ALL
               SELECT prompt_tokens, output_tokens, created_at, provider, model, 'Group routing' AS source FROM ai_group_classifications
               UNION ALL
-              SELECT prompt_tokens, output_tokens, created_at, provider, model, 'Duplicate detection' AS source FROM ai_duplicate_classifications";
+              SELECT prompt_tokens, output_tokens, created_at, provider, model, 'Duplicate detection' AS source FROM ai_duplicate_classifications
+              UNION ALL
+              SELECT prompt_tokens, output_tokens, created_at, provider, model, 'Similar tickets' AS source FROM ai_similarity_classifications";
 
     $bucketSql = "SELECT {$cfg['sql']} AS bkt,
                          COALESCE(SUM(prompt_tokens),0) AS in_tok,
