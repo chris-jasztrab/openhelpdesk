@@ -218,7 +218,7 @@ class TicketExportVisibilityTest extends TestCase
 
         // Agent role: no groups, no tickets.view_all (asserted above), so:
         //   confidential  -> only tickets they created
-        //   normal        -> assigned to / created by / watched
+        //   normal        -> assigned to / created by / watched / CC'd
         $q = $db->prepare(
             'SELECT t.id
                FROM tickets t
@@ -226,9 +226,10 @@ class TicketExportVisibilityTest extends TestCase
               WHERE (COALESCE(tt.is_confidential, 0) = 1 AND t.created_by = ?)
                  OR (COALESCE(tt.is_confidential, 0) = 0
                      AND (t.assigned_to = ? OR t.created_by = ?
-                          OR t.id IN (SELECT ticket_id FROM ticket_watchers WHERE user_id = ?)))'
+                          OR t.id IN (SELECT ticket_id FROM ticket_watchers WHERE user_id = ?)
+                          OR t.id IN (SELECT ticket_id FROM ticket_cc WHERE user_id = ?)))'
         );
-        $q->execute([$me, $me, $me, $me]);
+        $q->execute([$me, $me, $me, $me, $me]);
         $expected = array_map('strval', $q->fetchAll(\PDO::FETCH_COLUMN));
 
         $actual = $this->csvIds($this->get($this->agentClient(), '/agent/tickets/export'));

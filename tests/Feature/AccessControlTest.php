@@ -226,6 +226,35 @@ class AccessControlTest extends TestCase
         }
     }
 
+    /**
+     * Regression: a CC automation added an agent from another group to a ticket;
+     * the CC email linked to /agent/tickets/{id}, which denied them because only
+     * assignees and watchers were exempt from the group check.
+     */
+    public function test_agent_can_open_ticket_they_are_ccd_on(): void
+    {
+        $db = \Database::connect();
+        $db->prepare("INSERT INTO tickets (subject, description, created_by, status) VALUES ('[TEST] CC access', 'x', ?, 'open')")
+           ->execute([DatabaseSeeder::$portalId]);
+        $id   = (int) $db->lastInsertId();
+        $path = '/agent/tickets/' . $id;
+
+        try {
+            $this->assertForbidden($this->get($this->agentClient(), $path, follow: false),
+                ' — agent with no group/watch/CC should not open the ticket');
+
+            $db->prepare('INSERT INTO ticket_cc (ticket_id, user_id, added_by) VALUES (?, ?, ?)')
+               ->execute([$id, DatabaseSeeder::$agentId, DatabaseSeeder::$agentId]);
+
+            $this->assertSame(200, $this->get($this->agentClient(), $path, follow: false)->getStatusCode(),
+                ' — a CC\'d agent should open the ticket from the email link');
+        } finally {
+            $db->prepare('DELETE FROM ticket_cc       WHERE ticket_id = ?')->execute([$id]);
+            $db->prepare('DELETE FROM ticket_timeline WHERE ticket_id = ?')->execute([$id]);
+            $db->prepare('DELETE FROM tickets         WHERE id = ?')->execute([$id]);
+        }
+    }
+
     // ── Redirect destination after auth guard ─────────────────────────────────
 
     public function test_unauthenticated_request_redirects_to_login_not_403(): void

@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.177.1 &mdash; 2026-10-13
+
+### Fixed
+- **Staff CC'd on a ticket can now open it.** A CC automation (e.g. "Eastside Tickets CC") could add an agent from another group; the CC email linked to the agent ticket view, which said "You do not have access to this ticket" because only the assignee and watchers were exempt from the group check. Being CC'd now grants the same access as watching: the ticket opens from the email and appears in the agent's ticket list. Confidential tickets are unchanged (CC still grants nothing there).
+
 ## 2.177.0 &mdash; 2026-10-09
 
 ### Added

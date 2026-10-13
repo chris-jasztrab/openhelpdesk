@@ -8317,11 +8317,11 @@ function nextEscalationStep(PDO $db, int $ticketTypeId, int $currentLevel, int $
 
 /**
  * Group-based ticket visibility override: an agent who is the current
- * assignee or an explicit watcher of a ticket should always be able to
- * open it, even if the ticket's group is outside their group memberships.
- * Escalation and manual assignment can hand a ticket to someone outside
- * the group; without this exemption they'd get the notification email
- * but a 403 on the link.
+ * assignee, an explicit watcher, or a CC of a ticket should always be able
+ * to open it, even if the ticket's group is outside their group memberships.
+ * Escalation, manual assignment and CC automations can hand a ticket to
+ * someone outside the group; without this exemption they'd get the
+ * notification email but a 403 on the link.
  */
 function ticketAccessExempt(PDO $db, int $userId, ?int $ticketId): bool
 {
@@ -8335,8 +8335,12 @@ function ticketAccessExempt(PDO $db, int $userId, ?int $ticketId): bool
         return true;
     }
 
-    $s = $db->prepare('SELECT 1 FROM ticket_watchers WHERE ticket_id = ? AND user_id = ?');
-    $s->execute([$ticketId, $userId]);
+    $s = $db->prepare(
+        'SELECT 1 FROM ticket_watchers WHERE ticket_id = ? AND user_id = ?
+         UNION ALL
+         SELECT 1 FROM ticket_cc WHERE ticket_id = ? AND user_id = ?'
+    );
+    $s->execute([$ticketId, $userId, $ticketId, $userId]);
     return (bool) $s->fetchColumn();
 }
 
@@ -8486,6 +8490,7 @@ function ticketStaffVisibilitySql(PDO $db, int $userId, ?string $role, string $t
         $nc[] = "{$t}.assigned_to = ?";
         $nc[] = "{$t}.created_by = ?";
         $nc[] = "{$t}.id IN (SELECT ticket_id FROM ticket_watchers WHERE user_id = ?)";
+        $nc[] = "{$t}.id IN (SELECT ticket_id FROM ticket_cc WHERE user_id = ?)";
         $nonConfClause = "(NOT $isConfidential AND (" . implode(' OR ', $nc) . '))';
     }
 
@@ -8497,6 +8502,7 @@ function ticketStaffVisibilitySql(PDO $db, int $userId, ?string $role, string $t
         $params[] = $userId; // nonConf assigned
         $params[] = $userId; // nonConf created
         $params[] = $userId; // nonConf watcher
+        $params[] = $userId; // nonConf CC
     }
 
     return ['sql' => "($confClause OR $nonConfClause)", 'params' => $params];
