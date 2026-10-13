@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.178.0 &mdash; 2026-10-13
+
+### Added
+- **Freshdesk importer: `scripts/import-freshdesk-conversations.php`.** Freshdesk's CSV export leaves out archived tickets and carries no replies, notes or attachments. This CLI walks every Freshdesk ticket id over the v2 API: tickets not yet imported are created (mapped like the CSV importer, SLA-exempt with no clock started), every reply and note is added to the timeline with its original author and time (private notes stay internal), and every attachment — the ticket's own and each reply's — is downloaded into attachment storage, along with Freshdesk-hosted inline images. An archived Freshdesk ticket is never left open: new ones are created closed, existing ones still showing open are closed with a timeline note. Dry run by default (`--apply` to write), honours Freshdesk's rate limit, resumable with `--from`, and safe to re-run — it only fills gaps. Inserts directly, so no emails, Teams messages or notifications are sent.
+
 ## 2.177.1 &mdash; 2026-10-13
 
 ### Fixed
