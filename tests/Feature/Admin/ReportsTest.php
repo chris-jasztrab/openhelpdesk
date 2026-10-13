@@ -38,6 +38,7 @@ class ReportsTest extends TestCase
             ['/admin/reports/trends'],
             ['/admin/reports/fcr'],
             ['/admin/reports/custom'],
+            ['/admin/reports/ai-usage'],
         ];
     }
 

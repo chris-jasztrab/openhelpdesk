@@ -2487,6 +2487,73 @@ function _autoAssignFirstAvailable(PDO $db, array $members): ?int
 /* ── AI ticket classification ─────────────────────────────────── */
 
 /**
+ * Anthropic list price in USD per million tokens as [input, output], or null
+ * when there's no price on file (OpenAI models, anything newer than this
+ * table). Dated snapshot ids (claude-haiku-4-5-20251001) resolve to their alias.
+ * Source: platform.claude.com/docs/en/about-claude/pricing, 2026-10-13. The app
+ * sends no cache_control, so every logged input token bills at the base rate.
+ *
+ * @return array{0: float, 1: float}|null
+ */
+function aiModelPriceUsd(string $model): ?array
+{
+    // ponytail: hand-maintained; add a row when AI settings offers a new model.
+    $prices = [
+        'claude-fable-5-1'  => [10.00, 50.00],
+        'claude-fable-5'    => [10.00, 50.00],
+        'claude-opus-5-5'   => [4.00, 20.00],
+        'claude-opus-5'     => [5.00, 25.00],
+        'claude-opus-4-8'   => [5.00, 25.00],
+        'claude-opus-4-7'   => [5.00, 25.00],
+        'claude-opus-4-6'   => [5.00, 25.00],
+        'claude-opus-4-5'   => [5.00, 25.00],
+        'claude-opus-4-1'   => [15.00, 75.00],
+        'claude-opus-4-0'   => [15.00, 75.00],
+        'claude-opus-4'     => [15.00, 75.00],
+        'claude-sonnet-5-5' => [2.00, 10.00],
+        'claude-sonnet-5'   => [2.00, 10.00],
+        'claude-sonnet-4-6' => [3.00, 15.00],
+        'claude-sonnet-4-5' => [3.00, 15.00],
+        'claude-sonnet-4-0' => [3.00, 15.00],
+        'claude-sonnet-4'   => [3.00, 15.00],
+        // ponytail: Haiku 5.5 bills $0.50/$2.50 once a prompt passes 100K tokens;
+        // helpdesk prompts run a few thousand, so only the base tier is modelled.
+        'claude-haiku-5-5'  => [0.10, 0.50],
+        'claude-haiku-4-5'  => [1.00, 5.00],
+        'claude-3-5-haiku'  => [0.80, 4.00],
+    ];
+    return $prices[preg_replace('/-\d{8}$/', '', $model)] ?? null;
+}
+
+/**
+ * USD→CAD: the Bank of Canada's daily average rate (Valet API, no key needed),
+ * cached in settings and re-checked at most twice a day. A failed fetch keeps
+ * the last good rate.
+ *
+ * @return array{rate: float, date: string}
+ */
+function usdCadRate(): array
+{
+    if (time() - (int) getSetting('fx_usdcad_checked_at', '0') > 43200) {
+        // Stamp before fetching so an unreachable BoC costs one slow page, not every page.
+        setSetting('fx_usdcad_checked_at', (string) time());
+        $ch = curl_init('https://www.bankofcanada.ca/valet/observations/FXUSDCAD/json?recent=1');
+        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_CONNECTTIMEOUT => 3, CURLOPT_TIMEOUT => 5]);
+        $obs = json_decode((string) curl_exec($ch), true)['observations'][0] ?? null;
+        $rate = (float) ($obs['FXUSDCAD']['v'] ?? 0);
+        if ($rate > 0) {
+            setSetting('fx_usdcad_rate', (string) $rate);
+            setSetting('fx_usdcad_date', (string) $obs['d']);
+        }
+    }
+    // Defaults are the BoC rate when this shipped, used until the first good fetch.
+    return [
+        'rate' => (float) getSetting('fx_usdcad_rate', '1.4271'),
+        'date' => getSetting('fx_usdcad_date', '2026-10-09'),
+    ];
+}
+
+/**
  * Classify a ticket via the configured AI provider.
  *
  * Persists the result in `ai_classifications`, points

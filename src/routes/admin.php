@@ -12576,22 +12576,40 @@ $router->get('/admin/reports/ai-usage', function () {
               UNION ALL
               SELECT prompt_tokens, output_tokens, created_at, provider, model, 'Similar tickets' AS source FROM ai_similarity_classifications";
 
-    $bucketSql = "SELECT {$cfg['sql']} AS bkt,
+    // Cost in CAD for one model's tokens; null when the model has no price on file.
+    $fx  = usdCadRate();
+    $cad = function (string $model, $in, $out) use ($fx): ?float {
+        $p = aiModelPriceUsd($model);
+        return $p === null ? null : ((int) $in * $p[0] + (int) $out * $p[1]) / 1e6 * $fx['rate'];
+    };
+
+    // Each model bills at its own rate, so queries group by model too and this
+    // folds the per-model rows up to $key, pricing as it goes.
+    $fold = function (array $rows, string $key) use ($cad): array {
+        $out = [];
+        foreach ($rows as $r) {
+            $o = $out[$r[$key]] ?? [$key => $r[$key], 'in_tok' => 0, 'out_tok' => 0, 'calls' => 0, 'cost' => 0.0];
+            $o['in_tok']  += (int) $r['in_tok'];
+            $o['out_tok'] += (int) $r['out_tok'];
+            $o['calls']   += (int) $r['calls'];
+            $o['cost']    += $cad($r['model'], $r['in_tok'], $r['out_tok']) ?? 0.0;
+            $out[$r[$key]] = $o;
+        }
+        return $out;
+    };
+
+    $bucketSql = "SELECT {$cfg['sql']} AS bkt, model,
                          COALESCE(SUM(prompt_tokens),0) AS in_tok,
                          COALESCE(SUM(output_tokens),0) AS out_tok,
                          COUNT(*) AS calls
                   FROM ( $union ) u
                   WHERE created_at BETWEEN ? AND ?
-                  GROUP BY bkt";
+                  GROUP BY bkt, model";
 
-    $fetchBuckets = function (string $wFrom, string $wTo) use ($db, $bucketSql) {
+    $fetchBuckets = function (string $wFrom, string $wTo) use ($db, $bucketSql, $fold) {
         $stmt = $db->prepare($bucketSql);
         $stmt->execute([$wFrom . ' 00:00:00', $wTo . ' 23:59:59']);
-        $map = [];
-        foreach ($stmt->fetchAll() as $r) {
-            $map[$r['bkt']] = $r;
-        }
-        return $map;
+        return $fold($stmt->fetchAll(), 'bkt');
     };
 
     $curMap  = $fetchBuckets($from, $to);
@@ -12602,49 +12620,50 @@ $router->get('/admin/reports/ai-usage', function () {
 
     // Chart series: current-period totals per bucket, previous-period totals
     // aligned by bucket index so the two windows overlay for comparison.
-    $labels = $prevLabels = $curTotal = $prevTotal = [];
+    $labels = $prevLabels = $curTotal = $prevTotal = $curCost = $prevCost = [];
     foreach ($curBuckets as $i => $b) {
         $labels[]   = $b['label'];
         $cr         = $curMap[$b['key']] ?? null;
-        $curTotal[] = $cr ? (int) $cr['in_tok'] + (int) $cr['out_tok'] : 0;
+        $curTotal[] = $cr ? $cr['in_tok'] + $cr['out_tok'] : 0;
+        $curCost[]  = $cr ? round($cr['cost'], 2) : 0;
 
         $pb = $prevBuckets[$i] ?? null;
         if ($pb) {
             $prevLabels[] = $pb['label'];
             $pr           = $prevMap[$pb['key']] ?? null;
-            $prevTotal[]  = $pr ? (int) $pr['in_tok'] + (int) $pr['out_tok'] : 0;
+            $prevTotal[]  = $pr ? $pr['in_tok'] + $pr['out_tok'] : 0;
+            $prevCost[]   = $pr ? round($pr['cost'], 2) : 0;
         } else {
             $prevLabels[] = '';
             $prevTotal[]  = null;
+            $prevCost[]   = null;
         }
     }
 
     // Window totals (summed across every bucket in each window, not just aligned ones).
-    $curIn = $curOut = $curCalls = 0;
-    foreach ($curMap as $r) { $curIn += (int) $r['in_tok']; $curOut += (int) $r['out_tok']; $curCalls += (int) $r['calls']; }
-    $prevIn = $prevOut = $prevCalls = 0;
-    foreach ($prevMap as $r) { $prevIn += (int) $r['in_tok']; $prevOut += (int) $r['out_tok']; $prevCalls += (int) $r['calls']; }
+    $sum = fn (array $map, string $k) => array_sum(array_column($map, $k));
 
     $stats = [
-        ['label' => 'Total tokens',  'icon' => 'bi-cpu',                'cur' => $curIn + $curOut, 'prev' => $prevIn + $prevOut],
-        ['label' => 'Input tokens',  'icon' => 'bi-box-arrow-in-right', 'cur' => $curIn,           'prev' => $prevIn],
-        ['label' => 'Output tokens', 'icon' => 'bi-box-arrow-right',    'cur' => $curOut,          'prev' => $prevOut],
-        ['label' => 'API calls',     'icon' => 'bi-braces',             'cur' => $curCalls,        'prev' => $prevCalls],
+        ['label' => 'Total tokens',    'icon' => 'bi-cpu',                'cur' => $sum($curMap, 'in_tok') + $sum($curMap, 'out_tok'), 'prev' => $sum($prevMap, 'in_tok') + $sum($prevMap, 'out_tok')],
+        ['label' => 'Input tokens',    'icon' => 'bi-box-arrow-in-right', 'cur' => $sum($curMap, 'in_tok'),  'prev' => $sum($prevMap, 'in_tok')],
+        ['label' => 'Output tokens',   'icon' => 'bi-box-arrow-right',    'cur' => $sum($curMap, 'out_tok'), 'prev' => $sum($prevMap, 'out_tok')],
+        ['label' => 'API calls',       'icon' => 'bi-braces',             'cur' => $sum($curMap, 'calls'),   'prev' => $sum($prevMap, 'calls')],
+        ['label' => 'Est. cost (CAD)', 'icon' => 'bi-currency-dollar',    'cur' => $sum($curMap, 'cost'),    'prev' => $sum($prevMap, 'cost'), 'money' => true],
     ];
 
     // Breakdown tables for the current window.
     $stmt = $db->prepare(
-        "SELECT source,
+        "SELECT source, model,
                 COALESCE(SUM(prompt_tokens),0) AS in_tok,
                 COALESCE(SUM(output_tokens),0) AS out_tok,
                 COUNT(*) AS calls
          FROM ( $union ) u
          WHERE created_at BETWEEN ? AND ?
-         GROUP BY source
-         ORDER BY (COALESCE(SUM(prompt_tokens),0) + COALESCE(SUM(output_tokens),0)) DESC"
+         GROUP BY source, model"
     );
     $stmt->execute([$from . ' 00:00:00', $to . ' 23:59:59']);
-    $bySource = $stmt->fetchAll();
+    $bySource = array_values($fold($stmt->fetchAll(), 'source'));
+    usort($bySource, fn ($a, $b) => ($b['in_tok'] + $b['out_tok']) <=> ($a['in_tok'] + $a['out_tok']));
 
     $stmt = $db->prepare(
         "SELECT COALESCE(provider,'—') AS provider,
@@ -12658,12 +12677,15 @@ $router->get('/admin/reports/ai-usage', function () {
          ORDER BY (COALESCE(SUM(prompt_tokens),0) + COALESCE(SUM(output_tokens),0)) DESC"
     );
     $stmt->execute([$from . ' 00:00:00', $to . ' 23:59:59']);
-    $byModel = $stmt->fetchAll();
+    $byModel = array_map(fn ($r) => $r + [
+        'price' => aiModelPriceUsd($r['model']),
+        'cost'  => $cad($r['model'], $r['in_tok'], $r['out_tok']),
+    ], $stmt->fetchAll());
 
     render('admin/reports/ai-usage', compact(
         'from', 'to', 'range', 'gran', 'cfg', 'cmpFrom', 'cmpTo',
-        'labels', 'prevLabels', 'curTotal', 'prevTotal',
-        'stats', 'bySource', 'byModel'
+        'labels', 'prevLabels', 'curTotal', 'prevTotal', 'curCost', 'prevCost',
+        'stats', 'bySource', 'byModel', 'fx'
     ));
 });
 

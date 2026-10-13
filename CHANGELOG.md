@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.180.0 &mdash; 2026-10-13
+
+### Added
+- **AI Token Usage report shows estimated cost in CAD.** Each model's tokens are priced at Anthropic's published USD list rate for that model, then converted at the Bank of Canada's daily USD/CAD rate (fetched automatically, cached, re-checked twice a day). New "Est. cost (CAD)" card with period-over-period change, a cost column on the by-feature and by-model tables (the model table also shows the USD rate used), and per-bucket cost in the chart tooltip. Models with no price on file (e.g. OpenAI) show "No price on file" and are listed under the table instead of being guessed at.
+
 ## 2.179.1 &mdash; 2026-10-13
 
 ### Fixed
