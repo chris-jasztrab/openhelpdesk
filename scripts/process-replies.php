@@ -184,8 +184,11 @@ foreach ($messages as $msg) {
         logMsg('WARN', "  Sender authentication FAILED for {$fromAddr} (possible spoof) — ignoring inline commands, posting reply as unprivileged.");
     }
     if (!$authFailed && $user !== null && in_array($user['role'], ['admin', 'agent'], true)) {
-        if ($parsed['status'] !== null) {
+        // Same rule as every other status write: a hidden (inactive) status is refused.
+        if ($parsed['status'] !== null && in_array($parsed['status'], ticketActiveStatusSlugs(), true)) {
             $newStatus = $parsed['status'];
+        } elseif ($parsed['status'] !== null) {
+            logMsg('WARN', "  #{$parsed['status']} ignored: that status is inactive.");
         }
         if ($parsed['priority_slug'] !== null) {
             $pStmt = $db->prepare('SELECT id FROM ticket_priorities WHERE LOWER(name) = ? LIMIT 1');

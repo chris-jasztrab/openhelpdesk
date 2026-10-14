@@ -261,16 +261,22 @@ $ticketId = (int) $ticket['id'];
             <?php endif; ?>
 
             <?php
-            // Curated floor-view quick actions — pinned to the legacy slugs.
-            // If an admin has renamed those slugs the buttons silently drop out.
+            // Curated floor-view quick actions — pinned to the legacy slugs, and an
+            // inactive (hidden) status drops out: the action handler rejects it anyway.
+            // With Resolved active the closing button is Resolve, otherwise Close.
+            $closedSlug    = ticketDefaultClosedStatusSlug();
             $statusButtons = [
                 'in_progress' => ['In progress',  'a-progress', 'bi-play-fill'],
                 'pending'     => ['Pending',      'a-pending',  'bi-pause-fill'],
                 'resolved'    => ['Resolve',      'a-resolve',  'bi-check2-circle'],
             ];
+            $statusButtons = array_intersect_key($statusButtons, array_flip(ticketActiveStatusSlugs()));
+            if (!isset($statusButtons['resolved'])) {
+                $statusButtons[$closedSlug] = ['Close', 'a-resolve', 'bi-check2-circle'];
+            }
             if (in_array($status, ticketClosedBucketSlugs(), true)) {
                 $statusButtons = [ticketDefaultNewStatusSlug() => ['Reopen', 'a-reopen', 'bi-arrow-counterclockwise']] + $statusButtons;
-                unset($statusButtons['resolved']);
+                unset($statusButtons['resolved'], $statusButtons[$closedSlug]);
             }
             foreach ($statusButtons as $s => [$label, $cls, $icon]):
                 if ($s === $status) continue; ?>

@@ -584,8 +584,8 @@ $router->get('/api/v1/dashboard', function () {
     $s->execute($vis['params']);
     $pending = (int) $s->fetchColumn();
 
-    $s = $db->prepare("SELECT COUNT(*) FROM tickets t WHERE t.status = ? AND DATE(t.updated_at) = CURDATE() AND {$vis['sql']}");
-    $s->execute(array_merge([ticketDefaultResolvedStatusSlug()], $vis['params']));
+    $s = $db->prepare("SELECT COUNT(*) FROM tickets t WHERE " . ticketResolvedTodaySql() . " AND {$vis['sql']}");
+    $s->execute($vis['params']);
     $resolvedToday = (int) $s->fetchColumn();
 
     $s = $db->prepare(
@@ -1679,15 +1679,8 @@ $router->get('/api/v1/meta', function () {
         'locations'  => $locations,
         'groups'     => $groups,
         'agents'     => $agents,
-        'statuses'   => [
-            ['value' => 'open',                   'label' => 'Open'],
-            ['value' => 'in_progress',            'label' => 'In Progress'],
-            ['value' => 'pending',                'label' => 'Pending'],
-            ['value' => 'waiting_on_customer',    'label' => 'Waiting on Customer'],
-            ['value' => 'waiting_on_third_party', 'label' => 'Waiting on Third Party'],
-            ['value' => 'resolved',               'label' => 'Resolved'],
-            ['value' => 'closed',                 'label' => 'Closed'],
-        ],
+        // Active statuses only — what a status write will accept.
+        'statuses'   => array_map(fn($s) => ['value' => $s['slug'], 'label' => $s['label']], ticketActiveStatuses()),
     ]);
 });
 

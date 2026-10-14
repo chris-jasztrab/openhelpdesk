@@ -69,7 +69,7 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/agent/help'], ['label' => 'Worki
     <li><strong>Canned responses</strong> &mdash; click <strong>Canned</strong> in the box's header to insert a saved reply. See <a href="/agent/help/canned-responses">Canned Responses</a>.</li>
     <li><strong>@mentions</strong> &mdash; type <code>@</code> and start a colleague's name, then pick them from the list. They get a notification pointing to your message.</li>
     <li><strong>Taking the ticket</strong> &mdash; posting a public reply on an unassigned ticket assigns it to you.</li>
-    <li><strong>Send &amp; change status</strong> &mdash; the arrow beside <strong>Send Reply</strong> lets you send and set the status in one step: <strong>Resolved</strong>, <strong>Closed</strong>, <strong>Pending</strong>, <strong>Waiting on Customer</strong> or <strong>Waiting on Third Party</strong>.</li>
+    <li><strong>Send &amp; change status</strong> &mdash; the arrow beside <strong>Send Reply</strong> lets you send and set the status in one step: <strong>Resolved</strong> (if your organisation uses it), <strong>Closed</strong>, <strong>Pending</strong>, <strong>Waiting on Customer</strong> or <strong>Waiting on Third Party</strong>.</li>
 </ul>
 </div>
 </div>

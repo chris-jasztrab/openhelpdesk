@@ -116,6 +116,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-envelope-arrow-down text-primary me-2"></i>Inbound Email (Reply by Email)</h5>
 <p class="text-muted mb-2">Requesters and staff can reply to a ticket notification from their inbox, and the reply is added to the ticket. Inbound mail is read from a Microsoft 365 mailbox through the <strong>Microsoft Graph API</strong> (no IMAP or app passwords).</p>
+<p class="text-muted mb-2"><strong>Nothing a person writes is dropped.</strong> A reply that can't go on its ticket opens a <strong>new ticket</strong> with their message instead: a requester replying to a <strong>Closed</strong> ticket (unless it was closed with <em>reopen on reply</em> and the window is still open), a reply from an address with no account, or a reply to a ticket that no longer exists. The new ticket keeps the original's type and group, and both tickets get an internal note linking them. Staff replies always go on the ticket, even a closed one. A reply to a merged ticket goes on the ticket it was merged into. When the requester replies, the assigned agent gets the same alert as for a portal comment.</p>
 <ol class="text-muted mb-3">
     <li>Register an app in Microsoft Entra ID with the <code>Mail.Read</code> and <code>Mail.ReadWrite</code> <strong>application</strong> permissions and admin consent. The <a href="/admin/settings/email-reply-help">Email Reply Setup Guide</a> walks through it.</li>
     <li>On <a href="/admin/settings"><strong>Email / SMTP</strong></a>, in <strong>Inbound Mail &mdash; Reply Processing</strong>, tick <strong>Enable reply-by-email</strong> and fill in <strong>Reply-To Address</strong>, <strong>Mailbox Address</strong>, <strong>Tenant ID</strong>, <strong>Client ID (Application ID)</strong>, <strong>Client Secret</strong> and <strong>App Secret Expiry Date</strong>. Then click <strong>Save Inbound Settings</strong>.</li>
@@ -130,10 +131,10 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <h5 class="fw-semibold mb-3"><i class="bi bi-envelope-plus text-primary me-2"></i>Email-to-Ticket</h5>
 <p class="text-muted mb-2">With <strong>Enable Email-to-Ticket</strong> switched on (Email-to-Ticket card), a message to the same mailbox that isn't a reply to an existing ticket becomes a new ticket. The subject becomes the ticket subject and the body becomes the description. Inbound mail must be configured first.</p>
 <ul class="text-muted mb-0">
-    <li><strong>Auto-create user accounts</strong>: unknown senders get an End User account. When this is off, mail from unknown addresses is skipped.</li>
+    <li><strong>Auto-create user accounts</strong>: unknown senders get an End User account. When this is off, new mail from unknown addresses is skipped. A <em>reply</em> to a ticket from an unknown address still gets an account and a ticket, so it isn't lost.</li>
     <li><strong>Default Ticket Type</strong> and <strong>Default Priority</strong> are applied to every emailed ticket. The group follows the type's default group, then the system default group from <a href="/admin/settings/ticket-routing">Ticket Routing</a>.</li>
     <li>New tickets run through AI routing and classification, ticket-created automations and auto-assignment, and the sender gets the usual confirmation email. If <em>Classify tickets created from inbound email</em> is off under <a href="/admin/settings/ai">AI Classification</a>, emailed tickets are only auto-assigned.</li>
-    <li>Automatic replies (out-of-office messages, bulk and list mail) are ignored and never create tickets.</li>
+    <li>Automatic mail is the only mail ignored, and it never creates a ticket: out-of-office and vacation replies, bounces and delivery reports, and bulk and list mail.</li>
 </ul>
 </div>
 </div>
@@ -163,7 +164,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
     <tbody class="text-muted">
         <tr><td><code>#open</code></td><td>Open (also reopens a closed ticket)</td></tr>
         <tr><td><code>#close</code> or <code>#closed</code></td><td>Closed</td></tr>
-        <tr><td><code>#resolve</code> or <code>#resolved</code></td><td>Resolved</td></tr>
+        <tr><td><code>#resolve</code> or <code>#resolved</code></td><td>Resolved (ignored while the Resolved status is inactive)</td></tr>
         <tr><td><code>#pending</code></td><td>Pending</td></tr>
         <tr><td><code>#in_progress</code> or <code>#inprogress</code></td><td>In Progress</td></tr>
         <tr><td><code>#waiting_on_customer</code> or <code>#waitingoncustomer</code></td><td>Waiting on Customer</td></tr>
@@ -178,7 +179,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <h6 class="fw-semibold mb-2">Usage Rules</h6>
 <ul class="text-muted mb-3">
     <li>Commands go on their own line(s) at the end of your text: several on one line (<code>#resolve #high</code>) or on consecutive lines. Your email signature can follow them.</li>
-    <li>Hashtags inside sentences (<em>"see ticket #123"</em>) are never commands, and unknown hashtags are ignored.</li>
+    <li>Hashtags inside sentences (<em>"see ticket #123"</em>) are never commands. Unknown hashtags, and commands for a status that has been deactivated, are ignored.</li>
     <li>Command lines are removed from the stored comment. A reply that contains only commands changes the ticket without adding a comment.</li>
     <li>If Exchange Online marks the message as failing sender authentication (DMARC / compauth), commands are ignored and the reply is posted as plain text, so a spoofed agent address can't change tickets.</li>
 </ul>
@@ -188,8 +189,8 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 
 I've confirmed the fix is deployed and the user has verified it works.
 
-#resolve #high</pre>
-<p class="text-muted mt-2 mb-0">This posts the comment, sets the status to <strong>Resolved</strong> and the priority to <strong>High</strong>. The command line doesn't appear in the comment.</p>
+#close #high</pre>
+<p class="text-muted mt-2 mb-0">This posts the comment, sets the status to <strong>Closed</strong> and the priority to <strong>High</strong>. The command line doesn't appear in the comment.</p>
 </div>
 </div>
 

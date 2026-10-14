@@ -18,15 +18,7 @@ $breadcrumbs  = [
 $priorityOpts = array_map(fn($r) => ['id' => (string)$r['id'], 'label' => $r['name']], $priorities);
 $groupOpts    = array_map(fn($r) => ['id' => (string)$r['id'], 'label' => $r['name']], $groups);
 $agentOpts    = array_map(fn($r) => ['id' => (string)$r['id'], 'label' => $r['first_name'].' '.$r['last_name']], $agents);
-$statusOpts   = [
-    ['id' => 'open',                   'label' => 'Open'],
-    ['id' => 'in_progress',            'label' => 'In Progress'],
-    ['id' => 'pending',                'label' => 'Pending'],
-    ['id' => 'waiting_on_customer',    'label' => 'Waiting on Customer'],
-    ['id' => 'waiting_on_third_party', 'label' => 'Waiting on Third Party'],
-    ['id' => 'resolved',               'label' => 'Resolved'],
-    ['id' => 'closed',                 'label' => 'Closed'],
-];
+$statusOpts   = array_map(fn($s) => ['id' => $s['slug'], 'label' => $s['label']], ticketActiveStatuses());
 $slaStateOpts = [
     ['id' => 'on_track', 'label' => 'On Track'],
     ['id' => 'warning',  'label' => 'Warning'],

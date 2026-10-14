@@ -187,7 +187,7 @@ The agent dashboard shows five stat cards. Each one links to the matching filter
 | **Unassigned** | Open tickets with no agent assigned. |
 | **My Tickets** | Open tickets assigned to you. |
 | **Pending** | Tickets in Pending status. |
-| **Resolved Today** | Tickets resolved today. Tickets closed as duplicate, won't fix or no response are not counted. |
+| **Resolved Today** | Tickets moved to Resolved or Closed today. Tickets closed as duplicate, won't fix or no response are not counted. |
 | **Escalated to Me** | Open tickets escalated to you. |
 
 Below them, **Recent Tickets** is a sortable table with a **Columns** picker. Status, priority, type, assignee and group can be changed in place from the chevron (▾) next to each value.
@@ -644,7 +644,7 @@ Other emails: ticket merged, satisfaction survey, escalation to the next person 
 
 With a Microsoft 365 mailbox connected through Microsoft Graph (**Settings → Email / SMTP**, which links to a setup guide):
 
-- **Reply by email**: replies to notification emails are added to the ticket timeline, with signatures and quoted text stripped. Replies to a closed ticket are ignored unless it was closed with *reopen on reply* and the window is still open.
+- **Reply by email**: replies to notification emails are added to the ticket timeline, with signatures and quoted text stripped, and a requester's reply alerts the assigned agent. Nothing a person writes is dropped: a requester's reply to a **Closed** ticket (outside a *reopen on reply* window), a reply from an address with no account, or a reply to a deleted ticket opens a new ticket with the message, keeping the original's type and group, with internal notes linking the two. Staff replies always land on the ticket. Replies to a merged ticket go to the ticket it was merged into. Only out-of-office and vacation replies, bounces, and bulk or list mail are ignored, and they never open tickets.
 - **Email-to-ticket**: new messages become tickets, with a default type and priority. Unknown senders can optionally get accounts created for them.
 - **Email commands**: staff can end a reply with a line such as `#close`, `#resolved`, `#pending` or `#high` to change the status or priority. Commands are ignored if the message fails sender authentication.
 

@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.187.0 &mdash; 2026-10-14
+
+### Changed
+- **A deactivated Resolved status is now hidden everywhere.** Turning Resolved off under Settings → Ticket Statuses already removed it from the status dropdowns. It now also disappears from the places that listed it by hand: the **Send & change status** menu on the agent and admin ticket pages, the escalation-rule status picker, and the API's status list (which now returns your configured statuses and labels). On the floor view the **Resolve** button becomes **Close**. An emailed `#resolve` command is ignored while Resolved is inactive, the same rule every other status change already followed.
+- **"Resolved Today" counts Closed tickets too.** The agent dashboard card, the *Resolved Today* ticket-list filter, the wallboard drill-down and the API dashboard count only counted tickets in Resolved, so they showed 0 for teams that close tickets. They now count every ticket that moved to Resolved or Closed today. Duplicate, won't-fix and no-response closes are left out, matching the dashboard widget of the same name, which now shares the same query.
+- Help pages and `DOCS.md` updated for both changes and for 2.186.0's email-reply handling.
+
 ## 2.186.0 &mdash; 2026-10-14
 
 ### Changed

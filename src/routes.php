@@ -3450,8 +3450,8 @@ $router->get('/agent', function () {
     $stmt->execute($vis['params']);
     $pending = (int) $stmt->fetchColumn();
 
-    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets t WHERE t.status = ? AND DATE(t.updated_at) = CURDATE() AND {$vis['sql']}");
-    $stmt->execute(array_merge([ticketDefaultResolvedStatusSlug()], $vis['params']));
+    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets t WHERE " . ticketResolvedTodaySql() . " AND {$vis['sql']}");
+    $stmt->execute($vis['params']);
     $resolvedToday = (int) $stmt->fetchColumn();
 
     $stmt = $db->prepare("SELECT COUNT(*) FROM tickets t WHERE t.assigned_to = ? AND t.escalation_level > 0 AND $openInT AND {$vis['sql']}");

@@ -323,7 +323,7 @@ class Dashboard
 
             case 'resolved_today':
                 return ['value' => (int) self::scalar($db,
-                    "SELECT COUNT(*) FROM tickets t WHERE {$where} AND {$closeIn} AND t.close_reason IS NULL AND DATE(t.updated_at) = CURDATE()", $p),
+                    "SELECT COUNT(*) FROM tickets t WHERE {$where} AND " . ticketResolvedTodaySql(), $p),
                     'tone' => 'success'];
 
             case 'avg_response': {

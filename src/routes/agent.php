@@ -318,8 +318,7 @@ $router->get('/agent/tickets', function () {
     // same rows — CURDATE() coerces to today 00:00:00 against a TIMESTAMP, and
     // both columns are NOT NULL so there is no NULL edge case either way.
     if ($fResolvedToday) {
-        $where[] = "t.status = 'resolved'
-                    AND t.updated_at >= CURDATE() AND t.updated_at < CURDATE() + INTERVAL 1 DAY";
+        $where[] = ticketResolvedTodaySql();
     }
 
     if ($fEscalatedToMe) {
@@ -590,8 +589,7 @@ $router->get('/agent/tickets/export', function () {
     // drill-downs and the agent-only quick filters.
     $conds = [];
     if (!empty($_GET['resolved_today'])) {
-        $conds[] = "t.status = 'resolved'
-                    AND t.updated_at >= CURDATE() AND t.updated_at < CURDATE() + INTERVAL 1 DAY";
+        $conds[] = ticketResolvedTodaySql();
     }
     if (!empty($_GET['escalated_to_me'])) {
         $conds[]  = 't.assigned_to = ? AND t.escalation_level > 0 AND '

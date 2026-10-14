@@ -22,7 +22,7 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/agent/help'], ['label' => 'Dashb
         <tr><td><strong>Unassigned</strong></td><td>Open tickets with nobody assigned.</td></tr>
         <tr><td><strong>My Tickets</strong></td><td>Open tickets assigned to you.</td></tr>
         <tr><td><strong>Pending</strong></td><td>Tickets in the <em>Pending</em> status.</td></tr>
-        <tr><td><strong>Resolved Today</strong></td><td>Tickets moved to <em>Resolved</em> today &mdash; by anyone, not just you.</td></tr>
+        <tr><td><strong>Resolved Today</strong></td><td>Tickets moved to <em>Resolved</em> or <em>Closed</em> today &mdash; by anyone, not just you. Tickets closed as duplicate, won't fix or no response aren't counted.</td></tr>
         <tr><td><strong>Escalated to Me</strong></td><td>Open tickets that were escalated to you. This red card only appears when you have at least one.</td></tr>
     </tbody>
 </table>
