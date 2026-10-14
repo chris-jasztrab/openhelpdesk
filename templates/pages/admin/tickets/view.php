@@ -102,9 +102,11 @@ $resolutionClosedSlugs  = ticketClosedBucketSlugs();
 </a>
 <?php endif; ?>
 
-<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4 ticket-sticky-header">
-    <div>
-        <h2 class="fw-bold mb-1"><?= e($ticket['subject']) ?></h2>
+<!-- flex-lg-nowrap: at 3-column width the title wraps its own text instead of
+     knocking the action buttons onto a new line, so they stay top-right. -->
+<div class="d-flex flex-wrap flex-lg-nowrap justify-content-between align-items-start gap-3 mb-4 ticket-sticky-header">
+    <div class="min-w-0">
+        <h2 class="fw-bold mb-1 text-break"><?= e($ticket['subject']) ?></h2>
         <div class="d-flex flex-wrap gap-2 align-items-center">
             <?= ticketStatusBadgeHtml($ticket['status'], 'fs-6') ?>
             <?php if ($ticket['merged_into_ticket_id']): ?>
@@ -125,7 +127,7 @@ $resolutionClosedSlugs  = ticketClosedBucketSlugs();
         <!-- Live concurrent-viewer indicator (replaces the old "Ticket Already Open" popup) -->
         <div id="presenceIndicator" class="small mt-2 d-flex align-items-center gap-1" style="display:none !important;" role="status" aria-live="polite"></div>
     </div>
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2 flex-lg-shrink-0">
         <?php if (empty($isConfidential)): ?>
         <form method="POST" action="/admin/tickets/<?= (int) $ticket['id'] ?>/watch">
             <?= csrfField() ?>

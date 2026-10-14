@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.182.2 &mdash; 2026-10-14
+
+### Fixed
+- **Ticket action buttons (Watch, Escalate, Split, Merge, Back) no longer jump around** on the agent and admin ticket pages. A long subject used to push them onto their own line above the Description; a short one left them top-right above CC. On desktop they now always sit top-right and a long subject wraps beside them. Phones are unchanged: the buttons still drop below the title.
+
 ## 2.182.1 &mdash; 2026-10-14
 
 ### Changed
