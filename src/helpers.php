@@ -1337,6 +1337,7 @@ function notificationMeta(string $type): array
         'new_ticket'     => ['icon' => 'bi-plus-circle',        'color' => 'text-primary', 'label' => 'new ticket:'],
         'customer_reply' => ['icon' => 'bi-chat-left-text',     'color' => 'text-info',    'label' => 'customer replied on'],
         'note_added'     => ['icon' => 'bi-sticky',             'color' => 'text-secondary','label' => 'added a note on'],
+        'followup'       => ['icon' => 'bi-alarm',              'color' => 'text-warning', 'label' => 'follow-up reminder:'],
     ];
     return $map[$type] ?? ['icon' => 'bi-bell', 'color' => 'text-muted', 'label' => 'updated'];
 }
@@ -9797,6 +9798,277 @@ function recordCloseResolution(PDO $db, int $ticketId, int $userId, string $note
     $db->prepare(
         'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 1)'
     )->execute([$ticketId, $userId, 'comment', $details]);
+}
+
+/* ── Close split-button (ticket page) ─────────────────────────── */
+
+/**
+ * The Close button's dropdown options (v2.183.0). Every option rides the normal
+ * /update submit, so the optimistic lock, resolution-note gate, SLA, automations
+ * and timeline behave exactly like a sidebar close; the form just adds a
+ * `close_mode`. The plain Close button and "Close and notify" send no mode, so
+ * they ARE the sidebar close. Merge has no mode — it opens the merge modal.
+ *
+ * Returns the mode when the submit is a Close-menu close into a closed-bucket
+ * status, else null (= the ordinary update path, notifications as before).
+ */
+function ticketCloseMode(array $post, string $newStatus): ?string
+{
+    $mode = (string) ($post['close_mode'] ?? '');
+    $modes = ['silent', 'feedback', 'duplicate', 'wont_fix', 'no_response', 'kb', 'reopen_on_reply', 'followup'];
+    return in_array($mode, $modes, true) && in_array($newStatus, ticketClosedBucketSlugs(), true) ? $mode : null;
+}
+
+/** Header badge text for a closed ticket's close_reason. */
+function ticketCloseReasonLabel(string $reason): string
+{
+    return ['duplicate' => 'Duplicate', 'wont_fix' => "Won't fix", 'no_response' => 'No response'][$reason] ?? $reason;
+}
+
+/**
+ * What the Close modal's "Email the requester" box + message turn into:
+ * a message is a public reply (emailed) or, unticked, an internal note; with
+ * no message the requester gets the standard "ticket closed" email or nothing.
+ */
+function closeNotifyAction(bool $notify, string $message): string
+{
+    if (trim($message) !== '') {
+        return $notify ? 'reply' : 'note';
+    }
+    return $notify ? 'closed_email' : 'none';
+}
+
+/**
+ * Parse the follow-up modal's <input type="datetime-local"> value. Must be a
+ * real time in the future and within a year. Returns 'Y-m-d H:i:s' in PHP's
+ * timezone (the cron compares in PHP too), or null.
+ */
+function followupDueAt(string $input, int $now): ?string
+{
+    $dt = DateTime::createFromFormat('Y-m-d\TH:i', $input);
+    if (!$dt || $dt->format('Y-m-d\TH:i') !== $input) {
+        return null;
+    }
+    $ts = $dt->getTimestamp();
+    if ($ts <= $now || $ts > $now + 366 * 86400) {
+        return null;
+    }
+    return date('Y-m-d H:i:s', $ts);
+}
+
+/**
+ * Do the mode-specific part of a Close-menu close. Called by both /update
+ * handlers AFTER the status change (Sla::onStatusChanged clears the previous
+ * close's metadata, so the order matters). Returns a redirect URL to use
+ * instead of the ticket page, or null.
+ */
+function applyTicketCloseMode(PDO $db, int $ticketId, string $status, string $mode, array $in): ?string
+{
+    $uid      = (int) Auth::id();
+    $notify   = !empty($in['close_notify']);
+    $message  = trim((string) ($in['close_message'] ?? ''));
+    $redirect = null;
+    $note     = static function (string $text, int $onTicket) use ($db, $uid): void {
+        $db->prepare(
+            'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 1)'
+        )->execute([$onTicket, $uid, 'comment', $text]);
+    };
+
+    switch ($mode) {
+        case 'silent':
+            return null;
+
+        case 'feedback':
+            // The survey email IS the requester's notice. sendCsatSurvey no-ops
+            // when surveys are off or this ticket was already surveyed.
+            sendCsatSurvey($db, $ticketId);
+            return null;
+
+        case 'kb':
+            $notify  = true; // otherwise a plain Close: standard closed email
+            $message = '';
+            if (Auth::can('kb.articles.manage')) {
+                flashInput(ticketKbDraft($db, $ticketId));
+                $redirect = '/admin/kb/articles/create';
+            }
+            break;
+
+        case 'duplicate':
+            $origId = (int) ($in['duplicate_of'] ?? 0);
+            $o = $db->prepare('SELECT id FROM tickets WHERE id = ? AND id <> ?');
+            $o->execute([$origId, $ticketId]);
+            if (!$o->fetchColumn()) {
+                flash('error', 'Ticket closed, but the original ticket was not found, so it was not linked as a duplicate.');
+                break;
+            }
+            $db->prepare("UPDATE tickets SET close_reason = 'duplicate', duplicate_of_ticket_id = ? WHERE id = ?")
+               ->execute([$origId, $ticketId]);
+            $note("Closed as a duplicate of #{$origId}.", $ticketId);
+            $note("Ticket #{$ticketId} was closed as a duplicate of this ticket.", $origId);
+            break;
+
+        case 'wont_fix':
+        case 'no_response':
+            $db->prepare('UPDATE tickets SET close_reason = ? WHERE id = ?')->execute([$mode, $ticketId]);
+            $note('Closed as ' . strtolower(ticketCloseReasonLabel($mode)) . '.', $ticketId);
+            break;
+
+        case 'reopen_on_reply':
+            $days = max(1, min(90, (int) ($in['reopen_days'] ?? 7)));
+            $until = date('Y-m-d H:i:s', time() + $days * 86400);
+            $db->prepare('UPDATE tickets SET reopen_on_reply_until = ? WHERE id = ?')->execute([$until, $ticketId]);
+            $note('Will reopen automatically if the requester replies before ' . date('M j, Y g:i A', strtotime($until)) . '.', $ticketId);
+            break;
+
+        case 'followup':
+            $due = followupDueAt((string) ($in['followup_at'] ?? ''), time());
+            if ($due === null) {
+                flash('error', 'Ticket closed, but the follow-up time was missing or in the past, so no reminder was set.');
+                break;
+            }
+            $fuNote = mb_substr(trim((string) ($in['followup_note'] ?? '')), 0, 500);
+            $db->prepare('INSERT INTO ticket_followups (ticket_id, user_id, due_at, note, created_at) VALUES (?, ?, ?, ?, ?)')
+               ->execute([$ticketId, $uid, $due, $fuNote, date('Y-m-d H:i:s')]);
+            $note('Follow-up reminder set for ' . date('M j, Y g:i A', strtotime($due)) . ($fuNote !== '' ? ": {$fuNote}" : '.'), $ticketId);
+            break;
+    }
+
+    switch (closeNotifyAction($notify, $message)) {
+        case 'reply':
+            $db->prepare(
+                'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
+            )->execute([$ticketId, $uid, 'comment', $message]);
+            notifyTicketCreator($db, $ticketId, $message, Auth::fullName());
+            break;
+        case 'note':
+            $note($message, $ticketId);
+            break;
+        case 'closed_email':
+            notifyRequesterStatusChanged($db, $ticketId, $status);
+            break;
+    }
+    return $redirect;
+}
+
+/**
+ * Prefill for "Close and create KB article": the ticket's subject, its
+ * description as the problem, and the resolution — the marked solution, else
+ * the latest public staff reply, else the latest staff note. Shaped for
+ * flashInput() so the KB create form's old() picks it up.
+ */
+function ticketKbDraft(PDO $db, int $ticketId): array
+{
+    $t = $db->prepare('SELECT subject, description, solution_timeline_id FROM tickets WHERE id = ?');
+    $t->execute([$ticketId]);
+    $ticket = $t->fetch();
+    if (!$ticket) {
+        return [];
+    }
+    $r = $db->prepare(
+        "SELECT tl.details FROM ticket_timeline tl
+         JOIN users u ON u.id = tl.user_id
+         WHERE tl.ticket_id = ? AND tl.action = 'comment' AND " . staffRoleSqlIn('u.role') . "
+         ORDER BY (tl.id = ?) DESC, tl.is_internal ASC, tl.created_at DESC LIMIT 1"
+    );
+    $r->execute([$ticketId, (int) ($ticket['solution_timeline_id'] ?? 0)]);
+    $resolution = (string) ($r->fetchColumn() ?: '');
+
+    $html = static fn(string $s): string => ($s !== '' && ltrim($s)[0] === '<') ? sanitizeRichHtml($s) : '<p>' . nl2br(e($s)) . '</p>';
+    return [
+        'title'         => $ticket['subject'],
+        'status'        => 'draft',
+        'body_markdown' => '<h2>Problem</h2>' . $html((string) $ticket['description'])
+                         . '<h2>Resolution</h2>' . $html($resolution),
+    ];
+}
+
+/**
+ * "Close and reopen on reply": a closed ticket whose reopen_on_reply_until has
+ * not passed goes back to the default new status when its requester replies.
+ * Called from every requester reply path (portal, email, API) before the reply
+ * is stored. Returns true if it reopened.
+ */
+function reopenOnRequesterReply(PDO $db, int $ticketId, int $userId): bool
+{
+    $s = $db->prepare('SELECT status, created_by, reopen_on_reply_until FROM tickets WHERE id = ?');
+    $s->execute([$ticketId]);
+    $t = $s->fetch();
+    if (!$t || $t['reopen_on_reply_until'] === null || (int) $t['created_by'] !== $userId
+        || strtotime($t['reopen_on_reply_until']) < time()
+        || !in_array($t['status'], ticketClosedBucketSlugs(), true)) {
+        return false;
+    }
+    $newStatus = ticketDefaultNewStatusSlug();
+    $db->prepare('UPDATE tickets SET status = ? WHERE id = ?')->execute([$newStatus, $ticketId]);
+    $db->prepare(
+        'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
+    )->execute([$ticketId, $userId, 'status_changed', "Status changed from {$t['status']} to {$newStatus} (reopened: the requester replied)"]);
+    notifyAgentStatusChanged($db, $ticketId, $t['status'], $newStatus, $userId);
+    Sla::onStatusChanged($db, $ticketId, $t['status'], $newStatus); // also clears the window
+    return true;
+}
+
+/**
+ * Fire due "Close and schedule follow-up" reminders as in-app (and push)
+ * notifications to the agent who set them. Run by the SLA cron. Each row is
+ * claimed before notifying, so overlapping runs can't double-send.
+ */
+function processDueTicketFollowups(PDO $db): int
+{
+    $due = $db->prepare('SELECT id, ticket_id, user_id, note FROM ticket_followups WHERE sent_at IS NULL AND due_at <= ? ORDER BY due_at LIMIT 200');
+    $due->execute([date('Y-m-d H:i:s')]);
+    $claim = $db->prepare('UPDATE ticket_followups SET sent_at = ? WHERE id = ? AND sent_at IS NULL');
+    $sent  = 0;
+    foreach ($due->fetchAll() as $f) {
+        $claim->execute([date('Y-m-d H:i:s'), $f['id']]);
+        if ($claim->rowCount() === 0) {
+            continue;
+        }
+        createNotification($db, (int) $f['user_id'], (int) $f['ticket_id'], 'followup',
+            $f['note'] !== '' ? $f['note'] : 'Time to follow up on this ticket.');
+        $sent++;
+    }
+    return $sent;
+}
+
+/**
+ * Merge moves the conversation, not just a link (v2.183.0). The source's
+ * replies, notes and forwards — with their attachments — are re-parented onto
+ * the target, and its original description lands there as a reply dated when
+ * it was written. Rows keep their created_at, so they interleave by time.
+ * System events (created, assigned, SLA, ...) stay on the source. Call inside
+ * the merge transaction, before the 'merged' timeline entries are written.
+ */
+function moveTicketThread(PDO $db, int $sourceId, int $targetId): void
+{
+    $s = $db->prepare('SELECT subject, description, created_by, created_at FROM tickets WHERE id = ?');
+    $s->execute([$sourceId]);
+    $src = $s->fetch();
+    if (!$src) {
+        return;
+    }
+
+    $desc    = (string) $src['description'];
+    $intro   = "Original request from merged ticket #{$sourceId} ({$src['subject']})";
+    $details = ($desc !== '' && ltrim($desc)[0] === '<')
+        ? '<p><em>' . e($intro) . '</em></p>' . $desc
+        : $intro . ":\n\n" . $desc;
+    $db->prepare(
+        'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal, created_at) VALUES (?, ?, ?, ?, 0, ?)'
+    )->execute([$targetId, $src['created_by'], 'comment', $details, $src['created_at']]);
+    $descRowId = (int) $db->lastInsertId();
+
+    // Description attachments (no timeline row) follow the description.
+    $db->prepare('UPDATE ticket_attachments SET ticket_id = ?, timeline_id = ? WHERE ticket_id = ? AND timeline_id IS NULL')
+       ->execute([$targetId, $descRowId, $sourceId]);
+    $db->prepare(
+        "UPDATE ticket_attachments ta JOIN ticket_timeline tl ON tl.id = ta.timeline_id
+         SET ta.ticket_id = ? WHERE ta.ticket_id = ? AND tl.action IN ('comment', 'forwarded')"
+    )->execute([$targetId, $sourceId]);
+    $db->prepare("UPDATE ticket_timeline SET ticket_id = ? WHERE ticket_id = ? AND action IN ('comment', 'forwarded')")
+       ->execute([$targetId, $sourceId]);
+    // A marked solution would now point at a row on another ticket.
+    $db->prepare('UPDATE tickets SET solution_timeline_id = NULL WHERE id = ?')->execute([$sourceId]);
 }
 
 /** Slugs that pause SLA timers — replaces the inline $pausingStatuses arrays. */

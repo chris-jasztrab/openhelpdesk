@@ -1271,6 +1271,10 @@ $router->post('/api/v1/tickets/{id}/replies', function (array $p) {
         $isInternal = !empty($input['is_internal']);
     }
 
+    if (!$isInternal) {
+        reopenOnRequesterReply($db, $ticketId, $userId); // no-op unless the requester, inside the window
+    }
+
     // Insert timeline entry
     $db->prepare(
         'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal)

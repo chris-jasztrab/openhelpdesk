@@ -23,6 +23,7 @@ define('ROOT_DIR', dirname(__DIR__));
 require_once ROOT_DIR . '/vendor/autoload.php';
 require_once ROOT_DIR . '/src/helpers.php';
 require_once ROOT_DIR . '/src/Database.php';
+require_once ROOT_DIR . '/src/Sla.php';     // reopenOnRequesterReply() → Sla::onStatusChanged
 require_once ROOT_DIR . '/src/graph.php';   // curlGet/Post/Patch + getAccessToken
 require_once ROOT_DIR . '/src/CronRun.php';
 
@@ -252,6 +253,12 @@ foreach ($messages as $msg) {
                 $newPriorityId = (int) $pRow['id'];
             }
         }
+    }
+
+    // ── "Close and reopen on reply": the requester answered inside the window ──
+    if (reopenOnRequesterReply($db, $ticketId, (int) $user['id'])) {
+        $ticket['status'] = ticketDefaultNewStatusSlug();
+        logMsg('INFO', "  Ticket #{$ticketId} reopened: requester replied inside the reopen-on-reply window.");
     }
 
     // ── Guard: skip closed tickets unless an admin/agent is re-opening it ─────

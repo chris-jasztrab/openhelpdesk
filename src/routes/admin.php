@@ -4920,6 +4920,7 @@ $router->post('/admin/tickets/bulk', function () {
                        ->execute([$targetId, Auth::id(), $sourceId]);
                     $db->prepare('INSERT IGNORE INTO ticket_tag_map (ticket_id, tag_id) SELECT ?, tag_id FROM ticket_tag_map WHERE ticket_id = ?')
                        ->execute([$targetId, $sourceId]);
+                    moveTicketThread($db, $sourceId, $targetId);
                     $db->prepare('INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)')
                        ->execute([$targetId, Auth::id(), 'merged', "Ticket #{$sourceId} ({$sourceTicket['subject']}) was merged into this ticket by {$actor}"]);
                     $db->prepare('INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)')
@@ -5475,6 +5476,8 @@ $router->post('/admin/tickets/{id}/merge', function (array $p) {
              SELECT ?, tag_id FROM ticket_tag_map WHERE ticket_id = ?'
         )->execute([$targetId, $sourceId]);
 
+        moveTicketThread($db, $sourceId, $targetId);
+
         // Escalate target priority to the highest of all merged tickets
         if ($bestPriorityId && $bestPriorityId != $targetTicket['priority_id']) {
             $db->prepare('UPDATE tickets SET priority_id = ? WHERE id = ?')
@@ -5958,8 +5961,12 @@ $router->post('/admin/tickets/{id}/update', function (array $p) {
         flash('error', 'Status was not changed: it had already been updated to "'
             . ticketStatusLabel($ticket['status']) . '" by someone else. Your other changes were saved.');
     }
+    // Close split-button option, if this submit came from it (null otherwise).
+    // A close mode decides the requester's email itself in applyTicketCloseMode.
+    $closeMode = null;
     if (!$statusConflict && $newStatus !== '' && in_array($newStatus, ticketActiveStatusSlugs(), true) && $newStatus !== $ticket['status']) {
         $oldStatus = $ticket['status'];
+        $closeMode = ticketCloseMode($_POST, $newStatus);
         $db->prepare('UPDATE tickets SET status = ? WHERE id = ?')->execute([$newStatus, $id]);
         $db->prepare(
             'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
@@ -5967,7 +5974,7 @@ $router->post('/admin/tickets/{id}/update', function (array $p) {
         notifyAgentStatusChanged($db, $id, $oldStatus, $newStatus, Auth::id());
         $changes[] = 'status';
 
-        if (in_array($newStatus, ticketClosedBucketSlugs(), true)) {
+        if ($closeMode === null && in_array($newStatus, ticketClosedBucketSlugs(), true)) {
             notifyRequesterStatusChanged($db, $id, $newStatus);
         }
 
@@ -5988,6 +5995,7 @@ $router->post('/admin/tickets/{id}/update', function (array $p) {
             (string) ($_POST['close_without_note_reason'] ?? '')
         );
     }
+    $closeRedirect = $closeMode !== null ? applyTicketCloseMode($db, $id, $newStatus, $closeMode, $_POST) : null;
 
     // Priority change
     $newPriorityRaw = $_POST['priority_id'] ?? '';
@@ -6129,7 +6137,7 @@ $router->post('/admin/tickets/{id}/update', function (array $p) {
     } else {
         flash('info', 'No changes made.');
     }
-    redirect("/admin/tickets/{$id}");
+    redirect($closeRedirect ?? "/admin/tickets/{$id}");
 });
 
 /* ==================================================================
@@ -10649,7 +10657,8 @@ $router->get('/admin/reports', function () {
     $stmt->execute([$from, $toEnd]);
     $ticketsCreated = (int) $stmt->fetchColumn();
 
-    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets WHERE $closedIn AND created_at BETWEEN ? AND ?");
+    // close_reason marks duplicate / won't-fix / no-response closes: closed, not resolved.
+    $stmt = $db->prepare("SELECT COUNT(*) FROM tickets WHERE $closedIn AND close_reason IS NULL AND created_at BETWEEN ? AND ?");
     $stmt->execute([$from, $toEnd]);
     $ticketsResolved = (int) $stmt->fetchColumn();
 

@@ -726,6 +726,21 @@ CREATE TABLE IF NOT EXISTS `ticket_field_values` (
   CONSTRAINT `ticket_field_values_ibfk_1` FOREIGN KEY (`ticket_id`) REFERENCES `tickets` (`id`) ON DELETE CASCADE,
   CONSTRAINT `ticket_field_values_ibfk_2` FOREIGN KEY (`field_id`) REFERENCES `ticket_form_fields` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS `ticket_followups` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `ticket_id` int(10) unsigned NOT NULL,
+  `user_id` int(10) unsigned NOT NULL,
+  `due_at` datetime NOT NULL,
+  `note` varchar(500) NOT NULL DEFAULT '',
+  `created_at` datetime NOT NULL,
+  `sent_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_followups_due` (`sent_at`,`due_at`),
+  KEY `idx_followups_ticket` (`ticket_id`),
+  KEY `fk_followups_user` (`user_id`),
+  CONSTRAINT `fk_followups_ticket` FOREIGN KEY (`ticket_id`) REFERENCES `tickets` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_followups_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE IF NOT EXISTS `ticket_form_field_options` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `field_id` int(10) unsigned NOT NULL,
@@ -965,6 +980,9 @@ CREATE TABLE IF NOT EXISTS `tickets` (
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `merged_into_ticket_id` int(10) unsigned DEFAULT NULL,
   `solution_timeline_id` int(10) unsigned DEFAULT NULL,
+  `close_reason` varchar(32) DEFAULT NULL,
+  `duplicate_of_ticket_id` int(10) unsigned DEFAULT NULL,
+  `reopen_on_reply_until` datetime DEFAULT NULL,
   `ai_classification_id` int(10) unsigned DEFAULT NULL,
   `ai_sentiment` varchar(32) DEFAULT NULL,
   `ai_group_classification_id` int(10) unsigned DEFAULT NULL,
@@ -988,8 +1006,10 @@ CREATE TABLE IF NOT EXISTS `tickets` (
   KEY `idx_tickets_sla_state_created` (`sla_state`,`created_at`),
   KEY `idx_tickets_sla_exempt` (`sla_exempt`),
   KEY `idx_tickets_status_updated` (`status`,`updated_at`),
+  KEY `idx_tickets_duplicate_of` (`duplicate_of_ticket_id`),
   FULLTEXT KEY `ft_tickets_subject_description` (`subject`,`description`),
   CONSTRAINT `fk_tickets_ai_classification` FOREIGN KEY (`ai_classification_id`) REFERENCES `ai_classifications` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_tickets_duplicate_of` FOREIGN KEY (`duplicate_of_ticket_id`) REFERENCES `tickets` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_tickets_ai_group_classification` FOREIGN KEY (`ai_group_classification_id`) REFERENCES `ai_group_classifications` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_tickets_solution_timeline` FOREIGN KEY (`solution_timeline_id`) REFERENCES `ticket_timeline` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_tickets_submitted_by` FOREIGN KEY (`submitted_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,

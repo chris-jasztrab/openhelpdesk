@@ -89,7 +89,7 @@ final class CronJobs
             'sla' => [
                 'title'            => 'SLA Recalculation',
                 'icon'             => 'bi-stopwatch',
-                'description'      => 'Recalculates SLA status (breached / at-risk) for all active tickets. Should run frequently so SLA breaches are detected promptly.',
+                'description'      => 'Recalculates SLA status (breached / at-risk) for all active tickets, and sends due ticket follow-up reminders (in-app). Should run frequently so SLA breaches are detected promptly.',
                 'frequency'        => 'Every 5 minutes',
                 'interval_seconds' => 300,
                 'script'           => 'public/sla-cron.php',

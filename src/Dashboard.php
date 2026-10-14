@@ -323,7 +323,7 @@ class Dashboard
 
             case 'resolved_today':
                 return ['value' => (int) self::scalar($db,
-                    "SELECT COUNT(*) FROM tickets t WHERE {$where} AND {$closeIn} AND DATE(t.updated_at) = CURDATE()", $p),
+                    "SELECT COUNT(*) FROM tickets t WHERE {$where} AND {$closeIn} AND t.close_reason IS NULL AND DATE(t.updated_at) = CURDATE()", $p),
                     'tone' => 'success'];
 
             case 'avg_response': {
@@ -484,7 +484,7 @@ class Dashboard
 
         $st = $db->prepare(
             "SELECT DATE(t.updated_at) d, COUNT(*) n FROM tickets t
-              WHERE {$where} AND {$closeIn} AND t.updated_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+              WHERE {$where} AND {$closeIn} AND t.close_reason IS NULL AND t.updated_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
               GROUP BY DATE(t.updated_at)");
         $st->execute(array_merge($p, [$days]));
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {

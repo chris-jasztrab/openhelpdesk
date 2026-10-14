@@ -994,10 +994,18 @@ class Sla
      */
     public static function onStatusChanged(PDO $db, int $ticketId, ?string $oldStatus, string $newStatus): void
     {
-        if (!slaEnabled()) {
+        if ($oldStatus === $newStatus) {
             return;
         }
-        if ($oldStatus === $newStatus) {
+        // Not SLA, but this is the one hook every status-change path shares: the
+        // Close menu's reason / duplicate link / reopen-on-reply window describe
+        // a single close, so any status change ends them (applyTicketCloseMode
+        // sets them again after a Close-menu close). Runs even with SLA off.
+        $db->prepare(
+            'UPDATE tickets SET close_reason = NULL, duplicate_of_ticket_id = NULL, reopen_on_reply_until = NULL WHERE id = ?'
+        )->execute([$ticketId]);
+
+        if (!slaEnabled()) {
             return;
         }
 

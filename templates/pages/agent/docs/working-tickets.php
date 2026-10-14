@@ -189,13 +189,33 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/agent/help'], ['label' => 'Worki
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-check2-circle text-primary me-2"></i>Closing a Ticket</h5>
+<p class="text-muted mb-2">The green <strong>Close</strong> button beside Back closes the ticket and emails the requester the standard &ldquo;ticket closed&rdquo; notice. The arrow next to it offers other ways to close:</p>
+<ul class="text-muted mb-3">
+    <li><strong>Close without notifying</strong> &mdash; no email to the requester.</li>
+    <li><strong>Close and request feedback</strong> &mdash; sends the satisfaction survey instead (only when surveys are on).</li>
+    <li><strong>Close as duplicate</strong> &mdash; pick the original ticket; this one shows &ldquo;Duplicate of #&hellip;&rdquo; and the original gets an internal note.</li>
+    <li><strong>Close as won&rsquo;t fix</strong> &mdash; requires a reason. <strong>Close as no response</strong> &mdash; the requester stopped replying. Duplicate, won&rsquo;t fix and no response are <em>not</em> counted as resolved on the dashboard and reports.</li>
+    <li><strong>Close and merge</strong> &mdash; opens Merge (below).</li>
+    <li><strong>Close and create KB article</strong> &mdash; closes, then opens a draft article filled in with the problem and the resolution.</li>
+    <li><strong>Close and reopen on reply</strong> &mdash; if the requester replies within the days you choose, the ticket reopens by itself.</li>
+    <li><strong>Close and schedule follow-up</strong> &mdash; you get a notification on the ticket at the time you pick.</li>
+</ul>
+<div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
+    Options with &hellip; open a box with a message for the requester. With <em>Email the requester</em> ticked, the message goes out as a reply (leave it blank for the standard closed email). Unticked, it&rsquo;s saved as an internal note and nothing is emailed.
+</div>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-intersect text-primary me-2"></i>Merging Tickets</h5>
 <p class="text-muted mb-2">Use <strong>Merge</strong> when a requester has submitted duplicate tickets about the same issue.</p>
 <ol class="text-muted mb-3">
     <li>Open the ticket you want to keep as the <strong>primary</strong>.</li>
     <li>Click <strong>Merge</strong> in the ticket actions.</li>
     <li>Enter the ID of the duplicate ticket to merge in.</li>
-    <li>Confirm — the duplicate is closed and its history is linked to the primary. The requester is notified by email.</li>
+    <li>Confirm — the duplicate's replies, notes and attachments move into the primary (in date order, with its original request), and the duplicate is closed and linked. The requester is notified by email.</li>
 </ol>
 <div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
     The primary ticket's priority is automatically escalated to the highest priority among all merged tickets.

@@ -109,6 +109,7 @@ $resolutionClosedSlugs  = ticketClosedBucketSlugs();
         <h2 class="fw-bold mb-1 text-break"><?= e($ticket['subject']) ?></h2>
         <div class="d-flex flex-wrap gap-2 align-items-center">
             <?= ticketStatusBadgeHtml($ticket['status'], 'fs-6') ?>
+            <?php $closeArea = '/admin'; $closePart = 'badges'; require ROOT_DIR . '/templates/partials/ticket-close.php'; ?>
             <?php if ($ticket['merged_into_ticket_id']): ?>
             <span class="badge bg-secondary fs-6"><i class="bi bi-arrow-right-circle me-1"></i>Merged</span>
             <?php endif; ?>
@@ -127,7 +128,7 @@ $resolutionClosedSlugs  = ticketClosedBucketSlugs();
         <!-- Live concurrent-viewer indicator (replaces the old "Ticket Already Open" popup) -->
         <div id="presenceIndicator" class="small mt-2 d-flex align-items-center gap-1" style="display:none !important;" role="status" aria-live="polite"></div>
     </div>
-    <div class="d-flex gap-2 flex-lg-shrink-0">
+    <div class="d-flex flex-wrap gap-2 flex-lg-shrink-0">
         <?php if (empty($isConfidential)): ?>
         <form method="POST" action="/admin/tickets/<?= (int) $ticket['id'] ?>/watch">
             <?= csrfField() ?>
@@ -145,6 +146,7 @@ $resolutionClosedSlugs  = ticketClosedBucketSlugs();
             <i class="bi bi-arrow-right-circle me-1"></i>Merge
         </button>
         <?php endif; ?>
+        <?php $closePart = 'menu'; require ROOT_DIR . '/templates/partials/ticket-close.php'; ?>
         <a href="/admin/tickets" class="btn btn-outline-secondary" id="backBtn">
             <i class="bi bi-arrow-left me-1"></i>Back
         </a>
@@ -1155,7 +1157,7 @@ $resolutionClosedSlugs  = ticketClosedBucketSlugs();
             </div>
             <div class="modal-body">
                 <p class="text-muted small mb-3">
-                    The secondary ticket will be <strong>closed</strong> and linked to the primary. The original submitter and any CC'd users will be notified.
+                    The secondary ticket's replies, notes and attachments <strong>move into the primary</strong>, and the secondary is <strong>closed</strong> and linked to it. Public replies become visible to the primary's requester. The original submitter and any CC'd users will be notified.
                 </p>
                 <div class="mb-3" style="position:relative;">
                     <label class="form-label fw-semibold small">Search for ticket to merge with</label>
@@ -1189,6 +1191,8 @@ $resolutionClosedSlugs  = ticketClosedBucketSlugs();
     </div>
 </div>
 <?php endif; ?>
+
+<?php $closePart = 'modal'; require ROOT_DIR . '/templates/partials/ticket-close.php'; ?>
 
 <!-- Reply Collision Modal — shown when someone else replied while you were drafting -->
 <div class="modal fade" id="collisionModal" tabindex="-1" aria-labelledby="collisionModalLabel" aria-hidden="true" data-bs-backdrop="static">

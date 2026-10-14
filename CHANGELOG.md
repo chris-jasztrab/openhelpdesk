@@ -11,6 +11,17 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.183.0 &mdash; 2026-10-14
+
+### Added
+- **Close split-button on the ticket page** (agent and admin), beside Back. The green **Close** closes the ticket and emails the requester the standard "ticket closed" notice, exactly like closing from the Update Ticket panel. The arrow offers: *Close without notifying*, *Close and notify*, *Close and request feedback* (satisfaction survey, greyed out when surveys are off), *Close as duplicate* (pick the original), *Close as won't fix* (reason required), *Close as no response*, *Close and merge*, *Close and create KB article* (opens a draft prefilled with the problem and the resolution), *Close and reopen on reply* (N days), and *Close and schedule follow-up* (a notification on the ticket at the time you pick). The options that ask for input have a message box: ticked *Email the requester* sends it as a reply, blank sends the standard closed email, unticked saves it as an internal note. The resolution-note prompt and the "someone else changed the status" guard still apply. Closed tickets show a *Duplicate of #…*, *Won't fix* or *No response* badge, or *Reopens on reply until …*.
+- **Reopen on reply** works from portal replies, emailed replies and the API. Email replies to a ticket in its window are no longer dropped as "closed".
+- **Follow-up reminders** go out from the SLA cron job (every 5 minutes, already required), so no new cron line is needed.
+
+### Changed
+- **Merge now moves the conversation.** The merged ticket's replies, internal notes, forwards and attachments move into the primary ticket in date order, along with its original request. Before, they stayed behind on the closed ticket. This applies to the Merge button, *Close and merge*, and bulk merge (agent and admin).
+- **Resolved counts leave out tickets closed as duplicate, won't fix or no response**: the Reports overview "Tickets resolved" figure, the dashboard "Resolved today" tile and the "Created vs resolved" chart.
+
 ## 2.182.2 &mdash; 2026-10-14
 
 ### Fixed

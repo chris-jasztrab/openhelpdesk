@@ -41,8 +41,10 @@ if (php_sapi_name() !== 'cli') {
 
 $db = Database::connect();
 $count = Sla::recalculateAll($db);
+// Rides this required 5-minute job rather than adding a cron line of its own.
+$followups = processDueTicketFollowups($db);
 
-$message = date('Y-m-d H:i:s') . " - SLA recalculated: {$count} ticket(s) updated.\n";
+$message = date('Y-m-d H:i:s') . " - SLA recalculated: {$count} ticket(s) updated. Follow-up reminders sent: {$followups}.\n";
 
 if (php_sapi_name() === 'cli') {
     echo $message;

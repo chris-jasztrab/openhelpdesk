@@ -829,6 +829,7 @@ $router->post('/portal/tickets/{id}/comment', function (array $p) {
         redirect("/portal/tickets/{$id}");
     }
 
+    $reopened = reopenOnRequesterReply($db, $id, (int) Auth::id());
     $db->prepare(
         'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
     )->execute([$id, Auth::id(), 'comment', $message]);
@@ -853,6 +854,9 @@ $router->post('/portal/tickets/{id}/comment', function (array $p) {
     $msg = 'Comment added.';
     if (!empty($attachments)) {
         $msg = 'Comment added with ' . count($attachments) . ' file(s).';
+    }
+    if ($reopened) {
+        $msg .= ' Your ticket has been reopened.';
     }
     flash('success', $msg);
     redirect("/portal/tickets/{$id}");
