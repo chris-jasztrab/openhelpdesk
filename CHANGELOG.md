@@ -11,6 +11,16 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.184.1 &mdash; 2026-10-14
+
+### Changed
+- **Help documentation brought up to date with every release so far.** Every in-app help page (Admin Docs, Agent Help and Portal Help) and `DOCS.md` was checked against the current code and rewritten where it had fallen behind. Menu paths now follow the Settings left nav, features that never existed or were removed are gone, and features that were never documented are now covered: the Close split-button and its options, merge moving the conversation, split, drafts and undo send, time tracking, the full permission-level catalogue, the Email Queue, email-to-ticket, the Cron Jobs page, recurring tickets, scheduled reports, Import Users, Labels and more.
+- **New help pages.** Admin Docs gains *Reports* and *System &amp; Maintenance* (status banners, server time, backup, Danger Zone, REST API). Agent Help gains *Creating Tickets*, *Knowledge Base*, *Profile &amp; Notifications*, *Status Banners* and *Manager Tools*. *Importing Tickets* is now *Importing Data* (tickets and users), and *Branding* is now *Branding &amp; Labels*.
+- **Corrections to wrong claims.** Removed: self-registration, the welcome email, IMAP inbound mail, the KB revision Restore button, the Publish All button, named SLA policies, the Reply Added and Status Changed automation triggers, and the Set location and internal-note automation actions. Also corrected: groupless staff see almost no tickets rather than all of them, editing KB articles needs the *Create &amp; delete KB articles* permission, and the portal's My Requests list opens on Submitted requests only.
+
+### Fixed
+- **Admin Docs → Single Sign-On was blank.** The page was an empty stub that showed only the docs nav. It now covers account matching, the location prompt, every setting and the login error messages.
+
 ## 2.184.0 &mdash; 2026-10-14
 
 ### Added

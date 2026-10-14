@@ -9,117 +9,137 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="col-lg-9">
 
 <h2 class="fw-bold mb-1">User Portal</h2>
-<p class="text-muted mb-4">The portal is the public-facing interface where end users submit and track their support tickets.</p>
+<p class="text-muted mb-4">The portal is where requesters (users with the End User level) submit help requests, follow them, reply, and search the knowledge base.</p>
 
 <div class="alert alert-info small mb-4"><i class="bi bi-translate me-2"></i>
-    <strong>Plain-language vocabulary:</strong> The portal uses non-technical wording so library staff and patrons aren't confronted with IT jargon. "Tickets" appear as <strong>Help Requests</strong>, statuses read as <em>Submitted</em>, <em>We're working on it</em>, <em>Waiting on you</em>, <em>We're waiting on someone else</em>, and <em>Done</em>, the priority field asks <em>"How urgent is this?"</em> with a "let our team decide" default, and the navbar entry is <strong>Help</strong>. Agent and admin views are unchanged — staff who handle the queue still see "Ticket". The full set of editable strings (and their defaults) lives at <a href="/admin/settings/labels"><strong>Admin → Settings → Labels</strong></a>, with download / upload / reset controls if you want to fork your own copy of <code>config/labels.default.json</code>.
+    <strong>Plain-language wording.</strong> The portal avoids help-desk jargon. Tickets are <strong>Help Requests</strong>. The list is <strong>My Requests</strong>. Built-in statuses read <em>Submitted</em>, <em>We're working on it</em>, <em>We're waiting on someone else</em>, <em>Waiting on you</em>, <em>Done</em> and <em>Closed</em>. The priority question is <em>"How urgent is this?"</em>, and if priority isn't required it defaults to <em>Let our team decide</em>. Staff still see the real names. To change any of this wording, see <a href="/admin/docs/branding#labels">Labels</a>.
 </div>
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-globe text-primary me-2"></i>Portal URL</h5>
-<p class="text-muted mb-2">Share the following URL with your end users:</p>
+<p class="text-muted mb-2">Share this address with your requesters:</p>
 <div class="bg-light rounded px-3 py-2 font-monospace small mb-2"><strong><?= e(env('APP_URL', 'http://your-site.com')) ?>/portal</strong></div>
-<p class="text-muted mb-0">Users can register, log in, submit new tickets, and track the status of their existing tickets.</p>
+<p class="text-muted mb-0">Anyone who isn't signed in is sent to the sign-in page first, then on to the page they asked for.</p>
 </div>
 </div>
 
-<div class="card border-0 shadow-sm mb-4">
+<div class="card border-0 shadow-sm mb-4" id="accounts">
 <div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-person-plus text-primary me-2"></i>User Registration</h5>
-<p class="text-muted mb-2">End users register by clicking <strong>Register</strong> on the portal login page. They provide:</p>
+<h5 class="fw-semibold mb-3"><i class="bi bi-person-plus text-primary me-2"></i>How Requesters Get an Account</h5>
+<p class="text-muted mb-2">There is no self-registration page. A requester account is created when:</p>
 <ul class="text-muted mb-3">
-    <li>First name, last name</li>
-    <li>Email address (used as login)</li>
-    <li>Password</li>
+    <li>you add the person at <a href="/admin/users/create">Settings → Users &amp; Access → Users → Add User</a> with the <strong>End User</strong> level, or import a list at <a href="/admin/settings/import-users">Settings → Data → Import Users</a>;</li>
+    <li>they sign in with <strong>Microsoft 365</strong> for the first time, if <a href="/admin/docs/sso">Single Sign-On</a> is set up;</li>
+    <li>they email the helpdesk mailbox and <strong>Auto-create user accounts</strong> is on in the Email-to-Ticket settings (see <a href="/admin/docs/email">Email &amp; Notifications</a>);</li>
+    <li>staff forward a ticket to an outside address, which creates an <em>external</em> contact.</li>
 </ul>
-<p class="text-muted mb-0">After registration, a verification email is sent. Users must click the link in the email to verify their address before they can log in. If SMTP is not configured, accounts are activated immediately without email verification.</p>
+<p class="text-muted mb-0">Accounts created from email or a forward have no usable password. The person clicks <strong>Forgot password?</strong> on the sign-in page to set one: the emailed link works once and expires after 60 minutes. Microsoft 365 users just sign in with Microsoft.</p>
 </div>
 </div>
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-send text-primary me-2"></i>Submitting a Ticket</h5>
-<p class="text-muted mb-2">Once logged in, users click <strong>New Ticket</strong> to submit a support request. The form includes:</p>
-<ul class="text-muted mb-3">
-    <li><strong>Subject</strong> — a brief summary of the issue.</li>
-    <li><strong>Description</strong> — full details of the request.</li>
-    <li><strong>Location</strong> — visible only if locations are configured in Admin → Settings → Locations.</li>
-    <li><strong>Attachments</strong> — users can attach files (images, PDFs, documents) up to the configured upload size limit.</li>
-</ul>
-<p class="text-muted mb-0">On submission, the user receives a confirmation email (if SMTP is configured) and the ticket appears in their portal dashboard.</p>
-</div>
-</div>
-
-<div class="card border-0 shadow-sm mb-4">
-<div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-chat-left-dots text-primary me-2"></i>Ticket Communication</h5>
-<p class="text-muted mb-2">Users can view the full conversation history on their ticket and post follow-up replies directly from the portal. Each reply:</p>
+<h5 class="fw-semibold mb-3"><i class="bi bi-house text-primary me-2"></i>What Requesters See</h5>
 <ul class="text-muted mb-0">
-    <li>Is visible to the assigned agent and all admins.</li>
-    <li>Triggers an email notification to the agent (if SMTP is configured).</li>
-    <li>Appears in the ticket timeline with a timestamp.</li>
+    <li><strong>Dashboard</strong>: a welcome, the <strong>New Help Request</strong> button and <em>Your Active Requests</em>.</li>
+    <li><strong>Left rail</strong>: Dashboard, My Requests, Knowledge Base and Help. A <strong>Floor mode</strong> entry also appears on touch-screen devices.</li>
+    <li><strong>Status banners</strong> you post appear at the top of every page. Portal users see global banners and banners for their own location. See <a href="/admin/docs/system#status-banners">Status Banners</a>.</li>
+    <li><strong>My Requests</strong>: search, filters and sorting. It starts on their own open requests.</li>
+    <li>Each requester controls their own emails, light or dark mode, and timeline order on <strong>My Profile</strong>.</li>
 </ul>
 </div>
 </div>
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-pencil-square text-primary me-2"></i>Editing &amp; Closing Your Own Ticket</h5>
-<p class="text-muted mb-2">Portal users have limited self-service options on their own open tickets:</p>
+<h5 class="fw-semibold mb-3"><i class="bi bi-send text-primary me-2"></i>Submitting a Request</h5>
+<p class="text-muted mb-2"><strong>New Help Request</strong> opens a form built from the chosen ticket type's layout. You design each type's form in <a href="/admin/workflows/ticket-fields">Settings → Organization → Ticket Forms</a>, so the fields depend on your setup. See <a href="/admin/docs/tickets#form-builder">Tickets → Form Builder</a>. Typically:</p>
 <ul class="text-muted mb-3">
-    <li><strong>Edit subject &amp; description</strong> — a user can update the subject line and description of a ticket they submitted, as long as it has not yet been closed.</li>
-    <li><strong>Close ticket</strong> — a user can close one of their own open tickets if the issue has been resolved or the request is no longer needed.</li>
+    <li><strong>Ticket type</strong>: which form to fill in. Fields that only explain things stay hidden until a type is picked.</li>
+    <li><strong>Subject</strong>: matching knowledge-base articles are suggested while they type.</li>
+    <li><strong>Description</strong>, <strong>How urgent is this?</strong>, <strong>Location</strong> (pre-filled with theirs), <strong>Tags</strong> (if tags are on), <strong>Attachments</strong>, <strong>CC</strong> colleagues, and any custom fields you added.</li>
+    <li>An optional <strong>SLA notice</strong> showing the response and resolution targets for the chosen type and priority.</li>
+    <li><strong>Start from a template</strong> appears when you have shared ticket templates.</li>
 </ul>
-<p class="text-muted mb-0">Both actions are available from the ticket detail view in the portal. Internal notes and system events are never shown to portal users.</p>
+<ul class="text-muted mb-0">
+    <li>Drafts save automatically, so a half-written request survives a closed tab.</li>
+    <li>If the type has AI duplicate checking on, a likely duplicate is shown before the request is created. See <a href="/admin/docs/ai#duplicate-detection">AI → Duplicate Detection</a>.</li>
+    <li>With <a href="/admin/settings/undo-send">Undo Send</a> on, there's a short countdown in which the requester can cancel.</li>
+    <li>After submitting, the requester gets a confirmation email. If SLA tracking is on and a policy matches, a <strong>What happens next</strong> pop-up shows the actual response and resolution due times.</li>
+</ul>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-chat-left-dots text-primary me-2"></i>On a Request</h5>
+<ul class="text-muted mb-0">
+    <li><strong>Replies</strong>: requesters comment on the page or simply reply to any notification email. Internal notes and system entries are never shown to them.</li>
+    <li><strong>Edit</strong>: the requester can change the subject and description until the request is closed.</li>
+    <li><strong>Close this request</strong>: the requester can close their own request when it's no longer needed.</li>
+    <li><strong>CC'd colleagues</strong> are listed on the request. Requesters add CCs on the form when they submit, and after that only staff can add more.</li>
+    <li>When staff mark a reply as the solution, a green <strong>Answer available</strong> banner links to it.</li>
+    <li>While a request is still <em>Submitted</em>, a <strong>"What happens next?"</strong> panel tells the requester it's queued and that they'll get an email when there's an update. The wording is editable under <a href="/admin/docs/branding#labels">Labels</a>.</li>
+</ul>
 </div>
 </div>
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-arrow-up-right-circle text-danger me-2"></i>Requester Escalation</h5>
-<p class="text-muted mb-2">If a requester feels their request has stalled, they can click <strong>Escalate</strong> on their own ticket from the portal. This walks the ticket up the <a href="/admin/docs/automations#escalation-paths">escalation path</a> configured for its ticket type — exactly the same flow agents use, but limited by an owner check (only the user who created the ticket can escalate it).</p>
-<p class="text-muted mb-0">If no escalation path is configured for the ticket's type, the button is hidden. To enable requester escalation for a type, define its chain at <a href="/admin/settings/escalation-paths"><strong>Admin → Settings → Escalation Paths</strong></a>.</p>
+<p class="text-muted mb-2">The person who opened a request can click <strong>Escalate</strong>. A confirmation shows who it will go to, and they can give a reason. The request then moves up the <a href="/admin/docs/automations#escalation-paths">escalation path</a> for its ticket type, the same as when an agent escalates. Other people who can see the request can't escalate it.</p>
+<ul class="text-muted mb-2">
+    <li>The button is hidden when the ticket type has no escalation path. Set paths up at <a href="/admin/settings/escalation-paths"><strong>Settings → Automation → Escalation Paths</strong></a>.</li>
+    <li>On the same page, <strong>Escalate Button Visibility</strong> can hide the button until the request's SLA has been breached.</li>
+</ul>
+<p class="text-muted mb-0">Escalated requests show an <strong>Escalated L#</strong> badge in My Requests, an <strong>Escalated: Level N</strong> badge and Escalation row on the request, and an entry in the timeline.</p>
 </div>
 </div>
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-eye text-primary me-2"></i>Escalation Visibility for Requesters</h5>
-<p class="text-muted mb-2">When a ticket has been escalated (manually or via a time-based rule), portal users see clear visual indicators rather than only timeline events:</p>
+<h5 class="fw-semibold mb-3"><i class="bi bi-geo-alt text-primary me-2"></i>Seeing a Whole Location's Requests</h5>
+<p class="text-muted mb-0">Requesters with <strong>Location Ticket Visibility</strong> on their account get a <strong>My Location</strong> toggle on My Requests. The toggle follows your Location label: with <em>Branch</em> it reads <em>My Branch</em>. It shows other people's requests at their location, except confidential types and types you've hidden from location visibility. Before commenting on a request they didn't open, they're asked to confirm. See <a href="/admin/docs/users">Users &amp; Roles</a>.</p>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-envelope-check text-primary me-2"></i>Requester Emails</h5>
+<p class="text-muted mb-2">Requesters are emailed when their request is received (from any channel), assigned, updated by staff, and resolved or closed. They also get a satisfaction survey if <a href="/admin/docs/csat">surveys</a> are on.</p>
+<p class="text-muted mb-0">Each email can be switched off for everyone in the <strong>Ticket Requester Notifications</strong> section of <a href="/admin/settings/email-notifications">Settings → Email → Email Notifications</a>, and each person can opt out on My Profile. Wording lives in <a href="/admin/settings/email-templates">Email Templates</a>. See <a href="/admin/docs/email">Email &amp; Notifications</a>.</p>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-life-preserver text-primary me-2"></i>Help Pages and the Guided Tour</h5>
 <ul class="text-muted mb-0">
-    <li>An <strong>Escalated L#</strong> badge on the row in the portal request list.</li>
-    <li>An <strong>Escalated — Level N</strong> badge at the top of the ticket detail view.</li>
-    <li>A new <strong>Escalation Level</strong> row in the Details sidebar.</li>
-    <li>An <code>escalated</code> entry in the timeline they can already see.</li>
+    <li>Requesters have their own help section at <a href="/portal/help">/portal/help</a>, linked from <strong>Help</strong> on the rail. Its articles are Getting Started, Submitting a Request, Tracking Your Requests, Replying, Editing &amp; Closing, Finding Answers Yourself, Your Profile &amp; Emails, and Floor Mode.</li>
+    <li>On their first visit, each requester is offered a guided tour of the portal, including a practice request. It skips anything their account doesn't have. They can replay it from their name menu → <strong>Restart Tour</strong>.</li>
+    <li>Published <a href="/admin/docs/kb">knowledge base</a> articles appear under <strong>Knowledge Base</strong> on the rail, and public articles can be read without signing in.</li>
 </ul>
 </div>
 </div>
 
-<div class="card border-0 shadow-sm mb-4">
+<div class="card border-0 shadow-sm mb-4" id="floor-mode">
 <div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-question-circle text-primary me-2"></i>"What happens next?" Callout</h5>
-<p class="text-muted mb-0">When a requester opens a help request that's still in the Submitted (open) state, the portal shows a reassuring callout explaining that the request is in the queue, someone will review it, and they'll get an email when there's an update — so there's no need to phone or email to confirm. The text comes from the <code>portal.what_next.*</code> label keys and can be edited at <a href="/admin/settings/labels">Admin → Settings → Labels</a>.</p>
+<h5 class="fw-semibold mb-3"><i class="bi bi-grid-1x2 text-primary me-2"></i>Floor Mode</h5>
+<p class="text-muted mb-0">Floor mode is a touch-friendly view for tablets and phones, made for staff working away from a desk. It appears on the rail only on touch-screen devices, and there's nothing to configure. Requesters get a big <strong>New help request</strong> button, their recent requests, and a quick form with photo capture. Agents get a live queue and quick actions. See <a href="/portal/help/floor">Portal Help → Floor Mode</a> and <a href="/agent/help/floor">Agent Help → Floor Mode</a>.</p>
 </div>
 </div>
 
-<div class="card border-0 shadow-sm mb-4">
+<div class="card border-0 shadow-sm mb-4" id="install-app">
 <div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-envelope-check text-primary me-2"></i>Requester Email Notifications</h5>
-<p class="text-muted mb-2">Two notifications keep requesters in the loop without any portal action on their part:</p>
+<h5 class="fw-semibold mb-3"><i class="bi bi-phone text-primary me-2"></i>Install as an App</h5>
+<p class="text-muted mb-2">OpenHelpDesk can be installed to a phone, tablet or desktop home screen. This works for requesters and staff alike, and there's nothing to switch on.</p>
 <ul class="text-muted mb-0">
-    <li><strong>Submission acknowledgement</strong> — fires from every creation path (portal, admin, API, email-to-ticket) so the requester always gets a "we got it, here's the request number" email.</li>
-    <li><strong>Assignment notification</strong> — when an agent picks up the request, the requester is told who is handling it.</li>
+    <li>In Chrome, Edge and Android browsers a small banner offers <strong>Install</strong>. On iPhone and iPad it explains Share → <em>Add to Home Screen</em>. Dismissing the banner hides it for 14 days, and it never shows once the app is installed.</li>
+    <li>The installed app takes its name, theme colour and icon from <a href="/admin/docs/branding">Branding</a>. The icon is made from your logo, or from the first letter of the app name if there's no logo. Generating icons needs the PHP GD extension on the server.</li>
+    <li>Long-pressing the icon offers shortcuts to Floor mode, New ticket and My tickets. If the connection drops, a simple offline page offers <em>Try again</em>.</li>
+    <li>Browsers only offer installation over HTTPS.</li>
 </ul>
-<p class="text-muted small mb-0 mt-2">Both notifications honour the global <a href="/admin/settings/email-templates">email template toggles</a> and individual users' <a href="/admin/docs/users">notification preferences</a>.</p>
-</div>
-</div>
-
-<div class="card border-0 shadow-sm mb-4">
-<div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-book text-primary me-2"></i>Knowledge Base Access</h5>
-<p class="text-muted mb-2">Published knowledge base articles are accessible to portal users from the <strong>Knowledge Base</strong> link in the portal navigation. Users can browse by category and search for articles before submitting a ticket.</p>
-<p class="text-muted mb-0">See the <a href="/admin/docs/kb"><strong>Knowledge Base</strong></a> documentation for how to create and publish articles.</p>
 </div>
 </div>
 
@@ -128,59 +148,48 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-link-45deg text-primary me-2"></i>Linking Straight to a Specific Type's Form</h5>
-<p class="text-muted mb-2">Most users land on the portal, click <em>New Ticket</em>, and pick a ticket type from a dropdown. But there are plenty of situations where you want to skip the dropdown and send someone directly to the right form — a "Report a printer problem" link on the staff intranet, a QR code on a public-access PC, a button in a Teams channel, an email signature.</p>
-<p class="text-muted mb-2">The new-ticket page accepts two query parameters that pre-select the ticket type for the visitor:</p>
+<p class="text-muted mb-2">Sometimes you want to skip the type dropdown and send people straight to the right form. For example: a "Report a printer problem" link on the intranet, a QR code on a public computer, a button in a Teams channel, or an email signature.</p>
+<p class="text-muted mb-2">The new-request page accepts two parameters that pre-select the ticket type:</p>
 <div class="table-responsive mb-3">
 <table class="table table-sm mb-0">
     <thead class="table-light"><tr><th style="width:40%">URL pattern</th><th>Behaviour</th></tr></thead>
     <tbody class="text-muted">
         <tr>
             <td><code>/portal/tickets/create?type_id=<em>N</em></code></td>
-            <td>Numeric ticket-type ID (you can find it in the URL when you edit a type). <strong>Stable across renames</strong> — the link keeps working even if you change the type's display name later. Recommended for shareable links.</td>
+            <td>The numeric ticket-type ID. It keeps working if you rename the type, so use this for links you share.</td>
         </tr>
         <tr>
             <td><code>/portal/tickets/create?type=<em>name</em></code></td>
-            <td>Human-readable name, case-insensitive. Hyphens and underscores are treated as spaces, so <code>?type=hardware-issue</code> resolves the same as <code>?type=Hardware%20Issue</code>. Nicer to read in a URL bar but <strong>breaks silently if the type is later renamed</strong>.</td>
+            <td>The type name, ignoring case. Hyphens and underscores count as spaces, so <code>?type=hardware-issue</code> matches <em>Hardware Issue</em>. Easier to read, but it <strong>stops pre-selecting if the type is renamed</strong>.</td>
         </tr>
     </tbody>
 </table>
 </div>
-<p class="text-muted mb-2">The numeric form wins if both are supplied. Unknown values are ignored — a stale link still loads the form, just without the pre-selection (the dropdown stays at "&mdash; Select type &mdash;"). And anything the user has typed before submitting (a half-finished POST that came back with an error) takes precedence over the URL parameter, so re-submitting after a validation failure won't lose their pick.</p>
-<p class="text-muted mb-0">Once the type is pre-selected, the form's existing JS automatically renders any custom fields scoped to that type — see <a href="/admin/docs/tickets#form-builder"><strong>Tickets → Form Builder</strong></a> for how field scope is configured.</p>
+<p class="text-muted mb-0">If both are given, <code>type_id</code> wins. An unknown value is ignored, so the form loads with no type selected. If a submission bounces back with an error, the requester's own choice is kept instead of the link's. Once the type is selected, the form shows that type's layout.</p>
 </div>
 </div>
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-clipboard-check text-primary me-2"></i>Where to Get a Direct Link</h5>
-<p class="text-muted mb-2">Rather than hand-crafting URLs, use the built-in column at <a href="/admin/types"><strong>Admin → Settings → Ticket Types</strong></a>. Each row carries a <strong>Direct Link</strong> column with three controls:</p>
-<ul class="text-muted mb-3">
-    <li><strong>Read-only path input</strong> — shows the relative path (<code>/portal/tickets/create?type_id=<em>N</em></code>). Click it once to select the whole thing, then <kbd>Ctrl</kbd>+<kbd>C</kbd> to copy. Hovering it shows a tooltip noting that anonymous visitors will be sent through login first.</li>
-    <li><strong>Copy button</strong> (clipboard icon) — copies the <em>absolute</em> URL (full <code>https://your-site/...</code>) to your clipboard, and briefly flashes a green check so you know it worked. Uses the modern <code>navigator.clipboard</code> API where available, with a fallback for older browsers and non-HTTPS contexts.</li>
-    <li><strong>Open in new tab</strong> (square-arrow icon) — opens the link in a new tab. Useful for sanity-checking that the right type pre-selects and that any type-scoped custom fields show up the way you expect.</li>
+<p class="text-muted mb-2"><a href="/admin/types"><strong>Settings → Organization → Ticket Types</strong></a> has a <strong>Direct Link</strong> column for every type:</p>
+<ul class="text-muted mb-2">
+    <li><strong>The path box</strong> shows <code>/portal/tickets/create?type_id=<em>N</em></code>. Click it to select the whole path.</li>
+    <li><strong>Copy</strong> (clipboard icon) copies the full <code>https://…</code> address and briefly shows a green check.</li>
+    <li><strong>Open in new tab</strong> lets you check that the right type and form appear.</li>
 </ul>
-<p class="text-muted mb-2">The link uses the <code>type_id</code> form deliberately — it's the durable choice. If you'd rather share a name-based URL (it reads more naturally on a printed poster or in an email), copy the path and swap <code>type_id=<em>N</em></code> for <code>type=<em>your-type-name</em></code> by hand.</p>
-<p class="text-muted mb-0">Direct-link URLs are always relative paths starting with a single forward slash. They are safe to embed anywhere on the same site (intranet pages, internal Slack/Teams messages, email signatures) and the absolute version on the clipboard is what you'd typically paste into a public-facing place.</p>
+<p class="text-muted mb-0">For a friendlier link on a poster, swap <code>type_id=<em>N</em></code> for <code>type=<em>your-type-name</em></code> yourself.</p>
 </div>
 </div>
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-shield-check text-primary me-2"></i>What Happens When the Visitor Isn't Signed In</h5>
-<p class="text-muted mb-2">Submitting a ticket requires a logged-in account. Direct links would be much less useful if every anonymous click dumped the visitor on a generic home page after login — they'd be left wondering what they were supposed to do next.</p>
-<p class="text-muted mb-2">OpenHelpDesk handles this with a <strong>"remember where you were going"</strong> flow:</p>
-<ol class="text-muted mb-3">
-    <li>An anonymous visitor clicks the direct link (e.g. <code>/portal/tickets/create?type_id=5</code>).</li>
-    <li>The server sees they aren't signed in, <strong>stashes the requested URL in their session</strong>, and redirects them to the login page.</li>
-    <li>They sign in (and complete 2FA if their account has it enabled — the stashed URL survives the 2FA round-trip).</li>
-    <li>On final success, they're sent <strong>straight to the new-ticket form for the right type</strong>, with type-scoped custom fields already rendered.</li>
-</ol>
-<p class="text-muted mb-2">Self-registration works the same way: a visitor without an account can register from the login page, click the verification link in their welcome email, sign in, and land on the form they originally clicked. The session-stashed URL persists until either it's consumed on a successful login or the browser session ends.</p>
-<p class="text-muted mb-2">If you want to share a "log in first, then go to this form" link explicitly — for example, in an email where you want the recipient to see the login page even if they think they're already signed in elsewhere — you can also pass the destination as a <code>?next=</code> parameter on the login URL itself:</p>
+<h5 class="fw-semibold mb-3"><i class="bi bi-shield-check text-primary me-2"></i>When the Visitor Isn't Signed In</h5>
+<p class="text-muted mb-2">Direct links survive the sign-in step. Someone who clicks one while signed out is sent to the sign-in page. After signing in (including two-factor sign-in) they land on the form with the right type selected.</p>
+<p class="text-muted mb-2">To send people through sign-in on purpose, put the destination in <code>?next=</code> on the sign-in address. URL-encode it, because it contains its own <code>?</code>:</p>
 <div class="bg-light rounded px-3 py-2 font-monospace small mb-3">/login?next=%2Fportal%2Ftickets%2Fcreate%3Ftype_id%3D5</div>
-<p class="text-muted mb-2">The <code>next</code> value must be URL-encoded because it contains its own <code>?</code>. Once the user signs in, they're forwarded to the decoded path.</p>
 <div class="alert alert-warning small mb-0"><i class="bi bi-shield-lock me-2"></i>
-    <strong>Open-redirect protection.</strong> Both the auto-stash and the explicit <code>?next=</code> parameter only accept <strong>relative paths starting with a single forward slash</strong>. Absolute URLs (<code>http://&hellip;</code>), protocol-relative URLs (<code>//evil.example.com/&hellip;</code>), backslash-prefix variants that some browsers normalise (<code>/\evil.example.com</code>), the <code>/login</code> page itself, anything longer than 2&nbsp;000 characters, and non-GET requests are all silently rejected — visitors hitting a bad value just land on the home page after login. There is no way to weaponise this flow into bouncing a logged-in user off-site.
+    <strong>Off-site links are blocked.</strong> Only paths on this site that start with a single <code>/</code> are accepted. Full addresses, <code>//other-site</code> and backslash tricks, <code>/login</code> itself, and anything over 2,000 characters are ignored, and the person lands on the home page instead. A direct link can't be used to bounce someone to another website.
 </div>
 </div>
 </div>
@@ -188,11 +197,11 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-paint-bucket text-primary me-2"></i>Customising the Portal</h5>
-<p class="text-muted mb-2">You can personalise what end users see on the portal homepage at <a href="/admin/settings/branding"><strong>Admin → Settings → Branding</strong></a>:</p>
 <ul class="text-muted mb-0">
-    <li><strong>Portal Welcome Title</strong> — large heading on the portal homepage.</li>
-    <li><strong>Portal Welcome Message</strong> — supporting text below the heading.</li>
-    <li><strong>Logo</strong> and <strong>Primary Colour</strong> — applied throughout the portal as well as the admin interface.</li>
+    <li><strong>Look</strong>: logo, app name and colours at <a href="/admin/docs/branding">Branding</a>.</li>
+    <li><strong>Wording</strong>: status names, buttons, headings and panels at <a href="/admin/docs/branding#labels">Labels</a>.</li>
+    <li><strong>Forms</strong>: which types requesters can pick and which fields each form shows, at <a href="/admin/docs/tickets#form-builder">Ticket Forms</a>.</li>
+    <li><strong>Announcements</strong>: <a href="/admin/docs/system#status-banners">status banners</a>.</li>
 </ul>
 </div>
 </div>

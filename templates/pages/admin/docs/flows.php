@@ -46,10 +46,10 @@ $breadcrumbs  = [
 
 <h3 id="d0" class="fw-bold mt-5 mb-3">Diagram 0 — Master flow (every new ticket runs this)</h3>
 <div class="card border-0 shadow-sm mb-4"><div class="card-body p-4">
-<p class="text-muted mb-2">Each newly-created ticket flows through these steps before any group strategy runs. The four "group is set" gates are <strong>three layers of defence</strong> against tickets ending up in the no-group queue:</p>
+<p class="text-muted mb-2">Each newly-created ticket flows through these steps before any group strategy runs. The portal, staff form, floor mode, email, API, splits and recurring schedules all run the same steps (CSV imports skip them). There are <strong>three layers of defence</strong> against tickets ending up in the no-group queue:</p>
 <ol class="text-muted mb-3">
 <li><strong>Creation-time</strong> — every creation path calls <code>resolveTicketGroup()</code>, which tries the caller's explicit choice, then the ticket type's default group, then the system-wide <strong>Default Group</strong> setting, then the lowest-id existing group.</li>
-<li><strong>Post-create</strong> — after AI classification and automations run, <code>backfillTicketGroupFromDefault()</code> sweeps any ticket whose group_id is somehow still NULL into the default group.</li>
+<li><strong>Post-create</strong> — after AI routing, AI classification and automations run, <code>backfillTicketGroupFromDefault()</code> sweeps any ticket whose group_id is somehow still NULL into the default group.</li>
 <li><strong>Hourly cron</strong> — <code>scripts/process-stale-tickets.php</code> sweeps any orphans the previous two layers missed (e.g. legacy data, hand-edited rows).</li>
 </ol>
 <div class="flow-diagram"><pre class="mermaid">
@@ -57,7 +57,8 @@ flowchart TD
     A[Someone submits a ticket] --> B["resolveTicketGroup()<br/>caller's pick → type's group →<br/>default_group_id setting →<br/>lowest-id existing group"]
     B --> C["INSERT INTO tickets<br/>(group_id rarely NULL after this)"]
     C --> D[runPostTicketCreateHooks]
-    D --> E["classifyTicketWithAI<br/>(skipped for confidential types<br/>or when AI disabled)"]
+    D --> D2["aiRouteTicketToGroup<br/>('No Wrong Door' types only;<br/>may move the ticket to another group)"]
+    D2 --> E["classifyTicketWithAI<br/>(skipped for confidential types<br/>or when AI disabled)"]
     E --> F["runAutomations 'ticket_created'<br/>may overwrite group_id, type_id,<br/>or assigned_to"]
     F --> G["backfillTicketGroupFromDefault<br/>last-ditch NULL-group sweep<br/>routes to default_group_id"]
     G --> H{Has anything<br/>already assigned<br/>an agent?}
@@ -74,7 +75,7 @@ flowchart TD
     K -->|First Available| D6[See Diagram 6]
 </pre></div>
 <div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
-Auto-assignment only fires when a group is set AND no assignee has been picked yet. Automations execute <em>before</em> auto-assign, so a "set group" automation can redirect the ticket and a "set assignee" automation can short-circuit auto-assign entirely.
+Auto-assignment only fires when a group is set AND no assignee has been picked yet. Automations execute <em>before</em> auto-assign, so a "set group" automation can redirect the ticket and a "set assignee" automation can short-circuit auto-assign entirely. Only staff members of the group are considered; end users who happen to be in a group are ignored.
 </div>
 </div></div>
 
@@ -87,9 +88,9 @@ flowchart TD
     B --> C["Group's strategy: Manual"]
     C --> D[System doesn't pick anyone]
     D --> E[Ticket waits in IT queue]
-    E --> F["An IT agent opens the queue<br/>and clicks 'assign to me'<br/>(or an admin assigns it)"]
+    E --> F["An IT agent assigns it to themselves<br/>from the list's Assigned To dropdown,<br/>or just replies publicly<br/>(or an admin assigns it)"]
 </pre></div>
-<p class="text-muted mb-0"><strong>Outcome:</strong> Whichever IT agent picks it up first owns it. <strong>When to use:</strong> Small teams who self-triage, or when you want a human in the loop on every ticket.</p>
+<p class="text-muted mb-0"><strong>Outcome:</strong> Whichever IT agent picks it up first owns it &mdash; a public reply on an unassigned ticket assigns it to the person replying. <strong>When to use:</strong> Small teams who self-triage, or when you want a human in the loop on every ticket.</p>
 </div></div>
 
 <h3 id="d2" class="fw-bold mt-5 mb-3">Diagram 2 — Round Robin</h3>
@@ -115,7 +116,7 @@ flowchart TD
 flowchart TD
     A["Jane submits 'Printer Issue'<br/>Ticket lands in IT group"] --> B["Group's strategy: Load-Based"]
     B --> C[Look at IT group members]
-    C --> D["Count each agent's<br/>currently-open tickets<br/>(ignoring resolved and closed)"]
+    C --> D["Count each agent's<br/>currently-open tickets<br/>(statuses in the Closed bucket<br/>don't count)"]
     D --> E["Open ticket counts:<br/>Alice = 3, Bob = 1<br/>Carol = 5, Dave = 2<br/>Bob has the fewest"]
     E --> F[Ticket assigned to Bob]
     F -.- G["Tie-break: lower user_id wins<br/>(stable / deterministic)"]
@@ -188,24 +189,24 @@ flowchart TD
 
 <h3 id="d7" class="fw-bold mt-5 mb-3">Diagram 7 — Strategy fallback (when the primary rule can't pick anyone)</h3>
 <div class="card border-0 shadow-sm mb-4"><div class="card-body p-4">
-<p class="text-muted mb-2">Every strategy except Manual can come up empty (no eligible specialist, nobody online, AI not confident enough, etc.). When that happens, the system runs the group's <strong>fallback</strong> on the full membership — no skill / availability filtering.</p>
+<p class="text-muted mb-2">Every strategy except Manual can come up empty (no eligible specialist, nobody online, AI not confident enough, etc.). When that happens, the system runs the group's <strong>If no agent matches</strong> fallback (set on the group's edit form at <a href="/admin/groups">Settings → Organization → Groups</a>) on the full membership — no skill / availability filtering.</p>
 <div class="flow-diagram"><pre class="mermaid">
 flowchart TD
-    A["Primary strategy didn't pick anyone<br/>(no eligible specialist,<br/>no one online,<br/>AI not confident enough, etc.)"] --> B["Check the group's<br/>fallback setting"]
+    A["Primary strategy didn't pick anyone<br/>(no eligible specialist,<br/>no one online,<br/>AI not confident enough, etc.)"] --> B["Check the group's<br/>'If no agent matches' setting"]
     B --> C{Fallback?}
-    C -->|Round Robin| D["Run Round Robin<br/>across the full group<br/>(Diagram 2 logic)"]
-    C -->|Load-Based| E["Run Load-Based<br/>across the full group<br/>(Diagram 3 logic)"]
-    C -->|None| F["Don't assign anyone<br/>Ticket waits in the group queue<br/>for human triage"]
+    C -->|Rotate via round-robin| D["Run Round Robin<br/>across the full group<br/>(Diagram 2 logic)"]
+    C -->|Pick the least-loaded member| E["Run Load-Based<br/>across the full group<br/>(Diagram 3 logic)"]
+    C -->|Leave the ticket unassigned| F["Don't assign anyone<br/>Ticket waits in the group queue<br/>for human triage"]
     D --> G[Agent picked → assigned]
     E --> G
     F --> H[No assignment — but the ticket<br/>still has a group, so it's visible<br/>in that group's queue]
 </pre></div>
-<p class="text-muted mb-2"><strong>Recommended fallback:</strong> Set it to <strong>Load-Based</strong> if you want every ticket assigned to a human no matter what. Set it to <strong>None</strong> if you'd rather have ambiguous tickets sit unassigned for a human to triage.</p>
+<p class="text-muted mb-2"><strong>Recommended fallback:</strong> Choose <strong>Pick the least-loaded member</strong> if you want every ticket assigned to a human no matter what. Choose <strong>Leave the ticket unassigned</strong> if you'd rather have ambiguous tickets sit unassigned for a human to triage.</p>
 </div></div>
 
 <h3 id="d8" class="fw-bold mt-5 mb-3">Diagram 8 — Default-group fallback (the "no ticket gets stuck" safety net)</h3>
 <div class="card border-0 shadow-sm mb-4"><div class="card-body p-4">
-<p class="text-muted mb-2">A separate, earlier safety net than Diagram 7. Diagram 7 handles "no eligible <em>agent</em> in this group" — Diagram 8 handles "no <em>group</em> at all." Configured at <a href="/admin/settings#default_group_id"><strong>Admin → Settings → Ticket Routing Defaults → Default Group</strong></a>.</p>
+<p class="text-muted mb-2">A separate, earlier safety net than Diagram 7. Diagram 7 handles "no eligible <em>agent</em> in this group" — Diagram 8 handles "no <em>group</em> at all." Configured at <a href="/admin/settings/ticket-routing"><strong>Settings → Organization → Ticket Routing → Default Group</strong></a>.</p>
 <div class="flow-diagram"><pre class="mermaid">
 flowchart TD
     A[Ticket creation path begins] --> B{Did the caller<br/>specify a group?}

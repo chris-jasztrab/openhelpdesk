@@ -28,7 +28,7 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/portal/help'], ['label' => 'Find
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-search text-primary me-2"></i>Searching</h5>
-<p class="text-muted mb-2">If you know roughly what you're after, searching is faster than browsing. Type a keyword in the search box &mdash; it looks through every article. The same site-wide search (press <code>/</code> on any page) covers Knowledge Base articles too.</p>
+<p class="text-muted mb-2">If you know roughly what you're after, searching is faster than browsing. Type at least two letters in the <strong>Search articles&hellip;</strong> box at the top of the Knowledge Base page &mdash; matching articles appear as you type. The search box in the top bar (press <code>/</code> on any page) covers articles too; pick its <strong>Knowledge Base Articles</strong> tab to see only articles.</p>
 <p class="text-muted small mb-0">You'll also see matching articles pop up automatically while you type the <strong>subject</strong> of a new request &mdash; a last chance to find the answer before you even submit.</p>
 </div>
 </div>
@@ -36,7 +36,7 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/portal/help'], ['label' => 'Find
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-hand-thumbs-up text-success me-2"></i>Was It Helpful?</h5>
-<p class="text-muted mb-0">At the bottom of each article you can tell us whether it <strong>helped or not</strong>. This is genuinely useful &mdash; it tells us which articles are working and which ones need to be rewritten or expanded. It takes one click.</p>
+<p class="text-muted mb-0">At the bottom of each article, <strong>Was this article helpful?</strong> asks for a quick <strong>Yes</strong> or <strong>No</strong>. This is genuinely useful &mdash; it tells us which articles are working and which ones need to be rewritten or expanded. It takes one click, and you can change your answer later.</p>
 </div>
 </div>
 

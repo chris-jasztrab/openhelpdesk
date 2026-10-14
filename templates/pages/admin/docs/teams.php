@@ -12,7 +12,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <p class="text-muted mb-4">Post ticket activity into a Microsoft Teams channel as it happens. Choose which events are announced, and &mdash; if you want &mdash; route different ticket types to different channels (e.g. IT tickets to the IT channel, Lifelong Learning tickets to theirs).</p>
 
 <div class="alert alert-info small mb-4"><i class="bi bi-info-circle me-2"></i>
-    Set everything up at <a href="/admin/settings/teams"><strong>Admin &rarr; Settings &rarr; Integrations &rarr; Microsoft Teams</strong></a>. This page is admin-only.
+    Set everything up at <a href="/admin/settings/teams"><strong>Settings &rarr; Integrations &rarr; Microsoft Teams</strong></a>. The page is admin-only and can't be granted to other permission levels.
 </div>
 
 <div class="card border-0 shadow-sm mb-4">
@@ -38,9 +38,12 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
     <li><strong>New ticket created</strong> &mdash; whenever a ticket is opened through any channel (agent, portal, email-to-ticket, or floor mode).</li>
     <li><strong>Ticket assigned</strong> &mdash; when a ticket is assigned or reassigned to an agent.</li>
     <li><strong>Status changed</strong> &mdash; when a ticket moves between statuses; the card shows the <em>old&nbsp;&rarr;&nbsp;new</em> status.</li>
-    <li><strong>SLA breached</strong> &mdash; the moment a ticket breaches its SLA (detected during SLA recalculation, including the scheduled cron run).</li>
+    <li><strong>SLA breached</strong> &mdash; when a ticket moves into Breached during SLA recalculation (the SLA cron job or <strong>Recalculate All</strong>).</li>
 </ul>
-<p class="text-muted mb-0">Each card carries the ticket number and subject, the key facts (status, priority, type, group, location, requester, assignee) and an <strong>Open ticket</strong> button that links straight back to the ticket in the helpdesk.</p>
+<p class="text-muted mb-2">Each card carries the ticket number and subject, the key facts (status, priority, type, group, location, requester, assignee) and an <strong>Open ticket</strong> button that links straight back to the ticket in the helpdesk.</p>
+<div class="alert alert-warning small mb-0"><i class="bi bi-shield-lock me-2"></i>
+    Cards are posted for every ticket type, <strong>including confidential ones</strong>, and show the subject and requester to everyone in the channel. Route confidential types to a private channel, or leave the default webhook blank so only the types you route are posted.
+</div>
 </div>
 </div>
 
@@ -67,7 +70,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
     <li>Go to <a href="/admin/settings/teams"><strong>Settings &rarr; Integrations &rarr; Microsoft Teams</strong></a>.</li>
     <li>Paste the URL into <strong>Default channel webhook</strong>.</li>
     <li>Click <strong>Test</strong> next to it &mdash; a confirmation card should appear in the channel within a few seconds.</li>
-    <li>Tick <strong>Enable Teams notifications</strong>, then <strong>Save settings</strong>.</li>
+    <li>Tick <strong>Enable Teams notifications</strong>, then <strong>Save settings</strong>. Enabling needs a default webhook or at least one per-type webhook.</li>
 </ol>
 </div>
 </div>
@@ -123,9 +126,8 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
     <li><strong>Notifications are one-way.</strong> The integration posts <em>into</em> Teams; it doesn't read replies or let you act on tickets from Teams. Use the <strong>Open ticket</strong> button on each card to jump back to the helpdesk.</li>
     <li><strong>&ldquo;Couldn't connect&rdquo; on test</strong> usually means the URL was copied incompletely, or your server can't reach <code>*.logic.azure.com</code> outbound. Confirm the full URL and that outbound HTTPS is allowed.</li>
     <li><strong>HTTP 4xx on test</strong> usually means the workflow was deleted or disabled in Teams &mdash; recreate it (Step&nbsp;1) and paste the new URL.</li>
-    <li><strong>Webhooks must be <code>https://</code>.</strong> Plain <code>http</code> URLs are rejected.</li>
-    <li><strong>SLA-breach posts</strong> depend on SLA recalculation running. Make sure the SLA cron job is scheduled (see <a href="/admin/settings/cron-jobs">Cron Jobs</a>); breaches are also re-evaluated on normal ticket activity.</li>
-</ul>
+    <li><strong>Accepted URLs.</strong> Webhooks must be <code>https://</code> addresses on a Microsoft host ending in <code>.webhook.office.com</code>, <code>.logic.azure.com</code> or <code>.office.com</code>. Plain <code>http</code>, other hosts and bare IP addresses are refused, and the Test button says why.</li>
+    <li><strong>SLA-breach posts</strong> depend on SLA recalculation running. Make sure the SLA Recalculation cron job is scheduled (see <a href="/admin/settings/cron-jobs">Cron Jobs</a>).</li></ul>
 </div>
 </div>
 

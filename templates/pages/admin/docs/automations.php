@@ -9,14 +9,16 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="col-lg-9">
 
 <h2 class="fw-bold mb-1">Automations &amp; Escalations</h2>
-<p class="text-muted mb-4">Reduce manual work by letting OpenHelpDesk act on tickets for you. This page covers four related-but-distinct systems:</p>
+<p class="text-muted mb-4">Let the helpdesk act on tickets for you. Everything here is under <strong>Settings &rarr; Automation</strong>:</p>
 <ul class="text-muted mb-4">
-    <li><a href="#automation-rules"><strong>Automation Rules</strong></a> — event-based "when X happens, do Y" rules.</li>
-    <li><a href="#group-auto-assign"><strong>Group Auto-Assignment</strong></a> — which member of a group picks up a new ticket.</li>
-    <li><a href="#escalation-rules"><strong>Escalation Rules</strong></a> — time-based reminders and reassignments via cron.</li>
-    <li><a href="#escalation-paths"><strong>Manual Escalation Paths</strong></a> — the per-type chain used by the agent &amp; portal <strong>Escalate</strong> button.</li>
-    <li><a href="#stale-tickets"><strong>Stale Ticket Notifications</strong></a> — automatic nag emails when a ticket has been ignored.</li>
-    <li><a href="#oof-coverage"><strong>Out-of-Office Coverage</strong></a> — reassign or auto-reply an away agent's tickets, read from Outlook.</li>
+    <li><a href="#automation-rules"><strong>Automation Rules</strong></a>: "when a ticket is created or updated and matches X, do Y".</li>
+    <li><a href="#group-auto-assign"><strong>Group Auto-Assignment</strong></a>: which member of a group picks up a new ticket.</li>
+    <li><a href="#escalation-rules"><strong>Escalation Rules</strong></a>: time-based reminders and reassignments, run by cron.</li>
+    <li><a href="#escalation-paths"><strong>Escalation Paths</strong></a>: the per-type chain behind the <strong>Escalate</strong> button.</li>
+    <li><a href="#stale-tickets"><strong>Stale Tickets</strong></a>: reminder emails when a ticket has been left alone.</li>
+    <li><a href="#oof-coverage"><strong>Out of Office</strong></a>: cover tickets of agents who are away, read from Outlook.</li>
+    <li><a href="#recurring-tickets"><strong>Recurring Tickets</strong></a> and <a href="#scheduled-reports"><strong>Scheduled Reports</strong></a>.</li>
+    <li><a href="#cron-jobs"><strong>Cron Jobs</strong></a>: the background jobs that power all of the above.</li>
 </ul>
 
 <h3 id="automation-rules" class="fw-bold mt-5 mb-3">Automation Rules</h3>
@@ -24,57 +26,23 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-question-circle text-primary me-2"></i>How Automations Work</h5>
-<p class="text-muted mb-2">Each automation rule has three parts:</p>
-<ol class="text-muted mb-0">
-    <li><strong>Trigger</strong> — the event that causes the rule to be evaluated (e.g. ticket created, ticket updated).</li>
-    <li><strong>Conditions</strong> — criteria that must be met for the rule to fire (e.g. priority is High, subject contains "urgent").</li>
-    <li><strong>Actions</strong> — what happens when conditions are met (e.g. assign to agent, set priority, add tag).</li>
-</ol>
-</div>
-</div>
-
-<div class="card border-0 shadow-sm mb-4">
-<div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-plus-circle text-primary me-2"></i>Creating a Rule</h5>
-<ol class="text-muted mb-0">
-    <li>Go to <a href="/admin/settings/automations"><strong>Admin → Settings → Automations</strong></a>.</li>
-    <li>Click <strong>Add Rule</strong>.</li>
-    <li>Give the rule a descriptive name.</li>
-    <li>Choose the <strong>trigger</strong> event.</li>
-    <li>Add one or more <strong>conditions</strong> using the condition builder. Choose whether <strong>all</strong> or <strong>any</strong> conditions must match.</li>
-    <li>Add one or more <strong>actions</strong> to perform.</li>
-    <li>Toggle the rule <strong>Active</strong> and click <strong>Save</strong>.</li>
-</ol>
-</div>
-</div>
-
-<div class="card border-0 shadow-sm mb-4">
-<div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-lightning text-primary me-2"></i>Available Triggers</h5>
+<p class="text-muted mb-2">Manage rules at <a href="/admin/settings/automations"><strong>Settings &rarr; Automation &rarr; Automations</strong></a> (needs <strong>Manage automations &amp; escalations</strong>). Click <strong>Add Automation</strong> and give the rule a <strong>Name</strong>, a <strong>Trigger</strong>, conditions and actions, then tick <strong>Enabled</strong> and save.</p>
 <ul class="text-muted mb-0">
-    <li><strong>Ticket Created</strong> — fires when a new ticket is submitted (via portal or admin).</li>
-    <li><strong>Ticket Updated</strong> — fires when any field on a ticket is changed.</li>
-    <li><strong>Reply Added</strong> — fires when a public reply is posted on a ticket.</li>
-    <li><strong>Status Changed</strong> — fires specifically when the ticket status changes.</li>
+    <li><strong>Ticket Created</strong> runs on every new ticket from any channel. It runs after AI routing and classification and before auto-assignment, so a rule that sets the group decides who gets auto-assigned.</li>
+    <li><strong>Ticket Updated</strong> runs when a ticket's properties change: the Update Ticket panel, list quick-edits (status, priority, type, group, assignee) and floor-mode actions. Replies don't trigger it.</li>
 </ul>
 </div>
 </div>
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-funnel text-primary me-2"></i>Available Conditions</h5>
+<h5 class="fw-semibold mb-3"><i class="bi bi-funnel text-primary me-2"></i>Conditions</h5>
+<p class="text-muted mb-2">Conditions sit in one or more <strong>groups</strong>. The rule fires if <strong>any</strong> group matches, and each group is set to match <strong>ALL (AND)</strong> or <strong>ANY (OR)</strong> of its conditions, so you can build "(A and B) or C".</p>
 <div class="table-responsive mb-0">
 <table class="table table-sm mb-0">
     <thead class="table-light"><tr><th>Field</th><th>Operators</th></tr></thead>
     <tbody class="text-muted">
-        <tr><td>Subject</td><td>contains, does not contain, equals</td></tr>
-        <tr><td>Description</td><td>contains, does not contain</td></tr>
-        <tr><td>Status</td><td>is, is not</td></tr>
-        <tr><td>Priority</td><td>is, is not</td></tr>
-        <tr><td>Assigned To</td><td>is, is not, is unassigned</td></tr>
-        <tr><td>Location</td><td>is, is not</td></tr>
-        <tr><td>Tag</td><td>includes, does not include</td></tr>
-        <tr><td>Requester Email</td><td>contains, equals</td></tr>
+        <tr><td>Ticket Type, Priority, Status, <?= e(label('location.singular', 'Location')) ?>, Group, Assigned To</td><td>is, is not, is empty, is not empty</td></tr>
     </tbody>
 </table>
 </div>
@@ -83,37 +51,29 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-play-circle text-primary me-2"></i>Available Actions</h5>
-<ul class="text-muted mb-0">
-    <li><strong>Assign to agent</strong> — assigns the ticket to a specific agent.</li>
-    <li><strong>Set ticket type</strong> — changes the ticket's type. Useful for tickets that arrived as "I don't know" and were routed to a group by AI: match on the group and set the type to go with it.</li>
-    <li><strong>Set priority</strong> — changes the ticket's priority.</li>
-    <li><strong>Set status</strong> — changes the ticket's status.</li>
-    <li><strong>Add tag</strong> — adds a tag to the ticket.</li>
-    <li><strong>Set location</strong> — assigns or changes the ticket's location.</li>
-    <li><strong>Add internal note</strong> — posts an internal note with specified text.</li>
+<h5 class="fw-semibold mb-3"><i class="bi bi-play-circle text-primary me-2"></i>Actions</h5>
+<ul class="text-muted mb-2">
+    <li><strong>Assign to group</strong> and <strong>Assign to agent</strong>.</li>
+    <li><strong>Set ticket type</strong>: e.g. match on Group to stamp a type on tickets that AI routed from a "No Wrong Door" type, so type-based rules, reports and SLA apply. SLA deadlines are recalculated.</li>
+    <li><strong>Set priority</strong> and <strong>Set status</strong>.</li>
+    <li><strong>Add tag</strong>.</li>
+    <li><strong>CC user</strong>: adds a person as a CC; they get the "you were added as a CC" email.</li>
 </ul>
+<p class="text-muted mb-0">Every action writes a timeline entry on the ticket.</p>
 </div>
 </div>
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-sort-numeric-up text-primary me-2"></i>Rule Order &amp; Priority</h5>
-<p class="text-muted mb-2">Rules are evaluated in the order they appear in the list. Multiple rules can fire on the same event — all matching rules run in sequence.</p>
-<p class="text-muted mb-0">Drag rules in the list to reorder them. Place more specific rules above general ones to ensure correct behaviour when multiple rules could match.</p>
-</div>
-</div>
-
-<div class="card border-0 shadow-sm mb-4">
-<div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-lightbulb text-primary me-2"></i>Examples</h5>
+<h5 class="fw-semibold mb-3"><i class="bi bi-sort-numeric-up text-primary me-2"></i>Order, Run Now &amp; Safety</h5>
 <ul class="text-muted mb-0">
-    <li><strong>Auto-assign urgent tickets:</strong> Trigger = Ticket Created, Condition = Priority is Critical, Action = Assign to [senior agent].</li>
-    <li><strong>Tag IT requests:</strong> Trigger = Ticket Created, Condition = Subject contains "computer" or "laptop", Action = Add tag "hardware".</li>
-    <li><strong>Flag unassigned tickets:</strong> Trigger = Ticket Updated, Condition = Status is Open AND assigned to is unassigned, Action = Add internal note "Ticket is unassigned and still open."</li>
+    <li>All matching rules run, top to bottom; each rule sees the changes made by the rules above it. Drag rules by the grip to reorder.</li>
+    <li>Toggle a rule on or off from the list without editing it.</li>
+    <li><strong>Run Now</strong> applies a rule to every existing open ticket that matches it now. Use it carefully: it can change many tickets at once.</li>
+    <li>If a rule points at something that was later deleted (a type, group, agent or <?= e(strtolower(label('location.singular', 'location'))) ?>), the editor flags that dropdown red with "previous choice was deleted, pick again" and won't save until you choose. Until it's fixed, the broken action is skipped and noted on the ticket timeline; the rest of the rule still runs.</li>
 </ul>
 <div class="alert alert-info small mt-3 mb-0"><i class="bi bi-info-circle me-2"></i>
-    Looking for <em>time-based</em> rules (fire after X hours)? See <a href="#escalation-rules" class="alert-link">Escalation Rules</a> below. Looking for "send a reminder when no-one has touched this ticket in N hours"? See <a href="#stale-tickets" class="alert-link">Stale Ticket Notifications</a>.
+    Need something to happen after a period of time? Use <a href="#escalation-rules" class="alert-link">Escalation Rules</a>. For "nobody has touched this ticket in N days" reminders, use <a href="#stale-tickets" class="alert-link">Stale Tickets</a>.
 </div>
 </div>
 </div>
@@ -123,276 +83,202 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-person-fill-gear text-primary me-2"></i>How It Works</h5>
-<p class="text-muted mb-2">When a new ticket arrives with a <strong>Group</strong> set but no assignee, OpenHelpDesk can pick a member of that group automatically. Each group chooses its own strategy at <a href="/admin/groups"><strong>Admin → Settings → Groups → Edit</strong></a>.</p>
-<p class="text-muted mb-0">Auto-assignment runs on portal submissions, the public REST API, email-to-ticket, and the admin "Split Ticket" flow whenever the assignee is left blank but a group is set. Direct manual assignment is never overridden.</p>
+<p class="text-muted mb-2">When a new ticket has a <strong>group</strong> but no assignee, the helpdesk can pick a member automatically. Each group chooses an <strong>Auto-Assignment Strategy</strong> on its edit form at <a href="/admin/groups"><strong>Settings &rarr; Organization &rarr; Groups</strong></a>.</p>
+<p class="text-muted mb-0">It runs on every creation path (portal, staff New Ticket, email-to-ticket, API, floor mode, splits and recurring tickets). The order is AI group routing &rarr; AI skill classification &rarr; Ticket Created automations &rarr; default-group safety net &rarr; auto-assignment. A ticket that already has an assignee is never reassigned.</p>
 <div class="alert alert-info small mt-3 mb-0"><i class="bi bi-diagram-3 me-2"></i>
-For step-by-step diagrams of every strategy, the master flow that runs on every new ticket, and the default-group safety net that prevents tickets getting stuck in the no-group queue, see <a href="/admin/docs/flows" class="alert-link"><strong>Docs → Assignment Flows</strong></a>.
+    Diagrams of every strategy and of the full routing flow are in <a href="/admin/docs/flows" class="alert-link"><strong>Docs &rarr; Assignment Flows</strong></a>.
 </div>
 </div>
 </div>
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-shield-check text-success me-2"></i>The "No Group" Safety Net <span class="badge bg-primary ms-1">2.23</span></h5>
-<p class="text-muted mb-2">Pre-2.23, several creation paths could leave a ticket with no group at all (most notoriously email-to-ticket, which never set <code>group_id</code>). Auto-assign short-circuits on a NULL group, so those tickets sat invisible in a "no group" queue until someone happened to look for them.</p>
-<p class="text-muted mb-2">Three new layers prevent that now:</p>
-<ol class="text-muted mb-2">
-    <li><strong>At creation</strong> — every path calls <code>resolveTicketGroup()</code> which chains caller's pick → ticket type's default group → system default → lowest-id existing group.</li>
-    <li><strong>After post-create hooks</strong> — if AI classification or automations didn't set a group, a final sweep routes the ticket to the system default.</li>
-    <li><strong>Hourly cron</strong> — the stale-ticket processor catches any orphan that slipped through (e.g. legacy data, hand-edited rows) and logs a warning for investigation.</li>
-</ol>
-<p class="text-muted mb-0">Configure the system default at <a href="/admin/settings#default_group_id"><strong>Admin → Settings → Ticket Routing Defaults → Default Group</strong></a>. Best practice is to create (or designate) a generic <em>Triage</em> / <em>Service Desk</em> group, set its assignment strategy to <strong>Load-Based</strong> or <strong>First Available</strong>, and point this setting at it — that way the catch-all queue is also auto-distributed to a human.</p>
-</div>
-</div>
-
-<div class="card border-0 shadow-sm mb-4">
-<div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-diagram-3 text-primary me-2"></i>The Five Strategies</h5>
+<h5 class="fw-semibold mb-3"><i class="bi bi-diagram-3 text-primary me-2"></i>The Strategies</h5>
 <div class="table-responsive mb-0">
 <table class="table table-sm mb-0">
     <thead class="table-light"><tr><th style="width:160px;">Strategy</th><th>Behaviour</th></tr></thead>
     <tbody class="text-muted">
         <tr>
             <td><strong>Manual</strong> <span class="badge bg-secondary ms-1">default</span></td>
-            <td>Do nothing — leave the ticket unassigned for an agent to claim. Preserves pre-2.12 behaviour.</td>
+            <td>Leave the ticket unassigned for an agent to claim.</td>
         </tr>
         <tr>
             <td><strong>Round Robin</strong></td>
-            <td>Rotate sequentially through group members. The next pick is always the agent <em>after</em> whoever was last auto-assigned (tracked on the group, not per-ticket-type). Distribution is even by ticket count.</td>
+            <td>Rotate through the group's members in turn, so ticket counts even out.</td>
         </tr>
         <tr>
             <td><strong>Load-Based</strong></td>
-            <td>Pick the member with the fewest <em>open</em> (non-resolved, non-closed) tickets. Best when work items vary in length. Ties are broken by user ID for stability.</td>
+            <td>Pick the member with the fewest open tickets. Best when work varies in size.</td>
         </tr>
         <tr>
             <td><strong>Skill-Based</strong></td>
-            <td>Pick a member whose declared skills cover <strong>every</strong> skill required by the ticket type. If multiple members qualify, the least-loaded among them wins. Falls back to the configured fallback when nobody qualifies.</td>
+            <td>Pick a member whose skills cover <strong>every</strong> skill the ticket type requires (least-loaded if several qualify).</td>
+        </tr>
+        <tr>
+            <td><strong>AI Skill-Based</strong></td>
+            <td>Like Skill-Based, but the AI reads the ticket and decides which skills it needs. Falls back when AI is off or not confident. See <a href="/admin/docs/ai">AI Classification</a>.</td>
         </tr>
         <tr>
             <td><strong>First Available</strong></td>
-            <td>Pick a group member who currently has the app open in a browser — i.e. their heartbeat has fired in the last ~2 minutes (least-loaded among them). Background tabs and minimized windows still count, since the heartbeat keeps running and the window is wide enough to absorb the browser's background-timer throttling. The live list is at <a href="/admin/users/online">Admin → Settings → Users &amp; Access → Users → Who's Online</a>. Good for shift / follow-the-sun coverage. Falls back when nobody is online.</td>
-        </tr>
-        <tr>
-            <td><strong>AI Skill-Based</strong> <span class="badge bg-primary ms-1">new</span></td>
-            <td>Same as Skill-Based, but instead of reading the ticket type's required-skills, an LLM reads the ticket's actual subject + body and infers which skills it needs. See <a href="/admin/docs/ai">AI Classification</a> for setup. Confidential ticket types are never sent to the AI provider.</td>
+            <td>Pick a member who has the app open right now (least-loaded among them). Background tabs and minimised windows count. See <a href="/admin/docs/users">Online Presence</a> and <a href="/admin/users/online">Who's Online</a>.</td>
         </tr>
     </tbody>
 </table>
 </div>
+<p class="text-muted mt-3 mb-0"><strong>If no agent matches</strong>: when Skill-Based, AI Skill-Based or First Available find nobody, the group's fallback decides: <strong>Load-Based</strong> (default), <strong>Round Robin</strong> or <strong>Leave unassigned</strong>.</p>
 </div>
 </div>
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-arrow-down-circle text-primary me-2"></i>Fallback Behaviour</h5>
-<p class="text-muted mb-2">Skill-Based and First Available can both come up empty (no member has the required skills, or nobody is currently online). When that happens, the group's <strong>Fallback</strong> setting decides what to do next:</p>
-<ul class="text-muted mb-0">
-    <li><strong>Load-Based</strong> <span class="badge bg-secondary ms-1">default</span> — assign the least-loaded member of the group regardless of skill / availability.</li>
-    <li><strong>Round Robin</strong> — rotate through the group ignoring skill / availability.</li>
-    <li><strong>Leave Unassigned</strong> — fall through and let an agent pick it up manually.</li>
+<h5 class="fw-semibold mb-3"><i class="bi bi-tags text-primary me-2"></i>Skills &amp; Groups to Set Up</h5>
+<ul class="text-muted mb-2">
+    <li><strong>Agent Skills</strong> at <a href="/admin/skills">Settings &rarr; Organization &rarr; Agent Skills</a>, global or owned by a group (whose <a href="/admin/docs/users#group-managers">managers</a> can maintain them).</li>
+    <li><strong>Required skills</strong> on each <a href="/admin/types">ticket type</a>.</li>
+    <li>A <strong>Default Group</strong> on each ticket type: new tickets of that type land in that group.</li>
 </ul>
+<p class="text-muted mb-0">Each auto-assignment adds the timeline entry <code>Auto-assigned to NAME via STRATEGY</code>, and the normal "ticket assigned" emails go to the agent and the requester (subject to notification settings).</p>
 </div>
 </div>
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-tags text-primary me-2"></i>Skills &amp; Availability</h5>
-<p class="text-muted mb-2">Two pieces feed Skill-Based and First Available:</p>
-<ul class="text-muted mb-3">
-    <li><strong>Agent Skills</strong> are managed at <a href="/admin/skills"><strong>Admin → Settings → Agent Skills</strong></a>. Each skill has a name, description, and a <strong>scope</strong> — Global (admin-curated) or owned by a specific group. <a href="/admin/docs/users#group-managers">Group managers</a> can edit skills their group owns and assign them to teammates without admin involvement.</li>
-    <li><strong>Required skills per ticket type</strong> are configured on the <a href="/admin/types">Ticket Types</a> form. A ticket type can require zero, one, or several skills — Skill-Based assignment matches members who hold them <em>all</em>.</li>
-    <li><strong>Online presence</strong> drives First Available — anyone with the app open in a browser tab heartbeats every 30s, and anyone whose last heartbeat was within the last ~2 minutes is treated as online. The heartbeat keeps running while the tab is hidden / window is minimized (browsers throttle the timer in the background, which is exactly why the online window is 120s rather than 60s). There's no manual "available" toggle anymore (was removed in 2.21.0); just close the tab when you're off duty. Live list at <a href="/admin/users/online">Admin → Settings → Users &amp; Access → Users → Who's Online</a>.</li>
-</ul>
-<div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
-    Auto-assignment only fires when the ticket already has a group. Portal-created tickets inherit the group from <a href="/admin/types">Ticket Types → Default Group</a>, so make sure types you want auto-routed have a default group set.
-</div>
-</div>
-</div>
-
-<div class="card border-0 shadow-sm mb-4">
-<div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-clock-history text-primary me-2"></i>Audit &amp; Notifications</h5>
-<p class="text-muted mb-0">Every auto-assignment posts an internal timeline entry on the ticket reading <code>Auto-assigned to NAME via STRATEGY</code>. The standard "ticket assigned" emails go out to the chosen agent and to the requester (subject to each user's notification preferences).</p>
+<h5 class="fw-semibold mb-3"><i class="bi bi-shield-check text-success me-2"></i>The "No Group" Safety Net</h5>
+<p class="text-muted mb-2">No ticket is left without a group:</p>
+<ol class="text-muted mb-2">
+    <li>At creation the group is the one chosen, else the ticket type's Default Group, else the system <strong>Default Group</strong>, else the first group.</li>
+    <li>If AI and automations still leave it without one, it goes to the system Default Group with an internal timeline note.</li>
+    <li>The hourly stale-ticket job moves any remaining ungrouped open tickets into the Default Group and logs a warning.</li>
+</ol>
+<p class="text-muted mb-0">Set the Default Group at <a href="/admin/settings/ticket-routing"><strong>Settings &rarr; Organization &rarr; Ticket Routing</strong></a>. A good choice is a Triage / Service Desk group with Load-Based or First Available assignment, so the catch-all queue still reaches a person.</p>
 </div>
 </div>
 
 <h3 id="escalation-rules" class="fw-bold mt-5 mb-3">Escalation Rules</h3>
 
 <div class="card border-0 shadow-sm mb-4">
-<div class="card-header bg-white py-3">
-    <h5 class="fw-semibold mb-0"><i class="bi bi-alarm text-danger me-2"></i>Time-Based Escalation Rules</h5>
-</div>
 <div class="card-body p-4">
-<p class="text-muted mb-3">Escalation Rules are <strong>time-based</strong> rules that fire when a ticket has been in a particular state for too long — for example, when a customer hasn't replied for several days. They complement event-based Automations.</p>
-<p class="text-muted mb-2">Manage escalation rules at <a href="/admin/settings/escalations"><strong>Admin → Settings → Escalation Rules</strong></a>.</p>
-
-<h6 class="fw-semibold mt-3 mb-2">How Escalation Rules Work</h6>
-<ol class="text-muted mb-3">
-    <li>A background cron job runs <code>scripts/process-escalations.php</code> periodically (e.g. every hour).</li>
-    <li>Each active rule is evaluated against every open ticket.</li>
-    <li>If the ticket's conditions are met <em>and</em> the rule has not already fired for that ticket, the defined actions are executed.</li>
-    <li>A log entry is created so the same rule doesn't fire again for the same ticket.</li>
-</ol>
-
-<h6 class="fw-semibold mt-3 mb-2">Available Conditions</h6>
-<div class="table-responsive mb-3">
-<table class="table table-sm mb-0">
-    <thead class="table-light"><tr><th>Condition</th><th>Description</th></tr></thead>
-    <tbody class="text-muted">
-        <tr><td><strong>Hours in status</strong></td><td>The ticket has been in the specified status for at least N hours.</td></tr>
-        <tr><td><strong>Status is</strong></td><td>The ticket's current status matches a specific value (e.g. Waiting on Customer).</td></tr>
-        <tr><td><strong>Priority is</strong></td><td>Matches tickets of a given priority.</td></tr>
-        <tr><td><strong>Assigned to</strong></td><td>Matches tickets assigned to a specific agent (or unassigned).</td></tr>
-    </tbody>
-</table>
-</div>
-
-<h6 class="fw-semibold mt-3 mb-2">Available Actions</h6>
+<h5 class="fw-semibold mb-3"><i class="bi bi-alarm text-danger me-2"></i>Time-Based Escalation Rules</h5>
+<p class="text-muted mb-2">Escalation Rules act on open tickets that have been in a state for too long, e.g. "no update for 48 hours" or "SLA breached". Manage them at <a href="/admin/settings/escalations"><strong>Settings &rarr; Automation &rarr; Escalation Rules</strong></a> with <strong>Add Rule</strong>.</p>
 <ul class="text-muted mb-3">
-    <li><strong>Notify assigned agent</strong> — sends the assigned agent an escalation alert email with a link to the ticket.</li>
-    <li><strong>Notify ticket creator</strong> — sends the requester a customisable reminder email. This is the "Customer Reminder" template found under <a href="/admin/settings/email-templates"><strong>Admin → Settings → Email Templates</strong></a>.</li>
-    <li><strong>Set status</strong> — changes the ticket's status automatically.</li>
-    <li><strong>Set priority</strong> — bumps or lowers the priority.</li>
-    <li><strong>Assign to agent</strong> — reassigns the ticket to a specific agent.</li>
-    <li><strong>Add internal note</strong> — posts an internal note on the ticket documenting the escalation.</li>
+    <li>The <strong>Escalation Rules</strong> cron job evaluates every enabled rule, in order, every 15 minutes against tickets in Open, In Progress, Pending, Waiting on Customer or Waiting on Third Party (custom statuses aren't checked). <strong>Run Now</strong> on the page runs it immediately.</li>
+    <li>All conditions must match (AND). A rule with no conditions matches every one of those tickets.</li>
+    <li><strong>Re-fire cooldown</strong>: <code>0</code> fires once per ticket ever; a duration such as <code>12h</code> or <code>2d</code> lets it fire again after that gap (a bare number means hours).</li>
 </ul>
-
-<h6 class="fw-semibold mt-3 mb-2">Customer Reminder Example</h6>
-<p class="text-muted mb-0">To send an automatic follow-up when a customer hasn't replied for 3 days:</p>
-<ol class="text-muted mb-0">
-    <li>Create a new escalation rule and give it a descriptive name (e.g. "3-Day Customer Follow-Up").</li>
-    <li>Add condition: <strong>Status is</strong> → <em>Waiting on Customer</em>.</li>
-    <li>Add condition: <strong>Hours in status ≥</strong> <em>72</em>.</li>
-    <li>Add action: <strong>Notify ticket creator</strong>.</li>
-    <li>Save and activate the rule.</li>
+<div class="row g-3 mb-3">
+<div class="col-md-6">
+<h6 class="fw-semibold mb-2">Conditions</h6>
+<ul class="text-muted small mb-0">
+    <li><strong>SLA State</strong>: equals / not equals On Track, Warning, Breached</li>
+    <li><strong>Hours open (since created)</strong>: greater than N</li>
+    <li><strong>Hours since last update</strong>: greater than N</li>
+    <li><strong>Hours in current status</strong>: greater than N</li>
+    <li><strong>Is assigned</strong>: Yes / No</li>
+    <li><strong>Priority</strong>, <strong>Status</strong>: equals / not equals</li>
+    <li><strong>Group</strong>: equals / not equals / is empty / is not empty</li>
+</ul>
+</div>
+<div class="col-md-6">
+<h6 class="fw-semibold mb-2">Actions (run in order)</h6>
+<ul class="text-muted small mb-0">
+    <li><strong>Set priority</strong>, <strong>Set group</strong>, <strong>Set status</strong></li>
+    <li><strong>Assign to</strong> (or leave empty to unassign)</li>
+    <li><strong>Notify specific user</strong> / <strong>Notify assigned agent</strong>: sends the Escalation Alert email</li>
+    <li><strong>Send reminder email to customer</strong>: sends the Customer Reminder email to the requester</li>
+    <li><strong>Add internal note</strong></li>
+</ul>
+</div>
+</div>
+<h6 class="fw-semibold mt-3 mb-2">Example: 3-day customer follow-up</h6>
+<ol class="text-muted mb-3">
+    <li>Add a rule named "3-Day Customer Follow-Up".</li>
+    <li>Conditions: <strong>Status</strong> equals <em>Waiting on Customer</em>, and <strong>Hours in current status</strong> greater than <em>72</em>.</li>
+    <li>Action: <strong>Send reminder email to customer</strong>. Set the cooldown to <code>3d</code> to repeat every three days, or <code>0</code> for a single reminder.</li>
 </ol>
-<div class="alert alert-info small mt-3 mb-0"><i class="bi bi-info-circle me-2"></i>
-    The reminder email content can be customised at <a href="/admin/settings/email-templates" class="alert-link"><strong>Admin → Settings → Email Templates → Customer Reminder</strong></a>. Available tokens include <code>{{first_name}}</code>, <code>{{ticket_id}}</code>, and <code>{{subject}}</code>.
+<p class="text-muted mb-2">Reword the emails on the <strong>Escalation Alert</strong> and <strong>Customer Reminder</strong> tabs of <a href="/admin/settings/email-templates">Email Templates</a>.</p>
+<p class="text-muted mb-2"><strong>Notify</strong> actions also add the notified staff member as a watcher (except on confidential tickets), so they can open the ticket from the email even if it isn't in their group. Recipients who opted out of <em>Escalation alerts</em> aren't emailed.</p>
+<div class="alert alert-warning small mb-0"><i class="bi bi-exclamation-triangle me-2"></i>
+    A new rule acts on <em>every</em> open ticket that already matches, on its very next run. Before enabling a notify rule (especially one on SLA State), check how many tickets match, or use <a href="#cron-jobs" class="alert-link">Dry run</a> on the Cron Jobs page.
+</div>
+</div>
 </div>
 
-<h6 class="fw-semibold mt-4 mb-2">Watcher access for off-group recipients</h6>
-<p class="text-muted mb-0">When an escalation rule's <strong>Notify user</strong> or <strong>Notify assigned agent</strong> action targets someone outside the ticket's group, that user is automatically added to the ticket's watchers list. They can open the ticket from the email link without hitting a 403 — the same behaviour as the manual <a href="#escalation-paths">escalation paths</a>. Portal users are skipped (portal access uses a separate path).</p>
-</div>
-</div>
-
-<h3 id="escalation-paths" class="fw-bold mt-5 mb-3">Manual Escalation Paths</h3>
+<h3 id="escalation-paths" class="fw-bold mt-5 mb-3">Escalation Paths</h3>
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-arrow-up-right-circle text-danger me-2"></i>What They Are</h5>
-<p class="text-muted mb-2"><strong>Escalation Paths</strong> drive the red <strong>Escalate</strong> button on the ticket view. Each ticket type has its own ordered chain of agents (e.g. Tier 1 → Tier 2 → Manager). When someone clicks Escalate, the ticket reassigns to the next agent in the chain, the previous assignee stays on as a watcher, and the event is logged.</p>
-<p class="text-muted mb-0">This is distinct from the time-based <a href="#escalation-rules">Escalation Rules</a> above — paths fire on a button press, rules fire from cron. Use paths when you want a person to <em>decide</em> to escalate; use rules when you want the system to escalate automatically after time elapses.</p>
-</div>
-</div>
-
-<div class="card border-0 shadow-sm mb-4">
-<div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-list-ol text-primary me-2"></i>Configuring a Path</h5>
+<p class="text-muted mb-2">An <strong>Escalation Path</strong> is an ordered chain of people for a ticket type (e.g. Tier 1 &rarr; Tier 2 &rarr; Supervisor). It drives the red <strong>Escalate</strong> button: a person decides to escalate. Escalation Rules, by contrast, escalate automatically after time passes.</p>
 <ol class="text-muted mb-0">
-    <li>Go to <a href="/admin/settings/escalation-paths"><strong>Admin → Settings → Escalation Paths</strong></a>.</li>
-    <li>Pick a ticket type from the list.</li>
-    <li>Add agents to the chain in order. Each step is a single user (agent, power user, or admin) plus an optional label like "Tier 2 Lead".</li>
-    <li>Drag rows to reorder.</li>
-    <li>Save — the change is recorded in the audit log.</li>
+    <li>Go to <a href="/admin/settings/escalation-paths"><strong>Settings &rarr; Automation &rarr; Escalation Paths</strong></a> and pick a ticket type.</li>
+    <li>Add people in order (top row = Level 1), each with an optional label such as "Branch Supervisor". Drag rows to reorder.</li>
+    <li>Save. The change is audit-logged.</li>
 </ol>
 </div>
 </div>
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-play-fill text-primary me-2"></i>Who Can Click Escalate</h5>
-<ul class="text-muted mb-0">
-    <li><strong>Agents, power users, admins</strong> — see the Escalate button on every ticket they can access. Confirms in a modal before reassigning.</li>
-    <li><strong>Portal users (requesters)</strong> — see the Escalate button on tickets they themselves submitted. Useful when they feel the response has stalled. Owner check is enforced server-side; non-owners cannot escalate someone else's ticket.</li>
-</ul>
-</div>
-</div>
-
-<div class="card border-0 shadow-sm mb-4">
-<div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-eye-slash text-primary me-2"></i>When the Escalate Button Appears</h5>
-<p class="text-muted mb-2">The <strong>Escalate Button Visibility</strong> setting (at the top of <a href="/admin/settings/escalation-paths"><strong>Admin → Settings → Escalation Paths</strong></a>) controls when the button is offered, so you can reserve manual escalation for tickets that have actually fallen behind:</p>
+<h5 class="fw-semibold mb-3"><i class="bi bi-eye-slash text-primary me-2"></i>Who Sees the Escalate Button, and When</h5>
 <ul class="text-muted mb-2">
-    <li><strong>Always show</strong> <span class="badge bg-secondary ms-1">default</span> — the button appears on every ticket that has an escalation path.</li>
-    <li><strong>Only after SLA breach</strong> — the button stays hidden until the ticket's SLA timer has breached.</li>
+    <li><strong>Staff</strong> see it on tickets they can access. <strong>Requesters</strong> see it on tickets they submitted themselves (not on tickets they see through <?= e(label('location.singular', 'Location')) ?> Ticket Visibility).</li>
+    <li>It is hidden on tickets whose type has no path, and greyed out on closed or merged tickets and at the top of the chain.</li>
+    <li><strong>Escalate Button Visibility</strong> (top of the Escalation Paths page): <strong>Always show</strong> (default) or <strong>Only after SLA breach</strong>. The breach-only mode falls back to always showing the button when SLA tracking is off.</li>
 </ul>
-<p class="text-muted mb-0">The mode applies to both the agent and the requester (portal) Escalate buttons. If SLA tracking is turned off site-wide, the "breached only" mode falls back to always showing the button, so the action is never hidden permanently. The default is <strong>Always show</strong>, so existing installs are unchanged.</p>
 </div>
 </div>
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-skip-forward text-primary me-2"></i>Skipping the Current Assignee</h5>
-<p class="text-muted mb-0">If the current assignee already appears in the escalation path (say they <em>are</em> Tier 2), clicking Escalate skips ahead to the step <em>after</em> them rather than re-routing back to an earlier level. This prevents a ticket from looping inside the same tier.</p>
-</div>
-</div>
-
-<div class="card border-0 shadow-sm mb-4">
-<div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-bell text-primary me-2"></i>What Happens On Escalate</h5>
+<h5 class="fw-semibold mb-3"><i class="bi bi-bell text-primary me-2"></i>What Happens on Escalate</h5>
 <ul class="text-muted mb-0">
-    <li>Ticket is reassigned to the next agent in the chain.</li>
-    <li>The previous assignee is added as a <strong>watcher</strong> so they keep email visibility and can still open the ticket even if it leaves their group.</li>
-    <li>An entry is added to the <code>ticket_escalations</code> audit table with the from/to agents, step number, optional reason, and who clicked the button.</li>
-    <li>The new assignee receives the dedicated <strong>Ticket Escalated</strong> email template.</li>
-    <li>An <code>escalated</code> timeline entry shows on the ticket. The portal also shows an <strong>Escalated — Level N</strong> badge to the requester (see the <a href="/admin/docs/portal">Portal docs</a>).</li>
-    <li>The "Escalated to Me" agent dashboard card and ticket-list filter surface tickets currently at an escalation level.</li>
+    <li>A confirmation shows exactly who the ticket will go to (name, level and label) and asks for an optional reason.</li>
+    <li>The ticket is reassigned to the next person. If the current assignee is already on the path, it skips to the step after them, so a ticket never loops back down.</li>
+    <li>The previous assignee becomes a watcher, keeping access even if the ticket leaves their group.</li>
+    <li>The new assignee gets the <strong>Ticket Escalated</strong> email. The ticket shows its escalation level and an Escalation History card, and requesters see an <strong>Escalated &mdash; Level N</strong> badge.</li>
+    <li>Agents find tickets escalated to them via the <strong>Escalated to Me</strong> dashboard card and list filter.</li>
 </ul>
 </div>
 </div>
 
-<h3 id="stale-tickets" class="fw-bold mt-5 mb-3">Stale Ticket Notifications</h3>
+<h3 id="stale-tickets" class="fw-bold mt-5 mb-3">Stale Tickets</h3>
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-hourglass-split text-warning me-2"></i>What It Does</h5>
-<p class="text-muted mb-2">When a ticket has had <em>no</em> activity for longer than the configured threshold and is in a status that's still waiting on your team, OpenHelpDesk emails the assigned agent (or all group members if unassigned), optionally the manager(s) of the ticket's group, and reassures the requester that they haven't been forgotten.</p>
-<p class="text-muted mb-0">Tickets in <strong>Waiting on Customer</strong>, <strong>Waiting on Third Party</strong>, <strong>Resolved</strong>, or <strong>Closed</strong> are intentionally ignored — the clock only runs when the ball is in your court.</p>
+<p class="text-muted mb-2">When a ticket has had no update for longer than the threshold, the helpdesk emails the assigned agent (or the whole group if it's unassigned), optionally the group's managers, and reassures the requester that they haven't been forgotten. Each notification adds an internal <code>stale_notification_sent</code> entry to the timeline.</p>
+<p class="text-muted mb-0">Only tickets in <strong>Open</strong>, <strong>In Progress</strong> or <strong>Pending</strong> are checked. Waiting on Customer, Waiting on Third Party, closed statuses and custom statuses are ignored. Any update to the ticket restarts its clock.</p>
 </div>
 </div>
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-sliders text-primary me-2"></i>Configuration</h5>
-<p class="text-muted mb-2">Settings live at <a href="/admin/settings/stale-tickets"><strong>Admin → Settings → Stale Tickets</strong></a>:</p>
-<ul class="text-muted mb-0">
-    <li><strong>Stale threshold</strong> — how long a ticket can sit without an update before it counts as stale. Default <code>3d</code> (72 hours). Set to <code>0</code> to disable the feature globally. Accepts day/hour/minute durations (e.g. <code>3d</code>, <code>72h</code>, <code>1d 12h</code>) — see <a href="/admin/docs/sla#duration-units">Typing Durations</a>. When the ticket's type + priority match an <a href="/admin/settings/sla-policies">SLA policy</a>, only the days that policy's timer counts advance the stale clock — weekdays unticked on the policy, holidays excluded from SLA, and business-schedule closed days are skipped. Tickets with no matching policy count every day.</li>
-    <li><strong>Re-notify after</strong> — minimum gap between repeat stale notifications on the same ticket, so the same nag doesn't fire on every cron run. Default <code>24h</code>. Also accepts day/hour/minute durations.</li>
-    <li><strong>Coverage</strong> — <em>Retroactive</em> (default) evaluates every open ticket, including ones created before stale notifications were turned on; expect a burst of email on the first run if you have an old backlog. <em>New tickets only</em> stamps a cutoff timestamp when you save and only tickets created after it are ever eligible — the existing backlog stays quiet. Re-saving settings keeps the cutoff; switching to Retroactive and back stamps a new one.</li>
-    <li><strong>Notify the assigned agent</strong> — toggle on/off. When the ticket is unassigned, the email goes to every member of the ticket's group instead.</li>
-    <li><strong>Notify the group manager(s)</strong> — toggle on/off, <strong>off by default</strong>. Emails the people who manage the department a stale ticket belongs to: the members of the ticket's group ticked <strong>Manager</strong> under <a href="/admin/groups">Admin → Groups</a> → edit a group. A group can have several managers and they all get the email.
-        <ul class="mt-1">
-            <li><strong>Which group gets used.</strong> Every ticket belongs to one group, and it starts out as the <strong>Default Group</strong> of the ticket's type — set per type at <a href="/admin/types">Admin → Ticket Types</a> → edit a type → <em>Default Group</em>. OpenHelpDesk keeps a ticket's group and type in step in both directions: re-type a ticket and it moves into the new type's group, and move a ticket into a group that isn't its type's default and the type is cleared to <em>Not Set</em>. So in normal use "the ticket's group" and "the type's Default Group" are the same thing.</li>
-            <li><strong>Why the wording says "the ticket's" group.</strong> The alert follows the ticket, not the type — a ticket an agent has moved into another group notifies <em>that</em> group's manager, which is the team actually holding it. Only a ticket carrying no group at all has to fall back to its type's Default Group; that's a safety net for strays, which the same cron job also repairs.</li>
-            <li><strong>No duplicates.</strong> A manager who already received the agent alert above — which happens when the ticket is unassigned and the whole group is emailed — is not mailed twice.</li>
-            <li><strong>Gaps are surfaced.</strong> The settings page lists any ticket types that would reach nobody because they have no Default Group, or their group has no member ticked Manager.</li>
-        </ul>
-    </li>
-    <li><strong>Notify the requester</strong> — toggle on/off for the "we haven't forgotten you" email.</li>
+<p class="text-muted mb-2">At <a href="/admin/settings/stale-tickets"><strong>Settings &rarr; Automation &rarr; Stale Tickets</strong></a>:</p>
+<ul class="text-muted mb-3">
+    <li><strong>Stale threshold</strong> (default <code>3d</code>): how long without an update before a ticket is stale. Accepts <a href="/admin/docs/sla#duration-units">durations</a> like <code>3d</code> or <code>72h</code>. When the ticket's type and priority match an SLA policy, only that policy's <a href="/admin/docs/sla#counted-days">counted days</a> advance the clock (holidays and closed days are skipped), so <code>3d</code> means three counted days. Tickets without a matching policy count every day.</li>
+    <li><strong>Re-notify after</strong> (default <code>1d</code>): the minimum gap before the same ticket is reported again.</li>
+    <li><strong>Coverage</strong>: <em>Retroactive</em> (default) checks every open ticket, so the first run can email about your whole backlog. <em>New tickets only</em> stamps a cutoff when you save and ignores everything older. Re-saving keeps the cutoff; switching to Retroactive and back stamps a new one.</li>
+    <li><strong>Email notifications</strong>: <em>Notify the assigned agent</em>, <em>Notify the group manager(s) for the ticket's type</em> (off by default) and <em>Send the requester a "we haven't forgotten you" update</em>. These are the same switches as the stale rows on <a href="/admin/settings/email-notifications">Email Notifications</a>. To stop stale emails entirely, turn all three off.</li>
 </ul>
-<h6 class="fw-semibold mt-3 mb-2">Per-Type Overrides (editable inline)</h6>
-<p class="text-muted mb-2">The <strong>Per-Type Overrides</strong> table on the same Stale Tickets settings page lets you set a different threshold for each ticket type without leaving for the Ticket Types editor — each type has a threshold field you edit and save right there. Saving records each change in the <a href="/admin/audit-log">audit log</a>.</p>
-<ul class="text-muted mb-0">
-    <li>Leave a type's field <strong>blank</strong> to fall back to the global threshold.</li>
-    <li>Set it to <code>0</code> to <strong>disable</strong> stale detection for that type only.</li>
-    <li>The same day/hour/minute duration formats apply here too.</li>
+<h6 class="fw-semibold mb-2">Manager alerts</h6>
+<ul class="text-muted mb-3">
+    <li>Go to everyone ticked <strong>Manager</strong> on the ticket's group (<a href="/admin/groups">Groups</a> &rarr; edit). The ticket's group normally is its type's <strong>Default Group</strong>, because re-typing a ticket moves it into the new type's group. A ticket moved to another group alerts that group's managers instead.</li>
+    <li>Managers who already got the agent email (unassigned ticket, whole group emailed) aren't emailed twice.</li>
+    <li>The settings page lists ticket types whose alerts would reach nobody (no Default Group, or no Manager in it).</li>
 </ul>
+<h6 class="fw-semibold mb-2">Per-Type Overrides</h6>
+<p class="text-muted mb-0">The <strong>Per-Type Overrides</strong> table sets a different threshold for any ticket type. Leave a field blank to use the global threshold. Changes are audit-logged. Reword the emails on the three <strong>Stale</strong> tabs of <a href="/admin/settings/email-templates">Email Templates</a>.</p>
 </div>
 </div>
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-terminal text-primary me-2"></i>Cron Setup</h5>
-<p class="text-muted mb-2">The stale notifier runs on the same cron pattern as the other background jobs. Add this to your server's crontab so it runs hourly:</p>
-<code class="d-block bg-light border rounded p-2 small user-select-all mb-3">0 * * * * php /path/to/app/scripts/process-stale-tickets.php &gt;&gt; /path/to/app/storage/logs/stale-tickets.log 2&gt;&amp;1</code>
-<p class="text-muted mb-0">A <strong>Run Now</strong> button on the settings page executes the processor immediately — useful when you change the threshold and want to see the effect without waiting an hour. Each run streams its log lines to <code>storage/logs/stale-tickets.log</code> so you can verify it ran.</p>
+<h5 class="fw-semibold mb-3"><i class="bi bi-terminal text-primary me-2"></i>Running It</h5>
+<p class="text-muted mb-2">The <strong>Stale Ticket Notifications</strong> cron job runs hourly (command on <a href="/admin/settings/cron-jobs">Cron Jobs</a>). <strong>Run Now</strong> on the settings page runs it immediately, for real. Output goes to <code>storage/logs/stale-tickets.log</code>.</p>
+<div class="alert alert-warning small mb-0"><i class="bi bi-exclamation-triangle me-2"></i>
+    On an established helpdesk, use <strong>Dry run</strong> on the Cron Jobs page before the first live run to see how many emails it would send, or choose <em>New tickets only</em> coverage.
 </div>
-</div>
-
-<div class="card border-0 shadow-sm mb-4">
-<div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-shield-check text-primary me-2"></i>De-Duplication</h5>
-<p class="text-muted mb-0">Each notification posts an internal <code>stale_notification_sent</code> timeline entry. The processor checks the timeline before sending: if a stale notification was already sent within the re-notify window, the ticket is skipped this run. Replying to or updating the ticket clears its staleness automatically (the threshold is measured from <code>updated_at</code>).</p>
 </div>
 </div>
 
@@ -401,82 +287,111 @@ For step-by-step diagrams of every strategy, the master flow that runs on every 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-person-x text-primary me-2"></i>What It Does</h5>
-<p class="text-muted mb-2">Solves the "single-person group" problem: when the only agent in a group goes on vacation, their unanswered tickets would otherwise sit untouched until they return. A background job reads each group member's Outlook <strong>automatic-replies (out-of-office)</strong> state via the Microsoft Graph API, then for each active ticket whose responsible agent is away it either:</p>
+<p class="text-muted mb-2">When an agent turns on their Outlook automatic replies, their tickets shouldn't sit untouched. A background job reads each group member's out-of-office state through Microsoft Graph. For each active ticket whose agent is away, it either:</p>
 <ul class="text-muted mb-2">
-    <li><strong>Reassigns</strong> the ticket to an available (not-away) member of the same group; or</li>
-    <li><strong>Auto-replies the requester</strong> once with the agent's out-of-office message when there is nobody to reassign to — i.e. a single-person group, or a group where everyone is away — leaving the ticket open.</li>
+    <li><strong>Reassigns</strong> the ticket to an available member of the same group; or</li>
+    <li><strong>Auto-replies to the requester</strong> once, with the agent's out-of-office message, when there is nobody to reassign to (a one-person group, or everyone away). The ticket stays open.</li>
 </ul>
-<p class="text-muted mb-0">Configure it at <a href="/admin/settings/oof"><strong>Admin → Settings → Out of Office</strong></a>.</p>
-<div class="alert alert-info small mt-3 mb-0"><i class="bi bi-info-circle me-2"></i>
-    OOF coverage only ever acts on a ticket whose work is actually blocked by an absence. It never touches the general unassigned queue when a free group member exists — normal <a href="#group-auto-assign" class="alert-link">Group Auto-Assignment</a> owns that.
-</div>
+<p class="text-muted mb-0">An unassigned ticket is only picked up when <em>every</em> member of its group is away; otherwise normal <a href="#group-auto-assign">auto-assignment</a> handles it. Configure everything at <a href="/admin/settings/oof"><strong>Settings &rarr; Automation &rarr; Out of Office</strong></a>, and see the <a href="/admin/settings/oof/help">Out of Office Setup Guide</a>.</p>
 </div>
 </div>
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-key text-primary me-2"></i>Prerequisites</h5>
-<ol class="text-muted mb-0">
-    <li>Microsoft Graph must be configured (Tenant ID, Client ID, Client Secret) — the <strong>same Azure app registration</strong> used for inbound email. No second app is needed.</li>
-    <li>That app needs the <code>MailboxSettings.Read</code> <strong>application</strong> permission, with admin consent granted. See <a href="/admin/settings/oof/help">the OOF setup guide</a> and the Graph app-registration steps in the <a href="/admin/settings/email-reply-help">inbound-email setup guide</a>.</li>
-    <li>The <strong>Out-of-Office Coverage</strong> cron job must be scheduled (see below).</li>
-    <li>Agents set their out-of-office in Outlook as usual. Use the <strong>"Outside my organization"</strong> message — that is the text requesters receive.</li>
+<ol class="text-muted mb-2">
+    <li>Microsoft Graph configured for inbound email (Tenant ID, Client ID, Client Secret). The same app registration is reused.</li>
+    <li>The <code>MailboxSettings.Read</code> <strong>application</strong> permission on that app, with admin consent (see the <a href="/admin/settings/email-reply-help">Email Reply Setup Guide</a>).</li>
+    <li>The <strong>Out-of-Office Coverage</strong> cron job scheduled every 15 minutes.</li>
+    <li>Agents set automatic replies in Outlook as usual. The <strong>"Outside my organization"</strong> message is the one requesters receive.</li>
 </ol>
-<div class="alert alert-warning small mt-3 mb-0"><i class="bi bi-exclamation-triangle me-2"></i>
-    A missing or unconsented <code>MailboxSettings.Read</code> grant shows up as <strong>HTTP 403</strong> in the log for every agent. Grant admin consent on the correct app registration (the one whose Client ID is in Settings) and re-run. An agent whose email has no Exchange Online mailbox (unlicensed, on-prem, alias, or a test account) returns <strong>HTTP 404</strong> and is quietly skipped.
+<div class="alert alert-warning small mb-0"><i class="bi bi-exclamation-triangle me-2"></i>
+    A missing or unconsented <code>MailboxSettings.Read</code> grant shows as <strong>HTTP 403</strong> for every agent in <code>storage/logs/oof-coverage.log</code>. Agents with no Exchange Online mailbox return <strong>HTTP 404</strong> and are skipped quietly.
 </div>
 </div>
 </div>
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-diagram-3 text-primary me-2"></i>Behaviour When an Agent Is Away</h5>
-<div class="table-responsive mb-0">
+<h5 class="fw-semibold mb-3"><i class="bi bi-sliders text-primary me-2"></i>Settings</h5>
+<ul class="text-muted mb-2">
+    <li><strong>Enable out-of-office coverage</strong>: the master switch.</li>
+    <li><strong>When an agent is out of office</strong>: <em>Reassign if possible, otherwise auto-reply</em> (recommended), <em>Reassign only</em> (one-person groups are left alone), or <em>Auto-reply only</em> (never moves tickets).</li>
+    <li><strong>Which tickets to act on</strong>: <em>Unanswered tickets only</em> (recommended; conversations already under way aren't disturbed) or <em>All active tickets</em>.</li>
+    <li><strong>Auto-reply message</strong>: two messages, <em>When the agent has a return date</em> (tokens <code>{requester_name}</code>, <code>{ticket_id}</code>, <code>{agent_name}</code>, <code>{return_date}</code>) and <em>When the agent has no return date</em> (same tokens without <code>{return_date}</code>). Leave blank to use the defaults. The agent's own Outlook message is appended when present.</li>
+</ul>
+<p class="text-muted mb-2">The auto-reply is posted as a public reply and emailed to the requester <strong>once</strong> per ticket (a later absence won't trigger a second auto-reply on the same ticket). A return date is used only when the agent scheduled their out-of-office with an end time. Replies switched on with no end date count as "away until switched off".</p>
+<p class="text-muted mb-0">The <strong>Current agent status</strong> table shows each member's last-read state. Changing settings needs <strong>Manage automations &amp; escalations</strong>; the grantable <strong>View out-of-office status</strong> permission lets other levels (e.g. Power Users) open the page read-only to see who is away.</p>
+</div>
+</div>
+
+<h3 id="recurring-tickets" class="fw-bold mt-5 mb-3">Recurring Tickets</h3>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-arrow-clockwise text-primary me-2"></i>Scheduled Ticket Creation</h5>
+<p class="text-muted mb-2">Create tickets on a schedule for preventive maintenance and routine checks (monthly toner audit, quarterly HVAC service, annual fire inspection). Manage schedules at <a href="/admin/recurring-tickets"><strong>Settings &rarr; Automation &rarr; Recurring Tickets</strong></a> (needs <strong>Manage recurring tickets</strong>) with <strong>New Recurring Ticket</strong>:</p>
+<ul class="text-muted mb-2">
+    <li><strong>Schedule</strong>: an internal name and notes, a <strong>Frequency</strong> (Daily, Weekly, Monthly, Yearly or Custom every N days), an interval (e.g. 3 &times; Monthly = quarterly), a <strong>Start Date</strong>, and optional day-of-week, day-of-month and month anchors. A plain-language summary updates as you type.</li>
+    <li><strong>Ticket</strong>: subject, description, type, priority, <?= e(strtolower(label('location.singular', 'location'))) ?>, group (or auto-route), assignee (or auto-assign), a due date set N days after creation, and <strong>Filed As (Requester)</strong>.</li>
+</ul>
+<ul class="text-muted mb-0">
+    <li>Tickets are created at 06:00 on the scheduled day. Days past the end of a month use the last day.</li>
+    <li>Created tickets go through the normal steps (AI, automations, auto-assignment, SLA, notifications) and show "Ticket auto-created by recurring schedule".</li>
+    <li>If the cron job misses a run, the schedule fires once when it catches up; missed dates aren't back-filled. A schedule whose requester has been deleted switches itself off.</li>
+    <li>The list shows next run (red if overdue), last run (linked to the ticket created) and run count, with an On/Off toggle and <strong>Run now</strong>, which creates a ticket immediately without changing the schedule.</li>
+    <li>Needs the <strong>Recurring Tickets</strong> cron job (every 15 minutes).</li>
+</ul>
+</div>
+</div>
+
+<h3 id="scheduled-reports" class="fw-bold mt-5 mb-3">Scheduled Reports</h3>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-calendar-check text-primary me-2"></i>Emailing Reports on a Schedule</h5>
+<p class="text-muted mb-2"><a href="/admin/settings/scheduled-reports"><strong>Settings &rarr; Automation &rarr; Scheduled Reports</strong></a> emails a report summary to a list of recipients. Anyone who can view reports can schedule them, from this page (<strong>Add Schedule</strong>) or with the <strong>Schedule</strong> button on a report page.</p>
+<ul class="text-muted mb-0">
+    <li>Each schedule has a name, a <strong>Report Type</strong>, <strong>Enabled</strong>, a <strong>Frequency</strong> (Daily, Weekly or Monthly) with a <strong>Send Day</strong>, and a <strong>Report Date Range</strong> (how many days the email covers).</li>
+    <li>Type recipients as chips (Enter, comma or space adds one; <strong>Add me</strong> adds you). Invalid addresses turn red and block saving.</li>
+    <li>Schedules belong to their creator. People see and edit only their own; admins see all, with a <strong>Created By</strong> column.</li>
+    <li>Each email says which schedule sent it and who set it up. Sending needs the <strong>Scheduled Reports</strong> cron job (every 30 minutes).</li>
+</ul>
+</div>
+</div>
+
+<h3 id="cron-jobs" class="fw-bold mt-5 mb-3">Cron Jobs</h3>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-clock-history text-primary me-2"></i>Background Jobs</h5>
+<p class="text-muted mb-2">Time-based features run from your server's scheduler (cron on Linux/macOS, Task Scheduler on Windows). <a href="/admin/settings/cron-jobs"><strong>Settings &rarr; Automation &rarr; Cron Jobs</strong></a> shows ready-to-copy commands for this server (with a Linux / Windows toggle) and each job's status: <span class="badge bg-success">Running</span> if its log was written within twice its interval, <span class="badge bg-warning text-dark">Stale</span> if older, <span class="badge bg-light text-muted border">Not configured</span> if it has never run.</p>
+<div class="table-responsive mb-3">
 <table class="table table-sm mb-0">
-    <thead class="table-light"><tr><th style="width:200px;">Mode</th><th>Behaviour</th></tr></thead>
+    <thead class="table-light"><tr><th>Job</th><th>Schedule</th><th>Needed for</th></tr></thead>
     <tbody class="text-muted">
-        <tr>
-            <td><strong>Reassign, else auto-reply</strong> <span class="badge bg-secondary ms-1">recommended</span></td>
-            <td>Hand the ticket to an available group member (least-loaded). Only auto-reply the requester when there is nobody to reassign to.</td>
-        </tr>
-        <tr><td><strong>Reassign only</strong></td><td>Move tickets to an available member, but never auto-reply. Single-person-group tickets are left untouched.</td></tr>
-        <tr><td><strong>Auto-reply only</strong></td><td>Never move tickets between agents; just let the requester know their agent is away.</td></tr>
+        <tr><td><strong>SLA Recalculation</strong> <span class="badge bg-danger ms-1">Required</span></td><td>Every 5 min</td><td>SLA warnings and breaches, follow-up reminders</td></tr>
+        <tr><td><strong>Inbound Email Replies</strong></td><td>Every 5 min</td><td>Reply by email, email-to-ticket</td></tr>
+        <tr><td><strong>Escalation Rules</strong></td><td>Every 15 min</td><td><a href="#escalation-rules">Escalation rules</a></td></tr>
+        <tr><td><strong>Recurring / Preventive-Maintenance Tickets</strong></td><td>Every 15 min</td><td><a href="#recurring-tickets">Recurring tickets</a></td></tr>
+        <tr><td><strong>Out-of-Office Coverage</strong></td><td>Every 15 min</td><td><a href="#oof-coverage">Out-of-office coverage</a></td></tr>
+        <tr><td><strong>Scheduled Reports</strong></td><td>Every 30 min</td><td><a href="#scheduled-reports">Scheduled reports</a></td></tr>
+        <tr><td><strong>Stale Ticket Notifications</strong></td><td>Hourly</td><td><a href="#stale-tickets">Stale tickets</a>, the no-group sweep</td></tr>
+        <tr><td><strong>App Secret Expiry Reminders</strong></td><td>Daily, 08:00</td><td>Graph client-secret expiry emails</td></tr>
     </tbody>
 </table>
 </div>
-<p class="text-muted mt-3 mb-0"><strong>Scope</strong> — choose <strong>Unanswered tickets only</strong> (the default; only tickets with no agent reply yet, so conversations in progress aren't disturbed) or <strong>All active tickets</strong>.</p>
-</div>
-</div>
-
-<div class="card border-0 shadow-sm mb-4">
-<div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-chat-left-text text-primary me-2"></i>Auto-Reply Messages</h5>
-<p class="text-muted mb-2">Two independently-editable messages are sent to the requester depending on whether the agent set a return date:</p>
+<h6 class="fw-semibold mb-2">Running a job by hand</h6>
 <ul class="text-muted mb-2">
-    <li><strong>With a return date</strong> — used when the agent scheduled their out-of-office with an end date. Tokens: <code>{requester_name}</code>, <code>{ticket_id}</code>, <code>{agent_name}</code>, <code>{return_date}</code>.</li>
-    <li><strong>No return date</strong> — used when the agent simply turned automatic replies on without a time range, so there is no date to promise. Same tokens <em>except</em> <code>{return_date}</code>.</li>
+    <li><strong>Dry run</strong> runs the real job but rolls back every database change and lists the emails it <em>would</em> send (<code>WOULD EMAIL &hellip;</code>). It's safe at any time. For Inbound Email Replies it reads the mailbox without marking anything read.</li>
+    <li><strong>Run for real</strong> (in the job's dropdown) always asks for confirmation. Jobs that send email also make you tick an acknowledgement, and the dialog shows whether outbound mail is on.</li>
+    <li>Output appears in a pop-up. Every manual run is recorded in <code>storage/logs/cron-manual-runs.log</code> (who, which job, dry or live, result, duration).</li>
+    <li>A job never runs twice at once: if the scheduled copy is running, a manual run steps aside and says so.</li>
+    <li>If the buttons are disabled, the page says why. Usually no PHP command-line binary was found; set <code>PHP_CLI_BINARY</code> in <code>.env</code> to its full path.</li>
 </ul>
-<p class="text-muted mb-0">Leave either blank to use its built-in default. The agent's own Outlook out-of-office message is appended below whichever message is used, when present. The reply is posted as a public reply on the ticket and emailed to the requester <strong>once</strong> — a per-ticket stamp prevents it firing twice for the same absence.</p>
-<div class="alert alert-info small mt-3 mb-0"><i class="bi bi-info-circle me-2"></i>
-    <strong>No return date?</strong> An agent who toggles automatic replies on without a time range is treated as out of office <em>indefinitely</em> until they turn it off — there is no end date, so the "no return date" message is used and the agent stays flagged until the next run after they disable OOF. Remind staff to turn automatic replies off when they return.
+<div class="alert alert-warning small mb-0"><i class="bi bi-exclamation-triangle me-2"></i>
+    Before scheduling an email-sending job for the first time on a helpdesk with existing tickets, <strong>Dry run</strong> it and read the list of emails. Stale tickets, escalation rules and similar jobs act on the whole backlog on their first run.
 </div>
-</div>
-</div>
-
-<div class="card border-0 shadow-sm mb-4">
-<div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-people text-primary me-2"></i>Read-Only Access for Non-Managers</h5>
-<p class="text-muted mb-2">Changing coverage settings requires the <strong>Manage automations &amp; escalations</strong> permission. A separate, grantable <strong>View out-of-office status</strong> (<code>oof.view</code>) permission lets other roles — e.g. Power Users — open the page to see <em>who is currently away</em> without being able to change anything (the configuration form is hidden for them).</p>
-<p class="text-muted mb-0">Assign it at <a href="/admin/roles"><strong>Admin → Settings → Permission Levels</strong></a>, under the <em>Automation</em> category.</p>
-</div>
-</div>
-
-<div class="card border-0 shadow-sm mb-4">
-<div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-terminal text-primary me-2"></i>Cron Setup</h5>
-<p class="text-muted mb-2">Schedule the processor (every 15 minutes is recommended). It refreshes the cached out-of-office state and acts on tickets in one pass:</p>
-<code class="d-block bg-light border rounded p-2 small user-select-all mb-3">*/15 * * * * php /path/to/app/scripts/process-oof-coverage.php &gt;&gt; /path/to/app/storage/logs/oof-coverage.log 2&gt;&amp;1</code>
-<p class="text-muted mb-0">The exact command for your platform is on the <a href="/admin/settings/cron-jobs">Cron Jobs</a> page. The job is missed-tick safe — it acts on current state each run and never auto-replies the same ticket twice. The <strong>Current agent status</strong> table on the settings page shows each member's last-read out-of-office state.</p>
 </div>
 </div>
 

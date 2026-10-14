@@ -1,14 +1,19 @@
 <?php
 $agentHelpNav = [
     ['url' => '/agent/help',                  'label' => 'Overview',             'icon' => 'bi-house'],
-    ['url' => '/agent/help/dashboard',        'label' => 'Dashboard',            'icon' => 'bi-speedometer2'],
+    ['url' => '/agent/help/dashboard',        'label' => 'Dashboard & Getting Around', 'icon' => 'bi-speedometer2'],
     ['url' => '/agent/help/wallboard',        'label' => 'Live Wallboard',       'icon' => 'bi-display'],
     ['url' => '/agent/help/ticket-list',      'label' => 'Ticket List & Filters','icon' => 'bi-list-ul'],
     ['url' => '/agent/help/kanban',           'label' => 'Kanban Board',         'icon' => 'bi-kanban'],
+    ['url' => '/agent/help/creating-tickets', 'label' => 'Creating Tickets',     'icon' => 'bi-plus-square'],
     ['url' => '/agent/help/working-tickets',  'label' => 'Working on Tickets',   'icon' => 'bi-ticket-detailed'],
     ['url' => '/agent/help/sla',              'label' => 'SLAs & Response Times','icon' => 'bi-stopwatch'],
     ['url' => '/agent/help/floor',            'label' => 'Floor Mode',           'icon' => 'bi-grid-1x2'],
     ['url' => '/agent/help/canned-responses', 'label' => 'Canned Responses',     'icon' => 'bi-chat-square-text'],
+    ['url' => '/agent/help/knowledge-base',   'label' => 'Knowledge Base',       'icon' => 'bi-book'],
+    ['url' => '/agent/help/profile',          'label' => 'Profile & Notifications', 'icon' => 'bi-person-gear'],
+    ['url' => '/agent/help/status-banners',   'label' => 'Status Banners',       'icon' => 'bi-megaphone'],
+    ['url' => '/agent/help/manager-tools',    'label' => 'Manager Tools',        'icon' => 'bi-stars'],
 ];
 $cp = currentPath();
 ?>

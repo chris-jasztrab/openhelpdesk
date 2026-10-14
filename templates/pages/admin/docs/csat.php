@@ -9,10 +9,10 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="col-lg-9">
 
 <h2 class="fw-bold mb-1">Satisfaction Surveys (CSAT)</h2>
-<p class="text-muted mb-4">Automatically email a rating request when a ticket is resolved or closed. You can use the built-in 1&ndash;5 star page or link recipients to an external survey tool (HappyOrNot, SurveyGizmo / Alchemer, Jotform, Typeform, Microsoft Forms, Google Forms, etc.). Results &mdash; from either mode &mdash; now appear <strong>right on the ticket</strong>, and external tools can push responses back through a signed <a href="#webhook">webhook</a> so they land in your reports just like built-in ratings.</p>
+<p class="text-muted mb-4">Email a rating request automatically when a ticket is resolved or closed. Use the built-in five-point rating page, or send recipients to an external survey tool such as HappyOrNot, SurveyGizmo / Alchemer, Jotform, Typeform, Microsoft Forms or Google Forms. Results from either mode appear <strong>on the ticket itself</strong>. External tools can send responses back through a signed <a href="#webhook">webhook</a>, so they count in your reports just like built-in ratings.</p>
 
 <div class="alert alert-info small mb-4"><i class="bi bi-info-circle me-2"></i>
-    Configure everything described here at <a href="/admin/settings/csat"><strong>Admin &rarr; Settings &rarr; CSAT Surveys</strong></a>. View collected results at <a href="/admin/reports/csat"><strong>Admin &rarr; Settings &rarr; Reports &rarr; Satisfaction</strong></a>.
+    Configure surveys at <a href="/admin/settings/csat"><strong>Settings &rarr; Customization &rarr; CSAT Surveys</strong></a>, which needs the <strong>Manage CSAT surveys</strong> permission. Results are at <a href="/admin/reports/csat"><strong>Settings &rarr; Reports &rarr; Satisfaction</strong></a>.
 </div>
 
 <div class="card border-0 shadow-sm mb-4">
@@ -22,7 +22,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
     <li><a href="#sending">How and when a survey is sent</a></li>
     <li><a href="#modes">Survey type: Built-in vs. External</a></li>
     <li><a href="#placeholders">External URL placeholders</a> &mdash; passing the ticket through to your survey tool</li>
-    <li><a href="#on-ticket">Results on the ticket</a> &mdash; the new Satisfaction panel</li>
+    <li><a href="#on-ticket">Results on the ticket</a> &mdash; the Satisfaction Survey panel</li>
     <li><a href="#webhook"><strong>External response webhook</strong></a> &mdash; full setup, signature, payload, examples, per-provider notes, troubleshooting</li>
     <li><a href="#reopen-button">The reopen button</a></li>
     <li><a href="#reports">Where the results show up</a> (reports)</li>
@@ -34,12 +34,18 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card border-0 shadow-sm mb-4" id="sending">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-send text-primary me-2"></i>How and when a survey is sent</h5>
-<p class="text-muted mb-2">When CSAT is enabled, the app watches for tickets reaching the <strong>trigger status</strong> (default <em>Resolved</em>, or you can switch to <em>Closed</em>). The moment a ticket lands on that status &mdash; whether the agent posted a public reply with a status change or used the quick-status modal &mdash; a survey email is queued to the ticket's <strong>requester</strong> (the user in <code>created_by</code>, not whoever submitted the ticket on their behalf).</p>
-<p class="text-muted mb-2"><strong>Guards that keep things sane:</strong></p>
+<p class="text-muted mb-2">With surveys enabled, a survey is emailed when a ticket reaches the <strong>trigger status</strong>: <em>Resolved</em> by default, or <em>Closed</em>. These are your default resolved and default closed statuses from Ticket Statuses, so renaming them doesn't break the trigger. It fires when the status is changed from the agent ticket page's Update Ticket panel, <em>Send &amp; set status</em> on a reply, the inline status menu on a ticket list, floor mode, or the API. The survey goes to the ticket's <strong>requester</strong>, not to a staff member who filed it on their behalf.</p>
+<p class="text-muted mb-2"><strong>The ticket page's Close menu:</strong></p>
+<ul class="text-muted mb-3">
+    <li><strong>Close</strong> and <em>Close and notify</em> follow the trigger rule above.</li>
+    <li><strong>Close and request feedback</strong> sends the survey whatever the trigger status is. The survey email then takes the place of the usual closed notice. The option is greyed out while surveys are switched off.</li>
+    <li>The other Close options (without notifying, as duplicate, won't fix, no response, merge, and so on) don't send a survey.</li>
+</ul>
+<p class="text-muted mb-2"><strong>Guards:</strong></p>
 <ul class="text-muted mb-0">
-    <li>Only <strong>one survey per ticket</strong> &mdash; if a ticket is re-resolved after being reopened, no duplicate email is sent.</li>
-    <li>The requester's <strong>"Send me satisfaction surveys"</strong> notification preference is respected. If they've turned it off in their profile, no email goes out.</li>
-    <li>If <strong>External</strong> mode is selected but the URL is blank, the send is skipped entirely (and doesn't burn the one-survey-per-ticket slot) so the misconfiguration is fixable.</li>
+    <li>Only <strong>one survey per ticket</strong>. A ticket resolved again after reopening gets no second email.</li>
+    <li>Requesters who switch off <strong>Satisfaction surveys</strong> on their My Profile page get no survey.</li>
+    <li>If <strong>External</strong> is selected but the URL is blank, nothing is sent and the ticket's one survey isn't used up. (The settings page won't let you save External without a URL.)</li>
 </ul>
 </div>
 </div>
@@ -53,8 +59,8 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
     <div class="col-md-6">
         <div class="border rounded p-3 h-100">
             <div class="fw-semibold mb-2"><i class="bi bi-star me-1 text-warning"></i>Built-in</div>
-            <p class="text-muted small mb-2">The rating button in the email opens a public page hosted by this app (no login required). Recipients pick 1&ndash;5 stars and can leave an optional comment.</p>
-            <p class="text-muted small mb-0"><strong>Results live in this app</strong> &mdash; visible on the Satisfaction report with average rating, response rate, distribution, and full per-ticket comments.</p>
+            <p class="text-muted small mb-2">The rating button in the email opens a page hosted by this app, with no sign-in needed. Recipients choose one of five faces, from <em>Terrible</em> (1) to <em>Excellent</em> (5), and can add a comment of up to 2,000 characters. The page also has a link to reopen the ticket.</p>
+            <p class="text-muted small mb-0"><strong>Results live in this app</strong>: the Satisfaction report shows the average rating, response rate, distribution and every comment.</p>
         </div>
     </div>
     <div class="col-md-6">
@@ -110,13 +116,12 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <h5 class="fw-semibold mb-3"><i class="bi bi-window-stack text-primary me-2"></i>Results on the ticket</h5>
 <p class="text-muted mb-2">Once a survey has been sent for a ticket, a <strong>Satisfaction Survey</strong> panel appears in the details column of both the <strong>agent</strong> and <strong>admin</strong> ticket views. It shows one of these states:</p>
 <ul class="text-muted mb-3">
-    <li><strong>Responded</strong> &mdash; the 1&ndash;5 star rating, the score (e.g. <em>4/5</em>), the requester's comment if they left one, and when they responded.</li>
+    <li><strong>Responded</strong> &mdash; the rating as 1&ndash;5 stars, the score (e.g. <em>4/5</em>), the requester's comment if they left one, and when they responded.</li>
     <li><strong>Awaiting response</strong> &mdash; &ldquo;Survey sent &lt;date&gt; &mdash; awaiting response.&rdquo; In External mode this also reminds you that ratings only land here if the webhook is wired up.</li>
     <li><strong>Reopened by requester</strong> &mdash; a badge appears if the recipient used the email's reopen button.</li>
 </ul>
-<p class="text-muted mb-2">The panel also has an <strong>Open survey</strong> button linking to the <em>exact</em> URL that was emailed &mdash; the built-in star page, or your external survey with its placeholders filled in &mdash; so you can see precisely what the requester received.</p>
-<p class="text-muted mb-2">When a rating lands (from the built-in page <em>or</em> the webhook), it's also written to the ticket timeline as an internal <strong>Satisfaction Rating</strong> entry, so it shows inline in the conversation. Internal entries are never visible to the requester.</p>
-<p class="text-muted mb-0 small"><i class="bi bi-info-circle text-primary me-1"></i> Tickets resolved before this feature shipped won't have the <em>Open survey</em> link (the link wasn't stored back then), but the rating / awaiting state still displays correctly.</p>
+<p class="text-muted mb-2">The panel also has an <strong>Open survey</strong> button linking to the <em>exact</em> URL that was emailed &mdash; the built-in rating page, or your external survey with its placeholders filled in &mdash; so you can see precisely what the requester received.</p>
+<p class="text-muted mb-0">Each rating, whether from the built-in page or the webhook, is also added to the ticket timeline as an internal entry ("Customer rated their experience 4/5…"), so it shows in the conversation. The requester never sees internal entries.</p>
 </div>
 </div>
 
@@ -307,7 +312,7 @@ await fetch('https://help.example.com/api/csat/webhook', {
         <div class="border rounded p-3 h-100">
             <div class="fw-semibold mb-2">Switch ON (default)</div>
             <p class="text-muted small mb-2">The email shows <strong>two buttons</strong>: a red <em>&ldquo;No, please reopen it&rdquo;</em> and a green <em>&ldquo;Yes, it was resolved!&rdquo;</em>.</p>
-            <p class="text-muted small mb-0">The reopen button always points back to this app (one click and the ticket flips back to Open with a timeline note). The rate button goes to either the built-in star page or your external URL, depending on the mode.</p>
+            <p class="text-muted small mb-0">The reopen button always points back to this app. It opens a <em>Reopen this ticket?</em> page, and only the requester's confirmation there reopens the ticket (status Open, with a timeline note). Email security scanners that pre-open links can't reopen tickets by accident. Once a rating has been recorded, the ticket can't be reopened this way. The rate button goes to the built-in rating page or your external URL, depending on the mode.</p>
         </div>
     </div>
     <div class="col-md-6">
@@ -327,7 +332,7 @@ await fetch('https://help.example.com/api/csat/webhook', {
 <h5 class="fw-semibold mb-3"><i class="bi bi-bar-chart text-primary me-2"></i>Where the results show up</h5>
 <p class="text-muted mb-2">The <a href="/admin/reports/csat"><strong>Settings &rarr; Reports &rarr; Satisfaction</strong></a> page is the same in both modes, but it shows different things:</p>
 <ul class="text-muted mb-3">
-    <li><strong>Built-in mode</strong> &mdash; full picture: surveys sent, responses, response rate, average rating, star distribution, and a table of every comment (linked to its ticket).</li>
+    <li><strong>Built-in mode</strong> &mdash; full picture: surveys sent, responses, response rate, average rating, rating distribution, and a table of every comment (linked to its ticket).</li>
     <li><strong>External mode <u>with</u> the webhook</strong> &mdash; the same full picture. Responses posted back via the <a href="#webhook">webhook</a> count toward response rate, average, distribution and comments just like built-in ratings.</li>
     <li><strong>External mode <u>without</u> the webhook</strong> &mdash; only the <em>Surveys Sent</em> count is meaningful; responses, average rating, etc. show as 0 because the ratings live only in your external system. A blue banner at the top of the report explains this.</li>
 </ul>
@@ -338,8 +343,8 @@ await fetch('https://help.example.com/api/csat/webhook', {
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-send-check text-primary me-2"></i>Sending a test survey</h5>
-<p class="text-muted mb-2">The <strong>Send a Test Survey</strong> form at the bottom of <a href="/admin/settings/csat">the CSAT settings page</a> uses the same logic as a real send, so you can preview the email end-to-end &mdash; including external URLs with placeholders substituted &mdash; before any real ticket triggers one.</p>
-<p class="text-muted mb-0">Test emails reuse the most recent ticket that doesn't already have a survey attached, so the placeholders show plausible values rather than dummy data.</p>
+<p class="text-muted mb-2">Use the <strong>Send a Test Survey</strong> card at the bottom of <a href="/admin/settings/csat">the CSAT settings page</a>: enter any address and click <strong>Send Test Survey</strong>. The email matches a real one, including external URLs with the placeholders filled in, and its links work.</p>
+<p class="text-muted mb-0">The test is attached to the most recent ticket that has no survey yet, so the placeholders show real values. That ticket then counts as surveyed. It won't get its own survey later, and the test shows up in <em>Surveys Sent</em>. On a live helpdesk, create a throwaway ticket first if that matters.</p>
 </div>
 </div>
 
@@ -353,7 +358,7 @@ await fetch('https://help.example.com/api/csat/webhook', {
         </thead>
         <tbody>
             <tr><td><strong>Enable CSAT surveys</strong></td><td>Master switch. Off = no survey emails ever go out, regardless of the other settings below.</td></tr>
-            <tr><td><strong>Send survey when ticket is</strong></td><td><em>Resolved</em> (default, recommended) or <em>Closed</em>. Picks the status that triggers the email.</td></tr>
+            <tr><td><strong>Send survey when ticket is</strong></td><td><em>Resolved</em> (default, recommended) or <em>Closed</em>: your default resolved or default closed status. <em>Close and request feedback</em> sends a survey regardless.</td></tr>
             <tr><td><strong>Survey type</strong></td><td><em>Built-in</em> (default) hosts the rating page in this app. <em>External</em> links to a URL you provide.</td></tr>
             <tr><td><strong>External survey URL</strong></td><td>Required when type is External. Supports <code>{ticket_id}</code>, <code>{token}</code>, <code>{user_email}</code>, <code>{first_name}</code>, <code>{last_name}</code>, <code>{user_name}</code>, <code>{subject}</code>.</td></tr>
             <tr><td><strong>External dashboard URL</strong></td><td>Optional. Surfaces as an <em>Open external dashboard</em> button on the Satisfaction report.</td></tr>

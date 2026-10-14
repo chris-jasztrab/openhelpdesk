@@ -79,7 +79,7 @@ $breadcrumbs  = [
         <span class="fw-semibold">Schedule the cron job</span>
     </div>
     <div class="card-body">
-        <p class="mb-2">Add the <strong>OOF Coverage</strong> job from the
+        <p class="mb-2">Add the <strong>Out-of-Office Coverage</strong> job from the
             <a href="/admin/settings/cron-jobs">Cron Jobs</a> page (recommended: every 15 minutes).
             Until it runs, no status is collected and no action is taken.</p>
         <p class="text-muted small mb-0">
@@ -97,8 +97,8 @@ $breadcrumbs  = [
     </div>
     <div class="card-body">
         <p class="mb-0">On the <a href="/admin/settings/oof">Out of Office</a> settings page, pick how to handle
-            away agents (reassign, reply, or both), choose the ticket scope, optionally customise the auto-reply
-            message, then switch the feature on.</p>
+            away agents (reassign, reply, or both), choose which tickets to act on, optionally customise the two auto-reply
+            messages, then tick <strong>Enable out-of-office coverage</strong> and click <strong>Save Settings</strong>.</p>
     </div>
 </div>
 

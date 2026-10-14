@@ -688,6 +688,7 @@ $router->post('/admin/onboarding/dismiss', function () {
 $validDocPages = [
     'getting-started', 'tickets', 'users', 'email',
     'sla', 'automations', 'flows', 'ai', 'branding', 'portal', 'csat', 'import', 'kb', 'sso', 'teams',
+    'reports', 'system',
 ];
 
 $router->get('/admin/docs', function () {
@@ -715,13 +716,15 @@ $router->get('/admin/docs/{page}', function (array $p) use ($validDocPages) {
         'automations'     => 'Automations',
         'flows'           => 'Assignment Flow Diagrams',
         'ai'              => 'AI Classification',
-        'branding'        => 'Branding',
+        'branding'        => 'Branding & Labels',
         'portal'          => 'Portal',
         'csat'            => 'Satisfaction Surveys',
-        'import'          => 'Importing Tickets',
+        'import'          => 'Importing Data',
         'kb'              => 'Knowledge Base',
         'sso'             => 'Single Sign-On',
         'teams'           => 'Microsoft Teams',
+        'reports'         => 'Reports',
+        'system'          => 'System & Maintenance',
     ];
     render('admin/docs/' . $page, [
         'sidebarItems' => adminSidebar('docs'),

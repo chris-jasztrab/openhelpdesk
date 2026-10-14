@@ -10,7 +10,7 @@ $breadcrumbs  = [
 ?>
 <div class="mb-4 d-flex align-items-center justify-content-between">
     <h2 class="fw-bold mb-0">Email Reply Setup Guide</h2>
-    <a href="/admin/settings#inbound-mail" class="btn btn-outline-secondary btn-sm">
+    <a href="/admin/settings#graph_enabled" class="btn btn-outline-secondary btn-sm">
         <i class="bi bi-arrow-left me-1"></i>Back to Settings
     </a>
 </div>
@@ -191,9 +191,13 @@ $breadcrumbs  = [
                     <td><strong>Client Secret</strong></td>
                     <td>The secret value you copied in Step 4</td>
                 </tr>
+                <tr>
+                    <td><strong>App Secret Expiry Date</strong></td>
+                    <td>The secret&rsquo;s expiry date from Certificates &amp; secrets. Admins are reminded 30 days, 7 days and on the day it expires.</td>
+                </tr>
             </tbody>
         </table>
-        <p class="mt-3 mb-0">Enable the <strong>Enable reply-by-email</strong> toggle and click <strong>Save Inbound Settings</strong>.</p>
+        <p class="mt-3 mb-0">Enable the <strong>Enable reply-by-email</strong> toggle and click <strong>Save Inbound Settings</strong>. To also turn new emails (not replies) into tickets, switch on <strong>Enable Email-to-Ticket</strong> on the same page.</p>
     </div>
 </div>
 
@@ -206,12 +210,8 @@ $breadcrumbs  = [
         </h5>
     </div>
     <div class="card-body p-4">
-        <p>Add the following entry to your server's crontab (<code>crontab -e</code>) to poll for new replies every 5 minutes:</p>
-        <code class="d-block bg-light border rounded p-3 user-select-all" style="word-break:break-all;">* /5 * * * * php <?= e(ROOT_DIR) ?>/scripts/process-replies.php &gt;&gt; <?= e(ROOT_DIR) ?>/storage/logs/graph-mail.log 2&gt;&amp;1</code>
-        <p class="text-muted small mt-2 mb-0">
-            <i class="bi bi-info-circle me-1"></i>Remove the space between <code>*</code> and <code>/5</code> when pasting into crontab.
-            The space is shown here to avoid a display issue.
-        </p>
+        <p>Schedule the <strong>Inbound Email Replies</strong> job to poll for new replies every 5 minutes. The <a href="/admin/settings/cron-jobs">Cron Jobs</a> page shows the exact command for this server (Linux or Windows). On Linux, add this to the crontab (<code>crontab -e</code>):</p>
+        <code class="d-block bg-light border rounded p-3 user-select-all" style="word-break:break-all;">*/5 * * * * php <?= e(ROOT_DIR) ?>/scripts/process-replies.php &gt;&gt; <?= e(ROOT_DIR) ?>/storage/logs/graph-mail.log 2&gt;&amp;1</code>
         <p class="mt-3 mb-0">The log file will be created automatically at <code><?= e(ROOT_DIR) ?>/storage/logs/graph-mail.log</code>.</p>
     </div>
 </div>
@@ -234,6 +234,9 @@ $breadcrumbs  = [
 
             <dt class="mb-1">Sender not a registered user</dt>
             <dd class="mb-3">Only users with accounts in OpenHelpDesk can post replies via email. The email address in OpenHelpDesk must match the From address of the reply exactly.</dd>
+
+            <dt class="mb-1">Ticket is closed, skipping reply</dt>
+            <dd class="mb-3">Replies to a Closed ticket are not added. An agent can reopen it by replying with <code>#open</code>, or close tickets with <em>Close and reopen on reply</em> so a requester's reply within the window reopens them.</dd>
 
             <dt class="mb-1">Reply body is empty after stripping quoted text</dt>
             <dd class="mb-0">The reply processor strips the quoted original email from the reply body. Make sure the user is replying <em>above</em> the quoted text, not below or replacing it.</dd>

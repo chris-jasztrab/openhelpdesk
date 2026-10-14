@@ -9,7 +9,7 @@ $breadcrumbs  = [['label'=>'Help','url'=>'/agent/help'],['label'=>'Live Wallboar
 <div class="col-lg-9">
 
 <h2 class="fw-bold mb-1">Live Wallboard</h2>
-<p class="text-muted mb-4">A real-time operations board you can put on a screen or keep open on your desk. It refreshes on its own, shows only the data you're allowed to see, and you choose which widgets appear, arrange them across independent columns, and size each one. Open it from <strong><i class="bi bi-display"></i> Wallboard</strong> in the left sidebar, or go to <a href="/agent/wallboard">/agent/wallboard</a>.</p>
+<p class="text-muted mb-4">A real-time operations board you can put on a screen or keep open on your desk. It refreshes on its own, shows only the data you're allowed to see, and you choose which widgets appear, arrange them across independent columns, and size each one. Open it from your account menu (your name, top-right) &rarr; <strong><i class="bi bi-display"></i> Wallboard</strong>, or go straight to the <a href="/agent/wallboard">Wallboard</a>.</p>
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
@@ -93,7 +93,7 @@ $breadcrumbs  = [['label'=>'Help','url'=>'/agent/help'],['label'=>'Live Wallboar
 <div class="card border-0 shadow-sm mb-4" id="visibility">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-shield-check text-primary me-2"></i>What data you see</h5>
-<p class="text-muted mb-0">The wallboard follows the <strong>same visibility rules as your ticket list</strong>. Every number, chart and list only counts tickets you're allowed to open &mdash; tickets in your groups, assigned to you, that you created or watch, plus confidential tickets only if you're permitted. Admins (and anyone with &ldquo;view all tickets&rdquo;) see everything. Applying a filter can only <em>narrow</em> what you already see; it can never reveal tickets outside your access.</p>
+<p class="text-muted mb-0">The wallboard follows the <strong>same visibility rules as your ticket list</strong>. Every number, chart and list only counts tickets you're allowed to open &mdash; tickets in your groups, assigned to you, that you created, watch or are CC'd on, plus confidential tickets only if you're permitted. Admins (and anyone with &ldquo;view all tickets&rdquo;) see everything. Applying a filter can only <em>narrow</em> what you already see; it can never reveal tickets outside your access.</p>
 </div>
 </div>
 

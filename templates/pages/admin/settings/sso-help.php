@@ -29,6 +29,7 @@ $redirectUri = rtrim(env('APP_URL', ''), '/') . '/auth/microsoft/callback';
         <ul class="mb-0">
             <li>You must be a <strong>Global Administrator</strong> or <strong>Application Administrator</strong> in your Microsoft 365 tenant.</li>
             <li>Your OpenHelpDesk install must be accessible over HTTPS. Microsoft does not allow plain HTTP redirect URIs in production.</li>
+            <li><code>APP_URL</code> in the server's <code>.env</code> must be set to the exact <code>https://</code> address users visit &mdash; the redirect URI is built from it.</li>
             <li>The redirect URI for your install is: <br>
                 <div class="input-group mt-2" style="max-width:560px;">
                     <input type="text" class="form-control form-control-sm font-monospace bg-light" readonly
@@ -52,7 +53,7 @@ $redirectUri = rtrim(env('APP_URL', ''), '/') . '/auth/microsoft/callback';
     <div class="card-body">
         <ol class="mb-0">
             <li>Navigate to <a href="https://portal.azure.com" target="_blank" rel="noopener">portal.azure.com</a> and sign in with your admin account.</li>
-            <li>In the top search bar, type <strong>Azure Active Directory</strong> and click it (it may also appear as <strong>Microsoft Entra ID</strong> in newer tenants).</li>
+            <li>In the top search bar, type <strong>Microsoft Entra ID</strong> (formerly Azure Active Directory) and open it.</li>
         </ol>
     </div>
 </div>
@@ -210,8 +211,16 @@ $redirectUri = rtrim(env('APP_URL', ''), '/') . '/auth/microsoft/callback';
                     <td>The Client Secret may have expired. Create a new secret in Azure and update it in OpenHelpDesk SSO settings.</td>
                 </tr>
                 <tr>
-                    <td>"SSO is not enabled" on login page</td>
+                    <td>"SSO is not currently enabled" on login page</td>
                     <td>The <em>Enable Microsoft 365 SSO</em> toggle is off. Enable it and save settings.</td>
+                </tr>
+                <tr>
+                    <td>"Your organization is not authorized for single sign-on here"</td>
+                    <td>The account belongs to a different tenant, or the Tenant ID is set to <code>common</code> / <code>organizations</code> (which only lets already-linked accounts in). Use your own Directory (Tenant) ID.</td>
+                </tr>
+                <tr>
+                    <td>Staff member signs in but lands in the portal</td>
+                    <td>Accounts created by a first Microsoft sign-in are End Users. Change their Permission Level under Settings &rarr; Users, or create staff accounts before they first sign in.</td>
                 </tr>
             </tbody>
         </table>

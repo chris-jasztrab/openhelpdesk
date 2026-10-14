@@ -9,54 +9,26 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="col-lg-9">
 
 <h2 class="fw-bold mb-1">Email &amp; SMTP</h2>
-<p class="text-muted mb-4">Configure outgoing email so OpenHelpDesk can notify users and agents about ticket activity.</p>
+<p class="text-muted mb-4">Outgoing mail, replies by email, email-to-ticket, notification switches, templates and the email queue. Everything here lives under the <strong>Email</strong> group in Settings.</p>
 
-<div class="card border-0 shadow-sm mb-4">
+<div class="card border-0 shadow-sm mb-4" id="smtp">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-envelope-check text-primary me-2"></i>SMTP Configuration</h5>
-<p class="text-muted mb-2">Go to <a href="/admin/settings"><strong>Admin → Settings → Email / SMTP</strong></a> and enter your mail server details:</p>
+<p class="text-muted mb-2">Go to <a href="/admin/settings"><strong>Settings &rarr; Email &rarr; Email / SMTP</strong></a> and fill in <strong>Email / SMTP Configuration</strong>:</p>
 <div class="table-responsive mb-3">
 <table class="table table-sm mb-0">
     <thead class="table-light"><tr><th>Field</th><th>Description</th></tr></thead>
     <tbody>
-        <tr><td class="fw-semibold">SMTP Host</td><td class="text-muted">Your mail server hostname (e.g. <code>smtp.gmail.com</code>).</td></tr>
-        <tr><td class="fw-semibold">SMTP Port</td><td class="text-muted">Usually <code>587</code> for TLS or <code>465</code> for SSL.</td></tr>
-        <tr><td class="fw-semibold">Encryption</td><td class="text-muted">Choose <strong>TLS</strong> (recommended), <strong>SSL</strong>, or <strong>None</strong>.</td></tr>
-        <tr><td class="fw-semibold">Username</td><td class="text-muted">Your SMTP login — usually the sending email address.</td></tr>
-        <tr><td class="fw-semibold">Password</td><td class="text-muted">SMTP password or app-specific password (see below).</td></tr>
-        <tr><td class="fw-semibold">From Address</td><td class="text-muted">The email address recipients will see in the From field.</td></tr>
-        <tr><td class="fw-semibold">From Name</td><td class="text-muted">The display name recipients will see (e.g. "IT Support").</td></tr>
+        <tr><td class="fw-semibold">SMTP Host</td><td class="text-muted">Your mail server hostname (e.g. <code>smtp.office365.com</code>).</td></tr>
+        <tr><td class="fw-semibold">Port</td><td class="text-muted">Usually <code>587</code> for TLS or <code>465</code> for SSL.</td></tr>
+        <tr><td class="fw-semibold">Encryption</td><td class="text-muted"><strong>TLS</strong> (recommended), <strong>SSL</strong> or <strong>None</strong>.</td></tr>
+        <tr><td class="fw-semibold">Username / Password</td><td class="text-muted">The SMTP login. Leave Password blank to keep the saved one.</td></tr>
+        <tr><td class="fw-semibold">From Address / From Name</td><td class="text-muted">What recipients see in the From line (e.g. "IT Support").</td></tr>
+        <tr><td class="fw-semibold">SMTP Debug Logging</td><td class="text-muted">Logs every send attempt in detail to <code>storage/logs/smtp.log</code> (the SMTP password is masked). Turn it off once mail works.</td></tr>
     </tbody>
 </table>
 </div>
-<p class="text-muted mb-0">After saving, use the <strong>Send Test Email</strong> button to verify the configuration by sending a test message to the logged-in admin's address.</p>
-</div>
-</div>
-
-<div class="card border-0 shadow-sm mb-4">
-<div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-envelope-arrow-down text-primary me-2"></i>Inbound Email (Email Reply Integration)</h5>
-<p class="text-muted mb-2">OpenHelpDesk can process replies sent directly to your support email address and automatically add them as ticket comments — so agents and requesters can reply from their inbox without logging in.</p>
-
-<h6 class="fw-semibold mt-3 mb-2">Option 1 — Microsoft Graph API (Microsoft 365 / Exchange Online)</h6>
-<p class="text-muted mb-2">Configure at <a href="/admin/settings"><strong>Admin → Settings → Email → Graph API</strong></a>. You will need a registered Azure AD application with <code>Mail.Read</code> permissions.</p>
-<ol class="text-muted mb-3">
-    <li>Enter your Azure <strong>Client ID</strong>, <strong>Tenant ID</strong>, and <strong>Client Secret</strong>.</li>
-    <li>Enter the <strong>mailbox address</strong> to monitor.</li>
-    <li>Save, then use the <strong>Run Now</strong> button to test immediately.</li>
-    <li>Set up a cron job to run <code>scripts/process-replies.php</code> periodically (e.g. every 5 minutes).</li>
-</ol>
-
-<h6 class="fw-semibold mt-3 mb-2">Option 2 — IMAP</h6>
-<p class="text-muted mb-2">Configure IMAP credentials in the Email settings tab. Inbound messages are matched to tickets via <code>In-Reply-To</code> / <code>Message-ID</code> headers and a special <code>X-Ticket-ID</code> header added to outgoing emails.</p>
-
-<h6 class="fw-semibold mt-3 mb-2">How replies are processed</h6>
-<ul class="text-muted mb-0">
-    <li>Email signatures and quoted text are stripped — only the new reply content is saved.</li>
-    <li>Replies from unknown senders are rejected.</li>
-    <li>Portal user replies become public comments; agent/admin replies follow their default visibility setting.</li>
-    <li>Agents and admins can include <strong>hashtag commands</strong> (e.g. <code>#resolve</code>) at the end of their reply to update ticket status or priority — see the <em>Email Reply Commands</em> section below.</li>
-</ul>
+<p class="text-muted mb-0">Click <strong>Save Settings</strong>, then use the <strong>Test Email</strong> card to send a message to any address (it defaults to yours). If the test fails because outbound mail is switched off on the server, the message says so and the email waits in the <a href="#email-queue">Email Queue</a>.</p>
 </div>
 </div>
 
@@ -68,39 +40,32 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
     <thead class="table-light"><tr><th>Provider</th><th>Host</th><th>Port</th><th>Encryption</th><th>Notes</th></tr></thead>
     <tbody>
         <tr>
-            <td class="fw-semibold">Gmail</td>
-            <td><code>smtp.gmail.com</code></td>
-            <td><code>587</code></td>
-            <td>TLS</td>
-            <td class="text-muted">Requires an <a href="https://support.google.com/accounts/answer/185833" target="_blank">App Password</a> if 2FA is enabled.</td>
-        </tr>
-        <tr>
             <td class="fw-semibold">Microsoft 365</td>
             <td><code>smtp.office365.com</code></td>
             <td><code>587</code></td>
             <td>TLS</td>
-            <td class="text-muted">SMTP AUTH must be enabled on the mailbox in the M365 admin centre.</td>
+            <td class="text-muted">SMTP AUTH must be enabled for the mailbox in the Microsoft 365 admin centre.</td>
         </tr>
         <tr>
-            <td class="fw-semibold">Outlook.com</td>
-            <td><code>smtp-mail.outlook.com</code></td>
+            <td class="fw-semibold">Gmail</td>
+            <td><code>smtp.gmail.com</code></td>
             <td><code>587</code></td>
             <td>TLS</td>
-            <td class="text-muted">Free Outlook accounts; same M365 auth requirements.</td>
+            <td class="text-muted">Requires an <a href="https://support.google.com/accounts/answer/185833" target="_blank" rel="noopener">App Password</a> when 2FA is on.</td>
         </tr>
         <tr>
             <td class="fw-semibold">Mailgun</td>
             <td><code>smtp.mailgun.org</code></td>
             <td><code>587</code></td>
             <td>TLS</td>
-            <td class="text-muted">Use your Mailgun SMTP credentials from the dashboard.</td>
+            <td class="text-muted">Use the SMTP credentials from your Mailgun dashboard.</td>
         </tr>
         <tr>
             <td class="fw-semibold">SendGrid</td>
             <td><code>smtp.sendgrid.net</code></td>
             <td><code>587</code></td>
             <td>TLS</td>
-            <td class="text-muted">Username is always <code>apikey</code>; password is your API key.</td>
+            <td class="text-muted">Username is always <code>apikey</code>; the password is your API key.</td>
         </tr>
     </tbody>
 </table>
@@ -108,17 +73,95 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 </div>
 </div>
 
+<div class="card border-0 shadow-sm mb-4" id="outbound-switches">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-toggles text-primary me-2"></i>Outbound Mail Switches (<code>.env</code>)</h5>
+<p class="text-muted mb-2">Two master switches decide whether mail leaves the server at all. They live in the server's <code>.env</code> file, not in the admin UI, so a stray click (or a compromised admin account) can't turn mail on for everyone.</p>
+<div class="table-responsive mb-3">
+<table class="table table-sm mb-0">
+    <thead class="table-light"><tr><th>Setting</th><th>Default</th><th>Effect</th></tr></thead>
+    <tbody>
+        <tr>
+            <td class="fw-semibold"><code>MAIL_ENABLED</code></td>
+            <td><code>true</code></td>
+            <td class="text-muted">Master kill switch. When <code>false</code>, outbound mail is held in the <a href="#email-queue">Email Queue</a> instead of being delivered, and each held message is noted in <code>storage/logs/smtp.log</code> as <code>SKIPPED</code>. Use <code>false</code> on dev, staging and test copies.</td>
+        </tr>
+        <tr>
+            <td class="fw-semibold"><code>MAIL_TRANSACTIONAL_ENABLED</code></td>
+            <td><code>false</code></td>
+            <td class="text-muted">When <code>MAIL_ENABLED=false</code>, setting this to <code>true</code> still lets password-reset emails through (one recipient, requested by that person) while all ticket mail stays held. No effect when <code>MAIL_ENABLED=true</code>.</td>
+        </tr>
+    </tbody>
+</table>
+</div>
+<p class="text-muted small mb-0">Both switches only decide <em>whether</em> mail is sent; delivery still uses the SMTP settings above.</p>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4" id="email-queue">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-envelope-paper text-primary me-2"></i>Email Queue</h5>
+<p class="text-muted mb-2">Mail that can't be delivered is held rather than lost: mail blocked by <code>MAIL_ENABLED=false</code>, mail sent while SMTP isn't configured, and mail the SMTP server rejected. <a href="/admin/settings/email-queue"><strong>Settings &rarr; Email &rarr; Email Queue</strong></a> lists the newest 500 held messages with when they were queued, recipient, subject, ticket, reason and attempts.</p>
+<ul class="text-muted mb-2">
+    <li><strong>Send all now</strong> tries to deliver everything in the queue (even while <code>MAIL_ENABLED=false</code>, after you confirm). Sent messages leave the queue; failures stay.</li>
+    <li><strong>Flush queue</strong> deletes every held message without sending it.</li>
+</ul>
+<div class="alert alert-warning small mb-0"><i class="bi bi-exclamation-triangle me-2"></i>
+    Nothing drains the queue automatically, so turning <code>MAIL_ENABLED</code> back on never sends the backlog by itself. Review it before pressing <strong>Send all now</strong>: a backlog can hold weeks of stale notifications.
+</div>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4" id="inbound">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-envelope-arrow-down text-primary me-2"></i>Inbound Email (Reply by Email)</h5>
+<p class="text-muted mb-2">Requesters and staff can reply to a ticket notification from their inbox, and the reply is added to the ticket. Inbound mail is read from a Microsoft 365 mailbox through the <strong>Microsoft Graph API</strong> (no IMAP or app passwords).</p>
+<ol class="text-muted mb-3">
+    <li>Register an app in Microsoft Entra ID with the <code>Mail.Read</code> and <code>Mail.ReadWrite</code> <strong>application</strong> permissions and admin consent. The <a href="/admin/settings/email-reply-help">Email Reply Setup Guide</a> walks through it.</li>
+    <li>On <a href="/admin/settings"><strong>Email / SMTP</strong></a>, in <strong>Inbound Mail &mdash; Reply Processing</strong>, tick <strong>Enable reply-by-email</strong> and fill in <strong>Reply-To Address</strong>, <strong>Mailbox Address</strong>, <strong>Tenant ID</strong>, <strong>Client ID (Application ID)</strong>, <strong>Client Secret</strong> and <strong>App Secret Expiry Date</strong>. Then click <strong>Save Inbound Settings</strong>.</li>
+    <li>Schedule the <strong>Inbound Email Replies</strong> cron job (every 5 minutes; see <a href="/admin/settings/cron-jobs">Cron Jobs</a>). <strong>Run Now</strong> on the same card processes the mailbox immediately and shows the output.</li>
+</ol>
+<p class="text-muted mb-0"><strong>Secret expiry:</strong> with an App Secret Expiry Date saved, the card shows how long is left, admins see a reminder pop-up after signing in during the last 30 days, and the <strong>App Secret Expiry Reminders</strong> cron job emails all admins 30 days, 7 days and on the day of expiry.</p>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4" id="email-to-ticket">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-envelope-plus text-primary me-2"></i>Email-to-Ticket</h5>
+<p class="text-muted mb-2">With <strong>Enable Email-to-Ticket</strong> switched on (Email-to-Ticket card), a message to the same mailbox that isn't a reply to an existing ticket becomes a new ticket. The subject becomes the ticket subject and the body becomes the description. Inbound mail must be configured first.</p>
+<ul class="text-muted mb-0">
+    <li><strong>Auto-create user accounts</strong>: unknown senders get an End User account. When this is off, mail from unknown addresses is skipped.</li>
+    <li><strong>Default Ticket Type</strong> and <strong>Default Priority</strong> are applied to every emailed ticket. The group follows the type's default group, then the system default group from <a href="/admin/settings/ticket-routing">Ticket Routing</a>.</li>
+    <li>New tickets run through AI routing and classification, ticket-created automations and auto-assignment, and the sender gets the usual confirmation email. If <em>Classify tickets created from inbound email</em> is off under <a href="/admin/settings/ai">AI Classification</a>, emailed tickets are only auto-assigned.</li>
+    <li>Automatic replies (out-of-office messages, bulk and list mail) are ignored and never create tickets.</li>
+</ul>
+</div>
+</div>
+
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-hash text-primary me-2"></i>Email Reply Commands (Agents &amp; Admins)</h5>
-<p class="text-muted mb-3">Agents and admins can take actions on a ticket directly from their email client by adding <strong>hashtag commands</strong> on their own line at the very end of the reply. Commands placed in the middle of a message are never processed — only lines at the bottom of the reply count.</p>
+<h5 class="fw-semibold mb-3"><i class="bi bi-reply text-primary me-2"></i>How Replies Are Matched &amp; Added</h5>
+<ul class="text-muted mb-0">
+    <li>The ticket is found from <code>[#123]</code> or <code>[Ticket #123]</code> in the subject. If that has been stripped, the <code>In-Reply-To</code> / <code>References</code> headers of the original notification are used instead.</li>
+    <li>The sender's address must match a user account; replies from unknown addresses are skipped. Replies from forwarded third parties work because forwarding creates an <a href="/admin/docs/users">external contact</a> for them.</li>
+    <li>Quoted text and signatures are stripped, and the new text is added to the ticket as a <strong>public</strong> comment.</li>
+    <li>Replies to a <strong>Closed</strong> ticket are skipped, unless an agent sends <code>#open</code>, or the ticket was closed with <em>Close and reopen on reply</em> and the requester replies within that window (the ticket reopens).</li>
+    <li>Processed messages are marked read in the mailbox.</li>
+</ul>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4" id="reply-commands">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-hash text-primary me-2"></i>Email Reply Commands</h5>
+<p class="text-muted mb-3">Users at the <strong>Admin</strong> or <strong>Agent</strong> level can change a ticket from their mail client by putting <strong>hashtag commands</strong> on their own line at the end of the reply. For anyone else, the hashtags are treated as plain text.</p>
 
 <h6 class="fw-semibold mb-2">Status Commands</h6>
 <div class="table-responsive mb-4">
 <table class="table table-sm mb-0">
     <thead class="table-light"><tr><th>Hashtag</th><th>Sets ticket status to</th></tr></thead>
     <tbody class="text-muted">
-        <tr><td><code>#open</code></td><td>Open — also re-opens a closed ticket</td></tr>
+        <tr><td><code>#open</code></td><td>Open (also reopens a closed ticket)</td></tr>
         <tr><td><code>#close</code> or <code>#closed</code></td><td>Closed</td></tr>
         <tr><td><code>#resolve</code> or <code>#resolved</code></td><td>Resolved</td></tr>
         <tr><td><code>#pending</code></td><td>Pending</td></tr>
@@ -130,26 +173,14 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 </div>
 
 <h6 class="fw-semibold mb-2">Priority Commands</h6>
-<div class="table-responsive mb-4">
-<table class="table table-sm mb-0">
-    <thead class="table-light"><tr><th>Hashtag</th><th>Sets ticket priority to</th></tr></thead>
-    <tbody class="text-muted">
-        <tr><td><code>#low</code></td><td>Low</td></tr>
-        <tr><td><code>#medium</code></td><td>Medium</td></tr>
-        <tr><td><code>#high</code></td><td>High</td></tr>
-        <tr><td><code>#critical</code></td><td>Critical</td></tr>
-    </tbody>
-</table>
-</div>
+<p class="text-muted mb-4"><code>#low</code>, <code>#medium</code>, <code>#high</code> and <code>#critical</code> set the priority with that name. They do nothing if no priority by that name exists.</p>
 
 <h6 class="fw-semibold mb-2">Usage Rules</h6>
 <ul class="text-muted mb-3">
-    <li>Commands must be on their <strong>own line at the very end</strong> of the reply — not in the middle of a sentence.</li>
-    <li>Multiple commands can appear on the <strong>same line</strong> (e.g. <code>#resolve #high</code>) or on <strong>consecutive lines</strong>.</li>
-    <li>Blank lines between your message and the command line are fine — they are automatically skipped.</li>
-    <li>Commands are <strong>only processed for agents and admins</strong>. If a regular portal user includes a hashtag command, it is treated as plain text and stored in the comment with no action taken.</li>
-    <li>Hashtags embedded in normal sentences (e.g. <em>"check ticket #123"</em>) are never treated as commands.</li>
-    <li>Unknown hashtags are silently ignored — they will not affect the ticket or appear in the comment.</li>
+    <li>Commands go on their own line(s) at the end of your text: several on one line (<code>#resolve #high</code>) or on consecutive lines. Your email signature can follow them.</li>
+    <li>Hashtags inside sentences (<em>"see ticket #123"</em>) are never commands, and unknown hashtags are ignored.</li>
+    <li>Command lines are removed from the stored comment. A reply that contains only commands changes the ticket without adding a comment.</li>
+    <li>If Exchange Online marks the message as failing sender authentication (DMARC / compauth), commands are ignored and the reply is posted as plain text, so a spoofed agent address can't change tickets.</li>
 </ul>
 
 <h6 class="fw-semibold mb-2">Example</h6>
@@ -158,110 +189,95 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 I've confirmed the fix is deployed and the user has verified it works.
 
 #resolve #high</pre>
-<p class="text-muted mt-2 mb-0">This reply posts the comment, sets the ticket status to <strong>Resolved</strong>, and raises the priority to <strong>High</strong>. The <code>#resolve #high</code> line does not appear in the stored comment.</p>
+<p class="text-muted mt-2 mb-0">This posts the comment, sets the status to <strong>Resolved</strong> and the priority to <strong>High</strong>. The command line doesn't appear in the comment.</p>
 </div>
 </div>
 
-<div class="card border-0 shadow-sm mb-4">
+<div class="card border-0 shadow-sm mb-4" id="notifications">
 <div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-send-check text-primary me-2"></i>When Emails Are Sent</h5>
-<p class="text-muted mb-2">OpenHelpDesk sends emails automatically for the following events:</p>
+<h5 class="fw-semibold mb-3"><i class="bi bi-bell text-primary me-2"></i>Email Notifications</h5>
+<p class="text-muted mb-2"><a href="/admin/settings/email-notifications"><strong>Settings &rarr; Email &rarr; Email Notifications</strong></a> holds the site-wide switch for each notification. An email goes out only when its switch is on <em>and</em> the recipient hasn't opted out on their profile (see <a href="/admin/docs/users#notification-preferences">notification preferences</a>).</p>
+<div class="table-responsive mb-3">
+<table class="table table-sm mb-0">
+    <thead class="table-light"><tr><th style="width:34%;">Switch</th><th>Who gets the email</th></tr></thead>
+    <tbody class="text-muted">
+        <tr><td colspan="2" class="fw-semibold text-body">Agent Notifications</td></tr>
+        <tr><td>New Ticket Created</td><td>Members of the ticket's group, if that group has <em>Notify members when a new ticket is created</em> ticked. If the ticket has no group, the ticket type's group is used; with neither, every opted-in group is notified. The requester, assignee and anyone already emailed about the ticket are skipped.</td></tr>
+        <tr><td>Ticket Assigned to Group</td><td>Members of the group a ticket is assigned to.</td></tr>
+        <tr><td>Ticket Assigned to Agent</td><td>The agent a ticket is assigned to.</td></tr>
+        <tr><td>Requester Replies to Ticket</td><td>The assigned agent, when the requester (or another staff member, publicly) replies.</td></tr>
+        <tr><td>Note Added to Ticket</td><td>The assigned agent, when an internal note is added.</td></tr>
+        <tr><td>Ticket Stale (No Activity)</td><td>The assigned agent, or the group if unassigned (see <a href="/admin/docs/automations#stale-tickets">Stale Tickets</a>).</td></tr>
+        <tr><td>Ticket Stale &mdash; Group Manager</td><td>The group's managers. Off by default.</td></tr>
+        <tr><td colspan="2" class="fw-semibold text-body">Ticket Requester Notifications</td></tr>
+        <tr><td>New Ticket Created (Confirmation)</td><td>The requester, from every channel (portal, staff-created, email, API).</td></tr>
+        <tr><td>Ticket Assigned to Agent</td><td>The requester, naming who is handling it.</td></tr>
+        <tr><td>Agent Adds Comment to Ticket</td><td>The requester, on each public staff reply.</td></tr>
+        <tr><td>Ticket Resolved / Ticket Closed</td><td>The requester, when the ticket enters the default resolved or closed status.</td></tr>
+        <tr><td>Stale Ticket Check-In</td><td>The requester ("we haven't forgotten you").</td></tr>
+        <tr><td colspan="2" class="fw-semibold text-body">CC Notifications</td></tr>
+        <tr><td>Comment Added to Ticket</td><td>CC'd people: a one-time "you were added as a CC" email (also when an automation adds them), then an email for each public reply.</td></tr>
+    </tbody>
+</table>
+</div>
+<p class="text-muted mb-2">Emails without a switch on that page, which still respect the recipient's own preference where one exists:</p>
 <ul class="text-muted mb-0">
-    <li><strong>New ticket submitted</strong> — confirmation sent to the requester.</li>
-    <li><strong>Agent reply</strong> — notification sent to the requester with the reply content.</li>
-    <li><strong>Ticket resolved</strong> — notification sent to the requester.</li>
-    <li><strong>Ticket assigned</strong> — notification sent to the assigned agent.</li>
-    <li><strong>Escalation alert</strong> — sent to the assigned agent when an escalation rule fires.</li>
-    <li><strong>Customer reminder</strong> — sent to the requester when an escalation rule with the "Notify ticket creator" action fires (e.g. after 3 days without a reply).</li>
-    <li><strong>Welcome email</strong> — sent to new users created by an admin.</li>
-    <li><strong>Password reset</strong> — sent when a user requests a password reset.</li>
+    <li><strong>Ticket merged</strong> and <strong>satisfaction survey</strong> (see <a href="/admin/docs/csat">Satisfaction Surveys</a>) to the requester.</li>
+    <li><strong>Escalation alert</strong> and <strong>customer reminder</strong> from <a href="/admin/docs/automations#escalation-rules">escalation rules</a>, and <strong>Ticket escalated</strong> to the next person on an <a href="/admin/docs/automations#escalation-paths">escalation path</a>.</li>
+    <li><strong>Password reset</strong>, <strong>confidential-group security alerts</strong>, <strong>scheduled reports</strong>, <strong>app-secret expiry reminders</strong> and <strong>ticket forwards</strong>.</li>
 </ul>
 </div>
 </div>
 
-<div class="card border-0 shadow-sm mb-4">
+<div class="card border-0 shadow-sm mb-4" id="templates">
 <div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-toggles text-primary me-2"></i>Outbound Mail Switches (<code>.env</code>)</h5>
-<p class="text-muted mb-2">Two master switches control whether any mail leaves the server at all. They live in the application's <code>.env</code> file on the server &mdash; <strong>not</strong> in the admin UI &mdash; so changing them requires shell access to the host. This is deliberate: it keeps the "stop all email" control off the web interface, where an accidental click (or a compromised admin account) could otherwise flip mail on for every recipient at once.</p>
+<h5 class="fw-semibold mb-3"><i class="bi bi-envelope-paper text-primary me-2"></i>Email Templates</h5>
+<p class="text-muted mb-2">Change the wording of the main emails, with no code, at <a href="/admin/settings/email-templates"><strong>Settings &rarr; Email &rarr; Email Templates</strong></a>. Each tab has a <strong>Subject</strong>, an <strong>Intro Message</strong> (rich text: bold, italic, lists, links) and usually a <strong>Button Label</strong>, with a live subject preview and a <strong>Reset to Defaults</strong> button. Leave a field blank to use the built-in wording.</p>
 <div class="table-responsive mb-3">
 <table class="table table-sm mb-0">
-    <thead class="table-light"><tr><th>Setting</th><th>Default</th><th>Effect</th></tr></thead>
-    <tbody>
-        <tr>
-            <td class="fw-semibold"><code>MAIL_ENABLED</code></td>
-            <td><code>true</code></td>
-            <td class="text-muted">Master kill switch. When <code>false</code>, <strong>all</strong> outbound mail is held in the <a href="/admin/settings/email-queue">Email Queue</a> instead of being delivered (each attempt is also logged to <code>storage/logs/smtp.log</code>). Nothing drains the queue automatically; an admin sends or flushes it by hand. Set to <code>false</code> on dev, staging, and test instances so they never deliver real mail; leave <code>true</code> on production.</td>
-        </tr>
-        <tr>
-            <td class="fw-semibold"><code>MAIL_TRANSACTIONAL_ENABLED</code></td>
-            <td><code>false</code></td>
-            <td class="text-muted">Transactional bypass. When <code>MAIL_ENABLED=false</code>, setting this to <code>true</code> still lets <strong>user-initiated, single-recipient</strong> mail through &mdash; currently <strong>password-reset</strong> emails &mdash; while bulk ticket-notification mail stays suppressed. Has no effect when <code>MAIL_ENABLED=true</code> (everything already sends).</td>
-        </tr>
-    </tbody>
-</table>
-</div>
-<div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
-    The transactional bypass still needs SMTP configured above &mdash; it changes <em>whether</em> the kill switch blocks the message, not how it is delivered. Use it when you want password resets to work on an instance that intentionally keeps all other outbound mail turned off.
-</div>
-</div>
-</div>
-
-<div class="card border-0 shadow-sm mb-4">
-<div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-envelope-paper text-primary me-2"></i>Customisable Email Templates</h5>
-<p class="text-muted mb-2">The subject line, introductory message, button label and footer text for several system emails can be customised without editing code. Go to <a href="/admin/settings/email-templates"><strong>Admin → Settings → Email Templates</strong></a>.</p>
-<div class="table-responsive mb-3">
-<table class="table table-sm mb-0">
-    <thead class="table-light"><tr><th>Template</th><th>Sent when…</th></tr></thead>
+    <thead class="table-light"><tr><th style="width:30%;">Tab</th><th>Sent when&hellip;</th></tr></thead>
     <tbody class="text-muted">
-        <tr><td><strong>Ticket Created</strong></td><td>A new ticket is submitted by a portal user or created by an agent.</td></tr>
-        <tr><td><strong>Ticket Updated</strong></td><td>An agent posts a public reply on the ticket.</td></tr>
-        <tr><td><strong>Ticket Merged</strong></td><td>Two tickets are merged and the requester is notified.</td></tr>
-        <tr><td><strong>CSAT Survey</strong></td><td>A satisfaction survey is sent after a ticket is resolved/closed.</td></tr>
-        <tr><td><strong>Customer Reminder</strong></td><td>An escalation rule with the "Notify ticket creator" action fires (e.g. follow-up after no reply).</td></tr>
-        <tr><td><strong>Group Alerts</strong></td><td>A new ticket is created and the ticket's assigned group has email alerts enabled.</td></tr>
+        <tr><td><strong>Ticket Created</strong></td><td>A ticket is submitted (requester confirmation).</td></tr>
+        <tr><td><strong>Ticket Updated</strong></td><td>Staff post a public reply.</td></tr>
+        <tr><td><strong>Ticket Merged</strong></td><td>A requester's ticket is merged into another.</td></tr>
+        <tr><td><strong>CSAT Survey</strong></td><td>A satisfaction survey is sent.</td></tr>
+        <tr><td><strong>Customer Reminder</strong></td><td>An escalation rule's <em>Send reminder email to customer</em> action fires.</td></tr>
+        <tr><td><strong>Group Alerts</strong></td><td>A new ticket alert goes to a group.</td></tr>
+        <tr><td><strong>Agent Assigned</strong> / <strong>Group Assigned</strong></td><td>A ticket is assigned to an agent or a group.</td></tr>
+        <tr><td><strong>Escalation Alert</strong></td><td>An escalation rule notifies an agent.</td></tr>
+        <tr><td><strong>Stale &mdash; Requester</strong> / <strong>Agent</strong> / <strong>Manager</strong></td><td>Stale-ticket notifications. The requester version also has an editable <strong>Message Body</strong> (blank uses the default; a single space removes the paragraph).</td></tr>
+        <tr><td><strong>Shared Footer</strong></td><td>Footer text on every ticket email.</td></tr>
     </tbody>
 </table>
 </div>
-
-<h6 class="fw-semibold mb-2">Rich Text Intro Messages</h6>
-<p class="text-muted mb-2">The <strong>Intro Message</strong> field on each template uses a rich text editor (CKEditor 5). You can apply bold, italic, bullet lists, numbered lists, and hyperlinks — the formatted HTML is rendered directly in the outgoing email. Tokens (see below) work inside the rich text editor as normal.</p>
-
-<h6 class="fw-semibold mb-2">Using Tokens</h6>
-<p class="text-muted mb-2">Template fields support dynamic tokens that are replaced with live ticket data when the email is sent. Wrap tokens in double curly braces:</p>
+<h6 class="fw-semibold mb-2">Tokens</h6>
+<p class="text-muted mb-2">Each tab lists the tokens it supports. Click a token chip to insert it at the cursor in the field you're editing. Common ones:</p>
 <div class="table-responsive mb-3">
 <table class="table table-sm mb-0">
     <thead class="table-light"><tr><th>Token</th><th>Replaced with</th></tr></thead>
     <tbody class="text-muted">
-        <tr><td><code>{{first_name}}</code></td><td>Recipient's first name</td></tr>
-        <tr><td><code>{{last_name}}</code></td><td>Recipient's last name</td></tr>
-        <tr><td><code>{{user_name}}</code></td><td>Recipient's full name</td></tr>
-        <tr><td><code>{{ticket_id}}</code></td><td>Ticket number</td></tr>
-        <tr><td><code>{{subject}}</code></td><td>Ticket subject line</td></tr>
-        <tr><td><code>{{sla}}</code></td><td>SLA summary for the ticket's type + priority, e.g. "First response within 4 hours and resolution within 16 hours (business hours)" — empty when no SLA policy applies</td></tr>
-        <tr><td><code>{{sla_response}}</code></td><td>SLA first-response target, e.g. "4 hours" (business hours)</td></tr>
-        <tr><td><code>{{sla_resolution}}</code></td><td>SLA resolution target, e.g. "16 hours" (business hours)</td></tr>
+        <tr><td><code>{{first_name}}</code>, <code>{{last_name}}</code>, <code>{{user_name}}</code></td><td>Recipient's name</td></tr>
+        <tr><td><code>{{ticket_id}}</code>, <code>{{subject}}</code></td><td>Ticket number and subject</td></tr>
+        <tr><td><code>{{type}}</code>, <code>{{priority}}</code>, <code>{{location}}</code>, <code>{{group}}</code>, <code>{{submitter}}</code></td><td>Ticket details (on the templates that offer them)</td></tr>
+        <tr><td><code>{{message}}</code>, <code>{{author}}</code></td><td>The new comment and who wrote it (Ticket Updated)</td></tr>
+        <tr><td><code>{{sla}}</code></td><td>A sentence such as "First response within 4 hours and resolution within 16 hours (business hours)"</td></tr>
+        <tr><td><code>{{sla_response}}</code>, <code>{{sla_resolution}}</code></td><td>The individual targets, e.g. "4 hours"</td></tr>
     </tbody>
 </table>
 </div>
-<p class="text-muted mb-3">The SLA tokens are available on the <strong>Ticket Created</strong>, <strong>Group Alerts</strong>, <strong>Assigned to Agent</strong>, and <strong>Assigned to Group</strong> templates. They resolve from the SLA policy matching the ticket's type and priority (falling back to the default policy), and render as empty text when SLA tracking is disabled or no policy matches — so a sentence like "{{sla}}" simply disappears rather than showing a blank value.</p>
-<p class="text-muted mb-0">Each template also has a <strong>Reset to default</strong> button to restore the original built-in content if needed. A shared <strong>Footer Text</strong> tab lets you customise the footer that appears on all outgoing ticket emails.</p>
+<p class="text-muted mb-0">The SLA tokens are offered on Ticket Created, Group Alerts, Agent Assigned and Group Assigned. They come from the SLA policy matching the ticket's type and priority, and are empty when SLA tracking is off or no policy applies.</p>
 </div>
 </div>
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-people text-primary me-2"></i>Per-Group Email Templates</h5>
-<p class="text-muted mb-2">The four requester-facing emails &mdash; <strong>Ticket Created</strong>, <strong>Ticket Updated</strong>, <strong>Customer Reminder</strong>, and <strong>CSAT Survey</strong> &mdash; can be worded differently per group, so each team can speak in its own voice.</p>
-<p class="text-muted mb-2">On <a href="/admin/settings/email-templates"><strong>Admin → Settings → Email Templates</strong></a>, use the <strong>"Editing for:"</strong> picker to choose a group and give that team its own subject, intro, and button. For example, the IT group's <em>Ticket Created</em> email can quote its SLA targets with <code>{{sla_response}}</code> / <code>{{sla_resolution}}</code> while Facilities keeps the simpler default.</p>
-<ul class="text-muted mb-2">
-    <li><strong>Leave any field blank to inherit.</strong> The resolution order for each field is <strong>group override → global custom value → built-in default</strong>, so you only override the pieces a team actually needs.</li>
-    <li><strong>The footer stays shared</strong> across all groups and all emails.</li>
-    <li><strong>The handling group is read at send time</strong>, so if a ticket is reassigned to another group, its later emails follow whichever group owns it then.</li>
+<p class="text-muted mb-2">The four requester-facing emails (<strong>Ticket Created</strong>, <strong>Ticket Updated</strong>, <strong>Customer Reminder</strong> and <strong>CSAT Survey</strong>) can be worded differently for each group. On those tabs, use the <strong>Editing for:</strong> picker to choose a group and give it its own subject, intro and button. The picker shows which groups already have their own version.</p>
+<ul class="text-muted mb-0">
+    <li>Blank fields inherit. Each field resolves as <strong>group override &rarr; global custom value &rarr; built-in default</strong>. <strong>Reset to Global Default</strong> clears a group's override.</li>
+    <li>The footer is shared by all groups.</li>
+    <li>The ticket's group is read when the email is sent, so a reassigned ticket uses its new group's wording.</li>
 </ul>
-<div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
-    Overrides are created only when a group is actually customised &mdash; groups with no overrides behave exactly as before, so turning this on changes nothing until you use it.
-</div>
 </div>
 </div>
 
@@ -269,12 +285,11 @@ I've confirmed the fix is deployed and the user has verified it works.
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-exclamation-triangle text-warning me-2"></i>Troubleshooting</h5>
 <ul class="text-muted mb-0">
-    <li><strong>Test email fails:</strong> Double-check host, port, and credentials. Ensure your firewall allows outbound connections on the SMTP port.</li>
-    <li><strong>Emails going to spam:</strong> Configure SPF, DKIM, and DMARC records for your sending domain.</li>
-    <li><strong>Gmail "Less secure app" error:</strong> Use an App Password instead of your regular Gmail password when 2FA is enabled.</li>
-    <li><strong>Microsoft 365 authentication error:</strong> Ensure SMTP AUTH is enabled for the mailbox in the Exchange admin centre under <em>Mail flow → Connectors</em>.</li>
-    <li><strong>No errors but emails not arriving:</strong> Check that your From Address matches the authenticated SMTP user — mismatches can cause silent rejection.</li>
-    <li><strong>No mail at all (and nothing in the send log):</strong> Confirm <code>MAIL_ENABLED=true</code> in the server's <code>.env</code> — when it is <code>false</code>, every message is skipped and logged to <code>storage/logs/smtp.log</code> as <code>SKIPPED</code>. If you intend to keep general mail off but need password resets to work, set <code>MAIL_TRANSACTIONAL_ENABLED=true</code> (see <em>Outbound Mail Switches</em> above).</li>
+    <li><strong>No mail at all:</strong> check the <a href="/admin/settings/email-queue">Email Queue</a>. If messages are piling up with the reason <code>MAIL_ENABLED=false</code>, outbound mail is switched off in the server's <code>.env</code>. Other reasons show the SMTP error.</li>
+    <li><strong>Test email fails:</strong> check host, port, encryption and credentials, and that the server can reach the SMTP port outbound. Turn on SMTP Debug Logging and read <code>storage/logs/smtp.log</code>.</li>
+    <li><strong>Microsoft 365 authentication error:</strong> make sure SMTP AUTH is enabled for the sending mailbox.</li>
+    <li><strong>Sent but not arriving:</strong> the From Address usually has to match the authenticated mailbox. Also check SPF, DKIM and DMARC for your domain.</li>
+    <li><strong>Replies not appearing on tickets:</strong> confirm the Inbound Email Replies cron job is running (<a href="/admin/settings/cron-jobs">Cron Jobs</a>), press <strong>Run Now</strong> and read the output (<code>storage/logs/graph-mail.log</code>). "Not a registered user" means the sender's address doesn't match any account; "is closed" means the ticket is Closed.</li>
 </ul>
 </div>
 </div>
