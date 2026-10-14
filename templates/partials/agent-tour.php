@@ -276,17 +276,6 @@ $_agentTourCanTemplates = Auth::can('ticket_templates.manage') ? 'true' : 'false
             }
         },
         {
-            element: '#tour-ticket-timeline',
-            popover: {
-                title:       'Timeline',
-                description: 'Every action on the ticket is logged here in chronological order — replies, internal notes, ' +
-                             'status changes, assignments, and SLA events. ' +
-                             'Internal notes (shown with a lock icon) are visible to agents only.',
-                side:  'top',
-                align: 'start'
-            }
-        },
-        {
             element: '#replyActionBar',
             popover: {
                 title:       'Reply, Note & Forward',
@@ -295,6 +284,17 @@ $_agentTourCanTemplates = Auth::can('ticket_templates.manage') ? 'true' : 'false
                              'useful for leaving context for other agents.<br>' +
                              '<strong>Forward</strong> routes the message to a third party (e.g. a vendor) ' +
                              'while keeping the ticket open and tracked.',
+                side:  'bottom',
+                align: 'start'
+            }
+        },
+        {
+            element: '#tour-ticket-timeline',
+            popover: {
+                title:       'Timeline',
+                description: 'Every action on the ticket is logged here in chronological order — replies, internal notes, ' +
+                             'status changes, assignments, and SLA events. ' +
+                             'Internal notes (shown with a lock icon) are visible to agents only.',
                 side:  'top',
                 align: 'start'
             }

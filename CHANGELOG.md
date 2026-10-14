@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.182.1 &mdash; 2026-10-14
+
+### Changed
+- **Reply, Forward and Add Note now sit directly under the ticket description** (agent and admin ticket pages) instead of below the whole timeline, so staff no longer scroll past every reply and note to answer a ticket. The reply box opens in the same spot, right above the newest timeline entry. The agent tour and the Working Tickets help page now describe the new spot.
+
 ## 2.182.0 &mdash; 2026-10-14
 
 ### Added

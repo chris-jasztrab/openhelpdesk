@@ -26,7 +26,7 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/agent/help'], ['label' => 'Worki
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-chat-dots text-primary me-2"></i>Replies, Notes &amp; Forwarding</h5>
-<p class="text-muted mb-2">Three action buttons below the timeline open the reply composer:</p>
+<p class="text-muted mb-2">Three action buttons directly under the ticket description open the reply composer:</p>
 <ul class="text-muted mb-3">
     <li><strong>Reply</strong> — sends a public message to the requester. The message appears in their portal view and triggers an email notification (if SMTP is configured).</li>
     <li><strong>Add Note</strong> — adds a private internal note visible only to agents and admins. Notes are never sent to the requester or shown in the portal.</li>

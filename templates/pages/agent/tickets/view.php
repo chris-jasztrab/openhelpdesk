@@ -219,6 +219,90 @@ $resolutionClosedSlugs  = ticketClosedBucketSlugs();
             </div>
         </div>
 
+        <!-- Reply / Forward / Note action bar -->
+        <div class="d-flex gap-2 mb-3" id="replyActionBar">
+            <button type="button" class="btn btn-sm btn-outline-primary" id="btnReply">
+                <i class="bi bi-reply me-1"></i>Reply
+            </button>
+            <?php if (canForwardTickets()): ?>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="btnForward">
+                <i class="bi bi-forward me-1"></i>Forward
+            </button>
+            <?php endif; ?>
+            <button type="button" class="btn btn-sm btn-outline-warning" id="btnNote">
+                <i class="bi bi-lock me-1"></i>Add Note
+            </button>
+        </div>
+
+        <!-- Collapsible reply / note panel -->
+        <div id="replyBox" style="display:none;" class="mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header border-bottom d-flex align-items-center justify-content-between py-2 bg-white" id="replyBoxHeader">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="fw-semibold" id="replyBoxTitle"></span>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="btnCanned" title="Insert canned response">
+                            <i class="bi bi-chat-square-text me-1"></i>Canned
+                        </button>
+                    </div>
+                    <button type="button" class="btn-close" id="replyBoxClose" aria-label="Close"></button>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="/agent/tickets/<?= $ticket['id'] ?>/comment" enctype="multipart/form-data" id="replyForm">
+                        <?= csrfField() ?>
+                        <input type="hidden" name="is_internal" id="replyIsInternal" value="0">
+                        <input type="hidden" name="status_after" id="replyStatusAfter" value="">
+                        <?php
+                        $canFwdInt = Auth::can('tickets.forward.internal');
+                        $canFwdExt = Auth::can('tickets.forward.external');
+                        $fwdHint = $canFwdInt && $canFwdExt
+                            ? 'Enter internal contacts or external email addresses.'
+                            : ($canFwdExt
+                                ? 'Enter external email addresses.'
+                                : 'Enter the email of an existing internal contact — you can&rsquo;t forward to external addresses.');
+                        ?>
+                        <div class="mb-3" id="forwardRecipientsRow" style="display:none;">
+                            <label for="forwardTo" class="form-label small fw-semibold">Forward to <span class="text-muted fw-normal">(email addresses, separated by commas)</span></label>
+                            <input type="text" class="form-control" name="forward_to" id="forwardTo" placeholder="vendor@example.com, jane.doe@partner.org" autocomplete="off">
+                            <div class="form-text"><?= $fwdHint ?> Recipients are added as contacts and CC'd on the ticket; their email replies thread back in automatically. The full conversation and all attachments are included.</div>
+                        </div>
+                        <div id="replyDraftNote" class="alert alert-info d-flex align-items-center justify-content-between py-2 px-3 mb-2 small d-none">
+                            <span><i class="bi bi-arrow-counterclockwise me-1"></i>Restored your unsent draft.</span>
+                            <button type="button" class="btn btn-sm btn-link text-decoration-none p-0 ms-2" id="replyDraftDiscard">Discard</button>
+                        </div>
+                        <div class="mb-3" style="position:relative;">
+                            <div id="replyEditor"></div>
+                            <input type="hidden" name="message" id="replyMessageHidden">
+                            <div id="mentionDropdown" class="mention-dropdown" style="display:none;"></div>
+                        </div>
+                        <div class="mb-3">
+                            <input type="file" class="form-control" name="attachments[]" multiple>
+                            <div class="form-text">Max <?= UPLOAD_MAX_SIZE / 1024 / 1024 ?>MB per file</div>
+                        </div>
+                        <div class="d-flex justify-content-end">
+                            <div class="btn-group">
+                                <button type="submit" class="btn text-white" style="background:var(--ld-primary);">
+                                    <i class="bi bi-send me-1" id="replySubmitIcon"></i><span id="replySubmitLabel">Send Reply</span>
+                                </button>
+                                <button type="button" class="btn text-white dropdown-toggle dropdown-toggle-split"
+                                        style="background:var(--ld-primary);border-left:1px solid rgba(255,255,255,.3);"
+                                        data-bs-toggle="dropdown" aria-expanded="false">
+                                    <span class="visually-hidden">More send options</span>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><h6 class="dropdown-header small">Send &amp; change status to</h6></li>
+                                    <li><a class="dropdown-item reply-status-opt" href="#" data-status="resolved"><i class="bi bi-check-circle me-2 text-success"></i>Resolved</a></li>
+                                    <li><a class="dropdown-item reply-status-opt" href="#" data-status="closed"><i class="bi bi-x-circle me-2 text-secondary"></i>Closed</a></li>
+                                    <li><a class="dropdown-item reply-status-opt" href="#" data-status="pending"><i class="bi bi-pause-circle me-2 text-info"></i>Pending</a></li>
+                                    <li><a class="dropdown-item reply-status-opt" href="#" data-status="waiting_on_customer"><i class="bi bi-person-clock me-2 text-warning"></i>Waiting on Customer</a></li>
+                                    <li><a class="dropdown-item reply-status-opt" href="#" data-status="waiting_on_third_party"><i class="bi bi-building-check me-2"></i>Waiting on Third Party</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
         <?php if (!empty($similarEnabled)): ?>
         <!-- Similar past tickets (AI) — populated async from /agent/tickets/{id}/similar -->
         <div class="card border-0 shadow-sm mb-4" id="similarTicketsCard"
@@ -558,90 +642,6 @@ $resolutionClosedSlugs  = ticketClosedBucketSlugs();
         })();
         </script>
         <?php endif; ?>
-
-        <!-- Reply / Forward / Note action bar -->
-        <div class="d-flex gap-2 mt-4" id="replyActionBar">
-            <button type="button" class="btn btn-sm btn-outline-primary" id="btnReply">
-                <i class="bi bi-reply me-1"></i>Reply
-            </button>
-            <?php if (canForwardTickets()): ?>
-            <button type="button" class="btn btn-sm btn-outline-secondary" id="btnForward">
-                <i class="bi bi-forward me-1"></i>Forward
-            </button>
-            <?php endif; ?>
-            <button type="button" class="btn btn-sm btn-outline-warning" id="btnNote">
-                <i class="bi bi-lock me-1"></i>Add Note
-            </button>
-        </div>
-
-        <!-- Collapsible reply / note panel -->
-        <div id="replyBox" style="display:none;" class="mt-3">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header border-bottom d-flex align-items-center justify-content-between py-2 bg-white" id="replyBoxHeader">
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="fw-semibold" id="replyBoxTitle"></span>
-                        <button type="button" class="btn btn-sm btn-outline-secondary" id="btnCanned" title="Insert canned response">
-                            <i class="bi bi-chat-square-text me-1"></i>Canned
-                        </button>
-                    </div>
-                    <button type="button" class="btn-close" id="replyBoxClose" aria-label="Close"></button>
-                </div>
-                <div class="card-body">
-                    <form method="POST" action="/agent/tickets/<?= $ticket['id'] ?>/comment" enctype="multipart/form-data" id="replyForm">
-                        <?= csrfField() ?>
-                        <input type="hidden" name="is_internal" id="replyIsInternal" value="0">
-                        <input type="hidden" name="status_after" id="replyStatusAfter" value="">
-                        <?php
-                        $canFwdInt = Auth::can('tickets.forward.internal');
-                        $canFwdExt = Auth::can('tickets.forward.external');
-                        $fwdHint = $canFwdInt && $canFwdExt
-                            ? 'Enter internal contacts or external email addresses.'
-                            : ($canFwdExt
-                                ? 'Enter external email addresses.'
-                                : 'Enter the email of an existing internal contact — you can&rsquo;t forward to external addresses.');
-                        ?>
-                        <div class="mb-3" id="forwardRecipientsRow" style="display:none;">
-                            <label for="forwardTo" class="form-label small fw-semibold">Forward to <span class="text-muted fw-normal">(email addresses, separated by commas)</span></label>
-                            <input type="text" class="form-control" name="forward_to" id="forwardTo" placeholder="vendor@example.com, jane.doe@partner.org" autocomplete="off">
-                            <div class="form-text"><?= $fwdHint ?> Recipients are added as contacts and CC'd on the ticket; their email replies thread back in automatically. The full conversation and all attachments are included.</div>
-                        </div>
-                        <div id="replyDraftNote" class="alert alert-info d-flex align-items-center justify-content-between py-2 px-3 mb-2 small d-none">
-                            <span><i class="bi bi-arrow-counterclockwise me-1"></i>Restored your unsent draft.</span>
-                            <button type="button" class="btn btn-sm btn-link text-decoration-none p-0 ms-2" id="replyDraftDiscard">Discard</button>
-                        </div>
-                        <div class="mb-3" style="position:relative;">
-                            <div id="replyEditor"></div>
-                            <input type="hidden" name="message" id="replyMessageHidden">
-                            <div id="mentionDropdown" class="mention-dropdown" style="display:none;"></div>
-                        </div>
-                        <div class="mb-3">
-                            <input type="file" class="form-control" name="attachments[]" multiple>
-                            <div class="form-text">Max <?= UPLOAD_MAX_SIZE / 1024 / 1024 ?>MB per file</div>
-                        </div>
-                        <div class="d-flex justify-content-end">
-                            <div class="btn-group">
-                                <button type="submit" class="btn text-white" style="background:var(--ld-primary);">
-                                    <i class="bi bi-send me-1" id="replySubmitIcon"></i><span id="replySubmitLabel">Send Reply</span>
-                                </button>
-                                <button type="button" class="btn text-white dropdown-toggle dropdown-toggle-split"
-                                        style="background:var(--ld-primary);border-left:1px solid rgba(255,255,255,.3);"
-                                        data-bs-toggle="dropdown" aria-expanded="false">
-                                    <span class="visually-hidden">More send options</span>
-                                </button>
-                                <ul class="dropdown-menu dropdown-menu-end">
-                                    <li><h6 class="dropdown-header small">Send &amp; change status to</h6></li>
-                                    <li><a class="dropdown-item reply-status-opt" href="#" data-status="resolved"><i class="bi bi-check-circle me-2 text-success"></i>Resolved</a></li>
-                                    <li><a class="dropdown-item reply-status-opt" href="#" data-status="closed"><i class="bi bi-x-circle me-2 text-secondary"></i>Closed</a></li>
-                                    <li><a class="dropdown-item reply-status-opt" href="#" data-status="pending"><i class="bi bi-pause-circle me-2 text-info"></i>Pending</a></li>
-                                    <li><a class="dropdown-item reply-status-opt" href="#" data-status="waiting_on_customer"><i class="bi bi-person-clock me-2 text-warning"></i>Waiting on Customer</a></li>
-                                    <li><a class="dropdown-item reply-status-opt" href="#" data-status="waiting_on_third_party"><i class="bi bi-building-check me-2"></i>Waiting on Third Party</a></li>
-                                </ul>
-                            </div>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
     </div>
 
     <!-- Resolution-note-on-close Modal (require_resolution_on_close types) -->
