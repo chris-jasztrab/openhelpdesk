@@ -12857,6 +12857,175 @@ $router->get('/admin/reports/group-coverage', function () {
 });
 
 /* ==================================================================
+ * ADMIN – Reports: Time Spent (per ticket) and Agent Time (per agent)
+ *
+ * Both read ticket_time_entries, filtered on work_date — the day the work
+ * was done, not the day it was typed in. Only stopped time counts; a running
+ * timer is added when it is stopped. Confidential tickets show no subject
+ * or note here.
+ * ================================================================== */
+
+$router->get('/admin/reports/time-spent', function () {
+    Auth::requirePermission('reports.view');
+    $db = Database::connect();
+    [$from, $to, $range] = reportDateRange();
+    $where  = 'te.work_date BETWEEN ? AND ? AND te.timer_started_at IS NULL';
+    $export = ($_GET['export'] ?? '') === 'csv';
+
+    $stmt = $db->prepare(
+        "SELECT COALESCE(SUM(te.seconds), 0) AS total, COUNT(DISTINCT te.ticket_id) AS tickets,
+                COUNT(*) AS entries, COUNT(DISTINCT te.user_id) AS agents
+         FROM ticket_time_entries te WHERE $where"
+    );
+    $stmt->execute([$from, $to]);
+    $kpi = $stmt->fetch();
+
+    // Trend: per day for windows up to ~3 months, per month beyond that.
+    $byMonth = (strtotime($to) - strtotime($from)) / 86400 > 92;
+    $stmt = $db->prepare(
+        "SELECT DATE_FORMAT(te.work_date, '" . ($byMonth ? '%Y-%m' : '%Y-%m-%d') . "') AS bucket, SUM(te.seconds)
+         FROM ticket_time_entries te WHERE $where GROUP BY bucket"
+    );
+    $stmt->execute([$from, $to]);
+    $sums  = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+    $trend = [];
+    $step  = $byMonth ? '+1 month' : '+1 day';
+    for ($d = strtotime($byMonth ? date('Y-m-01', strtotime($from)) : $from); $d <= strtotime($to); $d = strtotime($step, $d)) {
+        $key = date($byMonth ? 'Y-m' : 'Y-m-d', $d);
+        $trend[$key] = round(($sums[$key] ?? 0) / 3600, 2);
+    }
+
+    $stmt = $db->prepare(
+        "SELECT COALESCE(tt.name, '(No type)') AS name, COUNT(DISTINCT te.ticket_id) AS tickets, SUM(te.seconds) AS total
+         FROM ticket_time_entries te
+         JOIN tickets t ON t.id = te.ticket_id
+         LEFT JOIN ticket_types tt ON tt.id = t.type_id
+         WHERE $where GROUP BY tt.id, tt.name ORDER BY total DESC"
+    );
+    $stmt->execute([$from, $to]);
+    $byType = $stmt->fetchAll();
+
+    $stmt = $db->prepare(
+        "SELECT COALESCE(g.name, '(No group)') AS name, COUNT(DISTINCT te.ticket_id) AS tickets, SUM(te.seconds) AS total
+         FROM ticket_time_entries te
+         JOIN tickets t ON t.id = te.ticket_id
+         LEFT JOIN `groups` g ON g.id = t.group_id
+         WHERE $where GROUP BY g.id, g.name ORDER BY total DESC"
+    );
+    $stmt->execute([$from, $to]);
+    $byGroup = $stmt->fetchAll();
+
+    $stmt = $db->prepare(
+        "SELECT t.id, t.status,
+                CASE WHEN tt.is_confidential = 1 THEN 'Confidential ticket' ELSE t.subject END AS subject,
+                COALESCE(tt.name, '') AS type_name, COALESCE(g.name, '') AS group_name,
+                SUM(te.seconds) AS total, COUNT(*) AS entries,
+                GROUP_CONCAT(DISTINCT CONCAT(u.first_name, ' ', u.last_name) SEPARATOR ', ') AS agents
+         FROM ticket_time_entries te
+         JOIN tickets t ON t.id = te.ticket_id
+         LEFT JOIN ticket_types tt ON tt.id = t.type_id
+         LEFT JOIN `groups` g ON g.id = t.group_id
+         LEFT JOIN users u ON u.id = te.user_id
+         WHERE $where
+         GROUP BY t.id, t.status, t.subject, tt.is_confidential, tt.name, g.name
+         ORDER BY total DESC" . ($export ? '' : ' LIMIT 25')
+    );
+    $stmt->execute([$from, $to]);
+    $tickets = $stmt->fetchAll();
+
+    if ($export) {
+        reportCsvOut(
+            "time-spent-{$from}-to-{$to}.csv",
+            ['Ticket', 'Subject', 'Type', 'Group', 'Status', 'Agents', 'Entries', 'Hours', 'Time'],
+            array_map(fn($t) => [
+                $t['id'], $t['subject'], $t['type_name'], $t['group_name'], ticketStatusLabel($t['status']),
+                $t['agents'], $t['entries'], round($t['total'] / 3600, 2), formatTrackedTime((int) $t['total']),
+            ], $tickets)
+        );
+    }
+
+    render('admin/reports/time-spent', compact('from', 'to', 'range', 'kpi', 'trend', 'byMonth', 'byType', 'byGroup', 'tickets'));
+});
+
+$router->get('/admin/reports/agent-time', function () {
+    Auth::requirePermission('reports.view');
+    $db = Database::connect();
+    [$from, $to, $range] = reportDateRange();
+    $where   = 'te.work_date BETWEEN ? AND ? AND te.timer_started_at IS NULL';
+    $export  = ($_GET['export'] ?? '') === 'csv';
+    $agentId = (int) requestScalar('agent', '0');
+
+    $stmt = $db->prepare(
+        "SELECT te.user_id, COALESCE(CONCAT(u.first_name, ' ', u.last_name), 'Deleted user') AS agent_name,
+                SUM(te.seconds) AS total, COUNT(DISTINCT te.ticket_id) AS tickets,
+                COUNT(*) AS entries, COUNT(DISTINCT te.work_date) AS days
+         FROM ticket_time_entries te
+         LEFT JOIN users u ON u.id = te.user_id
+         WHERE $where
+         GROUP BY te.user_id, u.first_name, u.last_name ORDER BY total DESC"
+    );
+    $stmt->execute([$from, $to]);
+    $agents     = $stmt->fetchAll();
+    $grandTotal = (int) array_sum(array_column($agents, 'total'));
+
+    // Agent × ticket type grid, types ordered by total time.
+    $stmt = $db->prepare(
+        "SELECT te.user_id, COALESCE(tt.name, '(No type)') AS type_name, SUM(te.seconds) AS total
+         FROM ticket_time_entries te
+         JOIN tickets t ON t.id = te.ticket_id
+         LEFT JOIN ticket_types tt ON tt.id = t.type_id
+         WHERE $where GROUP BY te.user_id, tt.name"
+    );
+    $stmt->execute([$from, $to]);
+    $grid = [];
+    $typeTotals = [];
+    foreach ($stmt->fetchAll() as $r) {
+        $grid[(int) $r['user_id']][$r['type_name']] = (int) $r['total'];
+        $typeTotals[$r['type_name']] = ($typeTotals[$r['type_name']] ?? 0) + (int) $r['total'];
+    }
+    arsort($typeTotals);
+
+    // Timesheet: one agent on screen, everyone (or the chosen agent) in the CSV.
+    $entries = [];
+    if ($agentId || $export) {
+        $stmt = $db->prepare(
+            "SELECT te.work_date, te.seconds, te.ticket_id,
+                    COALESCE(CONCAT(u.first_name, ' ', u.last_name), 'Deleted user') AS agent_name,
+                    CASE WHEN tt.is_confidential = 1 THEN 'Confidential ticket' ELSE t.subject END AS subject,
+                    CASE WHEN tt.is_confidential = 1 THEN '' ELSE te.note END AS note,
+                    COALESCE(tt.name, '') AS type_name
+             FROM ticket_time_entries te
+             JOIN tickets t ON t.id = te.ticket_id
+             LEFT JOIN ticket_types tt ON tt.id = t.type_id
+             LEFT JOIN users u ON u.id = te.user_id
+             WHERE $where" . ($agentId ? ' AND te.user_id = ?' : '') . "
+             ORDER BY te.work_date DESC, te.id DESC" . ($export ? '' : ' LIMIT 500')
+        );
+        $stmt->execute($agentId ? [$from, $to, $agentId] : [$from, $to]);
+        $entries = $stmt->fetchAll();
+    }
+
+    if ($export) {
+        reportCsvOut(
+            "agent-time-{$from}-to-{$to}.csv",
+            ['Date', 'Agent', 'Ticket', 'Subject', 'Type', 'Minutes', 'Hours', 'Note'],
+            array_map(fn($e) => [
+                $e['work_date'], $e['agent_name'], $e['ticket_id'], $e['subject'], $e['type_name'],
+                (int) round($e['seconds'] / 60), round($e['seconds'] / 3600, 2), $e['note'],
+            ], $entries)
+        );
+    }
+
+    $staff = $db->query(
+        "SELECT id, CONCAT(first_name, ' ', last_name) AS name FROM users WHERE " . staffRoleSqlIn('role') . ' ORDER BY first_name, last_name'
+    )->fetchAll();
+
+    render('admin/reports/agent-time', compact(
+        'from', 'to', 'range', 'agentId', 'agents', 'grandTotal', 'grid', 'typeTotals', 'entries', 'staff'
+    ));
+});
+
+/* ==================================================================
  * ADMIN – Report: Custom Report Builder
  * ================================================================== */
 

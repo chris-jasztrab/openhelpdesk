@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.182.0 &mdash; 2026-10-14
+
+### Added
+- **Time Spent report** (Reports → Time Spent): total time logged, tickets worked, average per ticket and agents logging for the period; hours per day (or per month for windows over ~3 months); time by ticket type and by group with the average per ticket; and the 25 tickets that took the most time, with who worked them. Export CSV lists every ticket.
+- **Agent Time report** (Reports → Agent Time): hours per agent (chart and table with share of total, tickets, entries, average per ticket, days logged, average per day), an agent × ticket type grid, and a per-agent timesheet (pick an agent or click a name). Export CSV gives every time entry in the period, for one agent or everyone.
+- Both reports count time on the date the work was done, leave out timers still running, and hide the subject and note of confidential tickets. Documented under Admin Docs → Tickets → Time Tracking.
+
 ## 2.181.0 &mdash; 2026-10-14
 
 ### Added

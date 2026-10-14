@@ -145,6 +145,10 @@ Fourteen built-in report pages accessible from the Reports Overview, each with d
 - **Ticket Trends** — multi-line volume trend drilled down by type or location
 - **FCR Rate** — first-contact resolution rate for tickets resolved without back-and-forth
 - **Group Coverage** — ticket type → default group → members mapping, print-friendly
+- **Time Spent** — time logged on tickets: totals, trend, by type and group, and the longest-running tickets
+- **Agent Time** — time each agent logged, an agent × ticket type grid, and a per-agent timesheet (CSV export)
+- **Time Spent** — time logged on tickets: totals, trend, by type and group, and the longest-running tickets
+- **Agent Time** — time each agent logged, an agent × ticket type grid, and a per-agent timesheet (CSV export)
 - **Custom Builder** — pick any metric and group-by combination to build a custom report
 - **Scheduled Reports** — configure reports to run automatically and email results on a schedule; "Schedule" button on each report page
 - **Ticket Types Settings Matrix** — printable at-a-glance grid of every per-type setting

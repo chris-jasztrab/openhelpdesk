@@ -154,6 +154,8 @@ $breadcrumbs  = [
         ['icon' => 'bi-arrow-repeat',         'title' => 'Ticket Lifecycle',   'desc' => 'Average time spent in each status stage and transition patterns.',       'url' => '/admin/reports/lifecycle'],
         ['icon' => 'bi-geo-alt',              'title' => 'By Location',        'desc' => 'Ticket volume and resolution rates compared across locations.',          'url' => '/admin/reports/location'],
         ['icon' => 'bi-star',                 'title' => 'Satisfaction',       'desc' => 'CSAT survey results — response rates, average ratings, and feedback.',     'url' => '/admin/reports/csat'],
+        ['icon' => 'bi-hourglass-split',      'title' => 'Time Spent',         'desc' => 'Time logged on tickets — totals, trend, by type and group, and the tickets that took longest.', 'url' => '/admin/reports/time-spent'],
+        ['icon' => 'bi-person-workspace',     'title' => 'Agent Time',         'desc' => 'Time each agent logged, split by ticket type, with a per-agent timesheet and CSV export.',     'url' => '/admin/reports/agent-time'],
         ['icon' => 'bi-people',               'title' => 'Agent Workload',     'desc' => 'Visual heatmap of open tickets per agent, broken down by status and SLA.',  'url' => '/admin/reports/workload'],
         ['icon' => 'bi-graph-up-arrow',       'title' => 'Ticket Trends',      'desc' => 'Multi-line volume trend over time, drilled down by type or location.',      'url' => '/admin/reports/trends'],
         ['icon' => 'bi-patch-check',          'title' => 'FCR Rate',           'desc' => 'First-contact resolution rate — tickets resolved without back-and-forth.',   'url' => '/admin/reports/fcr'],

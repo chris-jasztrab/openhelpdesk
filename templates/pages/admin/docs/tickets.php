@@ -532,6 +532,20 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-hourglass-split text-primary me-2"></i>Time Tracking</h5>
+<p class="text-muted mb-2">Each ticket type has a <strong>Track time spent on these tickets</strong> checkbox (off by default). When it's on, tickets of that type get a <strong>Time Tracking</strong> card on the ticket page, under Update Ticket. Agents can:</p>
+<ul class="text-muted mb-2">
+    <li><strong>Start timer / Stop timer</strong>: the timer runs on the server, so it keeps counting through page reloads. Each agent has one live timer; starting a timer on another ticket stops the one already running. Add a short note when stopping.</li>
+    <li><strong>Log time</strong>: enter hours and minutes, the date the work was done, and an optional note, for work done away from the ticket page.</li>
+    <li><strong>Edit / Delete</strong> their own entries. Admins can edit or delete anyone's.</li>
+</ul>
+<p class="text-muted mb-2">If an agent closes one of these tickets from the ticket page (the Update form, or the reply box's <em>Send &amp; change status</em>) with no time logged, a reminder asks them to log time first. They can still choose <strong>Close without logging</strong>. List quick-edits, bulk changes, and automations close without asking.</p>
+<p class="text-muted mb-0">Logged time feeds two reports under <a href="/admin/reports"><strong>Reports</strong></a>. <strong>Time Spent</strong> shows totals, a daily or monthly trend, time by ticket type and group, and the tickets that took longest. <strong>Agent Time</strong> shows each agent's total, an agent &times; ticket type grid, and a per-agent timesheet. Both export to CSV and count time on the <em>date the work was done</em>. Turning tracking off for a type later keeps time already logged visible on its tickets.</p>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-shield-lock text-primary me-2"></i>Confidential Ticket Types</h5>
 <p class="text-muted mb-2">Ticket types can be marked as <strong>Confidential</strong> to restrict access to sensitive tickets (e.g., HR, Legal). This feature ensures that only authorised group members can view the ticket details.</p>
 
