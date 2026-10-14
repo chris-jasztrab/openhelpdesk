@@ -3874,6 +3874,7 @@ $router->get('/admin/tickets', function () {
         'q'         => trim($_GET['q'] ?? ''),
         'date_from' => trim($_GET['date_from'] ?? ''),
         'date_to'   => trim($_GET['date_to'] ?? ''),
+        'requested_by_me' => !empty($_GET['requested_by_me']) ? '1' : '',
         'watched'   => !empty($_GET['watched']) ? '1' : '',
         'has_attachment' => !empty($_GET['has_attachment']) ? '1' : '',
     ];
@@ -4054,6 +4055,7 @@ $router->get('/admin/tickets/export', function () {
         'q'         => trim($_GET['q'] ?? ''),
         'date_from' => trim($_GET['date_from'] ?? ''),
         'date_to'   => trim($_GET['date_to'] ?? ''),
+        'requested_by_me' => !empty($_GET['requested_by_me']) ? '1' : '',
         'watched'   => !empty($_GET['watched']) ? '1' : '',
         'has_attachment' => !empty($_GET['has_attachment']) ? '1' : '',
     ];

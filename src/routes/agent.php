@@ -202,6 +202,7 @@ $router->get('/agent/tickets', function () {
     $fAgent    = array_values(array_filter(array_map('trim', (array) ($_GET['agent']    ?? []))));
     $fGroup    = array_values(array_filter(array_map('trim', (array) ($_GET['group']    ?? []))));
     $fSearch      = trim($_GET['q'] ?? '');
+    $fRequestedByMe = !empty($_GET['requested_by_me']) ? '1' : '';
     $fWatched     = !empty($_GET['watched']) ? '1' : '';
     $fHasAttachment = !empty($_GET['has_attachment']) ? '1' : '';
     $fResolvedToday = !empty($_GET['resolved_today']) ? '1' : '';
@@ -295,6 +296,11 @@ $router->get('/agent/tickets', function () {
     if ($fSearch !== '') {
         $where[]  = 't.subject LIKE ?';
         $params[] = '%' . $fSearch . '%';
+    }
+
+    if ($fRequestedByMe) {
+        $where[]  = 't.created_by = ?';
+        $params[] = Auth::id();
     }
 
     if ($fWatched) {
@@ -482,6 +488,7 @@ $router->get('/agent/tickets', function () {
         'agent'         => $fAgent,    // array
         'group'         => $fGroup,    // array
         'q'             => $fSearch,
+        'requested_by_me' => $fRequestedByMe,
         'watched'       => $fWatched,
         'has_attachment' => $fHasAttachment,
         'resolved_today' => $fResolvedToday,
@@ -573,6 +580,7 @@ $router->get('/agent/tickets/export', function () {
         'agent'    => $fAgent,
         'group'    => $_GET['group']    ?? [],
         'q'        => trim($_GET['q'] ?? ''),
+        'requested_by_me' => !empty($_GET['requested_by_me']) ? '1' : '',
         'watched'  => !empty($_GET['watched']) ? '1' : '',
         'has_attachment' => !empty($_GET['has_attachment']) ? '1' : '',
     ]);

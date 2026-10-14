@@ -47,6 +47,7 @@ foreach ((array) ($filters['location'] ?? []) as $v) $appliedPills[] = ['label' 
 foreach ((array) ($filters['agent'] ?? []) as $v)    $appliedPills[] = ['label' => 'Assigned To: '    . ($agentMap[(string) $v] ?? $v), 'url' => $buildRemoveUrl('agent', $v)];
 foreach ((array) ($filters['group'] ?? []) as $v)    $appliedPills[] = ['label' => 'Group: '    . ($groupMap[(string) $v] ?? $v), 'url' => $buildRemoveUrl('group', $v)];
 if (($filters['q'] ?? '') !== '')          $appliedPills[] = ['label' => 'Search: "' . $filters['q'] . '"', 'url' => $buildRemoveUrl('q')];
+if (!empty($filters['requested_by_me']))   $appliedPills[] = ['label' => 'Requested by Me', 'url' => $buildRemoveUrl('requested_by_me')];
 if (!empty($filters['watched']))           $appliedPills[] = ['label' => 'My Watched Tickets', 'url' => $buildRemoveUrl('watched')];
 if (!empty($filters['has_attachment']))    $appliedPills[] = ['label' => 'Has Attachment', 'url' => $buildRemoveUrl('has_attachment')];
 if (!empty($filters['resolved_today']))    $appliedPills[] = ['label' => 'Resolved Today', 'url' => $buildRemoveUrl('resolved_today')];
@@ -359,6 +360,15 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                         <span><?= e($grp['name']) ?></span>
                     </label>
                     <?php endforeach; ?>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label small fw-semibold mb-1">Requester</label>
+                <div class="filter-checklist">
+                    <label class="filter-check-item">
+                        <input type="checkbox" name="requested_by_me" value="1" <?= !empty($filters['requested_by_me']) ? 'checked' : '' ?>>
+                        <span class="text-muted fst-italic"><i class="bi bi-person me-1"></i>Requested by Me</span>
+                    </label>
                 </div>
             </div>
             <div class="mb-3">

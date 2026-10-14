@@ -127,6 +127,7 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/agent/help'], ['label' => 'Ticke
         <tr><td><strong>Location</strong></td><td>Any branch or site. Ticking a location marked <em>(any)</em>, such as System Wide, means &ldquo;any location&rdquo;.</td></tr>
         <tr><td><strong>Assigned To</strong></td><td><em>My Tickets</em>, <em>Unassigned</em>, or particular people.</td></tr>
         <tr><td><strong>Group</strong></td><td><em>No Group</em>, or particular groups.</td></tr>
+        <tr><td><strong>Requester</strong></td><td><em>Requested by Me</em> &mdash; tickets you opened yourself, for example asking IT for help with your own computer.</td></tr>
         <tr><td><strong>Watching</strong></td><td><em>My Watched Tickets</em>.</td></tr>
         <tr><td><strong>Attachments</strong></td><td><em>Has Attachment</em>.</td></tr>
         <tr><td><strong>Date</strong></td><td><em>Resolved Today</em>.</td></tr>

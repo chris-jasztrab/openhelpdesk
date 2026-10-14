@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.185.0 &mdash; 2026-10-14
+
+### Added
+- **"Requested by Me" ticket filter.** Staff who open tickets for themselves (say, a Marketing staff member asking IT about their own computer) can now find them from the ticket list: **Filters → Requester → Requested by Me**. Available on both the agent and admin ticket lists, works with saved filters, and applies to CSV export.
+
 ## 2.184.1 &mdash; 2026-10-14
 
 ### Changed
