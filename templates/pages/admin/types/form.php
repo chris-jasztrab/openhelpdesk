@@ -163,6 +163,20 @@ $aiWarning = $aiWarning ?? null;
                 </div>
             </div>
 
+            <div class="mb-3">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="time_tracking_enabled" name="time_tracking_enabled" value="1"
+                           <?= (int) old('time_tracking_enabled', (string) ($editing['time_tracking_enabled'] ?? '0')) ? 'checked' : '' ?>>
+                    <label class="form-check-label fw-semibold" for="time_tracking_enabled">
+                        <i class="bi bi-hourglass-split me-1"></i>Track time spent on these tickets
+                    </label>
+                </div>
+                <div class="form-text">
+                    Adds a <strong>Time Tracking</strong> card to the ticket page, where agents start/stop a timer or log time by hand, with an optional note. The time feeds the <em>Time Spent</em> and <em>Agent Time</em> reports.
+                    Closing one of these tickets from the ticket page with no time logged shows a reminder (the agent can still close without logging). Turning this off later keeps time already logged visible on the ticket.
+                </div>
+            </div>
+
             <?php if ($isEdit): ?>
             <div class="mb-3">
                 <label class="form-label fw-semibold">

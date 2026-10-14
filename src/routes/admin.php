@@ -1992,6 +1992,7 @@ $router->post('/admin/types/create', function () {
     $aiSimilarCheck = !empty($_POST['ai_similar_check_enabled']) && !$isConfidential ? 1 : 0;
     $showToLocVis   = !empty($_POST['show_to_location_visibility']) ? 1 : 0;
     $requireResolution = !empty($_POST['require_resolution_on_close']) ? 1 : 0;
+    $timeTracking   = !empty($_POST['time_tracking_enabled']) ? 1 : 0;
     // Stale threshold accepts d/h/m; a bare number means hours (legacy unit).
     $staleRaw       = trim((string) ($_POST['stale_threshold_minutes'] ?? ''));
     $staleMinutes   = $staleRaw === '' ? null : max(0, parseDurationToMinutes($staleRaw, 'h') ?? 0);
@@ -2032,8 +2033,8 @@ $router->post('/admin/types/create', function () {
         ]);
     }
 
-    $db->prepare('INSERT INTO ticket_types (name, color, group_id, is_confidential, ai_route_group, ai_dup_check_enabled, ai_dup_threshold, ai_similar_check_enabled, show_to_location_visibility, require_resolution_on_close, sort_order, stale_threshold_minutes, sla_reopen_behavior) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $aiSimilarCheck, $showToLocVis, $requireResolution, $order, $staleMinutes, $reopenBehavior]);
+    $db->prepare('INSERT INTO ticket_types (name, color, group_id, is_confidential, ai_route_group, ai_dup_check_enabled, ai_dup_threshold, ai_similar_check_enabled, show_to_location_visibility, require_resolution_on_close, time_tracking_enabled, sort_order, stale_threshold_minutes, sla_reopen_behavior) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $aiSimilarCheck, $showToLocVis, $requireResolution, $timeTracking, $order, $staleMinutes, $reopenBehavior]);
     $typeId = (int) $db->lastInsertId();
     if ($skillIds) {
         $stmt = $db->prepare('INSERT IGNORE INTO ticket_type_skill_map (ticket_type_id, skill_id) VALUES (?, ?)');
@@ -2104,6 +2105,7 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
     $aiSimilarCheck = !empty($_POST['ai_similar_check_enabled']) && !$isConfidential ? 1 : 0;
     $showToLocVis   = !empty($_POST['show_to_location_visibility']) ? 1 : 0;
     $requireResolution = !empty($_POST['require_resolution_on_close']) ? 1 : 0;
+    $timeTracking   = !empty($_POST['time_tracking_enabled']) ? 1 : 0;
     // Stale threshold accepts d/h/m; a bare number means hours (legacy unit).
     $staleRaw       = trim((string) ($_POST['stale_threshold_minutes'] ?? ''));
     $staleMinutes   = $staleRaw === '' ? null : max(0, parseDurationToMinutes($staleRaw, 'h') ?? 0);
@@ -2169,6 +2171,8 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
                 'ai_dup_check_enabled' => $aiDupCheck ? '1' : '',
                 'ai_dup_threshold' => (string) $aiDupThreshold,
                 'ai_similar_check_enabled' => $aiSimilarCheck ? '1' : '',
+                'require_resolution_on_close' => $requireResolution ? '1' : '',
+                'time_tracking_enabled' => $timeTracking ? '1' : '',
                 // is_confidential intentionally omitted (unchecked = removal)
             ];
             logAudit(
@@ -2209,14 +2213,14 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
     // not just the confidential flag we already snapshotted above.
     $fullPriorStmt = $db->prepare(
         'SELECT name, color, group_id, is_confidential, ai_route_group, ai_dup_check_enabled,
-                ai_dup_threshold, ai_similar_check_enabled, show_to_location_visibility, require_resolution_on_close, sort_order, stale_threshold_minutes, sla_reopen_behavior
+                ai_dup_threshold, ai_similar_check_enabled, show_to_location_visibility, require_resolution_on_close, time_tracking_enabled, sort_order, stale_threshold_minutes, sla_reopen_behavior
          FROM ticket_types WHERE id = ?'
     );
     $fullPriorStmt->execute([$id]);
     $fullPrior = $fullPriorStmt->fetch(\PDO::FETCH_ASSOC) ?: [];
 
-    $db->prepare('UPDATE ticket_types SET name=?, color=?, group_id=?, is_confidential=?, ai_route_group=?, ai_dup_check_enabled=?, ai_dup_threshold=?, ai_similar_check_enabled=?, show_to_location_visibility=?, require_resolution_on_close=?, sort_order=?, stale_threshold_minutes=?, sla_reopen_behavior=? WHERE id=?')
-        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $aiSimilarCheck, $showToLocVis, $requireResolution, $order, $staleMinutes, $reopenBehavior, $id]);
+    $db->prepare('UPDATE ticket_types SET name=?, color=?, group_id=?, is_confidential=?, ai_route_group=?, ai_dup_check_enabled=?, ai_dup_threshold=?, ai_similar_check_enabled=?, show_to_location_visibility=?, require_resolution_on_close=?, time_tracking_enabled=?, sort_order=?, stale_threshold_minutes=?, sla_reopen_behavior=? WHERE id=?')
+        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $aiSimilarCheck, $showToLocVis, $requireResolution, $timeTracking, $order, $staleMinutes, $reopenBehavior, $id]);
 
     // Required skills (used by Skill-Based group auto-assignment)
     $skillIds = array_filter(array_map('intval', (array) ($_POST['required_skills'] ?? [])));
@@ -2247,6 +2251,7 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
             'ai_similar_check_enabled'    => $aiSimilarCheck,
             'show_to_location_visibility' => $showToLocVis,
             'require_resolution_on_close' => $requireResolution,
+            'time_tracking_enabled'       => $timeTracking,
             'sort_order'                  => $order,
             'stale_threshold_minutes'     => $staleMinutes,
             'sla_reopen_behavior'         => $reopenBehavior,

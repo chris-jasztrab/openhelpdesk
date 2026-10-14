@@ -11,6 +11,16 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.181.0 &mdash; 2026-10-14
+
+### Added
+- **Time tracking on tickets.** A new **Time Tracking** card on the ticket page (agent and admin views, under Update Ticket) lets agents start/stop a live timer or log time by hand (hours, minutes, date worked, optional note). The card shows the ticket's total and every entry with who logged it; agents can edit or delete their own entries, admins anyone's. The timer is kept on the server, so it survives a page reload, and starting a timer on another ticket stops the one already running (one live timer per agent). Changes save in place without reloading the page, so a half-written reply is never lost.
+- **Choose which ticket types track time.** Admin → Ticket Types → edit a type → "Track time spent on these tickets" (off by default, so nothing changes until a type is opted in). The Settings Matrix gains a Time tracking column. Turning it off later keeps time already logged visible on the ticket.
+- **Reminder when closing without time.** Closing a time-tracked ticket from the ticket page (the Update form or the reply box's "Send & change status") with nothing logged asks first: log time now, or close without logging.
+
+### Fixed
+- Removing the confidential flag from a ticket type (the password re-check step) no longer silently switches off its "Prompt for a resolution note before the owner closes" setting.
+
 ## 2.180.3 &mdash; 2026-10-14
 
 ### Fixed

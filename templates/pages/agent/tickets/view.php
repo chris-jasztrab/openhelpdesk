@@ -1089,6 +1089,9 @@ $resolutionClosedSlugs  = ticketClosedBucketSlugs();
             </div>
         </div>
 
+        <!-- Time Tracking (ticket types with time tracking on) -->
+        <?php require ROOT_DIR . '/templates/partials/time-tracking.php'; ?>
+
         <!-- SLA Info -->
         <?php if (slaEnabled() && $ticket['sla_state']): ?>
         <div class="card border-0 shadow-sm mt-4">

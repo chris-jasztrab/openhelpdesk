@@ -16,6 +16,7 @@ $columns = [
     'ai_dup_check'        => 'AI dup-check',
     'ai_similar_check'    => 'AI similar tickets',
     'show_to_loc_vis'     => 'Show "To" / Location',
+    'time_tracking'       => 'Time tracking',
     'custom_dup_thr'      => 'Custom dup threshold',
     'custom_stale_thr'    => 'Custom stale threshold',
     'sla_on_reopen'       => 'SLA on reopen',
@@ -107,6 +108,7 @@ if (!isset($reopenLabels[$reopenGlobal])) {
                     <td class="tt-c"><?= $dupOn ? tt_cell_yes() : tt_cell_no() ?></td>
                     <td class="tt-c"><?= (int) ($t['ai_similar_check_enabled'] ?? 1) === 1 ? tt_cell_yes() : tt_cell_no() ?></td>
                     <td class="tt-c"><?= !empty($t['show_to_location_visibility']) ? tt_cell_yes() : tt_cell_no() ?></td>
+                    <td class="tt-c"><?= !empty($t['time_tracking_enabled']) ? tt_cell_yes() : tt_cell_no() ?></td>
                     <td class="tt-c">
                         <?php if ($custThr): ?>
                             <span class="mx-on" title="ai_dup_threshold"><?= number_format($thr, 2) ?></span>

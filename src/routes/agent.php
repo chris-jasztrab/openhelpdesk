@@ -1756,6 +1756,118 @@ $router->post('/agent/tickets/{id}/watch', function (array $p) {
 });
 
 /* ==================================================================
+ * AGENT – Time tracking (start / stop timer, log / edit / delete time)
+ *
+ * Backs the Time Tracking card on both the agent and admin ticket views
+ * (admins are staff). Responds with the re-rendered card body, which the
+ * page swaps in place — a full reload would throw away a half-written reply.
+ * Agents change only their own entries; admins can change anyone's.
+ * ================================================================== */
+
+$router->post('/agent/tickets/{id}/time', function (array $p) {
+    Auth::requireStaff();
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        http_response_code(403);
+        exit('Your session expired. Reload the page and try again.');
+    }
+    $db = Database::connect();
+    $stmt = $db->prepare('SELECT id, type_id, group_id FROM tickets WHERE id = ?');
+    $stmt->execute([$id]);
+    $ticket = $stmt->fetch();
+    if (!$ticket) {
+        http_response_code(404);
+        exit('Ticket not found.');
+    }
+    _agentRequireTicketAccess($db, $ticket);
+    // Same 5-minute re-auth window the ticket page enforces for confidential types.
+    if (requiresConfidentialReAuth($db, $ticket) && time() - ($_SESSION["confidential_access_{$id}"] ?? 0) > 300) {
+        http_response_code(403);
+        exit('Re-authenticate to change this confidential ticket.');
+    }
+
+    $me      = (int) Auth::id();
+    $now     = date('Y-m-d H:i:s');
+    $action  = (string) ($_POST['action'] ?? '');
+    $note    = mb_substr(trim((string) ($_POST['note'] ?? '')), 0, 500);
+    $enabled = timeTrackingEnabledForType($db, $ticket['type_id'] !== null ? (int) $ticket['type_id'] : null);
+    $ttError = '';
+
+    $entry = null;
+    if (in_array($action, ['stop', 'update', 'delete'], true)) {
+        $e = $db->prepare('SELECT * FROM ticket_time_entries WHERE id = ? AND ticket_id = ?');
+        $e->execute([(int) ($_POST['entry_id'] ?? 0), $id]);
+        $entry = $e->fetch() ?: null;
+        if (!$entry || ((int) $entry['user_id'] !== $me && !Auth::isAdmin())) {
+            $ttError = 'That time entry no longer exists.';
+            $action  = '';
+        }
+    }
+
+    // Manual entries: whole hours/minutes and a work date no later than today.
+    $seconds  = timeEntryInputSeconds((string) ($_POST['hours'] ?? ''), (string) ($_POST['minutes'] ?? ''));
+    $dateObj  = DateTime::createFromFormat('!Y-m-d', (string) ($_POST['work_date'] ?? ''));
+    $workDate = $dateObj && $dateObj->format('Y-m-d') <= date('Y-m-d') ? $dateObj->format('Y-m-d') : null;
+    if ($action === 'update' && $seconds !== null) {
+        // The edit form shows whole minutes; resaving an untouched value must
+        // not round away a timer entry's seconds.
+        if ($seconds === intdiv((int) $entry['seconds'] + 30, 60) * 60) {
+            $seconds = (int) $entry['seconds'];
+        }
+    }
+    if (in_array($action, ['add', 'update'], true)) {
+        if (!$seconds) {
+            $ttError = 'Enter a time between 1 minute and 24 hours.';
+        } elseif ($workDate === null) {
+            $ttError = 'Pick a valid date, no later than today.';
+        } elseif ($action === 'add' && !$enabled) {
+            $ttError = 'Time tracking is off for this ticket type.';
+        } elseif ($action === 'update' && $entry['timer_started_at']) {
+            $ttError = 'Stop the timer before editing this entry.';
+        }
+        if ($ttError !== '') {
+            $action = '';
+        }
+    }
+
+    switch ($action) {
+        case 'start':
+            if (!$enabled) {
+                $ttError = 'Time tracking is off for this ticket type.';
+                break;
+            }
+            stopRunningTimeEntries($db, $me, $now); // one live timer per agent
+            $db->prepare(
+                'INSERT INTO ticket_time_entries (ticket_id, user_id, seconds, timer_started_at, work_date, note, created_at, updated_at)
+                 VALUES (?, ?, 0, ?, ?, \'\', ?, ?)'
+            )->execute([$id, $me, $now, date('Y-m-d'), $now, $now]);
+            break;
+        case 'stop':
+            if ($entry['timer_started_at']) {
+                $db->prepare('UPDATE ticket_time_entries SET seconds = ?, timer_started_at = NULL, note = ?, updated_at = ? WHERE id = ?')
+                   ->execute([timeEntryElapsed($entry, strtotime($now)), $note, $now, $entry['id']]);
+            }
+            break;
+        case 'add':
+            $db->prepare(
+                'INSERT INTO ticket_time_entries (ticket_id, user_id, seconds, work_date, note, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)'
+            )->execute([$id, $me, $seconds, $workDate, $note, $now, $now]);
+            break;
+        case 'update':
+            $db->prepare('UPDATE ticket_time_entries SET seconds = ?, work_date = ?, note = ?, updated_at = ? WHERE id = ?')
+               ->execute([$seconds, $workDate, $note, $now, $entry['id']]);
+            break;
+        case 'delete':
+            $db->prepare('DELETE FROM ticket_time_entries WHERE id = ?')->execute([$entry['id']]);
+            break;
+    }
+
+    require ROOT_DIR . '/templates/partials/time-tracking-body.php';
+    exit;
+});
+
+/* ==================================================================
  * AGENT – Mark / Unmark a Comment as the Solution
  *
  * Pass timeline_id in the form body to mark; pass it empty (or omit)

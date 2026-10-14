@@ -839,6 +839,22 @@ CREATE TABLE IF NOT EXISTS `ticket_templates` (
   CONSTRAINT `ticket_templates_ibfk_2` FOREIGN KEY (`priority_id`) REFERENCES `ticket_priorities` (`id`) ON DELETE SET NULL,
   CONSTRAINT `ticket_templates_ibfk_3` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS `ticket_time_entries` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `ticket_id` int(10) unsigned NOT NULL,
+  `user_id` int(10) unsigned NOT NULL,
+  `seconds` int(10) unsigned NOT NULL DEFAULT 0,
+  `timer_started_at` datetime DEFAULT NULL,
+  `work_date` date NOT NULL,
+  `note` varchar(500) NOT NULL DEFAULT '',
+  `created_at` datetime NOT NULL,
+  `updated_at` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_time_entries_ticket` (`ticket_id`),
+  KEY `idx_time_entries_user_date` (`user_id`,`work_date`),
+  KEY `idx_time_entries_work_date` (`work_date`),
+  CONSTRAINT `fk_time_entries_ticket` FOREIGN KEY (`ticket_id`) REFERENCES `tickets` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE IF NOT EXISTS `ticket_timeline` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `ticket_id` int(10) unsigned NOT NULL,
@@ -900,6 +916,7 @@ CREATE TABLE IF NOT EXISTS `ticket_types` (
   `ai_similar_check_enabled` tinyint(1) NOT NULL DEFAULT 1,
   `show_to_location_visibility` tinyint(1) NOT NULL DEFAULT 1,
   `require_resolution_on_close` tinyint(1) NOT NULL DEFAULT 0,
+  `time_tracking_enabled` tinyint(1) NOT NULL DEFAULT 0,
   `sort_order` int(10) unsigned NOT NULL DEFAULT 0,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),

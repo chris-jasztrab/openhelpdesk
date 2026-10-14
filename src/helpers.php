@@ -4473,6 +4473,91 @@ function formatDuration(int $minutes): string
     return implode(' ', $parts);
 }
 
+/* ── Time tracking ────────────────────────────────────────────── */
+
+/**
+ * Logged work time as hours + minutes: 2700 → "45m", 7500 → "2h 05m", 20 → "<1m".
+ * Never rolls up into days the way formatDuration() does — 26 hours of logged
+ * work is not "1d 2h".
+ */
+function formatTrackedTime(int $seconds): string
+{
+    if ($seconds > 0 && $seconds < 60) {
+        return '<1m';
+    }
+    $m = intdiv(max(0, $seconds), 60);
+    return $m < 60 ? $m . 'm' : intdiv($m, 60) . 'h ' . sprintf('%02d', $m % 60) . 'm';
+}
+
+/** Does this ticket type show the Time Tracking card? */
+function timeTrackingEnabledForType(PDO $db, ?int $typeId): bool
+{
+    if (!$typeId) {
+        return false;
+    }
+    $stmt = $db->prepare('SELECT time_tracking_enabled FROM ticket_types WHERE id = ?');
+    $stmt->execute([$typeId]);
+    return (int) $stmt->fetchColumn() === 1;
+}
+
+/**
+ * Seconds on a time entry including a running timer. The timer is measured on
+ * PHP's clock, the same clock that wrote timer_started_at (local dev MySQL
+ * runs hours off PHP, so NOW() can't be used for this).
+ */
+function timeEntryElapsed(array $entry, ?int $now = null): int
+{
+    $running = empty($entry['timer_started_at'])
+        ? 0
+        : max(0, ($now ?? time()) - strtotime($entry['timer_started_at']));
+    return (int) $entry['seconds'] + $running;
+}
+
+/** A ticket's time entries, newest work first, each with `elapsed` seconds. */
+function ticketTimeEntries(PDO $db, int $ticketId): array
+{
+    $stmt = $db->prepare(
+        "SELECT te.*, CONCAT(u.first_name, ' ', u.last_name) AS user_name
+         FROM ticket_time_entries te
+         LEFT JOIN users u ON u.id = te.user_id
+         WHERE te.ticket_id = ?
+         ORDER BY te.work_date DESC, te.id DESC"
+    );
+    $stmt->execute([$ticketId]);
+    $rows = $stmt->fetchAll();
+    foreach ($rows as &$row) {
+        $row['elapsed'] = timeEntryElapsed($row);
+    }
+    return $rows;
+}
+
+/**
+ * Hours + minutes typed into the Log time form → seconds, or null when either
+ * is not a whole number or the total is outside 0..24h. Zero is allowed here;
+ * callers decide whether an empty entry is acceptable.
+ */
+function timeEntryInputSeconds(string $hours, string $minutes): ?int
+{
+    $h = trim($hours) === '' ? '0' : trim($hours);
+    $m = trim($minutes) === '' ? '0' : trim($minutes);
+    if (!ctype_digit($h) || !ctype_digit($m) || (int) $m > 59) {
+        return null;
+    }
+    $seconds = (int) $h * 3600 + (int) $m * 60;
+    return $seconds <= 86400 ? $seconds : null;
+}
+
+/** Stop every timer this agent has running (one live timer per agent). */
+function stopRunningTimeEntries(PDO $db, int $userId, string $now): void
+{
+    $stmt = $db->prepare('SELECT * FROM ticket_time_entries WHERE user_id = ? AND timer_started_at IS NOT NULL');
+    $stmt->execute([$userId]);
+    $upd = $db->prepare('UPDATE ticket_time_entries SET seconds = ?, timer_started_at = NULL, updated_at = ? WHERE id = ?');
+    foreach ($stmt->fetchAll() as $entry) {
+        $upd->execute([timeEntryElapsed($entry, strtotime($now)), $now, $entry['id']]);
+    }
+}
+
 /**
  * Build the {{sla}}, {{sla_response}} and {{sla_resolution}} email tokens for
  * a ticket's type + priority combination. All three resolve to empty strings
