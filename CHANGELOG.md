@@ -11,6 +11,12 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.180.3 &mdash; 2026-10-14
+
+### Fixed
+- **Phones: pages fit the screen.** 62 of 127 pages were wider than a phone (Galaxy S Ultra, 384px), so the browser zoomed the whole page out: content slid left and right, and a large grey band showed under the page. Causes: the `min-w-0` class used by the settings layout and admin dashboard was never defined (Bootstrap 5 has no such utility), the settings menu sat in a fixed 190px column beside the content instead of stacking, page-header toolbars and the report date pickers never wrapped, and the form builder grid could not shrink. All 127 pages now fit at 384px. Wide tables scroll inside their own box instead of dragging the page, and on phones the long settings menu folds behind an "All settings" button.
+- **Phones: the hamburger menu works.** The navbar had a fixed 56px height, so the opened menu spilled below it as white text on the light page background, behind the page content, which looked like nothing happened. The bar now grows to hold the menu (and scrolls if it is taller than the screen), and the menu includes the Dashboard / Tickets / Knowledge Base / Settings links, which on phones were missing because the icon rail is hidden there. Desktop navbar height is unchanged.
+
 ## 2.180.2 &mdash; 2026-10-13
 
 ### Fixed

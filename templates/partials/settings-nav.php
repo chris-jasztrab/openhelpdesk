@@ -219,8 +219,10 @@ foreach ($settingsNavGroups as $_grp) {
 }
 unset($_grp, $_it);
 ?>
-<div class="d-flex gap-4 align-items-start">
-    <div class="flex-shrink-0" style="width:190px;">
+<?php // Phones: nav stacks above the content and its list folds behind a toggle (shown from md up). ?>
+<style>@media (min-width: 768px) { .settings-nav-col { width: 190px; } }</style>
+<div class="d-flex flex-column flex-md-row gap-4 align-items-stretch align-items-md-start">
+    <div class="flex-shrink-0 settings-nav-col">
         <div class="card border-0 shadow-sm" style="position:sticky;top:1rem;">
             <div class="card-body p-2">
                 <div class="px-1 pb-2 position-relative">
@@ -238,13 +240,18 @@ unset($_grp, $_it);
                     <!-- Chrome-style results dropdown for individual settings (floats over page content) -->
                     <div id="settingsSearchResults" class="card border shadow-lg"
                          role="listbox" aria-label="Settings search results"
-                         style="display:none;position:absolute;top:calc(100% + 4px);left:.25rem;z-index:1050;width:380px;max-height:60vh;overflow-y:auto;font-size:.825rem;"></div>
+                         style="display:none;position:absolute;top:calc(100% + 4px);left:.25rem;z-index:1050;width:380px;max-width:calc(100vw - 2rem);max-height:60vh;overflow-y:auto;font-size:.825rem;"></div>
 
                     <div id="settingsNavNoMatch" class="text-muted small px-2 pt-2" style="display:none;font-size:.75rem;">
                         No settings match.
                     </div>
                 </div>
-                <div id="settingsNavList">
+                <button class="btn btn-sm btn-outline-secondary w-100 d-md-none" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#settingsNavList"
+                        aria-expanded="false" aria-controls="settingsNavList">
+                    <i class="bi bi-list me-1" aria-hidden="true"></i>All settings
+                </button>
+                <div id="settingsNavList" class="collapse d-md-block mt-2 mt-md-0">
                 <?php foreach ($settingsNavGroups as $groupLabel => $items): ?>
                 <div class="mb-2 settings-nav-group" data-group-label="<?= e(strtolower($groupLabel)) ?>">
                     <div class="px-2 py-1 text-uppercase fw-semibold settings-nav-group-label"

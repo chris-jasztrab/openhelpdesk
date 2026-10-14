@@ -1,4 +1,6 @@
-<nav class="navbar navbar-expand-lg navbar-dark sticky-top" style="height:var(--ld-navbar-height,56px);" aria-label="Primary">
+<?php // Fixed height only when expanded (lg+): below that the bar must grow to show the hamburger menu. ?>
+<style>@media (min-width: 992px) { .ld-navbar { height: var(--ld-navbar-height, 56px); } }</style>
+<nav class="navbar navbar-expand-lg navbar-dark sticky-top ld-navbar" style="min-height:var(--ld-navbar-height,56px);" aria-label="Primary">
     <div class="container-fluid">
         <?php $brandLogo = getSetting('branding_logo', ''); $brandName = getSetting('branding_app_name', 'OpenHelpDesk'); $brandIcon = getSetting('branding_navbar_icon', 'bi-headset'); ?>
         <a class="navbar-brand d-flex align-items-center gap-2" href="/">
@@ -17,7 +19,24 @@
 
         <div class="collapse navbar-collapse" id="navbarNav">
             <?php if (Auth::check()): ?>
+            <?php
+            if (Auth::isAdmin()) {
+                $_helpUrl = '/admin/docs';
+            } elseif (Auth::isStaff()) {
+                $_helpUrl = '/agent/help';
+            } else {
+                $_helpUrl = '/portal/help';
+            }
+            ?>
             <ul class="navbar-nav me-auto">
+                <?php // Phones have no icon rail (hidden below md), so its section links live in the hamburger menu. ?>
+                <?php foreach ($sidebarItems ?? [] as $item): if ($item['url'] === $_helpUrl) continue; ?>
+                <li class="nav-item d-md-none">
+                    <a class="nav-link <?= ($item['active'] ?? false) ? 'active' : '' ?>" href="<?= e($item['url']) ?>" <?= ($item['active'] ?? false) ? 'aria-current="page"' : '' ?>>
+                        <i class="bi <?= e($item['icon']) ?> me-1" aria-hidden="true"></i><?= e($item['label']) ?>
+                    </a>
+                </li>
+                <?php endforeach; ?>
                 <?php if (Auth::isAdmin()): ?>
                 <li class="nav-item">
                     <a class="nav-link <?= isActive('/admin') ? 'active' : '' ?>" href="/admin" <?= isActive('/admin') ? 'aria-current="page"' : '' ?>>
@@ -32,15 +51,6 @@
                     </a>
                 </li>
                 <?php endif; ?>
-                <?php
-                if (Auth::isAdmin()) {
-                    $_helpUrl = '/admin/docs';
-                } elseif (Auth::isStaff()) {
-                    $_helpUrl = '/agent/help';
-                } else {
-                    $_helpUrl = '/portal/help';
-                }
-                ?>
                 <li class="nav-item">
                     <a class="nav-link <?= isActive($_helpUrl) ? 'active' : '' ?>" id="tour-nav-help" href="<?= e($_helpUrl) ?>" <?= isActive($_helpUrl) ? 'aria-current="page"' : '' ?>>
                         <i class="bi bi-life-preserver me-1" aria-hidden="true"></i><?= e(label('portal.nav.help', 'Help')) ?>
@@ -85,7 +95,7 @@
                 ?>
                 <li class="nav-item" id="ld-notif-bell" data-count="<?= $notifCount ?>">
                     <?php $notifLabel = $notifCount === 0 ? 'Notifications, none unread' : 'Notifications, ' . ($notifCount > 99 ? '99+' : $notifCount) . ' unread'; ?>
-                    <a class="nav-link position-relative <?= $notifCount > 0 ? 'ld-bell-active' : '' ?>" href="/notifications" aria-label="<?= e($notifLabel) ?>">
+                    <a class="nav-link position-relative d-inline-block <?= $notifCount > 0 ? 'ld-bell-active' : '' ?>" href="/notifications" aria-label="<?= e($notifLabel) ?>">
                         <i class="bi bi-bell fs-5" aria-hidden="true"></i>
                         <span class="position-absolute badge rounded-pill bg-danger <?= $notifCount > 0 ? '' : 'd-none' ?>"
                               id="ld-notif-badge" style="font-size:.55rem; top:.35rem; right:.15rem; padding:.15em .35em; line-height:1;" aria-hidden="true">

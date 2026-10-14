@@ -63,7 +63,7 @@ $sysDefaults = systemFieldDefaults();
     }
     @media (max-width: 991px) {
         .builder-shell, .builder-shell.preview-open {
-            grid-template-columns: 1fr;
+            grid-template-columns: minmax(0, 1fr);
         }
     }
 
@@ -152,6 +152,7 @@ $sysDefaults = systemFieldDefaults();
         margin-bottom: .45rem;
         display: flex; align-items: center; gap: .65rem;
     }
+    @media (max-width: 575.98px) { .field-row { flex-wrap: wrap; } }
     .field-row.is-system {
         background: #f8fafc;
     }

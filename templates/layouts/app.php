@@ -98,6 +98,7 @@
             margin-left: var(--ld-sidebar-width);
             padding: 1.5rem 2rem;
             min-height: calc(100vh - var(--ld-navbar-height));
+            min-height: calc(100dvh - var(--ld-navbar-height));
         }
 
         /* Ticket-view sticky header — pins the ticket title, status badges,
@@ -135,9 +136,36 @@
             display: flex; align-items: center; justify-content: center; font-size: 1.25rem;
         }
 
+        /* Not a Bootstrap 5 utility, but templates use it to let a flex child
+           shrink below its content (wide tables then scroll inside their own
+           wrapper instead of stretching the whole page sideways). */
+        .min-w-0 { min-width: 0 !important; }
+
         @media (max-width: 768px) {
             .sidebar { display: none; }
             .main-content { margin-left: 0; padding: 1rem; }
+        }
+
+        /* Phones. Anything wider than the screen makes mobile browsers zoom the
+           whole page out, which reads as sideways scrolling plus a grey band
+           under the page. */
+        @media (max-width: 767.98px) {
+            /* Page headers (title + toolbar) and their button rows wrap. */
+            .main-content .d-flex.justify-content-between { flex-wrap: wrap; gap: .5rem; }
+            .main-content .d-flex.justify-content-between > .d-flex,
+            .main-content form:has(.js-report-range) { flex-wrap: wrap; margin-left: 0 !important; }
+            /* Long file paths / tokens break instead of widening their row. */
+            .main-content code { overflow-wrap: anywhere; }
+            /* No icon rail on phones, so the filter panel slides from the edge. */
+            .filter-panel { width: min(280px, 85vw); }
+            .filter-panel.open { transform: translateX(0); }
+            .filter-panel-backdrop { left: 0; }
+        }
+
+        /* Collapsed (hamburger) navbar: the open menu scrolls inside itself
+           rather than running off the bottom of the screen. */
+        @media (max-width: 991.98px) {
+            .navbar-collapse { max-height: calc(100dvh - var(--ld-navbar-height)); overflow-y: auto; }
         }
 
         /* Embed mode — chrome-less rendering for iframe previews */
