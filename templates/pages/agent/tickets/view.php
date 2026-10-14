@@ -225,15 +225,15 @@ $resolutionClosedSlugs  = ticketClosedBucketSlugs();
 
         <!-- Reply / Forward / Note action bar -->
         <div class="d-flex gap-2 mb-3" id="replyActionBar">
-            <button type="button" class="btn btn-sm btn-outline-primary" id="btnReply">
+            <button type="button" class="btn btn-sm btn-outline-primary" id="btnReply" data-reply-mode="reply">
                 <i class="bi bi-reply me-1"></i>Reply
             </button>
             <?php if (canForwardTickets()): ?>
-            <button type="button" class="btn btn-sm btn-outline-secondary" id="btnForward">
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="btnForward" data-reply-mode="forward">
                 <i class="bi bi-forward me-1"></i>Forward
             </button>
             <?php endif; ?>
-            <button type="button" class="btn btn-sm btn-outline-warning" id="btnNote">
+            <button type="button" class="btn btn-sm btn-outline-warning" id="btnNote" data-reply-mode="note">
                 <i class="bi bi-lock me-1"></i>Add Note
             </button>
         </div>
@@ -594,6 +594,21 @@ $resolutionClosedSlugs  = ticketClosedBucketSlugs();
                 </div>
                 <?php endif; ?>
             </div>
+        </div>
+
+        <!-- Same Reply / Forward / Note buttons under the timeline; the panel opens next to whichever bar was clicked -->
+        <div class="d-flex gap-2 mt-3 mb-3">
+            <button type="button" class="btn btn-sm btn-outline-primary" data-reply-mode="reply">
+                <i class="bi bi-reply me-1"></i>Reply
+            </button>
+            <?php if (canForwardTickets()): ?>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-reply-mode="forward">
+                <i class="bi bi-forward me-1"></i>Forward
+            </button>
+            <?php endif; ?>
+            <button type="button" class="btn btn-sm btn-outline-warning" data-reply-mode="note">
+                <i class="bi bi-lock me-1"></i>Add Note
+            </button>
         </div>
 
         <script>
@@ -1776,9 +1791,9 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
     var submitLabel  = document.getElementById('replySubmitLabel');
     var submitIcon   = document.getElementById('replySubmitIcon');
     var closeBtn     = document.getElementById('replyBoxClose');
-    var btnReply     = document.getElementById('btnReply');
     var btnForward   = document.getElementById('btnForward');
-    var btnNote      = document.getElementById('btnNote');
+    var modeBtns     = document.querySelectorAll('[data-reply-mode]');
+    var topBar       = document.getElementById('replyActionBar');
     var currentMode  = null;
 
     var modes = {
@@ -1793,8 +1808,11 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
     var commentAction  = '/agent/tickets/<?= (int) $ticket['id'] ?>/comment';
     var forwardAction  = '/agent/tickets/<?= (int) $ticket['id'] ?>/forward';
 
-    function openMode(mode) {
-        if (currentMode === mode && box.style.display !== 'none') { closePanel(); return; }
+    // bar = the button row that was clicked; the panel moves directly under it.
+    function openMode(mode, bar) {
+        bar = bar || topBar;
+        if (currentMode === mode && box.style.display !== 'none' && box.previousElementSibling === bar) { closePanel(); return; }
+        bar.after(box);
         currentMode = mode;
         var cfg = modes[mode];
         titleEl.innerHTML    = cfg.title;
@@ -1824,9 +1842,7 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
                 });
             });
         }, 80);
-        [btnReply, btnForward, btnNote].forEach(function(b) { if (b) b.classList.remove('active'); });
-        var activeBtn = ({ reply: btnReply, forward: btnForward, note: btnNote })[mode];
-        if (activeBtn) activeBtn.classList.add('active');
+        modeBtns.forEach(function(b) { b.classList.toggle('active', b.parentElement === bar && b.dataset.replyMode === mode); });
         // Tell other viewers we're composing a reply (public reply only — a note
         // is internal and a forward isn't a reply to the requester).
         if (window.ticketPresence) window.ticketPresence.setReplying(mode === 'reply');
@@ -1836,13 +1852,13 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
         box.style.display = 'none';
         currentMode = null;
         statusAfterEl.value = '';
-        [btnReply, btnForward, btnNote].forEach(function(b) { if (b) b.classList.remove('active'); });
+        modeBtns.forEach(function(b) { b.classList.remove('active'); });
         if (window.ticketPresence) window.ticketPresence.setReplying(false);
     }
 
-    btnReply.addEventListener('click',   function() { openMode('reply'); });
-    if (btnForward) btnForward.addEventListener('click', function() { openMode('forward'); });
-    btnNote.addEventListener('click',    function() { openMode('note'); });
+    modeBtns.forEach(function(b) {
+        b.addEventListener('click', function() { openMode(b.dataset.replyMode, b.parentElement); });
+    });
     closeBtn.addEventListener('click',   closePanel);
 
     // Let the draft-restore logic (in the editor block) re-open the reply panel.

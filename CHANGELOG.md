@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.184.0 &mdash; 2026-10-14
+
+### Added
+- **Reply, Forward and Add Note buttons under the timeline too** (agent and admin ticket pages). The top set under the description stays. A second set now sits below the last timeline entry, so with oldest-first sorting you can answer from beside the newest reply without scrolling back up. The composer opens under whichever set you click, and moving it keeps your unsent text.
+
 ## 2.183.0 &mdash; 2026-10-14
 
 ### Added
