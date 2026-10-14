@@ -96,7 +96,7 @@ foreach ($messages as $msg) {
 
     logMsg('INFO', "Message {$msgId}: From={$fromAddr} Subject=\"{$subject}\"");
 
-    // ── Skip automated / out-of-office replies ────────────────────────────────
+    // ── Skip automated / out-of-office replies — the only mail ever dropped ────
     if (isAutoReply($msg)) {
         logMsg('INFO', '  Auto-reply detected — skipping.');
         markMessageRead($accessToken, $mailbox, $msgId);
@@ -133,11 +133,7 @@ foreach ($messages as $msg) {
 
         logMsg('INFO', '  No ticket ID found — creating new ticket from inbound email.');
 
-        // Find sender in users table
-        $userStmt = $db->prepare('SELECT id, first_name, last_name, email FROM users WHERE LOWER(email) = ?');
-        $userStmt->execute([$fromAddr]);
-        $senderUser = $userStmt->fetch();
-
+        $senderUser = findEmailUser($db, $fromAddr);
         if (!$senderUser) {
             if (getSetting('email_to_ticket_auto_create_users') !== '1') {
                 logMsg('WARN', "  Sender {$fromAddr} is not a registered user; auto-create disabled — skipping.");
@@ -145,90 +141,36 @@ foreach ($messages as $msg) {
                 $skipped++;
                 continue;
             }
-
-            // Auto-create a portal user for this sender
-            [$firstName, $lastName] = parseEmailName($fromName, $fromAddr);
-            $hashedPw = password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT);
-            $db->prepare('INSERT INTO users (first_name, last_name, email, password, role) VALUES (?, ?, ?, ?, ?)')
-               ->execute([$firstName, $lastName, $fromAddr, $hashedPw, 'user']);
-            $newUserId = (int) $db->lastInsertId();
-            $senderUser = ['id' => $newUserId, 'first_name' => $firstName, 'last_name' => $lastName, 'email' => $fromAddr];
-            logMsg('INFO', "  Auto-created user #{$newUserId} ({$fromAddr}).");
+            $senderUser = createEmailUser($db, $fromAddr, $fromName);
         }
 
-        $ticketSubject = trim($subject) !== '' ? trim($subject) : '(No Subject)';
-        $body          = trim(extractGraphBody($msg));
-        if ($body === '') {
-            $body = '(No message body)';
-        }
-
-        $typeId     = getSetting('email_to_ticket_default_type_id') !== '' ? (int) getSetting('email_to_ticket_default_type_id') : null;
-        $priorityId = getSetting('email_to_ticket_default_priority_id') !== '' ? (int) getSetting('email_to_ticket_default_priority_id') : null;
-        // Pre-2.23 the email path skipped group_id entirely, so every
-        // inbound email landed with NULL group — invisible to auto-assign,
-        // stuck in the no-group queue. resolveTicketGroup() now chains
-        // type-default → system default_group_id → first existing group
-        // so an inbound email is always routed somewhere.
-        $groupId    = resolveTicketGroup($db, null, $typeId);
-
-        // Create the ticket
-        $db->prepare(
-            'INSERT INTO tickets (subject, description, created_by, type_id, status, priority_id, group_id) VALUES (?, ?, ?, ?, ?, ?, ?)'
-        )->execute([$ticketSubject, $body, $senderUser['id'], $typeId, 'open', $priorityId, $groupId]);
-        $newTicketId = (int) $db->lastInsertId();
-
-        // Timeline entry
-        $db->prepare(
-            'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
-        )->execute([$newTicketId, $senderUser['id'], 'created', 'Ticket created via inbound email.']);
-
-        logMsg('INFO', "  Created Ticket #{$newTicketId} (subject: \"{$ticketSubject}\").");
-
-        // AI classification (if enabled, non-confidential type, and the
-        // ai_classify_inbound_email toggle is on) + auto-assign.
-        if (getSetting('ai_classify_inbound_email', '1') === '1') {
-            runPostTicketCreateHooks($db, $newTicketId);
-        } else {
-            autoAssignTicket($db, $newTicketId);
-        }
-
-        // Send ticket-created confirmation email to sender (gated by global + user prefs)
-        notifyRequesterTicketCreated($db, $newTicketId);
-        logMsg('INFO', "  Confirmation email dispatched to {$fromAddr} (subject to prefs).");
+        createTicketFromEmail($db, (int) $senderUser['id'], $subject, extractGraphBody($msg));
 
         markMessageRead($accessToken, $mailbox, $msgId);
         $processed++;
         continue;
     }
 
-    // ── Verify the ticket exists ──────────────────────────────────────────────
-    $ticketStmt = $db->prepare('SELECT id, subject, status, created_by FROM tickets WHERE id = ?');
+    // ── Load the ticket. A reply to a ticket that was merged away belongs on the
+    //    ticket it was merged into — follow the chain (bounded, in case of a cycle).
+    $ticketStmt = $db->prepare('SELECT id, subject, status, created_by, type_id, group_id, merged_into_ticket_id FROM tickets WHERE id = ?');
     $ticketStmt->execute([$ticketId]);
-    $ticket = $ticketStmt->fetch();
-
-    if (!$ticket) {
-        logMsg('WARN', "  Ticket #{$ticketId} not found, skipping.");
-        markMessageRead($accessToken, $mailbox, $msgId);
-        $skipped++;
-        continue;
+    $ticket = $ticketStmt->fetch() ?: null;
+    for ($hop = 0; $ticket !== null && $ticket['merged_into_ticket_id'] !== null && $hop < 5; $hop++) {
+        $ticketStmt->execute([(int) $ticket['merged_into_ticket_id']]);
+        $ticket = $ticketStmt->fetch() ?: null;
+    }
+    if ($ticket !== null && (int) $ticket['id'] !== $ticketId) {
+        logMsg('INFO', "  Ticket #{$ticketId} was merged — using Ticket #{$ticket['id']}.");
+        $ticketId = (int) $ticket['id'];
     }
 
-    // ── Find the sender in the users table (with role) ────────────────────────
-    $userStmt = $db->prepare('SELECT id, first_name, last_name, role FROM users WHERE LOWER(email) = ?');
-    $userStmt->execute([$fromAddr]);
-    $user = $userStmt->fetch();
-
-    if (!$user) {
-        logMsg('WARN', "  Sender {$fromAddr} is not a registered user, skipping.");
-        markMessageRead($accessToken, $mailbox, $msgId);
-        $skipped++;
-        continue;
-    }
+    $user          = findEmailUser($db, $fromAddr);
+    $senderIsStaff = $user !== null && roleIsStaff($user['role']);
 
     // ── Extract the reply body and parse hashtag commands ─────────────────────
     $rawBody = extractGraphBody($msg);
-    $body    = extractReplyBody($rawBody);
-    $parsed  = parseEmailCommands($body);
+    $parsed  = parseEmailCommands(extractReplyBody($rawBody));
     $body    = $parsed['body'];
 
     // Resolve commands (admin/agent only, and never from a spoofed sender).
@@ -241,7 +183,7 @@ foreach ($messages as $msg) {
     if ($authFailed) {
         logMsg('WARN', "  Sender authentication FAILED for {$fromAddr} (possible spoof) — ignoring inline commands, posting reply as unprivileged.");
     }
-    if (!$authFailed && in_array($user['role'], ['admin', 'agent'], true)) {
+    if (!$authFailed && $user !== null && in_array($user['role'], ['admin', 'agent'], true)) {
         if ($parsed['status'] !== null) {
             $newStatus = $parsed['status'];
         }
@@ -255,17 +197,42 @@ foreach ($messages as $msg) {
         }
     }
 
+    // Nothing left once quotes and commands are stripped (a reply typed below the
+    // quote, or an attachment-only email) and no command to apply: keep the whole
+    // message rather than lose it.
+    if (trim($body) === '' && $newStatus === null && $newPriorityId === null) {
+        $body = trim($rawBody) !== '' ? trim($rawBody) : '(No message body)';
+    }
+
     // ── "Close and reopen on reply": the requester answered inside the window ──
-    if (reopenOnRequesterReply($db, $ticketId, (int) $user['id'])) {
+    if ($ticket !== null && $user !== null && reopenOnRequesterReply($db, $ticketId, (int) $user['id'])) {
         $ticket['status'] = ticketDefaultNewStatusSlug();
         logMsg('INFO', "  Ticket #{$ticketId} reopened: requester replied inside the reopen-on-reply window.");
     }
 
-    // ── Guard: skip closed tickets unless an admin/agent is re-opening it ─────
-    if ($ticket['status'] === 'closed' && $newStatus !== 'open') {
-        logMsg('WARN', "  Ticket #{$ticketId} is closed, skipping reply.");
+    // ── A reply that can't go on its ticket opens a new one — never dropped ──
+    $reason = inboundReplyNewTicketReason($ticket, $user, $senderIsStaff, ticketDefaultClosedStatusSlug());
+    if ($reason !== null) {
+        $why = [
+            'missing'        => "ticket #{$ticketId} no longer exists",
+            'unknown_sender' => "{$fromAddr} had no account",
+            'closed'         => "ticket #{$ticketId} is closed",
+        ][$reason];
+        $user ??= createEmailUser($db, $fromAddr, $fromName);
+        $newTicketId = createTicketFromEmail($db, (int) $user['id'], followUpTicketSubject($subject), $body, $ticket);
+
+        // Internal, author-less notes: staff see the link both ways, the requester doesn't.
+        $note = $db->prepare(
+            "INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, 'reply_opened_new_ticket', ?, 1)"
+        );
+        $note->execute([$newTicketId, "Opened from an email reply to ticket #{$ticketId} — {$why}."]);
+        if ($ticket !== null) {
+            $note->execute([$ticketId, "An email reply from {$fromAddr} was opened as ticket #{$newTicketId} — {$why}."]);
+        }
+        logMsg('INFO', "  Reply opened as Ticket #{$newTicketId}: {$why}.");
+
         markMessageRead($accessToken, $mailbox, $msgId);
-        $skipped++;
+        $processed++;
         continue;
     }
 
@@ -289,19 +256,18 @@ foreach ($messages as $msg) {
         logMsg('INFO', "  Priority changed to '{$parsed['priority_slug']}' via email command.");
     }
 
-    // ── Insert timeline comment (skip if body is empty after command stripping) ─
+    // ── Insert timeline comment (none for a commands-only email) ──────────────
     if (trim($body) !== '') {
         $db->prepare(
             'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
         )->execute([$ticketId, $user['id'], 'comment', $body]);
         logMsg('INFO', "  Added reply from {$fromAddr} to Ticket #{$ticketId} ✓");
-    } elseif ($newStatus !== null || $newPriorityId !== null) {
-        logMsg('INFO', "  Commands-only email from {$fromAddr} on Ticket #{$ticketId} — no comment body.");
+        // Same agent alert as a portal comment — an emailed reply used to land silently.
+        if (!$senderIsStaff) {
+            notifyAgentRequesterReplied($db, $ticketId, $body);
+        }
     } else {
-        logMsg('WARN', '  Reply body is empty after stripping quoted text, skipping.');
-        markMessageRead($accessToken, $mailbox, $msgId);
-        $skipped++;
-        continue;
+        logMsg('INFO', "  Commands-only email from {$fromAddr} on Ticket #{$ticketId} — no comment body.");
     }
 
     markMessageRead($accessToken, $mailbox, $msgId);
@@ -313,62 +279,76 @@ exit(0);
 
 // ─── Helper functions ─────────────────────────────────────────────────────────
 
-/**
- * Detect automated / out-of-office replies that should not create tickets.
- *
- * Checks:
- *  1. Auto-Submitted internet message header (RFC 3834) — any value other than "no"
- *  2. X-Auto-Response-Suppress header presence (Exchange / Outlook OOO)
- *  3. Precedence: bulk|auto_reply|list
- *  4. Common OOO / autoresponder subject keywords
- */
-function isAutoReply(array $msg): bool
+// isAutoReply(), followUpTicketSubject() and inboundReplyNewTicketReason() live
+// in src/helpers.php so tests/Feature/InboundReplyHelpersTest.php can reach them.
+
+/** The users row for an inbound sender's address, or null. */
+function findEmailUser(PDO $db, string $fromAddr): ?array
 {
-    $headers = $msg['internetMessageHeaders'] ?? [];
-    foreach ($headers as $header) {
-        $name  = strtolower(trim($header['name'] ?? ''));
-        $value = strtolower(trim($header['value'] ?? ''));
+    $stmt = $db->prepare('SELECT id, first_name, last_name, email, role FROM users WHERE LOWER(email) = ?');
+    $stmt->execute([$fromAddr]);
+    return $stmt->fetch() ?: null;
+}
 
-        // RFC 3834 — any value other than "no" means it is automated
-        if ($name === 'auto-submitted' && $value !== 'no') {
-            return true;
-        }
+/** Auto-create a portal user for an inbound sender with no account. */
+function createEmailUser(PDO $db, string $fromAddr, string $fromName): array
+{
+    [$firstName, $lastName] = parseEmailName($fromName, $fromAddr);
+    $hashedPw = password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT);
+    $db->prepare('INSERT INTO users (first_name, last_name, email, password, role) VALUES (?, ?, ?, ?, ?)')
+       ->execute([$firstName, $lastName, $fromAddr, $hashedPw, 'user']);
+    $newUserId = (int) $db->lastInsertId();
+    logMsg('INFO', "  Auto-created user #{$newUserId} ({$fromAddr}).");
+    return ['id' => $newUserId, 'first_name' => $firstName, 'last_name' => $lastName, 'email' => $fromAddr, 'role' => 'user'];
+}
 
-        // Exchange / Outlook out-of-office suppression header
-        if ($name === 'x-auto-response-suppress') {
-            return true;
-        }
+/**
+ * Open a ticket from an inbound email — routed, classified and acknowledged the
+ * same way for a brand-new email and for a reply that can't go on its ticket.
+ * $original is the ticket the reply named, when it still exists: the new ticket
+ * keeps its type and group, so a confidential thread stays confidential (and
+ * out of the AI hooks) and the follow-up reaches the same team.
+ * Returns the new ticket ID.
+ */
+function createTicketFromEmail(PDO $db, int $userId, string $subject, string $body, ?array $original = null): int
+{
+    $ticketSubject = trim($subject) !== '' ? trim($subject) : '(No Subject)';
+    $body          = trim($body) !== '' ? trim($body) : '(No message body)';
 
-        // Mailing list / bulk senders
-        if ($name === 'precedence' && in_array($value, ['bulk', 'auto_reply', 'list'], true)) {
-            return true;
-        }
+    $typeId     = $original['type_id'] ?? (getSetting('email_to_ticket_default_type_id') !== '' ? getSetting('email_to_ticket_default_type_id') : null);
+    $typeId     = $typeId !== null ? (int) $typeId : null;
+    $priorityId = getSetting('email_to_ticket_default_priority_id') !== '' ? (int) getSetting('email_to_ticket_default_priority_id') : null;
+    // Pre-2.23 the email path skipped group_id entirely, so every
+    // inbound email landed with NULL group — invisible to auto-assign,
+    // stuck in the no-group queue. resolveTicketGroup() now chains
+    // type-default → system default_group_id → first existing group
+    // so an inbound email is always routed somewhere.
+    $groupId    = resolveTicketGroup($db, isset($original['group_id']) ? (int) $original['group_id'] : null, $typeId);
+
+    $db->prepare(
+        'INSERT INTO tickets (subject, description, created_by, type_id, status, priority_id, group_id) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    )->execute([$ticketSubject, $body, $userId, $typeId, 'open', $priorityId, $groupId]);
+    $newTicketId = (int) $db->lastInsertId();
+
+    $db->prepare(
+        'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
+    )->execute([$newTicketId, $userId, 'created', 'Ticket created via inbound email.']);
+
+    logMsg('INFO', "  Created Ticket #{$newTicketId} (subject: \"{$ticketSubject}\").");
+
+    // AI classification (if enabled, non-confidential type, and the
+    // ai_classify_inbound_email toggle is on) + auto-assign.
+    if (getSetting('ai_classify_inbound_email', '1') === '1') {
+        runPostTicketCreateHooks($db, $newTicketId);
+    } else {
+        autoAssignTicket($db, $newTicketId);
     }
 
-    // Subject-line heuristics as a last resort
-    $subject = strtolower($msg['subject'] ?? '');
-    $keywords = [
-        'out of office',
-        'automatic reply',
-        'auto-reply',
-        'auto reply',
-        'autoreply',
-        'vacation reply',
-        'away from office',
-        'on vacation',
-        'autosvar',     // Swedish/Norwegian
-        'abwesend',     // German
-        'hors du bureau', // French
-        'fuera de la oficina', // Spanish
-    ];
+    // Ticket-created confirmation to the sender (gated by global + user prefs)
+    notifyRequesterTicketCreated($db, $newTicketId);
+    logMsg('INFO', '  Confirmation email dispatched to the sender (subject to prefs).');
 
-    foreach ($keywords as $kw) {
-        if (str_contains($subject, $kw)) {
-            return true;
-        }
-    }
-
-    return false;
+    return $newTicketId;
 }
 
 /**

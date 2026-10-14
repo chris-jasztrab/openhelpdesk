@@ -11,6 +11,15 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.186.0 &mdash; 2026-10-14
+
+### Changed
+- **Emailed replies are never dropped any more — only out-of-office, vacation and bounce mail is.** A reply that can't be added to its ticket now opens a new ticket with the person's message instead of being silently discarded: a requester replying to a **Closed** ticket, a reply from an address with no account, or a reply to a ticket that no longer exists. The new ticket keeps the original's type and group (so a confidential thread stays confidential), gets a clean subject, and both tickets carry an internal note linking them. A reply to a merged-away ticket goes on the ticket it was merged into. Staff replies still land on the ticket even when it's closed, so `#open` and the other commands keep working. A reply with nothing left after quote-stripping (typed below the quote, or attachments only) is kept whole instead of dropped.
+- **Out-of-office detection is stricter about what it drops.** Subject keywords now only count at the start of the subject, so a real reply such as "RE: [Ticket #12] Out of office not working" is no longer mistaken for an auto-reply. Exchange bounces, delivery reports and mailer-daemon mail are now recognised too, so they can't open tickets.
+
+### Fixed
+- **The assigned agent is now told when the requester replies by email**, the same in-app and email alert a portal comment already sent. Emailed replies used to land on the ticket without telling anyone.
+
 ## 2.185.0 &mdash; 2026-10-14
 
 ### Added
