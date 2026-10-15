@@ -52,6 +52,7 @@ if (!empty($filters['watched']))           $appliedPills[] = ['label' => 'My Wat
 if (!empty($filters['has_attachment']))    $appliedPills[] = ['label' => 'Has Attachment', 'url' => $buildRemoveUrl('has_attachment')];
 if (!empty($filters['resolved_today']))    $appliedPills[] = ['label' => 'Resolved Today', 'url' => $buildRemoveUrl('resolved_today')];
 if (!empty($filters['escalated_to_me']))   $appliedPills[] = ['label' => 'Escalated to Me', 'url' => $buildRemoveUrl('escalated_to_me')];
+if (!empty($filters['hide_mentioned']))    $appliedPills[] = ['label' => 'Hiding @Mentioned Tickets', 'url' => $buildRemoveUrl('hide_mentioned')];
 // The wallboard drill-downs have no checkbox in the panel, so the pill is the
 // only thing telling an agent why the list is narrowed — and the only way out.
 if (!empty($filters['created_today']))     $appliedPills[] = ['label' => 'Created Today', 'url' => $buildRemoveUrl('created_today')];
@@ -381,6 +382,15 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                 </div>
             </div>
             <div class="mb-3">
+                <label class="form-label small fw-semibold mb-1">Mentions</label>
+                <div class="filter-checklist">
+                    <label class="filter-check-item" title="Tickets outside your groups that show up only because someone @mentioned you">
+                        <input type="checkbox" name="hide_mentioned" value="1" <?= !empty($filters['hide_mentioned']) ? 'checked' : '' ?>>
+                        <span class="text-muted fst-italic"><i class="bi bi-at me-1"></i>Hide @Mentioned Tickets</span>
+                    </label>
+                </div>
+            </div>
+            <div class="mb-3">
                 <label class="form-label small fw-semibold mb-1">Attachments</label>
                 <div class="filter-checklist">
                     <label class="filter-check-item">
@@ -597,6 +607,9 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                                 <?php endif; ?>
                                 <?php if (!empty($draftTicketIds[$t['id']])): ?>
                                 <span class="badge bg-warning bg-opacity-25 text-dark ms-1" title="You have an unsent reply draft on this ticket"><i class="bi bi-pencil-square me-1"></i>Draft</span>
+                                <?php endif; ?>
+                                <?php if (!empty($mentionTicketIds[$t['id']])): ?>
+                                <span class="badge bg-info bg-opacity-25 text-dark ms-1" title="Not in your groups. You see it because someone @mentioned you."><i class="bi bi-at"></i>Mentioned</span>
                                 <?php endif; ?>
                                 <span class="ld-presence-hint d-block small fst-italic" style="color:#b45309;<?= $presence ? '' : 'display:none;' ?>" title="Another staff member currently has this ticket open">
                                     <?php if ($presence): ?>

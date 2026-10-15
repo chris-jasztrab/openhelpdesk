@@ -19,6 +19,7 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/agent/help'], ['label' => 'Ticke
     <li>tickets in any group you belong to, and tickets with no group;</li>
     <li>tickets assigned to you, that you submitted, that you watch, or that you're CC'd on.</li>
 </ul>
+<p class="text-muted mb-2">If someone @mentions you on a ticket outside your groups, you can open it, and it also shows on your <a href="/agent/tickets">Tickets</a> list (not the dashboard or board) with an <span class="badge bg-info bg-opacity-25 text-dark"><i class="bi bi-at"></i>Mentioned</span> badge, so you know it isn't one of yours. To leave those out, tick <em>Hide @Mentioned Tickets</em> under <strong>Filters</strong>. Confidential tickets are never opened up by a mention.</p>
 <p class="text-muted mb-0">If your permission level includes <em>view all tickets</em>, you see every ticket except confidential ones. A blue note at the top &mdash; <em>&ldquo;Showing tickets assigned to your groups&rdquo;</em> &mdash; names the groups you're in. Confidential tickets follow stricter rules; see <a href="/agent/help/working-tickets#confidential">Confidential Tickets</a>.</p>
 </div>
 </div>
@@ -129,6 +130,7 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/agent/help'], ['label' => 'Ticke
         <tr><td><strong>Group</strong></td><td><em>No Group</em>, or particular groups.</td></tr>
         <tr><td><strong>Requester</strong></td><td><em>Requested by Me</em> &mdash; tickets you opened yourself, for example asking IT for help with your own computer.</td></tr>
         <tr><td><strong>Watching</strong></td><td><em>My Watched Tickets</em>.</td></tr>
+        <tr><td><strong>Mentions</strong></td><td><em>Hide @Mentioned Tickets</em> &mdash; leaves out tickets that are on your list only because someone @mentioned you.</td></tr>
         <tr><td><strong>Attachments</strong></td><td><em>Has Attachment</em>.</td></tr>
         <tr><td><strong>Date</strong></td><td><em>Resolved Today</em>.</td></tr>
         <tr><td><strong>Escalation</strong></td><td><em>Escalated to Me</em>.</td></tr>

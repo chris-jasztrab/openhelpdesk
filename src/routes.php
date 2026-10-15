@@ -1151,7 +1151,7 @@ $router->get('/api/tickets/presence', function () {
 
     // Restrict to ids the caller can actually see (same predicate the list uses),
     // so this can't be used to probe presence on out-of-scope tickets.
-    $vis = ticketStaffVisibilitySql($db, (int) Auth::id(), Auth::role(), 't');
+    $vis = ticketStaffVisibilitySql($db, (int) Auth::id(), Auth::role(), 't', true);
     $ph  = implode(',', array_fill(0, count($ids), '?'));
     $vStmt = $db->prepare(
         "SELECT t.id FROM tickets t WHERE t.id IN ($ph) AND ({$vis['sql']})"

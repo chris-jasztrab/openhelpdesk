@@ -11,6 +11,12 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.190.0 &mdash; 2026-10-15
+
+### Added
+- **@Mentioned staff can open the ticket.** Before, if you @mentioned a colleague on a ticket outside their groups, they got the alert (and from 2.189.0 the email) but saw "You do not have access to this ticket" when they clicked it. Being mentioned now lets them open it, the same way being a watcher or CC does. A mention never opens a confidential ticket.
+- **Mentioned tickets show on the agent Tickets list.** A ticket outside your groups that someone @mentioned you on now appears on your Tickets list with an **@Mentioned** badge, so you know it isn't one of yours. This works in the table, inbox and card views. Tick **Filters → Mentions → Hide @Mentioned Tickets** to leave them out. Saved filters remember that choice, and Export CSV follows it. These tickets do not show on dashboards, Kanban, the wallboard or the floor view.
+
 ## 2.189.0 &mdash; 2026-10-15
 
 ### Added

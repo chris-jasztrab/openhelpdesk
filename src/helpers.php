@@ -7914,7 +7914,7 @@ function ticketBoolFilterKeys(string $panel = 'agent'): array
 {
     return $panel === 'admin'
         ? ['requested_by_me', 'watched', 'has_attachment']
-        : ['requested_by_me', 'watched', 'has_attachment', 'resolved_today', 'escalated_to_me', 'created_today', 'due_today'];
+        : ['requested_by_me', 'watched', 'has_attachment', 'resolved_today', 'escalated_to_me', 'created_today', 'due_today', 'hide_mentioned'];
 }
 
 /**
@@ -8676,11 +8676,12 @@ function nextEscalationStep(PDO $db, int $ticketTypeId, int $currentLevel, int $
 
 /**
  * Group-based ticket visibility override: an agent who is the current
- * assignee, an explicit watcher, or a CC of a ticket should always be able
- * to open it, even if the ticket's group is outside their group memberships.
- * Escalation, manual assignment and CC automations can hand a ticket to
- * someone outside the group; without this exemption they'd get the
- * notification email but a 403 on the link.
+ * assignee, an explicit watcher, a CC, or was @mentioned on a ticket should
+ * always be able to open it, even if the ticket's group is outside their group
+ * memberships. Escalation, manual assignment, CC automations and @mentions can
+ * point someone outside the group at a ticket; without this exemption they'd
+ * get the notification but a 403 on the link. Callers check confidential
+ * tickets first, so none of this ever opens a confidential ticket.
  */
 function ticketAccessExempt(PDO $db, int $userId, ?int $ticketId): bool
 {
@@ -8695,11 +8696,13 @@ function ticketAccessExempt(PDO $db, int $userId, ?int $ticketId): bool
     }
 
     $s = $db->prepare(
-        'SELECT 1 FROM ticket_watchers WHERE ticket_id = ? AND user_id = ?
+        "SELECT 1 FROM ticket_watchers WHERE ticket_id = ? AND user_id = ?
          UNION ALL
-         SELECT 1 FROM ticket_cc WHERE ticket_id = ? AND user_id = ?'
+         SELECT 1 FROM ticket_cc WHERE ticket_id = ? AND user_id = ?
+         UNION ALL
+         SELECT 1 FROM notifications WHERE ticket_id = ? AND user_id = ? AND type = 'mention'"
     );
-    $s->execute([$ticketId, $userId, $ticketId, $userId]);
+    $s->execute([$ticketId, $userId, $ticketId, $userId, $ticketId, $userId]);
     return (bool) $s->fetchColumn();
 }
 
@@ -8750,9 +8753,12 @@ function userGroupIds(PDO $db, int $userId): array
  *   - Non-confidential tickets are visible to holders of `tickets.view_all`, or
  *     if the ticket is in one of the user's groups, or is group-less and the
  *     user belongs to at least one group, or is assigned to / created by /
- *     watched by them.
+ *     watched by / CC'd to them.
  *   - A staff user with no group and no `tickets.view_all` sees only the tickets
- *     they are assigned to / created / watch.
+ *     they are assigned to / created / watch / are CC'd on.
+ *   - $withMentions also admits tickets they were @mentioned on. Only the agent
+ *     ticket list opts in; dashboards, kanban and counts leave it off, because
+ *     mentions never expire and would pile up there with no badge to explain them.
  *
  * Admins are unrestricted (returns `1=1`): they reach confidential tickets via
  * the audited re-auth flow on the detail page, and lists redact confidential
@@ -8812,7 +8818,7 @@ function ticketListPresenceMap(PDO $db, array $ticketIds, int $excludeUserId): a
     return $map;
 }
 
-function ticketStaffVisibilitySql(PDO $db, int $userId, ?string $role, string $t = 't'): array
+function ticketStaffVisibilitySql(PDO $db, int $userId, ?string $role, string $t = 't', bool $withMentions = false): array
 {
     if (roleIsAdmin($role)) {
         return ['sql' => '1=1', 'params' => []];
@@ -8850,6 +8856,9 @@ function ticketStaffVisibilitySql(PDO $db, int $userId, ?string $role, string $t
         $nc[] = "{$t}.created_by = ?";
         $nc[] = "{$t}.id IN (SELECT ticket_id FROM ticket_watchers WHERE user_id = ?)";
         $nc[] = "{$t}.id IN (SELECT ticket_id FROM ticket_cc WHERE user_id = ?)";
+        if ($withMentions) {
+            $nc[] = "{$t}.id IN (SELECT ticket_id FROM notifications WHERE user_id = ? AND type = 'mention')";
+        }
         $nonConfClause = "(NOT $isConfidential AND (" . implode(' OR ', $nc) . '))';
     }
 
@@ -8862,9 +8871,32 @@ function ticketStaffVisibilitySql(PDO $db, int $userId, ?string $role, string $t
         $params[] = $userId; // nonConf created
         $params[] = $userId; // nonConf watcher
         $params[] = $userId; // nonConf CC
+        if ($withMentions) {
+            $params[] = $userId; // nonConf @mention
+        }
     }
 
     return ['sql' => "($confClause OR $nonConfClause)", 'params' => $params];
+}
+
+/**
+ * Which of these list rows the user can see ONLY because they were @mentioned
+ * (outside their groups, not assigned / created / watched / CC'd). Drives the
+ * "@Mentioned" badge on the agent ticket list. Returns [ticket_id => true].
+ */
+function mentionOnlyTicketIds(PDO $db, array $ticketIds, int $userId, ?string $role): array
+{
+    $base = ticketStaffVisibilitySql($db, $userId, $role, 't');
+    if (!$ticketIds || $base['sql'] === '1=1') {
+        return [];
+    }
+    $ids = array_map('intval', $ticketIds);
+    $ph  = implode(',', array_fill(0, count($ids), '?'));
+    // IS NOT TRUE, not NOT: a NULL column (e.g. unassigned) can make the base
+    // predicate NULL, and NOT NULL would wrongly drop the row.
+    $stmt = $db->prepare("SELECT t.id FROM tickets t WHERE t.id IN ($ph) AND ({$base['sql']}) IS NOT TRUE");
+    $stmt->execute(array_merge($ids, $base['params']));
+    return array_fill_keys(array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN)), true);
 }
 
 /**

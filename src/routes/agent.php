@@ -207,6 +207,7 @@ $router->get('/agent/tickets', function () {
     $fHasAttachment = !empty($_GET['has_attachment']) ? '1' : '';
     $fResolvedToday = !empty($_GET['resolved_today']) ? '1' : '';
     $fEscalatedToMe = !empty($_GET['escalated_to_me']) ? '1' : '';
+    $fHideMentioned = !empty($_GET['hide_mentioned']) ? '1' : '';
     // Drill-down filters used by the wallboard widgets (also valid stand-alone).
     $fCreatedToday  = !empty($_GET['created_today']) ? '1' : '';
     $fDueToday      = !empty($_GET['due_today']) ? '1' : '';
@@ -353,7 +354,8 @@ $router->get('/agent/tickets', function () {
     if (Auth::isStaff() && !Auth::isAdmin()) {
         $agentGroupIds = userGroupIds($db, (int) Auth::id());
     }
-    $vis      = ticketStaffVisibilitySql($db, (int) Auth::id(), Auth::role(), 't');
+    // Tickets the agent was @mentioned on are listed too, unless they tick "Hide".
+    $vis      = ticketStaffVisibilitySql($db, (int) Auth::id(), Auth::role(), 't', !$fHideMentioned);
     $where[]  = $vis['sql'];
     $params   = array_merge($params, $vis['params']);
 
@@ -398,7 +400,7 @@ $router->get('/agent/tickets', function () {
     $totalTickets = (int) $countStmt->fetchColumn();
 
     // Count all visible tickets (no user filters, just the visibility predicate)
-    $visAll  = ticketStaffVisibilitySql($db, (int) Auth::id(), Auth::role(), 't');
+    $visAll  = ticketStaffVisibilitySql($db, (int) Auth::id(), Auth::role(), 't', true);
     $allStmt = $db->prepare('SELECT COUNT(*) FROM tickets t WHERE ' . $visAll['sql']);
     $allStmt->execute($visAll['params']);
     $allTickets = (int) $allStmt->fetchColumn();
@@ -437,6 +439,7 @@ $router->get('/agent/tickets', function () {
     // Who else currently has these tickets open (snapshot at render time) — drives
     // the amber "Opened by X" subject hint in the list.
     $ticketPresence = ticketListPresenceMap($db, array_column($tickets, 'id'), (int) Auth::id());
+    $mentionTicketIds = $fHideMentioned ? [] : mentionOnlyTicketIds($db, array_column($tickets, 'id'), (int) Auth::id(), Auth::role());
 
     // Load filter dropdown options
     $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
@@ -492,6 +495,7 @@ $router->get('/agent/tickets', function () {
         'has_attachment' => $fHasAttachment,
         'resolved_today' => $fResolvedToday,
         'escalated_to_me' => $fEscalatedToMe,
+        'hide_mentioned' => $fHideMentioned,
         'created_today'  => $fCreatedToday,
         'due_today'      => $fDueToday,
         'sla'            => $fSla,
@@ -519,6 +523,7 @@ $router->get('/agent/tickets', function () {
     render('agent/tickets/index', [
         'tickets'            => $tickets,
         'draftTicketIds'     => $draftTicketIds,
+        'mentionTicketIds'   => $mentionTicketIds,
         'ticketPresence'     => $ticketPresence,
         'priorities'         => $priorities,
         'types'              => $types,
@@ -613,7 +618,8 @@ $router->get('/agent/tickets/export', function () {
     }
 
     // Fail-closed visibility, always last so it is impossible to overlook.
-    $vis     = ticketStaffVisibilitySql($db, (int) Auth::id(), Auth::role(), 't');
+    // Same @mention rule as the list, so the file matches what was on screen.
+    $vis     = ticketStaffVisibilitySql($db, (int) Auth::id(), Auth::role(), 't', empty($_GET['hide_mentioned']));
     $conds[] = $vis['sql'];
     $params  = array_merge($params, $vis['params']);
 

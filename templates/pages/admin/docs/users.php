@@ -105,6 +105,7 @@ $locLabel     = label('location.singular', 'Location');
         <tr><td>In one or more groups</td><td>Tickets in those groups, plus tickets with no group.</td></tr>
         <tr><td>In no group</td><td>Nothing from the queue, only tickets below.</td></tr>
         <tr><td>Anyone (on top of the above)</td><td>Tickets assigned to them, created by them, watched by them, or that they are CC'd on.</td></tr>
+        <tr><td>@Mentioned on a ticket</td><td>Can open it, and it shows on their agent Tickets list with an <em>@Mentioned</em> badge (not on dashboards, Kanban or the wallboard). Never applies to confidential tickets.</td></tr>
         <tr><td>Level with <strong>View all tickets</strong></td><td>Every non-confidential ticket.</td></tr>
         <tr><td>Admin</td><td>Every ticket (confidential ones redacted until a password re-check).</td></tr>
     </tbody>

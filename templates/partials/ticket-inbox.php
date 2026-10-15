@@ -119,6 +119,9 @@ $inboxBase = $inboxBase ?? '/agent/tickets';
                             <?php if (!empty($draftTicketIds[$t['id']])): ?>
                             <span class="badge bg-warning bg-opacity-25 text-dark ms-1" title="You have an unsent reply draft on this ticket"><i class="bi bi-pencil-square me-1"></i>Draft</span>
                             <?php endif; ?>
+                            <?php if (!empty($mentionTicketIds[$t['id']])): ?>
+                            <span class="badge bg-info bg-opacity-25 text-dark ms-1" title="Not in your groups. You see it because someone @mentioned you."><i class="bi bi-at"></i>Mentioned</span>
+                            <?php endif; ?>
                             <?php if ($t['merged_into_ticket_id']): ?>
                             <span class="badge bg-secondary ms-1" title="Merged into #<?= (int) $t['merged_into_ticket_id'] ?>"><i class="bi bi-arrow-right-circle"></i> Merged</span>
                             <?php endif; ?>
