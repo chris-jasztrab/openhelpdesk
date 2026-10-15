@@ -1076,6 +1076,10 @@ $resolutionClosedSlugs  = ticketClosedBucketSlugs();
                                 <?= e($a['first_name'] . ' ' . $a['last_name']) ?>
                             </option>
                             <?php endforeach; ?>
+                            <?php // An assignee outside the group must still be selected, or saving any other field posts "Unassigned".
+                            if (!empty($ticket['assigned_to']) && !in_array((int) $ticket['assigned_to'], array_map('intval', array_column($agents, 'id')), true)): ?>
+                            <option value="<?= (int) $ticket['assigned_to'] ?>" selected><?= e($ticket['agent_name'] ?? 'Unknown') ?> (not in group)</option>
+                            <?php endif; ?>
                         </select>
                     </div>
 

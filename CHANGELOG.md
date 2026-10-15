@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.190.1 &mdash; 2026-10-15
+
+### Fixed
+- **Saving a ticket no longer unassigns it.** The ticket page's **Assigned To** box only lists staff in the ticket's group. If a ticket was assigned to someone outside that list, the box showed "Unassigned", and saving any other field (due date, status, priority) quietly unassigned the ticket. This happened on tickets the Freshdesk import gave to a duplicate portal account, and on tickets owned by staff who aren't in the ticket's group. The current assignee now always shows in the box, marked **(not in group)** when that applies, so they stay assigned unless you pick someone else. Fixed on both the agent and admin ticket pages.
+
 ## 2.190.0 &mdash; 2026-10-15
 
 ### Added
