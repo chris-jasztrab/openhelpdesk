@@ -29,7 +29,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <h5 class="fw-semibold mb-3"><i class="bi bi-hdd-network text-primary me-2"></i>Before You Start: the Server</h5>
 <ul class="text-muted mb-0">
     <li><strong><code>APP_URL</code> in <code>.env</code></strong> must be the address people actually use, such as <code>https://help.example.org</code>. Every link in an email, the survey links and the satisfaction-survey webhook address are built from it.</li>
-    <li><strong>Background jobs.</strong> SLA timers, inbound email, escalations, stale-ticket reminders, recurring tickets, scheduled reports and out-of-office coverage all run from cron (Task Scheduler on Windows). <a href="/admin/settings/cron-jobs"><strong>Settings → Automation → Cron Jobs</strong></a> lists the exact command for each job, and shows whether each one is running. See <a href="/admin/docs/automations">Automations</a>.</li>
+    <li><strong>Background jobs.</strong> SLA timers and ticket reminders, inbound email, escalations, recurring tickets, scheduled reports and out-of-office coverage all run from cron (Task Scheduler on Windows). <a href="/admin/settings/cron-jobs"><strong>Settings → Automation → Cron Jobs</strong></a> lists the exact command for each job, and shows whether each one is running. See <a href="/admin/docs/automations">Automations</a>.</li>
 </ul>
 </div>
 </div>
@@ -109,7 +109,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
     <li><strong>Email-to-ticket and reply-by-email</strong>: <a href="/admin/docs/email">Email &amp; Notifications</a></li>
     <li><strong>Microsoft 365 sign-in</strong>: <a href="/admin/docs/sso">Single Sign-On</a></li>
     <li><strong>Teams channel alerts</strong>: <a href="/admin/docs/teams">Microsoft Teams</a></li>
-    <li><strong>Automation rules, escalations and stale-ticket reminders</strong>: <a href="/admin/docs/automations">Automations</a></li>
+    <li><strong>Automation rules, escalations and ticket reminders</strong>: <a href="/admin/docs/automations">Automations</a></li>
     <li><strong>AI routing, duplicate detection and similar past tickets</strong>: <a href="/admin/docs/ai">AI Classification</a></li>
     <li><strong>Satisfaction surveys</strong>: <a href="/admin/docs/csat">Satisfaction Surveys</a></li>
     <li><strong>Knowledge base articles</strong>: <a href="/admin/docs/kb">Knowledge Base</a></li>

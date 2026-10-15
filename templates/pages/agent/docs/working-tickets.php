@@ -111,11 +111,12 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/agent/help'], ['label' => 'Worki
 <div class="card border-0 shadow-sm mb-4" id="updating">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-sliders text-primary me-2"></i>Updating Ticket Fields</h5>
-<p class="text-muted mb-2">Use the <strong>Update Ticket</strong> card on the right to change <strong>Status</strong>, <strong>Priority</strong>, <strong>Assigned To</strong>, <strong>Group</strong> and <strong>Type</strong>. The <strong>Update</strong> button becomes clickable once you change something. Each change is recorded on the timeline. You can also reassign straight from the <strong>Assigned To</strong> line in the Details card.</p>
+<p class="text-muted mb-2">Use the <strong>Update Ticket</strong> card on the right to change <strong>Status</strong>, <strong>Priority</strong>, <strong>Assigned To</strong>, <strong>Group</strong>, <strong>Type</strong> and <strong>Due Date</strong>. The <strong>Update</strong> button becomes clickable once you change something. Each change is recorded on the timeline. You can also reassign straight from the <strong>Assigned To</strong> line in the Details card.</p>
 <ul class="text-muted mb-0">
     <li>Changing the <strong>Group</strong> immediately narrows <em>Assigned To</em> to that group's members.</li>
     <li>Changing the <strong>Type</strong> moves the ticket into that type's default group (if it has one). Moving it to a group that doesn't match its type clears the type to &ldquo;Not Set&rdquo;.</li>
     <li>Only the priorities allowed for the ticket's type are offered.</li>
+    <li>The <strong>Due Date</strong> usually follows the SLA resolution date, shown as <em>SLA target</em> under the field. If you move it past the SLA target, a box asks you to tell the customer why and when to expect it, with a reply already drafted: <strong>Send reply &amp; save</strong> sends it as a normal public reply and saves the date, or choose <strong>Save without replying</strong>. Moving the due date doesn't change the SLA.</li>
     <li>If someone else changed the status after you opened the page, your status change is skipped and a message tells you what it was changed to. Your other changes are still saved.</li>
 </ul>
 </div>

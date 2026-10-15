@@ -28,7 +28,7 @@ final class RecurringTickets
      * clock — a "monthly" schedule fires *on* the 15th, not at 09:42 on
      * the 15th. We pick 06:00 local so the ticket is in the agent's
      * inbox before they sit down, but late enough that overnight batch
-     * jobs (escalations, stale-ticket sweeps) won't trip over it.
+     * jobs (escalations, ticket reminders) won't trip over it.
      */
     private const DEFAULT_HOUR = 6;
     private const DEFAULT_MIN  = 0;

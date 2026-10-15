@@ -69,7 +69,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <ul class="text-muted mb-0">
     <li>All seven days selected means no extra restriction.</li>
     <li>Changing only the days on a type tab saves on its own; you don't need to fill in the times.</li>
-    <li>Counted days are honoured when a paused ticket resumes, and they also pace the <a href="/admin/docs/automations#stale-tickets">stale-ticket</a> clock.</li>
+    <li>Counted days are honoured when a paused ticket resumes.</li>
 </ul>
 </div>
 </div>
@@ -85,7 +85,8 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-hourglass-split text-primary me-2"></i>How Timers Work</h5>
 <ul class="text-muted mb-2">
-    <li>When a ticket with a priority is created, the matching targets are added to its start time, counting only business hours on counted days and skipping excluded holidays.</li>
+    <li>When a ticket with a priority is created (from any channel, including email-to-ticket and splits), the matching targets are added to its start time, counting only business hours on counted days and skipping excluded holidays.</li>
+    <li>With <strong>Due date follows the SLA</strong> on (the default), the ticket's due date is set to the resolution deadline and moves whenever that deadline moves. A due date set by hand is kept, and moving the due date never changes the SLA. See <a href="/admin/docs/automations#ticket-reminders">Ticket Reminders</a>.</li>
     <li>The <strong>first response</strong> deadline is met by the first public reply from staff. The <strong>resolution</strong> deadline is met when the ticket moves to a closed-bucket status (e.g. Resolved or Closed).</li>
     <li>A ticket is <span class="text-success fw-semibold">On track</span>, then <span class="text-warning fw-semibold">Warning</span> once 80% of a deadline has elapsed, then <span class="text-danger fw-semibold">Breached</span> after it passes.</li>
     <li>Moving into Warning or Breached creates an in-app notification for the assigned agent; a breach can also post to <a href="/admin/docs/teams">Microsoft Teams</a>.</li>
@@ -130,7 +131,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-terminal text-primary me-2"></i>Keeping SLA States Current</h5>
 <ul class="text-muted mb-0">
-    <li>The <strong>SLA Recalculation</strong> cron job is <strong>required</strong> and runs every 5 minutes; it moves tickets into Warning and Breached as time passes. Get the exact command from <a href="/admin/settings/cron-jobs">Cron Jobs</a>. It can also be triggered over HTTP with a secret token (<code>SLA_CRON_TOKEN</code> in <code>.env</code>).</li>
+    <li>The <strong>SLA Recalculation</strong> cron job is <strong>required</strong> and runs every 5 minutes; it moves tickets into Warning and Breached as time passes. Get the exact command from <a href="/admin/settings/cron-jobs">Cron Jobs</a>. It can also be triggered over HTTP with a secret token (<code>SLA_CRON_TOKEN</code> in <code>.env</code>). The same job sends <a href="/admin/docs/automations#ticket-reminders">Ticket Reminders</a> (so it counts as an email-sending job) and routes any ticket with no group to the default group.</li>
     <li><strong>Recalculate All</strong> on the SLA Policies page recalculates every active ticket immediately.</li>
     <li>The first time a ticket's state is calculated, no notifications are sent, so putting a backlog under SLA doesn't flood anyone.</li>
     <li>Tickets marked <strong>SLA-exempt</strong> (e.g. imported with "Exclude from SLA") never get a clock, even if they are edited later.</li>
@@ -141,10 +142,10 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <div class="card border-0 shadow-sm mb-4" id="duration-units">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-clock text-primary me-2"></i>Typing Durations</h5>
-<p class="text-muted mb-2">The SLA targets here, plus the <a href="/admin/docs/automations#stale-tickets">stale-ticket thresholds</a>, the stale re-notify gap and the escalation re-fire cooldown, all accept unit suffixes:</p>
+<p class="text-muted mb-2">The SLA targets here, plus the escalation re-fire cooldown, accept unit suffixes:</p>
 <ul class="text-muted mb-2">
     <li><code>72h</code>, <code>3d</code> and <code>4320m</code> mean the same thing, and units can be combined: <code>1d 2h 30m</code>.</li>
-    <li>A bare number uses the field's own unit: minutes for SLA targets, hours for stale and escalation fields. Add the unit to be unambiguous.</li>
+    <li>A bare number uses the field's own unit: minutes for SLA targets, hours for the escalation cooldown. Add the unit to be unambiguous.</li>
 </ul>
 <p class="text-muted mb-0">Values are stored in minutes and shown rolled up (<code>60m</code> shows as <code>1h</code>, <code>80m</code> as <code>1h 20m</code>, <code>24h</code> as <code>1d</code>). Here <code>1d</code> always means 24 hours. SLA time only elapses during business hours, so a <code>1d</code> target means 24 <em>business</em> hours.</p>
 </div>

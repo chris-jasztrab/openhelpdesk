@@ -46,7 +46,7 @@ If you only want to spin up an evaluation copy on your laptop, jump to [Installa
 13. [Escalations](#13-escalations)
     - 13.1 [Time-based escalation rules](#131-time-based-escalation-rules)
     - 13.2 [Manual escalation paths](#132-manual-escalation-paths)
-    - 13.3 [Stale ticket notifications](#133-stale-ticket-notifications)
+    - 13.3 [Ticket reminders](#133-ticket-reminders)
     - 13.4 [Out-of-Office coverage](#134-out-of-office-coverage)
 14. [AI ticket triage (optional)](#14-ai-ticket-triage-optional)
 15. [CSAT surveys](#15-csat-surveys)
@@ -81,7 +81,7 @@ It also has an **optional AI triage layer** powered by Anthropic Claude or OpenA
 
 Released under the [MIT License](LICENSE).
 
-> Architecture in one paragraph: requests hit `public/index.php`, which boots `src/bootstrap.php` (env + session + migrations), then dispatches through `src/Router.php` to a route file in `src/routes/`. Each route renders a PHP template from `templates/pages/...`. Long-running jobs (SLA recalc, inbound mail, escalations, stale-ticket emails, scheduled reports) live in `scripts/` and are invoked by cron. The database schema sits in `database/schema.sql`; numbered migration files in `database/migrations/` apply incrementally on every request, so deploying is `git pull` (plus a permission fix if you run as `www-data`).
+> Architecture in one paragraph: requests hit `public/index.php`, which boots `src/bootstrap.php` (env + session + migrations), then dispatches through `src/Router.php` to a route file in `src/routes/`. Each route renders a PHP template from `templates/pages/...`. Long-running jobs (SLA recalc and ticket reminders, inbound mail, escalations, scheduled reports) live in `scripts/` and are invoked by cron. The database schema sits in `database/schema.sql`; numbered migration files in `database/migrations/` apply incrementally on every request, so deploying is `git pull` (plus a permission fix if you run as `www-data`).
 
 ![Admin dashboard](docs/screenshots/admin-dashboard.png)
 *Admin dashboard — your home base after logging in.*
@@ -394,7 +394,7 @@ Go to **Admin → Settings → Cron Jobs**. The page shows the full crontab with
 On Linux, `crontab -e` (as the user that owns the project files — usually `www-data` if you followed the LAMP setup above):
 
 ```cron
-# SLA recalculation — every 5 minutes (required)
+# SLA recalculation + ticket reminders — every 5 minutes (required)
 */5  * * * * php /var/www/openhelpdesk/public/sla-cron.php                >> /var/www/openhelpdesk/storage/logs/sla-cron.log         2>&1
 
 # Inbound email replies — every 5 minutes (only if Microsoft Graph / IMAP is configured)
@@ -408,9 +408,6 @@ On Linux, `crontab -e` (as the user that owns the project files — usually `www
 
 # Scheduled reports — every 30 minutes (only if scheduled reports exist)
 */30 * * * * php /var/www/openhelpdesk/scripts/process-scheduled-reports.php >> /var/www/openhelpdesk/storage/logs/scheduled-reports.log 2>&1
-
-# Stale ticket notifications — hourly (configurable in Settings → Stale Tickets)
-0    * * * * php /var/www/openhelpdesk/scripts/process-stale-tickets.php  >> /var/www/openhelpdesk/storage/logs/stale-tickets.log    2>&1
 
 # Microsoft Graph app-secret expiry reminders — daily at 08:00 (only if Graph is configured)
 0    8 * * * php /var/www/openhelpdesk/scripts/process-secret-reminders.php >> /var/www/openhelpdesk/storage/logs/secret-reminders.log 2>&1
@@ -442,7 +439,7 @@ Open an **elevated** PowerShell or Command Prompt (Run as Administrator — non-
 schtasks /Create /TN "OpenHelpDesk SLA Recalculation" /TR "'C:\xampp\php\php.exe' 'C:\xampp\htdocs\openhelpdesk\public\sla-cron.php'" /SC MINUTE /MO 5 /F
 ```
 
-The `/F` flag overwrites an existing task with the same name, so re-pasting an updated command is safe. Repeat for each job listed on the Cron Jobs page (SLA, Inbound Email, Escalations, Recurring Tickets, Scheduled Reports, Stale Ticket Notifications, Secret Reminders).
+The `/F` flag overwrites an existing task with the same name, so re-pasting an updated command is safe. Repeat for each job listed on the Cron Jobs page (SLA, Inbound Email, Escalations, Recurring Tickets, Scheduled Reports, Secret Reminders).
 
 #### Option B — wrapper `.bat` files (recommended; makes the status dashboard work)
 
@@ -636,7 +633,7 @@ Tell the system which dates your team is closed so SLA timers skip them. The pag
 
 For convenience, **Auto-Populate Year** opens a modal that lets you pick a country (CA, US, GB, AU, NZ, IE) and a year, and inserts every federal / provincial holiday for that year in one click. Variable-date holidays like Easter are calculated for the exact year. Dates already in your list are skipped, not duplicated. Holidays added via auto-populate are flagged "Exclude from SLA" by default.
 
-> The escalation cron and stale-ticket cron also respect business hours and holidays — a "3-day customer follow-up" rule won't fire on a weekend if Saturday and Sunday aren't business days.
+> The escalation cron also respects business hours and holidays — a "3-day customer follow-up" rule won't fire on a weekend if Saturday and Sunday aren't business days.
 
 ---
 
@@ -692,7 +689,6 @@ A ticket type is the top-level "what kind of request is this" category. Common e
 | **No Wrong Door** | (Internal field name: `ai_route_group`.) When on, the AI router (if enabled) reads the ticket body and picks the best-matching group from your configured groups' descriptions. Mutually exclusive with Confidential. See [AI](#14-ai-ticket-triage-optional). |
 | **AI duplicate check** | When on, the AI scans recent open non-confidential tickets at the same branch when a requester clicks Submit and warns if any look like the same issue. Useful at multi-shift sites where staff don't see what's already in the queue. Has a separate **threshold** slider for match-confidence floor. Requires AI to be enabled. |
 | **Show to "Location Ticket Visibility" users** | When on, a non-agent user with the *Location Ticket Visibility* flag can see tickets of this type at their location. Off means even location-visible users don't see this type. Useful for sensitive categories. |
-| **Stale-ticket override** | Override the global stale-ticket threshold for this type (e.g. give "Facilities" a 7-day threshold instead of the global 3-day). |
 | **Escalation path** | Per-type ordered chain of agents the manual **Escalate** button rotates through. See [Manual escalation paths](#132-manual-escalation-paths). |
 
 Create your first three or four types now. You can always add more later.
@@ -878,7 +874,7 @@ Every creation path — portal form, agent / admin forms, ticket-split, public R
 Two more safety nets fire after the ticket is in the database:
 
 - After post-create hooks (automations + AI classification) have run, if the ticket still has no group, a final sweep routes it to the system default.
-- The hourly stale-ticket cron catches any orphan that slipped through and logs a warning — so a misconfiguration can never silently park tickets in an invisible "no group" queue.
+- The SLA cron (every 5 minutes) catches any orphan that slipped through, routes it to the default group with a timeline note and logs a warning — so a misconfiguration can never silently park tickets in an invisible "no group" queue.
 
 Configure the system default at **Admin → Settings → Ticket Routing Defaults**. Best practice: create (or designate) a generic *Triage* or *Service Desk* group, set its auto-assignment strategy to **Load-Based** or **First Available**, and point the system default at it. That way the catch-all queue is also auto-distributed to a human.
 
@@ -1081,24 +1077,24 @@ Who can click Escalate:
 
 If the current assignee already appears in the chain (they *are* Tier 2), Escalate skips ahead to the step **after** them rather than looping back. On escalation the previous assignee is added as a watcher (so they keep email visibility even if the ticket leaves their group), the new assignee receives the dedicated **Ticket Escalated** email template, and an internal timeline entry is recorded.
 
-### 13.3 Stale ticket notifications
+### 13.3 Ticket reminders
 
-**Admin → Settings → Stale Tickets.**
+**Admin → Settings → Ticket Reminders** (`/admin/settings/ticket-reminders`, under Automation; needs the `automations.manage` permission). This replaces the old Stale Tickets page.
 
-![Stale-ticket settings](docs/screenshots/stale-tickets.png)
-*Stale ticket settings — global threshold, re-notify gap, agent / requester toggles. Per-type overrides live on the Ticket Types page.*
-
-Stale-ticket notifications email the assigned agent (or the group, if unassigned) when a ticket has had **no activity** for longer than the configured threshold and is in a status that's still waiting on your team. Tickets in Waiting on Customer, Waiting on Third Party, Resolved, or Closed are intentionally ignored — the clock only runs when the ball is in your court.
+Ticket reminders nudge the **ticket owner** to keep the customer informed. Nothing on this page emails the customer automatically.
 
 Settings:
 
-- **Stale threshold (hours)** — default 72. Set to 0 to disable.
-- **Re-notify after (hours)** — default 24. Minimum gap between repeat nags.
-- **Notify the assigned agent** toggle.
-- **Notify the requester** toggle (sends a "we haven't forgotten you" email).
-- **Per-type override** on the Ticket Types page — override the global threshold per type.
+- **Due date follows the SLA** — on by default. A ticket's due date is set to its SLA resolution date and moves with it when the SLA moves (a pause ends, reopen, priority or type change). A due date someone set by hand is never overwritten.
+- **Ask for a customer reply when a due date moves past the SLA date** — on by default. The ticket page's **Update Ticket** panel has a **Due Date** field (with "SLA target: <date>" under it). Saving a later date opens *New due date is past the SLA target* with a drafted reply to the customer: **Send reply & save** posts a normal public reply (requester, CCs and watchers) and saves the date, **Save without replying** just saves it, **Cancel** backs out. The change is logged as an internal **Due Date Changed** timeline entry. The SLA itself is not changed, so SLA reports stay honest.
+- **Email the owner when a ticket passes its due date** — off by default. Sent once, the day after the due date, if the ticket is still open. Moving the due date later re-arms it for the new date. Template: **Overdue Reminder**.
+- **Email the owner when the customer hasn't heard from us in N days** — off by default; N defaults to 15 (1–365). Counted from the last public staff reply, or from ticket creation if there is none. Any public reply resets it, and it repeats every N days while the silence continues. Template: **Update Due Reminder**.
+- **If a ticket has no owner, email its group's manager(s) instead** — off by default. Managers are group members ticked **Manager** under Groups. With it off, unassigned tickets get no reminder.
+- **Coverage** — *New tickets only* (default; only tickets created after the page is saved get reminders, and nothing is sent until it has been saved once) or *All open tickets* (the first run can email about the whole backlog).
 
-The cron `0 * * * *` runs `scripts/process-stale-tickets.php`. Each notification posts an internal `stale_notification_sent` timeline entry to dedupe. Replying to or updating the ticket clears its staleness automatically (the threshold is measured from `updated_at`).
+Tickets in **Waiting on Customer** are skipped, and owners who turned off "a ticket is assigned to me" emails on their profile don't get these. Each reminder posts an internal `overdue_reminder_sent` or `update_reminder_sent` timeline entry, which is also how duplicates are prevented. Both templates support `{{first_name}} {{last_name}} {{user_name}} {{ticket_id}} {{subject}} {{requester}} {{due_date}} {{days_since_contact}} {{group}}`.
+
+Reminders run inside the **SLA Recalculation** job (`public/sla-cron.php`, every 5 minutes), so there is no separate cron line. Use **Dry run** on that job in **Settings → Cron Jobs** to preview what would be sent. If your crontab still has the old hourly `scripts/process-stale-tickets.php` line, remove it — the script no longer exists.
 
 ### 13.4 Out-of-Office coverage
 
@@ -1740,8 +1736,7 @@ All runtime logs live in `storage/logs/`. The useful ones:
 | `escalations.log` | Output of `scripts/process-escalations.php`. |
 | `recurring-tickets.log` | Output of `scripts/process-recurring-tickets.php`. |
 | `scheduled-reports.log` | Output of `scripts/process-scheduled-reports.php`. |
-| `stale-tickets.log` | Output of `scripts/process-stale-tickets.php`. |
-| `sla-cron.log` | Output of `public/sla-cron.php`. |
+| `sla-cron.log` | Output of `public/sla-cron.php` (SLA recalculation, ticket reminders, no-group sweep). |
 | `sso-debug.log` | When SSO Debug is on. |
 | `secret-reminders.log` | Output of `scripts/process-secret-reminders.php`. |
 | `php-error.log` | PHP errors. Web server's `error_log` directive should also point here. |
@@ -1819,7 +1814,6 @@ The authoritative version of this list is at **Admin → Settings → Cron Jobs*
 | Escalation Rules | every 15 min | If rules exist | `scripts/process-escalations.php` |
 | Recurring Tickets | every 15 min | If recurring schedules exist | `scripts/process-recurring-tickets.php` |
 | Scheduled Reports | every 30 min | If schedules exist | `scripts/process-scheduled-reports.php` |
-| Stale Ticket Notifications | hourly | Optional | `scripts/process-stale-tickets.php` |
 | App Secret Expiry Reminders | daily at 08:00 | If Graph configured | `scripts/process-secret-reminders.php` |
 
 ---
@@ -1868,7 +1862,7 @@ The authoritative version of this list is at **Admin → Settings → Cron Jobs*
 | `/admin/settings/email-templates` | Outbound email templates. |
 | `/admin/settings/escalations` | Time-based escalation rules. |
 | `/admin/settings/escalation-paths` | Manual escalation paths. |
-| `/admin/settings/stale-tickets` | Stale-ticket thresholds. |
+| `/admin/settings/ticket-reminders` | Ticket reminders: due date follows SLA, overdue / update-due owner emails. |
 | `/admin/settings/cron-jobs` | Cron job dashboard. |
 | `/admin/settings/labels` | Label vocabulary customisation. |
 | `/admin/settings/sso` | Microsoft 365 SSO. |
@@ -1914,7 +1908,7 @@ The admin UI ships with its own per-feature documentation that goes deeper than 
 | `/admin/docs/users` | Roles, group managers, online presence, confidential groups in depth. |
 | `/admin/docs/tickets` | Full ticket lifecycle, merge / split, watching, bulk actions. |
 | `/admin/docs/sla` | SLA mechanics, pause/resume, re-initialisation. |
-| `/admin/docs/automations` | Automations, group auto-assign, escalation rules, manual paths, stale tickets — all in one page. |
+| `/admin/docs/automations` | Automations, group auto-assign, escalation rules, manual paths, ticket reminders — all in one page. |
 | `/admin/docs/ai` | AI provider setup, No Wrong Door, debugging, cost analysis. |
 | `/admin/docs/email` | Inbound email backend deep-dive (Graph + IMAP). |
 | `/admin/docs/sso` | Microsoft 365 SSO configuration. |

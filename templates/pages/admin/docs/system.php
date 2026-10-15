@@ -99,7 +99,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
         <tr><td><code>php-error.log</code></td><td>PHP errors and warnings from the website and background jobs. Errors only appear on screen when <code>APP_DEBUG=true</code> in <code>.env</code>, which should stay <code>false</code> on a live site.</td></tr>
         <tr><td><code>smtp.log</code></td><td>Outgoing mail sessions, plus skipped sends while outbound mail is switched off. See <a href="/admin/docs/email">Email &amp; Notifications</a>.</td></tr>
         <tr><td><code>sso-debug.log</code></td><td>Microsoft 365 sign-in steps. See <a href="/admin/docs/sso">Single Sign-On</a>.</td></tr>
-        <tr><td>One log per background job</td><td>For example <code>scheduled-reports.log</code>, <code>stale-tickets.log</code> and <code>escalations.log</code>. The Cron Jobs page uses these to show when each job last ran. See <a href="/admin/docs/automations">Automations</a>.</td></tr>
+        <tr><td>One log per background job</td><td>For example <code>sla-cron.log</code>, <code>scheduled-reports.log</code> and <code>escalations.log</code>. The Cron Jobs page uses these to show when each job last ran. See <a href="/admin/docs/automations">Automations</a>.</td></tr>
         <tr><td><code>cron-manual-runs.log</code></td><td>Who ran a background job by hand from the Cron Jobs page, dry run or live, and how it finished.</td></tr>
     </tbody>
 </table>

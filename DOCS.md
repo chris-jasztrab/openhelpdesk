@@ -234,7 +234,7 @@ The ticket page (`/agent/tickets/{id}`; admins `/admin/tickets/{id}`) has a stic
 - **Details**: status, priority, type, location, requester (with "filed by" when submitted on someone's behalf), group, assignee, dates and escalation level.
 - **Custom Fields** that have values.
 - **CC**: add or remove people who receive updates. Staff who are CC'd can open the ticket.
-- **Update Ticket**: change status, priority, type, group and assignee. Changing the group re-filters the assignee list. Changing the type moves the ticket into that type's default group. Picking a group that doesn't match the type's group clears the type. If someone else changed the status while you were editing, the status change is refused rather than overwritten.
+- **Update Ticket**: change status, priority, type, group, assignee and due date. Changing the group re-filters the assignee list. Changing the type moves the ticket into that type's default group. Picking a group that doesn't match the type's group clears the type. If someone else changed the status while you were editing, the status change is refused rather than overwritten.
 - **Time Tracking** (types that track time). See [Time Tracking](#time-tracking).
 - **SLA**: first-response and resolution due times with on-track / warning / breached state.
 - **Escalation History**, **Satisfaction Survey** result, and (admins) **AI Classification** details.
@@ -339,7 +339,7 @@ The admin ticket list and ticket page (`/admin/tickets`) work the same as the ag
 | Security | SSO / Microsoft 365 |
 | Integrations | Microsoft Teams |
 | Customization | Branding, Labels, Tags, Canned Responses, Ticket Templates, CSAT Surveys, Undo Send, Attachments |
-| Automation | Automations, AI Classification, Escalation Paths, Escalation Rules, Stale Tickets, Out of Office, Recurring Tickets, Scheduled Reports, Cron Jobs |
+| Automation | Automations, AI Classification, Escalation Paths, Escalation Rules, Ticket Reminders, Out of Office, Recurring Tickets, Scheduled Reports, Cron Jobs |
 | Reports | Reports |
 | Data | Import Tickets, Import Users, Import KB, Backup |
 | System | Audit Log, Danger Zone |
@@ -461,7 +461,6 @@ You can add custom statuses, reorder them by dragging, deactivate them, and choo
 | Prompt for a resolution note before the owner closes | Asks the assigned agent for a resolution note when closing. |
 | Track time spent on these tickets | Adds the Time Tracking card. |
 | Form Fields | **Edit this type's form** opens the form builder for this type. |
-| Stale Threshold | Overrides the global stale-ticket threshold (for example `3d`, `72h`). Leave blank to inherit. |
 | SLA on Reopen | Overrides the global reopen behaviour (see [SLA System](#sla-system)). |
 | Required Skills | Used by skill-based auto-assignment. |
 | Available Priorities | Limits which priorities this type offers. All ticked means no restriction. |
@@ -507,7 +506,7 @@ Every ticket ends up in a group. The group is chosen in this order: the group ex
 1. **Settings → Business Hours** and **Holidays** define when SLA time counts.
 2. **Settings → SLA Policies** sets **first response** and **resolution** targets for each priority. A **Default** tab applies to all types, and each ticket type has its own tab that can override any target. Enter durations as `90m`, `8h` or `2d`; a bare number means minutes. Blank type values inherit the default. A priority can have one target or both, and a priority with neither gets no SLA.
 3. Each policy row has **SLA counts on** day toggles. Days that aren't ticked freeze that policy's timer. A type can also use its own business-hours schedule.
-4. When a ticket gets a priority with a matching policy, its due dates are calculated in business time. Its state is **On Track**, **Warning** (80% of the allowed time used) or **Breached**.
+4. When a ticket gets a priority with a matching policy, its due dates are calculated in business time. Its state is **On Track**, **Warning** (80% of the allowed time used) or **Breached**. With **Due date follows the SLA** on (see [Ticket Reminders](#ticket-reminders)), the ticket's due date is set to the resolution deadline and moves with it.
 5. A master **Enable SLA tracking** switch turns SLA off site-wide while keeping policies and history.
 
 ### Pausing, Changes and Reopening
@@ -518,7 +517,7 @@ Every ticket ends up in a group. The group is chosen in this order: the group ex
 
 ### Recalculation and Alerts
 
-The SLA cron job (every 5 minutes) updates SLA states and sends in-app warning and breach alerts. **Recalculate All** on the SLA Policies page runs a recalculation immediately. Email on breach is configured through **Escalation Rules**. The **Escalate** button can be set to appear only after a breach (see [Escalation Paths](#escalation-paths)).
+The SLA cron job (every 5 minutes) updates SLA states, sends in-app warning and breach alerts, and also runs [Ticket Reminders](#ticket-reminders) and the no-group sweep. **Recalculate All** on the SLA Policies page runs a recalculation immediately. Email on breach is configured through **Escalation Rules**. The **Escalate** button can be set to appear only after a breach (see [Escalation Paths](#escalation-paths)).
 
 ---
 
@@ -528,12 +527,11 @@ Background jobs are listed on **Settings → Cron Jobs**. That page shows each j
 
 | Job | Purpose |
 |-----|---------|
-| SLA Recalculation | SLA states, warning/breach alerts, follow-up reminders |
+| SLA Recalculation | SLA states, warning/breach alerts, follow-up reminders, ticket reminders, the no-group sweep |
 | Inbound Email Replies | Reads the Microsoft 365 mailbox into tickets |
 | Escalation Rules | Time-based rules |
 | Scheduled Reports | Emails due reports |
 | Recurring Tickets | Creates scheduled tickets |
-| Stale Ticket Notifications | Idle-ticket reminders |
 | Out-of-Office Coverage | Covers tickets owned by away agents |
 | App Secret Expiry Reminders | Warns admins before the Microsoft Graph secret expires |
 
@@ -549,9 +547,18 @@ Background jobs are listed on **Settings → Cron Jobs**. That page shows each j
 
 **Settings → Escalation Paths**: an ordered chain of people for each ticket type (Level 1, Level 2, …), each with an optional label. The **Escalate** button on the staff and portal ticket pages hands the ticket to the next person in the chain and emails them. The **Escalate Button Visibility** setting chooses between *Always show* and *Only after SLA breach*.
 
-### Stale Tickets
+### Ticket Reminders
 
-**Settings → Stale Tickets**: finds active tickets that have been idle beyond a threshold (global, or per type) and can email the assigned agent (or the whole group if the ticket is unassigned), the requester, and the group manager(s). Idle time counts only the days the ticket's SLA policy counts. **Coverage** can be *Retroactive* or *New tickets only*. Turn notifications on carefully: a first run in Retroactive mode can email your whole backlog.
+**Settings → Ticket Reminders** (replaces the old Stale Tickets page) nudges the ticket owner to keep the customer informed. Nothing on it emails the customer automatically.
+
+- **Due date follows the SLA** (on by default): the due date is set to the SLA resolution date and moves with it (a pause ends, reopen, priority or type change). A due date set by hand is never overwritten.
+- **Ask for a customer reply when a due date moves past the SLA date** (on by default): saving a due date later than the SLA target in the **Update Ticket** panel opens a prompt with a drafted reply. **Send reply & save** posts it as a normal public reply; **Save without replying** just saves the date. The change is logged as **Due Date Changed**. The SLA itself is not changed.
+- **Email the owner when a ticket passes its due date** (off by default): sent once, the day after the due date, if the ticket is still open. Moving the due date later re-arms it.
+- **Email the owner when the customer hasn't heard from us in N days** (off by default, N defaults to 15): counted from the last public staff reply, or from creation. Any public reply resets it; it repeats every N days.
+- **If a ticket has no owner, email its group's manager(s) instead** (off by default). With it off, unassigned tickets get no reminder.
+- **Coverage**: *New tickets only* (default; nothing is sent until the page is saved once) or *All open tickets* (the first run can email about the whole backlog).
+
+Tickets in Waiting on Customer are skipped, and owners who turned off "a ticket is assigned to me" emails don't get these. Each reminder adds an **Overdue Reminder Sent** or **Update Reminder Sent** timeline entry, which also prevents duplicates. Reminders run inside the SLA Recalculation job, so there is no separate cron line; use **Dry run** on that job to preview them.
 
 ### Out of Office
 
@@ -630,15 +637,15 @@ Mail that can't be delivered is held on **Settings → Email Queue**, where you 
 
 | Audience | Events |
 |----------|--------|
-| Staff | New ticket created (group members), ticket assigned to group, ticket assigned to agent, requester replies, note added, stale ticket, stale ticket (group manager) |
-| Requester | New ticket confirmation, ticket assigned to an agent, agent adds a comment, ticket resolved, ticket closed, stale-ticket check-in |
+| Staff | New ticket created (group members), ticket assigned to group, ticket assigned to agent, requester replies, note added |
+| Requester | New ticket confirmation, ticket assigned to an agent, agent adds a comment, ticket resolved, ticket closed |
 | CC'd people | New ticket created, comment added, and a one-time "you were added as a CC" notice |
 
-Other emails: ticket merged, satisfaction survey, escalation to the next person in a path, escalation-rule reminders, forwarded tickets, password reset, scheduled reports, confidential-access security alerts, and Graph secret-expiry reminders.
+Other emails: ticket merged, satisfaction survey, escalation to the next person in a path, escalation-rule reminders, overdue and update-due [ticket reminders](#ticket-reminders) to the ticket owner, forwarded tickets, password reset, scheduled reports, confidential-access security alerts, and Graph secret-expiry reminders.
 
 ### Email Templates
 
-**Settings → Email Templates** customises the subject, intro (rich text), button label and, where used, the message body. Templates: Ticket Created, Ticket Updated, Ticket Merged, CSAT Survey, Customer Reminder, Group Alerts, Agent Assigned, Group Assigned, Escalation Alert, and Stale (Requester, Agent, Manager). There is also a **Shared Footer**. Click a token chip such as `{{ticket_id}}`, `{{first_name}}` or `{{sla}}` to insert it. **Editing for:** sets per-group overrides of the requester-facing templates. **Reset to default** restores the built-in text.
+**Settings → Email Templates** customises the subject, intro (rich text), button label and, where used, the message body. Templates: Ticket Created, Ticket Updated, Ticket Merged, CSAT Survey, Customer Reminder, Group Alerts, Agent Assigned, Group Assigned, Escalation Alert, Overdue Reminder and Update Due Reminder. There is also a **Shared Footer**. Click a token chip such as `{{ticket_id}}`, `{{first_name}}` or `{{sla}}` to insert it. **Editing for:** sets per-group overrides of the requester-facing templates. **Reset to default** restores the built-in text.
 
 ### Inbound Email
 
@@ -725,7 +732,7 @@ Statuses are configurable. See [Ticket Statuses](#ticket-statuses).
 
 ### Timeline
 
-Every change is logged on the ticket's timeline. Entries include: Created, Comment (public reply), Internal Note, Status Changed, Priority Changed, Assigned, Escalated, Forwarded, Merged, Split, Edited by Requester, SLA Set / Paused / Resumed, Stale Reminder Sent, Satisfaction Rating, and AI entries (AI Classified, AI Routed, AI Routing Skipped, AI Duplicate Warning).
+Every change is logged on the ticket's timeline. Entries include: Created, Comment (public reply), Internal Note, Status Changed, Priority Changed, Assigned, Escalated, Forwarded, Merged, Split, Edited by Requester, SLA Set / Paused / Resumed, Due Date Changed, Overdue Reminder Sent, Update Reminder Sent, Satisfaction Rating, and AI entries (AI Classified, AI Routed, AI Routing Skipped, AI Duplicate Warning).
 
 Requesters only see public entries. Internal notes, system events and AI entries are staff-only, and staff can hide system and AI entries with the timeline switches.
 

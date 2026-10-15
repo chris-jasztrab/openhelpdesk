@@ -26,7 +26,7 @@ For the AI Skill-Based diagram, the sample ticket type is the broader "IT Issue"
 
 ## Diagram 0 — The master flow
 
-Every newly created ticket goes through these steps before any auto-assignment rule runs. Notice the **three layers of defence** against tickets ending up in the "no group" queue: `resolveTicketGroup()` at INSERT time, `backfillTicketGroupFromDefault()` after AI/automations run, and the hourly cron sweep in `scripts/process-stale-tickets.php`.
+Every newly created ticket goes through these steps before any auto-assignment rule runs. Notice the **three layers of defence** against tickets ending up in the "no group" queue: `resolveTicketGroup()` at INSERT time, `backfillTicketGroupFromDefault()` after AI/automations run, and the 5-minute SLA cron sweep in `public/sla-cron.php`.
 
 ```mermaid
 flowchart TD
@@ -233,7 +233,7 @@ A separate, **earlier** safety net than Diagram 7. Diagram 7 handles "no eligibl
 
 1. **At creation** — every ticket creation path calls `resolveTicketGroup()`, which chains caller's pick → ticket type's default group → `default_group_id` setting → lowest-id existing group.
 2. **After post-create hooks** — `backfillTicketGroupFromDefault()` runs after AI and automations and routes any ticket still sitting with a NULL group to the default.
-3. **Hourly cron** — `scripts/process-stale-tickets.php` sweeps any orphans the previous two layers somehow missed (legacy data, hand-edited rows, future creation paths a developer forgot to plumb).
+3. **5-minute cron** — the SLA Recalculation job (`public/sla-cron.php`) sweeps any orphans the previous two layers somehow missed (legacy data, hand-edited rows, future creation paths a developer forgot to plumb).
 
 ```mermaid
 flowchart TD
@@ -248,7 +248,7 @@ flowchart TD
     E -->|No| G["Group stays NULL<br/>(only possible on a<br/>pristine fresh install)"]
     F --> Z
     Z[Ticket gets a group] --> H[Continue to Diagram 0]
-    G --> I["Backfill happens later in<br/>runPostTicketCreateHooks<br/>and the hourly cron sweep"]
+    G --> I["Backfill happens later in<br/>runPostTicketCreateHooks<br/>and the 5-minute SLA cron sweep"]
 ```
 
 **When to use:** Always. The setting is part of the routing core — leaving it unset is supported but inadvisable, since it's the difference between an inbound email landing in a triaged queue versus sitting invisible in the no-group filter view. Best practice: pick (or create) a generic *Triage* / *Service Desk* group, set it as the system default, and configure that group's auto-assign strategy so the catch-all queue is itself auto-distributed to a human.

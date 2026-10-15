@@ -312,7 +312,6 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
         <tr><td><strong>Prompt for a resolution note before the owner closes</strong></td><td>See <a href="#resolution-note">below</a>.</td></tr>
         <tr><td><strong>Track time spent on these tickets</strong></td><td>See <a href="#time-tracking">Time Tracking</a>.</td></tr>
         <tr><td><strong>Form Fields</strong></td><td><strong>Edit this type's form</strong> opens the type in the <a href="#form-builder">Form Builder</a>.</td></tr>
-        <tr><td><strong>Stale Threshold</strong></td><td>See <a href="#stale-threshold">below</a>.</td></tr>
         <tr><td><strong>SLA on Reopen</strong></td><td>Overrides the site-wide <em>When a closed ticket is reopened</em> setting for this type (see <a href="/admin/docs/sla">SLA Policies</a>).</td></tr>
         <tr><td><strong>Required Skills</strong></td><td>Used by Skill-Based auto-assignment (see <a href="/admin/docs/flows#d4">Assignment Flows</a>).</td></tr>
         <tr><td><strong>Available Priorities</strong></td><td>Which priorities requesters and agents can pick for this type. All ticked (the default) offers every priority, including ones added later. Enforced on every form, quick-edit and bulk change; existing tickets keep their priority.</td></tr>
@@ -324,7 +323,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
     <li>The list's <strong>Direct Link</strong> column gives a link that opens the portal form with the type pre-selected (see <a href="#direct-links">Direct Links</a>). A signpost icon marks AI-routed types.</li>
     <li>Deleting a type that still has tickets lets you <strong>Bulk Reassign</strong> them to another type, <strong>Delete All Affected Tickets</strong>, or edit them individually first.</li>
 </ul>
-<p class="text-muted mb-0"><strong>Type Settings Matrix.</strong> <a href="/admin/types/matrix"><strong>Settings → Organization → Type Settings Matrix</strong></a> shows every type against its optional settings (group assigned, confidential, AI routing, AI duplicate check, AI similar tickets, location visibility, time tracking, custom duplicate and stale thresholds, SLA on reopen) in one grid. <strong>Print</strong> fits it on one landscape page.</p>
+<p class="text-muted mb-0"><strong>Type Settings Matrix.</strong> <a href="/admin/types/matrix"><strong>Settings → Organization → Type Settings Matrix</strong></a> shows every type against its optional settings (group assigned, confidential, AI routing, AI duplicate check, AI similar tickets, location visibility, time tracking, custom duplicate threshold, SLA on reopen) in one grid. <strong>Print</strong> fits it on one landscape page.</p>
 </div>
 </div>
 
@@ -348,13 +347,6 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
     </tbody>
 </table>
 </div>
-</div>
-</div>
-
-<div class="card border-0 shadow-sm mb-4" id="stale-threshold">
-<div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-hourglass-split text-warning me-2"></i>Per-Type Stale Threshold</h5>
-<p class="text-muted mb-0">Each ticket type can override the global stale-notification threshold with its <strong>Stale Threshold</strong> field. Enter days, hours or minutes (<code>3d</code>, <code>72h</code>, <code>4320m</code>; a bare number means hours), or leave it blank to inherit the value set under <a href="/admin/settings/stale-tickets">Settings → Automation → Stale Tickets</a>. Useful when "Critical Outage" tickets should nag after 4 hours but "Suggestion Box" tickets can wait much longer. See the <a href="/admin/docs/automations#stale-tickets">Stale Ticket Notifications</a> section for the full picture.</p>
 </div>
 </div>
 

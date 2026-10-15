@@ -106,7 +106,7 @@ try {
         ('groups.manage',            'Manage groups',                    'People',         'Create, edit and delete ticket groups.',                       100),
         ('skills.manage',            'Manage agent skills',              'People',         'Create and assign agent skills.',                              110),
         ('locations.manage',         'Manage locations',                 'Organization',   'Create, edit and delete locations / sites.',                   120),
-        ('automations.manage',       'Manage automations & escalations', 'Automation',     'Configure automation rules, escalations, stale-ticket and scheduled-report jobs.', 130),
+        ('automations.manage',       'Manage automations & escalations', 'Automation',     'Configure automation rules, escalations, ticket reminders and scheduled-report jobs.', 130),
         ('csat.manage',              'Manage CSAT surveys',              'Automation',     'Configure customer satisfaction surveys.',                     140),
         ('ai.manage',                'Manage AI classification',         'Automation',     'Configure AI auto-classification and routing.',                150),
         ('import.manage',            'Import data & manage backups',     'Data',           'Import tickets/users/KB and create or restore backups.',       160),

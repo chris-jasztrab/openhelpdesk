@@ -98,7 +98,7 @@
 </ul>
 
 <h2 id="d0">Diagram 0 — Master flow (every ticket goes through this)</h2>
-<p>The chokepoint that runs on every create path (portal, agent, admin, API, email-to-ticket, ticket splits, legacy CSV import). <code>autoAssignTicket</code> runs <em>after</em> AI classification, automations, and the default-group backfill, so all three can affect what it sees. Three layers of defence keep tickets out of the no-group queue: <code>resolveTicketGroup()</code> at INSERT, <code>backfillTicketGroupFromDefault()</code> after hooks, and the hourly cron in <code>scripts/process-stale-tickets.php</code>.</p>
+<p>The chokepoint that runs on every create path (portal, agent, admin, API, email-to-ticket, ticket splits, legacy CSV import). <code>autoAssignTicket</code> runs <em>after</em> AI classification, automations, and the default-group backfill, so all three can affect what it sees. Three layers of defence keep tickets out of the no-group queue: <code>resolveTicketGroup()</code> at INSERT, <code>backfillTicketGroupFromDefault()</code> after hooks, and the 5-minute SLA cron in <code>public/sla-cron.php</code>.</p>
 <div class="diagram"><pre class="mermaid">
 flowchart TD
     A[End user / agent / API submits ticket] --> B["resolveTicketGroup()<br/>caller's pick → type's group →<br/>default_group_id setting →<br/>lowest-id existing group"]
@@ -259,7 +259,7 @@ flowchart TD
 <ol>
   <li><strong>At creation</strong> — every creation path calls <code>resolveTicketGroup()</code>, which chains caller's pick → ticket type's default group → <code>default_group_id</code> setting → lowest-id existing group.</li>
   <li><strong>After post-create hooks</strong> — <code>backfillTicketGroupFromDefault()</code> sweeps any ticket still sitting with NULL group after AI classification and automations.</li>
-  <li><strong>Hourly cron</strong> — <code>scripts/process-stale-tickets.php</code> sweeps any orphans that the previous two layers somehow missed (legacy data, hand-edited rows, future creation paths a developer forgets to plumb).</li>
+  <li><strong>5-minute cron</strong> — the SLA Recalculation job (<code>public/sla-cron.php</code>) sweeps any orphans that the previous two layers somehow missed (legacy data, hand-edited rows, future creation paths a developer forgets to plumb).</li>
 </ol>
 
 <div class="diagram"><pre class="mermaid">
@@ -275,7 +275,7 @@ flowchart TD
     E -->|no| G["Group stays NULL<br/>(only on a pristine fresh install)"]
     F --> Z
     Z[Ticket gets a group] --> H[Continue to Diagram 0]
-    G --> I["Backfill happens later<br/>in runPostTicketCreateHooks<br/>and the hourly cron sweep"]
+    G --> I["Backfill happens later<br/>in runPostTicketCreateHooks<br/>and the 5-minute SLA cron sweep"]
 </pre></div>
 
 <div class="note">

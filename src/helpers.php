@@ -4685,7 +4685,7 @@ function flashSlaNotice(PDO $db, int $ticketId): void
  * getEmailTpl() need a 'body' entry, and its file in templates/emails/ has to
  * actually echo $bodyText.
  */
-const EMAIL_TPL_BODY_TABS = ['ticket_stale_requester'];
+const EMAIL_TPL_BODY_TABS = [];
 
 /**
  * Resolve the customisable parts of an outgoing email (subject, intro text,
@@ -4765,23 +4765,15 @@ function getEmailTpl(string $name, array $rawTokens, ?int $groupId = null): arra
             'intro'   => '{{escalated_by_name}} has escalated this ticket to you. Please review and take it forward.',
             'button'  => 'View Ticket',
         ],
-        'ticket_stale_agent' => [
-            'subject' => '[Ticket #{{ticket_id}}] Stale — {{hours_since_update}}h without activity: {{subject}}',
-            'intro'   => 'A ticket assigned to you has had no activity for {{hours_since_update}} hours.',
-            'button'  => 'View Ticket',
+        'ticket_overdue' => [
+            'subject' => '[Ticket #{{ticket_id}}] Past its due date: {{subject}}',
+            'intro'   => 'This ticket was due on {{due_date}} and is still open. Please contact {{requester}} to let them know where things stand. If it needs more time, set a new due date on the ticket and tell them when to expect it.',
+            'button'  => 'Open Ticket',
         ],
-        'ticket_stale_manager' => [
-            'subject' => '[Ticket #{{ticket_id}}] Stale in {{group}} — {{hours_since_update}}h without activity: {{subject}}',
-            'intro'   => 'A ticket in a group you manage has had no activity for {{hours_since_update}} hours. Current owner: {{assignee}}.',
-            'button'  => 'View Ticket',
-        ],
-        'ticket_stale_requester' => [
-            'subject' => '[Ticket #{{ticket_id}}] Status update: {{subject}}',
-            'intro'   => 'We wanted to let you know that we\'re still tracking your ticket, even though there\'s no new update yet.',
-            'button'  => 'View Ticket',
-            // Second paragraph, below the status box. Only templates whose
-            // layout renders {{body}} declare one — see the 'body' part below.
-            'body'    => 'You haven\'t been forgotten — your ticket is still in our queue and will be picked up as soon as possible. If you have any additional information that might help, please reply to this ticket to add it to the record.',
+        'ticket_update_due' => [
+            'subject' => '[Ticket #{{ticket_id}}] No reply to {{requester}} in {{days_since_contact}} days: {{subject}}',
+            'intro'   => '{{requester}} hasn\'t had a reply on this ticket in {{days_since_contact}} days. Please send them a short update so they know it\'s still being worked on, even if nothing has changed yet.',
+            'button'  => 'Open Ticket',
         ],
         'ticket_status_resolved' => [
             'subject' => '[Ticket #{{ticket_id}}] Resolved: {{subject}}',
@@ -4830,7 +4822,7 @@ function getEmailTpl(string $name, array $rawTokens, ?int $groupId = null): arra
     $button     = ($g ? getSetting("email_button_{$key}{$g}") : null)
                   ?: getSetting("email_button_{$key}")  ?: $d['button'];
     // 'body' — an optional second paragraph for layouts that have one to
-    // render (currently the stale-requester email). Empty string for every
+    // render (none right now; see EMAIL_TPL_BODY_TABS). Empty string for every
     // other template, so passing it through a layout that ignores it is safe.
     $bodyTpl    = ($g ? getSetting("email_body_{$key}{$g}") : null)
                   ?: getSetting("email_body_{$key}")    ?: ($d['body'] ?? '');
@@ -4892,8 +4884,8 @@ function renderEmail(string $template, array $data = []): string
 function emailNotifyDefault(string $type): string
 {
     return match ($type) {
-        'ticket_stale_manager' => '0',
-        default                => '1',
+        'ticket_overdue', 'ticket_update_due' => '0',
+        default                               => '1',
     };
 }
 
@@ -8793,8 +8785,6 @@ function ticketStaffVisibilitySql(PDO $db, int $userId, ?string $role, string $t
     return ['sql' => "($confClause OR $nonConfClause)", 'params' => $params];
 }
 
-/* ── Stale ticket notifications ─────────────────────────────────────── */
-
 /**
  * Human labels and help text for the SLA reopen behaviours.
  *
@@ -8835,349 +8825,276 @@ function slaReopenBehaviorLabels(): array
     ];
 }
 
+/* ── Ticket reminders (Settings → Ticket Reminders) ─────────────── */
+
 /**
- * Resolve the effective stale threshold (minutes) for a ticket.
- * Per-type override wins; otherwise the global setting; otherwise 3 days.
+ * Email ticket owners about tickets that need them. Rides the 5-minute SLA
+ * cron (public/sla-cron.php). Two independent reminders, both off by default:
+ *
+ *   ticket_overdue     once per due date, the day after it passes while the
+ *                      ticket is still open: "you're late, tell the customer"
+ *   ticket_update_due  when the customer hasn't had a public reply from staff
+ *                      in ticket_update_due_days; repeats every that-many days
+ *                      for as long as the silence lasts
+ *
+ * Waiting on Customer tickets are skipped — the ball is in their court. Each
+ * send writes an internal timeline row, which doubles as the dedup record.
+ *
+ * @return array{overdue: int, update: int} tickets reminded about
  */
-function staleThresholdMinutesForType(PDO $db, ?int $typeId): int
+function processTicketReminders(PDO $db): array
 {
-    if ($typeId) {
-        $stmt = $db->prepare('SELECT stale_threshold_minutes FROM ticket_types WHERE id = ?');
-        $stmt->execute([$typeId]);
-        $val = $stmt->fetchColumn();
-        if ($val !== false && $val !== null && $val !== '') {
-            return (int) $val;
+    $sent      = ['overdue' => 0, 'update' => 0];
+    $overdueOn = emailNotifyEnabled('ticket_overdue');
+    $updateOn  = emailNotifyEnabled('ticket_update_due');
+    if (!$overdueOn && !$updateOn) {
+        return $sent;
+    }
+
+    $where  = [ticketStatusSqlIn(array_values(array_diff(ticketOpenBucketSlugs(), ['waiting_on_customer'])), 't.status')];
+    $params = [];
+    // "New tickets only" coverage: tickets created after the cutoff stamped
+    // when the admin saved that mode, so switching reminders on never mails
+    // about the existing backlog. No cutoff yet means nothing is in scope.
+    if (getSetting('ticket_reminders_scope', 'new') !== 'all') {
+        $cutoff = getSetting('ticket_reminders_scope_cutoff', '');
+        if ($cutoff === '') {
+            return $sent;
         }
+        $where[]  = 't.created_at >= ?';
+        $params[] = $cutoff;
     }
-    return (int) (getSetting('stale_threshold_minutes', '4320') ?: '4320');
-}
+    $base = implode(' AND ', $where);
 
-/**
- * Email the assigned agent (or all members of the assigned group) that a
- * ticket has gone stale. Respects global + per-user notification prefs.
- *
- * Returns the user IDs actually emailed, so notifyStaleTicketManager() can
- * skip anyone who already got this alert — a group's manager is also one of
- * its members, so an unassigned ticket would otherwise mail them twice.
- *
- * @return int[]
- */
-function notifyStaleTicketAgent(PDO $db, array $ticket, int $hoursSinceUpdate, int $thresholdHours): array
-{
-    if (!emailNotifyEnabled('ticket_stale_agent')) {
-        return [];
-    }
-
-    $ticketId = (int) $ticket['id'];
-    $typeName = $priorityName = $submitterName = '';
-    if (!empty($ticket['type_id'])) {
-        $s = $db->prepare('SELECT name FROM ticket_types WHERE id = ?');
-        $s->execute([$ticket['type_id']]);
-        $typeName = $s->fetchColumn() ?: '';
-    }
-    if (!empty($ticket['priority_id'])) {
-        $s = $db->prepare('SELECT name FROM ticket_priorities WHERE id = ?');
-        $s->execute([$ticket['priority_id']]);
-        $priorityName = $s->fetchColumn() ?: '';
-    }
-    if (!empty($ticket['created_by'])) {
-        $s = $db->prepare('SELECT first_name, last_name FROM users WHERE id = ?');
-        $s->execute([$ticket['created_by']]);
-        $row = $s->fetch();
-        $submitterName = $row ? trim($row['first_name'] . ' ' . $row['last_name']) : '';
-    }
-
-    // Determine recipients: assigned agent, or all members of the assigned group.
-    $recipients = [];
-    if (!empty($ticket['assigned_to'])) {
-        $s = $db->prepare(
-            'SELECT id, first_name, last_name, email, role, notify_assigned_to_me
-             FROM users WHERE id = ?'
+    if ($overdueOn) {
+        // A reminder logged after this due date passed means it was sent.
+        // Moving the due date later re-arms it for the new date.
+        $stmt = $db->prepare(
+            "SELECT t.* FROM tickets t
+              WHERE {$base} AND t.due_date < CURDATE()
+                AND NOT EXISTS (SELECT 1 FROM ticket_timeline r
+                                 WHERE r.ticket_id = t.id AND r.action = 'overdue_reminder_sent'
+                                   AND r.created_at >= t.due_date + INTERVAL 1 DAY)"
         );
-        $s->execute([(int) $ticket['assigned_to']]);
-        $row = $s->fetch();
-        if ($row && (bool) ($row['notify_assigned_to_me'] ?? 1)) {
-            $recipients[] = $row;
-        }
-    } elseif (!empty($ticket['group_id'])) {
-        $s = $db->prepare(
-            'SELECT u.id, u.first_name, u.last_name, u.email, u.role, u.notify_assigned_to_group
-             FROM group_user_map gum
-             JOIN users u ON u.id = gum.user_id
-             WHERE gum.group_id = ?'
-        );
-        $s->execute([(int) $ticket['group_id']]);
-        foreach ($s->fetchAll() as $row) {
-            if ((bool) ($row['notify_assigned_to_group'] ?? 1)) {
-                $recipients[] = $row;
-            }
+        $stmt->execute($params);
+        foreach ($stmt->fetchAll() as $ticket) {
+            $sent['overdue'] += sendTicketReminder($db, $ticket, 'ticket_overdue') ? 1 : 0;
         }
     }
 
-    if (empty($recipients)) {
-        return [];
-    }
-
-    $appUrl      = env('APP_URL', 'http://localhost:8000');
-    $statusLabel = ticketStatusLabel((string) $ticket['status']);
-    $notifiedIds = [];
-
-    foreach ($recipients as $agent) {
-        $rolePrefix = match ($agent['role']) {
-            'admin' => '/admin',
-            default => '/agent',
-        };
-        $ticketUrl = $appUrl . $rolePrefix . '/tickets/' . $ticketId;
-
-        $tpl = getEmailTpl('ticket_stale_agent', [
-            'ticket_id'           => $ticketId,
-            'subject'             => $ticket['subject'],
-            'type'                => $typeName,
-            'priority'            => $priorityName,
-            'submitter'           => $submitterName,
-            'hours_since_update'  => (string) $hoursSinceUpdate,
-            'threshold_hours'     => (string) $thresholdHours,
-            'user_name'           => $agent['first_name'] . ' ' . $agent['last_name'],
-            'first_name'          => $agent['first_name'],
-            'last_name'           => $agent['last_name'],
-        ]);
-
-        $emailHtml = renderEmail('ticket-stale-agent', [
-            'ticketId'         => $ticketId,
-            'subject'          => $ticket['subject'],
-            'typeName'         => $typeName,
-            'priorityName'     => $priorityName,
-            'submitterName'    => $submitterName,
-            'hoursSinceUpdate' => $hoursSinceUpdate,
-            'thresholdHours'   => $thresholdHours,
-            'statusLabel'      => $statusLabel,
-            'ticketUrl'        => $ticketUrl,
-            'introText'        => $tpl['intro'],
-            'buttonLabel'      => $tpl['button'],
-            'footerText'       => $tpl['footer'],
-        ]);
-
-        sendMail(
-            $agent['email'],
-            $agent['first_name'] . ' ' . $agent['last_name'],
-            $tpl['subject'],
-            $emailHtml,
-            '',
-            $ticketId
+    if ($updateOn) {
+        $days = max(1, (int) getSetting('ticket_update_due_days', '15'));
+        $stmt = $db->prepare(
+            "SELECT x.* FROM (
+                 SELECT t.*, " . ticketLastContactSql('t') . " AS last_contact_at
+                   FROM tickets t WHERE {$base}
+             ) x
+             WHERE COALESCE(x.last_contact_at, x.created_at) < NOW() - INTERVAL ? DAY
+               AND NOT EXISTS (SELECT 1 FROM ticket_timeline r
+                                WHERE r.ticket_id = x.id AND r.action = 'update_reminder_sent'
+                                  AND r.created_at > NOW() - INTERVAL ? DAY)"
         );
-        $notifiedIds[] = (int) $agent['id'];
-    }
-
-    return $notifiedIds;
-}
-
-/**
- * Email the manager(s) of the group behind a stale ticket.
- *
- * "The group" is the ticket's own group_id, falling back to the default group
- * configured on the ticket's type when the ticket has none — the type's group
- * is what an admin actually curates, and a ticket that has been moved to
- * another group should surface to that group's manager instead.
- *
- * Managers are group members flagged is_manager = 1 (Admin → Groups → edit →
- * per-member Manager checkbox), so a group can have several.
- *
- * Off unless the admin opts in — see emailNotifyDefault().
- *
- * @param  int[] $excludeUserIds Users already emailed by the agent alert.
- * @return int   Number of managers emailed.
- */
-function notifyStaleTicketManager(
-    PDO $db,
-    array $ticket,
-    int $hoursSinceUpdate,
-    int $thresholdHours,
-    array $excludeUserIds = []
-): int {
-    if (!emailNotifyEnabled('ticket_stale_manager')) {
-        return 0;
-    }
-
-    $ticketId = (int) $ticket['id'];
-
-    $groupId = !empty($ticket['group_id']) ? (int) $ticket['group_id'] : 0;
-    if ($groupId === 0 && !empty($ticket['type_id'])) {
-        $g = $db->prepare('SELECT group_id FROM ticket_types WHERE id = ?');
-        $g->execute([(int) $ticket['type_id']]);
-        $groupId = (int) ($g->fetchColumn() ?: 0);
-    }
-    if ($groupId === 0) {
-        return 0;
-    }
-
-    $m = $db->prepare(
-        'SELECT u.id, u.first_name, u.last_name, u.email, u.role
-         FROM group_user_map gum
-         JOIN users u ON u.id = gum.user_id
-         WHERE gum.group_id = ? AND gum.is_manager = 1'
-    );
-    $m->execute([$groupId]);
-    $managers = $m->fetchAll();
-    if (empty($managers)) {
-        return 0;
-    }
-
-    $exclude = array_map('intval', $excludeUserIds);
-
-    $groupName = '';
-    $gn = $db->prepare('SELECT name FROM `groups` WHERE id = ?');
-    $gn->execute([$groupId]);
-    $groupName = (string) ($gn->fetchColumn() ?: '');
-
-    $typeName = $priorityName = $submitterName = $assigneeName = '';
-    if (!empty($ticket['type_id'])) {
-        $s = $db->prepare('SELECT name FROM ticket_types WHERE id = ?');
-        $s->execute([(int) $ticket['type_id']]);
-        $typeName = (string) ($s->fetchColumn() ?: '');
-    }
-    if (!empty($ticket['priority_id'])) {
-        $s = $db->prepare('SELECT name FROM ticket_priorities WHERE id = ?');
-        $s->execute([(int) $ticket['priority_id']]);
-        $priorityName = (string) ($s->fetchColumn() ?: '');
-    }
-    if (!empty($ticket['created_by'])) {
-        $s = $db->prepare('SELECT first_name, last_name FROM users WHERE id = ?');
-        $s->execute([(int) $ticket['created_by']]);
-        $row = $s->fetch();
-        $submitterName = $row ? trim($row['first_name'] . ' ' . $row['last_name']) : '';
-    }
-    if (!empty($ticket['assigned_to'])) {
-        $s = $db->prepare('SELECT first_name, last_name FROM users WHERE id = ?');
-        $s->execute([(int) $ticket['assigned_to']]);
-        $row = $s->fetch();
-        $assigneeName = $row ? trim($row['first_name'] . ' ' . $row['last_name']) : '';
-    }
-
-    $appUrl      = env('APP_URL', 'http://localhost:8000');
-    $statusLabel = ticketStatusLabel((string) $ticket['status']);
-    $sent        = 0;
-
-    foreach ($managers as $manager) {
-        if (in_array((int) $manager['id'], $exclude, true)) {
-            continue; // already got the agent-facing stale alert
+        $stmt->execute(array_merge($params, [$days, $days]));
+        foreach ($stmt->fetchAll() as $ticket) {
+            $sent['update'] += sendTicketReminder($db, $ticket, 'ticket_update_due') ? 1 : 0;
         }
-
-        $rolePrefix = $manager['role'] === 'admin' ? '/admin' : '/agent';
-        $ticketUrl  = $appUrl . $rolePrefix . '/tickets/' . $ticketId;
-
-        $tpl = getEmailTpl('ticket_stale_manager', [
-            'ticket_id'          => $ticketId,
-            'subject'            => $ticket['subject'],
-            'type'               => $typeName,
-            'priority'           => $priorityName,
-            'group'              => $groupName,
-            'submitter'          => $submitterName,
-            'assignee'           => $assigneeName !== '' ? $assigneeName : 'Unassigned',
-            'hours_since_update' => (string) $hoursSinceUpdate,
-            'threshold_hours'    => (string) $thresholdHours,
-            'user_name'          => $manager['first_name'] . ' ' . $manager['last_name'],
-            'first_name'         => $manager['first_name'],
-            'last_name'          => $manager['last_name'],
-        ]);
-
-        $emailHtml = renderEmail('ticket-stale-manager', [
-            'ticketId'         => $ticketId,
-            'subject'          => $ticket['subject'],
-            'typeName'         => $typeName,
-            'priorityName'     => $priorityName,
-            'groupName'        => $groupName,
-            'submitterName'    => $submitterName,
-            'assigneeName'     => $assigneeName,
-            'hoursSinceUpdate' => $hoursSinceUpdate,
-            'thresholdHours'   => $thresholdHours,
-            'statusLabel'      => $statusLabel,
-            'ticketUrl'        => $ticketUrl,
-            'introText'        => $tpl['intro'],
-            'buttonLabel'      => $tpl['button'],
-            'footerText'       => $tpl['footer'],
-        ]);
-
-        sendMail(
-            $manager['email'],
-            $manager['first_name'] . ' ' . $manager['last_name'],
-            $tpl['subject'],
-            $emailHtml,
-            '',
-            $ticketId
-        );
-        $sent++;
     }
 
     return $sent;
 }
 
 /**
- * Email the requester that their ticket is stale — essentially a
- * "we haven't forgotten you" update even though nothing has changed.
+ * SQL for the last time staff replied publicly on ticket alias $t — a
+ * customer-visible comment by anyone on staff other than the requester.
  */
-function notifyStaleTicketRequester(PDO $db, array $ticket, int $hoursSinceUpdate): void
+function ticketLastContactSql(string $t): string
 {
-    if (!emailNotifyEnabled('ticket_stale_requester')) {
-        return;
-    }
+    return "(SELECT MAX(lc.created_at) FROM ticket_timeline lc JOIN users lcu ON lcu.id = lc.user_id
+              WHERE lc.ticket_id = {$t}.id AND lc.action = 'comment' AND lc.is_internal = 0
+                AND lc.user_id <> {$t}.created_by AND " . staffRoleSqlIn('lcu.role') . ')';
+}
 
+/**
+ * Email one reminder ($tpl: ticket_overdue / ticket_update_due) to the
+ * ticket's owner and log it on the timeline. An unassigned ticket goes to its
+ * group's managers when ticket_reminders_managers is on, otherwise to nobody.
+ * Returns false when nobody was emailed — no row is written, so the ticket is
+ * picked up once it has an owner.
+ */
+function sendTicketReminder(PDO $db, array $ticket, string $tpl): bool
+{
     $ticketId = (int) $ticket['id'];
-    if (empty($ticket['created_by'])) {
-        return;
+    $toOwner  = !empty($ticket['assigned_to']);
+
+    if ($toOwner) {
+        $s = $db->prepare('SELECT id, first_name, last_name, email, role, notify_assigned_to_me FROM users WHERE id = ?');
+        $s->execute([(int) $ticket['assigned_to']]);
+        $recipients = array_filter([$s->fetch() ?: null], fn ($u) => $u && (bool) ($u['notify_assigned_to_me'] ?? 1));
+    } elseif (getSetting('ticket_reminders_managers', '0') === '1' && !empty($ticket['group_id'])) {
+        $s = $db->prepare(
+            'SELECT u.id, u.first_name, u.last_name, u.email, u.role
+               FROM group_user_map gum JOIN users u ON u.id = gum.user_id
+              WHERE gum.group_id = ? AND gum.is_manager = 1'
+        );
+        $s->execute([(int) $ticket['group_id']]);
+        $recipients = $s->fetchAll();
+    } else {
+        $recipients = [];
+    }
+    if (!$recipients) {
+        return false;
     }
 
     $s = $db->prepare(
-        'SELECT id, first_name, last_name, email, notify_ticket_updated
-         FROM users WHERE id = ?'
+        "SELECT CONCAT(r.first_name, ' ', r.last_name) AS requester, g.name AS group_name,
+                " . ticketLastContactSql('t') . " AS last_contact_at
+           FROM tickets t
+           LEFT JOIN users r ON r.id = t.created_by
+           LEFT JOIN `groups` g ON g.id = t.group_id
+          WHERE t.id = ?"
     );
-    $s->execute([(int) $ticket['created_by']]);
-    $user = $s->fetch();
-    if (!$user || !(bool) ($user['notify_ticket_updated'] ?? 1)) {
-        return;
-    }
+    $s->execute([$ticketId]);
+    $info = $s->fetch() ?: [];
 
-    $assigneeName = '';
-    if (!empty($ticket['assigned_to'])) {
-        $a = $db->prepare('SELECT first_name, last_name FROM users WHERE id = ?');
-        $a->execute([(int) $ticket['assigned_to']]);
-        $row = $a->fetch();
-        $assigneeName = $row ? trim($row['first_name'] . ' ' . $row['last_name']) : '';
-    }
-
+    $lastContact = $info['last_contact_at'] ?? null;
+    $daysSilent  = intdiv(max(0, time() - strtotime($lastContact ?: $ticket['created_at'])), 86400);
+    $dueDate     = !empty($ticket['due_date']) ? date('M j, Y', strtotime($ticket['due_date'])) : '';
+    $slaDue      = !empty($ticket['resolution_due_at']) ? date('M j, Y g:i A', strtotime($ticket['resolution_due_at'])) : '';
+    $requester   = trim((string) ($info['requester'] ?? '')) ?: 'the requester';
+    $groupName   = (string) ($info['group_name'] ?? '');
     $appUrl      = env('APP_URL', 'http://localhost:8000');
-    $ticketUrl   = $appUrl . '/portal/tickets/' . $ticketId;
-    $statusLabel = ticketStatusLabel((string) $ticket['status']);
 
-    $tpl = getEmailTpl('ticket_stale_requester', [
-        'ticket_id'          => $ticketId,
-        'subject'            => $ticket['subject'],
-        'hours_since_update' => (string) $hoursSinceUpdate,
-        'user_name'          => $user['first_name'] . ' ' . $user['last_name'],
-        'first_name'         => $user['first_name'],
-        'last_name'          => $user['last_name'],
+    $names = [];
+    foreach ($recipients as $u) {
+        $parts = getEmailTpl($tpl, [
+            'ticket_id'          => $ticketId,
+            'subject'            => $ticket['subject'],
+            'requester'          => $requester,
+            'due_date'           => $dueDate,
+            'days_since_contact' => (string) $daysSilent,
+            'group'              => $groupName,
+            'user_name'          => $u['first_name'] . ' ' . $u['last_name'],
+            'first_name'         => $u['first_name'],
+            'last_name'          => $u['last_name'],
+        ]);
+        $html = renderEmail('ticket-owner-reminder', [
+            'badge'       => $tpl === 'ticket_overdue' ? 'OVERDUE' : 'UPDATE DUE',
+            'ticketId'    => $ticketId,
+            'subject'     => $ticket['subject'],
+            'introText'   => $parts['intro'],
+            'rows'        => array_filter([
+                'Requester'              => $requester,
+                'Due date'               => $dueDate,
+                'SLA resolution target'  => $slaDue,
+                'Last reply to customer' => $lastContact ? date('M j, Y', strtotime($lastContact)) . " ({$daysSilent} days ago)" : 'None yet',
+                'Status'                 => ticketStatusLabel((string) $ticket['status']),
+                'Group'                  => $groupName,
+            ]),
+            'managerNote' => $toOwner ? '' : "You're getting this because you manage " . ($groupName ?: 'this group') . ' and the ticket has no owner.',
+            'ticketUrl'   => $appUrl . ($u['role'] === 'admin' ? '/admin' : '/agent') . '/tickets/' . $ticketId,
+            'buttonLabel' => $parts['button'],
+            'footerText'  => $parts['footer'],
+        ]);
+        sendMail($u['email'], $u['first_name'] . ' ' . $u['last_name'], $parts['subject'], $html, '', $ticketId);
+        $names[] = $u['first_name'] . ' ' . $u['last_name'];
+    }
+
+    $why = $tpl === 'ticket_overdue'
+        ? "the ticket is past its due date of {$dueDate}"
+        : "the customer hasn't had a reply in {$daysSilent} days";
+    $db->prepare(
+        'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, ?, ?, 1)'
+    )->execute([
+        $ticketId,
+        $tpl === 'ticket_overdue' ? 'overdue_reminder_sent' : 'update_reminder_sent',
+        'Reminder emailed to ' . implode(', ', $names) . ": {$why}.",
     ]);
+    return true;
+}
 
-    $emailHtml = renderEmail('ticket-stale-requester', [
-        'ticketId'         => $ticketId,
-        'subject'          => $ticket['subject'],
-        'statusLabel'      => $statusLabel,
-        'assigneeName'     => $assigneeName,
-        'hoursSinceUpdate' => $hoursSinceUpdate,
-        'ticketUrl'        => $ticketUrl,
-        'introText'        => $tpl['intro'],
-        'bodyText'         => $tpl['body'],
-        'buttonLabel'      => $tpl['button'],
-        'footerText'       => $tpl['footer'],
-    ]);
+/**
+ * Apply a due-date edit from a ticket page's Update form. Returns true when
+ * the date changed.
+ *
+ * The edit can carry a customer reply (`due_date_reply`), written in the modal
+ * the form shows when the new date is past the SLA resolution date. It goes
+ * out as an ordinary public reply. The change itself is logged internally:
+ * the portal shows every public timeline row, and a bare "due date moved" with
+ * no explanation is exactly what the reply is for.
+ */
+function applyTicketDueDateChange(PDO $db, array $ticket, array $in, int $uid): bool
+{
+    if (!array_key_exists('due_date', $in)) {
+        return false;
+    }
+    $new = trim((string) $in['due_date']);
+    if ($new !== '') {
+        $d = DateTimeImmutable::createFromFormat('!Y-m-d', $new);
+        if (!$d || $d->format('Y-m-d') !== $new) {
+            flash('error', 'Due date was not changed: that is not a valid date.');
+            return false;
+        }
+    }
+    $new = $new !== '' ? $new : null;
+    $old = !empty($ticket['due_date']) ? (string) $ticket['due_date'] : null;
+    if ($new === $old) {
+        return false;
+    }
 
-    sendMail(
-        $user['email'],
-        $user['first_name'] . ' ' . $user['last_name'],
-        $tpl['subject'],
-        $emailHtml,
-        '',
-        $ticketId
+    $ticketId = (int) $ticket['id'];
+    $fmt      = static fn (?string $d): string => $d !== null ? date('M j, Y', strtotime($d)) : 'none';
+    $db->prepare('UPDATE tickets SET due_date = ? WHERE id = ?')->execute([$new, $ticketId]);
+    $db->prepare(
+        'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 1)'
+    )->execute([$ticketId, $uid, 'due_date_changed', 'Due date changed from ' . $fmt($old) . ' to ' . $fmt($new) . '.']);
+
+    $reply = trim((string) ($in['due_date_reply'] ?? ''));
+    if ($reply !== '') {
+        $db->prepare(
+            'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
+        )->execute([$ticketId, $uid, 'comment', $reply]);
+        notifyTicketCreator($db, $ticketId, $reply, Auth::fullName());
+        notifyCcUsers($db, $ticketId, $reply, Auth::fullName());
+        notifyWatchers($db, $ticketId, $reply, Auth::fullName());
+    }
+    return true;
+}
+
+/**
+ * Route open tickets that somehow have no group into the default group.
+ *
+ * Every creation path calls resolveTicketGroup(), so this normally finds
+ * nothing. When it does, a path forgot — each swept ticket says so on its
+ * timeline. Rides the SLA cron; it used to ride the stale-ticket job.
+ *
+ * @return int tickets swept
+ */
+function sweepNoGroupTickets(PDO $db): int
+{
+    $defaultGroupId = (int) (getSetting('default_group_id', '') ?: 0);
+    $exists = $db->prepare('SELECT 1 FROM `groups` WHERE id = ?');
+    $exists->execute([$defaultGroupId]);
+    if ($defaultGroupId <= 0 || !$exists->fetchColumn()) {
+        return 0;
+    }
+
+    $orphans = $db->query(
+        "SELECT id FROM tickets WHERE group_id IS NULL AND status NOT IN ('resolved','closed','merged')"
+    )->fetchAll(PDO::FETCH_COLUMN);
+    $update = $db->prepare('UPDATE tickets SET group_id = ? WHERE id = ?');
+    $note   = $db->prepare(
+        "INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal)
+         VALUES (?, NULL, 'group_set_from_default', ?, 1)"
     );
+    foreach ($orphans as $orphanId) {
+        $update->execute([$defaultGroupId, (int) $orphanId]);
+        $note->execute([
+            (int) $orphanId,
+            "Found with no group and routed to the default group (#{$defaultGroupId}). "
+            . 'Investigate which creation path produced a NULL group_id — every supported path should call resolveTicketGroup().',
+        ]);
+    }
+    return count($orphans);
 }
 
 /* ── Status Banners ───────────────────────────────────────────── */

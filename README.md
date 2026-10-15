@@ -2,7 +2,7 @@
 
 **OpenHelpDesk** is a self-hosted IT helpdesk and ticketing system built for libraries and small IT teams who want a capable support platform without SaaS fees or vendor lock-in. It runs on a plain LAMP stack — pure PHP 8 with a lightweight custom router, PDO, MySQL, and Bootstrap 5 — so it installs anywhere from XAMPP on Windows to a standard Apache box, via either a six-step web installer or a one-command seed script. Every front-end library ships self-hosted with the app (zero CDN dependencies), and database migrations apply themselves automatically on upgrade. Despite the modest footprint, it covers the full ticket lifecycle: assignment, prioritization, fully configurable ticket statuses, SLA tracking with business-hours and per-location timezone awareness, internal notes, attachments, tags, merging and splitting, bulk actions, drafts with server-side autosave, Gmail-style undo send, custom form fields with a per-type drag-and-drop form builder, and four switchable ticket-list views including a drag-and-drop Kanban board.
 
-Beyond core ticketing, OpenHelpDesk includes a three-tier knowledge base with a public help center and version history, fourteen built-in reports plus a custom report builder and scheduled emailed reports, a real-time customizable operations wallboard, CSAT surveys (built-in or via an external provider like HappyOrNot), a rule-based automation and escalation engine with skill-based auto-assignment, recurring/preventive-maintenance ticket schedules, stale-ticket follow-ups, out-of-office coverage that reads agents' Outlook auto-replies, and full inbound email integration over the Microsoft Graph API (email-to-ticket, reply threading, and hashtag commands). It ships with Microsoft 365 SSO, optional TOTP two-factor auth, granular role-based access control with custom permission levels, an end-user portal written in plain language, status/incident banners, an installable Progressive Web App with an iPad-friendly "floor mode" for roaming staff, Microsoft Teams channel notifications, customizable branding and email templates, one-click backups, and a Bearer-token REST API with an OpenAPI spec. Security is built in throughout — CSRF protection, prepared statements, bcrypt hashing, output sanitization, upload validation, security headers with a locked-down CSP, and per-route permission checks.
+Beyond core ticketing, OpenHelpDesk includes a three-tier knowledge base with a public help center and version history, fourteen built-in reports plus a custom report builder and scheduled emailed reports, a real-time customizable operations wallboard, CSAT surveys (built-in or via an external provider like HappyOrNot), a rule-based automation and escalation engine with skill-based auto-assignment, recurring/preventive-maintenance ticket schedules, due dates that follow the SLA with owner reminders for overdue or quiet tickets, out-of-office coverage that reads agents' Outlook auto-replies, and full inbound email integration over the Microsoft Graph API (email-to-ticket, reply threading, and hashtag commands). It ships with Microsoft 365 SSO, optional TOTP two-factor auth, granular role-based access control with custom permission levels, an end-user portal written in plain language, status/incident banners, an installable Progressive Web App with an iPad-friendly "floor mode" for roaming staff, Microsoft Teams channel notifications, customizable branding and email templates, one-click backups, and a Bearer-token REST API with an OpenAPI spec. Security is built in throughout — CSRF protection, prepared statements, bcrypt hashing, output sanitization, upload validation, security headers with a locked-down CSP, and per-route permission checks.
 
 OpenHelpDesk also has optional AI-assisted triage, powered by your choice of Anthropic Claude or OpenAI (just paste an API key — no extra services to run). On arrival, a large language model reads each new ticket and suggests the agent skills it needs, scores its own confidence, and gauges sentiment; from there it can auto-route the ticket to the best-matching agent, hand an ambiguous "No Wrong Door" request off to the right team, bump priority when a requester sounds angry or urgent, and flag likely duplicate tickets before they're filed. The AI layer is built to fail safe — confidential ticket types are never sent to a provider, every call has a hard timeout with graceful fallback to manual routing, hallucinated skill IDs are stripped, and every verdict is audit-logged with provider, model, latency, and token counts. Released under the MIT License.
 
@@ -92,12 +92,12 @@ OpenHelpDesk also has optional AI-assisted triage, powered by your choice of Ant
 - **Holidays / Closed Days** — configure public holidays and custom closed days with an auto-populate button; per-holiday option to exclude from SLA calculations
 - SLA tokens (`{{sla}}`, `{{sla_response}}`, `{{sla_resolution}}`) available in email templates
 
-### Escalations & Stale Tickets
+### Escalations & Ticket Reminders
 - **Escalation Rules** — time-based policies that automatically reassign, change priority, or update status when tickets remain unresolved past configurable thresholds; includes a waiting-on-customer reminder email action; Run Now button
 - **Manual Escalation Paths** — ordered per-type agent chains with an Escalate button and preview, escalation level badges and history, an "Escalated to Me" dashboard stat, and red escalation alert emails; skips the current assignee when they're in the chain
 - Requesters can escalate their own tickets from the portal, with escalation state surfaced to them
 - **Escalate Button Visibility** setting — always, or only after an SLA breach
-- **Stale-Ticket Follow-Ups** — hourly cron notifies agents and sends requesters a "we haven't forgotten you" email when tickets sit idle past a threshold; global and inline-editable per-type thresholds, re-notify window, deduplication, Run Now, coverage option (retroactive vs new-tickets-only), and idle time counted only on the SLA policy's counted days
+- **Ticket Reminders** — due dates follow the SLA resolution date (hand-set dates are kept); moving a due date past the SLA target prompts a drafted reply to the customer; optional owner emails when a ticket passes its due date or the customer hasn't had a reply in N days, with group managers covering unassigned tickets; new-tickets-only or all-open coverage; runs inside the 5-minute SLA job (replaces the old stale-ticket follow-ups)
 
 ### Automations & Routing
 - **Automations** — rule-based engine triggered on ticket create or update; nested AND/OR condition groups; conditions match on type, priority, status, location, group, or assigned agent; actions include assign, set priority/status/group, add tag, add CC; manual run against existing tickets
@@ -458,7 +458,7 @@ SMTP settings are configured through the admin UI at **Settings → Email / SMTP
 | `/admin/reports` | Reports & Analytics overview (14 reports + custom builder) |
 | `/admin/audit-log` | Audit log (filter, export, prune) |
 | `/admin/forms` | Per-type ticket form builder |
-| `/admin/settings` | Everything else: email, Graph, SSO, AI, SLA, business hours, holidays, statuses, routing, automations, escalations, stale tickets, undo send, CSAT, Teams, branding, labels, imports, backup, cron jobs, danger zone |
+| `/admin/settings` | Everything else: email, Graph, SSO, AI, SLA, business hours, holidays, statuses, routing, automations, escalations, ticket reminders, undo send, CSAT, Teams, branding, labels, imports, backup, cron jobs, danger zone |
 | `/admin/docs` · `/agent/help` · `/portal/help` | Built-in documentation |
 | `/notifications` | Notification inbox |
 | `/survey/{token}` | Public CSAT survey |
@@ -509,7 +509,6 @@ localdesk/
 │   ├── process-escalations.php        # Time-based escalation rule runner
 │   ├── process-recurring-tickets.php  # Recurring ticket generator
 │   ├── process-scheduled-reports.php  # Scheduled report mailer
-│   ├── process-stale-tickets.php      # Stale-ticket follow-ups
 │   ├── process-oof-coverage.php       # Out-of-office coverage (Graph)
 │   ├── process-secret-reminders.php   # Graph secret-expiry reminders
 │   └── ai-classify-backfill.php       # Backfill AI classification on old tickets
@@ -562,7 +561,7 @@ localdesk/
 
 ## Cron Jobs
 
-Background scripts keep SLA states, escalations, recurring tickets, stale-ticket follow-ups, out-of-office coverage, scheduled reports, and email processing up to date. **Admin → Settings → Cron Jobs** shows a live Running/Stale/Not-configured status for each job and generates copy-paste commands for both Linux (`crontab`) and Windows (`schtasks`) with your real installation paths. The Linux versions:
+Background scripts keep SLA states and ticket reminders, escalations, recurring tickets, out-of-office coverage, scheduled reports, and email processing up to date. **Admin → Settings → Cron Jobs** shows a live Running/Stale/Not-configured status for each job and generates copy-paste commands for both Linux (`crontab`) and Windows (`schtasks`) with your real installation paths. The Linux versions:
 
 ```bash
 */5  * * * * php /path/to/localdesk/public/sla-cron.php
@@ -571,7 +570,6 @@ Background scripts keep SLA states, escalations, recurring tickets, stale-ticket
 */15 * * * * php /path/to/localdesk/scripts/process-recurring-tickets.php
 */15 * * * * php /path/to/localdesk/scripts/process-oof-coverage.php
 */30 * * * * php /path/to/localdesk/scripts/process-scheduled-reports.php
-0    * * * * php /path/to/localdesk/scripts/process-stale-tickets.php
 0    8 * * * php /path/to/localdesk/scripts/process-secret-reminders.php
 ```
 

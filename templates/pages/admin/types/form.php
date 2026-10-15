@@ -192,23 +192,6 @@ $aiWarning = $aiWarning ?? null;
             <?php endif; ?>
 
             <div class="mb-3">
-                <label for="stale_threshold_minutes" class="form-label fw-semibold">
-                    <i class="bi bi-hourglass-split me-1"></i>Stale Threshold
-                </label>
-                <?php
-                $staleEditMins = isset($editing['stale_threshold_minutes']) && $editing['stale_threshold_minutes'] !== null && $editing['stale_threshold_minutes'] !== ''
-                    ? formatDuration((int) $editing['stale_threshold_minutes'])
-                    : '';
-                ?>
-                <input type="text" class="form-control" id="stale_threshold_minutes" name="stale_threshold_minutes"
-                       value="<?= e(old('stale_threshold_minutes', $staleEditMins)) ?>"
-                       placeholder="Uses global setting">
-                <div class="form-text">
-                    Override the global stale threshold for this ticket type. Enter days, hours or minutes &mdash; e.g. <code>3d</code>, <code>72h</code> or <code>4320m</code> (a bare number means hours). Leave blank to use the global setting (Admin → Settings → Stale Tickets).
-                </div>
-            </div>
-
-            <div class="mb-3">
                 <label for="sla_reopen_behavior" class="form-label fw-semibold">
                     <i class="bi bi-arrow-counterclockwise me-1"></i>SLA on Reopen
                 </label>

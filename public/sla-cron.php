@@ -41,10 +41,14 @@ if (php_sapi_name() !== 'cli') {
 
 $db = Database::connect();
 $count = Sla::recalculateAll($db);
-// Rides this required 5-minute job rather than adding a cron line of its own.
+// These ride this required 5-minute job rather than adding cron lines of their own.
 $followups = processDueTicketFollowups($db);
+$reminders = processTicketReminders($db);
+$swept     = sweepNoGroupTickets($db);
 
-$message = date('Y-m-d H:i:s') . " - SLA recalculated: {$count} ticket(s) updated. Follow-up reminders sent: {$followups}.\n";
+$message = date('Y-m-d H:i:s') . " - SLA recalculated: {$count} ticket(s) updated. Follow-up reminders sent: {$followups}."
+    . " Ticket reminders: {$reminders['overdue']} overdue, {$reminders['update']} update due."
+    . ($swept > 0 ? " WARN: routed {$swept} ticket(s) with no group to the default group." : '') . "\n";
 
 if (php_sapi_name() === 'cli') {
     echo $message;

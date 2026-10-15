@@ -193,16 +193,6 @@ return [
      'section' => 'Agent Notifications', 'anchor' => 'agent_note_added',
      'keywords' => 'agent internal note'],
 
-    ['label' => 'Notify: Stale Ticket',         'description' => 'Notify agent when a ticket goes stale',
-     'group' => 'Email', 'page_label' => 'Email Notifications', 'page_url' => '/admin/settings/email-notifications',
-     'section' => 'Agent Notifications', 'anchor' => 'ticket_stale_agent',
-     'keywords' => 'stale aging idle inactivity'],
-
-    ['label' => 'Notify: Stale Ticket — Group Manager', 'description' => 'Notify the group manager(s) when a ticket goes stale',
-     'group' => 'Email', 'page_label' => 'Email Notifications', 'page_url' => '/admin/settings/email-notifications',
-     'section' => 'Agent Notifications', 'anchor' => 'ticket_stale_manager',
-     'keywords' => 'stale aging idle inactivity manager supervisor department group'],
-
     ['label' => 'Requester: New Ticket Confirmation', 'description' => 'Send confirmation email to the ticket creator',
      'group' => 'Email', 'page_label' => 'Email Notifications', 'page_url' => '/admin/settings/email-notifications',
      'section' => 'Ticket Requester Notifications', 'anchor' => 'requester_new_ticket',
@@ -475,37 +465,37 @@ return [
      'keywords' => 'similar past tickets history semantic search related duplicate rag agent assist suggestions resolved'],
 
     // =======================================================================
-    // Stale Tickets  (/admin/settings/stale-tickets)
+    // Ticket Reminders  (/admin/settings/ticket-reminders)
     // =======================================================================
-    ['label' => 'Stale Threshold',              'description' => 'How long a ticket can be inactive before it is stale (days/hours/minutes)',
-     'group' => 'Automation', 'page_label' => 'Stale Tickets', 'page_url' => '/admin/settings/stale-tickets',
-     'section' => 'Global Thresholds', 'anchor' => 'stale_threshold_minutes',
-     'keywords' => 'stale threshold idle inactive aging'],
+    ['label' => 'Due Date Follows the SLA',     'description' => 'Set a ticket\'s due date to its SLA resolution date and keep it in step',
+     'group' => 'Automation', 'page_label' => 'Ticket Reminders', 'page_url' => '/admin/settings/ticket-reminders',
+     'section' => 'Due Dates', 'anchor' => 'due_date_follows_sla',
+     'keywords' => 'due date sla resolution target deadline sync'],
 
-    ['label' => 'Re-notify After',              'description' => 'Minimum gap between stale notifications (days/hours/minutes)',
-     'group' => 'Automation', 'page_label' => 'Stale Tickets', 'page_url' => '/admin/settings/stale-tickets',
-     'section' => 'Global Thresholds', 'anchor' => 'stale_recheck_minutes',
-     'keywords' => 'stale renotify recheck'],
+    ['label' => 'Due Date Past SLA Prompt',     'description' => 'Ask for a customer reply when a due date is moved past the SLA date',
+     'group' => 'Automation', 'page_label' => 'Ticket Reminders', 'page_url' => '/admin/settings/ticket-reminders',
+     'section' => 'Due Dates', 'anchor' => 'due_date_extension_prompt',
+     'keywords' => 'due date extend extension later sla customer reply modal popup'],
 
-    ['label' => 'Stale Coverage',               'description' => 'Retroactive (all open tickets) or only tickets created after enabling',
-     'group' => 'Automation', 'page_label' => 'Stale Tickets', 'page_url' => '/admin/settings/stale-tickets',
-     'section' => 'Coverage', 'anchor' => 'stale_scope_all',
-     'keywords' => 'stale retroactive backlog new tickets only coverage cutoff scope'],
+    ['label' => 'Overdue Reminder',             'description' => 'Email the ticket owner once when a ticket passes its due date',
+     'group' => 'Automation', 'page_label' => 'Ticket Reminders', 'page_url' => '/admin/settings/ticket-reminders',
+     'section' => 'Owner Reminder Emails', 'anchor' => 'notify_overdue',
+     'keywords' => 'overdue late past due sla breach owner email reminder stale'],
 
-    ['label' => 'Notify Assigned Agent (stale)', 'description' => 'Send stale alert to the assigned agent',
-     'group' => 'Automation', 'page_label' => 'Stale Tickets', 'page_url' => '/admin/settings/stale-tickets',
-     'section' => 'Email notifications', 'anchor' => 'notify_agent',
-     'keywords' => 'stale notify agent'],
+    ['label' => 'Update Due Reminder',          'description' => 'Email the owner when the customer hasn\'t had a reply in N days',
+     'group' => 'Automation', 'page_label' => 'Ticket Reminders', 'page_url' => '/admin/settings/ticket-reminders',
+     'section' => 'Owner Reminder Emails', 'anchor' => 'notify_update',
+     'keywords' => 'update customer quiet silent no reply days 15 stale idle inactive forgotten'],
 
-    ['label' => 'Notify Group Manager (stale)', 'description' => 'Send stale alert to the manager(s) of the ticket type\'s group',
-     'group' => 'Automation', 'page_label' => 'Stale Tickets', 'page_url' => '/admin/settings/stale-tickets',
-     'section' => 'Email notifications', 'anchor' => 'notify_manager',
-     'keywords' => 'stale notify manager supervisor department group ticket type escalate oversight'],
+    ['label' => 'Reminders for Unassigned Tickets', 'description' => 'Email the group\'s manager(s) when a ticket has no owner',
+     'group' => 'Automation', 'page_label' => 'Ticket Reminders', 'page_url' => '/admin/settings/ticket-reminders',
+     'section' => 'Owner Reminder Emails', 'anchor' => 'notify_managers',
+     'keywords' => 'unassigned no owner manager supervisor group department'],
 
-    ['label' => 'Notify Requester (stale)',     'description' => 'Reassure requester that ticket is not forgotten',
-     'group' => 'Automation', 'page_label' => 'Stale Tickets', 'page_url' => '/admin/settings/stale-tickets',
-     'section' => 'Email notifications', 'anchor' => 'notify_requester',
-     'keywords' => 'stale notify requester customer'],
+    ['label' => 'Reminder Coverage',            'description' => 'New tickets only, or every open ticket including the backlog',
+     'group' => 'Automation', 'page_label' => 'Ticket Reminders', 'page_url' => '/admin/settings/ticket-reminders',
+     'section' => 'Coverage', 'anchor' => 'ticket_reminders_scope_new',
+     'keywords' => 'retroactive backlog new tickets only coverage cutoff scope'],
 
     // =======================================================================
     // Out of Office  (/admin/settings/oof)

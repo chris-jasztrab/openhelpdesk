@@ -128,7 +128,7 @@ $breadcrumbs  = [['label' => 'Help']];
         ["Reply draft autosave restored unsent discard", "/agent/help/working-tickets", "Working on Tickets"],
         ["Undo send countdown escape", "/agent/help/working-tickets", "Working on Tickets"],
         ["Live updates presence viewing replying collision post anyway", "/agent/help/working-tickets", "Working on Tickets"],
-        ["Update ticket status priority assigned to group type", "/agent/help/working-tickets", "Working on Tickets"],
+        ["Update ticket status priority assigned to group type due date SLA target", "/agent/help/working-tickets", "Working on Tickets"],
         ["Close button close without notifying feedback duplicate won't fix no response", "/agent/help/working-tickets", "Working on Tickets"],
         ["Close and reopen on reply follow-up reminder create KB article", "/agent/help/working-tickets", "Working on Tickets"],
         ["Resolution note before you close what resolved this", "/agent/help/working-tickets", "Working on Tickets"],

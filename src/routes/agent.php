@@ -2684,6 +2684,11 @@ $router->post('/agent/tickets/{id}/update', function (array $p) {
         }
     }
 
+    // Due date — may carry a customer reply from the "past the SLA date" modal.
+    if (applyTicketDueDateChange($db, $ticket, $_POST, (int) Auth::id())) {
+        $changes[] = 'due date';
+    }
+
     // Run automations on ticket update
     if (!empty($changes)) {
         runAutomations($db, $id, 'ticket_updated');

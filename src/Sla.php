@@ -521,6 +521,7 @@ class Sla
         $db->prepare(
             'UPDATE tickets SET sla_started_at = ?, first_response_due_at = ?, resolution_due_at = ?, sla_state = ? WHERE id = ?'
         )->execute([$startedAt, $responseDue, $resolutionDue, $state, $ticketId]);
+        self::syncDueDate($db, $ticketId, null);
 
         // Add internal timeline entry — naming only the targets the policy sets.
         $parts = [];
@@ -550,6 +551,35 @@ class Sla
         if ($row && !empty($row['priority_id'])) {
             self::initializeForTicket($db, $ticketId, (int) $row['priority_id'], $row['type_id'] !== null ? (int) $row['type_id'] : null);
         }
+    }
+
+    /**
+     * Keep tickets.due_date on the SLA resolution date while it is tracking it.
+     *
+     * Call right after resolution_due_at changes, with its previous value. A
+     * due date that is empty, or still on the old SLA date, moves to the new
+     * one (or clears with it); a date someone set by hand is left alone. Does
+     * nothing when Settings → Ticket Reminders → "Due date follows the SLA" is
+     * off.
+     */
+    public static function syncDueDate(PDO $db, int $ticketId, ?string $oldResolutionDue): void
+    {
+        if (getSetting('due_date_follows_sla', '1') !== '1') {
+            return;
+        }
+        $db->prepare(
+            'UPDATE tickets SET due_date = DATE(resolution_due_at)
+              WHERE id = ? AND (due_date IS NULL OR due_date = DATE(?))'
+        )->execute([$ticketId, $oldResolutionDue]);
+    }
+
+    /** resolution_due_at before an update overwrites it — see syncDueDate(). */
+    private static function currentResolutionDue(PDO $db, int $ticketId): ?string
+    {
+        $stmt = $db->prepare('SELECT resolution_due_at FROM tickets WHERE id = ?');
+        $stmt->execute([$ticketId]);
+        $val = $stmt->fetchColumn();
+        return is_string($val) ? $val : null;
     }
 
     /**
@@ -634,6 +664,7 @@ class Sla
         $db->prepare(
             'UPDATE tickets SET sla_started_at = ?, first_response_due_at = ?, resolution_due_at = ?, sla_state = ?, sla_exempt = 0 WHERE id = ?'
         )->execute([$startedAt, $responseDue, $resolutionDue, $state, $ticketId]);
+        self::syncDueDate($db, $ticketId, null);
 
         return true;
     }
@@ -733,6 +764,7 @@ class Sla
         }
         $params[] = $ticketId;
         $db->prepare('UPDATE tickets SET ' . implode(', ', $setParts) . ' WHERE id = ?')->execute($params);
+        self::syncDueDate($db, $ticketId, $ticket['resolution_due_at']);
 
         $db->prepare(
             'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, ?, ?, 1)'
@@ -746,9 +778,8 @@ class Sla
      * What should happen to a ticket's SLA clock when it is reopened.
      *
      * Per-type override wins; otherwise the global `sla_reopen_behavior` setting;
-     * otherwise 'keep'. Mirrors staleThresholdMinutesForType() — NULL on the type
-     * row means "inherit", which is why the column is nullable rather than
-     * carrying its own default.
+     * otherwise 'keep'. NULL on the type row means "inherit", which is why the
+     * column is nullable rather than carrying its own default.
      *
      * An unrecognised stored value degrades to 'keep' rather than throwing: 'keep'
      * is the pre-2.171 behaviour, so a typo in the database leaves the ticket
@@ -985,6 +1016,9 @@ class Sla
         $params[] = $ticketId;
 
         $db->prepare('UPDATE tickets SET ' . implode(', ', $setParts) . ' WHERE id = ?')->execute($params);
+        if (array_key_exists('resolution_due_at', $updates)) {
+            self::syncDueDate($db, $ticketId, $ticket['resolution_due_at']);
+        }
     }
 
     private static function logReopen(PDO $db, int $ticketId, string $details): void
@@ -1067,13 +1101,15 @@ class Sla
             return;
         }
 
-        $sla = self::findPolicy($db, $typeId, $newPriorityId);
+        $sla    = self::findPolicy($db, $typeId, $newPriorityId);
+        $oldDue = self::currentResolutionDue($db, $ticketId);
 
         if (!$sla) {
             // No policy for new priority — clear SLA
             $db->prepare(
                 'UPDATE tickets SET first_response_due_at = NULL, resolution_due_at = NULL, sla_state = NULL WHERE id = ?'
             )->execute([$ticketId]);
+            self::syncDueDate($db, $ticketId, $oldDue);
             return;
         }
 
@@ -1098,6 +1134,7 @@ class Sla
         $db->prepare(
             'UPDATE tickets SET first_response_due_at = ?, resolution_due_at = ? WHERE id = ?'
         )->execute([$responseDue, $resolutionDue, $ticketId]);
+        self::syncDueDate($db, $ticketId, $oldDue);
 
         // Recalculate state immediately
         $stmt = $db->prepare(
@@ -1139,13 +1176,15 @@ class Sla
         }
 
         $priorityId = (int) $ticket['priority_id'];
-        $sla = self::findPolicy($db, $newTypeId, $priorityId);
+        $sla    = self::findPolicy($db, $newTypeId, $priorityId);
+        $oldDue = self::currentResolutionDue($db, $ticketId);
 
         if (!$sla) {
             // No policy for new type+priority — clear SLA
             $db->prepare(
                 'UPDATE tickets SET first_response_due_at = NULL, resolution_due_at = NULL, sla_state = NULL WHERE id = ?'
             )->execute([$ticketId]);
+            self::syncDueDate($db, $ticketId, $oldDue);
             return;
         }
 
@@ -1161,6 +1200,7 @@ class Sla
         $db->prepare(
             'UPDATE tickets SET first_response_due_at = ?, resolution_due_at = ? WHERE id = ?'
         )->execute([$responseDue, $resolutionDue, $ticketId]);
+        self::syncDueDate($db, $ticketId, $oldDue);
 
         // Recalculate state immediately
         $stmt = $db->prepare(
@@ -1174,47 +1214,6 @@ class Sla
                 $db->prepare('UPDATE tickets SET sla_state = ? WHERE id = ?')->execute([$newState, $ticketId]);
             }
         }
-    }
-
-    /**
-     * Count elapsed minutes between two datetimes on SLA-counted days only.
-     *
-     * Unlike countBusinessMinutes(), full 24-hour days are counted — this
-     * measures how long a ticket has sat idle in "days the SLA timer runs",
-     * not in business minutes, so a "3d" stale threshold still means three
-     * counted days. Skipped without counting: holidays excluded from SLA,
-     * weekdays outside the policy's counted_days set, and days the business
-     * schedule marks closed — the same days the SLA timer never advances on.
-     */
-    public static function countElapsedMinutesOnCountedDays(DateTimeImmutable $from, DateTimeImmutable $to, string $tz, array $schedule, array $excludedDates = [], ?array $countedDays = null): int
-    {
-        $timezone = new DateTimeZone($tz);
-        $current = $from->setTimezone($timezone);
-        $end = $to->setTimezone($timezone);
-        $totalMinutes = 0;
-
-        $maxIterations = 365;
-        $iteration = 0;
-
-        while ($current < $end && $iteration < $maxIterations) {
-            $iteration++;
-            $dayKey = strtolower(substr($current->format('D'), 0, 3));
-            $nextMidnight = $current->modify('+1 day')->setTime(0, 0, 0);
-            $segmentEnd = ($end < $nextMidnight) ? $end : $nextMidnight;
-
-            $daySchedule = $schedule[$dayKey] ?? null;
-            $skip = in_array($current->format('Y-m-d'), $excludedDates, true)
-                || ($countedDays !== null && !in_array($dayKey, $countedDays, true))
-                || ($daySchedule === null || !is_array($daySchedule) || count($daySchedule) < 2);
-
-            if (!$skip) {
-                $totalMinutes += (int) floor(($segmentEnd->getTimestamp() - $current->getTimestamp()) / 60);
-            }
-
-            $current = $nextMidnight;
-        }
-
-        return $totalMinutes;
     }
 
     /**

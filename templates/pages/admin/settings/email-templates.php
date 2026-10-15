@@ -104,39 +104,27 @@ $tokenSets = [
         ['token' => '{{subject}}',      'desc' => 'Ticket subject line'],
         ['token' => '{{rule_name}}',    'desc' => 'Name of the escalation rule that triggered'],
     ],
-    'ticket_stale_requester' => [
-        ['token' => '{{first_name}}',         'desc' => 'Requester\'s first name'],
-        ['token' => '{{last_name}}',          'desc' => 'Requester\'s last name'],
-        ['token' => '{{user_name}}',          'desc' => 'Requester\'s full name (first + last)'],
+    'ticket_overdue' => [
+        ['token' => '{{first_name}}',         'desc' => 'Recipient\'s first name (the ticket owner, or a group manager if it has none)'],
+        ['token' => '{{last_name}}',          'desc' => 'Recipient\'s last name'],
+        ['token' => '{{user_name}}',          'desc' => 'Recipient\'s full name (first + last)'],
         ['token' => '{{ticket_id}}',          'desc' => 'Ticket number'],
         ['token' => '{{subject}}',            'desc' => 'Ticket subject line'],
-        ['token' => '{{hours_since_update}}', 'desc' => 'Whole hours since the ticket last had any activity'],
+        ['token' => '{{requester}}',          'desc' => 'Full name of the customer who raised the ticket'],
+        ['token' => '{{due_date}}',           'desc' => 'The due date that passed, e.g. "Oct 20, 2026"'],
+        ['token' => '{{days_since_contact}}', 'desc' => 'Whole days since staff last replied publicly (or since the ticket was opened)'],
+        ['token' => '{{group}}',              'desc' => 'Name of the ticket\'s group'],
     ],
-    'ticket_stale_agent' => [
-        ['token' => '{{first_name}}',         'desc' => 'Agent\'s first name'],
-        ['token' => '{{last_name}}',          'desc' => 'Agent\'s last name'],
-        ['token' => '{{user_name}}',          'desc' => 'Agent\'s full name (first + last)'],
+    'ticket_update_due' => [
+        ['token' => '{{first_name}}',         'desc' => 'Recipient\'s first name (the ticket owner, or a group manager if it has none)'],
+        ['token' => '{{last_name}}',          'desc' => 'Recipient\'s last name'],
+        ['token' => '{{user_name}}',          'desc' => 'Recipient\'s full name (first + last)'],
         ['token' => '{{ticket_id}}',          'desc' => 'Ticket number'],
         ['token' => '{{subject}}',            'desc' => 'Ticket subject line'],
-        ['token' => '{{type}}',               'desc' => 'Ticket type (if set)'],
-        ['token' => '{{priority}}',           'desc' => 'Priority name (if set)'],
-        ['token' => '{{submitter}}',          'desc' => 'Full name of the person who submitted the ticket'],
-        ['token' => '{{hours_since_update}}', 'desc' => 'Whole hours since the ticket last had any activity'],
-        ['token' => '{{threshold_hours}}',    'desc' => 'The stale threshold in hours that this ticket passed'],
-    ],
-    'ticket_stale_manager' => [
-        ['token' => '{{first_name}}',         'desc' => 'Manager\'s first name'],
-        ['token' => '{{last_name}}',          'desc' => 'Manager\'s last name'],
-        ['token' => '{{user_name}}',          'desc' => 'Manager\'s full name (first + last)'],
-        ['token' => '{{ticket_id}}',          'desc' => 'Ticket number'],
-        ['token' => '{{subject}}',            'desc' => 'Ticket subject line'],
-        ['token' => '{{group}}',              'desc' => 'Name of the group the ticket belongs to (the department being alerted)'],
-        ['token' => '{{assignee}}',           'desc' => 'Agent currently holding the ticket, or "Unassigned"'],
-        ['token' => '{{type}}',               'desc' => 'Ticket type (if set)'],
-        ['token' => '{{priority}}',           'desc' => 'Priority name (if set)'],
-        ['token' => '{{submitter}}',          'desc' => 'Full name of the person who submitted the ticket'],
-        ['token' => '{{hours_since_update}}', 'desc' => 'Whole hours since the ticket last had any activity'],
-        ['token' => '{{threshold_hours}}',    'desc' => 'The stale threshold in hours that this ticket passed'],
+        ['token' => '{{requester}}',          'desc' => 'Full name of the customer who raised the ticket'],
+        ['token' => '{{days_since_contact}}', 'desc' => 'Whole days since staff last replied publicly (or since the ticket was opened)'],
+        ['token' => '{{due_date}}',           'desc' => 'The ticket\'s due date, if it has one'],
+        ['token' => '{{group}}',              'desc' => 'Name of the ticket\'s group'],
     ],
 ];
 
@@ -190,22 +178,16 @@ $defaults = [
         'intro'   => 'An escalation rule has been triggered for a ticket that requires your attention.',
         'button'  => 'View Ticket',
     ],
-    // Keep these three in step with the same keys in getEmailTpl()'s $defaults.
-    'ticket_stale_requester' => [
-        'subject' => '[Ticket #{{ticket_id}}] Status update: {{subject}}',
-        'intro'   => 'We wanted to let you know that we\'re still tracking your ticket, even though there\'s no new update yet.',
-        'button'  => 'View Ticket',
-        'body'    => 'You haven\'t been forgotten — your ticket is still in our queue and will be picked up as soon as possible. If you have any additional information that might help, please reply to this ticket to add it to the record.',
+    // Keep these two in step with the same keys in getEmailTpl()'s $defaults.
+    'ticket_overdue' => [
+        'subject' => '[Ticket #{{ticket_id}}] Past its due date: {{subject}}',
+        'intro'   => 'This ticket was due on {{due_date}} and is still open. Please contact {{requester}} to let them know where things stand. If it needs more time, set a new due date on the ticket and tell them when to expect it.',
+        'button'  => 'Open Ticket',
     ],
-    'ticket_stale_agent' => [
-        'subject' => '[Ticket #{{ticket_id}}] Stale — {{hours_since_update}}h without activity: {{subject}}',
-        'intro'   => 'A ticket assigned to you has had no activity for {{hours_since_update}} hours.',
-        'button'  => 'View Ticket',
-    ],
-    'ticket_stale_manager' => [
-        'subject' => '[Ticket #{{ticket_id}}] Stale in {{group}} — {{hours_since_update}}h without activity: {{subject}}',
-        'intro'   => 'A ticket in a group you manage has had no activity for {{hours_since_update}} hours. Current owner: {{assignee}}.',
-        'button'  => 'View Ticket',
+    'ticket_update_due' => [
+        'subject' => '[Ticket #{{ticket_id}}] No reply to {{requester}} in {{days_since_contact}} days: {{subject}}',
+        'intro'   => '{{requester}} hasn\'t had a reply on this ticket in {{days_since_contact}} days. Please send them a short update so they know it\'s still being worked on, even if nothing has changed yet.',
+        'button'  => 'Open Ticket',
     ],
 ];
 
@@ -221,9 +203,8 @@ $tabs = [
     'ticket_assigned_agent' => ['label' => 'Agent Assigned',      'icon' => 'bi-person-check'],
     'ticket_assigned_group' => ['label' => 'Group Assigned',      'icon' => 'bi-people-fill'],
     'escalation_alert'      => ['label' => 'Escalation Alert',    'icon' => 'bi-exclamation-triangle'],
-    'ticket_stale_requester' => ['label' => 'Stale — Requester',  'icon' => 'bi-hourglass-split'],
-    'ticket_stale_agent'     => ['label' => 'Stale — Agent',      'icon' => 'bi-hourglass'],
-    'ticket_stale_manager'   => ['label' => 'Stale — Manager',    'icon' => 'bi-person-badge'],
+    'ticket_overdue'        => ['label' => 'Overdue Reminder',    'icon' => 'bi-alarm'],
+    'ticket_update_due'     => ['label' => 'Update Due Reminder', 'icon' => 'bi-chat-left-dots'],
 ];
 
 $activeTab = $_GET['tab'] ?? 'ticket_created';
@@ -567,9 +548,8 @@ foreach ($groups as $grp) {
                     'ticket_assigned_agent' => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working', 'type' => 'Hardware', 'priority' => 'High', 'submitter' => 'Jordan Lee', 'sla' => 'First response within 4 hours and resolution within 16 hours (business hours)', 'sla_response' => '4 hours', 'sla_resolution' => '16 hours'],
                     'ticket_assigned_group' => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working', 'group' => 'IT Support', 'type' => 'Hardware', 'priority' => 'High', 'submitter' => 'Jordan Lee', 'sla' => 'First response within 4 hours and resolution within 16 hours (business hours)', 'sla_response' => '4 hours', 'sla_resolution' => '16 hours'],
                     'escalation_alert'      => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working', 'rule_name' => 'Overdue after 24h'],
-                    'ticket_stale_requester' => ['first_name' => 'Alex', 'last_name' => 'Johnson', 'user_name' => 'Alex Johnson', 'ticket_id' => '42', 'subject' => 'Printer not working', 'hours_since_update' => '96'],
-                    'ticket_stale_agent'     => ['first_name' => 'Jane', 'last_name' => 'Smith', 'user_name' => 'Jane Smith', 'ticket_id' => '42', 'subject' => 'Printer not working', 'type' => 'Hardware', 'priority' => 'High', 'submitter' => 'Alex Johnson', 'hours_since_update' => '96', 'threshold_hours' => '72'],
-                    'ticket_stale_manager'   => ['first_name' => 'Dana', 'last_name' => 'Reyes', 'user_name' => 'Dana Reyes', 'ticket_id' => '42', 'subject' => 'Printer not working', 'group' => 'IT Support', 'assignee' => 'Jane Smith', 'type' => 'Hardware', 'priority' => 'High', 'submitter' => 'Alex Johnson', 'hours_since_update' => '96', 'threshold_hours' => '72'],
+                    'ticket_overdue'        => ['first_name' => 'Jane', 'last_name' => 'Smith', 'user_name' => 'Jane Smith', 'ticket_id' => '42', 'subject' => 'Printer not working', 'requester' => 'Alex Johnson', 'due_date' => 'Oct 20, 2026', 'days_since_contact' => '9', 'group' => 'IT Support'],
+                    'ticket_update_due'     => ['first_name' => 'Jane', 'last_name' => 'Smith', 'user_name' => 'Jane Smith', 'ticket_id' => '42', 'subject' => 'Printer not working', 'requester' => 'Alex Johnson', 'due_date' => 'Mar 2, 2027', 'days_since_contact' => '15', 'group' => 'IT Support'],
                 ];
                 $preview = $subjectTpl;
                 foreach (($previewTokens[$activeTab] ?? []) as $k => $v) {

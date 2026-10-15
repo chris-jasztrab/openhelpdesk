@@ -360,7 +360,7 @@ function handleInstall(): void
             ('groups.manage',            'Manage groups',                    'People',         'Create, edit and delete ticket groups.',                       100),
             ('skills.manage',            'Manage agent skills',              'People',         'Create and assign agent skills.',                              110),
             ('locations.manage',         'Manage locations',                 'Organization',   'Create, edit and delete locations / sites.',                   120),
-            ('automations.manage',       'Manage automations & escalations', 'Automation',     'Configure automation rules, escalations, stale-ticket and scheduled-report jobs.', 130),
+            ('automations.manage',       'Manage automations & escalations', 'Automation',     'Configure automation rules, escalations, ticket reminders and scheduled-report jobs.', 130),
             ('csat.manage',              'Manage CSAT surveys',              'Automation',     'Configure customer satisfaction surveys.',                     140),
             ('ai.manage',                'Manage AI classification',         'Automation',     'Configure AI auto-classification and routing.',                150),
             ('import.manage',            'Import data & manage backups',     'Data',           'Import tickets/users/KB and create or restore backups.',       160),
@@ -1235,7 +1235,6 @@ function renderResultPage(array $messages, ?string $fatalError, string $appUrl):
                 <div>*/15 * * * * php <?= htmlspecialchars(INSTALL_ROOT, ENT_QUOTES, 'UTF-8') ?>/scripts/process-escalations.php</div>
                 <div>*/15 * * * * php <?= htmlspecialchars(INSTALL_ROOT, ENT_QUOTES, 'UTF-8') ?>/scripts/process-recurring-tickets.php</div>
                 <div>*/30 * * * * php <?= htmlspecialchars(INSTALL_ROOT, ENT_QUOTES, 'UTF-8') ?>/scripts/process-scheduled-reports.php</div>
-                <div>0 * * * * php <?= htmlspecialchars(INSTALL_ROOT, ENT_QUOTES, 'UTF-8') ?>/scripts/process-stale-tickets.php</div>
                 <div>0 8 * * * php <?= htmlspecialchars(INSTALL_ROOT, ENT_QUOTES, 'UTF-8') ?>/scripts/process-secret-reminders.php</div>
             </div>
             <p class="text-muted small mb-3">View full cron job details at <strong>Admin → Settings → Cron Jobs</strong> after logging in.</p>

@@ -254,7 +254,7 @@ $locLabel     = label('location.singular', 'Location');
 <div class="card border-0 shadow-sm mb-4" id="group-managers">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-stars text-primary me-2"></i>Group Managers</h5>
-<p class="text-muted mb-2">A <strong>group manager</strong> is a member with extra rights over their team's skills, and the person who receives stale-ticket manager alerts. Tick <strong>Manager</strong> next to a member on the group form (or on the user's Group Membership picker). A group can have several managers; unticking Member clears Manager too.</p>
+<p class="text-muted mb-2">A <strong>group manager</strong> is a member with extra rights over their team's skills, and the person who receives <a href="/admin/docs/automations#ticket-reminders">ticket reminders</a> for unassigned tickets when that option is on. Tick <strong>Manager</strong> next to a member on the group form (or on the user's Group Membership picker). A group can have several managers; unticking Member clears Manager too.</p>
 <h6 class="fw-semibold mt-3 mb-2">The Manage My Team area</h6>
 <p class="text-muted mb-2">Managers get <strong><i class="bi bi-stars"></i> Manage My Team</strong> in the account menu (top-right), which opens <code>/manager</code> with the groups they manage:</p>
 <ul class="text-muted mb-3">

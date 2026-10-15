@@ -935,7 +935,6 @@ CREATE TABLE IF NOT EXISTS `ticket_types` (
   `sort_order` int(10) unsigned NOT NULL DEFAULT 0,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `stale_threshold_minutes` int(10) unsigned DEFAULT NULL,
   `business_hours_schedule` text DEFAULT NULL,
   `sla_reopen_behavior` varchar(24) DEFAULT NULL,
   PRIMARY KEY (`id`),

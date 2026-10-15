@@ -15,7 +15,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
     <li><a href="#group-auto-assign"><strong>Group Auto-Assignment</strong></a>: which member of a group picks up a new ticket.</li>
     <li><a href="#escalation-rules"><strong>Escalation Rules</strong></a>: time-based reminders and reassignments, run by cron.</li>
     <li><a href="#escalation-paths"><strong>Escalation Paths</strong></a>: the per-type chain behind the <strong>Escalate</strong> button.</li>
-    <li><a href="#stale-tickets"><strong>Stale Tickets</strong></a>: reminder emails when a ticket has been left alone.</li>
+    <li><a href="#ticket-reminders"><strong>Ticket Reminders</strong></a>: due dates that follow the SLA, and owner emails for overdue or quiet tickets.</li>
     <li><a href="#oof-coverage"><strong>Out of Office</strong></a>: cover tickets of agents who are away, read from Outlook.</li>
     <li><a href="#recurring-tickets"><strong>Recurring Tickets</strong></a> and <a href="#scheduled-reports"><strong>Scheduled Reports</strong></a>.</li>
     <li><a href="#cron-jobs"><strong>Cron Jobs</strong></a>: the background jobs that power all of the above.</li>
@@ -73,7 +73,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
     <li>If a rule points at something that was later deleted (a type, group, agent or <?= e(strtolower(label('location.singular', 'location'))) ?>), the editor flags that dropdown red with "previous choice was deleted, pick again" and won't save until you choose. Until it's fixed, the broken action is skipped and noted on the ticket timeline; the rest of the rule still runs.</li>
 </ul>
 <div class="alert alert-info small mt-3 mb-0"><i class="bi bi-info-circle me-2"></i>
-    Need something to happen after a period of time? Use <a href="#escalation-rules" class="alert-link">Escalation Rules</a>. For "nobody has touched this ticket in N days" reminders, use <a href="#stale-tickets" class="alert-link">Stale Tickets</a>.
+    Need something to happen after a period of time? Use <a href="#escalation-rules" class="alert-link">Escalation Rules</a>. For "past its due date" or "the customer hasn't heard from us in N days" reminders, use <a href="#ticket-reminders" class="alert-link">Ticket Reminders</a>.
 </div>
 </div>
 </div>
@@ -148,7 +148,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <ol class="text-muted mb-2">
     <li>At creation the group is the one chosen, else the ticket type's Default Group, else the system <strong>Default Group</strong>, else the first group.</li>
     <li>If AI and automations still leave it without one, it goes to the system Default Group with an internal timeline note.</li>
-    <li>The hourly stale-ticket job moves any remaining ungrouped open tickets into the Default Group and logs a warning.</li>
+    <li>The SLA Recalculation job (every 5 minutes) moves any remaining ungrouped open tickets into the Default Group, adds a timeline note and logs a warning.</li>
 </ol>
 <p class="text-muted mb-0">Set the Default Group at <a href="/admin/settings/ticket-routing"><strong>Settings &rarr; Organization &rarr; Ticket Routing</strong></a>. A good choice is a Triage / Service Desk group with Load-Based or First Available assignment, so the catch-all queue still reaches a person.</p>
 </div>
@@ -241,43 +241,53 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 </div>
 </div>
 
-<h3 id="stale-tickets" class="fw-bold mt-5 mb-3">Stale Tickets</h3>
+<h3 id="ticket-reminders" class="fw-bold mt-5 mb-3">Ticket Reminders</h3>
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-hourglass-split text-warning me-2"></i>What It Does</h5>
-<p class="text-muted mb-2">When a ticket has had no update for longer than the threshold, the helpdesk emails the assigned agent (or the whole group if it's unassigned), optionally the group's managers, and reassures the requester that they haven't been forgotten. Each notification adds an internal <code>stale_notification_sent</code> entry to the timeline.</p>
-<p class="text-muted mb-0">Only tickets in <strong>Open</strong>, <strong>In Progress</strong> or <strong>Pending</strong> are checked. Waiting on Customer, Waiting on Third Party, closed statuses and custom statuses are ignored. Any update to the ticket restarts its clock.</p>
-</div>
-</div>
-
-<div class="card border-0 shadow-sm mb-4">
-<div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-sliders text-primary me-2"></i>Configuration</h5>
-<p class="text-muted mb-2">At <a href="/admin/settings/stale-tickets"><strong>Settings &rarr; Automation &rarr; Stale Tickets</strong></a>:</p>
-<ul class="text-muted mb-3">
-    <li><strong>Stale threshold</strong> (default <code>3d</code>): how long without an update before a ticket is stale. Accepts <a href="/admin/docs/sla#duration-units">durations</a> like <code>3d</code> or <code>72h</code>. When the ticket's type and priority match an SLA policy, only that policy's <a href="/admin/docs/sla#counted-days">counted days</a> advance the clock (holidays and closed days are skipped), so <code>3d</code> means three counted days. Tickets without a matching policy count every day.</li>
-    <li><strong>Re-notify after</strong> (default <code>1d</code>): the minimum gap before the same ticket is reported again.</li>
-    <li><strong>Coverage</strong>: <em>Retroactive</em> (default) checks every open ticket, so the first run can email about your whole backlog. <em>New tickets only</em> stamps a cutoff when you save and ignores everything older. Re-saving keeps the cutoff; switching to Retroactive and back stamps a new one.</li>
-    <li><strong>Email notifications</strong>: <em>Notify the assigned agent</em>, <em>Notify the group manager(s) for the ticket's type</em> (off by default) and <em>Send the requester a "we haven't forgotten you" update</em>. These are the same switches as the stale rows on <a href="/admin/settings/email-notifications">Email Notifications</a>. To stop stale emails entirely, turn all three off.</li>
+<h5 class="fw-semibold mb-3"><i class="bi bi-alarm text-warning me-2"></i>What It Does</h5>
+<p class="text-muted mb-2">Ticket Reminders keep customers informed by nudging the <strong>ticket owner</strong> to contact them; nothing here emails the customer automatically. Configure it at <a href="/admin/settings/ticket-reminders"><strong>Settings &rarr; Automation &rarr; Ticket Reminders</strong></a> (needs <strong>Manage automations &amp; escalations</strong>). It replaces the old Stale Tickets page.</p>
+<ul class="text-muted mb-0">
+    <li>Tickets in <strong>Waiting on Customer</strong> are skipped.</li>
+    <li>Owners who turned off "a ticket is assigned to me" emails on their profile don't get these reminders.</li>
+    <li>Each reminder adds an internal <strong>Overdue Reminder Sent</strong> or <strong>Update Reminder Sent</strong> entry to the timeline, which is also how duplicates are prevented.</li>
 </ul>
-<h6 class="fw-semibold mb-2">Manager alerts</h6>
-<ul class="text-muted mb-3">
-    <li>Go to everyone ticked <strong>Manager</strong> on the ticket's group (<a href="/admin/groups">Groups</a> &rarr; edit). The ticket's group normally is its type's <strong>Default Group</strong>, because re-typing a ticket moves it into the new type's group. A ticket moved to another group alerts that group's managers instead.</li>
-    <li>Managers who already got the agent email (unassigned ticket, whole group emailed) aren't emailed twice.</li>
-    <li>The settings page lists ticket types whose alerts would reach nobody (no Default Group, or no Manager in it).</li>
-</ul>
-<h6 class="fw-semibold mb-2">Per-Type Overrides</h6>
-<p class="text-muted mb-0">The <strong>Per-Type Overrides</strong> table sets a different threshold for any ticket type. Leave a field blank to use the global threshold. Changes are audit-logged. Reword the emails on the three <strong>Stale</strong> tabs of <a href="/admin/settings/email-templates">Email Templates</a>.</p>
 </div>
 </div>
 
 <div class="card border-0 shadow-sm mb-4">
 <div class="card-body p-4">
-<h5 class="fw-semibold mb-3"><i class="bi bi-terminal text-primary me-2"></i>Running It</h5>
-<p class="text-muted mb-2">The <strong>Stale Ticket Notifications</strong> cron job runs hourly (command on <a href="/admin/settings/cron-jobs">Cron Jobs</a>). <strong>Run Now</strong> on the settings page runs it immediately, for real. Output goes to <code>storage/logs/stale-tickets.log</code>.</p>
+<h5 class="fw-semibold mb-3"><i class="bi bi-calendar-event text-primary me-2"></i>Due Dates</h5>
+<ul class="text-muted mb-0">
+    <li><strong>Due date follows the SLA</strong> (on by default): a ticket's due date is set to its <a href="/admin/docs/sla">SLA</a> resolution date, and moves with it when the SLA moves (a pause ends, the ticket is reopened, or its priority or type changes). A due date someone set by hand is never overwritten.</li>
+    <li><strong>Ask for a customer reply when a due date moves past the SLA date</strong> (on by default): the <strong>Update Ticket</strong> panel on the ticket page has a <strong>Due Date</strong> field with the <em>SLA target</em> shown under it. Saving a later date opens <em>New due date is past the SLA target</em>, with a reply to the customer already drafted. <strong>Send reply &amp; save</strong> posts it as a normal public reply (to the requester, CCs and watchers) and saves the date; <strong>Save without replying</strong> just saves the date; <strong>Cancel</strong> changes nothing.</li>
+    <li>A due date changed on the ticket page is logged as an internal <strong>Due Date Changed</strong> timeline entry. Moving the due date never changes the SLA itself, so SLA reports stay accurate.</li>
+</ul>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-envelope-exclamation text-primary me-2"></i>Owner Reminder Emails</h5>
+<ul class="text-muted mb-3">
+    <li><strong>Email the owner when a ticket passes its due date</strong> (off by default): sent once, the day after the due date, if the ticket is still open. Moving the due date later sets up a new reminder for the new date.</li>
+    <li><strong>Email the owner when the customer hasn't heard from us in N days</strong> (off by default; N is 1&ndash;365, default 15): counted from the last public reply by staff, or from when the ticket was opened if nobody has replied. Any public reply resets it. It repeats every N days while the silence continues.</li>
+    <li><strong>If a ticket has no owner, email its group's manager(s) instead</strong> (off by default): managers are the group members ticked <strong>Manager</strong> under <a href="/admin/groups">Groups</a>. With this off, unassigned tickets get no reminder.</li>
+</ul>
+<p class="text-muted mb-0">Reword the emails on the <strong>Overdue Reminder</strong> and <strong>Update Due Reminder</strong> tabs of <a href="/admin/settings/email-templates">Email Templates</a>. Both offer <code>{{first_name}}</code>, <code>{{last_name}}</code>, <code>{{user_name}}</code> (the recipient), <code>{{ticket_id}}</code>, <code>{{subject}}</code>, <code>{{requester}}</code>, <code>{{due_date}}</code>, <code>{{days_since_contact}}</code> and <code>{{group}}</code>.</p>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-terminal text-primary me-2"></i>Coverage &amp; Running It</h5>
+<ul class="text-muted mb-2">
+    <li><strong>New tickets only</strong> (default): only tickets created after you save this setting get reminders; the backlog is left alone. Until the page has been saved once, no reminders go out. Saving again keeps the original start date.</li>
+    <li><strong>All open tickets</strong>: includes older tickets, so the first run can email about every open ticket that is already overdue or quiet.</li>
+</ul>
+<p class="text-muted mb-2">Reminders run inside the <strong>SLA Recalculation</strong> cron job every 5 minutes, so there is no separate cron line. Its log line reports, for example, <code>Ticket reminders: 0 overdue, 0 update due.</code> If your crontab still has the old hourly <code>scripts/process-stale-tickets.php</code> line, remove it; that script no longer exists.</p>
 <div class="alert alert-warning small mb-0"><i class="bi bi-exclamation-triangle me-2"></i>
-    On an established helpdesk, use <strong>Dry run</strong> on the Cron Jobs page before the first live run to see how many emails it would send, or choose <em>New tickets only</em> coverage.
+    Before choosing <em>All open tickets</em> on an established helpdesk, use <strong>Dry run</strong> on <a href="/admin/settings/cron-jobs" class="alert-link">Cron Jobs</a> &rarr; SLA Recalculation to see how many emails it would send.
 </div>
 </div>
 </div>
@@ -370,13 +380,12 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <table class="table table-sm mb-0">
     <thead class="table-light"><tr><th>Job</th><th>Schedule</th><th>Needed for</th></tr></thead>
     <tbody class="text-muted">
-        <tr><td><strong>SLA Recalculation</strong> <span class="badge bg-danger ms-1">Required</span></td><td>Every 5 min</td><td>SLA warnings and breaches, follow-up reminders</td></tr>
+        <tr><td><strong>SLA Recalculation</strong> <span class="badge bg-danger ms-1">Required</span></td><td>Every 5 min</td><td>SLA warnings and breaches, follow-up reminders, <a href="#ticket-reminders">ticket reminders</a>, the no-group sweep</td></tr>
         <tr><td><strong>Inbound Email Replies</strong></td><td>Every 5 min</td><td>Reply by email, email-to-ticket</td></tr>
         <tr><td><strong>Escalation Rules</strong></td><td>Every 15 min</td><td><a href="#escalation-rules">Escalation rules</a></td></tr>
         <tr><td><strong>Recurring / Preventive-Maintenance Tickets</strong></td><td>Every 15 min</td><td><a href="#recurring-tickets">Recurring tickets</a></td></tr>
         <tr><td><strong>Out-of-Office Coverage</strong></td><td>Every 15 min</td><td><a href="#oof-coverage">Out-of-office coverage</a></td></tr>
         <tr><td><strong>Scheduled Reports</strong></td><td>Every 30 min</td><td><a href="#scheduled-reports">Scheduled reports</a></td></tr>
-        <tr><td><strong>Stale Ticket Notifications</strong></td><td>Hourly</td><td><a href="#stale-tickets">Stale tickets</a>, the no-group sweep</td></tr>
         <tr><td><strong>App Secret Expiry Reminders</strong></td><td>Daily, 08:00</td><td>Graph client-secret expiry emails</td></tr>
     </tbody>
 </table>
@@ -390,7 +399,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
     <li>If the buttons are disabled, the page says why. Usually no PHP command-line binary was found; set <code>PHP_CLI_BINARY</code> in <code>.env</code> to its full path.</li>
 </ul>
 <div class="alert alert-warning small mb-0"><i class="bi bi-exclamation-triangle me-2"></i>
-    Before scheduling an email-sending job for the first time on a helpdesk with existing tickets, <strong>Dry run</strong> it and read the list of emails. Stale tickets, escalation rules and similar jobs act on the whole backlog on their first run.
+    Before scheduling an email-sending job for the first time on a helpdesk with existing tickets, <strong>Dry run</strong> it and read the list of emails. Escalation rules, ticket reminders set to <em>All open tickets</em> and similar jobs act on the whole backlog on their first run.
 </div>
 </div>
 </div>

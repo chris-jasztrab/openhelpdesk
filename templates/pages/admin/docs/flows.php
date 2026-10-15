@@ -50,7 +50,7 @@ $breadcrumbs  = [
 <ol class="text-muted mb-3">
 <li><strong>Creation-time</strong> — every creation path calls <code>resolveTicketGroup()</code>, which tries the caller's explicit choice, then the ticket type's default group, then the system-wide <strong>Default Group</strong> setting, then the lowest-id existing group.</li>
 <li><strong>Post-create</strong> — after AI routing, AI classification and automations run, <code>backfillTicketGroupFromDefault()</code> sweeps any ticket whose group_id is somehow still NULL into the default group.</li>
-<li><strong>Hourly cron</strong> — <code>scripts/process-stale-tickets.php</code> sweeps any orphans the previous two layers missed (e.g. legacy data, hand-edited rows).</li>
+<li><strong>5-minute cron</strong> — the SLA Recalculation job (<code>public/sla-cron.php</code>) sweeps any orphans the previous two layers missed (e.g. legacy data, hand-edited rows) into the default group, with a timeline note.</li>
 </ol>
 <div class="flow-diagram"><pre class="mermaid">
 flowchart TD
@@ -220,7 +220,7 @@ flowchart TD
     E -->|No| G["Group stays NULL<br/>(only possible on a<br/>pristine fresh install)"]
     F --> Z
     Z[Ticket gets a group] --> H[Continue to Diagram 0]
-    G --> I["Backfill happens later in<br/>runPostTicketCreateHooks<br/>and the hourly cron sweep"]
+    G --> I["Backfill happens later in<br/>runPostTicketCreateHooks<br/>and the 5-minute SLA cron sweep"]
 </pre></div>
 <div class="alert alert-warning small mb-2"><i class="bi bi-exclamation-triangle me-2"></i>
 The default group is genuinely <strong>last-resort</strong>. Don't use it as a primary routing target — point your ticket types at the right groups so most tickets never need the fallback.

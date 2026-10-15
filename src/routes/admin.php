@@ -1996,12 +1996,9 @@ $router->post('/admin/types/create', function () {
     $showToLocVis   = !empty($_POST['show_to_location_visibility']) ? 1 : 0;
     $requireResolution = !empty($_POST['require_resolution_on_close']) ? 1 : 0;
     $timeTracking   = !empty($_POST['time_tracking_enabled']) ? 1 : 0;
-    // Stale threshold accepts d/h/m; a bare number means hours (legacy unit).
-    $staleRaw       = trim((string) ($_POST['stale_threshold_minutes'] ?? ''));
-    $staleMinutes   = $staleRaw === '' ? null : max(0, parseDurationToMinutes($staleRaw, 'h') ?? 0);
-    // NULL means "inherit the global sla_reopen_behavior setting", same as the
-    // stale threshold above. Anything unrecognised becomes NULL rather than a
-    // stored value the resolver would silently ignore.
+    // NULL means "inherit the global sla_reopen_behavior setting". Anything
+    // unrecognised becomes NULL rather than a stored value the resolver would
+    // silently ignore.
     $reopenRaw      = trim((string) ($_POST['sla_reopen_behavior'] ?? ''));
     $reopenBehavior = in_array($reopenRaw, Sla::REOPEN_BEHAVIORS, true) ? $reopenRaw : null;
     $skillIds       = array_filter(array_map('intval', (array) ($_POST['required_skills'] ?? [])));
@@ -2036,8 +2033,8 @@ $router->post('/admin/types/create', function () {
         ]);
     }
 
-    $db->prepare('INSERT INTO ticket_types (name, color, group_id, is_confidential, ai_route_group, ai_dup_check_enabled, ai_dup_threshold, ai_similar_check_enabled, show_to_location_visibility, require_resolution_on_close, time_tracking_enabled, sort_order, stale_threshold_minutes, sla_reopen_behavior) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $aiSimilarCheck, $showToLocVis, $requireResolution, $timeTracking, $order, $staleMinutes, $reopenBehavior]);
+    $db->prepare('INSERT INTO ticket_types (name, color, group_id, is_confidential, ai_route_group, ai_dup_check_enabled, ai_dup_threshold, ai_similar_check_enabled, show_to_location_visibility, require_resolution_on_close, time_tracking_enabled, sort_order, sla_reopen_behavior) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $aiSimilarCheck, $showToLocVis, $requireResolution, $timeTracking, $order, $reopenBehavior]);
     $typeId = (int) $db->lastInsertId();
     if ($skillIds) {
         $stmt = $db->prepare('INSERT IGNORE INTO ticket_type_skill_map (ticket_type_id, skill_id) VALUES (?, ?)');
@@ -2109,12 +2106,9 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
     $showToLocVis   = !empty($_POST['show_to_location_visibility']) ? 1 : 0;
     $requireResolution = !empty($_POST['require_resolution_on_close']) ? 1 : 0;
     $timeTracking   = !empty($_POST['time_tracking_enabled']) ? 1 : 0;
-    // Stale threshold accepts d/h/m; a bare number means hours (legacy unit).
-    $staleRaw       = trim((string) ($_POST['stale_threshold_minutes'] ?? ''));
-    $staleMinutes   = $staleRaw === '' ? null : max(0, parseDurationToMinutes($staleRaw, 'h') ?? 0);
-    // NULL means "inherit the global sla_reopen_behavior setting", same as the
-    // stale threshold above. Anything unrecognised becomes NULL rather than a
-    // stored value the resolver would silently ignore.
+    // NULL means "inherit the global sla_reopen_behavior setting". Anything
+    // unrecognised becomes NULL rather than a stored value the resolver would
+    // silently ignore.
     $reopenRaw      = trim((string) ($_POST['sla_reopen_behavior'] ?? ''));
     $reopenBehavior = in_array($reopenRaw, Sla::REOPEN_BEHAVIORS, true) ? $reopenRaw : null;
     if ($name === '') {
@@ -2167,7 +2161,6 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
                 'color'     => $color,
                 'sort_order' => (string) $order,
                 'group_id'  => $groupId ? (string) $groupId : '',
-                'stale_threshold_minutes' => $staleMinutes === null ? '' : (string) $staleMinutes,
                 'sla_reopen_behavior' => $reopenBehavior ?? '',
                 'show_to_location_visibility' => $showToLocVis ? '1' : '',
                 'ai_route_group' => $aiRouteGroup ? '1' : '',
@@ -2216,14 +2209,14 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
     // not just the confidential flag we already snapshotted above.
     $fullPriorStmt = $db->prepare(
         'SELECT name, color, group_id, is_confidential, ai_route_group, ai_dup_check_enabled,
-                ai_dup_threshold, ai_similar_check_enabled, show_to_location_visibility, require_resolution_on_close, time_tracking_enabled, sort_order, stale_threshold_minutes, sla_reopen_behavior
+                ai_dup_threshold, ai_similar_check_enabled, show_to_location_visibility, require_resolution_on_close, time_tracking_enabled, sort_order, sla_reopen_behavior
          FROM ticket_types WHERE id = ?'
     );
     $fullPriorStmt->execute([$id]);
     $fullPrior = $fullPriorStmt->fetch(\PDO::FETCH_ASSOC) ?: [];
 
-    $db->prepare('UPDATE ticket_types SET name=?, color=?, group_id=?, is_confidential=?, ai_route_group=?, ai_dup_check_enabled=?, ai_dup_threshold=?, ai_similar_check_enabled=?, show_to_location_visibility=?, require_resolution_on_close=?, time_tracking_enabled=?, sort_order=?, stale_threshold_minutes=?, sla_reopen_behavior=? WHERE id=?')
-        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $aiSimilarCheck, $showToLocVis, $requireResolution, $timeTracking, $order, $staleMinutes, $reopenBehavior, $id]);
+    $db->prepare('UPDATE ticket_types SET name=?, color=?, group_id=?, is_confidential=?, ai_route_group=?, ai_dup_check_enabled=?, ai_dup_threshold=?, ai_similar_check_enabled=?, show_to_location_visibility=?, require_resolution_on_close=?, time_tracking_enabled=?, sort_order=?, sla_reopen_behavior=? WHERE id=?')
+        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $aiSimilarCheck, $showToLocVis, $requireResolution, $timeTracking, $order, $reopenBehavior, $id]);
 
     // Required skills (used by Skill-Based group auto-assignment)
     $skillIds = array_filter(array_map('intval', (array) ($_POST['required_skills'] ?? [])));
@@ -2256,7 +2249,6 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
             'require_resolution_on_close' => $requireResolution,
             'time_tracking_enabled'       => $timeTracking,
             'sort_order'                  => $order,
-            'stale_threshold_minutes'     => $staleMinutes,
             'sla_reopen_behavior'         => $reopenBehavior,
         ]
     );
@@ -6136,6 +6128,11 @@ $router->post('/admin/tickets/{id}/update', function (array $p) {
         }
     }
 
+    // Due date — may carry a customer reply from the "past the SLA date" modal.
+    if (applyTicketDueDateChange($db, $ticket, $_POST, (int) Auth::id())) {
+        $changes[] = 'due date';
+    }
+
     // Run automations on ticket update
     if (!empty($changes)) {
         runAutomations($db, $id, 'ticket_updated');
@@ -7402,10 +7399,8 @@ $router->get('/admin/settings/email-templates', function () {
         'email_subject_ticket_assigned_agent', 'email_intro_ticket_assigned_agent', 'email_button_ticket_assigned_agent',
         'email_subject_ticket_assigned_group', 'email_intro_ticket_assigned_group', 'email_button_ticket_assigned_group',
         'email_subject_escalation_alert',      'email_intro_escalation_alert',      'email_button_escalation_alert',
-        'email_subject_ticket_stale_requester', 'email_intro_ticket_stale_requester', 'email_button_ticket_stale_requester',
-        'email_body_ticket_stale_requester',
-        'email_subject_ticket_stale_agent',     'email_intro_ticket_stale_agent',     'email_button_ticket_stale_agent',
-        'email_subject_ticket_stale_manager',   'email_intro_ticket_stale_manager',   'email_button_ticket_stale_manager',
+        'email_subject_ticket_overdue',        'email_intro_ticket_overdue',        'email_button_ticket_overdue',
+        'email_subject_ticket_update_due',     'email_intro_ticket_update_due',     'email_button_ticket_update_due',
         'email_footer_text',
     ];
     $tplValues = [];
@@ -7481,7 +7476,7 @@ $router->post('/admin/settings/email-templates', function () {
     $groupQs      = $scoped ? '&group=' . $gid : '';
 
     // Reset buttons clear settings back to default (empty = use hardcoded default)
-    if (isset($_POST['reset_template']) && in_array($_POST['reset_template'], ['ticket_created', 'ticket_updated', 'ticket_merged', 'csat_survey', 'ticket_reminder', 'group_alerts', 'ticket_assigned_agent', 'ticket_assigned_group', 'escalation_alert', 'ticket_stale_requester', 'ticket_stale_agent', 'ticket_stale_manager'], true)) {
+    if (isset($_POST['reset_template']) && in_array($_POST['reset_template'], ['ticket_created', 'ticket_updated', 'ticket_merged', 'csat_survey', 'ticket_reminder', 'group_alerts', 'ticket_assigned_agent', 'ticket_assigned_group', 'escalation_alert', 'ticket_overdue', 'ticket_update_due'], true)) {
         $tpl = $_POST['reset_template'];
         setSetting("email_subject_{$tpl}{$suffix}", '');
         setSetting("email_intro_{$tpl}{$suffix}", '');
@@ -7511,7 +7506,7 @@ $router->post('/admin/settings/email-templates', function () {
         setSetting('email_intro_group_alerts',   trim($_POST['email_intro_group_alerts']   ?? ''));
         setSetting('email_button_group_alerts',  trim($_POST['email_button_group_alerts']  ?? ''));
         flash('success', 'Group alerts settings saved.');
-    } elseif (in_array($tab, ['ticket_assigned_agent', 'ticket_assigned_group', 'escalation_alert', 'ticket_stale_requester', 'ticket_stale_agent', 'ticket_stale_manager'], true)) {
+    } elseif (in_array($tab, ['ticket_assigned_agent', 'ticket_assigned_group', 'escalation_alert', 'ticket_overdue', 'ticket_update_due'], true)) {
         setSetting("email_subject_{$tab}", trim($_POST["email_subject_{$tab}"] ?? ''));
         setSetting("email_intro_{$tab}",   trim($_POST["email_intro_{$tab}"]   ?? ''));
         setSetting("email_button_{$tab}",  trim($_POST["email_button_{$tab}"]  ?? ''));
@@ -7545,10 +7540,8 @@ $router->get('/admin/settings/email-notifications', function () {
     $keys = [
         'agent_new_ticket', 'agent_assigned_group', 'agent_assigned_agent',
         'agent_requester_reply', 'agent_note_added',
-        'ticket_stale_agent', 'ticket_stale_manager',
         'requester_new_ticket', 'requester_ticket_assigned', 'requester_agent_comment',
         'requester_ticket_resolved', 'requester_ticket_closed',
-        'ticket_stale_requester',
         'cc_new_ticket', 'cc_note_added',
     ];
 
@@ -7570,10 +7563,8 @@ $router->post('/admin/settings/email-notifications', function () {
     $keys = [
         'agent_new_ticket', 'agent_assigned_group', 'agent_assigned_agent',
         'agent_requester_reply', 'agent_note_added',
-        'ticket_stale_agent', 'ticket_stale_manager',
         'requester_new_ticket', 'requester_ticket_assigned', 'requester_agent_comment',
         'requester_ticket_resolved', 'requester_ticket_closed',
-        'ticket_stale_requester',
         'cc_new_ticket', 'cc_note_added',
     ];
 
@@ -14671,177 +14662,73 @@ $router->post('/admin/settings/escalation-paths/{typeId}', function (array $p) {
 });
 
 /* ==================================================================
- * ADMIN – Stale Ticket Notifications
+ * ADMIN – Ticket Reminders (due dates + owner reminder emails)
  * ================================================================== */
 
-$router->get('/admin/settings/stale-tickets', function () {
+/** Current Ticket Reminders settings, with their out-of-the-box defaults. */
+function _ticketReminderSettings(): array
+{
+    return [
+        'due_date_follows_sla'           => getSetting('due_date_follows_sla', '1'),
+        'due_date_extension_prompt'      => getSetting('due_date_extension_prompt', '1'),
+        'email_notify:ticket_overdue'    => getSetting('email_notify:ticket_overdue', emailNotifyDefault('ticket_overdue')),
+        'email_notify:ticket_update_due' => getSetting('email_notify:ticket_update_due', emailNotifyDefault('ticket_update_due')),
+        'ticket_update_due_days'         => getSetting('ticket_update_due_days', '15'),
+        'ticket_reminders_managers'      => getSetting('ticket_reminders_managers', '0'),
+        'ticket_reminders_scope'         => getSetting('ticket_reminders_scope', 'new'),
+        'ticket_reminders_scope_cutoff'  => getSetting('ticket_reminders_scope_cutoff', ''),
+    ];
+}
+
+$router->get('/admin/settings/ticket-reminders', function () {
     Auth::requirePermission('automations.manage');
     $db = Database::connect();
-
-    $settings = [
-        'stale_threshold_minutes'             => getSetting('stale_threshold_minutes', '4320'),
-        'stale_recheck_minutes'               => getSetting('stale_recheck_minutes', '1440'),
-        'stale_scope'                         => getSetting('stale_scope', 'all'),
-        'stale_scope_cutoff'                  => getSetting('stale_scope_cutoff', ''),
-        'email_notify:ticket_stale_agent'     => getSetting('email_notify:ticket_stale_agent', '1'),
-        'email_notify:ticket_stale_manager'   => getSetting('email_notify:ticket_stale_manager', '0'),
-        'email_notify:ticket_stale_requester' => getSetting('email_notify:ticket_stale_requester', '1'),
-    ];
-
-    $types = $db->query(
-        'SELECT id, name, color, stale_threshold_minutes FROM ticket_types ORDER BY sort_order, name'
-    )->fetchAll();
-
-    // Surface the dead ends up front: a type with no default group, or whose
-    // group has nobody flagged is_manager, silently reaches nobody when the
-    // manager toggle is on. Cheaper to warn here than to wonder why the cron
-    // log says "0 manager alerts".
-    $typesWithoutManager = $db->query(
-        'SELECT tt.name
-           FROM ticket_types tt
-          WHERE tt.group_id IS NULL
-             OR NOT EXISTS (
-                 SELECT 1 FROM group_user_map gum
-                  WHERE gum.group_id = tt.group_id AND gum.is_manager = 1
-             )
-          ORDER BY tt.sort_order, tt.name'
-    )->fetchAll(PDO::FETCH_COLUMN);
-
-    render('admin/settings/stale-tickets', [
-        'settings'            => $settings,
-        'types'               => $types,
-        'typesWithoutManager' => $typesWithoutManager,
+    render('admin/settings/ticket-reminders', [
+        'settings'       => _ticketReminderSettings(),
+        'openUnassigned' => (int) $db->query(
+            'SELECT COUNT(*) FROM tickets WHERE assigned_to IS NULL AND ' . ticketStatusSqlIn(ticketOpenBucketSlugs(), 'status')
+        )->fetchColumn(),
     ]);
 });
 
-$router->post('/admin/settings/stale-tickets', function () {
+$router->post('/admin/settings/ticket-reminders', function () {
     Auth::requirePermission('automations.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
-        redirect('/admin/settings/stale-tickets');
+        redirect('/admin/settings/ticket-reminders');
     }
 
-    // Inputs accept d/h/m; a bare number means hours (the field's legacy unit).
-    $threshold = max(0, parseDurationToMinutes((string) ($_POST['stale_threshold_minutes'] ?? ''), 'h') ?? 4320);
-    $recheck   = max(1, parseDurationToMinutes((string) ($_POST['stale_recheck_minutes']   ?? ''), 'h') ?? 1440);
-    $scope     = ($_POST['stale_scope'] ?? 'all') === 'new' ? 'new' : 'all';
+    $before = _ticketReminderSettings();
+    $scope  = ($_POST['ticket_reminders_scope'] ?? 'new') === 'all' ? 'all' : 'new';
 
-    $before = [
-        'stale_threshold_minutes'             => getSetting('stale_threshold_minutes', '4320'),
-        'stale_recheck_minutes'               => getSetting('stale_recheck_minutes', '1440'),
-        'stale_scope'                         => getSetting('stale_scope', 'all'),
-        'stale_scope_cutoff'                  => getSetting('stale_scope_cutoff', ''),
-        'email_notify:ticket_stale_agent'    => getSetting('email_notify:ticket_stale_agent', '1'),
-        'email_notify:ticket_stale_manager'   => getSetting('email_notify:ticket_stale_manager', '0'),
-        'email_notify:ticket_stale_requester' => getSetting('email_notify:ticket_stale_requester', '1'),
-    ];
-
-    // The cutoff is stamped only when entering "new tickets only" mode and
-    // stays stable across subsequent saves, so re-saving unrelated settings
-    // never quietly excludes tickets created since the mode was enabled.
-    // Switching back to retroactive clears it. Stamped in DB time (not PHP
-    // time) because it's compared against tickets.created_at, which MySQL
-    // writes — the two clocks can sit in different timezones.
+    // The cutoff is stamped on entering "new tickets only" (or if it was never
+    // stamped) and then kept, so re-saving other settings never quietly drops
+    // tickets created since. DB time, because it's compared with
+    // tickets.created_at, which MySQL writes.
     $cutoff = '';
     if ($scope === 'new') {
-        $cutoff = ($before['stale_scope'] === 'new' && $before['stale_scope_cutoff'] !== '')
-            ? $before['stale_scope_cutoff']
+        $cutoff = ($before['ticket_reminders_scope'] === 'new' && $before['ticket_reminders_scope_cutoff'] !== '')
+            ? $before['ticket_reminders_scope_cutoff']
             : (string) Database::connect()->query('SELECT NOW()')->fetchColumn();
     }
 
-    setSetting('stale_threshold_minutes', (string) $threshold);
-    setSetting('stale_recheck_minutes',   (string) $recheck);
-    setSetting('stale_scope',             $scope);
-    setSetting('stale_scope_cutoff',      $cutoff);
-    setSetting('email_notify:ticket_stale_agent',     isset($_POST['notify_agent'])     ? '1' : '0');
-    setSetting('email_notify:ticket_stale_manager',   isset($_POST['notify_manager'])   ? '1' : '0');
-    setSetting('email_notify:ticket_stale_requester', isset($_POST['notify_requester']) ? '1' : '0');
-
-    logAuditChange(
-        'stale_tickets.settings_changed',
-        null,
-        null,
-        $before,
-        [
-            'stale_threshold_minutes'             => (string) $threshold,
-            'stale_recheck_minutes'               => (string) $recheck,
-            'stale_scope'                         => $scope,
-            'stale_scope_cutoff'                  => $cutoff,
-            'email_notify:ticket_stale_agent'    => isset($_POST['notify_agent'])     ? '1' : '0',
-            'email_notify:ticket_stale_manager'   => isset($_POST['notify_manager'])   ? '1' : '0',
-            'email_notify:ticket_stale_requester' => isset($_POST['notify_requester']) ? '1' : '0',
-        ]
-    );
-
-    flash('success', 'Stale ticket settings saved.');
-    redirect('/admin/settings/stale-tickets');
-});
-
-$router->post('/admin/settings/stale-tickets/type-overrides', function () {
-    Auth::requirePermission('automations.manage');
-    if (!verifyCsrf($_POST['_token'] ?? '')) {
-        flash('error', 'Invalid request.');
-        redirect('/admin/settings/stale-tickets');
-    }
-
-    $db    = Database::connect();
-    $input = (array) ($_POST['type_stale'] ?? []);
-
-    $existing = $db->query('SELECT id, name, stale_threshold_minutes FROM ticket_types')->fetchAll();
-
-    $update = $db->prepare('UPDATE ticket_types SET stale_threshold_minutes = ? WHERE id = ?');
-    $changed = 0;
-    foreach ($existing as $t) {
-        $id = (int) $t['id'];
-        if (!array_key_exists($id, $input)) {
-            continue;
-        }
-        // Inputs accept d/h/m; a bare number means hours (the field's legacy unit).
-        $raw = trim((string) $input[$id]);
-        $new = $raw === '' ? null : max(0, parseDurationToMinutes($raw, 'h') ?? 0);
-
-        $old = ($t['stale_threshold_minutes'] === null || $t['stale_threshold_minutes'] === '')
-            ? null
-            : (int) $t['stale_threshold_minutes'];
-
-        if ($new === $old) {
-            continue;
-        }
-
-        $update->execute([$new, $id]);
-        logAuditChange(
-            'ticket_type.stale_threshold_changed',
-            $id,
-            'ticket_type',
-            ['stale_threshold_minutes' => $old === null ? '' : (string) $old],
-            ['stale_threshold_minutes' => $new === null ? '' : (string) $new]
-        );
-        $changed++;
-    }
-
-    flash('success', $changed > 0
-        ? "Per-type stale thresholds updated ({$changed} change" . ($changed === 1 ? '' : 's') . ")."
-        : 'No changes to per-type stale thresholds.');
-    redirect('/admin/settings/stale-tickets');
-});
-
-$router->post('/admin/settings/stale-tickets/run-now', function () {
-    Auth::requirePermission('automations.manage');
-    if (!verifyCsrf($_POST['_token'] ?? '')) {
-        flash('error', 'Invalid request.');
-        redirect('/admin/settings/stale-tickets');
-    }
-    $script = ROOT_DIR . '/scripts/process-stale-tickets.php';
-    $cmd    = escapeshellarg(phpBinary()) . ' ' . escapeshellarg($script) . ' 2>&1';
-    $outputLines = [];
-    $returnCode  = 0;
-    exec($cmd, $outputLines, $returnCode);
-    $_SESSION['_stale_run'] = [
-        'lines' => $outputLines,
-        'code'  => $returnCode,
-        'time'  => date('Y-m-d H:i:s'),
+    $after = [
+        'due_date_follows_sla'           => isset($_POST['due_date_follows_sla']) ? '1' : '0',
+        'due_date_extension_prompt'      => isset($_POST['due_date_extension_prompt']) ? '1' : '0',
+        'email_notify:ticket_overdue'    => isset($_POST['notify_overdue']) ? '1' : '0',
+        'email_notify:ticket_update_due' => isset($_POST['notify_update']) ? '1' : '0',
+        'ticket_update_due_days'         => (string) max(1, min(365, (int) ($_POST['ticket_update_due_days'] ?? 15))),
+        'ticket_reminders_managers'      => isset($_POST['notify_managers']) ? '1' : '0',
+        'ticket_reminders_scope'         => $scope,
+        'ticket_reminders_scope_cutoff'  => $cutoff,
     ];
-    redirect('/admin/settings/stale-tickets');
+    foreach ($after as $k => $v) {
+        setSetting($k, $v);
+    }
+    logAuditChange('ticket_reminders.settings_changed', null, null, $before, $after);
+
+    flash('success', 'Ticket reminder settings saved.');
+    redirect('/admin/settings/ticket-reminders');
 });
 
 /* ==================================================================

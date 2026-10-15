@@ -11,6 +11,20 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.188.0 &mdash; 2026-10-15
+
+### Added
+- **Settings → Ticket Reminders replaces Stale Tickets.** It's built around one rule: don't send customers automated "we haven't forgotten you" filler. Instead, nudge the person who owns the ticket to send a real update. Nothing on the page emails the customer by itself.
+  - **The due date follows the SLA.** A ticket's due date is set to its SLA resolution date and moves with it when the SLA moves (a pause ends, a reopen, a priority or type change). A due date someone set by hand is never overwritten. Open tickets that had an SLA but no due date were given one.
+  - **Due Date is editable on the ticket page.** It's a new field in the Update Ticket panel on both the agent and admin views, with the SLA target shown underneath. Saving a date later than the SLA target opens a box with a ready-to-edit reply telling the customer why it's taking longer and when to expect it. **Send reply & save** sends it as a normal public reply; **Save without replying** is still allowed. The SLA itself doesn't move, so SLA reports stay honest.
+  - **Overdue reminder:** emails the owner once, the day after the due date, if the ticket is still open. Moving the due date later sets up a new reminder for the new date.
+  - **Update-due reminder:** emails the owner when the customer hasn't had a public reply from staff in 15 days (adjustable from 1 to 365). Any public reply resets the count, and it repeats while the silence lasts.
+  - Optionally, unassigned tickets go to the group's managers instead; otherwise they get no reminder. Waiting on Customer tickets are skipped. **Coverage** defaults to *new tickets only*, so turning reminders on never emails about the backlog. Both reminder emails are off until you turn them on, and their wording is editable under Email Templates.
+- Reminders run inside the 5-minute **SLA Recalculation** job, so there's no cron line to add. A dry run of that job on Cron Jobs previews what would be sent.
+
+### Removed
+- **Stale Tickets.** That covers the settings page, its hourly cron job (`scripts/process-stale-tickets.php`, so remove it from your crontab if you scheduled it), the per-type Stale Threshold, the three Stale email templates and their toggles, the requester "we haven't forgotten you" email, and the Run Now button. The no-group sweep that rode the stale job now rides the SLA job.
+
 ## 2.187.1 &mdash; 2026-10-15
 
 ### Fixed

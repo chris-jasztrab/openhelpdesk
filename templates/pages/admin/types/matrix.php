@@ -18,7 +18,6 @@ $columns = [
     'show_to_loc_vis'     => 'Show "To" / Location',
     'time_tracking'       => 'Time tracking',
     'custom_dup_thr'      => 'Custom dup threshold',
-    'custom_stale_thr'    => 'Custom stale threshold',
     'sla_on_reopen'       => 'SLA on reopen',
 ];
 
@@ -82,8 +81,6 @@ if (!isset($reopenLabels[$reopenGlobal])) {
                     $thr     = (float) ($t['ai_dup_threshold'] ?? 0.75);
                     $dupOn   = (int) ($t['ai_dup_check_enabled'] ?? 0) === 1;
                     $custThr = $dupOn && abs($thr - 0.75) > 0.001;
-                    $stale   = $t['stale_threshold_minutes'];
-                    $custSt  = $stale !== null;
                     // Shows the effective behaviour, not just whether it is
                     // overridden — "what happens on reopen" is the question this
                     // row is being read to answer, and "inherited" alone doesn't
@@ -117,13 +114,6 @@ if (!isset($reopenLabels[$reopenGlobal])) {
                         <?php endif; ?>
                     </td>
                     <td class="tt-c">
-                        <?php if ($custSt): ?>
-                            <span class="mx-on" title="stale_threshold_minutes"><?= e(formatDuration((int) $stale)) ?></span>
-                        <?php else: ?>
-                            <?= tt_cell_no() ?>
-                        <?php endif; ?>
-                    </td>
-                    <td class="tt-c">
                         <span class="<?= $reopenOwn ? 'mx-on' : 'text-muted' ?>"
                               title="sla_reopen_behavior<?= $reopenOwn ? '' : ' (inherited from the global setting)' ?>"
                               style="white-space:nowrap;font-size:.8rem;">
@@ -139,7 +129,6 @@ if (!isset($reopenLabels[$reopenGlobal])) {
             <span><span class="mx-on">&#10003;</span> enabled</span>
             <span><span class="mx-off">&minus;</span> not enabled</span>
             <span>&middot; "Custom dup threshold" = <code>ai_dup_threshold</code> &ne; 0.75 (default).</span>
-            <span>&middot; "Custom stale threshold" = a per-type override of the site-wide stale-ticket cutoff.</span>
             <span>&middot; "SLA on reopen" shows the effective behaviour &mdash;
                 <span class="mx-on">highlighted</span> where the type overrides it,
                 <span class="text-muted">dimmed</span> where it inherits the global default

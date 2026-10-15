@@ -208,14 +208,12 @@ I've confirmed the fix is deployed and the user has verified it works.
         <tr><td>Ticket Assigned to Agent</td><td>The agent a ticket is assigned to.</td></tr>
         <tr><td>Requester Replies to Ticket</td><td>The assigned agent, when the requester (or another staff member, publicly) replies.</td></tr>
         <tr><td>Note Added to Ticket</td><td>The assigned agent, when an internal note is added.</td></tr>
-        <tr><td>Ticket Stale (No Activity)</td><td>The assigned agent, or the group if unassigned (see <a href="/admin/docs/automations#stale-tickets">Stale Tickets</a>).</td></tr>
-        <tr><td>Ticket Stale &mdash; Group Manager</td><td>The group's managers. Off by default.</td></tr>
+        <tr><td>Overdue &amp; Update-Due Reminders</td><td>The ticket's owner when it passes its due date, or when the customer hasn't had a public reply in N days. If the ticket has no owner, the group's managers (only when that option is on). Both are off by default and switched on at <a href="/admin/docs/automations#ticket-reminders">Ticket Reminders</a>, not on this page.</td></tr>
         <tr><td colspan="2" class="fw-semibold text-body">Ticket Requester Notifications</td></tr>
         <tr><td>New Ticket Created (Confirmation)</td><td>The requester, from every channel (portal, staff-created, email, API).</td></tr>
         <tr><td>Ticket Assigned to Agent</td><td>The requester, naming who is handling it.</td></tr>
         <tr><td>Agent Adds Comment to Ticket</td><td>The requester, on each public staff reply.</td></tr>
         <tr><td>Ticket Resolved / Ticket Closed</td><td>The requester, when the ticket enters the default resolved or closed status.</td></tr>
-        <tr><td>Stale Ticket Check-In</td><td>The requester ("we haven't forgotten you").</td></tr>
         <tr><td colspan="2" class="fw-semibold text-body">CC Notifications</td></tr>
         <tr><td>Comment Added to Ticket</td><td>CC'd people: a one-time "you were added as a CC" email (also when an automation adds them), then an email for each public reply.</td></tr>
     </tbody>
@@ -246,7 +244,7 @@ I've confirmed the fix is deployed and the user has verified it works.
         <tr><td><strong>Group Alerts</strong></td><td>A new ticket alert goes to a group.</td></tr>
         <tr><td><strong>Agent Assigned</strong> / <strong>Group Assigned</strong></td><td>A ticket is assigned to an agent or a group.</td></tr>
         <tr><td><strong>Escalation Alert</strong></td><td>An escalation rule notifies an agent.</td></tr>
-        <tr><td><strong>Stale &mdash; Requester</strong> / <strong>Agent</strong> / <strong>Manager</strong></td><td>Stale-ticket notifications. The requester version also has an editable <strong>Message Body</strong> (blank uses the default; a single space removes the paragraph).</td></tr>
+        <tr><td><strong>Overdue Reminder</strong> / <strong>Update Due Reminder</strong></td><td>A <a href="/admin/docs/automations#ticket-reminders">ticket reminder</a> goes to the ticket's owner (or group managers). Extra tokens: <code>{{requester}}</code>, <code>{{due_date}}</code>, <code>{{days_since_contact}}</code>.</td></tr>
         <tr><td><strong>Shared Footer</strong></td><td>Footer text on every ticket email.</td></tr>
     </tbody>
 </table>

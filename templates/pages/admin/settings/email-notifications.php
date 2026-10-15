@@ -103,31 +103,8 @@ $on = function (string $key) use ($settings): string {
                 </li>
 
                 <li class="list-group-item px-4 py-3">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <div class="fw-semibold">Ticket Stale (No Activity)</div>
-                            <div class="text-muted" style="font-size:.875rem;">Notify the assigned agent (or group members if unassigned) when a ticket has had no activity for longer than the configured threshold. Configure in <a href="/admin/settings/stale-tickets">Stale Tickets</a>.</div>
-                        </div>
-                        <div class="form-check form-switch ms-4 mt-1">
-                            <input class="form-check-input" type="checkbox" role="switch"
-                                   id="ticket_stale_agent" name="ticket_stale_agent"
-                                   <?= $on('ticket_stale_agent') ?>>
-                        </div>
-                    </div>
-                </li>
-
-                <li class="list-group-item px-4 py-3">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <div class="fw-semibold">Ticket Stale — Group Manager</div>
-                            <div class="text-muted" style="font-size:.875rem;">Also notify whoever manages the department a stale ticket belongs to &mdash; the members of the ticket's group ticked <strong>Manager</strong> under <a href="/admin/groups">Groups</a>. A ticket's group comes from the <strong>Default Group</strong> on its <a href="/admin/types">ticket type</a>. Off by default. Configure in <a href="/admin/settings/stale-tickets">Stale Tickets</a>.</div>
-                        </div>
-                        <div class="form-check form-switch ms-4 mt-1">
-                            <input class="form-check-input" type="checkbox" role="switch"
-                                   id="ticket_stale_manager" name="ticket_stale_manager"
-                                   <?= $on('ticket_stale_manager') ?>>
-                        </div>
-                    </div>
+                    <div class="fw-semibold">Overdue &amp; Update-Due Reminders</div>
+                    <div class="text-muted" style="font-size:.875rem;">Email a ticket's owner when it passes its due date, or when the customer hasn't had a reply in a while. Turned on and tuned in <a href="/admin/settings/ticket-reminders">Ticket Reminders</a>.</div>
                 </li>
 
             </ul>
@@ -208,20 +185,6 @@ $on = function (string $key) use ($settings): string {
                             <input class="form-check-input" type="checkbox" role="switch"
                                    id="requester_ticket_closed" name="requester_ticket_closed"
                                    <?= $on('requester_ticket_closed') ?>>
-                        </div>
-                    </div>
-                </li>
-
-                <li class="list-group-item px-4 py-3">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <div class="fw-semibold">Stale Ticket Check-In</div>
-                            <div class="text-muted" style="font-size:.875rem;">Send the requester a "we haven't forgotten you" update when their ticket has had no activity for longer than the configured threshold. Configure in <a href="/admin/settings/stale-tickets">Stale Tickets</a>.</div>
-                        </div>
-                        <div class="form-check form-switch ms-4 mt-1">
-                            <input class="form-check-input" type="checkbox" role="switch"
-                                   id="ticket_stale_requester" name="ticket_stale_requester"
-                                   <?= $on('ticket_stale_requester') ?>>
                         </div>
                     </div>
                 </li>
