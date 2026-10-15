@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.188.1 &mdash; 2026-10-15
+
+### Fixed
+- **Inbound email no longer turns one message into a new ticket every minute.** The email job crashed right after creating a ticket, before it marked the message as read (`Class "AIClassifierFactory" not found`). The AI routing helpers need a class that only the web app loaded, and the email job doesn't use the web app's startup code. So the next run read the same unread message again and made another ticket. On helpdesk.wpl.ca one "Spam Quarantine Report" became over 600 Information Technology tickets this way. The helpers now load that class themselves, so every background job has it. Inbound tickets also now get their SLA dates (2.187.1), since that step came after the crash.
+
 ## 2.188.0 &mdash; 2026-10-15
 
 ### Added

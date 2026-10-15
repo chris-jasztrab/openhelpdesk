@@ -2,6 +2,12 @@
 
 declare(strict_types=1);
 
+// The AI helpers in this file (aiRouteTicketToGroup, classifyTicketWithAI, …)
+// need these classes, and cron scripts load helpers.php without the web
+// bootstrap. Without this, inbound email died after inserting each ticket and
+// never marked the message read, so one email became a new ticket every minute.
+require_once __DIR__ . '/AI.php';
+
 /**
  * Load environment variables from a .env file.
  */
