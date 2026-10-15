@@ -2270,7 +2270,7 @@ $router->post('/profile', function () {
         'notify_ticket_merged', 'notify_escalation', 'notify_csat',
         'notify_group_new_ticket', 'notify_assigned_to_me', 'notify_assigned_to_group',
         'notify_requester_replied', 'notify_note_added', 'notify_ticket_solved',
-        'notify_ticket_closed', 'notify_ticket_assigned',
+        'notify_ticket_closed', 'notify_ticket_assigned', 'notify_mention',
     ];
     $renderedNotify = array_values(array_intersect(
         array_filter(array_map('trim', explode(',', $_POST['_notify_fields'] ?? ''))),
@@ -2320,7 +2320,7 @@ $router->post('/profile/setting', function () {
         'notify_ticket_merged', 'notify_escalation', 'notify_csat',
         'notify_group_new_ticket', 'notify_assigned_to_me', 'notify_assigned_to_group',
         'notify_requester_replied', 'notify_note_added', 'notify_ticket_solved',
-        'notify_ticket_closed', 'notify_ticket_assigned',
+        'notify_ticket_closed', 'notify_ticket_assigned', 'notify_mention',
     ];
 
     if (in_array($field, ['first_name', 'last_name'], true)) {

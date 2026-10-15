@@ -1061,6 +1061,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `notify_assigned_to_group` tinyint(1) NOT NULL DEFAULT 1,
   `notify_requester_replied` tinyint(1) NOT NULL DEFAULT 1,
   `notify_note_added` tinyint(1) NOT NULL DEFAULT 1,
+  `notify_mention` tinyint(1) NOT NULL DEFAULT 1,
   `notify_ticket_solved` tinyint(1) NOT NULL DEFAULT 1,
   `notify_ticket_closed` tinyint(1) NOT NULL DEFAULT 1,
   `notify_ticket_assigned` tinyint(1) NOT NULL DEFAULT 1,

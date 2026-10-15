@@ -1363,8 +1363,74 @@ function processAtMentions(PDO $db, string $message, int $ticketId, int $timelin
         if (stripos($message, '@' . $fullName) !== false && (int) $agent['id'] !== $mentionedBy) {
             // body left NULL — the feed falls back to the linked timeline note.
             createNotification($db, (int) $agent['id'], $ticketId, 'mention', null, $mentionedBy, $timelineId);
+            notifyMentionedUser($db, (int) $agent['id'], $ticketId, $message, $mentionedBy);
         }
     }
+}
+
+/**
+ * Email a staff member who was @mentioned in a reply or note. Honors their
+ * notify_mention opt-out. On a confidential ticket they can't see, the subject
+ * and message are withheld — same gate as notificationsFeedRows().
+ */
+function notifyMentionedUser(PDO $db, int $userId, int $ticketId, string $message, int $mentionedBy): void
+{
+    $stmt = $db->prepare(
+        "SELECT u.first_name, u.last_name, u.email, u.role, u.notify_mention, t.subject,
+                CONCAT(a.first_name, ' ', a.last_name) AS actor_name,
+                (COALESCE(tt.is_confidential, 0) = 1
+                 AND NOT (t.created_by <=> u.id)
+                 AND (tt.group_id IS NULL
+                      OR tt.group_id NOT IN (SELECT group_id FROM group_user_map WHERE user_id = u.id))) AS redact
+           FROM users u
+           JOIN tickets t ON t.id = ?
+           LEFT JOIN ticket_types tt ON tt.id = t.type_id
+           LEFT JOIN users a ON a.id = ?
+          WHERE u.id = ?"
+    );
+    $stmt->execute([$ticketId, $mentionedBy, $userId]);
+    $row = $stmt->fetch();
+    if (!$row || empty($row['email']) || !(bool) ($row['notify_mention'] ?? 1)) {
+        return;
+    }
+
+    $actor   = trim((string) $row['actor_name']) ?: 'Someone';
+    $redact  = (bool) $row['redact'];
+    $subject = $redact ? 'Confidential ticket' : $row['subject'];
+    if ($redact) {
+        $message = 'This is a confidential ticket, so the message is not included in this email.';
+    }
+
+    $rolePrefix = $row['role'] === 'admin' ? '/admin' : '/agent';
+    $tpl = getEmailTpl('ticket-updated', [
+        'ticket_id'  => $ticketId,
+        'subject'    => $subject,
+        'message'    => $message,
+        'author'     => $actor,
+        'user_name'  => $row['first_name'] . ' ' . $row['last_name'],
+        'first_name' => $row['first_name'],
+        'last_name'  => $row['last_name'],
+    ]);
+
+    $emailHtml = renderEmail('ticket-updated', [
+        'ticketId'    => $ticketId,
+        'subject'     => $subject,
+        'message'     => $message,
+        'authorName'  => $actor,
+        'ticketUrl'   => env('APP_URL', 'http://localhost:8000') . $rolePrefix . '/tickets/' . $ticketId,
+        'introText'   => htmlspecialchars($actor, ENT_QUOTES, 'UTF-8') . ' mentioned you on a ticket.',
+        'buttonLabel' => $tpl['button'],
+        'footerText'  => $tpl['footer'],
+    ]);
+
+    sendMail(
+        $row['email'],
+        $row['first_name'] . ' ' . $row['last_name'],
+        '[Ticket #' . $ticketId . '] ' . $actor . ' mentioned you: ' . $subject,
+        $emailHtml,
+        '',
+        $ticketId
+    );
 }
 
 /**

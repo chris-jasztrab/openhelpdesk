@@ -37,7 +37,7 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/agent/help'], ['label' => 'Profi
 <h5 class="fw-semibold mb-3"><i class="bi bi-envelope text-primary me-2"></i>Choosing Your Emails</h5>
 <p class="text-muted mb-2">The <strong>Email Notifications</strong> card has a switch for each kind of email, in three groups:</p>
 <ul class="text-muted mb-2">
-    <li><strong>Agent Notifications</strong> &mdash; new ticket in my group, ticket assigned to my group, ticket assigned to me, requester replies and internal notes on tickets assigned to you.</li>
+    <li><strong>Agent Notifications</strong> &mdash; new ticket in my group, ticket assigned to my group, ticket assigned to me, requester replies and internal notes on tickets assigned to you, and when someone @mentions you in a reply or note.</li>
     <li><strong>Other Notifications</strong> &mdash; replies on tickets you're CC'd on, escalation alerts, and when a ticket you submitted is assigned.</li>
     <li><strong>Tickets You Submit</strong> &mdash; the same emails a requester gets for tickets you raise yourself: confirmation, agent replies, merged, resolved, closed and satisfaction surveys.</li>
 </ul>

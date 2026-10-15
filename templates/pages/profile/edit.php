@@ -174,6 +174,7 @@ $breadcrumbs = [
                             ['key' => 'notify_assigned_to_me',    'icon' => 'bi-person-check',          'label' => 'Ticket assigned to me',       'desc' => 'Email when a ticket is assigned directly to you.'],
                             ['key' => 'notify_requester_replied', 'icon' => 'bi-chat-left-text',        'label' => 'Requester replies',           'desc' => 'Email when a portal user replies to a ticket assigned to you.'],
                             ['key' => 'notify_note_added',        'icon' => 'bi-sticky',                'label' => 'Internal note added',         'desc' => 'Email when an internal note is added to a ticket assigned to you.'],
+                            ['key' => 'notify_mention',           'icon' => 'bi-at',                    'label' => '@Mentions',                   'desc' => 'Email when someone @mentions you in a ticket reply or note.'],
                         ];
                         $otherOptions = [
                             ['key' => 'notify_ticket_cc',         'icon' => 'bi-person-lines-fill',    'label' => 'CC updates',              'desc' => "Email when a ticket you're CC'd on receives a reply."],

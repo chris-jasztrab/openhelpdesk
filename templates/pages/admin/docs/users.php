@@ -363,7 +363,7 @@ $locLabel     = label('location.singular', 'Location');
 <table class="table table-sm mb-0">
     <thead class="table-light"><tr><th style="width:26%;">Section</th><th>Options</th></tr></thead>
     <tbody class="text-muted">
-        <tr><td><strong>Agent Notifications</strong> (staff)</td><td>New ticket in my group; Ticket assigned to my group; Ticket assigned to me; Requester replies; Internal note added</td></tr>
+        <tr><td><strong>Agent Notifications</strong> (staff)</td><td>New ticket in my group; Ticket assigned to my group; Ticket assigned to me; Requester replies; Internal note added; @Mentions</td></tr>
         <tr><td><strong>Other Notifications</strong> (staff)</td><td>CC updates; Escalation alerts; My ticket assigned</td></tr>
         <tr><td><strong>Tickets You Submit</strong> (staff)</td><td>Ticket submitted; Agent replies; Ticket merged; Ticket resolved; Ticket closed; Satisfaction surveys</td></tr>
         <tr><td>End users</td><td>Ticket submitted; Ticket assigned; Agent replies; CC updates; Ticket merged; Ticket resolved; Ticket closed; Satisfaction surveys</td></tr>

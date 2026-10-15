@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.189.0 &mdash; 2026-10-15
+
+### Added
+- **Email when someone @mentions you.** Staff already got a bell alert when a colleague @mentioned them in a reply or note. They now get an email too, with the message and a link to the ticket. Each person can turn it off under **My Profile → Email Notifications → @Mentions**. It is on by default for everyone. On a confidential ticket the person can't open, the email leaves out the subject and the message, the same way the bell alert does.
+
 ## 2.188.2 &mdash; 2026-10-15
 
 ### Fixed
