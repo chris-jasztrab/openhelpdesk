@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.191.0 &mdash; 2026-10-15
+
+### Added
+- **Satisfaction by group.** **Reports → Satisfaction** has a new **By Group** table. For each group it shows surveys sent, responses, response rate and average rating for the selected dates. Use its **Export CSV** button to download it. A ticket's survey counts toward the group the ticket is in now, so a ticket moved to another group before it was resolved counts for the new group.
+
 ## 2.190.1 &mdash; 2026-10-15
 
 ### Fixed

@@ -142,6 +142,50 @@ $csatExtDash   = trim(getSetting('csat_external_dashboard_url', ''));
 </div>
 <?php endif; ?>
 
+<!-- By group -->
+<?php if (!empty($groups)): ?>
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white py-3 d-flex align-items-center justify-content-between">
+        <h6 class="mb-0 fw-semibold"><i class="bi bi-people me-2"></i>By Group</h6>
+        <?php require ROOT_DIR . '/templates/partials/report-export-csv.php'; ?>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Group</th>
+                    <th class="text-center">Surveys Sent</th>
+                    <th class="text-center">Responses</th>
+                    <th class="text-center">Response Rate</th>
+                    <th class="text-center">Avg Rating</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($groups as $g): ?>
+                <tr>
+                    <td class="fw-semibold"><?= e($g['group_name']) ?></td>
+                    <td class="text-center"><?= (int) $g['sent'] ?></td>
+                    <td class="text-center"><?= (int) $g['responded'] ?></td>
+                    <td class="text-center"><?= $g['response_rate'] ?>%</td>
+                    <td class="text-center">
+                        <?php if ($g['avg_rating'] === null): ?>
+                            <span class="text-muted">—</span>
+                        <?php else:
+                            $a = $g['avg_rating']; $c = $a >= 4 ? 'success' : ($a >= 3 ? 'warning' : 'danger'); ?>
+                            <span class="badge bg-<?= $c ?> bg-opacity-10 text-<?= $c ?>"><?= $a ?> / 5</span>
+                        <?php endif; ?>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer bg-white text-muted small">
+        Credited to each ticket's current group.
+    </div>
+</div>
+<?php endif; ?>
+
 <!-- Responses table -->
 <div class="card border-0 shadow-sm">
     <div class="card-header bg-white py-3 d-flex align-items-center justify-content-between">

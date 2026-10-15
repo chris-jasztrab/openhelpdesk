@@ -11496,6 +11496,38 @@ $router->get('/admin/reports/csat', function () {
         $distribution[(int) $row['rating']] = (int) $row['cnt'];
     }
 
+    // Per-group breakdown — credited to the ticket's current group, not the
+    // group it sat in when the survey went out.
+    $stmt = $db->prepare(
+        "SELECT COALESCE(g.name, 'No group') AS group_name,
+                COUNT(*) AS sent,
+                COUNT(cs.responded_at) AS responded,
+                AVG(cs.rating) AS avg_rating
+         FROM csat_surveys cs
+         JOIN tickets t       ON t.id = cs.ticket_id
+         LEFT JOIN `groups` g ON g.id = t.group_id
+         WHERE cs.sent_at BETWEEN ? AND ?
+         GROUP BY t.group_id, g.name
+         ORDER BY group_name"
+    );
+    $stmt->execute([$from, $toEnd]);
+    $groups = $stmt->fetchAll();
+    foreach ($groups as &$g) {
+        $g['response_rate'] = $g['sent'] > 0 ? round($g['responded'] / $g['sent'] * 100) : 0;
+        $g['avg_rating']    = $g['avg_rating'] !== null ? round((float) $g['avg_rating'], 1) : null;
+    }
+    unset($g);
+
+    if (($_GET['export'] ?? '') === 'csv') {
+        reportCsvOut(
+            "csat-by-group-{$from}-to-{$to}.csv",
+            ['Group', 'Surveys Sent', 'Responses', 'Response Rate %', 'Avg Rating'],
+            array_map(fn($g) => [
+                $g['group_name'], $g['sent'], $g['responded'], $g['response_rate'], $g['avg_rating'] ?? '',
+            ], $groups)
+        );
+    }
+
     // Responses table
     $stmt = $db->prepare(
         "SELECT cs.rating, cs.comment, cs.responded_at,
@@ -11513,7 +11545,7 @@ $router->get('/admin/reports/csat', function () {
 
     render('admin/reports/csat', compact(
         'from', 'to', 'range', 'totalSent', 'totalResponded', 'responseRate',
-        'avgRating', 'distribution', 'responses'
+        'avgRating', 'distribution', 'groups', 'responses'
     ));
 });
 
