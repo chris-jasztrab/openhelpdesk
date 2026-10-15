@@ -9,6 +9,7 @@
     <?php require ROOT_DIR . '/templates/partials/pwa-head.php'; ?>
     <link href="/assets/vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
     <link href="/assets/vendor/bootstrap-icons/bootstrap-icons.min.css" rel="stylesheet">
+    <?= brandIconStylesheet() ?>
     <?php if (Auth::check() && !Auth::isAdmin()): ?>
     <link href="/assets/vendor/driverjs/driver.css" rel="stylesheet">
     <?php endif; ?>

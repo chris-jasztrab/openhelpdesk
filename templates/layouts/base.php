@@ -8,6 +8,7 @@
     <?php require ROOT_DIR . '/templates/partials/pwa-head.php'; ?>
     <link href="/assets/vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
     <link href="/assets/vendor/bootstrap-icons/bootstrap-icons.min.css" rel="stylesheet">
+    <?= brandIconStylesheet() ?>
     <style>
         :root { --ld-primary: <?= e(getSetting('branding_primary_color', '#4f46e5')) ?>; --ld-primary-hover: <?= e(getSetting('branding_primary_hover', '#4338ca')) ?>; --ld-navbar-height: 56px; }
         body { background-color: #f1f5f9; }

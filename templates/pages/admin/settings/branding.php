@@ -8,6 +8,8 @@ $breadcrumbs  = [
     ['label' => 'Branding'],
 ];
 ?>
+<?php // Always loaded here so the live preview can show a Font Awesome icon before it's saved. ?>
+<link href="/assets/vendor/fontawesome/css/all.min.css" rel="stylesheet">
 <div class="mb-4">
     <h2 class="fw-bold mb-0">Settings</h2>
 </div>
@@ -52,7 +54,7 @@ $breadcrumbs  = [
                     <div id="logoDefaultRow" class="mb-3" <?= $hasLogo ? 'style="display:none;"' : '' ?>>
                         <label class="form-label text-muted small">Current Logo</label>
                         <div class="p-3 rounded d-inline-flex align-items-center gap-2" style="background:#1e1b4b; color:#fff;">
-                            <i class="bi <?= e($navbarIcon) ?> fs-4" id="logoDefaultIcon"></i>
+                            <i class="<?= e(brandIconClass($navbarIcon)) ?> fs-4" id="logoDefaultIcon"></i>
                             <span class="fw-bold"><?= e($appName) ?></span>
                         </div>
                         <div class="form-text mt-1">Default — upload a logo to replace this.</div>
@@ -62,12 +64,14 @@ $breadcrumbs  = [
                     <div class="mb-3">
                         <label for="navbarIcon" class="form-label">Fallback Icon <span class="text-muted fw-normal">(shown when no logo is uploaded)</span></label>
                         <div class="input-group" style="max-width:320px;">
-                            <span class="input-group-text"><i class="bi <?= e($navbarIcon) ?>" id="navbarIconPreviewInput"></i></span>
+                            <span class="input-group-text"><i class="<?= e(brandIconClass($navbarIcon)) ?>" id="navbarIconPreviewInput"></i></span>
                             <input type="text" class="form-control font-monospace" id="navbarIconInput" name="navbar_icon"
-                                   value="<?= e($navbarIcon) ?>" placeholder="bi-person-raised-hand">
+                                   value="<?= e($navbarIcon) ?>" placeholder="bi-headset">
                         </div>
                         <div class="form-text">
-                            Enter any <a href="https://icons.getbootstrap.com/" target="_blank" rel="noopener">Bootstrap Icon</a> class name, e.g. <code>bi-display</code>, <code>bi-laptop</code>, <code>bi-building</code>.
+                            Enter a <a href="https://icons.getbootstrap.com/" target="_blank" rel="noopener">Bootstrap Icon</a> class name, e.g. <code>bi-building</code>,
+                            or a free <a href="https://fontawesome.com/search?ic=free" target="_blank" rel="noopener">Font Awesome</a> icon, e.g. <code>fa-solid fa-house</code>.
+                            You can paste the <code>&lt;i class="…"&gt;</code> snippet copied from either site.
                         </div>
                     </div>
 
@@ -248,7 +252,7 @@ $breadcrumbs  = [
                             <?php if ($logo && file_exists(ROOT_DIR . '/public/uploads/branding/' . $logo)): ?>
                                 <img id="previewLogoImg" src="/uploads/branding/<?= e($logo) ?>" alt="" style="height:24px;">
                             <?php else: ?>
-                                <i class="bi <?= e($navbarIcon) ?>" id="previewLogoIcon"></i>
+                                <i class="<?= e(brandIconClass($navbarIcon)) ?>" id="previewLogoIcon"></i>
                             <?php endif; ?>
                             <span class="fw-bold" id="previewAppName"><?= e($appName) ?></span>
                         </div>
@@ -326,21 +330,33 @@ $breadcrumbs  = [
         document.getElementById('previewAppName').textContent = appNameInput.value || 'OpenHelpDesk';
     });
 
-    // Navbar icon live preview
+    // Navbar icon live preview. Mirrors normalizeBrandIcon() + brandIconClass() in helpers.php.
+    var faStyles = {'fa': 'fa-solid', 'fas': 'fa-solid', 'fa-solid': 'fa-solid',
+                    'far': 'fa-regular', 'fa-regular': 'fa-regular',
+                    'fab': 'fa-brands', 'fa-brands': 'fa-brands'};
+    function iconClass(raw) {
+        var all = raw.toLowerCase().match(/[a-z0-9-]+/g) || [];
+        var style = 'fa-solid', tokens = [];
+        all.forEach(function (t) { if (faStyles[t]) style = faStyles[t]; else tokens.push(t); });
+        for (var i = 0; i < tokens.length; i++) {
+            if (/^bi-[a-z0-9]/.test(tokens[i])) return 'bi ' + tokens[i];
+            if (/^fa-[a-z0-9]/.test(tokens[i])) return style + ' ' + tokens[i];
+        }
+        return all.length === 1 && tokens.length ? 'bi bi-' + tokens[0] : 'bi bi-headset';
+    }
     var navbarIconInput = document.getElementById('navbarIconInput');
     navbarIconInput.addEventListener('input', function () {
-        var raw = this.value.trim();
-        if (!raw) raw = 'bi-person-raised-hand';
-        if (!raw.startsWith('bi-')) raw = 'bi-' + raw;
+        var cls = iconClass(this.value).split(' ');
         // Update all three icon elements (input adornment, default row preview, navbar preview)
         var previewInputIcon = document.getElementById('navbarIconPreviewInput');
         var defaultIcon      = document.getElementById('logoDefaultIcon');
         var previewLogoIcon  = document.getElementById('previewLogoIcon');
         [previewInputIcon, defaultIcon, previewLogoIcon].forEach(function (el) {
             if (!el) return;
-            // Strip existing bi-* classes and add new one
-            el.className = el.className.replace(/\bbi-[\w-]+\b/g, '').trim();
-            el.className += ' ' + raw;
+            // Swap the icon classes (bi, bi-*, fa*, fa-*) and keep the rest (e.g. fs-4)
+            el.className = el.className.split(/\s+/).filter(function (c) {
+                return c && !/^(bi|fa[srb]?)(-|$)/.test(c);
+            }).concat(cls).join(' ');
         });
     });
 

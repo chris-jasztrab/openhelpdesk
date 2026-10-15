@@ -316,10 +316,10 @@ return [
     // =======================================================================
     // Branding  (/admin/settings/branding)
     // =======================================================================
-    ['label' => 'Fallback Navbar Icon',         'description' => 'Bootstrap Icon class shown when no logo uploaded',
+    ['label' => 'Fallback Navbar Icon',         'description' => 'Bootstrap Icon or Font Awesome class shown when no logo uploaded',
      'group' => 'Customization', 'page_label' => 'Branding', 'page_url' => '/admin/settings/branding',
      'section' => 'Logo', 'anchor' => 'navbarIconInput',
-     'keywords' => 'icon navbar fallback brand bi-'],
+     'keywords' => 'icon navbar fallback brand bi- font awesome fa-'],
 
     ['label' => 'Upload New Logo',              'description' => 'JPG, PNG, GIF, WEBP, or SVG (max 2 MB)',
      'group' => 'Customization', 'page_label' => 'Branding', 'page_url' => '/admin/settings/branding',

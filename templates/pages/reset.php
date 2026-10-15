@@ -4,7 +4,7 @@ $pageTitle = 'Choose a New Password';
 ?>
 <div style="max-width:420px;width:100%;">
     <div class="text-center mb-4">
-        <h1 class="text-white fw-bold"><i class="bi <?= e(getSetting('branding_navbar_icon', 'bi-headset')) ?>" aria-hidden="true"></i> <?= e(getSetting('branding_app_name', 'OpenHelpDesk')) ?></h1>
+        <h1 class="text-white fw-bold"><i class="<?= e(brandIconClass()) ?>" aria-hidden="true"></i> <?= e(getSetting('branding_app_name', 'OpenHelpDesk')) ?></h1>
         <p class="text-white-50">Choose a new password</p>
     </div>
 

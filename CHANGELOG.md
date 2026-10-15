@@ -11,6 +11,14 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.192.0 &mdash; 2026-10-15
+
+### Added
+- **Font Awesome icons for the branding icon.** **Admin → Settings → Branding → Fallback Icon** now takes a free Font Awesome icon such as `fa-solid fa-house`, as well as a Bootstrap Icon such as `bi-building`. You can paste the `<i class="…">` snippet that fontawesome.com or icons.getbootstrap.com copies, and the live preview updates as you type. The icon shows in the top-left of the navbar when no logo is uploaded, and on the sign-in, forgot-password, reset-password, two-factor and location-picker pages. Font Awesome Free 7.3.1 is bundled with the app, and its stylesheet only loads when a Font Awesome icon is chosen.
+
+### Changed
+- When the Fallback Icon is left blank it now saves as `bi-headset`, the icon the navbar already showed by default. Before, the Branding page suggested a different icon from the one actually shown.
+
 ## 2.191.0 &mdash; 2026-10-15
 
 ### Added

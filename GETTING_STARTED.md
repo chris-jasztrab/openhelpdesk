@@ -584,7 +584,7 @@ The right-hand column shows the current value of every label, with overridden on
 What you can change:
 
 - **Logo** — JPG, PNG, GIF, WEBP, or SVG. Max 2 MB, recommended height 32–40 px. Replaces the navbar icon on every page; the preview shows what the navbar will look like before you save.
-- **Fallback icon** — any [Bootstrap Icon](https://icons.getbootstrap.com/) class name (e.g. `bi-display`, `bi-laptop`, `bi-building`). Shown when no logo is uploaded.
+- **Fallback icon** — any [Bootstrap Icon](https://icons.getbootstrap.com/) class name (e.g. `bi-display`, `bi-building`) or free [Font Awesome](https://fontawesome.com/search?ic=free) icon (e.g. `fa-solid fa-house`). Shown when no logo is uploaded, and on the sign-in pages.
 - **Application name** — display name in the navbar, titles, login, and emails.
 - **Primary colour** — buttons, links, active states. Default `#4f46e5` (indigo).
 - **Primary hover** — the darker shade used on hover/focus. Default `#4338ca`.

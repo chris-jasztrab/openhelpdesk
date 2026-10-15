@@ -1963,6 +1963,56 @@ function setSetting(string $key, string $value): void
 }
 
 /**
+ * Canonical form of the branding fallback icon typed on the Branding page.
+ *
+ * Accepts a Bootstrap Icons name ("bi-building", or a bare "building") or a
+ * Font Awesome Free icon ("fa-solid fa-house", "fas fa-house", "fa-house"),
+ * including the <i class="…"></i> snippet fontawesome.com copies. Returns
+ * "bi-<name>" or "fa-<style> fa-<name>", or '' when nothing usable was given.
+ */
+function normalizeBrandIcon(string $raw): string
+{
+    $styles = ['fa' => 'fa-solid', 'fas' => 'fa-solid', 'fa-solid' => 'fa-solid',
+               'far' => 'fa-regular', 'fa-regular' => 'fa-regular',
+               'fab' => 'fa-brands', 'fa-brands' => 'fa-brands'];
+    preg_match_all('/[a-z0-9-]+/', strtolower($raw), $m);
+    $style  = 'fa-solid';
+    $tokens = [];
+    foreach ($m[0] as $t) {
+        if (isset($styles[$t])) {
+            $style = $styles[$t];
+        } else {
+            $tokens[] = $t;
+        }
+    }
+    foreach ($tokens as $t) {
+        if (preg_match('/^bi-[a-z0-9]/', $t)) {
+            return $t;
+        }
+        if (preg_match('/^fa-[a-z0-9]/', $t)) {
+            return "$style $t";
+        }
+    }
+    // A lone bare name keeps the original behaviour: it's a Bootstrap Icon.
+    return count($m[0]) === 1 && $tokens ? 'bi-' . $tokens[0] : '';
+}
+
+/** Full class list for the branding fallback icon — Bootstrap Icons or Font Awesome. */
+function brandIconClass(?string $icon = null): string
+{
+    $icon ??= getSetting('branding_navbar_icon', 'bi-headset');
+    return str_starts_with($icon, 'fa-') ? $icon : 'bi ' . $icon;
+}
+
+/** Font Awesome <link>, emitted only when the branding icon is a Font Awesome one. */
+function brandIconStylesheet(): string
+{
+    return str_starts_with(brandIconClass(), 'fa-')
+        ? '<link href="/assets/vendor/fontawesome/css/all.min.css" rel="stylesheet">'
+        : '';
+}
+
+/**
  * Undo-send grace window in seconds, or 0 when the feature is off.
  *
  * When enabled, ticket-create and reply forms hold the submit client-side

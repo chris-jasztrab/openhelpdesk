@@ -5,7 +5,7 @@ $pageTitle = 'Choose your ' . label('location.singular', 'Location');
 <div style="max-width:480px;width:100%;">
     <div class="text-center mb-4">
         <h1 class="text-white fw-bold">
-            <i class="bi <?= e(getSetting('branding_navbar_icon', 'bi-headset')) ?>"></i>
+            <i class="<?= e(brandIconClass()) ?>"></i>
             <?= e(getSetting('branding_app_name', 'OpenHelpDesk')) ?>
         </h1>
         <p class="text-white-50">Almost there!</p>

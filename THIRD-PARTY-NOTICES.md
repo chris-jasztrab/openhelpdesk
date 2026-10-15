@@ -32,6 +32,7 @@ below are taken from each bundled file's banner.
 |---|---|---|---|
 | [Bootstrap](https://github.com/twbs/bootstrap) | 5.3.3 | MIT | UI framework / CSS |
 | [Bootstrap Icons](https://github.com/twbs/icons) | 1.11.3 (incl. woff/woff2 fonts) | MIT | Icon set |
+| [Font Awesome Free](https://github.com/FortAwesome/Font-Awesome) | 7.3.1 (CSS + woff2 fonts) | Icons CC BY 4.0, fonts SIL OFL 1.1, code MIT | Optional branding icon |
 | [CKEditor 5](https://github.com/ckeditor/ckeditor5) | 43.3.1 | **GPL-2.0-or-later** (or commercial) | Rich-text editor |
 | [Chart.js](https://github.com/chartjs/Chart.js) | 4.5.1 | MIT | Report charts |
 | [Mermaid](https://github.com/mermaid-js/mermaid) | 10.9.6 | MIT | Diagrams in docs |

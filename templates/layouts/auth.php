@@ -7,6 +7,7 @@
     <?php require ROOT_DIR . '/templates/partials/pwa-head.php'; ?>
     <link href="/assets/vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
     <link href="/assets/vendor/bootstrap-icons/bootstrap-icons.min.css" rel="stylesheet">
+    <?= brandIconStylesheet() ?>
     <style>
         :root {
             --ld-primary: <?= e(getSetting('branding_primary_color', '#4f46e5')) ?>;

@@ -2,12 +2,12 @@
 <style>@media (min-width: 992px) { .ld-navbar { height: var(--ld-navbar-height, 56px); } }</style>
 <nav class="navbar navbar-expand-lg navbar-dark sticky-top ld-navbar" style="min-height:var(--ld-navbar-height,56px);" aria-label="Primary">
     <div class="container-fluid">
-        <?php $brandLogo = getSetting('branding_logo', ''); $brandName = getSetting('branding_app_name', 'OpenHelpDesk'); $brandIcon = getSetting('branding_navbar_icon', 'bi-headset'); ?>
+        <?php $brandLogo = getSetting('branding_logo', ''); $brandName = getSetting('branding_app_name', 'OpenHelpDesk'); ?>
         <a class="navbar-brand d-flex align-items-center gap-2" href="/">
             <?php if ($brandLogo && file_exists(ROOT_DIR . '/public/uploads/branding/' . $brandLogo)): ?>
                 <img src="/uploads/branding/<?= e($brandLogo) ?>" alt="" style="height:32px;">
             <?php else: ?>
-                <i class="bi <?= e($brandIcon) ?> fs-4" aria-hidden="true"></i>
+                <i class="<?= e(brandIconClass()) ?> fs-4" aria-hidden="true"></i>
             <?php endif; ?>
             <span><?= e($brandName) ?></span>
         </a>

@@ -51,6 +51,27 @@ class SettingsTest extends TestCase
         $this->assertSee('navbar_icon', $r, ' — navbar icon input must be present on branding page');
     }
 
+    /** @dataProvider brandIcons */
+    public function test_normalize_brand_icon(string $raw, string $expected): void
+    {
+        $this->assertSame($expected, normalizeBrandIcon($raw));
+    }
+
+    public static function brandIcons(): array
+    {
+        return [
+            ['bi-building',                         'bi-building'],
+            ['building',                            'bi-building'],
+            ['<i class="bi bi-laptop"></i>',        'bi-laptop'],
+            ['fa-solid fa-house',                   'fa-solid fa-house'],
+            ['fa-house',                            'fa-solid fa-house'],
+            ['fab fa-github',                       'fa-brands fa-github'],
+            ['<i class="fa-regular fa-bell"></i>',  'fa-regular fa-bell'],
+            ['bi-x" onmouseover="alert(1)',         'bi-x'],
+            ['  ',                                  ''],
+        ];
+    }
+
     // ── Email templates-specific ──────────────────────────────────────────────
 
     public function test_email_templates_page_shows_csat_template(): void

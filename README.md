@@ -256,7 +256,7 @@ Fourteen built-in report pages accessible from the Reports Overview, each with d
 |-------|-----------|
 | Language | PHP 8.0+ (strict types) |
 | Database | MySQL 5.7+ / 8.0 (InnoDB, utf8mb4) |
-| Frontend | Bootstrap 5.3, Bootstrap Icons, Chart.js, CKEditor 5, Driver.js, Sortable.js — all self-hosted under `public/assets/vendor/` (no CDNs) |
+| Frontend | Bootstrap 5.3, Bootstrap Icons, Font Awesome Free (branding icon only), Chart.js, CKEditor 5, Driver.js, Sortable.js — all self-hosted under `public/assets/vendor/` (no CDNs) |
 | Email | PHPMailer 6 (SMTP out), Microsoft Graph API (inbound + OOF + Teams) |
 | Markdown | League CommonMark 2 |
 | Routing | Custom `Router.php` (no framework) |
