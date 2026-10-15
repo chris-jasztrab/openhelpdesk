@@ -347,6 +347,10 @@ function createTicketFromEmail(PDO $db, int $userId, string $subject, string $bo
         autoAssignTicket($db, $newTicketId);
     }
 
+    // Every other creation path starts the SLA clock; this one never did, so
+    // emailed tickets — most of them — had no SLA due dates at all.
+    Sla::initializeFromTicket($db, $newTicketId);
+
     // Ticket-created confirmation to the sender (gated by global + user prefs)
     notifyRequesterTicketCreated($db, $newTicketId);
     logMsg('INFO', '  Confirmation email dispatched to the sender (subject to prefs).');

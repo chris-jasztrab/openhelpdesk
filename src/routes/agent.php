@@ -2159,6 +2159,7 @@ $router->post('/agent/tickets/{id}/split', function (array $p) {
         // AI classification (if enabled & non-confidential) + auto-assign.
         // Both no-op cleanly when their preconditions aren't met.
         runPostTicketCreateHooks($db, $newId);
+        Sla::initializeFromTicket($db, $newId);
 
         // Timeline entry on new ticket
         $db->prepare(

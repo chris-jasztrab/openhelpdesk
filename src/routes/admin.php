@@ -5633,6 +5633,7 @@ $router->post('/admin/tickets/{id}/split', function (array $p) {
         $newId = (int) $db->lastInsertId();
 
         runPostTicketCreateHooks($db, $newId);
+        Sla::initializeFromTicket($db, $newId);
 
         // Timeline entry on new ticket
         $db->prepare(

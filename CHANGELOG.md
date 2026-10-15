@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.187.1 &mdash; 2026-10-15
+
+### Fixed
+- **Emailed tickets now get SLA due dates.** Tickets opened from an inbound email, and tickets created by splitting another ticket, never started their SLA clock, so they had no first-response or resolution due date and never showed a warning or breach. Every other way of creating a ticket already did this. On helpdesk.wpl.ca this was most new tickets (only 17 of 644 opened since go-live had an SLA). New tickets from both paths now get their SLA dates as soon as they're created. Tickets that already exist are unchanged.
+
 ## 2.187.0 &mdash; 2026-10-14
 
 ### Changed

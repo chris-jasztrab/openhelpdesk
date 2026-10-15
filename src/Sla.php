@@ -536,6 +536,23 @@ class Sla
     }
 
     /**
+     * initializeForTicket() using the ticket's current priority and type.
+     *
+     * For creation paths that run runPostTicketCreateHooks() first: AI
+     * classification and automations can change the priority or type, so the
+     * values the caller started with may already be stale.
+     */
+    public static function initializeFromTicket(PDO $db, int $ticketId): void
+    {
+        $stmt = $db->prepare('SELECT priority_id, type_id FROM tickets WHERE id = ?');
+        $stmt->execute([$ticketId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($row && !empty($row['priority_id'])) {
+            self::initializeForTicket($db, $ticketId, (int) $row['priority_id'], $row['type_id'] !== null ? (int) $row['type_id'] : null);
+        }
+    }
+
+    /**
      * Build the lookup cache used by initializeForImportedTicket().
      *
      * A CSV import applies SLA to thousands of rows in one transaction. Going
