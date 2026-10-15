@@ -7,7 +7,7 @@ define('ROOT_DIR', dirname(__DIR__));
 require ROOT_DIR . '/vendor/autoload.php';
 require ROOT_DIR . '/src/helpers.php';
 require ROOT_DIR . '/src/Database.php';
-require ROOT_DIR . '/src/Auth.php';
+require_once ROOT_DIR . '/src/Auth.php';   // helpers.php already loads it
 
 // Load the application .env so DB credentials are available
 loadEnv(ROOT_DIR . '/.env');

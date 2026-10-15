@@ -11,6 +11,14 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.188.2 &mdash; 2026-10-15
+
+### Fixed
+- **Inbound email stopped crash-looping for good.** After 2.188.1 the same job got one step further and crashed again, this time on `Class "Teams" not found` while sending the ticket-created notice. It was still making one "Spam Quarantine Report" ticket a minute. The helpers now also load the Teams and Auth classes, which the notify and assign steps use, so the background email job has every class those helpers touch. `Auth::id()` just returns nothing outside a signed-in web session.
+
+### Changed
+- **SpamTitan quarantine reports are dropped, like out-of-office replies.** An email whose body starts with "This is your Spam Quarantine Report" no longer opens a ticket or gets added to one. It is marked read and skipped. A person who forwards one to ask for a message to be released still gets a ticket, because their own text comes first.
+
 ## 2.188.1 &mdash; 2026-10-15
 
 ### Fixed

@@ -44,6 +44,15 @@ class InboundReplyHelpersTest extends TestCase
         $this->assertFalse(isAutoReply(self::msg('Printer jam')));
     }
 
+    public function test_spam_quarantine_report_is_dropped_but_a_forwarded_one_is_not(): void
+    {
+        $report = self::msg('Spam Quarantine Report', [], 'report@spamtitan.com');
+        $this->assertTrue(isAutoReply($report + ['bodyPreview' => " \r\nThis is your Spam Quarantine Report. SpamTitan caught these spam…"]));
+        $this->assertFalse(isAutoReply(self::msg('FW: Spam Quarantine Report') + [
+            'bodyPreview' => "Can you release the invoice email?\r\nFrom: report@spamtitan.com\r\nThis is your Spam Quarantine Report.",
+        ]), 'a person forwarding the report still opens a ticket');
+    }
+
     public function test_follow_up_subject_drops_reply_prefixes_ticket_tag_and_status_label(): void
     {
         $this->assertSame('Printer jam', followUpTicketSubject('RE: [Ticket #123] Closed: Printer jam'));

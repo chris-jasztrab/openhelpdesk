@@ -2,11 +2,14 @@
 
 declare(strict_types=1);
 
-// The AI helpers in this file (aiRouteTicketToGroup, classifyTicketWithAI, …)
-// need these classes, and cron scripts load helpers.php without the web
-// bootstrap. Without this, inbound email died after inserting each ticket and
-// never marked the message read, so one email became a new ticket every minute.
+// Functions in this file use these classes (AI routing/classification, Teams
+// posts, Auth::id() in the notify helpers), and cron scripts load helpers.php
+// without the web bootstrap. Without them, inbound email died after inserting
+// each ticket and never marked the message read, so one email became a new
+// ticket every minute. Auth::id() is simply null outside a web session.
 require_once __DIR__ . '/AI.php';
+require_once __DIR__ . '/Auth.php';
+require_once __DIR__ . '/Teams.php';
 
 /**
  * Load environment variables from a .env file.
@@ -8266,6 +8269,13 @@ function isAutoReply(array $msg): bool
 
     // Bounces come from the mail system itself
     if (preg_match('/^(mailer-daemon|postmaster)@/i', (string) ($msg['from']['emailAddress']['address'] ?? ''))) {
+        return true;
+    }
+
+    // Spam-filter digests (SpamTitan's quarantine report) carry none of the
+    // headers above. Anchored to the body's start, so a person forwarding one
+    // to ask for a release ("can you free this email?") still opens a ticket.
+    if (preg_match('/^\s*This is your Spam Quarantine Report\b/i', (string) ($msg['bodyPreview'] ?? ''))) {
         return true;
     }
 
