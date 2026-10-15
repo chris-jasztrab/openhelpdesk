@@ -32,3 +32,11 @@ RemoveType .php .php3 .php4 .php5 .php7 .php8 .phtml .phar
 
 # No directory listings.
 Options -Indexes -ExecCGI
+
+# SVG can carry script. Uploaded SVG logos are cleaned on the way in
+# (sanitizeSvg()); this sandbox makes sure one opened directly still can't run any.
+<IfModule mod_headers.c>
+    <FilesMatch "(?i)\.svg$">
+        Header set Content-Security-Policy "default-src 'none'; style-src 'unsafe-inline'; sandbox"
+    </FilesMatch>
+</IfModule>

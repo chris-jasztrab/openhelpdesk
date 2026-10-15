@@ -72,6 +72,31 @@ class SettingsTest extends TestCase
         ];
     }
 
+    public function test_sanitize_svg_strips_script_and_whitens_icons(): void
+    {
+        $out = sanitizeSvg(
+            '<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 10 10">'
+            . '<script>alert(1)</script><foreignObject><div>x</div></foreignObject>'
+            . '<a href="javascript:alert(1)"><path d="M1 1"/></a>'
+            . '<path d="M0 0" onclick="alert(1)" ONLOAD="alert(1)" stroke="currentColor"/>'
+            . '<use xlink:href="javascript:alert(1)"/><use href="data:image/svg+xml,x"/><use href="#ok"/>'
+            . '<animate attributeName="href" to="javascript:alert(1)"/></svg>'
+        );
+        $this->assertNotNull($out);
+        foreach (['script', 'foreignObject', '<a', 'onclick', 'ONLOAD', 'javascript', 'data:', 'animate', 'currentColor'] as $bad) {
+            $this->assertStringNotContainsStringIgnoringCase($bad, $out);
+        }
+        $this->assertStringContainsString('<path d="M0 0"', $out);
+        $this->assertStringContainsString('href="#ok"', $out);
+        $this->assertStringContainsString('fill="#fff"', $out);
+        $this->assertStringContainsString('stroke="#fff"', $out);
+
+        $this->assertNull(sanitizeSvg('<!DOCTYPE svg [<!ENTITY x "y">]><svg xmlns="http://www.w3.org/2000/svg">&x;</svg>'));
+        $this->assertNull(sanitizeSvg('<html><body>not an svg</body></html>'));
+        $this->assertNull(sanitizeSvg('<svg>missing namespace</svg>'));
+        $this->assertNull(sanitizeSvg('not xml'));
+    }
+
     // ── Email templates-specific ──────────────────────────────────────────────
 
     public function test_email_templates_page_shows_csat_template(): void

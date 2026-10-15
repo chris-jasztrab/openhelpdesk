@@ -11,6 +11,15 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.193.0 &mdash; 2026-10-15
+
+### Added
+- **SVG logos.** **Admin → Settings → Branding → Upload New Logo** now accepts SVG files. Each SVG is cleaned when it is uploaded: scripts, event handlers, links, embedded content and animations are removed, and only the drawing is kept. Single-colour icons, such as the SVGs you download from Font Awesome or Bootstrap Icons, are made white so they show up on the navbar. As a second safeguard, the server tells browsers not to run anything in an SVG that is opened directly.
+- **The logo shows on the sign-in pages.** An uploaded logo now replaces the icon on the sign-in, forgot-password, reset-password, two-factor and location-picker pages, not just in the navbar.
+
+### Fixed
+- **Logo uploads on a fresh install.** The `public/uploads/branding` folder is not part of the code, so on a new server (including ours) uploading a logo failed without any message. The folder is now created on the first upload, and you see an error if the file can't be saved.
+
 ## 2.192.0 &mdash; 2026-10-15
 
 ### Added

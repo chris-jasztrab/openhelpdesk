@@ -2004,6 +2004,77 @@ function brandIconClass(?string $icon = null): string
     return str_starts_with($icon, 'fa-') ? $icon : 'bi ' . $icon;
 }
 
+/**
+ * The brand mark for the navbar and sign-in pages: the uploaded logo if there
+ * is one, otherwise the fallback icon.
+ */
+function brandMark(string $imgHeight, string $iconExtraClass = ''): string
+{
+    $logo = basename(getSetting('branding_logo', ''));
+    if ($logo !== '' && is_file(ROOT_DIR . '/public/uploads/branding/' . $logo)) {
+        return '<img src="/uploads/branding/' . e($logo) . '" alt="" style="height:' . e($imgHeight) . ';vertical-align:-.125em;">';
+    }
+    return '<i class="' . e(trim(brandIconClass() . ' ' . $iconExtraClass)) . '" aria-hidden="true"></i>';
+}
+
+/**
+ * Clean an uploaded SVG logo; null when it isn't a usable SVG.
+ *
+ * SVG can carry script and logos are served from the public web root, so this
+ * is an allowlist: only drawing elements in the SVG namespace survive (script,
+ * foreignObject, animation, <a>, <image> are dropped), along with any on*
+ * handler and any href that isn't an in-file "#fragment". A DOCTYPE is refused
+ * outright (entity expansion). public/uploads/.htaccess also sandboxes .svg.
+ *
+ * The logo always sits on white-text backgrounds, and an <img> draws unset
+ * fills and currentColor as black, so single-colour icons are made white.
+ */
+function sanitizeSvg(string $svg): ?string
+{
+    if (stripos($svg, '<!DOCTYPE') !== false || stripos($svg, '<!ENTITY') !== false) {
+        return null;
+    }
+    $doc = new DOMDocument();
+    if (!@$doc->loadXML($svg, LIBXML_NONET)) {
+        return null;
+    }
+    $ns   = 'http://www.w3.org/2000/svg';
+    $root = $doc->documentElement;
+    if (!$root || $root->localName !== 'svg' || $root->namespaceURI !== $ns) {
+        return null;
+    }
+    $allowed = ['svg', 'g', 'path', 'circle', 'ellipse', 'rect', 'line', 'polyline', 'polygon',
+                'defs', 'symbol', 'use', 'clipPath', 'mask', 'linearGradient', 'radialGradient',
+                'stop', 'title', 'desc', 'style', 'text', 'tspan'];
+    foreach (iterator_to_array((new DOMXPath($doc))->query('//node()'), false) as $node) {
+        if ($node instanceof DOMProcessingInstruction) {
+            $node->parentNode?->removeChild($node);
+        }
+        if (!$node instanceof DOMElement) {
+            continue;
+        }
+        if ($node->namespaceURI !== $ns || !in_array($node->localName, $allowed, true)) {
+            $node->parentNode?->removeChild($node);
+            continue;
+        }
+        // false: href and xlink:href share a key and one would escape the loop.
+        foreach (iterator_to_array($node->attributes, false) as $attr) {
+            $name = strtolower($attr->localName);
+            if (str_starts_with($name, 'on')
+                || ($name === 'href' && !str_starts_with($attr->value, '#'))
+                || stripos(preg_replace('/\s+/', '', $attr->value), 'javascript:') !== false) {
+                $node->removeAttributeNode($attr);
+            } elseif (strcasecmp($attr->value, 'currentColor') === 0) {
+                $attr->value = '#fff';
+            }
+        }
+    }
+    if (!$root->hasAttribute('fill')) {
+        $root->setAttribute('fill', '#fff');
+    }
+    return $doc->saveXML($root);
+}
+
 /** Font Awesome <link>, emitted only when the branding icon is a Font Awesome one. */
 function brandIconStylesheet(): string
 {

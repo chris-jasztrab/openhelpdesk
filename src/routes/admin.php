@@ -9430,22 +9430,29 @@ $router->post('/admin/settings/branding', function () {
     // New logo upload
     if (!empty($_FILES['logo']['tmp_name'])) {
         $file = $_FILES['logo'];
-        // SVG is deliberately excluded: it can carry inline <script>, and the
-        // logo is served from the public web root with its native type, so an
-        // SVG logo would be stored XSS in the app origin. Raster formats only.
+        if ($file['size'] > 2 * 1024 * 1024) {
+            flash('error', 'Logo file is too large. Maximum 2 MB.');
+            redirect('/admin/settings/branding');
+            return;
+        }
+
         $allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
         $finfo = finfo_open(FILEINFO_MIME_TYPE);
         $mime  = finfo_file($finfo, $file['tmp_name']);
         finfo_close($finfo);
 
-        if (!in_array($mime, $allowedMimes, true)) {
-            flash('error', 'Invalid logo file type. Allowed: JPG, PNG, GIF, WEBP.');
-            redirect('/admin/settings/branding');
-            return;
-        }
-
-        if ($file['size'] > 2 * 1024 * 1024) {
-            flash('error', 'Logo file is too large. Maximum 2 MB.');
+        // SVG can carry <script> and the logo is served from the public web
+        // root, so it's rebuilt through sanitizeSvg() rather than stored as-is.
+        $svg = null;
+        if ($mime === 'image/svg+xml' || str_ends_with(strtolower($file['name']), '.svg')) {
+            $svg = sanitizeSvg((string) file_get_contents($file['tmp_name']));
+            if ($svg === null) {
+                flash('error', 'That SVG file could not be read. Save it as a plain SVG, or upload a PNG instead.');
+                redirect('/admin/settings/branding');
+                return;
+            }
+        } elseif (!in_array($mime, $allowedMimes, true)) {
+            flash('error', 'Invalid logo file type. Allowed: JPG, PNG, GIF, WEBP, SVG.');
             redirect('/admin/settings/branding');
             return;
         }
@@ -9455,15 +9462,27 @@ $router->post('/admin/settings/branding', function () {
             unlink(ROOT_DIR . '/public/uploads/branding/' . $currentLogo);
         }
 
-        $ext = match ($mime) {
+        $ext = $svg !== null ? 'svg' : match ($mime) {
             'image/jpeg'    => 'jpg',
             'image/png'     => 'png',
             'image/gif'     => 'gif',
             'image/webp'    => 'webp',
             default         => 'png',
         };
+        // The folder is gitignored, so a fresh checkout doesn't have it.
+        $dir = ROOT_DIR . '/public/uploads/branding';
+        if (!is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
         $filename = 'logo_' . uniqid() . '.' . $ext;
-        move_uploaded_file($file['tmp_name'], ROOT_DIR . '/public/uploads/branding/' . $filename);
+        $saved = $svg !== null
+            ? file_put_contents("$dir/$filename", $svg) !== false
+            : move_uploaded_file($file['tmp_name'], "$dir/$filename");
+        if (!$saved) {
+            flash('error', 'The logo could not be saved. Check that public/uploads/branding is writable by the web server.');
+            redirect('/admin/settings/branding');
+            return;
+        }
         setSetting('branding_logo', $filename);
     }
 

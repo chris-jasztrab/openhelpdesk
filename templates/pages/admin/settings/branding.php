@@ -78,7 +78,7 @@ $breadcrumbs  = [
                     <div>
                         <label for="logo" class="form-label">Upload New Logo</label>
                         <input type="file" class="form-control" id="logo" name="logo" accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml">
-                        <div class="form-text">JPG, PNG, GIF, WEBP, or SVG. Max 2 MB. Recommended height: 32–40px.</div>
+                        <div class="form-text">JPG, PNG, GIF, WEBP, or SVG. Max 2 MB. Recommended height: 32–40px. Also replaces the icon on the sign-in pages. Single-colour SVG icons are made white when saved, to show on the navbar.</div>
                     </div>
                 </div>
             </div>
