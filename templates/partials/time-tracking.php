@@ -6,7 +6,8 @@
  *
  * Also owns the "no time logged" reminder: closing a ticket whose type tracks
  * time, with nothing logged, asks first — from the Update form or the reply
- * box's "Send & change status". The agent can still close without logging.
+ * box's "Send & change status". The agent can still close without logging, and
+ * choosing "Log time" holds the close until that entry saves, then finishes it.
  */
 ?>
 <div id="ttCard"><?php require __DIR__ . '/time-tracking-body.php'; ?></div>
@@ -65,7 +66,17 @@
                 if (!r.ok || r.redirected) throw new Error('HTTP ' + r.status);
                 return r.text();
             })
-            .then(function (html) { card.innerHTML = html; tick(); })
+            .then(function (html) {
+                card.innerHTML = html;
+                tick();
+                // Sent here by the close reminder and the entry saved: finish the close.
+                var a = armed;
+                if (a && form.id === 'ttLogForm' && document.getElementById('ttBody').dataset.count !== '0') {
+                    armed = null;
+                    a.resume();
+                }
+                saveLabel();
+            })
             .catch(function () {
                 if (btn) btn.disabled = false;
                 alert('The time entry could not be saved. Reload the page and try again.');
@@ -78,7 +89,8 @@
     var update   = document.getElementById('updateTicketForm');
     var closed   = update ? (update.dataset.closedSlugs || '').split(',').filter(Boolean) : [];
     var modalEl  = document.getElementById('ttCloseReminder');
-    var pending  = null;   // { proceed, cancel } for the submit being held
+    var pending  = null;   // { proceed, cancel, resume } for the submit being held
+    var armed    = null;   // the held close, waiting on "Log time" → Save
     var go       = false;
 
     function needsReminder(status) {
@@ -87,16 +99,25 @@
             && closed.indexOf(status) !== -1;
     }
     function modal() { return bootstrap.Modal.getOrCreateInstance(modalEl); }
+    function saveLabel() {
+        var b = document.querySelector('#ttLogForm [type=submit]');
+        if (b) b.textContent = armed ? 'Save & close ticket' : 'Save';
+    }
 
-    function guard(form, statusOf, cancel) {
+    function guard(form, statusOf, cancel, restore) {
         if (!form) return;
         form.addEventListener('submit', function (e) {
             if (form._ttAck || !needsReminder(statusOf())) return;
             e.preventDefault();
             e.stopImmediatePropagation();
+            var status  = statusOf();
             var proceed = function () { form._ttAck = true; form.requestSubmit(); };
             if (!window.bootstrap) { proceed(); return; } // fail open
-            pending = { proceed: proceed, cancel: cancel };
+            pending = { proceed: proceed, cancel: cancel, resume: function () {
+                if (restore) restore(status);
+                // Skip if the agent moved off the close in the meantime.
+                if (statusOf() === status) proceed();
+            } };
             modal().show();
         });
     }
@@ -111,6 +132,10 @@
     }, function () {
         // Otherwise the next plain "Send" would still carry the close.
         if (statusAfter) statusAfter.value = '';
+    }, function (status) {
+        // Put the close back, unless the reply box was closed meanwhile.
+        var form = document.getElementById('replyForm');
+        if (statusAfter && form.offsetParent !== null) statusAfter.value = status;
     });
 
     // Act once the modal is fully hidden, so the resolution-note modal (if this
@@ -126,12 +151,20 @@
         modal().hide();
     });
     document.getElementById('ttLogNow').addEventListener('click', function () {
-        modal().hide();
         var logForm = document.getElementById('ttLogForm');
+        armed = logForm ? pending : null;
+        saveLabel();
+        modal().hide();
         if (!logForm) return;
         bootstrap.Collapse.getOrCreateInstance(logForm, { toggle: false }).show();
         logForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
         document.getElementById('ttHours').focus({ preventScroll: true });
+    });
+    // A fresh reminder, or folding the log form away, drops the held close.
+    function disarm() { armed = null; saveLabel(); }
+    modalEl.addEventListener('show.bs.modal', disarm);
+    card.addEventListener('hide.bs.collapse', function (e) {
+        if (e.target.id === 'ttLogForm') disarm();
     });
 })();
 </script>

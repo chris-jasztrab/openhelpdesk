@@ -166,7 +166,7 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/agent/help'], ['label' => 'Worki
     <li><strong>Log time</strong> &mdash; enter hours, minutes, the date you did the work and an optional note, then <strong>Save</strong>.</li>
     <li><strong>Edit</strong> / <strong>Delete</strong> &mdash; available on your own entries.</li>
     <li>The card saves without reloading the page, so a half-written reply is safe.</li>
-    <li>Closing a time-tracked ticket with no time logged asks whether to <strong>Log time</strong> first or <strong>Close without logging</strong>.</li>
+    <li>Closing a time-tracked ticket with no time logged asks whether to <strong>Log time</strong> first or <strong>Close without logging</strong>. If you choose <strong>Log time</strong>, the button reads <strong>Save &amp; close ticket</strong>, and saving your time finishes the close (and sends your reply, if you were replying). Fold the form away to cancel the close.</li>
 </ul>
 </div>
 </div>

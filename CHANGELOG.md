@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.193.2 &mdash; 2026-10-16
+
+### Fixed
+- **Logging time from the close reminder now finishes the close.** When you close a time-tracked ticket with no time logged and choose **Log time** in the reminder, the card's button now reads **Save &amp; close ticket**. Saving your time completes the close you started, and sends your reply first if you used **Send &amp; change status**. Before this, the time saved but the ticket stayed open. The close only continues if you came from the reminder. Using **Log time** on its own, or folding the form away, just saves the time.
+
 ## 2.193.1 &mdash; 2026-10-16
 
 ### Fixed
