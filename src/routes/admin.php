@@ -1280,6 +1280,12 @@ $router->post('/admin/users/{id}/edit', function (array $p) {
         redirect("/admin/users/{$id}/edit");
     }
 
+    // Email-notification switches, edited on the user's behalf. Only columns the
+    // form rendered (`_notify_fields`) are written, so an API caller that omits
+    // them changes nothing.
+    [$notifyBefore, $notifyAfter] = saveNotifyPrefsFromPost($db, $id, $_POST);
+    logAuditChange('user.notify_prefs_updated', $id, 'user', $notifyBefore, $notifyAfter);
+
     // Group membership, edited inline on this page. `_groups_present` marks a
     // submission that actually rendered the picker — without it an API or CSV
     // caller that omits `groups[]` would silently strip the user from every

@@ -359,7 +359,7 @@ $locLabel     = label('location.singular', 'Location');
 <div class="card border-0 shadow-sm mb-4" id="notification-preferences">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-bell text-primary me-2"></i>Email Notification Preferences</h5>
-<p class="text-muted mb-2">Each user chooses which emails they receive under <strong>My Profile &rarr; Email Notifications</strong>. An email goes out only when the site-wide switch on <a href="/admin/settings/email-notifications">Email Notifications</a> is on <em>and</em> the user hasn't opted out. In-app notifications (the bell) ignore these preferences.</p>
+<p class="text-muted mb-2">Each user chooses which emails they receive under <strong>My Profile &rarr; Email Notifications</strong>. An email goes out only when the site-wide switch on <a href="/admin/settings/email-notifications">Email Notifications</a> is on <em>and</em> the user hasn't opted out. In-app notifications (the bell) ignore these preferences. Admins can see and change a user's switches in the <strong>Email Notifications</strong> section of their edit page; each change is recorded in the audit log.</p>
 <div class="table-responsive mb-0">
 <table class="table table-sm mb-0">
     <thead class="table-light"><tr><th style="width:26%;">Section</th><th>Options</th></tr></thead>

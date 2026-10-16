@@ -633,7 +633,7 @@ Mail that can't be delivered is held on **Settings → Email Queue**, where you 
 
 ### Which Emails Are Sent
 
-**Settings → Email Notifications** switches each event on or off site-wide, and users can opt out of most of them on their profile:
+**Settings → Email Notifications** switches each event on or off site-wide, and users can opt out of most of them on their profile (admins can also change a user's switches from **Admin → Users → Edit**):
 
 | Audience | Events |
 |----------|--------|

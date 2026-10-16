@@ -2261,27 +2261,8 @@ $router->post('/profile', function () {
     }
 
     // Save notification preferences (no-JS fallback; the primary path is the
-    // per-field /profile/setting AJAX endpoint below). Only touch the columns
-    // the form actually rendered for this role — listed in `_notify_fields` —
-    // so a toggle that isn't shown is never silently zeroed. An unchecked but
-    // rendered checkbox is absent from $_POST and correctly resolves to 0.
-    $allowedNotify = [
-        'notify_ticket_created', 'notify_ticket_updated', 'notify_ticket_cc',
-        'notify_ticket_merged', 'notify_escalation', 'notify_csat',
-        'notify_group_new_ticket', 'notify_assigned_to_me', 'notify_assigned_to_group',
-        'notify_requester_replied', 'notify_note_added', 'notify_ticket_solved',
-        'notify_ticket_closed', 'notify_ticket_assigned', 'notify_mention',
-    ];
-    $renderedNotify = array_values(array_intersect(
-        array_filter(array_map('trim', explode(',', $_POST['_notify_fields'] ?? ''))),
-        $allowedNotify
-    ));
-    if ($renderedNotify) {
-        $setSql = implode(', ', array_map(static fn($c) => "$c = ?", $renderedNotify));
-        $params = array_map(static fn($c) => isset($_POST[$c]) ? 1 : 0, $renderedNotify);
-        $params[] = $userId;
-        $db->prepare("UPDATE users SET $setSql WHERE id = ?")->execute($params);
-    }
+    // per-field /profile/setting AJAX endpoint below).
+    saveNotifyPrefsFromPost($db, (int) $userId, $_POST);
 
     // Refresh session so navbar reflects changes immediately
     $_SESSION['user']['first_name'] = $fn;
@@ -2312,16 +2293,8 @@ $router->post('/profile/setting', function () {
     $db     = Database::connect();
     $userId = (int) Auth::id();
 
-    // Notification preferences are boolean columns on the users table. Keep an
-    // explicit allow-list so `field` can never be used to write an arbitrary
-    // column name.
-    $notifyColumns = [
-        'notify_ticket_created', 'notify_ticket_updated', 'notify_ticket_cc',
-        'notify_ticket_merged', 'notify_escalation', 'notify_csat',
-        'notify_group_new_ticket', 'notify_assigned_to_me', 'notify_assigned_to_group',
-        'notify_requester_replied', 'notify_note_added', 'notify_ticket_solved',
-        'notify_ticket_closed', 'notify_ticket_assigned', 'notify_mention',
-    ];
+    // Notification preferences are boolean columns on the users table.
+    $notifyColumns = notifyPrefColumns();
 
     if (in_array($field, ['first_name', 'last_name'], true)) {
         $name = trim($value);

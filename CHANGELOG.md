@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.195.0 &mdash; 2026-10-16
+
+### Added
+- **See and change a user's email notifications from their edit page.** **Admin → Users → Edit** now has an **Email Notifications** section with the same switches the person sees under **My Profile → Email Notifications**: agent, other and submitted-ticket emails for staff, and the requester emails for end users. Change any switch and click **Update User** to save it. Each change is written to the audit log as `user.notify_prefs_updated` with the old and new value. An email still only goes out when its site-wide switch under **Settings → Email Notifications** is on. The switches shown follow the user's saved permission level, so if you change the level, save first and then set the switches.
+
 ## 2.194.0 &mdash; 2026-10-16
 
 ### Added

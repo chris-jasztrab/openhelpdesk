@@ -10608,3 +10608,50 @@ function ticketStatusBadgeHtml(string $slug, string $extraClass = ''): string
     );
 }
 
+/**
+ * The users-table columns that hold a person's email-notification opt-outs.
+ * An explicit allow-list, so a posted field name can never pick an arbitrary
+ * column.
+ */
+function notifyPrefColumns(): array
+{
+    return [
+        'notify_ticket_created', 'notify_ticket_updated', 'notify_ticket_cc',
+        'notify_ticket_merged', 'notify_escalation', 'notify_csat',
+        'notify_group_new_ticket', 'notify_assigned_to_me', 'notify_assigned_to_group',
+        'notify_requester_replied', 'notify_note_added', 'notify_ticket_solved',
+        'notify_ticket_closed', 'notify_ticket_assigned', 'notify_mention',
+    ];
+}
+
+/**
+ * Save the notification switches from a form that rendered the notify-prefs
+ * partial. Only the columns listed in `_notify_fields` are touched, so a
+ * switch that wasn't shown for this role is never silently zeroed; a rendered
+ * but unchecked box is absent from $post and resolves to 0.
+ *
+ * @return array{0: array, 1: array} [before, after] for the touched columns
+ */
+function saveNotifyPrefsFromPost(PDO $db, int $userId, array $post): array
+{
+    $cols = array_values(array_intersect(
+        array_filter(array_map('trim', explode(',', (string) ($post['_notify_fields'] ?? '')))),
+        notifyPrefColumns()
+    ));
+    if (!$cols) {
+        return [[], []];
+    }
+
+    $stmt = $db->prepare('SELECT ' . implode(', ', $cols) . ' FROM users WHERE id = ?');
+    $stmt->execute([$userId]);
+    $before = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+    $after = [];
+    foreach ($cols as $c) {
+        $after[$c] = isset($post[$c]) ? 1 : 0;
+    }
+    $setSql = implode(', ', array_map(static fn($c) => "$c = ?", $cols));
+    $db->prepare("UPDATE users SET $setSql WHERE id = ?")->execute([...array_values($after), $userId]);
+
+    return [$before, $after];
+}

@@ -290,6 +290,18 @@ $targetOutranksEditor = $isEdit && !Auth::isAdmin()
             </div>
             <?php endif; ?>
 
+            <?php if ($isEdit): ?>
+            <hr class="my-4">
+            <label class="form-label fw-semibold mb-1"><i class="bi bi-bell me-1"></i>Email Notifications</label>
+            <p class="text-muted small mb-2">
+                The same switches this user sees under <strong>My Profile &rarr; Email Notifications</strong>.
+                An email only goes out when its <a href="/admin/settings/email-notifications">site-wide switch</a> is also on.
+                The list follows the saved permission level; save first if you're changing it.
+            </p>
+            <?php $notifyUser = $editing; $notifyRole = $editing['role'];
+            require ROOT_DIR . '/templates/partials/notify-prefs.php'; ?>
+            <?php endif; ?>
+
             <hr class="my-4">
 
             <div class="d-flex gap-2">

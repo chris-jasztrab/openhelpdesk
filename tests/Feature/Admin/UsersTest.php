@@ -248,6 +248,46 @@ class UsersTest extends TestCase
         $this->assertTrue($code === 200 || $code === 302, "Edit user: expected 200/302, got $code");
     }
 
+    // ── Email notifications from the user edit page ────────────────────────────
+
+    public function test_edit_user_form_shows_notification_switches(): void
+    {
+        $html = (string) $this->get($this->adminClient(), '/admin/users/' . DatabaseSeeder::$agentId . '/edit')->getBody();
+        $this->assertStringContainsString('name="notify_mention"', $html, 'Staff edit form must show the agent switches');
+        $this->assertStringContainsString('name="_notify_fields"', $html);
+    }
+
+    public function test_edit_user_saves_notification_switches(): void
+    {
+        $db   = \Database::connect();
+        $read = fn(): array => array_map('intval', $db->query(
+            'SELECT notify_mention, notify_escalation, notify_csat FROM users WHERE id = ' . (int) DatabaseSeeder::$agentId
+        )->fetch(\PDO::FETCH_ASSOC));
+        $base = [
+            'first_name' => 'TestAgent',
+            'last_name'  => 'User',
+            'email'      => DatabaseSeeder::AGENT_EMAIL,
+            'role'       => 'agent',
+        ];
+        $url = '/admin/users/' . DatabaseSeeder::$agentId . '/edit';
+
+        try {
+            // Rendered: mention + escalation; only escalation ticked. csat not rendered → untouched.
+            $db->exec('UPDATE users SET notify_mention = 1, notify_escalation = 0, notify_csat = 1 WHERE id = ' . (int) DatabaseSeeder::$agentId);
+            $this->post($this->adminClient(), $url, $base + [
+                '_notify_fields'    => 'notify_mention,notify_escalation',
+                'notify_escalation' => '1',
+            ]);
+            $this->assertSame(['notify_mention' => 0, 'notify_escalation' => 1, 'notify_csat' => 1], $read());
+
+            // A post without the marker (API/import) leaves every switch alone.
+            $this->post($this->adminClient(), $url, $base);
+            $this->assertSame(['notify_mention' => 0, 'notify_escalation' => 1, 'notify_csat' => 1], $read());
+        } finally {
+            $db->exec('UPDATE users SET notify_mention = 1, notify_escalation = 1, notify_csat = 1 WHERE id = ' . (int) DatabaseSeeder::$agentId);
+        }
+    }
+
     // ── Group membership from the user edit page ───────────────────────────────
 
     /** Lowest-id non-confidential group, so these tests never trigger a confidential alert. */
