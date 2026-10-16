@@ -464,6 +464,11 @@ return [
      'section' => 'Routing & Tuning', 'anchor' => 'ai_similar_enabled',
      'keywords' => 'similar past tickets history semantic search related duplicate rag agent assist suggestions resolved'],
 
+    ['label' => 'Similar Tickets Minimum Match', 'description' => 'Hide similar past tickets scored below this percentage',
+     'group' => 'Automation', 'page_label' => 'AI Classification', 'page_url' => '/admin/settings/ai',
+     'section' => 'Routing & Tuning', 'anchor' => 'ai_similar_min_relevance',
+     'keywords' => 'similar past tickets threshold minimum match percent relevance score cutoff filter weak'],
+
     // =======================================================================
     // Ticket Reminders  (/admin/settings/ticket-reminders)
     // =======================================================================

@@ -3181,11 +3181,17 @@ function findSimilarPastTickets(int $ticketId, int $viewerId, bool $forceRefresh
     if (!roleIsStaff($viewer['role'] ?? null))           { return $off; }
     $vis = ticketStaffVisibilitySql($db, $viewerId, $viewer['role'] ?? null, 't');
 
+    // Admin-set floor in whole percent (0 = show everything). Applied here, not
+    // at LLM time, so changing it also filters cached runs. Rounded the same way
+    // the panel rounds its % badge, so a match shown as "80%" passes an 80 floor.
+    $minPct = max(0, min(100, (int) getSetting('ai_similar_min_relevance', '0')));
+
     // Re-hydrate a list of {ticket_id, relevance, reasoning} into display rows,
     // re-checking visibility + confidentiality against the CURRENT viewer so a
     // cached result can never surface a ticket this agent may not see.
-    $hydrate = function (array $ranked) use ($db, $vis, $ticketId): array {
-        $ranked = array_values(array_filter($ranked, static fn($r) => (int) ($r['ticket_id'] ?? 0) > 0));
+    $hydrate = function (array $ranked) use ($db, $vis, $ticketId, $minPct): array {
+        $ranked = array_values(array_filter($ranked, static fn($r) => (int) ($r['ticket_id'] ?? 0) > 0
+            && round((float) ($r['relevance'] ?? 0) * 100) >= $minPct));
         if (empty($ranked)) { return []; }
         $ids   = array_map(static fn($r) => (int) $r['ticket_id'], $ranked);
         $place = implode(',', array_fill(0, count($ids), '?'));

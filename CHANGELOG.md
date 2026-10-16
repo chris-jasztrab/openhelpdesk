@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.194.0 &mdash; 2026-10-16
+
+### Added
+- **Minimum match for similar past tickets.** **Settings → Automation → AI Classification** has a new **Minimum match to show** field under the similar past tickets switch. Past tickets the AI scores below it are hidden from the panel. For example, set it to 80 to list only tickets rated 80% or higher. The default is 0, so the panel looks the same until you change it. A new value also applies to results the panel has already cached, with no new AI call.
+
 ## 2.193.2 &mdash; 2026-10-16
 
 ### Fixed

@@ -240,6 +240,7 @@ $router->get('/admin/settings/ai', function () {
         'aiSentimentPriorityBump'  => getSetting('ai_sentiment_priority_bump', '1'),
         'aiClassifyInboundEmail'   => getSetting('ai_classify_inbound_email', '1'),
         'aiSimilarEnabled'         => getSetting('ai_similar_enabled', '0'),
+        'aiSimilarMinRelevance'    => getSetting('ai_similar_min_relevance', '0'),
         'similarTypes'             => $similarTypes,
         'recent'                   => $recent,
     ]);
@@ -264,6 +265,7 @@ $router->post('/admin/settings/ai', function () {
     $sentimentBump   = isset($_POST['ai_sentiment_priority_bump']) ? '1' : '0';
     $classifyInbound = isset($_POST['ai_classify_inbound_email']) ? '1' : '0';
     $similarEnabled  = isset($_POST['ai_similar_enabled']) ? '1' : '0';
+    $similarMinPct   = max(0, min(100, (int) ($_POST['ai_similar_min_relevance'] ?? '0')));
 
     if ($threshold < 0.0) { $threshold = 0.0; }
     if ($threshold > 1.0) { $threshold = 1.0; }
@@ -293,6 +295,7 @@ $router->post('/admin/settings/ai', function () {
     setSetting('ai_sentiment_priority_bump', $sentimentBump);
     setSetting('ai_classify_inbound_email',  $classifyInbound);
     setSetting('ai_similar_enabled',         $similarEnabled);
+    setSetting('ai_similar_min_relevance',   (string) $similarMinPct);
 
     // Only overwrite a key if the admin provided a new value
     if ($anthropicKey !== '') { setSetting('ai_anthropic_api_key', $anthropicKey); }

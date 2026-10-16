@@ -120,6 +120,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
     <li><strong>Stage 1 — retrieval (no API call).</strong> A MySQL <code>FULLTEXT</code> index on <code>tickets(subject, description)</code> narrows the archive to roughly the 20 most lexically-similar candidates.</li>
     <li><strong>Stage 2 — rerank.</strong> Those candidates go to the configured provider, which scores each for relevance and writes a one-line note on how it relates. Results are scoped to what the viewing agent is allowed to see.</li>
     <li>The result is cached per ticket in <code>ai_similarity_classifications</code>, so the LLM runs <strong>once per ticket</strong>, not once per page view. A refresh button forces a recompute.</li>
+    <li>Matches scored below <strong>Minimum match to show</strong> (on the AI settings page, under the master switch) are hidden. The default is 0, which shows every match. Set it to 80, for example, to list only tickets the AI rates 80% or higher. The filter runs when the panel loads, so a new value applies to cached results straight away, with no new AI call.</li>
 </ol>
 
 <h6 class="fw-semibold mt-3 mb-2">Turning it on — a global switch <em>and</em> a per-type switch</h6>
@@ -228,6 +229,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
         <tr><td class="fw-semibold">Bump priority by one level&hellip;</td><td>The <a href="#sentiment">sentiment priority bump</a>.</td></tr>
         <tr><td class="fw-semibold">Classify tickets created from inbound email</td><td>On by default. Switch it off to classify only tickets created on the website and through the API.</td></tr>
         <tr><td class="fw-semibold">Show similar past tickets&hellip;</td><td>The master switch for <a href="#similar-tickets">Similar Past Tickets</a>.</td></tr>
+        <tr><td class="fw-semibold">Minimum match to show</td><td>0&ndash;100%, default 0 (show all). Similar past tickets scored below it are hidden.</td></tr>
     </tbody>
 </table>
 </div>
