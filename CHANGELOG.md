@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.193.1 &mdash; 2026-10-16
+
+### Fixed
+- **Tickets showed "updated" at odd hours, like 3:40 AM, when nobody was working.** When an SLA moved to **warning** or **breached**, the background SLA check also set the ticket's last-updated time, so dashboards and **Recent tickets** showed the time of that check as if someone had worked on the ticket. A change in SLA state no longer counts as activity. This also stops the "this ticket has changed, refresh" banner from appearing on an open ticket when its SLA state changes. Creation times and clocks were always correct (server, database and PHP are all on America/Toronto). Tickets already affected will show the right time again after their next real update.
+
 ## 2.193.0 &mdash; 2026-10-15
 
 ### Added

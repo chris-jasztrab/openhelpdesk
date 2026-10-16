@@ -330,7 +330,9 @@ class Sla
         );
 
         $updated = 0;
-        $updateStmt = $db->prepare('UPDATE tickets SET sla_state = ? WHERE id = ?');
+        // updated_at = updated_at: a cron-driven state flip isn't activity — without
+        // it the ON UPDATE column stamps the ticket "updated" at e.g. 3:40 AM.
+        $updateStmt = $db->prepare('UPDATE tickets SET sla_state = ?, updated_at = updated_at WHERE id = ?');
 
         while ($ticket = $stmt->fetch(PDO::FETCH_ASSOC)) {
             $newState = self::computeSlaState($ticket);

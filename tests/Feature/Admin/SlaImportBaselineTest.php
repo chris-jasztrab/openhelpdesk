@@ -284,4 +284,22 @@ class SlaImportBaselineTest extends TestCase
 
         $this->assertNull($this->ticket($id)['sla_state'], ' — recalculateAll must filter exempt rows out');
     }
+
+    /** The cron's state flip isn't activity — ticket #78888 read "updated 3:40 AM". */
+    public function test_recalculate_all_leaves_updated_at_alone(): void
+    {
+        $id = $this->makeImportedTicket(900, 0);
+        $this->db->prepare(
+            "UPDATE tickets SET first_response_due_at = '2022-01-01 01:00:00', resolution_due_at = '2022-01-01 02:00:00',
+                    sla_state = 'on_track', updated_at = '2022-02-02 02:02:02' WHERE id = ?"
+        )->execute([$id]);
+
+        Sla::recalculateAll($this->db);
+
+        $stmt = $this->db->prepare('SELECT sla_state, updated_at FROM tickets WHERE id = ?');
+        $stmt->execute([$id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $this->assertSame('breached', $row['sla_state']);
+        $this->assertSame('2022-02-02 02:02:02', $row['updated_at'], ' — a background state flip must not bump updated_at');
+    }
 }
