@@ -11,6 +11,12 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.195.2 &mdash; 2026-10-19
+
+### Fixed
+- **Ticket-list columns no longer paint over each other.** On **All Tickets** (admin and agent) and the agent dashboard, a long **Assigned To** name ran into the **Group** column. It now ends in "…" in front of its dropdown arrow, and you can hover to see the full name. Every other cell in these tables also stays inside its own column now. That matters when a column ends up narrower than its contents, for example after you drag a column to resize it.
+- **Names that fit no longer get a stray "…".** Columns were sized a fraction of a pixel too narrow, and before the icon font had loaded, so the widest name in a column (for example "TestAdmin User" or "East Branch") could be cut off by one letter. Columns are now sized after fonts load and rounded up to the next whole pixel. This also applies to every other resizable table on the site.
+
 ## 2.195.1 &mdash; 2026-10-19
 
 ### Fixed

@@ -251,7 +251,9 @@
         // Measure the natural rendered widths *before* switching to fixed
         // layout, so the table keeps its current look until the user resizes.
         var natural = [];
-        for (var i = 0; i < cells.length; i++) natural.push(cells[i].offsetWidth);
+        // Rounded up (not offsetWidth's nearest-px) so no cell is pinned a
+        // fraction narrower than its content and clips with a stray ellipsis.
+        for (var i = 0; i < cells.length; i++) natural.push(Math.ceil(cells[i].getBoundingClientRect().width));
 
         var stored = loadWidths(key);
         var widths = (stored && stored.n === cells.length && stored.w)
@@ -313,12 +315,17 @@
     // tables it has already processed, so only new tables get grips.
     window.LDColResize = { syncTableWidth: syncTableWidth, init: init };
 
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", function () {
+    // Wait for web fonts (the icon font especially) so natural widths are
+    // measured with the real glyphs, not the fallback's narrower ones.
+    function start() {
+        (document.fonts ? document.fonts.ready : Promise.resolve()).then(function () {
             requestAnimationFrame(init);
         });
+    }
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", start);
     } else {
-        requestAnimationFrame(init);
+        start();
     }
 })();
 </script>

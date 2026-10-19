@@ -132,6 +132,17 @@ $dir  = $dir ?? 'desc';
         <p class="mb-0">No tickets in the queue.</p>
     </div>
     <?php else: ?>
+    <style>
+    /* Cells clip inside their own (possibly resized) column instead of painting
+       over the next one; the quick-edit names truncate ahead of their chevron. */
+    #dashboardTicketTable td { overflow: hidden; }
+    #dashboardTicketTable .quick-assign-wrap,
+    #dashboardTicketTable .quick-group-wrap { max-width: 100%; }
+    #dashboardTicketTable .quick-assign-name,
+    #dashboardTicketTable .quick-group-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #dashboardTicketTable .quick-assign-btn,
+    #dashboardTicketTable .quick-group-btn { flex: 0 0 auto; }
+    </style>
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0" id="dashboardTicketTable">
             <thead class="table-light">
@@ -193,7 +204,7 @@ $dir  = $dir ?? 'desc';
                     <?php if (in_array('agent', $visibleColumns)): ?>
                     <td style="white-space:nowrap;text-align:right;">
                         <span class="d-inline-flex align-items-center gap-1 quick-assign-wrap" data-ticket-id="<?= (int)$t['id'] ?>">
-                            <span class="quick-assign-name"><?= e($t['agent_name'] ?: 'Unassigned') ?></span>
+                            <span class="quick-assign-name" title="<?= e($t['agent_name'] ?: 'Unassigned') ?>"><?= e($t['agent_name'] ?: 'Unassigned') ?></span>
                             <button class="btn btn-link btn-sm p-0 border-0 text-muted quick-assign-btn"
                                     type="button"
                                     data-agents="<?= e(json_encode(array_values($qaAgents))) ?>"
@@ -383,7 +394,7 @@ $dir  = $dir ?? 'desc';
                     headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
                     body: JSON.stringify({assigned_to: val === '' ? null : parseInt(val, 10)})
                 }).then(function (r) { return r.json(); }).then(function (data) {
-                    if (data.success) { nameSpan.textContent = data.agent_name || 'Unassigned'; }
+                    if (data.success) { nameSpan.textContent = nameSpan.title = data.agent_name || 'Unassigned'; }
                 }).catch(function () {});
             } else if (kind === 'type') {
                 var typeWrap = document.querySelector('.quick-type-wrap[data-ticket-id="' + ticketId + '"]');

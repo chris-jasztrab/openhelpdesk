@@ -519,18 +519,24 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
        flex column) keeps a comfortable width, and when space is tight the Type,
        Group, then Location columns shed width and truncate — in that order. */
     #ticketTable td.type-col .quick-type-wrap,
-    #ticketTable td.group-col .quick-group-wrap { max-width: 100%; }
+    #ticketTable td.group-col .quick-group-wrap,
+    #ticketTable .quick-assign-wrap { max-width: 100%; }
     #ticketTable td.type-col .quick-type-badge { min-width: 0; overflow: hidden; }
     #ticketTable td.type-col .quick-type-badge .badge {
         display: inline-block; max-width: 100%; overflow: hidden;
         text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;
     }
-    #ticketTable td.group-col .quick-group-name {
+    #ticketTable td.group-col .quick-group-name,
+    #ticketTable .quick-assign-name {
         min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     #ticketTable td.type-col .quick-type-btn,
-    #ticketTable td.group-col .quick-group-btn { flex: 0 0 auto; }
-    #ticketTable td.location-col { overflow: hidden; text-overflow: ellipsis; }
+    #ticketTable td.group-col .quick-group-btn,
+    #ticketTable .quick-assign-btn { flex: 0 0 auto; }
+    #ticketTable td.location-col { text-overflow: ellipsis; }
+    /* Any column can end up narrower than its content (a dragged or saved width),
+       so every cell clips inside its own box instead of painting over the next. */
+    #ticketTable td { overflow: hidden; }
     </style>
     <div style="overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 260px);">
         <table class="table table-hover align-middle mb-0" id="ticketTable" style="width:100%;visibility:hidden;">
@@ -656,7 +662,7 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                         ?>
                         <td style="white-space:nowrap;overflow:hidden;text-align:right;cursor:default;" onclick="event.stopPropagation()">
                             <span class="d-inline-flex align-items-center gap-1 quick-assign-wrap" data-ticket-id="<?= (int)$t['id'] ?>" style="cursor:pointer;">
-                                <span class="quick-assign-name"><?= e($t['agent_name'] ?: 'Unassigned') ?></span>
+                                <span class="quick-assign-name" title="<?= e($t['agent_name'] ?: 'Unassigned') ?>"><?= e($t['agent_name'] ?: 'Unassigned') ?></span>
                                 <button class="btn btn-link btn-sm p-0 border-0 text-muted quick-assign-btn"
                                         type="button"
                                         data-agents="<?= e(json_encode(array_values($qaAgents))) ?>"
@@ -1089,7 +1095,9 @@ sessionStorage.setItem('agentTicketListUrl', window.location.href);
         ths.forEach(function (th) {
             if (!th.classList.contains("subject-col") && !th.hasAttribute("data-ld-resized")) th.style.width = "";
         });
-        var natural = ths.map(function (th) { return th.offsetWidth; });
+        // Round up: offsetWidth rounds to the nearest px, and pinning a column a
+        // fraction under its content makes the cell show a stray ellipsis.
+        var natural = ths.map(function (th) { return Math.ceil(th.getBoundingClientRect().width); });
         tbl.style.width = "100%";
 
         // Guarantee Subject a comfortable share, then shed any overflow from the
@@ -1123,6 +1131,9 @@ sessionStorage.setItem('agentTicketListUrl', window.location.href);
         tbl.style.visibility = "";
     };
     window.ldMeasureTicketTable();
+    // Measuring lays out the inline-edit chevrons, which starts the icon font
+    // download; re-fit once it lands so the widest name isn't left short.
+    if (document.fonts) document.fonts.ready.then(window.ldMeasureTicketTable);
 
     // Quick-change: type, group, agent dropdowns
     (function () {
@@ -1281,7 +1292,7 @@ sessionStorage.setItem('agentTicketListUrl', window.location.href);
                         headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
                         body: JSON.stringify({assigned_to: val === '' ? null : parseInt(val, 10)})
                     }).then(function (r) { return r.json(); }).then(function (data) {
-                        if (data.success) { nameSpan.textContent = data.agent_name || 'Unassigned'; resizeColumns(); }
+                        if (data.success) { nameSpan.textContent = nameSpan.title = data.agent_name || 'Unassigned'; resizeColumns(); }
                     }).catch(function () {});
                 } else if (kind === 'type') {
                     var typeWrap = document.querySelector('.quick-type-wrap[data-ticket-id="' + ticketId + '"]');
