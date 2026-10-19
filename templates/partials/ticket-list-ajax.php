@@ -194,7 +194,7 @@ $ticketListScope = $ticketListScope ?? 'agent';
         });
     });
 
-    // Per-page selector (agent list) — replaces its form's inline submit.
+    // Per-page selector — replaces its form's inline submit.
     document.addEventListener('change', function (e) {
         if (e.target.matches('#ticketPager select[name="per_page"]') && e.target.form) {
             refresh(formUrl(e.target.form), {

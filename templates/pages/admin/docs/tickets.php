@@ -470,7 +470,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
     <li>Saved filters appear under <strong>Saved Filters</strong> and apply with one click.</li>
     <li>The arrow beside a saved filter offers <strong>Set as Default</strong> (applied automatically when you open the list each day), <strong>Share with Team</strong> / <strong>Make Private</strong>, and <strong>Delete</strong>.</li>
 </ol>
-<p class="text-muted mb-0">The list remembers the filters you used today and brings them back when you return; <strong>Clear All</strong> resets that. Coming back from a ticket via the <em>Tickets</em> breadcrumb restores the exact list, including sort order. The admin list shows 25 tickets per page; the agent list adds a per-page selector (25, 50, 100 or 200) at the bottom.</p>
+<p class="text-muted mb-0">The list remembers the filters you used today and brings them back when you return; <strong>Clear All</strong> resets that. Coming back from a ticket via the <em>Tickets</em> breadcrumb restores the exact list, including sort order. Both lists have a per-page selector at the bottom (10, 15, 20 or 50; 15 by default). Your choice is remembered, on both lists, until you change it.</p>
 </div>
 </div>
 

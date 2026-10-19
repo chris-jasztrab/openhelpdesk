@@ -4122,6 +4122,31 @@ function setUserTicketView(int $userId, string $view): void
     setSetting("ticket_view:{$userId}", $view);
 }
 
+/** Page sizes offered on the agent and admin ticket lists. */
+function ticketPerPageOptions(): array
+{
+    return [10, 15, 20, 50];
+}
+
+/**
+ * Tickets per page for the list. A valid ?per_page= wins and is remembered
+ * as the user's choice (`ticket_per_page:{userId}`), so page links don't
+ * need to carry it; otherwise their saved choice, else 15.
+ */
+function ticketListPerPage(int $userId): int
+{
+    $opts  = ticketPerPageOptions();
+    $saved = (int) getSetting("ticket_per_page:{$userId}", '15');
+    $req   = (int) ($_GET['per_page'] ?? 0);
+    if (in_array($req, $opts, true)) {
+        if ($req !== $saved) {
+            setSetting("ticket_per_page:{$userId}", (string) $req);
+        }
+        return $req;
+    }
+    return in_array($saved, $opts, true) ? $saved : 15;
+}
+
 /* ── Kanban boards ────────────────────────────────────────────────
  * The Kanban board is a separate ticket view (its own page, not one of the
  * table/inbox/card list layouts). Two kinds of board exist:

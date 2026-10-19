@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.196.0 &mdash; 2026-10-19
+
+### Changed
+- **Choose 10, 15, 20 or 50 tickets per page.** On **All Tickets** (admin and agent), use the selector next to "Showing 1–15 of N" at the bottom of the list. The admin list now has this selector too. The default is 15, which fits on a 1080p screen with the page links still visible, so you no longer have to scroll to reach the bottom of the list. Your choice is remembered for your account and applies to both lists until you change it. The old 25, 100 and 200 sizes are gone.
+
 ## 2.195.2 &mdash; 2026-10-19
 
 ### Fixed

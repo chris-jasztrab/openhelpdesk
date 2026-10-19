@@ -190,7 +190,7 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/agent/help'], ['label' => 'Ticke
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-sort-down text-primary me-2"></i>Sorting &amp; Pages</h5>
 <p class="text-muted mb-2">Click a column heading to sort by it; click again to reverse. An arrow shows the current sort.</p>
-<p class="text-muted mb-0">Use the selector at the bottom to show 25, 50, 100 or 200 tickets per page; the page links always include the first and last page. When you open a ticket, the <strong>Tickets</strong> link in the breadcrumb brings you back to the list with the same filters and sort.</p>
+<p class="text-muted mb-0">Use the selector at the bottom to show 10, 15, 20 or 50 tickets per page (15 by default). Your choice is remembered until you change it; the page links always include the first and last page. When you open a ticket, the <strong>Tickets</strong> link in the breadcrumb brings you back to the list with the same filters and sort.</p>
 </div>
 </div>
 

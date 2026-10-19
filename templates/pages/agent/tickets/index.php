@@ -10,12 +10,11 @@ $statusLabels = ticketStatusLabelMap();
 $slaStateColors = ['on_track' => 'success', 'warning' => 'warning', 'breached' => 'danger'];
 $hasFilters = array_filter($filters, fn($v) => is_array($v) ? !empty($v) : $v !== '');
 $sortParams = array_filter($filters, fn($v) => is_array($v) ? !empty($v) : $v !== '');
-if ($perPage !== 25) $sortParams['per_page'] = $perPage;
 
 // Applied-filter pills: build label + a "remove this one filter" URL for each active filter.
 $arrayFilterKeys = ['status', 'priority', 'type', 'location', 'agent', 'group'];
 $boolFilterKeys  = ticketBoolFilterKeys('agent');
-$buildRemoveUrl = function (string $removeKey, $removeVal = null) use ($filters, $perPage, $arrayFilterKeys, $boolFilterKeys) {
+$buildRemoveUrl = function (string $removeKey, $removeVal = null) use ($filters, $arrayFilterKeys, $boolFilterKeys) {
     $params = [];
     foreach ($arrayFilterKeys as $k) {
         $vals = array_map('strval', (array) ($filters[$k] ?? []));
@@ -28,7 +27,6 @@ $buildRemoveUrl = function (string $removeKey, $removeVal = null) use ($filters,
     foreach ($boolFilterKeys as $k) {
         if ($k !== $removeKey && !empty($filters[$k])) $params[$k] = 1;
     }
-    if ($perPage !== 25) $params['per_page'] = $perPage;
     $qs = http_build_query($params);
     return '/agent/tickets' . ($qs ? '?' . $qs : '');
 };
@@ -279,7 +277,6 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
         </div>
         <hr class="my-3">
         <form method="GET" action="/agent/tickets" id="filterForm">
-            <?php if ($perPage !== 25): ?><input type="hidden" name="per_page" value="<?= $perPage ?>"><?php endif; ?>
             <div class="mb-3">
                 <label class="form-label small fw-semibold mb-1">Search</label>
                 <input type="text" class="form-control form-control-sm" name="q"
@@ -1407,7 +1404,6 @@ if ($sort !== 'created_at' || $dir !== 'desc') {
     $pagerParams['sort'] = $sort;
     $pagerParams['dir']  = $dir;
 }
-if ($perPage !== 25) $pagerParams['per_page'] = $perPage;
 $pagerBase = '/agent/tickets';
 ?>
 <div id="ticketPager">
@@ -1427,7 +1423,7 @@ $pagerBase = '/agent/tickets';
             <?php endforeach; ?>
             <select name="per_page" class="form-select form-select-sm d-inline-block w-auto"
                     aria-label="Tickets per page">
-                <?php foreach ([25, 50, 100, 200] as $opt): ?>
+                <?php foreach (ticketPerPageOptions() as $opt): ?>
                 <option value="<?= $opt ?>" <?= $perPage === $opt ? 'selected' : '' ?>><?= $opt ?> per page</option>
                 <?php endforeach; ?>
             </select>

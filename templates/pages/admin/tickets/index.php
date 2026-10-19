@@ -15,7 +15,7 @@ $sortParams = array_filter($filters, fn($v) => is_array($v) ? !empty($v) : $v !=
 $arrayFilterKeys = ['status', 'priority', 'type', 'location', 'agent', 'group', 'requester'];
 $textFilterKeys  = ['q', 'date_from', 'date_to'];
 $boolFilterKeys  = ticketBoolFilterKeys('admin');
-$buildRemoveUrl = function (string $removeKey, $removeVal = null) use ($filters, $perPage, $arrayFilterKeys, $textFilterKeys, $boolFilterKeys) {
+$buildRemoveUrl = function (string $removeKey, $removeVal = null) use ($filters, $arrayFilterKeys, $textFilterKeys, $boolFilterKeys) {
     $params = [];
     foreach ($arrayFilterKeys as $k) {
         $vals = array_map('strval', (array) ($filters[$k] ?? []));
@@ -30,7 +30,6 @@ $buildRemoveUrl = function (string $removeKey, $removeVal = null) use ($filters,
     foreach ($boolFilterKeys as $k) {
         if ($k !== $removeKey && !empty($filters[$k])) $params[$k] = 1;
     }
-    if ($perPage !== 25) $params['per_page'] = $perPage;
     $qs = http_build_query($params);
     return '/admin/tickets' . ($qs ? '?' . $qs : '');
 };
@@ -1383,7 +1382,7 @@ document.getElementById('deleteFilterModal').addEventListener('show.bs.modal', f
 </script>
 
 <div id="ticketPager">
-<?php if ($totalPages > 1): ?>
+<?php if ($totalTickets > 0): ?>
 <?php
     // Build base query string preserving filters and sort
     $pagerParams = array_filter($filters, fn($v) => is_array($v) ? !empty($v) : $v !== '');
@@ -1394,9 +1393,27 @@ document.getElementById('deleteFilterModal').addEventListener('show.bs.modal', f
     $pagerBase   = '/admin/tickets';
 ?>
 <nav class="d-flex justify-content-between align-items-center mt-3">
-    <span class="text-muted small">
-        Showing <?= (($page - 1) * $perPage) + 1 ?>–<?= min($page * $perPage, $totalTickets) ?> of <?= $totalTickets ?>
-    </span>
+    <div class="d-flex align-items-center gap-2">
+        <span class="text-muted small">
+            Showing <?= (($page - 1) * $perPage) + 1 ?>–<?= min($page * $perPage, $totalTickets) ?> of <?= $totalTickets ?>
+        </span>
+        <form method="GET" action="/admin/tickets" class="d-inline">
+            <?php foreach ($pagerParams as $pk => $pv): ?>
+                <?php if (is_array($pv)): foreach ($pv as $pvi): ?>
+                <input type="hidden" name="<?= e($pk) ?>[]" value="<?= e($pvi) ?>">
+                <?php endforeach; else: ?>
+                <input type="hidden" name="<?= e($pk) ?>" value="<?= e($pv) ?>">
+                <?php endif; ?>
+            <?php endforeach; ?>
+            <select name="per_page" class="form-select form-select-sm d-inline-block w-auto"
+                    aria-label="Tickets per page">
+                <?php foreach (ticketPerPageOptions() as $opt): ?>
+                <option value="<?= $opt ?>" <?= $perPage === $opt ? 'selected' : '' ?>><?= $opt ?> per page</option>
+                <?php endforeach; ?>
+            </select>
+        </form>
+    </div>
+    <?php if ($totalPages > 1): ?>
     <ul class="pagination pagination-sm mb-0">
         <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
             <a class="page-link" href="<?= e($pagerBase . '?' . http_build_query(array_merge($pagerParams, ['page' => $page - 1]))) ?>">
@@ -1432,6 +1449,7 @@ document.getElementById('deleteFilterModal').addEventListener('show.bs.modal', f
             </a>
         </li>
     </ul>
+    <?php endif; ?>
 </nav>
 <?php endif; ?>
 </div>
