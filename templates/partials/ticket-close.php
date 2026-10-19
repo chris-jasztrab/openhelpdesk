@@ -148,7 +148,6 @@ endif;
     var closedSlug = <?= json_encode($closedSlug) ?>;
     var ticketId   = <?= (int) $ticket['id'] ?>;
     var searchUrl  = <?= json_encode($closeArea . '/tickets/search') ?>;
-    var original   = statusSel.value;
     var msgEl = $('closeMessage'), notifyEl = $('closeNotify'), daysEl = $('closeReopenDays');
     var dupId = $('closeDupId'), dupSearch = $('closeDupSearch'), dupResults = $('closeDupResults');
     var fuAt  = $('closeFollowupAt');
@@ -173,7 +172,7 @@ endif;
     // not stay staged, or a later sidebar Update would close the ticket too.
     function unstage() {
         modeInput.value = '';
-        statusSel.value = original;
+        statusSel.value = form.dataset.originalStatus; // read live: the ticket page's live sync moves it
         daysEl.value = 7;
     }
 

@@ -11,6 +11,16 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.198.0 &mdash; 2026-10-19
+
+### Changed
+- **The ticket page now keeps its details up to date.** When someone else changes the status, priority, assignee, group, type or due date, the header badges, the **Details** card and the **Update Ticket** panel all update within about 8 seconds, without pressing F5. Before, only the timeline updated, and the rest of the page kept showing the old values.
+- **Your own unsaved changes are kept.** If you've already changed a field in **Update Ticket**, it stays as you set it, and only the fields you haven't touched update.
+
+### Fixed
+- **Saving the ticket no longer undoes other people's changes.** Before, the **Update Ticket** panel kept the values from when you opened the ticket. If someone else changed the priority, assignee, group, type or due date in the meantime, and you then saved a change to a different field, their change was quietly reverted. The panel now picks up their changes within about 8 seconds, so this only happens if you save within those few seconds.
+- Changes made by automations, which add nothing to the timeline, now update the page too. Before, they only showed a "This ticket was updated" banner asking you to refresh.
+
 ## 2.197.0 &mdash; 2026-10-19
 
 ### Changed

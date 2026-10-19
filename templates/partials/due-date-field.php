@@ -58,7 +58,6 @@ $ddFirstName = strtok(trim((string) ($ticket['creator_name'] ?? '')), ' ') ?: 't
     var field   = document.getElementById('dueDateReplyField');
     if (!form || !input || !modalEl) return;
     var slaDate  = <?= json_encode($ddSla) ?>;
-    var original = input.value;
     var touched  = false;
     // Bootstrap loads after this inline script; resolve the modal at submit time.
     function getModal() { return window.bootstrap ? bootstrap.Modal.getOrCreateInstance(modalEl) : null; }
@@ -72,7 +71,8 @@ $ddFirstName = strtok(trim((string) ($ticket['creator_name'] ?? '')), ' ') ?: 't
     form.addEventListener('submit', function (e) {
         if (form._dueDateAck) return;
         var v = input.value;
-        if (!v || v === original || v <= slaDate) return;
+        // defaultValue, not a load-time copy: the ticket page's live sync moves it.
+        if (!v || v === input.defaultValue || v <= slaDate) return;
         e.preventDefault();
         e.stopImmediatePropagation();
         var m = getModal();

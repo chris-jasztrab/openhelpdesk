@@ -137,7 +137,7 @@ $resolutionClosedSlugs  = ticketClosedBucketSlugs();
 <div class="d-flex flex-wrap flex-lg-nowrap justify-content-between align-items-start gap-3 mb-4 ticket-sticky-header" id="tour-ticket-header">
     <div class="min-w-0">
         <h2 class="fw-bold mb-1 text-break"><?= e($ticket['subject']) ?></h2>
-        <div class="d-flex flex-wrap gap-2 align-items-center">
+        <div class="d-flex flex-wrap gap-2 align-items-center" id="ticketHeaderBadges">
             <?= ticketStatusBadgeHtml($ticket['status'], 'fs-6') ?>
             <?php $closeArea = '/agent'; $closePart = 'badges'; require ROOT_DIR . '/templates/partials/ticket-close.php'; ?>
             <?php if ($ticket['merged_into_ticket_id']): ?>
@@ -815,7 +815,7 @@ $resolutionClosedSlugs  = ticketClosedBucketSlugs();
             <div class="card-header bg-white border-bottom">
                 <h5 class="mb-0 fw-semibold"><i class="bi bi-info-circle me-2"></i>Details</h5>
             </div>
-            <div class="card-body">
+            <div class="card-body" id="ticketDetails">
                 <dl class="mb-0">
                     <dt class="text-muted small">Status</dt>
                     <dd>
@@ -1618,9 +1618,10 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
     // Stale-view detection: the ticket's last-modified timestamp at page render.
     // The presence poll returns the live value; if it advances past this, the
     // ticket changed under us (another agent, an automation, an inbound email),
-    // so we surface a one-time, dismissible "refresh" banner. Agent edits here
-    // (status/priority/reply) POST and reload, which re-seeds this baseline, so
-    // this won't fire on the agent's own changes.
+    // so we pull the page and update in place — the one-time, dismissible
+    // "refresh" banner is only the fallback when that fetch fails. Agent edits
+    // here (status/priority/reply) POST and reload, which re-seeds this baseline,
+    // so this won't fire on the agent's own changes.
     var loadedUpdatedAt = <?= json_encode($ticket['updated_at'] ?? null) ?>;
     var staleShown = false;
 
@@ -1689,14 +1690,13 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
             .then(function(r) { return r.json(); })
             .then(function(data) {
                 renderIndicator(data.viewers || []);
-                // Live timeline: when a new entry lands, inject it without a refresh.
-                if (data.latest_timeline_id && data.latest_timeline_id > loadedLatestTimeline) {
-                    refreshTimeline(data.latest_timeline_id, data.updated_at);
-                } else if (data.updated_at && loadedUpdatedAt && data.updated_at > loadedUpdatedAt) {
-                    // Changed with no new timeline row to inject (rare) — fall back to
-                    // the dismissible refresh hint. (Lexical compare is valid for the
-                    // 'YYYY-MM-DD HH:MM:SS' format.)
-                    showStaleBanner();
+                // Live updates: a new timeline entry, or a change with no entry
+                // (automations, SLA), pulls the page and updates it in place.
+                // (Lexical compare is valid for the 'YYYY-MM-DD HH:MM:SS' format.)
+                var newEntry = data.latest_timeline_id && data.latest_timeline_id > loadedLatestTimeline;
+                var changed  = data.updated_at && loadedUpdatedAt && data.updated_at > loadedUpdatedAt;
+                if (newEntry || changed) {
+                    refreshTimeline(Math.max(data.latest_timeline_id || 0, loadedLatestTimeline), data.updated_at);
                 }
             })
             .catch(function(){});
@@ -1719,12 +1719,45 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
                     current.innerHTML = fresh.innerHTML;
                     bindTimelineCollapser();
                     flashNewEntries(prevMax);
+                    syncTicketFields(doc);
                     loadedLatestTimeline = newLatestId;
                     if (newUpdatedAt) loadedUpdatedAt = newUpdatedAt; // so the stale banner won't also fire
                 }
                 timelineRefreshing = false;
             })
             .catch(function() { timelineRefreshing = false; showStaleBanner(); });
+    }
+
+    // Bring the header badges, the Details card and the Update Ticket panel in
+    // line with the server after someone else changed the ticket. A field the
+    // agent has already edited is left alone; untouched ones take the server's
+    // value and become the new baseline, so the Update button, the close and
+    // resolution gates and the expected_status lock all treat it as seen.
+    function syncTicketFields(doc) {
+        ['ticketHeaderBadges', 'ticketDetails'].forEach(function (id) {
+            var cur = document.getElementById(id), src = doc.getElementById(id);
+            if (cur && src) cur.innerHTML = src.innerHTML;
+        });
+        if (window.ldBindDetailQuickAssign) window.ldBindDetailQuickAssign(); // the swap replaced its button
+
+        var form  = document.getElementById('updateTicketForm');
+        var fresh = doc.getElementById('updateTicketForm');
+        var base  = window.ldTicketFieldBase;
+        if (!form || !fresh || !base) return;
+        Object.keys(base).forEach(function (name) {
+            var el = form.elements[name], src = fresh.elements[name];
+            if (!el || !src) return;
+            var val = src.value;
+            if (el.value !== base[name] && el.value !== val) return; // the agent's pending edit
+            if (el.tagName === 'SELECT') el.innerHTML = src.innerHTML; else el.defaultValue = val;
+            el.value = val;
+            base[name] = val;
+            if (name === 'status') {
+                form.dataset.originalStatus = val;
+                form.elements.expected_status.value = val;
+            }
+        });
+        form.dispatchEvent(new Event('ld:synced'));
     }
 
     // Re-bind the "show older/newer updates" collapser after a swap — the inline
@@ -1896,7 +1929,9 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
 (function () {
     var btn    = document.getElementById('updateTicketBtn');
     var fields = ['status', 'priority_id', 'assigned_to', 'group_id', 'type_id', 'due_date'];
-    var initial = {};
+    // Shared with the live sync (syncTicketFields), which moves a field's
+    // baseline when someone else changes it, then fires ld:synced.
+    var initial = window.ldTicketFieldBase = {};
     fields.forEach(function (id) {
         var el = document.getElementById(id);
         if (el) initial[id] = el.value;
@@ -1912,6 +1947,7 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
         var el = document.getElementById(id);
         if (el) el.addEventListener('change', check);
     });
+    btn.form.addEventListener('ld:synced', check);
 })();
 
 /* ── Filter the priority picker by the selected ticket type ──
@@ -1936,6 +1972,7 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
         });
     }
     typeSel.addEventListener('change', function () { filterPriorities(true); });
+    typeSel.form.addEventListener('ld:synced', function () { filterPriorities(false); });
     filterPriorities(false);
 })();
 
@@ -1960,7 +1997,6 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
     var addBtn      = document.getElementById('resolutionAddBtn');
     var withoutBtn  = document.getElementById('resolutionCloseWithoutBtn');
     var closedSlugs = (form.dataset.closedSlugs || '').split(',').filter(Boolean);
-    var originalStatus = form.dataset.originalStatus || '';
     var SCAFFOLD = 'Action Taken:\n- \n\nVerification:\n- \n\nNext Steps:\n- ';
     // Bootstrap's bundle may load after this inline script parses, so resolve the
     // modal instance lazily (by submit time it is always available).
@@ -1968,7 +2004,8 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
 
     function isClosing() {
         var v = statusSel ? statusSel.value : '';
-        return v !== originalStatus && closedSlugs.indexOf(v) !== -1;
+        // Read live: the live sync moves it when someone else changes the status.
+        return v !== (form.dataset.originalStatus || '') && closedSlugs.indexOf(v) !== -1;
     }
 
     form.addEventListener('submit', function (e) {
@@ -2530,13 +2567,20 @@ ClassicEditor.create(document.querySelector('#replyEditor'), {
         activeBtn  = btn;
     }
 
-    document.querySelectorAll('.quick-assign-btn').forEach(function (btn) {
-        btn.addEventListener('click', function (e) {
-            e.stopPropagation();
-            if (activeBtn === btn) { closeMenu(); return; }
-            openMenu(btn);
+    // Exposed so the live sync can bind the fresh button after it swaps the
+    // Details card; already-bound buttons are skipped.
+    window.ldBindDetailQuickAssign = function () {
+        document.querySelectorAll('.quick-assign-btn').forEach(function (btn) {
+            if (btn._ldBound) return;
+            btn._ldBound = true;
+            btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                if (activeBtn === btn) { closeMenu(); return; }
+                openMenu(btn);
+            });
         });
-    });
+    };
+    window.ldBindDetailQuickAssign();
 
     document.addEventListener('click', function (e) {
         var item = e.target.closest('.quick-assign-floating-item');
