@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.197.0 &mdash; 2026-10-19
+
+### Changed
+- **The ticket list now updates itself.** On **All Tickets** (admin and agent), new tickets and changes made by other staff (status, priority, assignee, and so on) appear within 30 seconds, without pressing F5. The list also updates as soon as you switch back to its tab or use Back to return to it. Your filters, sort and page stay as they are. To avoid disrupting your work, the update waits while you have tickets selected, a quick-edit menu or the filter panel open, or a ticket preview card showing.
+
 ## 2.196.0 &mdash; 2026-10-19
 
 ### Changed

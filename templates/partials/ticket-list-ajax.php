@@ -32,6 +32,7 @@ $ticketListScope = $ticketListScope ?? 'agent';
     var REGIONS = ['ticketCount', 'filterCount', 'filterPanelDynamic', 'ticketResults', 'ticketPager'];
     var NON_FILTER_PARAMS = ['page', 'sort', 'dir', 'per_page', 'reset'];
     var seq = 0; // newest refresh wins when clicks overlap in flight
+    var lastSig = null; // server markup of REGIONS at the last swap, so auto-refresh skips no-op swaps
 
     // Mirror what a full page load records (see the script at the top of the
     // template) so remember-today's-filter behaviour survives ajax updates.
@@ -92,9 +93,12 @@ $ticketListScope = $ticketListScope ?? 'agent';
 
     function refresh(url, opts) {
         opts = opts || {};
-        var mySeq = ++seq;
+        // Background auto-refresh: no dimming, no fallback navigation, and it
+        // never supersedes (or lands on top of) a refresh the agent started.
+        var silent = !!opts.silent;
+        var mySeq = silent ? seq : ++seq;
         var results = document.getElementById('ticketResults');
-        if (results) { results.setAttribute('aria-busy', 'true'); results.style.opacity = '0.5'; }
+        if (results && !silent) { results.setAttribute('aria-busy', 'true'); results.style.opacity = '0.5'; }
         fetch(url, { headers: { 'X-Requested-With': 'fetch' }, credentials: 'same-origin' })
             .then(function (r) {
                 if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -102,9 +106,13 @@ $ticketListScope = $ticketListScope ?? 'agent';
             })
             .then(function (html) {
                 if (mySeq !== seq) return; // superseded by a newer refresh
+                if (silent && url !== window.location.pathname + window.location.search) return; // list re-filtered meanwhile
                 var doc = new DOMParser().parseFromString(html, 'text/html');
                 // e.g. session expired and this is the login page — bail to a real navigation
                 if (!doc.getElementById('ticketResults')) throw new Error('unexpected response');
+                var sig = REGIONS.map(function (id) { var el = doc.getElementById(id); return el ? el.innerHTML : ''; }).join('\n');
+                if (silent && sig === lastSig) return; // nothing changed
+                lastSig = sig;
                 REGIONS.forEach(function (id) {
                     var src = doc.getElementById(id);
                     var dst = document.getElementById(id);
@@ -133,9 +141,30 @@ $ticketListScope = $ticketListScope ?? 'agent';
                 announce();
             })
             .catch(function () {
-                if (mySeq === seq) window.location.href = url;
+                if (!silent && mySeq === seq) window.location.href = url;
             });
     }
+
+    // Auto-refresh: re-pull the list every 30s, and the moment the agent comes
+    // back to the tab or Back-buttons onto a cached copy, so new tickets and
+    // other agents' changes appear without F5. Skipped while the agent is
+    // mid-interaction so a swap never yanks rows, menus or focus from under them.
+    function busy() {
+        if (document.hidden) return true;
+        if (document.querySelector('.ticket-cb:checked, .dropdown-menu.show, .modal.show, #filterPanel.open')) return true;
+        var pop = document.getElementById('ldInboxPop');
+        if (pop && pop.style.display === 'block') return true;
+        var a = document.activeElement;
+        return !!(a && a.closest('#ticketResults, #ticketPager') && a.matches('select, textarea, input:not([type=checkbox]), :focus-visible'));
+    }
+    function autoRefresh() {
+        if (window.location.pathname === BASE && !busy()) {
+            refresh(window.location.pathname + window.location.search, { silent: true, push: false });
+        }
+    }
+    setInterval(autoRefresh, 30000);
+    document.addEventListener('visibilitychange', autoRefresh);
+    window.addEventListener('pageshow', function (e) { if (e.persisted) autoRefresh(); });
 
     function formUrl(form) {
         var qs = new URLSearchParams();
