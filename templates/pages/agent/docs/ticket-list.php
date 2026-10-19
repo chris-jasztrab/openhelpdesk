@@ -90,7 +90,7 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/agent/help'], ['label' => 'Ticke
         <tr><td><strong>Created By</strong></td><td>The person who submitted the ticket.</td></tr>
         <tr><td><strong>Location</strong></td><td>The branch or site on the ticket.</td></tr>
         <tr><td><strong>SLA</strong></td><td>On Track, Warning or Breached (only when SLA tracking is on).</td></tr>
-        <tr><td><strong>Created</strong></td><td>When the ticket was submitted.</td></tr>
+        <tr><td><strong>Opened</strong></td><td>The date the ticket was submitted.</td></tr>
         <tr><td><strong>Due</strong></td><td>Due date, in red when overdue.</td></tr>
         <tr><td><strong>Confidential</strong></td><td>A lock on confidential tickets. Hidden until you turn it on.</td></tr>
     </tbody>

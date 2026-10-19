@@ -11,6 +11,14 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.195.1 &mdash; 2026-10-19
+
+### Fixed
+- **Long requester names no longer spill into the Location column.** On **All Tickets** (admin and agent) and the agent dashboard, a **Created By** name that is wider than its column now ends in "…" instead of running over the **Location** column. Hover the cell to see the full name. Shortened **Location** names show their full name on hover too.
+
+### Changed
+- **The ticket-list "Created" column is now called "Opened".** It is the date the ticket was submitted. It sits next to **Due** in the **Columns** picker, and it is easier to tell apart from **Created By**.
+
 ## 2.195.0 &mdash; 2026-10-16
 
 ### Added

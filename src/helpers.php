@@ -4015,7 +4015,7 @@ function ticketColumnDefinitions(): array
         'creator'      => 'Created By',
         'location'     => 'Location',
         'sla'          => 'SLA',
-        'created_at'   => 'Created',
+        'created_at'   => 'Opened',
         'due_date'     => 'Due',
         'confidential' => 'Confidential',
     ];

@@ -146,7 +146,7 @@ $dir  = $dir ?? 'desc';
                     <?php if (in_array('creator', $visibleColumns)): ?><th style="white-space:nowrap;"><a href="<?= sortUrl('creator', $sort, $dir, [], '/agent') ?>" class="text-decoration-none text-dark">Created By <?= sortIcon('creator', $sort, $dir) ?></a></th><?php endif; ?>
                     <?php if (in_array('location', $visibleColumns)): ?><th style="white-space:nowrap;"><a href="<?= sortUrl('location', $sort, $dir, [], '/agent') ?>" class="text-decoration-none text-dark">Location <?= sortIcon('location', $sort, $dir) ?></a></th><?php endif; ?>
                     <?php if (in_array('sla', $visibleColumns)): ?><th style="white-space:nowrap;">SLA</th><?php endif; ?>
-                    <?php if (in_array('created_at', $visibleColumns)): ?><th style="white-space:nowrap;"><a href="<?= sortUrl('created_at', $sort, $dir, [], '/agent') ?>" class="text-decoration-none text-dark">Created <?= sortIcon('created_at', $sort, $dir) ?></a></th><?php endif; ?>
+                    <?php if (in_array('created_at', $visibleColumns)): ?><th style="white-space:nowrap;"><a href="<?= sortUrl('created_at', $sort, $dir, [], '/agent') ?>" class="text-decoration-none text-dark">Opened <?= sortIcon('created_at', $sort, $dir) ?></a></th><?php endif; ?>
                     <?php if (in_array('due_date', $visibleColumns)): ?><th style="white-space:nowrap;"><a href="<?= sortUrl('due_date', $sort, $dir, [], '/agent') ?>" class="text-decoration-none text-dark">Due <?= sortIcon('due_date', $sort, $dir) ?></a></th><?php endif; ?>
                     <?php if (in_array('confidential', $visibleColumns)): ?><th style="white-space:nowrap;text-align:center;">Confidential</th><?php endif; ?>
                 </tr>
@@ -213,10 +213,10 @@ $dir  = $dir ?? 'desc';
                     </td>
                     <?php endif; ?>
                     <?php if (in_array('creator', $visibleColumns)): ?>
-                    <td class="text-muted" style="white-space:nowrap;"><?= e($t['creator_name'] ?? '—') ?></td>
+                    <td class="text-muted" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="<?= e($t['creator_name'] ?? '') ?>"><?= e($t['creator_name'] ?? '—') ?></td>
                     <?php endif; ?>
                     <?php if (in_array('location', $visibleColumns)): ?>
-                    <td class="text-muted" style="white-space:nowrap;"><?= e($t['location_name'] ?? '—') ?></td>
+                    <td class="text-muted" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="<?= e($t['location_name'] ?? '') ?>"><?= e($t['location_name'] ?? '—') ?></td>
                     <?php endif; ?>
                     <?php if (in_array('sla', $visibleColumns)): ?>
                     <td style="white-space:nowrap;">

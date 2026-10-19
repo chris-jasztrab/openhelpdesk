@@ -564,7 +564,7 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                     <th style="white-space:nowrap;">SLA</th>
                     <?php endif; ?>
                     <?php if (in_array('created_at', $visibleColumns)): ?>
-                    <th style="white-space:nowrap;"><a href="<?= sortUrl('created_at', $sort, $dir, $sortParams, '/agent/tickets') ?>" class="text-decoration-none text-dark">Created <?= sortIcon('created_at', $sort, $dir) ?></a></th>
+                    <th style="white-space:nowrap;"><a href="<?= sortUrl('created_at', $sort, $dir, $sortParams, '/agent/tickets') ?>" class="text-decoration-none text-dark">Opened <?= sortIcon('created_at', $sort, $dir) ?></a></th>
                     <?php endif; ?>
                     <?php if (in_array('due_date', $visibleColumns)): ?>
                     <th style="white-space:nowrap;"><a href="<?= sortUrl('due_date', $sort, $dir, $sortParams, '/agent/tickets') ?>" class="text-decoration-none text-dark">Due <?= sortIcon('due_date', $sort, $dir) ?></a></th>
@@ -676,10 +676,11 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                         </td>
                         <?php endif; ?>
                         <?php if (in_array('creator', $visibleColumns)): ?>
-                        <td class="text-muted" style="white-space:nowrap;overflow:hidden;"><?= $isRedacted ? '—' : e($t['creator_name'] ?? '—') ?></td>
+                        <?php $creatorCell = $isRedacted ? '—' : e($t['creator_name'] ?? '—'); ?>
+                        <td class="text-muted" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="<?= $creatorCell ?>"><?= $creatorCell ?></td>
                         <?php endif; ?>
                         <?php if (in_array('location', $visibleColumns)): ?>
-                        <td class="text-muted location-col" style="white-space:nowrap;overflow:hidden;"><?= e($t['location_name'] ?? '—') ?></td>
+                        <td class="text-muted location-col" style="white-space:nowrap;overflow:hidden;" title="<?= e($t['location_name'] ?? '') ?>"><?= e($t['location_name'] ?? '—') ?></td>
                         <?php endif; ?>
                         <?php if (in_array('sla', $visibleColumns)): ?>
                         <td style="white-space:nowrap;">
