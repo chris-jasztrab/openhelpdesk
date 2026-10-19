@@ -701,7 +701,7 @@ A confidential type locks its tickets to the members of its default group and th
 - **Import Tickets**: upload a CSV from another system, map its columns, preview, then import. You also choose how SLA applies to imported tickets: exclude them (the default), start clocks now, or apply from the original open date, optionally limited by type or date.
 - **Import Users** and **Import KB**: CSV import with column mapping and a preview.
 - **Freshdesk**: a command-line importer (`scripts/import-freshdesk-conversations.php`) pulls tickets, conversations and attachments through the Freshdesk API. It is a dry run unless `--apply` is given. See the script's header for its options.
-- **Backup**: one click creates a ZIP of the whole application directory plus a database dump, which you can then download or delete.
+- **Backup**: one click creates a ZIP of the whole application directory plus a database dump, which you can then download or delete. A progress bar shows each step while it runs. Tick **Leave out ticket attachments** for a smaller, faster backup without `storage/attachments/`.
 
 ---
 

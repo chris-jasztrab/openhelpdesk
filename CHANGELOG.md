@@ -11,6 +11,12 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.200.0 &mdash; 2026-10-19
+
+### Added
+- **Creating a backup now shows a progress bar.** After you click **Create Backup Now**, the page shows how far along the backup is and what it's doing: dumping each database table, collecting files, then compressing them. Before, the browser tab just spun until the backup finished. The success or error message appears when it's done, as before.
+- **Backups can leave out ticket attachments.** Tick **Leave out ticket attachments** on **Settings → Backup** for a smaller, faster backup. The database and everything else are still included, and the empty `storage/attachments/` folder is kept so uploads work after a restore. These backups are named `…_no-attachments.zip` and tagged **No attachments** in the list.
+
 ## 2.199.0 &mdash; 2026-10-19
 
 ### Added

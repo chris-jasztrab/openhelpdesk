@@ -14031,8 +14031,18 @@ $router->post('/admin/settings/backup/create', function () {
     $backupDir = ROOT_DIR . '/storage/backups/';
     @mkdir($backupDir, 0755, true);
 
-    $filename = 'localdesk_backup_' . date('Ymd_His') . '.zip';
+    $skipAttachments = !empty($_POST['skip_attachments']);
+    $filename = 'localdesk_backup_' . date('Ymd_His') . ($skipAttachments ? '_no-attachments' : '') . '.zip';
     $zipPath  = $backupDir . $filename;
+
+    // The page polls /admin/settings/backup/progress while this runs, so drop
+    // the session lock or every poll would queue behind this request.
+    $progressFile = $backupDir . '.progress_' . Auth::id() . '.json';
+    $progress = function (int $pct, string $msg) use ($progressFile) {
+        @file_put_contents($progressFile, json_encode(['pct' => $pct, 'msg' => $msg]), LOCK_EX);
+    };
+    $progress(0, 'Starting backup…');
+    session_write_close();
 
     try {
         $zip = new ZipArchive();
@@ -14048,7 +14058,8 @@ $router->post('/admin/settings/backup/create', function () {
         $sql .= "-- ------------------------------------------------\n\n";
         $sql .= "SET FOREIGN_KEY_CHECKS=0;\nSET SQL_MODE='NO_AUTO_VALUE_ON_ZERO';\n\n";
 
-        foreach ($tables as $table) {
+        foreach ($tables as $i => $table) {
+            $progress((int) (15 * $i / max(1, count($tables))), "Dumping database table $table (" . ($i + 1) . ' of ' . count($tables) . ')…');
             $sql .= "-- ---- `$table` ----\n";
             $sql .= "DROP TABLE IF EXISTS `$table`;\n";
             $create = $db->query("SHOW CREATE TABLE `$table`")->fetch(PDO::FETCH_NUM);
@@ -14078,17 +14089,20 @@ $router->post('/admin/settings/backup/create', function () {
         // Walks the entire application directory and adds every file under a
         // "website/" prefix inside the zip. The storage/backups/ folder is the
         // one mandatory exclusion — without it the in-progress zip would try
-        // to archive itself (and every prior backup).
+        // to archive itself (and every prior backup). "Skip attachments" keeps
+        // the empty storage/attachments/ folder so uploads work after a restore.
         $websiteRoot    = rtrim(str_replace('\\', '/', ROOT_DIR), '/');
         $backupAbsolute = rtrim(str_replace('\\', '/', realpath($backupDir) ?: $backupDir), '/');
+        $attachPrefix   = rtrim(str_replace('\\', '/', realpath(ATTACHMENT_STORAGE_PATH) ?: ATTACHMENT_STORAGE_PATH), '/') . '/';
 
         $it = new RecursiveIteratorIterator(
             new RecursiveDirectoryIterator(ROOT_DIR, RecursiveDirectoryIterator::SKIP_DOTS),
             RecursiveIteratorIterator::SELF_FIRST
         );
+        $fileCount = 0;
         foreach ($it as $entry) {
             $path = str_replace('\\', '/', $entry->getPathname());
-            if (strpos($path, $backupAbsolute) === 0) {
+            if (strpos($path, $backupAbsolute) === 0 || ($skipAttachments && strpos($path, $attachPrefix) === 0)) {
                 continue;
             }
             $rel = 'website/' . substr($path, strlen($websiteRoot) + 1);
@@ -14096,9 +14110,20 @@ $router->post('/admin/settings/backup/create', function () {
                 $zip->addEmptyDir($rel);
             } elseif ($entry->isFile() && is_readable($entry->getPathname())) {
                 $zip->addFile($entry->getPathname(), $rel);
+                if (++$fileCount % 500 === 0) {
+                    $progress(15, 'Collecting files (' . number_format($fileCount) . ' so far)…');
+                }
             }
         }
 
+        // Files are only read and compressed inside close(), which is the slow
+        // part, so map its 0–1 progress onto 20–100% of the bar.
+        $progress(20, 'Compressing ' . number_format($fileCount) . ' files…');
+        if (method_exists($zip, 'registerProgressCallback')) {
+            $zip->registerProgressCallback(0.01, function (float $r) use ($progress, $fileCount) {
+                $progress(20 + (int) (80 * $r), 'Compressing ' . number_format($fileCount) . ' files…');
+            });
+        }
         $zip->close();
         logAudit(
             'backup.created',
@@ -14106,19 +14131,32 @@ $router->post('/admin/settings/backup/create', function () {
             'backup',
             'file=' . $filename . '; size=' . (file_exists($zipPath) ? filesize($zipPath) : 0)
         );
-        flash('success', "Backup created: $filename");
+        $result = ['success', "Backup created: $filename"];
     } catch (Exception $e) {
         @unlink($zipPath);
-        flash('error', 'Backup failed: ' . $e->getMessage());
+        $result = ['error', 'Backup failed: ' . $e->getMessage()];
+    } finally {
+        @unlink($progressFile);
     }
 
+    session_start(); // closed above for the progress polls; reopen to set the flash
+    flash(...$result);
     redirect('/admin/settings/backup');
+});
+
+$router->get('/admin/settings/backup/progress', function () {
+    Auth::requirePermission('import.manage');
+    session_write_close();
+    $file = ROOT_DIR . '/storage/backups/.progress_' . Auth::id() . '.json';
+    header('Content-Type: application/json');
+    echo is_file($file) ? file_get_contents($file) : '{"pct":null}';
+    exit;
 });
 
 $router->get('/admin/settings/backup/download', function () {
     Auth::requirePermission('import.manage');
     $filename = $_GET['file'] ?? '';
-    if (!preg_match('/^localdesk_backup_\d{8}_\d{6}\.zip$/', $filename)) {
+    if (!preg_match('/^localdesk_backup_\d{8}_\d{6}(_no-attachments)?\.zip$/', $filename)) {
         flash('error', 'Invalid backup filename.');
         redirect('/admin/settings/backup');
     }
@@ -14148,7 +14186,7 @@ $router->post('/admin/settings/backup/delete', function () {
         redirect('/admin/settings/backup');
     }
     $filename = $_POST['filename'] ?? '';
-    if (!preg_match('/^localdesk_backup_\d{8}_\d{6}\.zip$/', $filename)) {
+    if (!preg_match('/^localdesk_backup_\d{8}_\d{6}(_no-attachments)?\.zip$/', $filename)) {
         flash('error', 'Invalid backup filename.');
         redirect('/admin/settings/backup');
     }
