@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.201.0 &mdash; 2026-10-19
+
+### Added
+- **Clearing or sending the Email Queue is now in the audit log.** **Flush queue** records who deleted the held emails, how many there were, and the dates they were queued. **Send all now** records who sent the backlog and how many emails went out or failed. Before, both actions left no trace, so a cleared queue couldn't be traced back to anyone.
+
 ## 2.200.0 &mdash; 2026-10-19
 
 ### Added

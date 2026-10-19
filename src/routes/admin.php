@@ -9733,6 +9733,7 @@ $router->post('/admin/settings/email-queue/send-all', function () {
     ignore_user_abort(true);
     $r = mailQueueSendAll();
     session_start();
+    logAudit('mail_queue.sent', null, null, "Sent {$r['sent']} queued email(s), {$r['failed']} failed");
     flash($r['failed'] > 0 ? 'error' : 'success',
         "Sent {$r['sent']} queued email(s)." . ($r['failed'] > 0 ? " {$r['failed']} failed and remain in the queue." : ''));
     redirect('/admin/settings/email-queue');
@@ -9744,7 +9745,11 @@ $router->post('/admin/settings/email-queue/flush', function () {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/email-queue');
     }
-    $n = Database::connect()->exec('DELETE FROM mail_queue');
+    $db   = Database::connect();
+    $span = $db->query('SELECT MIN(created_at), MAX(created_at) FROM mail_queue')->fetch(PDO::FETCH_NUM);
+    $n    = $db->exec('DELETE FROM mail_queue');
+    logAudit('mail_queue.flushed', null, null,
+        "Deleted {$n} queued email(s) unsent" . ($n > 0 ? ", queued {$span[0]} to {$span[1]}" : ''));
     flash('success', "Flushed {$n} queued email(s). They will not be sent.");
     redirect('/admin/settings/email-queue');
 });
