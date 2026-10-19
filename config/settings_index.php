@@ -55,6 +55,11 @@ return [
      'section' => 'Email / SMTP Configuration', 'anchor' => 'smtp_password',
      'keywords' => 'auth login credentials secret'],
 
+    ['label' => 'Send Mail Via',                'description' => 'Send outgoing email through an SMTP server or Microsoft Graph',
+     'group' => 'Email', 'page_label' => 'Email / SMTP', 'page_url' => '/admin/settings',
+     'section' => 'Email / SMTP Configuration', 'anchor' => 'mail_transport',
+     'keywords' => 'transport graph microsoft 365 office smtp outgoing send mail.send'],
+
     ['label' => 'Mail From Address',            'description' => 'Default From address on outgoing emails',
      'group' => 'Email', 'page_label' => 'Email / SMTP', 'page_url' => '/admin/settings',
      'section' => 'Email / SMTP Configuration', 'anchor' => 'mail_from_address',

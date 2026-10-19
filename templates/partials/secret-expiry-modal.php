@@ -38,13 +38,17 @@ $_SESSION['_secret_remind_shown'] = $threshold;
 
 // Build modal content based on threshold
 $expiryFormatted = date('F j, Y', strtotime($secretExpiry));
+// With Send Mail Via = Microsoft Graph the same secret carries all outgoing mail too.
+$impact = getSetting('mail_transport') === 'graph'
+    ? 'all helpdesk email, sending and reply-by-email'
+    : 'reply-by-email processing';
 
 if ($threshold === 'day') {
     $modalStyle  = 'danger';
     $icon        = 'bi-exclamation-octagon-fill';
     $title       = 'App Secret Has Expired';
     $message     = 'Your Microsoft Graph app secret expired on <strong>' . htmlspecialchars($expiryFormatted) . '</strong>. '
-                 . 'Reply-by-email processing has stopped working. '
+                 . ucfirst($impact) . ' has stopped working. '
                  . 'Rotate the secret in Azure Portal immediately and update it in your inbound mail settings.';
     $badgeClass  = 'bg-danger';
     $badgeText   = 'Expired';
@@ -54,7 +58,7 @@ if ($threshold === 'day') {
     $title       = 'App Secret Expiring Soon';
     $message     = 'Your Microsoft Graph app secret expires in <strong>' . $daysLeft . ' day' . ($daysLeft === 1 ? '' : 's') . '</strong> '
                  . '(on ' . htmlspecialchars($expiryFormatted) . '). '
-                 . 'Rotate it now to avoid interruption to reply-by-email processing.';
+                 . 'Rotate it now to avoid interruption to ' . $impact . '.';
     $badgeClass  = 'bg-danger';
     $badgeText   = 'Expires in ' . $daysLeft . ' day' . ($daysLeft === 1 ? '' : 's');
 } else {

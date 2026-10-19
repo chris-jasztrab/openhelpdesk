@@ -4429,7 +4429,7 @@ function sendMail(string $toEmail, string $toName, string $subject, string $html
         }
     }
 
-    $result = smtpDeliver($toEmail, $toName, $subject, $htmlBody, $textBody, $ticketId, $attachments);
+    $result = deliverMail($toEmail, $toName, $subject, $htmlBody, $textBody, $ticketId, $attachments);
     if ($result['messageId'] === false) {
         mailQueuePush(...$queueArgs, reason: $result['error']);
         return false;
@@ -4480,7 +4480,7 @@ function mailQueueSendAll(): array
     $failed = 0;
     foreach ($rows as $row) {
         $attachments = $row['attachments'] ? (json_decode($row['attachments'], true) ?: []) : [];
-        $r = smtpDeliver(
+        $r = deliverMail(
             $row['to_email'], $row['to_name'], $row['subject'], $row['html_body'],
             (string) $row['text_body'], $row['ticket_id'] !== null ? (int) $row['ticket_id'] : null, $attachments
         );
@@ -4496,8 +4496,183 @@ function mailQueueSendAll(): array
 }
 
 /**
+ * Hand one email to the transport chosen under Settings → Email (Send Mail Via).
+ * No kill switch and no queueing here. Only sendMail() and mailQueueSendAll()
+ * should call this.
+ *
+ * @return array{messageId:string|false, error:string}
+ */
+function deliverMail(string $toEmail, string $toName, string $subject, string $htmlBody, string $textBody = '', ?int $ticketId = null, array $attachments = []): array
+{
+    return getSetting('mail_transport') === 'graph'
+        ? graphDeliver($toEmail, $toName, $subject, $htmlBody, $ticketId, $attachments)
+        : smtpDeliver($toEmail, $toName, $subject, $htmlBody, $textBody, $ticketId, $attachments);
+}
+
+/**
+ * The Message-ID and Reply-To both transports stamp on a message.
+ * process-replies.php reads the ticket ID back out of <ticket-{id}-…@…> when a
+ * reply has lost its "[#id]" subject tag, and ticket mail replies to the
+ * inbound mailbox so the reply is captured.
+ *
+ * @return array{0:string, 1:string} [messageId, replyTo]
+ */
+function outboundMailIds(string $fromAddr, ?int $ticketId): array
+{
+    $domain    = substr(strrchr($fromAddr, '@'), 1) ?: 'localhost';
+    $messageId = $ticketId !== null
+        ? sprintf('<ticket-%d-%d@%s>', $ticketId, time(), $domain)
+        : sprintf('<localdesk-%s@%s>', bin2hex(random_bytes(12)), $domain);
+    $replyTo   = ($ticketId !== null && getSetting('graph_enabled') === '1')
+        ? getSetting('graph_reply_to')
+        : '';
+    return [$messageId, $replyTo !== '' ? $replyTo : $fromAddr];
+}
+
+/**
+ * Send one email through Microsoft Graph as the From Address mailbox, with the
+ * Inbound Mail app registration's credentials. The app needs Mail.ReadWrite and
+ * Mail.Send on that mailbox.
+ *
+ * Builds a draft, attaches the files, then sends it: a draft is the only place
+ * Graph lets us set our own Message-ID, and files over 3 MB can only be added to
+ * an existing draft. Graph takes a single body, so the HTML one is sent.
+ *
+ * @return array{messageId:string|false, error:string}
+ */
+function graphDeliver(string $toEmail, string $toName, string $subject, string $htmlBody, ?int $ticketId = null, array $attachments = []): array
+{
+    require_once ROOT_DIR . '/src/graph.php';
+
+    $fromAddr = getSetting('mail_from_address');
+    $fromName = getSetting('mail_from_name', 'OpenHelpDesk');
+    if ($fromAddr === '') {
+        return ['messageId' => false, 'error' => 'From address not configured'];
+    }
+    $token = graphMailToken();
+    if ($token === null) {
+        return ['messageId' => false, 'error' => 'No Microsoft Graph token: check the Inbound Mail tenant ID, client ID and secret'];
+    }
+    [$messageId, $replyTo] = outboundMailIds($fromAddr, $ticketId);
+
+    $message = [
+        'subject'           => $subject,
+        'body'              => ['contentType' => 'HTML', 'content' => $htmlBody],
+        'from'              => ['emailAddress' => ['address' => $fromAddr, 'name' => $fromName]],
+        'toRecipients'      => [['emailAddress' => ['address' => $toEmail, 'name' => $toName !== '' ? $toName : $toEmail]]],
+        'replyTo'           => [['emailAddress' => ['address' => $replyTo, 'name' => $fromName]]],
+        'internetMessageId' => $messageId,
+    ];
+    if ($ticketId !== null) {
+        $message['internetMessageHeaders'] = [['name' => 'X-Ticket-ID', 'value' => (string) $ticketId]];
+    }
+
+    $auth  = ["Authorization: Bearer {$token}", 'Content-Type: application/json'];
+    $base  = 'https://graph.microsoft.com/v1.0/users/' . $fromAddr . '/messages';
+    $draft = graphRequest('POST', $base, $auth, json_encode($message));
+    $error = $draft['error'] !== '' ? 'Creating draft: ' . $draft['error'] : '';
+
+    if ($error === '') {
+        $draftUrl = $base . '/' . rawurlencode(json_decode($draft['body'], true)['id'] ?? '');
+        foreach ($attachments as $att) {
+            $path = $att['path'] ?? '';
+            if ($path !== '' && is_file($path)) {
+                $name  = $att['name'] ?? basename($path);
+                $error = graphAttach($draftUrl, $auth, $path, $name);
+                if ($error !== '') {
+                    $error = "Attaching {$name}: {$error}";
+                    break;
+                }
+            }
+        }
+        if ($error === '') {
+            $sent  = graphRequest('POST', $draftUrl . '/send', [$auth[0]]); // no body
+            $error = $sent['error'] !== '' ? 'Sending: ' . $sent['error'] : '';
+        }
+        if ($error !== '') {
+            // The queue row retries from scratch, so don't leave the half-built draft behind.
+            graphRequest('DELETE', $draftUrl, $auth);
+        }
+    }
+
+    if (is_dir(ROOT_DIR . '/storage/logs')) {
+        file_put_contents(ROOT_DIR . '/storage/logs/smtp.log',
+            sprintf("[%s] graph send to=%s from=%s %s\n", date('Y-m-d H:i:s'), $toEmail, $fromAddr,
+                $error === '' ? 'SUCCESS messageId=' . $messageId : 'ERROR ' . $error),
+            FILE_APPEND | LOCK_EX);
+    }
+    return $error === ''
+        ? ['messageId' => $messageId, 'error' => '']
+        : ['messageId' => false, 'error' => $error];
+}
+
+/**
+ * One client-credentials token per process, so a notification to a whole group
+ * doesn't ask Microsoft for a fresh token per recipient.
+ */
+function graphMailToken(): ?string
+{
+    static $token = null, $expiresAt = 0;
+    if ($token === null || time() >= $expiresAt) {
+        $token     = getAccessToken(getSetting('graph_tenant_id'), getSetting('graph_client_id'), getSetting('graph_client_secret'));
+        $expiresAt = time() + 3000; // tokens live 60–90 minutes
+    }
+    return $token;
+}
+
+/**
+ * Add one file to a Graph draft. Returns '' on success, else the error.
+ * Under 3 MB goes up in one request; bigger files need an upload session.
+ */
+function graphAttach(string $draftUrl, array $auth, string $path, string $name): string
+{
+    $size = (int) filesize($path);
+    if ($size < 3 * 1024 * 1024) {
+        return graphRequest('POST', $draftUrl . '/attachments', $auth, json_encode([
+            '@odata.type'  => '#microsoft.graph.fileAttachment',
+            'name'         => $name,
+            'contentBytes' => base64_encode((string) file_get_contents($path)),
+        ]))['error'];
+    }
+
+    $session = graphRequest('POST', $draftUrl . '/attachments/createUploadSession', $auth, json_encode([
+        'AttachmentItem' => ['attachmentType' => 'file', 'name' => $name, 'size' => $size],
+    ]));
+    if ($session['error'] !== '') {
+        return $session['error'];
+    }
+    $uploadUrl = json_decode($session['body'], true)['uploadUrl'] ?? '';
+    foreach (graphUploadRanges($size) as [$start, $end]) {
+        // The upload URL is pre-authenticated; Graph rejects a chunk that carries the bearer token.
+        $put = graphRequest('PUT', $uploadUrl, [
+            'Content-Type: application/octet-stream',
+            "Content-Range: bytes {$start}-{$end}/{$size}",
+        ], (string) file_get_contents($path, false, null, $start, $end - $start + 1));
+        if ($put['error'] !== '') {
+            return $put['error'];
+        }
+    }
+    return '';
+}
+
+/**
+ * Inclusive [start, end] byte ranges for an upload session. Graph caps each PUT
+ * at 4 MB; the default chunk is 10 × 320 KiB.
+ *
+ * @return list<array{0:int, 1:int}>
+ */
+function graphUploadRanges(int $size, int $chunk = 3276800): array
+{
+    $ranges = [];
+    for ($start = 0; $start < $size; $start += $chunk) {
+        $ranges[] = [$start, min($start + $chunk, $size) - 1];
+    }
+    return $ranges;
+}
+
+/**
  * The actual SMTP conversation, with no kill switch and no queueing. Only
- * sendMail() and mailQueueSendAll() should call this.
+ * deliverMail() should call this.
  *
  * @return array{messageId:string|false, error:string}
  */
@@ -4519,11 +4694,7 @@ function smtpDeliver(string $toEmail, string $toName, string $subject, string $h
         return ['messageId' => false, 'error' => 'From address not configured'];
     }
 
-    // Build a Message-ID for threading
-    $domain    = substr(strrchr($fromAddr, '@'), 1) ?: 'localhost';
-    $messageId = $ticketId !== null
-        ? sprintf('<ticket-%d-%d@%s>', $ticketId, time(), $domain)
-        : sprintf('<localdesk-%s@%s>', bin2hex(random_bytes(12)), $domain);
+    [$messageId, $replyToAddr] = outboundMailIds($fromAddr, $ticketId);
 
     // SMTP debug log — captures full SMTP conversation to storage/logs/smtp.log
     $smtpLogDir  = ROOT_DIR . '/storage/logs';
@@ -4574,12 +4745,7 @@ function smtpDeliver(string $toEmail, string $toName, string $subject, string $h
         }
 
         $mail->setFrom($fromAddr, $fromName);
-        // If inbound reply processing is enabled and this is a ticket email,
-        // set Reply-To to the dedicated reply inbox so replies are captured.
-        $replyToAddr = ($ticketId !== null && getSetting('graph_enabled') === '1')
-            ? getSetting('graph_reply_to')
-            : '';
-        $mail->addReplyTo($replyToAddr !== '' ? $replyToAddr : $fromAddr, $fromName);
+        $mail->addReplyTo($replyToAddr, $fromName);
         $mail->addAddress($toEmail, $toName);
 
         $mail->MessageID = $messageId;

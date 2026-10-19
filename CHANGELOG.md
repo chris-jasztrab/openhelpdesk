@@ -11,6 +11,16 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.199.0 &mdash; 2026-10-19
+
+### Added
+- **Outgoing email can go through Microsoft Graph instead of SMTP.** A new **Send Mail Via** choice under **Settings → Email** sends as the **From Address** mailbox, with the same app registration that Inbound Mail already uses. With it, one Microsoft 365 mailbox can both send and receive helpdesk mail, and no separate SMTP account or password is needed. SMTP is still the default, so nothing changes until an admin switches it.
+- The app registration needs `Mail.Send` and `Mail.ReadWrite` on that mailbox. The **Setup Guide** now explains how to limit both permissions to the helpdesk mailbox with Exchange RBAC for Applications, rather than granting them for every mailbox in the tenant.
+- Attachments of any size are sent, including big forwarded tickets. Failures still wait in the **Email Queue**, and the error says which step failed: creating the draft, attaching a file, or sending.
+
+### Changed
+- When mail is sent through Graph, the app-secret expiry warning now says that all helpdesk email will stop, not only reply-by-email.
+
 ## 2.198.0 &mdash; 2026-10-19
 
 ### Changed

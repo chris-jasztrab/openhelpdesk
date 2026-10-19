@@ -105,6 +105,10 @@ $breadcrumbs  = [
                         <tr><td><code>Mail.Read</code></td><td>Read messages in the mailbox</td></tr>
                         <tr><td><code>Mail.ReadWrite</code></td><td>Mark messages as read after processing</td></tr>
                         <tr>
+                            <td><code>Mail.Send</code></td>
+                            <td>Send outgoing mail as the helpdesk mailbox. <span class="text-muted">Only needed if <em>Send Mail Via</em> is set to Microsoft Graph.</span></td>
+                        </tr>
+                        <tr>
                             <td><code>MailboxSettings.Read</code></td>
                             <td>Read agents' out-of-office (automatic-replies) status. <span class="text-muted">Only needed if you use <a href="/admin/settings/oof">Out-of-Office Coverage</a> — see <a href="/admin/settings/oof/help">its setup guide</a>.</span></td>
                         </tr>
@@ -114,6 +118,14 @@ $breadcrumbs  = [
                     <i class="bi bi-info-circle me-1"></i><code>MailboxSettings.Read</code> is read-only and grants
                     no access to message contents — it only exposes automatic-reply (out-of-office) settings. Add it to
                     this <em>same</em> app registration; Out-of-Office Coverage reuses these credentials.
+                </p>
+                <p class="text-muted small mt-2 mb-0">
+                    <i class="bi bi-shield-lock me-1"></i>Consent granted here covers <strong>every mailbox</strong> in
+                    your tenant. To limit the app to the helpdesk mailbox, grant <code>Mail.ReadWrite</code> and
+                    <code>Mail.Send</code> through
+                    <a href="https://learn.microsoft.com/exchange/permissions-exo/application-rbac" target="_blank" rel="noopener">Exchange RBAC for Applications</a>
+                    instead, and don't add them here: the two grants add together, so a tenant-wide grant here cancels
+                    the limit. <code>MailboxSettings.Read</code> has to stay tenant-wide, because Out-of-Office Coverage reads every agent's mailbox.
                 </p>
             </li>
             <li class="mb-2">Click <strong>Add permissions</strong>.</li>

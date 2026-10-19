@@ -3,10 +3,11 @@
  * OpenHelpDesk — Shared Microsoft Graph API helpers
  *
  * Transport (cURL), OAuth2 client-credentials token acquisition, and the
- * read-only Graph calls shared by more than one CLI script:
+ * Graph calls shared by more than one caller:
  *
  *   - scripts/process-replies.php       (inbound email → ticket replies)
  *   - scripts/process-oof-coverage.php  (out-of-office reassign / auto-reply)
+ *   - graphDeliver() in src/helpers.php (outbound mail when mail_transport = graph)
  *
  * Each script defines its own logMsg() before requiring this file; the
  * function_exists guard below is only a fallback for any other caller.
@@ -117,6 +118,38 @@ function curlPatch(string $url, string $body, array $headers = []): void
     } elseif ($httpCode >= 400) {
         logMsg('WARN', "Graph API PATCH returned HTTP {$httpCode}: " . substr((string) $response, 0, 200));
     }
+}
+
+/**
+ * Any-method HTTP request that hands back what happened instead of logging it,
+ * for callers that must report Graph's own error text (outbound mail parks it
+ * on the mail_queue row). status is 0 on a transport failure.
+ *
+ * @return array{status:int, body:string, error:string}
+ */
+function graphRequest(string $method, string $url, array $headers = [], string $body = ''): array
+{
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_CUSTOMREQUEST  => $method,
+        CURLOPT_POSTFIELDS     => $body,
+        CURLOPT_HTTPHEADER     => $headers,
+        CURLOPT_TIMEOUT        => 30,
+    ]);
+    $response = curl_exec($ch);
+    $status   = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $error    = curl_error($ch);
+    curl_close($ch);
+
+    if ($response === false || $error !== '') {
+        return ['status' => 0, 'body' => '', 'error' => "cURL {$method} error: {$error}"];
+    }
+    if ($status >= 400) {
+        $msg = json_decode((string) $response, true)['error']['message'] ?? substr((string) $response, 0, 300);
+        return ['status' => $status, 'body' => (string) $response, 'error' => "Graph {$method} HTTP {$status}: {$msg}"];
+    }
+    return ['status' => $status, 'body' => (string) $response, 'error' => ''];
 }
 
 /**

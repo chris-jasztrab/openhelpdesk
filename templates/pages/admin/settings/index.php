@@ -21,6 +21,22 @@ $breadcrumbs  = Auth::isAdmin()
         <form method="POST" action="/admin/settings/email">
             <?= csrfField() ?>
 
+            <div class="mb-3">
+                <label for="mail_transport" class="form-label fw-semibold">Send Mail Via</label>
+                <select class="form-select" id="mail_transport" name="mail_transport" style="max-width:360px;">
+                    <option value="smtp" <?= ($settings['mail_transport'] ?? '') !== 'graph' ? 'selected' : '' ?>>SMTP server (below)</option>
+                    <option value="graph" <?= ($settings['mail_transport'] ?? '') === 'graph' ? 'selected' : '' ?>>Microsoft Graph</option>
+                </select>
+                <div class="form-text">
+                    Microsoft Graph sends as the From Address with the app registration under
+                    <a href="#graph-secret">Inbound Mail</a>, and the SMTP fields below are ignored. The app needs
+                    <code>Mail.Send</code> and <code>Mail.ReadWrite</code> on the From Address mailbox; see the
+                    <a href="/admin/settings/email-reply-help">Setup Guide</a>.
+                </div>
+            </div>
+
+            <hr class="my-4">
+
             <div class="row g-3 mb-3">
                 <div class="col-md-8">
                     <label for="smtp_host" class="form-label fw-semibold">SMTP Host</label>

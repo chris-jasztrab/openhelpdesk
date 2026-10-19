@@ -7110,7 +7110,7 @@ $router->get('/admin/settings', function () {
     }
     $keys = [
         'smtp_host', 'smtp_port', 'smtp_encryption', 'smtp_username', 'smtp_password',
-        'mail_from_address', 'mail_from_name', 'smtp_debug',
+        'mail_from_address', 'mail_from_name', 'smtp_debug', 'mail_transport',
         'graph_enabled', 'graph_reply_to', 'graph_tenant_id', 'graph_client_id',
         'graph_client_secret', 'graph_mailbox', 'graph_secret_expires_at',
         'email_to_ticket_enabled', 'email_to_ticket_auto_create_users',
@@ -7167,6 +7167,7 @@ $router->post('/admin/settings/email', function () {
         'mail_from_address' => trim($_POST['mail_from_address'] ?? ''),
         'mail_from_name'   => trim($_POST['mail_from_name'] ?? ''),
         'smtp_debug'       => isset($_POST['smtp_debug']) ? '1' : '0',
+        'mail_transport'   => ($_POST['mail_transport'] ?? '') === 'graph' ? 'graph' : 'smtp',
     ];
 
     // Capture prior values for the audit diff (secret excluded — handled separately).
