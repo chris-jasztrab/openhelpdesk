@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.201.2 &mdash; 2026-10-20
+
+### Fixed
+- **Floor views now show replies and descriptions with their formatting.** The simplified floor ticket pages (requester and agent) stripped the formatting from agent replies and ticket descriptions. Paragraphs ran together and HTML codes such as `&nbsp;` showed up in the text, so a reply ended with "Matthew&nbsp;". Formatted replies now keep their paragraphs, line breaks and links, the same as on the full ticket page, and pass through the same filter that removes unsafe markup. Plain-text replies keep their line breaks, and their web links can now be clicked.
+
 ## 2.201.1 &mdash; 2026-10-20
 
 ### Fixed

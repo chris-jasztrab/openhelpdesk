@@ -114,6 +114,10 @@ $canReply  = !in_array($status, ['closed'], true); // patrons can reply on resol
 .floor-detail .tl-meta { font-size: .75rem; color: #64748b; }
 [data-bs-theme="dark"] .floor-detail .tl-meta { color: #adb5bd; }
 .floor-detail .tl-body { white-space: pre-wrap; word-break: break-word; }
+.floor-detail .rich { white-space: normal; }
+.floor-detail .rich p, .floor-detail .rich ul, .floor-detail .rich ol { margin-bottom: .5rem; }
+.floor-detail .rich > :last-child { margin-bottom: 0; }
+.floor-detail .rich img { max-width: 100%; height: auto; }
 
 .floor-detail textarea.note-input {
     width: 100%; min-height: 110px; border-radius: 10px;
@@ -194,9 +198,13 @@ $canReply  = !in_array($status, ['closed'], true); // patrons can reply on resol
     <?php if (!empty($ticket['description']) && trim(strip_tags((string) $ticket['description'])) !== ''): ?>
     <section class="section">
         <h3>What you reported</h3>
+        <?php if (str_starts_with(ltrim((string) $ticket['description']), '<')): ?>
+        <div class="description collapsed rich" id="floor-desc"><?= sanitizeRichHtml($ticket['description']) ?></div>
+        <?php else: ?>
         <div class="description collapsed" id="floor-desc">
-            <?= nl2br(e(strip_tags((string) $ticket['description']))) ?>
+            <?= nl2br(e($ticket['description'])) ?>
         </div>
+        <?php endif; ?>
         <button type="button" class="desc-toggle" id="floor-desc-toggle">
             <i class="bi bi-chevron-down"></i> Show all
         </button>
@@ -224,8 +232,10 @@ $canReply  = !in_array($status, ['closed'], true); // patrons can reply on resol
                             <?= e(str_replace('_', ' ', $tl['action'])) ?> ·
                             <?= e($tlAgeStr) ?>
                         </div>
-                        <?php if (!empty($tl['details'])): ?>
-                            <div class="tl-body"><?= nl2br(e(strip_tags((string) $tl['details']))) ?></div>
+                        <?php if (!empty($tl['details']) && str_starts_with(ltrim($tl['details']), '<')): ?>
+                            <div class="tl-body rich"><?= sanitizeRichHtml($tl['details']) ?></div>
+                        <?php elseif (!empty($tl['details'])): ?>
+                            <div class="tl-body"><?= linkify($tl['details']) ?></div>
                         <?php endif; ?>
                     </li>
                 <?php endforeach; ?>
