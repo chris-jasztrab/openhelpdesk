@@ -439,7 +439,11 @@ if ($solutionTimelineId > 0) {
                                     <small class="text-muted"><?= date('M j, Y g:i A', strtotime($entry['created_at'])) ?></small>
                                 </div>
                                 <?php if ($entry['details']): ?>
+                                <?php if (str_starts_with(ltrim($entry['details']), '<')): ?>
+                                <div class="mt-1 ck-content"><?= sanitizeRichHtml($entry['details']) ?></div>
+                                <?php else: ?>
                                 <div class="mt-1 text-muted" style="white-space:pre-wrap;"><?= linkify($entry['details']) ?></div>
+                                <?php endif; ?>
                                 <?php endif; ?>
                             </div>
                         </div>

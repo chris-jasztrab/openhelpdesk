@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.201.1 &mdash; 2026-10-20
+
+### Fixed
+- **Agent replies on the requester's ticket page no longer show raw HTML.** Opening a ticket from the **View Ticket** button in a notification email showed agent comments as code (`<p>Thanks…</p><p>Matthew&nbsp;</p>`) instead of formatted text. The requester's ticket page now formats these replies the same way the agent and admin pages do, with the same filter that removes unsafe markup.
+
 ## 2.201.0 &mdash; 2026-10-19
 
 ### Added
