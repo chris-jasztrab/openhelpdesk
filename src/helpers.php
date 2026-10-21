@@ -9573,7 +9573,10 @@ function creatableTicketTypes(PDO $db, array $types, int $userId): array
  */
 function spawnTicketTypeTasks(PDO $db, int $parentId): array
 {
-    $ps = $db->prepare('SELECT id, subject, type_id, created_by, submitted_by, location_id, priority_id FROM tickets WHERE id = ?');
+    $ps = $db->prepare(
+        'SELECT t.id, t.subject, t.type_id, t.created_by, t.submitted_by, t.location_id, t.priority_id, l.name AS location_name
+         FROM tickets t LEFT JOIN locations l ON l.id = t.location_id WHERE t.id = ?'
+    );
     $ps->execute([$parentId]);
     $parent = $ps->fetch();
     if (!$parent || !$parent['type_id']) {
@@ -9610,7 +9613,11 @@ function spawnTicketTypeTasks(PDO $db, int $parentId): array
 
         $insert->execute([
             mb_substr($task['child_type_name'] . ': ' . $parent['subject'], 0, 255),
-            'Task for ticket #' . $parentId . '.' . ($fieldIds ? ' The details are in the Custom Fields panel.' : ''),
+            // Location leads the description so it is in the new-ticket email too;
+            // the other handed-over details sit in the Custom Fields panel.
+            'Task for ticket #' . $parentId . '.'
+                . ($parent['location_name'] ? ' Location: ' . $parent['location_name'] . '.' : '')
+                . ($fieldIds ? ' The other details are in the Custom Fields panel.' : ''),
             (int) $parent['created_by'], $parent['submitted_by'], $typeId, $parent['location_id'],
             ticketDefaultNewStatusSlug(), $priId, resolveTicketGroup($db, null, $typeId), $parentId,
         ]);

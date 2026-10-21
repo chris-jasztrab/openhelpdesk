@@ -704,6 +704,22 @@ $sysDefaults = systemFieldDefaults();
                               placeholder="Category A&#10;&#9;Subcategory 1&#10;&#9;&#9;Item X"></textarea>
                 </div>
 
+                <!-- Text format -->
+                <div id="sectionTextFormat" class="field-section">
+                    <label class="form-label fw-medium" for="modalTextFormat">Format</label>
+                    <select class="form-select" id="modalTextFormat">
+                        <option value="">Any text</option>
+                        <option value="phone">Phone number: formats as (###) ###-#### while typing</option>
+                    </select>
+                </div>
+
+                <!-- Number minimum -->
+                <div id="sectionNumberMin" class="field-section">
+                    <label class="form-label fw-medium" for="modalNumberMin">Lowest allowed value</label>
+                    <input type="number" class="form-control" id="modalNumberMin" step="any" placeholder="No minimum">
+                    <div class="form-text">Set to 1 to accept positive numbers only.</div>
+                </div>
+
                 <!-- Text block -->
                 <div id="sectionTextBlock" class="field-section">
                     <label class="form-label fw-medium">Content</label>
@@ -1059,6 +1075,17 @@ $sysDefaults = systemFieldDefaults();
                 if (fieldType === 'text_block')    document.getElementById('sectionTextBlock').classList.add('active');
                 if (fieldType === 'image')         document.getElementById('sectionImage').classList.add('active');
 
+                var fCfg = {};
+                try { fCfg = JSON.parse(data.field.config || '{}') || {}; } catch (e) {}
+                if (fieldType === 'text') {
+                    document.getElementById('sectionTextFormat').classList.add('active');
+                    document.getElementById('modalTextFormat').value = fCfg.format || '';
+                }
+                if (fieldType === 'number' || fieldType === 'decimal') {
+                    document.getElementById('sectionNumberMin').classList.add('active');
+                    document.getElementById('modalNumberMin').value = fCfg.min != null ? fCfg.min : '';
+                }
+
                 if (fieldType === 'dropdown') {
                     populateDropdownPills((data.options || []).filter(function(o) { return !o.parent_option_id; }));
                 }
@@ -1196,6 +1223,12 @@ $sysDefaults = systemFieldDefaults();
             placeholder: placeholder,
             share_with_types: shareWith,
         };
+        if (fieldType === 'text' && document.getElementById('modalTextFormat').value) {
+            body.config = { format: document.getElementById('modalTextFormat').value };
+        }
+        if ((fieldType === 'number' || fieldType === 'decimal') && document.getElementById('modalNumberMin').value.trim() !== '') {
+            body.config = { min: Number(document.getElementById('modalNumberMin').value) };
+        }
         if (fieldType === 'dropdown') {
             body.options = Array.from(document.querySelectorAll('#dropdownPills .opt-pill'))
                 .map(function(p) { return { label: p.dataset.label }; });

@@ -83,10 +83,11 @@ class TicketTypeTasksTest extends TestCase
         $this->db->prepare('INSERT INTO ticket_type_tasks (type_id, child_type_id, field_ids) VALUES (?, ?, ?), (?, ?, ?)')
             ->execute([$parentType, $itType, json_encode([$name]), $parentType, $payType, json_encode([$name, $wage])]);
 
+        $this->db->exec("INSERT INTO locations (name) VALUES ('TTT Branch')");
         $this->db->prepare(
-            "INSERT INTO tickets (subject, description, created_by, type_id, status, group_id)
-             VALUES ('New hire: Test Person', 'x', ?, ?, 'open', ?)"
-        )->execute([$this->requester, $parentType, $hr]);
+            "INSERT INTO tickets (subject, description, created_by, type_id, status, group_id, location_id)
+             VALUES ('New hire: Test Person', 'x', ?, ?, 'open', ?, ?)"
+        )->execute([$this->requester, $parentType, $hr, (int) $this->db->lastInsertId()]);
         $parentId = (int) $this->db->lastInsertId();
         $this->db->prepare('INSERT INTO ticket_field_values (ticket_id, field_id, value) VALUES (?, ?, ?), (?, ?, ?)')
             ->execute([$parentId, $name, 'Test Person', $parentId, $wage, '29.36']);
@@ -113,7 +114,7 @@ class TicketTypeTasksTest extends TestCase
         $taskIds = spawnTicketTypeTasks($this->db, $parentId);
 
         $this->assertCount(2, $taskIds);
-        $s = $this->db->prepare('SELECT group_id, created_by, parent_ticket_id, subject FROM tickets WHERE id = ?');
+        $s = $this->db->prepare('SELECT group_id, created_by, parent_ticket_id, subject, description, location_id FROM tickets WHERE id = ?');
         $s->execute([$taskIds[0]]);
         $it = $s->fetch();
         $s->execute([$taskIds[1]]);
@@ -123,6 +124,8 @@ class TicketTypeTasksTest extends TestCase
         $this->assertSame($this->requester, (int) $it['created_by'], 'replies on a task reach whoever filed the parent');
         $this->assertSame($parentId, (int) $pay['parent_ticket_id']);
         $this->assertSame('TTT Onboarding - IT: New hire: Test Person', $it['subject']);
+        $this->assertNotNull($pay['location_id'], 'every task keeps the location');
+        $this->assertStringContainsString('Location: TTT Branch.', $pay['description']);
         $this->assertSame([$name => 'Test Person'], $this->fieldValues($taskIds[0]), 'IT never gets the wage');
         $this->assertSame([$name => 'Test Person', $wage => '29.36'], $this->fieldValues($taskIds[1]));
 

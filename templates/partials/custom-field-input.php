@@ -13,6 +13,10 @@
 $portalMode = $portalMode ?? false;
 $cfRequired = $cfRequired ?? false;
 $requiredAttr = ($portalMode && $cfRequired) ? 'required' : '';
+// Optional per-field settings from the form builder: text `format` ('phone'),
+// number/decimal `min`.
+$cfCfg   = $cf['config'] ? (is_string($cf['config']) ? (json_decode($cf['config'], true) ?: []) : $cf['config']) : [];
+$minAttr = isset($cfCfg['min']) && is_numeric($cfCfg['min']) ? 'min="' . e((string) $cfCfg['min']) . '"' : '';
 ?>
 <?php if ($cf['field_type'] === 'text_block'):
     $tbCfg = $cf['config'] ? (is_string($cf['config']) ? json_decode($cf['config'], true) : $cf['config']) : [];
@@ -54,7 +58,29 @@ $requiredAttr = ($portalMode && $cfRequired) ? 'required' : '';
         <span class="text-danger ms-1 field-required-star" <?= $cfRequired ? '' : 'style="display:none;"' ?>>*</span>
     </label>
 
-    <?php if ($cf['field_type'] === 'text'): ?>
+    <?php if ($cf['field_type'] === 'text' && ($cfCfg['format'] ?? '') === 'phone'): ?>
+    <input type="tel" class="form-control" name="<?= e($cfKey) ?>" data-format="phone"
+           inputmode="numeric" autocomplete="tel-national" maxlength="14"
+           pattern="\(\d{3}\) \d{3}-\d{4}" title="Phone number as (###) ###-####"
+           placeholder="<?= e($cf['placeholder'] ?: '(###) ###-####') ?>"
+           value="<?= e(old($cfKey)) ?>" <?= $requiredAttr ?>>
+    <script>
+    // Format phone fields as (###) ###-#### while typing. Registered once per page.
+    if (!window.ldPhoneFormat) {
+        window.ldPhoneFormat = true;
+        document.addEventListener('input', function (e) {
+            var el = e.target;
+            if (!el.matches || !el.matches('input[data-format="phone"]')) return;
+            // North American area codes never start with 0 or 1, so a leading
+            // 1 is the country code (typed or pasted as +1) and is dropped.
+            var d = el.value.replace(/\D/g, '').replace(/^[01]+/, '').slice(0, 10);
+            el.value = d.length < 4 ? (d ? '(' + d : '')
+                : '(' + d.slice(0, 3) + ') ' + d.slice(3, 6) + (d.length > 6 ? '-' + d.slice(6) : '');
+        });
+    }
+    </script>
+
+    <?php elseif ($cf['field_type'] === 'text'): ?>
     <input type="text" class="form-control" name="<?= e($cfKey) ?>"
            placeholder="<?= e($cf['placeholder'] ?? '') ?>"
            value="<?= e(old($cfKey)) ?>" <?= $requiredAttr ?>>
@@ -102,12 +128,12 @@ $requiredAttr = ($portalMode && $cfRequired) ? 'required' : '';
     <?php elseif ($cf['field_type'] === 'number'): ?>
     <input type="number" step="1" class="form-control" name="<?= e($cfKey) ?>"
            placeholder="<?= e($cf['placeholder'] ?? '') ?>"
-           value="<?= e(old($cfKey)) ?>" <?= $requiredAttr ?>>
+           value="<?= e(old($cfKey)) ?>" <?= $minAttr ?> <?= $requiredAttr ?>>
 
     <?php elseif ($cf['field_type'] === 'decimal'): ?>
     <input type="number" step="0.01" class="form-control" name="<?= e($cfKey) ?>"
            placeholder="<?= e($cf['placeholder'] ?? '') ?>"
-           value="<?= e(old($cfKey)) ?>" <?= $requiredAttr ?>>
+           value="<?= e(old($cfKey)) ?>" <?= $minAttr ?> <?= $requiredAttr ?>>
 
     <?php elseif ($cf['field_type'] === 'user_picker'):
         // Stores the chosen user's id, never the typed text — the typed text is
@@ -137,9 +163,6 @@ $requiredAttr = ($portalMode && $cfRequired) ? 'required' : '';
                id="up_value_<?= (int) $cf['id'] ?>" value="<?= e($upId) ?>">
         <div id="up_drop_<?= (int) $cf['id'] ?>" class="mention-dropdown"
              style="display:none;position:absolute;top:100%;left:0;z-index:1050;width:100%;"></div>
-    </div>
-    <div class="form-text user-picker-hint" id="up_hint_<?= (int) $cf['id'] ?>">
-        Pick a name from the list so the ticket is linked to the right person.
     </div>
 
     <?php elseif ($cf['field_type'] === 'cc'): ?>

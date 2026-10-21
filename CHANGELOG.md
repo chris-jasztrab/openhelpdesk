@@ -11,6 +11,16 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.203.0 &mdash; 2026-10-21
+
+### Added
+- **Phone-number format for text fields.** In the form builder, a text field can now be set to **Format: Phone number**. As the number is typed it is formatted as (###) ###-####, and a leading country code 1 is dropped. The ticket can't be submitted until the number is complete.
+- **Lowest allowed value for number fields.** Number and decimal fields can now have a minimum. Set it to 1 to accept positive numbers only, for example an Employee ID.
+
+### Changed
+- **Task tickets show the location in the description.** The description of each task ticket now names the location, e.g. "Location: Main Library". It used to appear only in the Details panel, so it was easy to miss, and it now reaches the new-ticket emails too.
+- **No hint under person-picker fields.** Fields such as Direct Supervisor no longer show the line "Pick a name from the list so the ticket is linked to the right person."
+
 ## 2.202.0 &mdash; 2026-10-21
 
 ### Added
