@@ -808,6 +808,10 @@ $router->post('/api/v1/tickets', function () {
     $assignedTo = null;
     $dueDate    = null;
 
+    if (!userCanCreateTicketType($db, $typeId, (int) $user['id'])) {
+        _apiJson(['error' => 'That ticket type is not available to you.'], 403);
+    }
+
     // Fields only agents/admins may set
     if (_apiIsStaff($user)) {
         $groupId    = isset($input['group_id'])    && $input['group_id']    !== null ? (int) $input['group_id']    : null;

@@ -9529,6 +9529,172 @@ function sweepNoGroupTickets(PDO $db): int
     return count($orphans);
 }
 
+/* ── Task tickets ─────────────────────────────────────────────── */
+
+/**
+ * Whether a user may create a ticket of this type. A type flagged
+ * restrict_create_to_group can only be created by members of its own group
+ * (e.g. New Employee → HR); every other type is open to everyone. There is no
+ * admin bypass on purpose — an admin who needs to file one joins the group.
+ */
+function userCanCreateTicketType(PDO $db, ?int $typeId, int $userId): bool
+{
+    if (!$typeId) {
+        return true;
+    }
+    $s = $db->prepare('SELECT restrict_create_to_group, group_id FROM ticket_types WHERE id = ?');
+    $s->execute([$typeId]);
+    $t = $s->fetch();
+    return !$t || creatableTicketTypes($db, [$t], $userId) !== [];
+}
+
+/** Drop the types this user may not create from a list of ticket_types rows. */
+function creatableTicketTypes(PDO $db, array $types, int $userId): array
+{
+    $mine = userGroupIds($db, $userId);
+    return array_values(array_filter(
+        $types,
+        static fn(array $t) => empty($t['restrict_create_to_group'])
+            || ($t['group_id'] !== null && in_array((int) $t['group_id'], $mine, true))
+    ));
+}
+
+/**
+ * Create the task tickets a ticket's type is set up to spawn (Admin → Ticket
+ * Types → Edit → Task tickets). Each task ticket:
+ *   - lands in its own type's default group, so each team works it from its queue;
+ *   - carries only the custom-field values picked for that task — the payroll
+ *     task gets the wage, IT's task does not;
+ *   - keeps the parent's requester, so a reply on it reaches whoever filed the parent.
+ * The requester's "ticket created" email is skipped — they already got one for
+ * the parent. Call only after the parent's custom-field values are saved.
+ *
+ * @return int[] the new task ticket ids
+ */
+function spawnTicketTypeTasks(PDO $db, int $parentId): array
+{
+    $ps = $db->prepare('SELECT id, subject, type_id, created_by, submitted_by, location_id, priority_id FROM tickets WHERE id = ?');
+    $ps->execute([$parentId]);
+    $parent = $ps->fetch();
+    if (!$parent || !$parent['type_id']) {
+        return [];
+    }
+
+    $ts = $db->prepare(
+        'SELECT tk.child_type_id, tk.field_ids, ct.name AS child_type_name
+         FROM ticket_type_tasks tk
+         JOIN ticket_types ct ON ct.id = tk.child_type_id
+         WHERE tk.type_id = ?
+         ORDER BY tk.sort_order, tk.id'
+    );
+    $ts->execute([(int) $parent['type_id']]);
+    $tasks = $ts->fetchAll();
+    if (!$tasks) {
+        return [];
+    }
+
+    $insert = $db->prepare(
+        'INSERT INTO tickets (subject, description, created_by, submitted_by, type_id, location_id, status, priority_id, group_id, parent_ticket_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    );
+    $timeline = $db->prepare('INSERT INTO ticket_timeline (ticket_id, user_id, action, details) VALUES (?, NULL, ?, ?)');
+
+    $childIds = [];
+    foreach ($tasks as $task) {
+        $typeId   = (int) $task['child_type_id'];
+        $fieldIds = array_values(array_filter(array_map('intval', (array) json_decode((string) $task['field_ids'], true))));
+        $priId    = $parent['priority_id'] !== null ? (int) $parent['priority_id'] : null;
+        if (!priorityAllowedForType($db, $typeId, $priId)) {
+            $priId = getDefaultPriorityId($db);
+        }
+
+        $insert->execute([
+            mb_substr($task['child_type_name'] . ': ' . $parent['subject'], 0, 255),
+            'Task for ticket #' . $parentId . '.' . ($fieldIds ? ' The details are in the Custom Fields panel.' : ''),
+            (int) $parent['created_by'], $parent['submitted_by'], $typeId, $parent['location_id'],
+            ticketDefaultNewStatusSlug(), $priId, resolveTicketGroup($db, null, $typeId), $parentId,
+        ]);
+        $childId    = (int) $db->lastInsertId();
+        $childIds[] = $childId;
+
+        if ($fieldIds) {
+            $ph = implode(',', array_fill(0, count($fieldIds), '?'));
+            $db->prepare(
+                "INSERT INTO ticket_field_values (ticket_id, field_id, value)
+                 SELECT ?, field_id, value FROM ticket_field_values WHERE ticket_id = ? AND field_id IN ($ph)"
+            )->execute(array_merge([$childId, $parentId], $fieldIds));
+        }
+
+        $timeline->execute([$childId, 'created', 'Task ticket created from ticket #' . $parentId . '.']);
+        $assignedTo = runPostTicketCreateHooks($db, $childId);
+        if ($priId) {
+            Sla::initializeForTicket($db, $childId, $priId, $typeId);
+        }
+        notifyGroupMembers($db, $childId);
+        if ($assignedTo !== null) {
+            notifyAssignedAgent($db, $childId, $assignedTo);
+        }
+    }
+
+    $timeline->execute([$parentId, 'tasks_created', 'Task tickets created: #' . implode(', #', $childIds) . '.']);
+    return $childIds;
+}
+
+/**
+ * What the ticket page shows about task tickets: the parent this ticket is a
+ * task of (id only — the parent may be confidential to this viewer), and the
+ * task tickets this one spawned.
+ */
+function ticketTaskLinks(PDO $db, array $ticket): array
+{
+    $s = $db->prepare(
+        "SELECT t.id, t.subject, t.status, g.name AS group_name,
+                CONCAT(a.first_name, ' ', a.last_name) AS agent_name
+         FROM tickets t
+         LEFT JOIN `groups` g ON g.id = t.group_id
+         LEFT JOIN users a    ON a.id = t.assigned_to
+         WHERE t.parent_ticket_id = ?
+         ORDER BY t.id"
+    );
+    $s->execute([(int) $ticket['id']]);
+    return [
+        'parent_id' => !empty($ticket['parent_ticket_id']) ? (int) $ticket['parent_ticket_id'] : null,
+        'tasks'     => $s->fetchAll(),
+    ];
+}
+
+/**
+ * Resolve each parent ticket whose task tickets are all closed, and send its
+ * requester the usual status-change email. Rides the 5-minute sla-cron. Fires
+ * at most once per parent — the tasks_completed timeline row marks it — so a
+ * parent someone reopens afterwards stays open.
+ */
+function resolveParentsWithClosedTasks(PDO $db): int
+{
+    $parentOpen = ticketStatusSqlIn(ticketOpenBucketSlugs(), 'p.status');
+    $taskOpen   = ticketStatusSqlIn(ticketOpenBucketSlugs(), 'c.status');
+    $parents = $db->query(
+        "SELECT p.id, p.status FROM tickets p
+         WHERE {$parentOpen}
+           AND EXISTS (SELECT 1 FROM tickets c WHERE c.parent_ticket_id = p.id)
+           AND NOT EXISTS (SELECT 1 FROM tickets c WHERE c.parent_ticket_id = p.id AND {$taskOpen})
+           AND NOT EXISTS (SELECT 1 FROM ticket_timeline tl WHERE tl.ticket_id = p.id AND tl.action = 'tasks_completed')"
+    )->fetchAll();
+
+    $resolved = ticketDefaultResolvedStatusSlug();
+    $update   = $db->prepare('UPDATE tickets SET status = ? WHERE id = ?');
+    $note     = $db->prepare("INSERT INTO ticket_timeline (ticket_id, user_id, action, details) VALUES (?, NULL, 'tasks_completed', ?)");
+    foreach ($parents as $p) {
+        $id = (int) $p['id'];
+        $update->execute([$resolved, $id]);
+        $note->execute([$id, 'All task tickets are closed. Status changed from '
+            . ticketStatusLabel($p['status']) . ' to ' . ticketStatusLabel($resolved) . '.']);
+        Sla::onStatusChanged($db, $id, $p['status'], $resolved);
+        notifyRequesterStatusChanged($db, $id, $resolved);
+    }
+    return count($parents);
+}
+
 /* ── Status Banners ───────────────────────────────────────────── */
 
 /**

@@ -45,9 +45,11 @@ $count = Sla::recalculateAll($db);
 $followups = processDueTicketFollowups($db);
 $reminders = processTicketReminders($db);
 $swept     = sweepNoGroupTickets($db);
+$completed = resolveParentsWithClosedTasks($db);
 
 $message = date('Y-m-d H:i:s') . " - SLA recalculated: {$count} ticket(s) updated. Follow-up reminders sent: {$followups}."
     . " Ticket reminders: {$reminders['overdue']} overdue, {$reminders['update']} update due."
+    . ($completed > 0 ? " Resolved {$completed} ticket(s) whose task tickets are all closed." : '')
     . ($swept > 0 ? " WARN: routed {$swept} ticket(s) with no group to the default group." : '') . "\n";
 
 if (php_sapi_name() === 'cli') {

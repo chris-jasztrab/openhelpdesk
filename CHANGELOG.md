@@ -11,6 +11,17 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.202.0 &mdash; 2026-10-21
+
+### Added
+- **Task tickets: one ticket can now create tickets for other teams.** Built for new-employee onboarding. HR files one **New Employee** ticket, and the helpdesk creates a separate ticket for IT, for Facilities and for Payroll, each in that team's own queue. Set this up under **Admin → Ticket Types → Edit → Task tickets**:
+  - Pick the ticket type each task ticket is created as. The task ticket goes to that type's Default Group.
+  - Tick the custom fields each task ticket carries. A team only sees the fields picked for it, so IT never sees the starting wage.
+  - The HR ticket lists every task ticket with its team, assignee and status ("2 of 3 done").
+  - Each task ticket links back to the HR ticket. Replies on a task ticket go to whoever filed the HR ticket.
+  - When every task ticket is closed, the HR ticket is resolved automatically and its requester is emailed. If someone reopens it, it stays open.
+- **A ticket type can be limited to its own group.** The new option *Only members of the Default Group can create these tickets* hides the type from everyone else. This covers the agent and admin New Ticket forms, the portal, floor quick-create and the API. Admins are included: an admin who needs to file one must join the group.
+
 ## 2.201.2 &mdash; 2026-10-20
 
 ### Fixed

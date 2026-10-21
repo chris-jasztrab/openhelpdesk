@@ -2011,6 +2011,7 @@ $router->post('/admin/types/create', function () {
     $reopenRaw      = trim((string) ($_POST['sla_reopen_behavior'] ?? ''));
     $reopenBehavior = in_array($reopenRaw, Sla::REOPEN_BEHAVIORS, true) ? $reopenRaw : null;
     $skillIds       = array_filter(array_map('intval', (array) ($_POST['required_skills'] ?? [])));
+    $restrictCreate = !empty($_POST['restrict_create_to_group']) && $groupId ? 1 : 0;
     if ($name === '') {
         flashInput($_POST);
         flash('error', 'Type name is required.');
@@ -2042,8 +2043,8 @@ $router->post('/admin/types/create', function () {
         ]);
     }
 
-    $db->prepare('INSERT INTO ticket_types (name, color, group_id, is_confidential, ai_route_group, ai_dup_check_enabled, ai_dup_threshold, ai_similar_check_enabled, show_to_location_visibility, require_resolution_on_close, time_tracking_enabled, sort_order, sla_reopen_behavior) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $aiSimilarCheck, $showToLocVis, $requireResolution, $timeTracking, $order, $reopenBehavior]);
+    $db->prepare('INSERT INTO ticket_types (name, color, group_id, is_confidential, restrict_create_to_group, ai_route_group, ai_dup_check_enabled, ai_dup_threshold, ai_similar_check_enabled, show_to_location_visibility, require_resolution_on_close, time_tracking_enabled, sort_order, sla_reopen_behavior) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        ->execute([$name, $color, $groupId, $isConfidential, $restrictCreate, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $aiSimilarCheck, $showToLocVis, $requireResolution, $timeTracking, $order, $reopenBehavior]);
     $typeId = (int) $db->lastInsertId();
     if ($skillIds) {
         $stmt = $db->prepare('INSERT IGNORE INTO ticket_type_skill_map (ticket_type_id, skill_id) VALUES (?, ?)');
@@ -2084,6 +2085,26 @@ $router->get('/admin/types/{id}/edit', function (array $p) {
     $rsStmt->execute([(int) $p['id']]);
     $requiredSkillIds = array_map('intval', $rsStmt->fetchAll(PDO::FETCH_COLUMN));
     $priorities = $db->query('SELECT id, name, color FROM ticket_priorities ORDER BY sort_order, id')->fetchAll();
+
+    // Task tickets: which other types this one spawns, and which of this
+    // type's custom fields each task carries.
+    $taskStmt = $db->prepare('SELECT id, child_type_id, field_ids FROM ticket_type_tasks WHERE type_id = ? ORDER BY sort_order, id');
+    $taskStmt->execute([(int) $p['id']]);
+    $typeTasks = array_map(
+        static fn(array $t) => ['field_ids' => array_map('intval', (array) json_decode((string) $t['field_ids'], true))] + $t,
+        $taskStmt->fetchAll()
+    );
+    $taskFields = array_values(array_map(
+        static fn(array $r) => $r['field'],
+        array_filter(
+            getFormLayoutForType($db, (int) $p['id'], false),
+            static fn(array $r) => $r['kind'] === 'custom' && $r['field']
+                && !in_array($r['field']['field_type'], ['text_block', 'image', 'cc'], true)
+        )
+    ));
+    $taskTypes = $db->prepare('SELECT id, name FROM ticket_types WHERE id <> ? ORDER BY sort_order, name');
+    $taskTypes->execute([(int) $p['id']]);
+
     render('admin/types/form', [
         'editing'          => $editing,
         'groups'           => $groups,
@@ -2091,7 +2112,55 @@ $router->get('/admin/types/{id}/edit', function (array $p) {
         'requiredSkillIds' => $requiredSkillIds,
         'priorities'       => $priorities,
         'typePriorityIds'  => typePriorityIds($db, (int) $p['id']),
+        'typeTasks'        => $typeTasks,
+        'taskFields'       => $taskFields,
+        'taskTypes'        => $taskTypes->fetchAll(),
     ]);
+});
+
+// Add or update one task ticket on a type (task_id set = update).
+$router->post('/admin/types/{id}/tasks', function (array $p) {
+    Auth::requirePermission('workflows.manage');
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect("/admin/types/{$id}/edit");
+    }
+    $db          = Database::connect();
+    $taskId      = (int) ($_POST['task_id'] ?? 0);
+    $childTypeId = (int) ($_POST['child_type_id'] ?? 0);
+    $fieldIds    = array_values(array_unique(array_filter(array_map('intval', (array) ($_POST['field_ids'] ?? [])))));
+
+    $check = $db->prepare('SELECT id FROM ticket_types WHERE id = ?');
+    $check->execute([$childTypeId]);
+    if ($childTypeId === $id || !$check->fetchColumn()) {
+        flash('error', 'Pick the ticket type the task ticket should be created as.');
+        redirect("/admin/types/{$id}/edit#task-tickets");
+    }
+
+    if ($taskId) {
+        $db->prepare('UPDATE ticket_type_tasks SET child_type_id = ?, field_ids = ? WHERE id = ? AND type_id = ?')
+           ->execute([$childTypeId, json_encode($fieldIds), $taskId, $id]);
+    } else {
+        $db->prepare('INSERT INTO ticket_type_tasks (type_id, child_type_id, field_ids) VALUES (?, ?, ?)')
+           ->execute([$id, $childTypeId, json_encode($fieldIds)]);
+    }
+    logAudit('ticket_type.task_saved', $id, 'ticket_type', 'child_type_id=' . $childTypeId . '; field_ids=' . implode(',', $fieldIds));
+    flash('success', 'Task ticket saved.');
+    redirect("/admin/types/{$id}/edit#task-tickets");
+});
+
+$router->post('/admin/types/{id}/tasks/{taskId}/delete', function (array $p) {
+    Auth::requirePermission('workflows.manage');
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect("/admin/types/{$id}/edit");
+    }
+    Database::connect()->prepare('DELETE FROM ticket_type_tasks WHERE id = ? AND type_id = ?')->execute([(int) $p['taskId'], $id]);
+    logAudit('ticket_type.task_deleted', $id, 'ticket_type', 'task_id=' . (int) $p['taskId']);
+    flash('success', 'Task ticket removed.');
+    redirect("/admin/types/{$id}/edit#task-tickets");
 });
 
 $router->post('/admin/types/{id}/edit', function (array $p) {
@@ -2120,6 +2189,7 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
     // silently ignore.
     $reopenRaw      = trim((string) ($_POST['sla_reopen_behavior'] ?? ''));
     $reopenBehavior = in_array($reopenRaw, Sla::REOPEN_BEHAVIORS, true) ? $reopenRaw : null;
+    $restrictCreate = !empty($_POST['restrict_create_to_group']) && $groupId ? 1 : 0;
     if ($name === '') {
         flashInput($_POST);
         flash('error', 'Type name is required.');
@@ -2178,6 +2248,7 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
                 'ai_similar_check_enabled' => $aiSimilarCheck ? '1' : '',
                 'require_resolution_on_close' => $requireResolution ? '1' : '',
                 'time_tracking_enabled' => $timeTracking ? '1' : '',
+                'restrict_create_to_group' => $restrictCreate ? '1' : '',
                 // is_confidential intentionally omitted (unchecked = removal)
             ];
             logAudit(
@@ -2217,15 +2288,15 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
     // Capture the full prior row so the diff covers all editable fields,
     // not just the confidential flag we already snapshotted above.
     $fullPriorStmt = $db->prepare(
-        'SELECT name, color, group_id, is_confidential, ai_route_group, ai_dup_check_enabled,
+        'SELECT name, color, group_id, is_confidential, restrict_create_to_group, ai_route_group, ai_dup_check_enabled,
                 ai_dup_threshold, ai_similar_check_enabled, show_to_location_visibility, require_resolution_on_close, time_tracking_enabled, sort_order, sla_reopen_behavior
          FROM ticket_types WHERE id = ?'
     );
     $fullPriorStmt->execute([$id]);
     $fullPrior = $fullPriorStmt->fetch(\PDO::FETCH_ASSOC) ?: [];
 
-    $db->prepare('UPDATE ticket_types SET name=?, color=?, group_id=?, is_confidential=?, ai_route_group=?, ai_dup_check_enabled=?, ai_dup_threshold=?, ai_similar_check_enabled=?, show_to_location_visibility=?, require_resolution_on_close=?, time_tracking_enabled=?, sort_order=?, sla_reopen_behavior=? WHERE id=?')
-        ->execute([$name, $color, $groupId, $isConfidential, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $aiSimilarCheck, $showToLocVis, $requireResolution, $timeTracking, $order, $reopenBehavior, $id]);
+    $db->prepare('UPDATE ticket_types SET name=?, color=?, group_id=?, is_confidential=?, restrict_create_to_group=?, ai_route_group=?, ai_dup_check_enabled=?, ai_dup_threshold=?, ai_similar_check_enabled=?, show_to_location_visibility=?, require_resolution_on_close=?, time_tracking_enabled=?, sort_order=?, sla_reopen_behavior=? WHERE id=?')
+        ->execute([$name, $color, $groupId, $isConfidential, $restrictCreate, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $aiSimilarCheck, $showToLocVis, $requireResolution, $timeTracking, $order, $reopenBehavior, $id]);
 
     // Required skills (used by Skill-Based group auto-assignment)
     $skillIds = array_filter(array_map('intval', (array) ($_POST['required_skills'] ?? [])));
@@ -2250,6 +2321,7 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
             'color'                       => $color,
             'group_id'                    => $groupId,
             'is_confidential'             => $isConfidential,
+            'restrict_create_to_group'    => $restrictCreate,
             'ai_route_group'              => $aiRouteGroup,
             'ai_dup_check_enabled'        => $aiDupCheck,
             'ai_dup_threshold'            => $aiDupThreshold,
@@ -4404,7 +4476,7 @@ $router->get('/admin/tickets/search', function () {
 $router->get('/admin/tickets/create', function () {
     Auth::requireStaff();
     $db         = Database::connect();
-    $types      = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
+    $types      = creatableTicketTypes($db, $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll(), (int) Auth::id());
     $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
     $locations  = $db->query('SELECT * FROM locations ORDER BY name')->fetchAll();
     $groups     = $db->query('SELECT * FROM `groups` ORDER BY sort_order, name')->fetchAll();
@@ -4530,6 +4602,12 @@ $router->post('/admin/tickets/create', function () {
     }
 
     $db = Database::connect();
+    if (!userCanCreateTicketType($db, $typeId, (int) Auth::id())) {
+        flashInput($_POST);
+        flash('error', 'Only members of that ticket type\'s group can create it.');
+        $redirectBase = (Auth::isStaff() && !Auth::isAdmin()) ? '/agent' : '/admin';
+        redirect("{$redirectBase}/tickets/create");
+    }
     $groupId = resolveTicketGroup($db, $groupId, $typeId);
     // If the priority picker is hidden for this type, the staff form will not
     // have rendered it — fall back to the system default so the ticket has a
@@ -4702,7 +4780,14 @@ $router->post('/admin/tickets/create', function () {
         notifyRequesterTicketAssigned($db, $ticketId, $assignedTo);
     }
 
+    // Task tickets for the other teams (e.g. New Employee → IT, Facilities,
+    // Payroll). After the custom fields are saved, since each task copies some.
+    $taskIds = spawnTicketTypeTasks($db, $ticketId);
+
     $msg = 'Ticket #' . $ticketId . ' created.';
+    if ($taskIds) {
+        $msg .= ' Task tickets created: #' . implode(', #', $taskIds) . '.';
+    }
     if (!empty($uploaded)) {
         $msg .= ' ' . count($uploaded) . ' file(s) attached.';
     }
@@ -5238,7 +5323,7 @@ $router->get('/admin/tickets/{id}', function (array $p) {
     $csat = $csatStmt->fetch() ?: null;
 
     render('admin/tickets/view', [
-        'ticket' => $ticket, 'timeline' => $timeline, 'agents' => $agents,
+        'ticket' => $ticket, 'taskLinks' => ticketTaskLinks($db, $ticket), 'timeline' => $timeline, 'agents' => $agents,
         'assignableByGroup' => $assignableByGroup,
         'priorities' => $priorities, 'ticketTypes' => $ticketTypes,
         'attachments' => $attachments, 'ccUsers' => $ccUsers, 'groups' => $groups,

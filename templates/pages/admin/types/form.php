@@ -80,6 +80,17 @@ $aiWarning = $aiWarning ?? null;
 
             <div class="mb-3">
                 <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="restrict_create_to_group" name="restrict_create_to_group" value="1"
+                           <?= (int) old('restrict_create_to_group', (string) ($editing['restrict_create_to_group'] ?? '0')) ? 'checked' : '' ?>>
+                    <label class="form-check-label fw-semibold" for="restrict_create_to_group">
+                        <i class="bi bi-person-lock me-1"></i>Only members of the Default Group can create these tickets
+                    </label>
+                </div>
+                <div class="form-text">Hides this type from everyone else's New Ticket forms, including admins and the portal. Use it for request types one team owns — e.g. <em>New Employee</em>, created only by HR. Needs a Default Group.</div>
+            </div>
+
+            <div class="mb-3">
+                <div class="form-check">
                     <input type="checkbox" class="form-check-input" id="ai_route_group" name="ai_route_group" value="1"
                            <?= (int) old('ai_route_group', (string) ($editing['ai_route_group'] ?? '0')) ? 'checked' : '' ?>>
                     <label class="form-check-label fw-semibold" for="ai_route_group">
@@ -301,6 +312,73 @@ $aiWarning = $aiWarning ?? null;
         </form>
     </div>
 </div>
+
+<?php if ($isEdit): ?>
+<?php
+$typeTasks     = $typeTasks ?? [];
+$taskFields    = $taskFields ?? [];
+$taskTypes     = $taskTypes ?? [];
+$taskTypeNames = array_column($taskTypes, 'name', 'id');
+// One form per task, plus a blank one to add a task. Each picks the type the
+// task ticket is created as (its Default Group is the team that works it) and
+// which of this type's custom fields it carries.
+$taskForms = array_merge($typeTasks, [['id' => 0, 'child_type_id' => 0, 'field_ids' => []]]);
+?>
+<div class="card border-0 shadow-sm mt-4" style="max-width:600px;" id="task-tickets">
+    <div class="card-body p-4">
+        <h5 class="fw-semibold mb-1"><i class="bi bi-diagram-3 me-2"></i>Task tickets</h5>
+        <p class="text-muted small mb-3">
+            When a ticket of this type is created, also create one task ticket per row below — e.g. a <em>New Employee</em>
+            ticket creates tasks for IT, Facilities and Payroll. Each task ticket is created as the type you pick, so it lands in
+            that type's Default Group, and carries only the custom fields you tick. When every task ticket is closed, this
+            ticket is resolved automatically.
+        </p>
+        <?php foreach ($taskForms as $tf): $isNew = (int) $tf['id'] === 0; ?>
+        <div class="border rounded p-3 mb-3<?= $isNew ? ' bg-light' : '' ?>">
+            <form method="POST" action="/admin/types/<?= (int) $editing['id'] ?>/tasks">
+                <?= csrfField() ?>
+                <input type="hidden" name="task_id" value="<?= (int) $tf['id'] ?>">
+                <label class="form-label fw-semibold small" for="task_type_<?= (int) $tf['id'] ?>">
+                    <?= $isNew ? 'Add a task ticket, created as' : 'Created as' ?>
+                </label>
+                <select class="form-select form-select-sm mb-2" name="child_type_id" id="task_type_<?= (int) $tf['id'] ?>" required>
+                    <option value="">— Pick a ticket type —</option>
+                    <?php foreach ($taskTypes as $tt): ?>
+                    <option value="<?= (int) $tt['id'] ?>" <?= (int) $tt['id'] === (int) $tf['child_type_id'] ? 'selected' : '' ?>><?= e($tt['name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <?php if ($taskFields): ?>
+                <div class="small fw-semibold mb-1">Fields it carries</div>
+                <div class="row g-1 mb-2">
+                    <?php foreach ($taskFields as $f): $cbId = 'task_' . (int) $tf['id'] . '_field_' . (int) $f['id']; ?>
+                    <div class="col-md-6">
+                        <div class="form-check small">
+                            <input class="form-check-input" type="checkbox" name="field_ids[]" value="<?= (int) $f['id'] ?>" id="<?= $cbId ?>"
+                                   <?= in_array((int) $f['id'], $tf['field_ids'], true) ? 'checked' : '' ?>>
+                            <label class="form-check-label" for="<?= $cbId ?>"><?= e($f['label']) ?></label>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+                <?php else: ?>
+                <p class="small text-muted mb-2">This type's form has no custom fields yet, so task tickets will carry none. <a href="/admin/workflows/ticket-fields?type=<?= (int) $editing['id'] ?>">Edit this type's form</a>.</p>
+                <?php endif; ?>
+                <button type="submit" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-<?= $isNew ? 'plus-lg' : 'check-lg' ?> me-1"></i><?= $isNew ? 'Add task ticket' : 'Save' ?>
+                </button>
+            </form>
+            <?php if (!$isNew): ?>
+            <form method="POST" action="/admin/types/<?= (int) $editing['id'] ?>/tasks/<?= (int) $tf['id'] ?>/delete" class="mt-2"
+                  onsubmit="return confirm('Remove the <?= e(addslashes($taskTypeNames[$tf['child_type_id']] ?? 'task')) ?> task ticket? Task tickets already created are kept.');">
+                <?= csrfField() ?>
+                <button type="submit" class="btn btn-sm btn-link text-danger p-0"><i class="bi bi-trash me-1"></i>Remove</button>
+            </form>
+            <?php endif; ?>
+        </div>
+        <?php endforeach; ?>
+    </div>
+</div>
+<?php endif; ?>
 
 <script>
 document.getElementById('color').addEventListener('input', function() {

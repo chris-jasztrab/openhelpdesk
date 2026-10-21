@@ -164,7 +164,7 @@ $router->get('/portal/tickets', function () {
 $router->get('/portal/tickets/create', function () {
     Auth::requireAuth();
     $db = Database::connect();
-    $types      = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
+    $types      = creatableTicketTypes($db, $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll(), (int) Auth::id());
     $locations  = $db->query('SELECT * FROM locations ORDER BY name')->fetchAll();
     $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
     $tags       = $db->query('SELECT * FROM ticket_tags ORDER BY name')->fetchAll();
@@ -357,6 +357,11 @@ $router->post('/portal/tickets/create', function () {
     if ($subject === '' || $description === '' || $typeId === null) {
         flashInput($_POST);
         flash('error', 'Subject, description, and type are required.');
+        redirect('/portal/tickets/create');
+    }
+    if (!userCanCreateTicketType($db, $typeId, (int) Auth::id())) {
+        flashInput($_POST);
+        flash('error', 'That ticket type is not available to you.');
         redirect('/portal/tickets/create');
     }
 

@@ -85,7 +85,7 @@ $router->get('/agent/floor', function () {
     $cUnass    = (int) $sU->fetchColumn();
 
     // Quick-create dropdown data
-    $types     = $db->query('SELECT * FROM ticket_types WHERE is_confidential = 0 ORDER BY sort_order, name')->fetchAll();
+    $types     = $db->query('SELECT * FROM ticket_types WHERE is_confidential = 0 AND restrict_create_to_group = 0 ORDER BY sort_order, name')->fetchAll();
     $locations = $db->query('SELECT * FROM locations ORDER BY name')->fetchAll();
 
     // Note: must NOT pass a key named 'view' — render() uses its own
@@ -130,9 +130,9 @@ $router->post('/agent/floor/quick-create', function () {
 
     // Default type if missing — picks the first non-confidential, lowest sort_order.
     if ($typeId === null) {
-        $typeId = (int) $db->query('SELECT id FROM ticket_types WHERE is_confidential = 0 ORDER BY sort_order, id LIMIT 1')->fetchColumn() ?: null;
+        $typeId = (int) $db->query('SELECT id FROM ticket_types WHERE is_confidential = 0 AND restrict_create_to_group = 0 ORDER BY sort_order, id LIMIT 1')->fetchColumn() ?: null;
     } else {
-        $check = $db->prepare('SELECT id FROM ticket_types WHERE id = ? AND is_confidential = 0');
+        $check = $db->prepare('SELECT id FROM ticket_types WHERE id = ? AND is_confidential = 0 AND restrict_create_to_group = 0');
         $check->execute([$typeId]);
         if (!$check->fetchColumn()) {
             echo json_encode(['ok' => false, 'error' => 'Selected ticket type is not available from quick-create.']);

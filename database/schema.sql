@@ -919,12 +919,26 @@ CREATE TABLE IF NOT EXISTS `ticket_type_skill_map` (
   CONSTRAINT `ticket_type_skill_map_ibfk_1` FOREIGN KEY (`ticket_type_id`) REFERENCES `ticket_types` (`id`) ON DELETE CASCADE,
   CONSTRAINT `ticket_type_skill_map_ibfk_2` FOREIGN KEY (`skill_id`) REFERENCES `agent_skills` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS `ticket_type_tasks` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `type_id` int(10) unsigned NOT NULL,
+  `child_type_id` int(10) unsigned NOT NULL,
+  `field_ids` text DEFAULT NULL,
+  `sort_order` int(10) unsigned NOT NULL DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_ttt_type` (`type_id`),
+  KEY `idx_ttt_child_type` (`child_type_id`),
+  CONSTRAINT `fk_ttt_type` FOREIGN KEY (`type_id`) REFERENCES `ticket_types` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_ttt_child_type` FOREIGN KEY (`child_type_id`) REFERENCES `ticket_types` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE IF NOT EXISTS `ticket_types` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `name` varchar(255) NOT NULL,
   `color` varchar(7) NOT NULL DEFAULT '#6c757d',
   `group_id` int(10) unsigned DEFAULT NULL,
   `is_confidential` tinyint(1) NOT NULL DEFAULT 0,
+  `restrict_create_to_group` tinyint(1) NOT NULL DEFAULT 0,
   `ai_route_group` tinyint(1) NOT NULL DEFAULT 0,
   `ai_dup_check_enabled` tinyint(1) NOT NULL DEFAULT 0,
   `ai_dup_threshold` decimal(3,2) NOT NULL DEFAULT 0.75,
@@ -981,6 +995,7 @@ CREATE TABLE IF NOT EXISTS `tickets` (
   `solution_timeline_id` int(10) unsigned DEFAULT NULL,
   `close_reason` varchar(32) DEFAULT NULL,
   `duplicate_of_ticket_id` int(10) unsigned DEFAULT NULL,
+  `parent_ticket_id` int(10) unsigned DEFAULT NULL,
   `reopen_on_reply_until` datetime DEFAULT NULL,
   `ai_classification_id` int(10) unsigned DEFAULT NULL,
   `ai_sentiment` varchar(32) DEFAULT NULL,
@@ -1006,9 +1021,11 @@ CREATE TABLE IF NOT EXISTS `tickets` (
   KEY `idx_tickets_sla_exempt` (`sla_exempt`),
   KEY `idx_tickets_status_updated` (`status`,`updated_at`),
   KEY `idx_tickets_duplicate_of` (`duplicate_of_ticket_id`),
+  KEY `idx_tickets_parent` (`parent_ticket_id`),
   FULLTEXT KEY `ft_tickets_subject_description` (`subject`,`description`),
   CONSTRAINT `fk_tickets_ai_classification` FOREIGN KEY (`ai_classification_id`) REFERENCES `ai_classifications` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_tickets_duplicate_of` FOREIGN KEY (`duplicate_of_ticket_id`) REFERENCES `tickets` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_tickets_parent` FOREIGN KEY (`parent_ticket_id`) REFERENCES `tickets` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_tickets_ai_group_classification` FOREIGN KEY (`ai_group_classification_id`) REFERENCES `ai_group_classifications` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_tickets_solution_timeline` FOREIGN KEY (`solution_timeline_id`) REFERENCES `ticket_timeline` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_tickets_submitted_by` FOREIGN KEY (`submitted_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,

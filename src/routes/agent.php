@@ -1064,7 +1064,7 @@ $router->get('/agent/tickets/{id}/similar', function (array $p) {
 $router->get('/agent/tickets/create', function () {
     Auth::requireStaff();
     $db         = Database::connect();
-    $types      = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();
+    $types      = creatableTicketTypes($db, $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll(), (int) Auth::id());
     $priorities = $db->query('SELECT * FROM ticket_priorities ORDER BY sort_order')->fetchAll();
     $locations  = $db->query('SELECT * FROM locations ORDER BY name')->fetchAll();
     $groups     = $db->query('SELECT * FROM `groups` ORDER BY sort_order, name')->fetchAll();
@@ -1681,7 +1681,7 @@ $router->get('/agent/tickets/{id}', function (array $p) {
     // the ticket page render.
     $similarEnabled = similarTicketsEnabledForType($db, $ticket['type_id'] !== null ? (int) $ticket['type_id'] : null);
 
-    render('agent/tickets/view', ['ticket' => $ticket, 'timeline' => $timeline, 'agents' => $agents, 'assignableByGroup' => $assignableByGroup, 'priorities' => $priorities, 'ticketTypes' => $ticketTypes, 'attachments' => $attachments, 'ccUsers' => $ccUsers, 'groups' => $groups, 'customFields' => $customFields, 'fieldValues' => $fieldValues, 'fieldOptions' => $fieldOptions, 'isWatching' => $isWatching, 'isConfidential' => $isConfidential, 'escalationHistory' => $escalationHistory, 'hasEscalationPath' => $hasEscalationPath, 'nextEscalationStep' => $nextEscalationStep, 'fromFloor' => $fromFloor, 'embedMode' => $fromFloor, 'csat' => $csat, 'similarEnabled' => $similarEnabled, 'typePriorityMap' => typePriorityMap($db)]);
+    render('agent/tickets/view', ['ticket' => $ticket, 'taskLinks' => ticketTaskLinks($db, $ticket), 'timeline' => $timeline, 'agents' => $agents, 'assignableByGroup' => $assignableByGroup, 'priorities' => $priorities, 'ticketTypes' => $ticketTypes, 'attachments' => $attachments, 'ccUsers' => $ccUsers, 'groups' => $groups, 'customFields' => $customFields, 'fieldValues' => $fieldValues, 'fieldOptions' => $fieldOptions, 'isWatching' => $isWatching, 'isConfidential' => $isConfidential, 'escalationHistory' => $escalationHistory, 'hasEscalationPath' => $hasEscalationPath, 'nextEscalationStep' => $nextEscalationStep, 'fromFloor' => $fromFloor, 'embedMode' => $fromFloor, 'csat' => $csat, 'similarEnabled' => $similarEnabled, 'typePriorityMap' => typePriorityMap($db)]);
 });
 
 /* ==================================================================
