@@ -10,7 +10,7 @@
 
     <!-- Header -->
     <tr>
-        <td style="background:linear-gradient(135deg,#7c3aed,#4f46e5,#06b6d4); padding:24px 32px;">
+        <td style="background-color:#7c3aed; background-image:linear-gradient(135deg,#7c3aed,#4f46e5,#06b6d4); padding:24px 32px;">
             <h1 style="margin:0; color:#ffffff; font-size:20px; font-weight:700;"><?= htmlspecialchars($appName, ENT_QUOTES, 'UTF-8') ?></h1>
         </td>
     </tr>

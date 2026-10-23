@@ -8,7 +8,7 @@
 
     <!-- Header -->
     <tr>
-        <td style="background:linear-gradient(135deg,#1e1b4b,#312e81); padding:20px 32px;">
+        <td style="background-color:#1e1b4b; background-image:linear-gradient(135deg,#1e1b4b,#312e81); padding:20px 32px;">
             <h1 style="margin:0; color:#ffffff; font-size:20px; font-weight:700;"><?= htmlspecialchars($appName, ENT_QUOTES, 'UTF-8') ?></h1>
         </td>
     </tr>
