@@ -8,7 +8,7 @@
 
     <!-- Header — amber/warning colour for security notice -->
     <tr>
-        <td style="background:linear-gradient(135deg,#92400e,#b45309); padding:20px 32px;">
+        <td style="background-color:#92400e; background-image:linear-gradient(135deg,#92400e,#b45309); padding:20px 32px;">
             <h1 style="margin:0; color:#ffffff; font-size:20px; font-weight:700;">OpenHelpDesk — Security Notice</h1>
         </td>
     </tr>

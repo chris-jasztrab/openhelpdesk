@@ -8,7 +8,7 @@
 
     <!-- Header -->
     <tr>
-        <td style="background:linear-gradient(135deg,#78350f,#b45309); padding:20px 32px;">
+        <td style="background-color:#78350f; background-image:linear-gradient(135deg,#78350f,#b45309); padding:20px 32px;">
             <h1 style="margin:0; color:#ffffff; font-size:20px; font-weight:700;">
                 <span style="display:inline-block; vertical-align:middle; background:#ffffff; color:#b45309; border-radius:4px; padding:2px 8px; font-size:12px; font-weight:700; letter-spacing:.05em; margin-right:8px;">STALE</span>
                 OpenHelpDesk
