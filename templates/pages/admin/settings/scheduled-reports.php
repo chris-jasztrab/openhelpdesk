@@ -9,10 +9,12 @@ $breadcrumbs  = [
 ];
 $typeLabels = [
     'overview'          => 'Overview',
+    'overview_by_group' => 'Overview by Group',
     'agent_performance' => 'Agent Performance',
     'ticket_volume'     => 'Ticket Volume',
     'response_times'    => 'Response Times',
     'sla'               => 'SLA Compliance',
+    'sla_violations'    => 'SLA Violations',
     'unresolved'        => 'Unresolved Tickets',
     'lifecycle'         => 'Ticket Lifecycle',
     'location'          => 'By ' . label('location.singular'),

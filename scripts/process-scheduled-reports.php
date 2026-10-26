@@ -101,10 +101,12 @@ foreach ($reports as $report) {
     $to    = $todayDate;
     $toEnd = $to . ' 23:59:59';
     $stats = [];
+    $table = null;
 
     try {
         switch ($type) {
             case 'overview':
+            case 'overview_by_group':
                 $row = $db->prepare(
                     "SELECT COUNT(*) AS total,
                             SUM(CASE WHEN status NOT IN ('resolved','closed') THEN 1 ELSE 0 END) AS open_count,
@@ -121,6 +123,26 @@ foreach ($reports as $report) {
                     'Resolved'       => (int) $d['resolved_count'],
                     'SLA Breached'   => (int) $d['breached_count'],
                 ];
+                if ($type === 'overview_by_group') {
+                    $stmt = $db->prepare(
+                        "SELECT COALESCE(g.name, 'No Group') AS group_name,
+                                COUNT(*) AS total,
+                                SUM(CASE WHEN t.status NOT IN ('resolved','closed') THEN 1 ELSE 0 END) AS open_count,
+                                SUM(CASE WHEN t.status IN ('resolved','closed') THEN 1 ELSE 0 END) AS resolved_count,
+                                SUM(CASE WHEN t.sla_state = 'breached' THEN 1 ELSE 0 END) AS breached_count
+                         FROM tickets t
+                         LEFT JOIN `groups` g ON g.id = t.group_id
+                         WHERE t.created_at BETWEEN ? AND ?
+                         GROUP BY g.id, g.name
+                         ORDER BY total DESC, group_name"
+                    );
+                    $stmt->execute([$from, $toEnd]);
+                    $table = [
+                        'title'   => 'By Group',
+                        'columns' => ['Group', 'Total', 'Open', 'Resolved', 'SLA Breached'],
+                        'rows'    => array_map('array_values', $stmt->fetchAll()),
+                    ];
+                }
                 break;
 
             case 'agent_performance':
@@ -407,6 +429,7 @@ foreach ($reports as $report) {
         . ($creator !== '' ? ", a report schedule set up by {$creator}" : '');
     $typeLabels = [
         'overview'          => 'Overview',
+        'overview_by_group' => 'Overview by Group',
         'agent_performance' => 'Agent Performance',
         'ticket_volume'     => 'Ticket Volume',
         'response_times'    => 'Response Times',
@@ -432,6 +455,7 @@ foreach ($reports as $report) {
         'periodLabel' => $periodLabel,
         'frequency'   => ucfirst($frequency),
         'stats'       => $stats,
+        'table'       => $table,
         'brandColor'  => $brandColor,
         'reportsUrl'  => rtrim($appUrl, '/') . '/admin/reports',
         'footerText'  => $footerText,

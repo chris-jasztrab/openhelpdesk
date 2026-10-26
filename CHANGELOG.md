@@ -11,6 +11,14 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.207.0 &mdash; 2026-10-26
+
+### Added
+- **Overview by Group scheduled report.** A new **Overview by Group** report type on **Admin → Settings → Scheduled Reports**. The email has the same overview totals as before (total, open, resolved, SLA breached), plus a **By Group** table with the same four counts for each group, busiest first. Tickets with no group are listed as *No Group*. To switch an existing Overview email over, edit the schedule and change its Report Type.
+
+### Fixed
+- **SLA Violations schedules saved as Overview.** *SLA Violations* was in the Report Type picker, but the save handler did not accept it and quietly stored *Overview* instead. It now saves and sends as SLA Violations.
+
 ## 2.206.1 &mdash; 2026-10-26
 
 ### Fixed

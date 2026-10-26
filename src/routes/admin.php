@@ -13433,8 +13433,8 @@ $router->post('/admin/settings/scheduled-reports/create', function () {
     }
     $db             = Database::connect();
     $name           = trim($_POST['name'] ?? '');
-    $allowedTypes   = ['overview','agent_performance','ticket_volume','response_times','sla',
-                       'unresolved','lifecycle','location','csat','workload','trends','fcr'];
+    $allowedTypes   = ['overview','overview_by_group','agent_performance','ticket_volume','response_times','sla',
+                       'sla_violations','unresolved','lifecycle','location','csat','workload','trends','fcr'];
     $reportType     = in_array($_POST['report_type'] ?? '', $allowedTypes, true)
         ? $_POST['report_type'] : 'overview';
     $frequency      = in_array($_POST['frequency'] ?? '', ['daily','weekly','monthly'], true)
@@ -13484,8 +13484,8 @@ $router->post('/admin/settings/scheduled-reports/{id}/edit', function (array $va
     $existing       = $loadScheduledReport($id);
     if (!$existing) { http_response_code(404); echo 'Not found'; exit; }
     $name           = trim($_POST['name'] ?? '');
-    $allowedTypes   = ['overview','agent_performance','ticket_volume','response_times','sla',
-                       'unresolved','lifecycle','location','csat','workload','trends','fcr'];
+    $allowedTypes   = ['overview','overview_by_group','agent_performance','ticket_volume','response_times','sla',
+                       'sla_violations','unresolved','lifecycle','location','csat','workload','trends','fcr'];
     $reportType     = in_array($_POST['report_type'] ?? '', $allowedTypes, true)
         ? $_POST['report_type'] : 'overview';
     $frequency      = in_array($_POST['frequency'] ?? '', ['daily','weekly','monthly'], true)

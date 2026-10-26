@@ -57,6 +57,33 @@
                 </tr>
             </table>
 
+            <?php if (!empty($table['rows'])): ?>
+            <!-- Breakdown table -->
+            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden;">
+                <tr>
+                    <td colspan="<?= count($table['columns']) ?>" style="padding:8px 16px; background:#f8fafc; font-size:12px; color:#64748b; font-weight:600; text-transform:uppercase; letter-spacing:.5px; border-bottom:1px solid #e2e8f0;">
+                        <?= htmlspecialchars($table['title'], ENT_QUOTES, 'UTF-8') ?>
+                    </td>
+                </tr>
+                <tr>
+                    <?php foreach ($table['columns'] as $i => $col): ?>
+                    <td style="padding:8px 16px; font-size:12px; color:#64748b; font-weight:600; border-bottom:1px solid #e2e8f0; text-align:<?= $i === 0 ? 'left' : 'right' ?>;">
+                        <?= htmlspecialchars($col, ENT_QUOTES, 'UTF-8') ?>
+                    </td>
+                    <?php endforeach; ?>
+                </tr>
+                <?php foreach ($table['rows'] as $row): ?>
+                <tr>
+                    <?php foreach ($row as $i => $cell): ?>
+                    <td style="padding:6px 16px; font-size:13px; border-bottom:1px solid #f1f5f9; <?= $i === 0 ? 'color:#64748b;' : 'color:#1e293b; font-weight:600; text-align:right;' ?>">
+                        <?= htmlspecialchars((string) $cell, ENT_QUOTES, 'UTF-8') ?>
+                    </td>
+                    <?php endforeach; ?>
+                </tr>
+                <?php endforeach; ?>
+            </table>
+            <?php endif; ?>
+
             <!-- CTA button -->
             <table cellpadding="0" cellspacing="0">
                 <tr>

@@ -93,7 +93,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
     <thead class="table-light"><tr><th style="width:180px;">Field</th><th>Notes</th></tr></thead>
     <tbody class="text-muted">
         <tr><td class="fw-semibold">Schedule Name</td><td>Shown in the list and in the email.</td></tr>
-        <tr><td class="fw-semibold">Report Type</td><td>Overview, Agent Performance, Ticket Volume, Response Times, SLA Compliance, SLA Violations, Unresolved Tickets, Ticket Lifecycle, By Location, CSAT / Satisfaction, Agent Workload, Ticket Trends or FCR Rate.</td></tr>
+        <tr><td class="fw-semibold">Report Type</td><td>Overview, Overview by Group (the overview totals plus a per-group breakdown), Agent Performance, Ticket Volume, Response Times, SLA Compliance, SLA Violations, Unresolved Tickets, Ticket Lifecycle, By Location, CSAT / Satisfaction, Agent Workload, Ticket Trends or FCR Rate.</td></tr>
         <tr><td class="fw-semibold">Frequency &amp; Send Day</td><td>Daily, Weekly (pick a weekday) or Monthly (pick day 1&ndash;28).</td></tr>
         <tr><td class="fw-semibold">Report Date Range</td><td>How many days before the send date the summary covers (1&ndash;365).</td></tr>
         <tr><td class="fw-semibold">Recipients</td><td>Type an address and press Enter, comma, semicolon or space, or paste a whole list. <strong>Add me</strong> adds your own address. Badly formed addresses turn red and block saving.</td></tr>

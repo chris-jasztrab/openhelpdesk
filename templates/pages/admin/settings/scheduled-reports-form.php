@@ -17,6 +17,7 @@ $recipients      = $isEdit ? implode("\n", json_decode($report['recipients'], tr
 $dateRangeDays   = (int) ($report['date_range_days'] ?? 30);
 $allReportTypes  = [
     'overview'          => 'Overview',
+    'overview_by_group' => 'Overview by Group',
     'agent_performance' => 'Agent Performance',
     'ticket_volume'     => 'Ticket Volume',
     'response_times'    => 'Response Times',
