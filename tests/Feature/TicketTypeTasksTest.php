@@ -125,7 +125,12 @@ class TicketTypeTasksTest extends TestCase
         $this->assertSame($parentId, (int) $pay['parent_ticket_id']);
         $this->assertSame('TTT Onboarding - IT: New hire: Test Person', $it['subject']);
         $this->assertNotNull($pay['location_id'], 'every task keeps the location');
-        $this->assertStringContainsString('Location: TTT Branch.', $pay['description']);
+        $this->assertStringContainsString('<td style="padding:1px 12px 1px 0;color:#64748b;white-space:nowrap;vertical-align:top;">Location</td><td style="padding:1px 0;">TTT Branch</td>', $pay['description']);
+        $this->assertStringContainsString('>TTT Starting Wage</td><td style="padding:1px 0;">29.36</td>', $pay['description'], 'the handed-over details are in the description so they reach the emails');
+        $this->assertStringNotContainsString('Starting Wage', $it['description'], 'IT never gets the wage');
+        $this->assertSame([
+            'Location' => 'TTT Branch', 'TTT Name' => 'Test Person', 'TTT Starting Wage' => '29.36',
+        ], ['Location' => 'TTT Branch'] + ticketFieldValuesForDisplay($this->db, $parentId, (int) $this->db->query("SELECT type_id FROM tickets WHERE id = $parentId")->fetchColumn(), [$name, $wage]));
         $this->assertSame([$name => 'Test Person'], $this->fieldValues($taskIds[0]), 'IT never gets the wage');
         $this->assertSame([$name => 'Test Person', $wage => '29.36'], $this->fieldValues($taskIds[1]));
 

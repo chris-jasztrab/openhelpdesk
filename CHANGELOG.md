@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.204.0 &mdash; 2026-10-26
+
+### Changed
+- **Task tickets list the handed-over details in the description.** Each task ticket's description now starts with a compact two-column table of the location and every field copied to that team, in form order, e.g. Start Date, Job Title, Direct Supervisor. The new-ticket and assignment emails carry the description, so each team sees the details in the email instead of only in the ticket's Custom Fields panel. Fields the team was not given are still left out.
+
 ## 2.203.0 &mdash; 2026-10-21
 
 ### Added

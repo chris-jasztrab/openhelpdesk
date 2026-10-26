@@ -9560,6 +9560,70 @@ function creatableTicketTypes(PDO $db, array $types, int $userId): array
 }
 
 /**
+ * A ticket's custom-field values as display text, in the form's order, keyed by
+ * label: "Start Date" => "2026-11-02", "Direct Supervisor" => "Jane Doe (jane@…)".
+ * Blank fields are left out. Mirrors the Custom Fields panel's per-type rendering.
+ *
+ * @param int[]|null $fieldIds only these fields; null for all of the type's fields
+ * @return array<string,string>
+ */
+function ticketFieldValuesForDisplay(PDO $db, int $ticketId, int $typeId, ?array $fieldIds = null): array
+{
+    if ($fieldIds === []) {
+        return [];
+    }
+    $in = $fieldIds === null ? '' : ' AND f.id IN (' . implode(',', array_map('intval', $fieldIds)) . ')';
+    // Form order where the type has a layout row for the field, else by id.
+    $vs = $db->prepare(
+        "SELECT f.id, f.field_type, COALESCE(NULLIF(l.label_override, ''), f.label) AS label, v.value
+         FROM ticket_field_values v
+         JOIN ticket_form_fields f ON f.id = v.field_id AND f.deleted_at IS NULL
+         LEFT JOIN ticket_type_form_layout l
+           ON l.type_id = ? AND l.field_kind = 'custom' AND CAST(l.field_key AS UNSIGNED) = f.id
+         WHERE v.ticket_id = ?{$in}
+         ORDER BY l.sort_order IS NULL, l.sort_order, f.id"
+    );
+    $vs->execute([$typeId, $ticketId]);
+    $opts = $db->prepare('SELECT id, label FROM ticket_form_field_options WHERE field_id = ?');
+
+    $out = [];
+    foreach ($vs->fetchAll() as $f) {
+        $val  = (string) ($f['value'] ?? '');
+        $text = '';
+        switch ($f['field_type']) {
+            case 'checkbox':
+                $text = $val === '1' ? 'Yes' : 'No';
+                break;
+            case 'user_picker':
+                $p    = userPickerDisplay($db, $val);
+                $text = $p ? $p['name'] . ($p['email'] !== '' ? ' (' . $p['email'] . ')' : '') : '';
+                break;
+            case 'dropdown':
+            case 'dependent':
+                $opts->execute([$f['id']]);
+                $labels = $opts->fetchAll(PDO::FETCH_KEY_PAIR);
+                $ids    = $f['field_type'] === 'dropdown' ? [$val] : array_values(json_decode($val, true) ?: []);
+                $parts  = [];
+                foreach ($ids as $id) {
+                    if ($id !== '' && isset($labels[(int) $id])) $parts[] = $labels[(int) $id];
+                }
+                $text = implode(' › ', $parts);
+                break;
+            case 'date_range':
+                $dr   = json_decode($val, true) ?: [];
+                $text = trim(($dr['from'] ?? '') . ' — ' . ($dr['to'] ?? ''), ' —');
+                break;
+            default:
+                $text = $val;
+        }
+        if ($text !== '') {
+            $out[$f['label']] = $text;
+        }
+    }
+    return $out;
+}
+
+/**
  * Create the task tickets a ticket's type is set up to spawn (Admin → Ticket
  * Types → Edit → Task tickets). Each task ticket:
  *   - lands in its own type's default group, so each team works it from its queue;
@@ -9611,13 +9675,21 @@ function spawnTicketTypeTasks(PDO $db, int $parentId): array
             $priId = getDefaultPriorityId($db);
         }
 
+        // The handed-over details go into the description as a tight two-column
+        // table, so the new-ticket emails carry them and not just the Custom
+        // Fields panel. The values are copied to the task's own fields below too.
+        $details = ($parent['location_name'] ? ['Location' => $parent['location_name']] : [])
+            + ticketFieldValuesForDisplay($db, $parentId, (int) $parent['type_id'], $fieldIds);
+        $rows = '';
+        foreach ($details as $label => $text) {
+            $rows .= '<tr><td style="padding:1px 12px 1px 0;color:#64748b;white-space:nowrap;vertical-align:top;">' . e($label)
+                . '</td><td style="padding:1px 0;">' . nl2br(e($text)) . '</td></tr>';
+        }
+
         $insert->execute([
             mb_substr($task['child_type_name'] . ': ' . $parent['subject'], 0, 255),
-            // Location leads the description so it is in the new-ticket email too;
-            // the other handed-over details sit in the Custom Fields panel.
-            'Task for ticket #' . $parentId . '.'
-                . ($parent['location_name'] ? ' Location: ' . $parent['location_name'] . '.' : '')
-                . ($fieldIds ? ' The other details are in the Custom Fields panel.' : ''),
+            '<p>Task for ticket #' . $parentId . '.</p>'
+                . ($rows ? '<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;"><tbody>' . $rows . '</tbody></table>' : ''),
             (int) $parent['created_by'], $parent['submitted_by'], $typeId, $parent['location_id'],
             ticketDefaultNewStatusSlug(), $priId, resolveTicketGroup($db, null, $typeId), $parentId,
         ]);
