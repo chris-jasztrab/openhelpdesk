@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.205.0 &mdash; 2026-10-26
+
+### Added
+- **A ticket type's due date can come from one of its date fields.** On **Admin → Ticket Types → Edit** there is a new **Due date comes from** picker listing the date fields on that type's form. Pick one, e.g. *Start Date* on *New Staff Member*, and the ticket's due date is set from it. The New Ticket form then hides its own Due Date box for that type, so agents no longer see two dates, and task tickets get the same due date. Changing the date in the Custom Fields panel later moves the due date on the ticket and its task tickets too. The Form Builder shows the Due Date box as a locked system row with "Hidden · from Start Date" (or "Optional") and a link to the setting, so it is clear where the field went.
+
 ## 2.204.0 &mdash; 2026-10-26
 
 ### Changed

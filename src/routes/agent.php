@@ -2262,6 +2262,7 @@ $router->post('/agent/tickets/{id}/fields', function (array $p) {
         }
         $saveStmt->execute([$id, $field['id'], $val]);
     }
+    syncDueDateFromTypeField($db, $id);
 
     flash('success', 'Custom fields updated.');
     redirect("/agent/tickets/{$id}");

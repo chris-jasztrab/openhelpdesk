@@ -126,7 +126,7 @@ $statusOptions = ticketStatusLabelMap();
                             <select class="form-select" id="type_id" name="type_id">
                                 <option value="">— Unclassified —</option>
                                 <?php foreach ($types as $t): ?>
-                                    <option value="<?= $t['id'] ?>"
+                                    <option value="<?= $t['id'] ?>" data-due-field="<?= (int) ($t['due_date_field_id'] ?? 0) ?>"
                                         <?= old('type_id', '') == $t['id'] ? 'selected' : '' ?>>
                                         <?= e($t['name']) ?>
                                     </option>
@@ -145,8 +145,8 @@ $statusOptions = ticketStatusLabelMap();
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <!-- Due date (admin-only, not in layout) -->
-                        <div class="col-md-6 col-lg-4">
+                        <!-- Due date (admin-only, not in layout; hidden for a type whose due date comes from one of its date fields) -->
+                        <div class="col-md-6 col-lg-4" id="due-date-wrap">
                             <label for="due_date" class="form-label fw-semibold">Due Date</label>
                             <input type="date" class="form-control" id="due_date" name="due_date"
                                    value="<?= e(old('due_date', '')) ?>">
@@ -450,6 +450,12 @@ $statusOptions = ticketStatusLabelMap();
         filterPriorities();
         var selectedType = parseInt(typeSelect.value) || 0;
         var layout = formLayouts[selectedType] || [];
+        var dueWrap = document.getElementById('due-date-wrap');
+        if (dueWrap) {
+            var dueOpt = typeSelect.options[typeSelect.selectedIndex];
+            dueWrap.hidden = !!(dueOpt && parseInt(dueOpt.dataset.dueField || '0'));
+            if (dueWrap.hidden) document.getElementById('due_date').value = '';
+        }
         // A row whose condition fails collapses to 'hidden', matching what the
         // server will do with the submission.
         var visByKey = {};

@@ -397,6 +397,24 @@ $sysDefaults = systemFieldDefaults();
             </div>
             <?php endforeach; ?>
 
+            <!-- Due Date: the agent form's own box, outside the layout. Shown here so
+                 "Due date comes from" (Admin → Ticket Types → Edit) is visible where
+                 admins look for a missing field. -->
+            <div class="field-row is-system is-locked" data-row-kind="system" data-row-key="due_date" title="Agent form only. Set on the ticket type, not here.">
+                <i class="bi bi-grip-vertical drag-handle"></i>
+                <i class="bi bi-calendar-check field-icon"></i>
+                <span class="field-name">Due Date <small>· system, agent form only</small></span>
+                <span class="badge-kind">System</span>
+                <?php if (!empty($dueDateFrom)): ?>
+                <span class="vis-pill is-locked" data-vis="hidden" title="Filled from <?= e($dueDateFrom) ?>">Hidden · from <?= e($dueDateFrom) ?></span>
+                <?php else: ?>
+                <span class="vis-pill is-locked" data-vis="optional" title="Agents may type a due date">Optional</span>
+                <?php endif; ?>
+                <a class="row-action" href="/admin/types/<?= (int) $selectedType['id'] ?>/edit#due_date_field_id" title="Change on the ticket type: Due date comes from">
+                    <i class="bi bi-box-arrow-up-right"></i>
+                </a>
+            </div>
+
             <!-- Form body (reorderable, droppable) -->
             <div class="section-label">
                 <i class="bi bi-arrows-move me-1"></i>Form fields

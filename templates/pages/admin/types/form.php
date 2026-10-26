@@ -89,6 +89,23 @@ $aiWarning = $aiWarning ?? null;
                 <div class="form-text">Hides this type from everyone else's New Ticket forms, including admins and the portal. Use it for request types one team owns — e.g. <em>New Employee</em>, created only by HR. Needs a Default Group.</div>
             </div>
 
+            <?php if ($editing): $dueDateFields = array_values(array_filter($taskFields ?? [], static fn(array $f) => $f['field_type'] === 'date')); ?>
+            <div class="mb-3">
+                <label class="form-label fw-semibold" for="due_date_field_id"><i class="bi bi-calendar-check me-1"></i>Due date comes from</label>
+                <select class="form-select" id="due_date_field_id" name="due_date_field_id" <?= $dueDateFields ? '' : 'disabled' ?>>
+                    <option value="">— The Due Date box on the New Ticket form —</option>
+                    <?php foreach ($dueDateFields as $f): ?>
+                    <option value="<?= (int) $f['id'] ?>" <?= (int) old('due_date_field_id', (string) ($editing['due_date_field_id'] ?? '')) === (int) $f['id'] ? 'selected' : '' ?>><?= e($f['label']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <div class="form-text">
+                    Pick a date field on this type's form, e.g. <em>Start Date</em> on <em>New Staff Member</em>, and the ticket's due date is set from it instead.
+                    The New Ticket form then hides its Due Date box for this type, and task tickets get the same due date.
+                    <?php if (!$dueDateFields): ?>This type's form has no date field yet.<?php endif; ?>
+                </div>
+            </div>
+            <?php endif; ?>
+
             <div class="mb-3">
                 <div class="form-check">
                     <input type="checkbox" class="form-check-input" id="ai_route_group" name="ai_route_group" value="1"

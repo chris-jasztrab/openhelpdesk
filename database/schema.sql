@@ -939,6 +939,7 @@ CREATE TABLE IF NOT EXISTS `ticket_types` (
   `group_id` int(10) unsigned DEFAULT NULL,
   `is_confidential` tinyint(1) NOT NULL DEFAULT 0,
   `restrict_create_to_group` tinyint(1) NOT NULL DEFAULT 0,
+  `due_date_field_id` int(10) unsigned DEFAULT NULL,
   `ai_route_group` tinyint(1) NOT NULL DEFAULT 0,
   `ai_dup_check_enabled` tinyint(1) NOT NULL DEFAULT 0,
   `ai_dup_threshold` decimal(3,2) NOT NULL DEFAULT 0.75,

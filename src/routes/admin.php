@@ -2198,6 +2198,20 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
 
     $db = Database::connect();
 
+    // "Due date comes from": must be a date field on this type's own form.
+    $dueDateFieldId = (int) ($_POST['due_date_field_id'] ?? 0) ?: null;
+    if ($dueDateFieldId !== null) {
+        $chk = $db->prepare(
+            "SELECT COUNT(*) FROM ticket_type_form_layout l
+             JOIN ticket_form_fields f ON f.id = CAST(l.field_key AS UNSIGNED) AND f.deleted_at IS NULL AND f.field_type = 'date'
+             WHERE l.type_id = ? AND l.field_kind = 'custom' AND f.id = ?"
+        );
+        $chk->execute([$id, $dueDateFieldId]);
+        if ((int) $chk->fetchColumn() === 0) {
+            $dueDateFieldId = null;
+        }
+    }
+
     // Live-test AI before saving an AI-dependent type, same as the create
     // handler. Runs first so a "save anyway" resubmit still flows through the
     // confidential re-auth gate below rather than short-circuiting it.
@@ -2249,6 +2263,7 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
                 'require_resolution_on_close' => $requireResolution ? '1' : '',
                 'time_tracking_enabled' => $timeTracking ? '1' : '',
                 'restrict_create_to_group' => $restrictCreate ? '1' : '',
+                'due_date_field_id' => $dueDateFieldId ? (string) $dueDateFieldId : '',
                 // is_confidential intentionally omitted (unchecked = removal)
             ];
             logAudit(
@@ -2288,15 +2303,15 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
     // Capture the full prior row so the diff covers all editable fields,
     // not just the confidential flag we already snapshotted above.
     $fullPriorStmt = $db->prepare(
-        'SELECT name, color, group_id, is_confidential, restrict_create_to_group, ai_route_group, ai_dup_check_enabled,
+        'SELECT name, color, group_id, is_confidential, restrict_create_to_group, due_date_field_id, ai_route_group, ai_dup_check_enabled,
                 ai_dup_threshold, ai_similar_check_enabled, show_to_location_visibility, require_resolution_on_close, time_tracking_enabled, sort_order, sla_reopen_behavior
          FROM ticket_types WHERE id = ?'
     );
     $fullPriorStmt->execute([$id]);
     $fullPrior = $fullPriorStmt->fetch(\PDO::FETCH_ASSOC) ?: [];
 
-    $db->prepare('UPDATE ticket_types SET name=?, color=?, group_id=?, is_confidential=?, restrict_create_to_group=?, ai_route_group=?, ai_dup_check_enabled=?, ai_dup_threshold=?, ai_similar_check_enabled=?, show_to_location_visibility=?, require_resolution_on_close=?, time_tracking_enabled=?, sort_order=?, sla_reopen_behavior=? WHERE id=?')
-        ->execute([$name, $color, $groupId, $isConfidential, $restrictCreate, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $aiSimilarCheck, $showToLocVis, $requireResolution, $timeTracking, $order, $reopenBehavior, $id]);
+    $db->prepare('UPDATE ticket_types SET name=?, color=?, group_id=?, is_confidential=?, restrict_create_to_group=?, due_date_field_id=?, ai_route_group=?, ai_dup_check_enabled=?, ai_dup_threshold=?, ai_similar_check_enabled=?, show_to_location_visibility=?, require_resolution_on_close=?, time_tracking_enabled=?, sort_order=?, sla_reopen_behavior=? WHERE id=?')
+        ->execute([$name, $color, $groupId, $isConfidential, $restrictCreate, $dueDateFieldId, $aiRouteGroup, $aiDupCheck, $aiDupThreshold, $aiSimilarCheck, $showToLocVis, $requireResolution, $timeTracking, $order, $reopenBehavior, $id]);
 
     // Required skills (used by Skill-Based group auto-assignment)
     $skillIds = array_filter(array_map('intval', (array) ($_POST['required_skills'] ?? [])));
@@ -2322,6 +2337,7 @@ $router->post('/admin/types/{id}/edit', function (array $p) {
             'group_id'                    => $groupId,
             'is_confidential'             => $isConfidential,
             'restrict_create_to_group'    => $restrictCreate,
+            'due_date_field_id'           => $dueDateFieldId,
             'ai_route_group'              => $aiRouteGroup,
             'ai_dup_check_enabled'        => $aiDupCheck,
             'ai_dup_threshold'            => $aiDupThreshold,
@@ -4780,8 +4796,10 @@ $router->post('/admin/tickets/create', function () {
         notifyRequesterTicketAssigned($db, $ticketId, $assignedTo);
     }
 
-    // Task tickets for the other teams (e.g. New Employee → IT, Facilities,
-    // Payroll). After the custom fields are saved, since each task copies some.
+    // Due date from the type's date field (e.g. Start Date), then the task
+    // tickets for the other teams (e.g. New Employee → IT, Facilities, Payroll).
+    // After the custom fields are saved, since both read them.
+    syncDueDateFromTypeField($db, $ticketId);
     $taskIds = spawnTicketTypeTasks($db, $ticketId);
 
     $msg = 'Ticket #' . $ticketId . ' created.';
@@ -5820,6 +5838,7 @@ $router->post('/admin/tickets/{id}/fields', function (array $p) {
         }
         $saveStmt->execute([$id, $field['id'], $val]);
     }
+    syncDueDateFromTypeField($db, $id);
 
     flash('success', 'Custom fields updated.');
     redirect("/admin/tickets/{$id}");
@@ -13471,7 +13490,7 @@ $router->get('/admin/workflows/ticket-fields', function () {
     Auth::requirePermission('workflows.manage');
     $db = Database::connect();
 
-    $ticketTypes = $db->query('SELECT id, name, color FROM ticket_types ORDER BY sort_order, name')->fetchAll();
+    $ticketTypes = $db->query('SELECT id, name, color, due_date_field_id FROM ticket_types ORDER BY sort_order, name')->fetchAll();
     if (!$ticketTypes) {
         render('admin/workflows/ticket-fields', [
             'layout'       => 'app',
@@ -13540,11 +13559,21 @@ $router->get('/admin/workflows/ticket-fields', function () {
         }
     }
 
+    // "Due date comes from" (set on the ticket type): the builder shows the
+    // Due Date box as hidden and filled from that field, so nobody hunts for it.
+    $dueDateFrom = null;
+    if (!empty($selectedType['due_date_field_id'])) {
+        $dfStmt = $db->prepare('SELECT label FROM ticket_form_fields WHERE id = ? AND deleted_at IS NULL');
+        $dfStmt->execute([(int) $selectedType['due_date_field_id']]);
+        $dueDateFrom = $dfStmt->fetchColumn() ?: null;
+    }
+
     render('admin/workflows/ticket-fields', [
         'layout'        => 'app',
         'pageTitle'     => 'Form Builder',
         'ticketTypes'   => $ticketTypes,
         'selectedType'  => $selectedType,
+        'dueDateFrom'   => $dueDateFrom,
         'layout_'       => $layout_,
         'unusedFields'  => $unusedFields,
         'fieldOptions'  => $fieldOptions,

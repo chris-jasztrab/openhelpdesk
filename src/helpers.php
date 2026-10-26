@@ -9624,6 +9624,32 @@ function ticketFieldValuesForDisplay(PDO $db, int $ticketId, int $typeId, ?array
 }
 
 /**
+ * Fill a ticket's due date from the date field its type names (Admin → Ticket
+ * Types → Edit → "Due date comes from"), and pass it down to its task tickets.
+ * No-op for a type without that setting, or when the field is blank or not a
+ * date. Call after the ticket's custom-field values are saved.
+ */
+function syncDueDateFromTypeField(PDO $db, int $ticketId): void
+{
+    $s = $db->prepare(
+        'SELECT v.value FROM tickets t
+         JOIN ticket_types tt ON tt.id = t.type_id AND tt.due_date_field_id IS NOT NULL
+         LEFT JOIN ticket_field_values v ON v.ticket_id = t.id AND v.field_id = tt.due_date_field_id
+         WHERE t.id = ?'
+    );
+    $s->execute([$ticketId]);
+    $row = $s->fetch();
+    if (!$row) {
+        return;
+    }
+    $date = (string) ($row['value'] ?? '');
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+        return;
+    }
+    $db->prepare('UPDATE tickets SET due_date = ? WHERE id = ? OR parent_ticket_id = ?')->execute([$date, $ticketId, $ticketId]);
+}
+
+/**
  * Create the task tickets a ticket's type is set up to spawn (Admin → Ticket
  * Types → Edit → Task tickets). Each task ticket:
  *   - lands in its own type's default group, so each team works it from its queue;
@@ -9638,7 +9664,7 @@ function ticketFieldValuesForDisplay(PDO $db, int $ticketId, int $typeId, ?array
 function spawnTicketTypeTasks(PDO $db, int $parentId): array
 {
     $ps = $db->prepare(
-        'SELECT t.id, t.subject, t.type_id, t.created_by, t.submitted_by, t.location_id, t.priority_id, l.name AS location_name
+        'SELECT t.id, t.subject, t.type_id, t.created_by, t.submitted_by, t.location_id, t.priority_id, t.due_date, l.name AS location_name
          FROM tickets t LEFT JOIN locations l ON l.id = t.location_id WHERE t.id = ?'
     );
     $ps->execute([$parentId]);
@@ -9661,8 +9687,8 @@ function spawnTicketTypeTasks(PDO $db, int $parentId): array
     }
 
     $insert = $db->prepare(
-        'INSERT INTO tickets (subject, description, created_by, submitted_by, type_id, location_id, status, priority_id, group_id, parent_ticket_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        'INSERT INTO tickets (subject, description, created_by, submitted_by, type_id, location_id, status, priority_id, group_id, parent_ticket_id, due_date)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     );
     $timeline = $db->prepare('INSERT INTO ticket_timeline (ticket_id, user_id, action, details) VALUES (?, NULL, ?, ?)');
 
@@ -9691,7 +9717,7 @@ function spawnTicketTypeTasks(PDO $db, int $parentId): array
             '<p>Task for ticket #' . $parentId . '.</p>'
                 . ($rows ? '<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;"><tbody>' . $rows . '</tbody></table>' : ''),
             (int) $parent['created_by'], $parent['submitted_by'], $typeId, $parent['location_id'],
-            ticketDefaultNewStatusSlug(), $priId, resolveTicketGroup($db, null, $typeId), $parentId,
+            ticketDefaultNewStatusSlug(), $priId, resolveTicketGroup($db, null, $typeId), $parentId, $parent['due_date'],
         ]);
         $childId    = (int) $db->lastInsertId();
         $childIds[] = $childId;

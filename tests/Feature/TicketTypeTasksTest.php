@@ -80,6 +80,11 @@ class TicketTypeTasksTest extends TestCase
         $payType    = $this->type('TTT Onboarding - Payroll', $pay);
         $name = $this->field('TTT Name');
         $wage = $this->field('TTT Starting Wage');
+        $this->db->prepare("INSERT INTO ticket_form_fields (field_type, label) VALUES ('date', 'TTT Start Date')")->execute();
+        $start = (int) $this->db->lastInsertId();
+        $this->db->prepare('INSERT INTO ticket_type_form_layout (type_id, field_kind, field_key, sort_order, visibility) VALUES (?, ?, ?, 10, ?)')
+            ->execute([$parentType, 'custom', (string) $start, 'required']);
+        $this->db->prepare('UPDATE ticket_types SET due_date_field_id = ? WHERE id = ?')->execute([$start, $parentType]);
         $this->db->prepare('INSERT INTO ticket_type_tasks (type_id, child_type_id, field_ids) VALUES (?, ?, ?), (?, ?, ?)')
             ->execute([$parentType, $itType, json_encode([$name]), $parentType, $payType, json_encode([$name, $wage])]);
 
@@ -89,8 +94,9 @@ class TicketTypeTasksTest extends TestCase
              VALUES ('New hire: Test Person', 'x', ?, ?, 'open', ?, ?)"
         )->execute([$this->requester, $parentType, $hr, (int) $this->db->lastInsertId()]);
         $parentId = (int) $this->db->lastInsertId();
-        $this->db->prepare('INSERT INTO ticket_field_values (ticket_id, field_id, value) VALUES (?, ?, ?), (?, ?, ?)')
-            ->execute([$parentId, $name, 'Test Person', $parentId, $wage, '29.36']);
+        $this->db->prepare('INSERT INTO ticket_field_values (ticket_id, field_id, value) VALUES (?, ?, ?), (?, ?, ?), (?, ?, ?)')
+            ->execute([$parentId, $name, 'Test Person', $parentId, $wage, '29.36', $parentId, $start, '2026-11-02']);
+        syncDueDateFromTypeField($this->db, $parentId);
 
         return [$parentId, [$it, $pay], [$name, $wage]];
     }
@@ -114,7 +120,7 @@ class TicketTypeTasksTest extends TestCase
         $taskIds = spawnTicketTypeTasks($this->db, $parentId);
 
         $this->assertCount(2, $taskIds);
-        $s = $this->db->prepare('SELECT group_id, created_by, parent_ticket_id, subject, description, location_id FROM tickets WHERE id = ?');
+        $s = $this->db->prepare('SELECT group_id, created_by, parent_ticket_id, subject, description, location_id, due_date FROM tickets WHERE id = ?');
         $s->execute([$taskIds[0]]);
         $it = $s->fetch();
         $s->execute([$taskIds[1]]);
@@ -125,6 +131,12 @@ class TicketTypeTasksTest extends TestCase
         $this->assertSame($parentId, (int) $pay['parent_ticket_id']);
         $this->assertSame('TTT Onboarding - IT: New hire: Test Person', $it['subject']);
         $this->assertNotNull($pay['location_id'], 'every task keeps the location');
+        $this->assertSame('2026-11-02', $this->db->query("SELECT due_date FROM tickets WHERE id = $parentId")->fetchColumn(), 'due date comes from the Start Date field');
+        $this->assertSame(['2026-11-02', '2026-11-02'], [$it['due_date'], $pay['due_date']], 'tasks inherit the due date');
+        $startField = (int) $this->db->query("SELECT due_date_field_id FROM ticket_types t JOIN tickets k ON k.type_id = t.id WHERE k.id = $parentId")->fetchColumn();
+        $this->db->prepare('UPDATE ticket_field_values SET value = ? WHERE ticket_id = ? AND field_id = ?')->execute(['2026-11-09', $parentId, $startField]);
+        syncDueDateFromTypeField($this->db, $parentId);
+        $this->assertSame(['2026-11-09', '2026-11-09'], $this->db->query("SELECT due_date FROM tickets WHERE id IN ($taskIds[0], $taskIds[1])")->fetchAll(PDO::FETCH_COLUMN), 'a changed Start Date moves every task');
         $this->assertStringContainsString('<td style="padding:1px 12px 1px 0;color:#64748b;white-space:nowrap;vertical-align:top;">Location</td><td style="padding:1px 0;">TTT Branch</td>', $pay['description']);
         $this->assertStringContainsString('>TTT Starting Wage</td><td style="padding:1px 0;">29.36</td>', $pay['description'], 'the handed-over details are in the description so they reach the emails');
         $this->assertStringNotContainsString('Starting Wage', $it['description'], 'IT never gets the wage');
