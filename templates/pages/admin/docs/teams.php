@@ -25,6 +25,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
     <li><a href="#events">Step 3 &mdash; choose which events to post</a></li>
     <li><a href="#routing"><strong>Routing by ticket type</strong></a> &mdash; send different types to different channels</li>
     <li><a href="#test">Testing</a></li>
+    <li><a href="#bot"><strong>Helpdesk bot</strong></a> &mdash; open, check, reply to and close tickets from inside Teams</li>
     <li><a href="#notes">Good to know &amp; troubleshooting</a></li>
 </ul>
 </div>
@@ -118,12 +119,49 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 </div>
 </div>
 
+<div class="card border-0 shadow-sm mb-4" id="bot">
+<div class="card-body p-4">
+<h5 class="fw-semibold mb-3"><i class="bi bi-robot text-primary me-2"></i>Helpdesk bot &mdash; work tickets from inside Teams</h5>
+<p class="text-muted mb-3">Separate from the one-way channel notifications above, the helpdesk can also run as a <strong>bot</strong> that staff add to any chat or channel. Talk to it in plain commands &mdash; in a channel, @mention it first:</p>
+<div class="table-responsive mb-3">
+<table class="table table-sm align-middle small">
+<thead><tr class="text-muted"><th style="width:260px;">Say</th><th>What happens</th></tr></thead>
+<tbody>
+<tr><td><code>new Printer on 2F jammed | paper light flashing</code></td><td>Opens a ticket. Text before the <code>|</code> (or on the first line) is the subject, the rest is the description. The ticket gets the default priority, your location and the default group, plus AI routing / auto-assign if those are on. The reply is the ticket card.</td></tr>
+<tr><td><code>my tickets</code></td><td>Your open tickets. Agents also see tickets assigned to them.</td></tr>
+<tr><td><code>status 123</code> &nbsp;or&nbsp; <code>#123</code></td><td>A card with the ticket's status, priority, group, assignee, description and latest reply, with <em>Send reply</em>, <em>Close</em>&nbsp;/&nbsp;<em>Reopen</em> and <em>Open in helpdesk</em> buttons.</td></tr>
+<tr><td><code>comment 123 Still broken after a restart</code></td><td>Adds a public reply &mdash; the same notifications fire as when replying on the web.</td></tr>
+<tr><td><code>close 123 Fixed by swapping the cable</code></td><td>Closes the ticket, recording the note as a reply first. <code>reopen 123</code> reopens it; agents can also <code>resolve 123</code>.</td></tr>
+<tr><td><code>help</code></td><td>The command list. The bot also posts it when it is first added to a chat or channel.</td></tr>
+</tbody></table></div>
+
+<h6 class="fw-semibold">Who can do what</h6>
+<ul class="text-muted small mb-3">
+    <li><strong>Identity.</strong> People are matched to helpdesk accounts by their Microsoft identity &mdash; the same id SSO stores. Someone who has never signed in is linked by email, or created as a portal user, when the message comes from your own tenant; otherwise the bot asks them to sign in to the helpdesk once.</li>
+    <li><strong>Access.</strong> Requesters see only tickets they opened; agents see what they could see in the agent interface. <strong>Confidential tickets are never shown</strong> &mdash; the bot points to the helpdesk instead, because a channel is a shared surface.</li>
+    <li><strong>Visibility.</strong> Whatever the bot posts is visible to everyone in that chat or channel. Use a personal chat with the bot for anything you would not post to the channel.</li>
+</ul>
+
+<h6 class="fw-semibold">Setup (once, by an admin)</h6>
+<ol class="text-muted small mb-0">
+    <li>In the Azure portal create an <strong>Azure Bot</strong> resource. Choose <em>Single Tenant</em>, and either let it create a Microsoft App ID or pick <em>Use existing app registration</em> with your SSO app.</li>
+    <li>Create a client secret on that app registration (Entra ID &rarr; App registrations &rarr; Certificates &amp; secrets).</li>
+    <li>On <a href="/admin/settings/teams#bot"><strong>Settings &rarr; Microsoft Teams &rarr; Helpdesk bot</strong></a> enter the App ID, tenant ID and secret (leave all blank to reuse the SSO app), enable the bot, save, then <strong>Check saved credentials</strong>.</li>
+    <li>Copy the <strong>Messaging endpoint</strong> shown there into the Azure Bot's Configuration, and add the <strong>Microsoft Teams</strong> channel under Channels. The helpdesk must be reachable from the internet over HTTPS.</li>
+    <li><strong>Download the Teams app package</strong> and upload it in Teams (Apps &rarr; Manage your apps &rarr; Upload an app), or have a Teams admin publish it to the organisation's app catalogue so anyone can add it to a chat or channel.</li>
+</ol>
+<div class="alert alert-light border small mt-3 mb-0">
+    <i class="bi bi-shield-check me-2"></i><strong>Security.</strong> Every message the bot receives carries a token signed by Microsoft's Bot Framework for your App ID; the helpdesk checks the signature, issuer, audience, expiry and the reply address before reading anything, so a request from anywhere else is refused with 401.
+</div>
+</div>
+</div>
+
 <div class="card border-0 shadow-sm mb-4" id="notes">
 <div class="card-body p-4">
 <h5 class="fw-semibold mb-3"><i class="bi bi-info-circle text-primary me-2"></i>Good to know &amp; troubleshooting</h5>
 <ul class="text-muted mb-0">
     <li><strong>It never breaks tickets.</strong> If a webhook is wrong, unreachable, or slow, the helpdesk logs the problem and carries on &mdash; creating, assigning and updating tickets always succeeds. A misconfigured webhook can add a few seconds of delay to the action that triggered it, so fix or clear a dead URL when you notice one.</li>
-    <li><strong>Notifications are one-way.</strong> The integration posts <em>into</em> Teams; it doesn't read replies or let you act on tickets from Teams. Use the <strong>Open ticket</strong> button on each card to jump back to the helpdesk.</li>
+    <li><strong>Channel notifications are one-way.</strong> They post <em>into</em> Teams; replies under a notification card are not read. To act on tickets from Teams, set up the <a href="#bot">helpdesk bot</a>, or use the <strong>Open ticket</strong> button on each card.</li>
     <li><strong>&ldquo;Couldn't connect&rdquo; on test</strong> usually means the URL was copied incompletely, or your server can't reach <code>*.logic.azure.com</code> outbound. Confirm the full URL and that outbound HTTPS is allowed.</li>
     <li><strong>HTTP 4xx on test</strong> usually means the workflow was deleted or disabled in Teams &mdash; recreate it (Step&nbsp;1) and paste the new URL.</li>
     <li><strong>Accepted URLs.</strong> Webhooks must be <code>https://</code> addresses on a Microsoft host ending in <code>.webhook.office.com</code>, <code>.logic.azure.com</code> or <code>.office.com</code>. Plain <code>http</code>, other hosts and bare IP addresses are refused, and the Test button says why.</li>

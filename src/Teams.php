@@ -177,14 +177,16 @@ class Teams
     /* ─────────────────────────────────────────────────────────────────── */
 
     /**
-     * Build the Adaptive Card for a ticket event.
-     * Returns [cardPayload, typeId|null], or null if the ticket is gone.
-     * The type id is returned so the caller can route to that type's channel.
+     * Ticket row plus the FactSet rows (Status, Priority, Type, …) shared by the
+     * webhook cards and the bot's cards (TeamsBot). Null if the ticket is gone.
+     * Status is always the first fact.
+     *
+     * @return array{row: array, facts: array}|null
      */
-    private static function buildTicketCard(PDO $db, int $ticketId, string $event, array $extra): ?array
+    public static function ticketFacts(PDO $db, int $ticketId): ?array
     {
         $stmt = $db->prepare(
-            "SELECT t.id, t.subject, t.status, t.created_at, t.type_id,
+            "SELECT t.id, t.subject, t.description, t.status, t.created_at, t.type_id,
                     COALESCE(ts.label, t.status)          AS status_label,
                     tp.name                                AS priority,
                     tt.name                                AS type,
@@ -217,20 +219,36 @@ class Teams
             }
         };
 
-        if ($event === 'status') {
-            $from = isset($extra['from_status'])
-                ? self::statusLabel($db, (string) $extra['from_status'])
-                : '';
-            $fact('Status', $from !== '' ? "{$from} → {$r['status_label']}" : (string) $r['status_label']);
-        } else {
-            $fact('Status', (string) $r['status_label']);
-        }
+        $fact('Status',    (string) $r['status_label']);
         $fact('Priority',  $r['priority']);
         $fact('Type',      $r['type']);
         $fact('Group',     $r['group_name']);
         $fact('Location',  $r['location']);
         $fact('Requester', $r['requester']);
         $fact('Assignee',  $r['assignee'] ?? 'Unassigned');
+
+        return ['row' => $r, 'facts' => $facts];
+    }
+
+    /**
+     * Build the Adaptive Card for a ticket event.
+     * Returns [cardPayload, typeId|null], or null if the ticket is gone.
+     * The type id is returned so the caller can route to that type's channel.
+     */
+    private static function buildTicketCard(PDO $db, int $ticketId, string $event, array $extra): ?array
+    {
+        $info = self::ticketFacts($db, $ticketId);
+        if ($info === null) {
+            return null;
+        }
+        $r     = $info['row'];
+        $facts = $info['facts'];
+        if ($event === 'status' && isset($extra['from_status'])) {
+            $from = self::statusLabel($db, (string) $extra['from_status']);
+            if ($from !== '') {
+                $facts[0]['value'] = "{$from} → {$r['status_label']}"; // Status is always the first fact
+            }
+        }
 
         $title = self::EVENTS[$event][1];
         $body = [
@@ -263,7 +281,7 @@ class Teams
      * Wrap card body elements in the message/attachment envelope the Teams
      * webhook expects. Adds an "Open ticket" action when a URL is supplied.
      */
-    private static function wrap(string $summary, array $body, string $openUrl = ''): array
+    public static function wrap(string $summary, array $body, string $openUrl = ''): array
     {
         $content = [
             '$schema' => 'http://adaptivecards.io/schemas/adaptive-card.json',

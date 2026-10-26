@@ -12,6 +12,15 @@ $router->get('/health', function () {
 });
 
 /* ------------------------------------------------------------------
+ * Microsoft Teams bot — messaging endpoint called by the Bot Framework.
+ * No session auth: every request carries a Microsoft-signed JWT that
+ * TeamsBot verifies before reading the activity.
+ * ------------------------------------------------------------------ */
+$router->post('/teams/bot/messages', static function (): void {
+    TeamsBot::handleRequest();
+});
+
+/* ------------------------------------------------------------------
  * Progressive Web App (manifest, service worker, icons, offline page)
  * ------------------------------------------------------------------ */
 require ROOT_DIR . '/src/routes/pwa.php';

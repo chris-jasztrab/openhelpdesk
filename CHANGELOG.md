@@ -11,6 +11,14 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.206.0 &mdash; 2026-10-26
+
+### Added
+- **Microsoft Teams helpdesk bot.** Staff can add the helpdesk to any Teams chat or channel and talk to it: **new Printer jammed | details** opens a ticket, **my tickets** lists their open ones, **status 123** shows a ticket card with the latest reply, **comment 123 …** adds a reply, **close 123 [note]**, **reopen 123** and (for agents) **resolve 123** change status. Cards carry *Send reply*, *Close* / *Reopen* and *Open in helpdesk* buttons. People are matched by the same Entra object id SSO stores, so there is no extra sign-up; ticket access follows the same rules as the REST API, and confidential tickets are never shown in Teams. Set up on **Admin → Settings → Microsoft Teams → Helpdesk bot**: enter the Azure Bot's App ID, tenant and secret (or leave them blank to reuse the SSO app), copy the messaging endpoint into Azure, check the credentials, and download the ready-made Teams app package to upload into Teams. Every request is verified against Microsoft's Bot Framework signing keys (issuer, audience, expiry, reply address) before anything is read. Docs on **Admin → Docs → Microsoft Teams**.
+
+### Changed
+- The REST API's per-ticket access rule now lives in a shared `userCanAccessTicket()` helper, used by both the API and the bot so the two cannot drift apart.
+
 ## 2.205.0 &mdash; 2026-10-26
 
 ### Added

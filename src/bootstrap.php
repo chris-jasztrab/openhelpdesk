@@ -17,6 +17,7 @@ require_once ROOT_DIR . '/src/CronJobs.php';
 require_once ROOT_DIR . '/src/PWA.php';
 require_once ROOT_DIR . '/src/Dashboard.php';
 require_once ROOT_DIR . '/src/Teams.php';
+require_once ROOT_DIR . '/src/TeamsBot.php';
 
 // Load environment configuration
 loadEnv(ROOT_DIR . '/.env');

@@ -203,67 +203,11 @@ function _apiInput(): array
  */
 function _apiEnforceTicketAccess(PDO $db, array $user, array $ticket): void
 {
-    if (_apiIsAdmin($user)) {
-        return; // unrestricted
+    // The rule itself is userCanAccessTicket() in helpers.php, shared with the
+    // Teams bot so the two can't drift apart; this just turns a refusal into 403.
+    if (!userCanAccessTicket($db, $user, $ticket)) {
+        _apiJson(['error' => 'Forbidden'], 403);
     }
-
-    if (!_apiIsStaff($user)) {
-        // Portal (non-staff) callers may only touch tickets they created.
-        if ((int) $ticket['created_by'] !== (int) $user['id']) {
-            _apiJson(['error' => 'Forbidden'], 403);
-        }
-        return;
-    }
-
-    $userId   = (int) $user['id'];
-    $ticketId = (int) ($ticket['id'] ?? 0);
-
-    // Authoritative re-fetch of the fields the rules depend on.
-    $groupId        = array_key_exists('group_id', $ticket) ? $ticket['group_id'] : null;
-    $createdBy      = (int) ($ticket['created_by'] ?? 0);
-    $isConfidential = false;
-    $confGroupId    = null;
-    if ($ticketId > 0) {
-        $meta = $db->prepare(
-            'SELECT t.group_id, t.created_by, tt.is_confidential, tt.group_id AS conf_group_id
-             FROM tickets t LEFT JOIN ticket_types tt ON t.type_id = tt.id WHERE t.id = ?'
-        );
-        $meta->execute([$ticketId]);
-        $row = $meta->fetch();
-        if ($row) {
-            $groupId        = $row['group_id'];
-            $createdBy      = (int) $row['created_by'];
-            $isConfidential = (int) ($row['is_confidential'] ?? 0) === 1;
-            $confGroupId    = $row['conf_group_id'] !== null ? (int) $row['conf_group_id'] : null;
-        }
-    }
-
-    $userGroups = userGroupIds($db, $userId);
-
-    // Confidential tickets: confidential-group members or the creator ONLY.
-    if ($isConfidential) {
-        $isMember = $confGroupId !== null && in_array($confGroupId, $userGroups, true);
-        if (!$isMember && $createdBy !== $userId) {
-            _apiJson(['error' => 'Forbidden'], 403);
-        }
-        return;
-    }
-
-    // Non-confidential tickets.
-    if (roleCan($user['role'] ?? null, 'tickets.view_all')) {
-        return;
-    }
-    $gid = $groupId !== null ? (int) $groupId : null;
-    if (!empty($userGroups) && ($gid === null || in_array($gid, $userGroups, true))) {
-        return;
-    }
-    if ($createdBy === $userId) {
-        return;
-    }
-    if (ticketAccessExempt($db, $userId, $ticketId)) {
-        return;
-    }
-    _apiJson(['error' => 'Forbidden'], 403);
 }
 
 /**

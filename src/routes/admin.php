@@ -12238,7 +12238,17 @@ $router->get('/admin/settings/teams', function () {
         $t['webhook'] = getSetting('teams_webhook_type:' . (int) $t['id'], '');
     }
     unset($t);
-    render('admin/settings/teams', compact('settings', 'types'));
+    $bot = [
+        'enabled'        => getSetting('teams_bot_enabled', '0'),
+        'app_id'         => getSetting('teams_bot_app_id', ''),
+        'tenant_id'      => getSetting('teams_bot_tenant_id', ''),
+        'has_secret'     => getSetting('teams_bot_app_secret', '') !== '',
+        'sso_app_id'     => getSetting('sso_client_id', ''),
+        'sso_tenant_id'  => getSetting('sso_tenant_id', ''),
+        'sso_has_secret' => getSetting('sso_client_secret', '') !== '',
+        'endpoint'       => TeamsBot::endpointUrl(),
+    ];
+    render('admin/settings/teams', compact('settings', 'types', 'bot'));
 });
 
 $router->post('/admin/settings/teams', function () {
@@ -12323,6 +12333,77 @@ $router->post('/admin/settings/teams/test', function () {
     $url  = is_array($body) ? trim((string) ($body['webhook_url'] ?? '')) : '';
     $res = Teams::post(Teams::testCard(), $url !== '' ? $url : null);
     echo json_encode($res);
+    exit;
+});
+
+/* Helpdesk bot (Azure Bot credentials). Blank App ID / secret / tenant fall
+ * back to the SSO app registration, see TeamsBot. */
+$router->post('/admin/settings/teams/bot', function () {
+    Auth::requireAdmin();
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/teams');
+    }
+    $appId  = trim($_POST['teams_bot_app_id'] ?? '');
+    $tenant = trim($_POST['teams_bot_tenant_id'] ?? '');
+    $secret = (string) ($_POST['teams_bot_app_secret'] ?? '');
+    $guid   = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i';
+    if (($appId !== '' && !preg_match($guid, $appId)) || ($tenant !== '' && !preg_match($guid, $tenant))) {
+        flash('error', 'The App ID and tenant ID must be GUIDs — or leave them blank to use the SSO app.');
+        redirect('/admin/settings/teams#bot');
+    }
+    $wasEnabled = getSetting('teams_bot_enabled', '0');
+    setSetting('teams_bot_enabled', isset($_POST['teams_bot_enabled']) ? '1' : '0');
+    setSetting('teams_bot_app_id', $appId);
+    setSetting('teams_bot_tenant_id', $tenant);
+    if ($secret !== '') {
+        setSetting('teams_bot_app_secret', $secret);
+    } elseif (isset($_POST['teams_bot_clear_secret'])) {
+        setSetting('teams_bot_app_secret', '');
+    }
+    setSetting('teams_bot_token_cache', ''); // credentials may have changed
+    logAuditChange(
+        'teams.bot_settings_changed', null, 'setting',
+        ['enabled' => $wasEnabled],
+        ['enabled' => getSetting('teams_bot_enabled', '0'), 'app_id' => $appId !== '' ? $appId : '(sso app)']
+    );
+    flash('success', 'Helpdesk bot settings saved.');
+    redirect('/admin/settings/teams#bot');
+});
+
+/* Ask Microsoft for a bot token with the SAVED credentials — proves the App
+ * ID, secret and tenant are right before anyone adds the bot in Teams. */
+$router->post('/admin/settings/teams/bot/test', function () {
+    Auth::requireAdmin();
+    header('Content-Type: application/json');
+    if (!verifyCsrf($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '')) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Invalid CSRF token.']);
+        exit;
+    }
+    $error = null;
+    $ok    = TeamsBot::botToken(true, $error) !== null;
+    echo json_encode(['ok' => $ok, 'error' => $ok ? '' : (string) $error]);
+    exit;
+});
+
+/* Teams app package (manifest.json + icons) to upload into Teams. The path has
+ * no .zip suffix on purpose: the PHP dev server swallows static extensions. */
+$router->get('/admin/settings/teams/bot/manifest', function () {
+    Auth::requireAdmin();
+    if (TeamsBot::appId() === '') {
+        flash('error', 'Enter the bot App ID (or configure SSO) before downloading the app package.');
+        redirect('/admin/settings/teams#bot');
+    }
+    $zip = TeamsBot::manifestZip();
+    if ($zip === null) {
+        flash('error', 'Could not build the app package — is the PHP zip extension installed?');
+        redirect('/admin/settings/teams#bot');
+    }
+    header('Content-Type: application/zip');
+    header('Content-Disposition: attachment; filename="helpdesk-teams-app.zip"');
+    header('Content-Length: ' . strlen($zip));
+    echo $zip;
     exit;
 });
 

@@ -11117,3 +11117,56 @@ function saveNotifyPrefsFromPost(PDO $db, int $userId, array $post): array
 
     return [$before, $after];
 }
+
+/**
+ * May this user see / act on this ticket? One rule for every non-HTML surface
+ * (REST API, Teams bot). Mirrors _agentRequireTicketAccess():
+ *   - admin  → yes
+ *   - user   → only tickets they created
+ *   - confidential type → only the type's confidential-group members or the creator
+ *   - otherwise → view_all holders; group members (and group-less tickets); the
+ *     creator; or an assignee / watcher (ticketAccessExempt)
+ * Only $ticket['id'] is trusted for staff; group/type/creator are re-fetched.
+ */
+function userCanAccessTicket(PDO $db, array $user, array $ticket): bool
+{
+    if (roleIsAdmin($user['role'] ?? null)) {
+        return true;
+    }
+    $userId = (int) ($user['id'] ?? 0);
+    if (!roleIsStaff($user['role'] ?? null)) {
+        return (int) ($ticket['created_by'] ?? 0) === $userId;
+    }
+
+    $ticketId       = (int) ($ticket['id'] ?? 0);
+    $groupId        = array_key_exists('group_id', $ticket) ? $ticket['group_id'] : null;
+    $createdBy      = (int) ($ticket['created_by'] ?? 0);
+    $isConfidential = false;
+    $confGroupId    = null;
+    if ($ticketId > 0) {
+        $meta = $db->prepare(
+            'SELECT t.group_id, t.created_by, tt.is_confidential, tt.group_id AS conf_group_id
+             FROM tickets t LEFT JOIN ticket_types tt ON t.type_id = tt.id WHERE t.id = ?'
+        );
+        $meta->execute([$ticketId]);
+        if ($row = $meta->fetch()) {
+            $groupId        = $row['group_id'];
+            $createdBy      = (int) $row['created_by'];
+            $isConfidential = (int) ($row['is_confidential'] ?? 0) === 1;
+            $confGroupId    = $row['conf_group_id'] !== null ? (int) $row['conf_group_id'] : null;
+        }
+    }
+
+    $userGroups = userGroupIds($db, $userId);
+    if ($isConfidential) {
+        return ($confGroupId !== null && in_array($confGroupId, $userGroups, true)) || $createdBy === $userId;
+    }
+    if (roleCan($user['role'] ?? null, 'tickets.view_all')) {
+        return true;
+    }
+    $gid = $groupId !== null ? (int) $groupId : null;
+    if (!empty($userGroups) && ($gid === null || in_array($gid, $userGroups, true))) {
+        return true;
+    }
+    return $createdBy === $userId || ticketAccessExempt($db, $userId, $ticketId);
+}
