@@ -171,7 +171,7 @@ $breadcrumbs  = [
                 <?php else: ?>
                     <?php foreach ($breachedTickets as $t): ?>
                     <tr>
-                        <td><a href="/admin/tickets/<?= $t['id'] ?>" class="fw-semibold">#<?= $t['id'] ?></a></td>
+                        <td><a href="<?= staffTicketUrl((int) $t['id']) ?>" class="fw-semibold">#<?= $t['id'] ?></a></td>
                         <td class="text-truncate" style="max-width:250px;"><?= e($t['subject']) ?></td>
                         <td><span class="badge" style="background:<?= e($t['priority_color'] ?? '#6c757d') ?>;"><?= e($t['priority_name'] ?? 'None') ?></span></td>
                         <td><?= e($t['agent_name'] ?? 'Unassigned') ?></td>

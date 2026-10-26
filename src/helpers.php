@@ -10211,6 +10211,17 @@ function roleIsAdmin(?string $slug): bool
     return $r !== null && $r['is_admin'];
 }
 
+/**
+ * Ticket view URL for the current staff user: admins get the admin view,
+ * every other staff role gets the agent view (which requireStaff() allows).
+ * Reports are gated by reports.view, which non-admin roles can hold, so
+ * report links must not hard-code /admin/tickets/.
+ */
+function staffTicketUrl(int $ticketId): string
+{
+    return (Auth::isAdmin() ? '/admin/tickets/' : '/agent/tickets/') . $ticketId;
+}
+
 /** Is this role a staff (agent-interface) role? */
 function roleIsStaff(?string $slug): bool
 {

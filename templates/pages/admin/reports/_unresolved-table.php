@@ -69,7 +69,7 @@ $hasFilters = $statusFilter !== '' || $ageFilter !== null;
                 <tr><td colspan="<?= slaEnabled() ? 8 : 7 ?>" class="text-center py-4 text-muted">No unresolved tickets match the current filter.</td></tr>
                 <?php else: foreach ($tickets as $t): ?>
                 <tr>
-                    <td><a href="/admin/tickets/<?= (int) $t['id'] ?>" class="fw-semibold">#<?= (int) $t['id'] ?></a></td>
+                    <td><a href="<?= staffTicketUrl((int) $t['id']) ?>" class="fw-semibold">#<?= (int) $t['id'] ?></a></td>
                     <td class="text-truncate" style="max-width:220px;"><?= e($t['subject']) ?></td>
                     <td><span class="badge bg-secondary bg-opacity-10 text-secondary"><?= e(ucfirst(str_replace('_', ' ', $t['status']))) ?></span></td>
                     <td>

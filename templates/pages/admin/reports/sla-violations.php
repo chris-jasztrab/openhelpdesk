@@ -115,7 +115,7 @@ $breadcrumbs  = [
                 <?php else: ?>
                     <?php foreach ($violations as $t): ?>
                     <tr>
-                        <td><a href="/admin/tickets/<?= $t['id'] ?>" class="fw-semibold">#<?= $t['id'] ?></a></td>
+                        <td><a href="<?= staffTicketUrl((int) $t['id']) ?>" class="fw-semibold">#<?= $t['id'] ?></a></td>
                         <td class="text-truncate" style="max-width:240px;"><?= e($t['subject']) ?></td>
                         <td>
                             <?php $sclr = ticketStatusColor($t['status']); ?>

@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.206.1 &mdash; 2026-10-26
+
+### Fixed
+- **Report ticket links 403'd for non-admin staff.** The SLA Violations, SLA Compliance and Unresolved Tickets reports linked every ticket to the admin ticket view, which only full-admin roles may open. Any agent whose role has *reports.view* could open the report but got "permission denied" on the ticket. Links now go to the admin view for admins and the agent view for everyone else (new `staffTicketUrl()` helper).
+
 ## 2.206.0 &mdash; 2026-10-26
 
 ### Added
