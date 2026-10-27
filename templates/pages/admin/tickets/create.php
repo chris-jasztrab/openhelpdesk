@@ -122,9 +122,9 @@ $statusOptions = ticketStatusLabelMap();
                     <div class="row g-3">
                         <!-- Type picker (always shown, drives the layout below) -->
                         <div class="col-md-6 col-lg-4">
-                            <label for="type_id" class="form-label fw-semibold">Type</label>
-                            <select class="form-select" id="type_id" name="type_id">
-                                <option value="">— Unclassified —</option>
+                            <label for="type_id" class="form-label fw-semibold">Type <span class="text-danger">*</span></label>
+                            <select class="form-select" id="type_id" name="type_id" required>
+                                <option value="">— Select type —</option>
                                 <?php foreach ($types as $t): ?>
                                     <option value="<?= $t['id'] ?>" data-due-field="<?= (int) ($t['due_date_field_id'] ?? 0) ?>"
                                         <?= old('type_id', '') == $t['id'] ? 'selected' : '' ?>>
@@ -182,6 +182,8 @@ $statusOptions = ticketStatusLabelMap();
                         $dynamicSystemOrder = ['location', 'priority', 'sla_notice', 'tags', 'attachments'];
                         foreach ($dynamicSystemOrder as $sysKey):
                             $v = $visOf('system', $sysKey);
+                            // Staff always pick a location and priority, whatever the type's layout says.
+                            if ($sysKey === 'location' || $sysKey === 'priority') $v = 'required';
                             $isAbsent = $v === 'absent' || $v === 'hidden';
                             $wrapStyle = $isAbsent ? 'style="display:none;"' : '';
                         ?>
@@ -192,8 +194,8 @@ $statusOptions = ticketStatusLabelMap();
                                 <?= label('location.singular') ?>
                                 <span class="text-danger field-required-star" <?= $v === 'required' ? '' : 'style="display:none;"' ?>>*</span>
                             </label>
-                            <select class="form-select" id="location_id" name="location_id">
-                                <option value="">— None —</option>
+                            <select class="form-select" id="location_id" name="location_id" required>
+                                <option value="">— Select —</option>
                                 <?php foreach ($locations as $loc): ?>
                                     <option value="<?= $loc['id'] ?>"
                                         <?= old('location_id', '') == $loc['id'] ? 'selected' : '' ?>>
@@ -209,8 +211,8 @@ $statusOptions = ticketStatusLabelMap();
                                 Priority
                                 <span class="text-danger field-required-star" <?= $v === 'required' ? '' : 'style="display:none;"' ?>>*</span>
                             </label>
-                            <select class="form-select" id="priority_id" name="priority_id">
-                                <option value="">— None —</option>
+                            <select class="form-select" id="priority_id" name="priority_id" required>
+                                <option value="">— Select —</option>
                                 <?php foreach ($priorities as $pri): ?>
                                     <option value="<?= $pri['id'] ?>"
                                         <?= old('priority_id', '') == $pri['id'] ? 'selected' : '' ?>>
@@ -469,6 +471,12 @@ $statusOptions = ticketStatusLabelMap();
             var kind = wrap.dataset.fieldKind;
             var key  = wrap.dataset.fieldKey;
             var v    = visByKey[kind + '|' + key];
+            if (kind === 'system' && (key === 'location' || key === 'priority')) {
+                // Staff always pick these, whatever the type's layout says.
+                wrap.style.display = '';
+                setRequired(wrap, true);
+                return;
+            }
             if (!selectedType) {
                 // No type chosen yet — show the input fields as an optional preview,
                 // but keep content-only blocks (text blocks / images) hidden: each is

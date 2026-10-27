@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.208.0 &mdash; 2026-10-27
+
+### Changed
+- **Type, location and priority are required on the staff New Ticket form.** Both **Admin → Tickets → New Ticket** and the agent version now need all three before the ticket can be saved, and the server rejects a submission without them. Before, a ticket left as *Unclassified* went to the default group (Information Technology), so every IT member got its new-ticket email even when it belonged to another team. Location and priority now always show on this form, even for types whose form layout hides them (*Collections/Discover Job Requests*, *Deputy Tickets*, *Customer Experience*), so a staff-picked priority is no longer swapped for the default. The portal form is unchanged.
+
 ## 2.207.0 &mdash; 2026-10-26
 
 ### Added

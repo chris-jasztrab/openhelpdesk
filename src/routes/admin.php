@@ -4616,6 +4616,12 @@ $router->post('/admin/tickets/create', function () {
         $redirectBase = (Auth::isStaff() && !Auth::isAdmin()) ? '/agent' : '/admin';
         redirect("{$redirectBase}/tickets/create");
     }
+    if (!$typeId || !$locationId || !$priId) {
+        flashInput($_POST);
+        flash('error', 'Type, ' . strtolower(label('location.singular')) . ' and priority are required.');
+        $redirectBase = (Auth::isStaff() && !Auth::isAdmin()) ? '/agent' : '/admin';
+        redirect("{$redirectBase}/tickets/create");
+    }
 
     $db = Database::connect();
     if (!userCanCreateTicketType($db, $typeId, (int) Auth::id())) {
@@ -4625,12 +4631,6 @@ $router->post('/admin/tickets/create', function () {
         redirect("{$redirectBase}/tickets/create");
     }
     $groupId = resolveTicketGroup($db, $groupId, $typeId);
-    // If the priority picker is hidden for this type, the staff form will not
-    // have rendered it — fall back to the system default so the ticket has a
-    // priority on creation.
-    if ($typeId && resolveFieldVisibility($db, $typeId, 'system', 'priority') === 'hidden') {
-        $priId = getDefaultPriorityId($db);
-    }
     // Enforce the type's available-priorities restriction server-side.
     if (!priorityAllowedForType($db, $typeId, $priId)) {
         flashInput($_POST);
