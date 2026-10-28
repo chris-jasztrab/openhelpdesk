@@ -252,6 +252,78 @@
         }
     }
 
+    // --- Easter egg: click the ghost brand icon five times for a Pac-Man chase ---
+    // Only exists while the brand icon is the Font Awesome ghost (Halloween).
+    // Clicks on the icon wait half a second for another before following the
+    // home link; the app name beside it still navigates instantly. The real
+    // icon only goes invisible and the sprites are fixed overlays, so nothing
+    // on the bar moves or restyles. Visual-only, never touches state.
+    var ghost = document.querySelector('.navbar-brand .fa-ghost');
+    if (ghost) {
+        var ghostHits  = 0;
+        var ghostTimer = null;
+
+        function pacmanChase() {
+            if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+            var bar   = ghost.closest('nav').getBoundingClientRect();
+            var r     = ghost.getBoundingClientRect();
+            var size  = r.height;
+            var color = getComputedStyle(ghost).color;
+            // x offsets are from the icon's own spot: the ghost turns at mid-bar,
+            // Pac-Man starts and ends just past the left edge of the screen.
+            var mid   = bar.left + bar.width / 2 - r.width / 2 - r.left;
+            var off   = -r.left - size - 10;
+            var gap   = size * 1.5;
+            var ms    = Math.max(1200, mid * 2.5);
+            var run   = { duration: ms, easing: 'linear', fill: 'forwards' };
+            var back  = { duration: ms, easing: 'linear', fill: 'both', delay: 300 };
+            var at    = function (x, flip) { return { transform: 'translateX(' + x + 'px)' + (flip ? ' scaleX(-1)' : '') }; };
+            var base  = 'position:fixed;z-index:2000;pointer-events:none;margin:0;left:' + r.left + 'px;top:' + r.top + 'px;';
+
+            var g = ghost.cloneNode(true);
+            g.style.cssText = base + 'color:' + color;
+            var p = document.createElement('span');
+            p.style.cssText = base + 'width:' + size + 'px;height:' + size + 'px;border-radius:50%;background:#ffd60a;';
+            document.body.append(g, p);
+            ghost.style.visibility = 'hidden';
+
+            p.animate([
+                { clipPath: 'polygon(100% 15%, 50% 50%, 100% 85%, 100% 100%, 0 100%, 0 0, 100% 0)' },
+                { clipPath: 'polygon(100% 50%, 50% 50%, 100% 50%, 100% 100%, 0 100%, 0 0, 100% 0)' }
+            ], { duration: 150, iterations: Infinity, direction: 'alternate' });
+
+            p.animate([at(off), at(mid - gap)], run);
+            g.animate([at(0), at(mid)], run).finished
+                .then(function () {
+                    // Mid-bar: the ghost turns red and chases Pac-Man back off the left edge.
+                    g.style.color = '#ff0000';
+                    p.animate([at(mid - gap, true), at(off, true)], back);
+                    return g.animate([at(mid), at(0)], back).finished;
+                })
+                .then(function () {
+                    return g.animate([{ color: '#ff0000' }, { color: color }], { duration: 800, fill: 'forwards' }).finished;
+                })
+                .then(function () {
+                    g.remove();
+                    p.remove();
+                    ghost.style.visibility = '';
+                });
+        }
+
+        ghost.addEventListener('click', function (e) {
+            if (e.ctrlKey || e.metaKey || e.shiftKey) return; // opening home in a new tab/window
+            e.preventDefault();
+            clearTimeout(ghostTimer);
+            if (++ghostHits >= 5) {
+                ghostHits = 0;
+                pacmanChase();
+                return;
+            }
+            var href = ghost.closest('a').href;
+            ghostTimer = setTimeout(function () { ghostHits = 0; location.href = href; }, 500);
+        });
+    }
+
     // --- Global Search ---
     var wrap     = document.getElementById('ld-search-wrap');
     if (!wrap) return;

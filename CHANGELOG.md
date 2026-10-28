@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.209.0 &mdash; 2026-10-28
+
+### Added
+- **Halloween easter egg: Pac-Man in the top bar.** While the navbar icon is the Font Awesome ghost (`fa-solid fa-ghost`), clicking the ghost five times in quick succession sends Pac-Man in from the left to chase it across the bar. At the middle the ghost turns red and chases Pac-Man back off the left edge, then settles into its usual spot and fades back to its normal colour. The real icon is only hidden while the animation runs and both sprites float above the bar, so the bar and its words don't move or change. Clicks on the ghost now wait half a second for another click before going to the home page; the app name beside it still goes there straight away. Skipped when the browser asks for reduced motion. Change the icon back after Halloween and the egg goes with it.
+
 ## 2.208.0 &mdash; 2026-10-27
 
 ### Changed
