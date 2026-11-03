@@ -937,6 +937,9 @@ $resolutionClosedSlugs  = ticketClosedBucketSlugs();
         <!-- Task Tickets -->
         <?php require ROOT_DIR . '/templates/partials/ticket-tasks.php'; ?>
 
+        <!-- Linked assets (inventory) -->
+        <?php require ROOT_DIR . '/templates/partials/ticket-assets.php'; ?>
+
         <!-- Custom Fields -->
         <?php if (!empty($customFields)): ?>
         <div class="card border-0 shadow-sm mb-4">

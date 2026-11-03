@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.213.0 &mdash; 2026-11-03
+
+### Added
+- **Link assets to tickets (phase 4 of the asset inventory).** The agent and admin ticket pages get an **Assets** card (shared partial, shown to staff who can view the inventory): the assets linked to the ticket with status, assignee, serial and an unlink control; the requester's own checked-out devices as one-click links; and a typeahead over the whole inventory (tag, name, serial, model — the requester's devices sort first). Linking and unlinking write an internal timeline entry on the ticket and a history entry on the asset, so the asset's **Tickets** tab and the ticket's timeline always agree. Endpoints `POST /tickets/{id}/assets` and `POST /tickets/{id}/assets/{assetId}/remove` are CSRF-checked and gated on the viewer's access to that ticket. Closing a ticket as a duplicate copies its linked assets onto the original; merging two users moves checked-out assets, history and link attribution to the kept account.
+
 ## 2.212.0 &mdash; 2026-11-03
 
 ### Added

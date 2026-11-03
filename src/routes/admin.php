@@ -1593,11 +1593,19 @@ $router->post('/admin/users/merge', function () {
                 ['kb_articles',          'created_by'],
                 ['kb_article_revisions', 'edited_by'],
                 ['ticket_templates',     'created_by'],
+                ['asset_history',        'user_id'],
+                ['asset_files',          'uploaded_by'],
+                ['assets',               'created_by'],
             ];
 
             foreach ($simpleUpdates as [$table, $col]) {
                 $db->prepare("UPDATE `{$table}` SET `{$col}` = ? WHERE `{$col}` = ?")->execute([$keepId, $deleteId]);
             }
+
+            // Inventory: assets checked out to the deleted user move to the kept one;
+            // ticket_asset_map is unique on (ticket_id, asset_id), linked_by is just attribution.
+            $db->prepare("UPDATE assets SET assigned_id = ? WHERE assigned_type = 'user' AND assigned_id = ?")->execute([$keepId, $deleteId]);
+            $db->prepare('UPDATE ticket_asset_map SET linked_by = ? WHERE linked_by = ?')->execute([$keepId, $deleteId]);
 
             // ── Pivot tables — reassign non-duplicates then drop duplicates ──
             // ticket_cc — unique on (ticket_id, user_id)

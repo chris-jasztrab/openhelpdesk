@@ -219,6 +219,55 @@ $router->get('/inventory/{id}/files/{fid}', function (array $p) {
     assetServeFile('files/' . basename($f['stored_name']), $f['original_name']);
 });
 
+/* ── Ticket ⇄ asset links (shared by the agent and admin ticket pages) ── */
+
+/** Load a ticket the current staff user may act on, or redirect back with an error. */
+function assetLinkTicket(PDO $db, int $ticketId): array
+{
+    if (!Auth::isStaff()) {
+        Auth::requireStaff();
+    }
+    $stmt = $db->prepare('SELECT * FROM tickets WHERE id = ?');
+    $stmt->execute([$ticketId]);
+    $ticket = $stmt->fetch();
+    if (!$ticket || !userCanAccessTicket($db, Auth::user(), $ticket)) {
+        flash('error', 'Ticket not found.');
+        redirect(Auth::isAdmin() ? '/admin/tickets' : '/agent/tickets');
+    }
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect(staffTicketUrl($ticketId));
+    }
+    return $ticket;
+}
+
+$router->post('/tickets/{id}/assets', function (array $p) {
+    Auth::requirePermission('assets.view', 'assets.manage');
+    $db = Database::connect();
+    $id = (int) $p['id'];
+    assetLinkTicket($db, $id);
+    $assetId = (int) ($_POST['asset_id'] ?? 0);
+    $stmt = $db->prepare('SELECT id FROM assets WHERE id = ? AND deleted_at IS NULL');
+    $stmt->execute([$assetId]);
+    if ($stmt->fetchColumn() === false) {
+        flash('error', 'Asset not found.');
+    } elseif (Assets::link($db, $id, $assetId, Auth::id())) {
+        flash('success', 'Asset ' . Assets::describe($db, $assetId) . ' linked.');
+    }
+    redirect(staffTicketUrl($id) . '#ticketAssetsCard');
+});
+
+$router->post('/tickets/{id}/assets/{assetId}/remove', function (array $p) {
+    Auth::requirePermission('assets.view', 'assets.manage');
+    $db = Database::connect();
+    $id = (int) $p['id'];
+    assetLinkTicket($db, $id);
+    if (Assets::unlink($db, $id, (int) $p['assetId'], Auth::id())) {
+        flash('success', 'Asset unlinked.');
+    }
+    redirect(staffTicketUrl($id) . '#ticketAssetsCard');
+});
+
 /** Stream a file from storage/attachments/assets/; a download name makes it an attachment. */
 function assetServeFile(string $rel, ?string $downloadName): never
 {

@@ -10646,6 +10646,11 @@ function applyTicketCloseMode(PDO $db, int $ticketId, string $status, string $mo
             }
             $db->prepare("UPDATE tickets SET close_reason = 'duplicate', duplicate_of_ticket_id = ? WHERE id = ?")
                ->execute([$origId, $ticketId]);
+            // The original inherits the duplicate's linked assets (the duplicate keeps its own record).
+            $db->prepare(
+                'INSERT IGNORE INTO ticket_asset_map (ticket_id, asset_id, linked_by)
+                 SELECT ?, asset_id, linked_by FROM ticket_asset_map WHERE ticket_id = ?'
+            )->execute([$origId, $ticketId]);
             $note("Closed as a duplicate of #{$origId}.", $ticketId);
             $note("Ticket #{$ticketId} was closed as a duplicate of this ticket.", $origId);
             break;
