@@ -52,6 +52,10 @@ $settingsNavGroups = [
         ['label' => 'Agent Skills',           'url' => '/admin/skills',     'icon' => 'bi-mortarboard',
          'keywords' => 'skill expertise routing assignment competency'],
     ],
+    'Inventory' => [
+        ['label' => 'Inventory',              'url' => '/admin/settings/inventory', 'icon' => 'bi-pc-display',
+         'keywords' => 'asset inventory hardware computer laptop model manufacturer supplier status tag snipe-it import'],
+    ],
     'Knowledge Base' => [
         ['label' => 'Manage Articles',        'url' => '/admin/kb/articles',   'icon' => 'bi-journal-text',
          'keywords' => 'knowledge base kb article documentation help guide write publish'],
@@ -149,6 +153,7 @@ $settingsNavPerm = static function (string $url): string {
         '/admin/settings/teams'             => '@admin',
         '/admin/roles'                      => '@admin',
         '/admin/settings'                   => 'settings.manage',
+        '/admin/settings/inventory'         => 'assets.manage',
         '/admin/locations'                  => 'locations.manage',
         '/admin/priorities'                 => 'priorities.manage',
         '/admin/types'                      => 'workflows.manage',

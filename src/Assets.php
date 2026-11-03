@@ -111,6 +111,32 @@ class Assets
         return Auth::can('assets.view') || Auth::can('assets.manage');
     }
 
+    /** May the current user create, edit, check out/in, delete assets and maintain the catalog? */
+    public static function canManage(): bool
+    {
+        return Auth::can('assets.manage');
+    }
+
+    /** Image types accepted for asset photos (never SVG — it can carry scripts). */
+    public const IMAGE_TYPES = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif', 'image/webp' => 'webp'];
+
+    /**
+     * {field: {old, new}} for every key in $fields whose value changed —
+     * the same shape the importer stores, so the History tab renders both.
+     */
+    public static function changes(array $before, array $after, array $fields): array
+    {
+        $out = [];
+        foreach ($fields as $f) {
+            $o = $before[$f] ?? null;
+            $n = $after[$f] ?? null;
+            if ((string) $o !== (string) $n) {
+                $out[$f] = ['old' => $o, 'new' => $n];
+            }
+        }
+        return $out;
+    }
+
     /** Plain-text assignee for a row carrying the assetSelect() join columns. */
     public static function assigneeLabel(array $a): string
     {
@@ -146,6 +172,7 @@ class Assets
             'restore'         => 'bi-arrow-counterclockwise',
             'audit'           => 'bi-clipboard-check',
             'file_uploaded'   => 'bi-paperclip',
+            'file_deleted'    => 'bi-paperclip',
             'ticket_linked'   => 'bi-link-45deg',
             'ticket_unlinked' => 'bi-x-circle',
             default           => 'bi-dot',
@@ -170,6 +197,7 @@ class Assets
             'restore'         => 'Restored',
             'audit'           => 'Audited',
             'file_uploaded'   => 'Uploaded ' . e((string) ($d['filename'] ?? 'a file')),
+            'file_deleted'    => 'Removed file ' . e((string) ($d['filename'] ?? '')),
             'ticket_linked'   => 'Linked to ticket ' . ($ticket ?? ''),
             'ticket_unlinked' => 'Unlinked from ticket ' . ($ticket ?? ''),
             default           => e(ucfirst(str_replace('_', ' ', $action))),

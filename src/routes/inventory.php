@@ -287,6 +287,488 @@ function assetServeFile(string $rel, ?string $downloadName): never
     exit;
 }
 
+/* ── Create / edit / check out / check in / delete / files (assets.manage) ── */
+
+/** Columns the create/edit form posts, in the order the history diff reports them. */
+const ASSET_FORM_FIELDS = ['asset_tag', 'name', 'serial', 'model_id', 'status_id', 'location_id', 'default_location_id', 'supplier_id', 'order_number', 'purchase_date', 'purchase_cost', 'warranty_months', 'eol_date', 'next_audit_date', 'notes'];
+
+/** Catalog lists the form needs. */
+function assetFormData(PDO $db): array
+{
+    return [
+        'models'    => $db->query('SELECT m.id, m.name, c.name AS category_name, mf.name AS manufacturer_name FROM asset_models m JOIN asset_categories c ON c.id = m.category_id LEFT JOIN asset_manufacturers mf ON mf.id = m.manufacturer_id ORDER BY c.name, m.name')->fetchAll(),
+        'statuses'  => $db->query('SELECT id, name FROM asset_statuses ORDER BY sort_order, name')->fetchAll(),
+        'locations' => $db->query('SELECT id, name FROM locations ORDER BY name')->fetchAll(),
+        'suppliers' => $db->query('SELECT id, name FROM asset_suppliers ORDER BY name')->fetchAll(),
+        'nextTag'   => assetNextTagPreview($db),
+    ];
+}
+
+/** What nextTag() would hand out, without advancing the counter. */
+function assetNextTagPreview(PDO $db): string
+{
+    return getSetting('asset_tag_prefix', '') . str_pad(getSetting('asset_tag_next', '1'), (int) getSetting('asset_tag_zerofill', '5'), '0', STR_PAD_LEFT);
+}
+
+/** Validate + normalise the posted form; returns [row, error]. */
+function assetFormRow(PDO $db, ?int $editingId): array
+{
+    $int  = static fn(string $k): ?int => ($_POST[$k] ?? '') === '' ? null : (int) $_POST[$k];
+    $str  = static fn(string $k): ?string => trim((string) ($_POST[$k] ?? '')) === '' ? null : trim((string) $_POST[$k]);
+    $row = [
+        'asset_tag' => trim((string) ($_POST['asset_tag'] ?? '')), 'name' => $str('name'), 'serial' => $str('serial'),
+        'model_id' => $int('model_id'), 'status_id' => $int('status_id'),
+        'location_id' => $int('location_id'), 'default_location_id' => $int('default_location_id'), 'supplier_id' => $int('supplier_id'),
+        'order_number' => $str('order_number'), 'purchase_date' => $str('purchase_date'),
+        'purchase_cost' => ($_POST['purchase_cost'] ?? '') === '' ? null : round((float) $_POST['purchase_cost'], 2),
+        'warranty_months' => $int('warranty_months'), 'eol_date' => $str('eol_date'), 'next_audit_date' => $str('next_audit_date'),
+        'notes' => $str('notes'),
+    ];
+    foreach (['purchase_date', 'eol_date', 'next_audit_date'] as $d) {
+        if ($row[$d] !== null && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $row[$d])) {
+            return [$row, 'Dates must be YYYY-MM-DD.'];
+        }
+    }
+    if ($row['model_id'] === null || $row['status_id'] === null) {
+        return [$row, 'Model and status are required.'];
+    }
+    if ($row['asset_tag'] !== '') {
+        $s = $db->prepare('SELECT id FROM assets WHERE asset_tag = ? AND id <> ?');
+        $s->execute([$row['asset_tag'], $editingId ?? 0]);
+        if ($s->fetchColumn() !== false) {
+            return [$row, 'Asset tag ' . $row['asset_tag'] . ' is already in use.'];
+        }
+    }
+    return [$row, null];
+}
+
+/** Store an uploaded asset photo under images/; returns the stored name or null. */
+function assetStoreImage(string $field, int $assetId): ?string
+{
+    if (empty($_FILES[$field]['tmp_name']) || ($_FILES[$field]['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        return null;
+    }
+    $mime = (string) mime_content_type($_FILES[$field]['tmp_name']);
+    if (!isset(Assets::IMAGE_TYPES[$mime]) || (int) $_FILES[$field]['size'] > UPLOAD_MAX_SIZE) {
+        flash('error', 'Photo must be a PNG, JPEG, GIF or WebP under ' . (UPLOAD_MAX_SIZE / 1048576) . ' MB.');
+        return null;
+    }
+    $dir = ROOT_DIR . '/storage/attachments/assets/images/';
+    if (!is_dir($dir)) {
+        mkdir($dir, 0775, true);
+    }
+    $name = 'asset_' . $assetId . '_' . bin2hex(random_bytes(4)) . '.' . Assets::IMAGE_TYPES[$mime];
+    return move_uploaded_file($_FILES[$field]['tmp_name'], $dir . $name) ? $name : null;
+}
+
+$router->get('/inventory/create', function () {
+    Auth::requirePermission('assets.manage');
+    render('inventory/form', ['editing' => null] + assetFormData(Database::connect()));
+});
+
+$router->post('/inventory/create', function () {
+    Auth::requirePermission('assets.manage');
+    $db = Database::connect();
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/inventory/create');
+    }
+    [$row, $err] = assetFormRow($db, null);
+    if ($err !== null) {
+        flashInput($_POST);
+        flash('error', $err);
+        redirect('/inventory/create');
+    }
+    if ($row['asset_tag'] === '') {
+        $row['asset_tag'] = Assets::nextTag($db);
+    }
+    $row['created_by'] = Auth::id();
+    $cols = array_keys($row);
+    $db->prepare('INSERT INTO assets (`' . implode('`, `', $cols) . '`) VALUES (' . implode(', ', array_fill(0, count($cols), '?')) . ')')
+       ->execute(array_values($row));
+    $id = (int) $db->lastInsertId();
+    if ($img = assetStoreImage('image', $id)) {
+        $db->prepare('UPDATE assets SET image = ? WHERE id = ?')->execute([$img, $id]);
+    }
+    Assets::logHistory($db, $id, 'create', [], Auth::id());
+    logAudit('asset.created', $id, 'asset', 'tag=' . $row['asset_tag']);
+    flash('success', 'Asset ' . $row['asset_tag'] . ' created.');
+    redirect('/inventory/' . $id);
+});
+
+$router->get('/inventory/{id}/edit', function (array $p) {
+    Auth::requirePermission('assets.manage');
+    $db = Database::connect();
+    $stmt = $db->prepare('SELECT * FROM assets WHERE id = ?');
+    $stmt->execute([(int) $p['id']]);
+    $editing = $stmt->fetch();
+    if (!$editing) {
+        flash('error', 'Asset not found.');
+        redirect('/inventory');
+    }
+    render('inventory/form', ['editing' => $editing] + assetFormData($db));
+});
+
+$router->post('/inventory/{id}/edit', function (array $p) {
+    Auth::requirePermission('assets.manage');
+    $db = Database::connect();
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect("/inventory/{$id}/edit");
+    }
+    $stmt = $db->prepare('SELECT * FROM assets WHERE id = ?');
+    $stmt->execute([$id]);
+    $before = $stmt->fetch();
+    if (!$before) {
+        flash('error', 'Asset not found.');
+        redirect('/inventory');
+    }
+    [$row, $err] = assetFormRow($db, $id);
+    if ($err !== null || $row['asset_tag'] === '') {
+        flashInput($_POST);
+        flash('error', $err ?? 'Asset tag is required.');
+        redirect("/inventory/{$id}/edit");
+    }
+    if ($img = assetStoreImage('image', $id)) {
+        $row['image'] = $img;
+    }
+    $sets = implode(', ', array_map(static fn(string $c): string => "`$c` = ?", array_keys($row)));
+    $db->prepare("UPDATE assets SET {$sets} WHERE id = ?")->execute([...array_values($row), $id]);
+    $changes = Assets::changes($before, $row, ASSET_FORM_FIELDS);
+    if ($changes !== [] || isset($row['image'])) {
+        Assets::logHistory($db, $id, 'update', $changes === [] ? [] : ['changes' => $changes], Auth::id());
+        logAudit('asset.updated', $id, 'asset', 'tag=' . $row['asset_tag'] . ' fields=' . implode(',', array_keys($changes)));
+    }
+    flash('success', 'Asset updated.');
+    redirect('/inventory/' . $id);
+});
+
+$router->post('/inventory/{id}/checkout', function (array $p) {
+    Auth::requirePermission('assets.manage');
+    $db = Database::connect();
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect("/inventory/{$id}");
+    }
+    $type = (string) ($_POST['assigned_type'] ?? '');
+    $note = trim((string) ($_POST['note'] ?? ''));
+    $target = null;
+    $location = null;
+    if ($type === 'user') {
+        $s = $db->prepare('SELECT id, CONCAT(first_name, " ", last_name) AS name, location_id FROM users WHERE id = ?');
+        $s->execute([(int) ($_POST['user_id'] ?? 0)]);
+        if ($target = $s->fetch()) {
+            $location = $target['location_id'] !== null ? (int) $target['location_id'] : null;
+        }
+    } elseif ($type === 'location') {
+        $s = $db->prepare('SELECT id, name FROM locations WHERE id = ?');
+        $s->execute([(int) ($_POST['location_id'] ?? 0)]);
+        if ($target = $s->fetch()) {
+            $location = (int) $target['id'];
+        }
+    } elseif ($type === 'asset') {
+        $s = $db->prepare('SELECT id, asset_tag AS name, location_id FROM assets WHERE asset_tag = ? AND id <> ? AND deleted_at IS NULL');
+        $s->execute([trim((string) ($_POST['asset_tag'] ?? '')), $id]);
+        if ($target = $s->fetch()) {
+            $location = $target['location_id'] !== null ? (int) $target['location_id'] : null;
+        }
+    }
+    if (!$target) {
+        flash('error', 'Choose who or where to check this asset out to.');
+        redirect("/inventory/{$id}?tab=details");
+    }
+    $db->prepare('UPDATE assets SET assigned_type = ?, assigned_id = ?, import_assignee = NULL, location_id = COALESCE(?, location_id), last_checkout_at = NOW() WHERE id = ? AND deleted_at IS NULL')
+       ->execute([$type, (int) $target['id'], $location, $id]);
+    Assets::logHistory($db, $id, 'checkout', array_filter(['target' => ['type' => $type, 'id' => (int) $target['id'], 'name' => $target['name']], 'note' => $note ?: null]), Auth::id());
+    logAudit('asset.checked_out', $id, 'asset', $type . '=' . $target['name']);
+    flash('success', 'Checked out to ' . $target['name'] . '.');
+    redirect("/inventory/{$id}");
+});
+
+$router->post('/inventory/{id}/checkin', function (array $p) {
+    Auth::requirePermission('assets.manage');
+    $db = Database::connect();
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect("/inventory/{$id}");
+    }
+    $stmt = $db->prepare(assetSelect() . ' WHERE a.id = ?');
+    $stmt->execute([$id]);
+    $a = $stmt->fetch();
+    if (!$a || ($a['assigned_type'] === null && $a['import_assignee'] === null)) {
+        flash('error', 'That asset is not checked out.');
+        redirect("/inventory/{$id}");
+    }
+    $from = Assets::assigneeLabel($a);
+    $db->prepare('UPDATE assets SET assigned_type = NULL, assigned_id = NULL, import_assignee = NULL, location_id = COALESCE(default_location_id, location_id), last_checkin_at = NOW() WHERE id = ?')
+       ->execute([$id]);
+    $note = trim((string) ($_POST['note'] ?? ''));
+    Assets::logHistory($db, $id, 'checkin', array_filter(['target' => ['type' => $a['assigned_type'] ?? 'user', 'id' => $a['assigned_id'] !== null ? (int) $a['assigned_id'] : null, 'name' => $from], 'note' => $note ?: null]), Auth::id());
+    logAudit('asset.checked_in', $id, 'asset', 'from=' . $from);
+    flash('success', 'Checked in from ' . $from . '.');
+    redirect("/inventory/{$id}");
+});
+
+$router->post('/inventory/{id}/delete', function (array $p) {
+    Auth::requirePermission('assets.manage');
+    $db = Database::connect();
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect("/inventory/{$id}");
+    }
+    $db->prepare('UPDATE assets SET deleted_at = NOW(), assigned_type = NULL, assigned_id = NULL WHERE id = ? AND deleted_at IS NULL')->execute([$id]);
+    Assets::logHistory($db, $id, 'delete', [], Auth::id());
+    logAudit('asset.deleted', $id, 'asset', null);
+    flash('success', 'Asset deleted. It stays in the list under "Show deleted" and can be restored.');
+    redirect("/inventory/{$id}");
+});
+
+$router->post('/inventory/{id}/restore', function (array $p) {
+    Auth::requirePermission('assets.manage');
+    $db = Database::connect();
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect("/inventory/{$id}");
+    }
+    $db->prepare('UPDATE assets SET deleted_at = NULL WHERE id = ?')->execute([$id]);
+    Assets::logHistory($db, $id, 'restore', [], Auth::id());
+    logAudit('asset.restored', $id, 'asset', null);
+    flash('success', 'Asset restored.');
+    redirect("/inventory/{$id}");
+});
+
+$router->post('/inventory/{id}/files', function (array $p) {
+    Auth::requirePermission('assets.manage');
+    $db = Database::connect();
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect("/inventory/{$id}?tab=files");
+    }
+    $f = $_FILES['file'] ?? null;
+    if (!$f || ($f['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        flash('error', 'Choose a file to upload.');
+        redirect("/inventory/{$id}?tab=files");
+    }
+    $mime = (string) mime_content_type($f['tmp_name']);
+    if (!in_array($mime, UPLOAD_ALLOWED_TYPES, true) || (int) $f['size'] > UPLOAD_MAX_SIZE) {
+        flash('error', 'That file type or size is not allowed (see Settings › Attachments).');
+        redirect("/inventory/{$id}?tab=files");
+    }
+    $dir = ROOT_DIR . '/storage/attachments/assets/files/';
+    if (!is_dir($dir)) {
+        mkdir($dir, 0775, true);
+    }
+    $stored = 'asset_' . $id . '_' . bin2hex(random_bytes(6)) . '.' . safeUploadExtension($mime, (string) $f['name']);
+    if (!move_uploaded_file($f['tmp_name'], $dir . $stored)) {
+        flash('error', 'Upload failed.');
+        redirect("/inventory/{$id}?tab=files");
+    }
+    $db->prepare('INSERT INTO asset_files (asset_id, uploaded_by, original_name, stored_name, mime_type, file_size) VALUES (?, ?, ?, ?, ?, ?)')
+       ->execute([$id, Auth::id(), (string) $f['name'], $stored, $mime, (int) $f['size']]);
+    Assets::logHistory($db, $id, 'file_uploaded', ['filename' => (string) $f['name']], Auth::id());
+    flash('success', 'File uploaded.');
+    redirect("/inventory/{$id}?tab=files");
+});
+
+$router->post('/inventory/{id}/files/{fid}/delete', function (array $p) {
+    Auth::requirePermission('assets.manage');
+    $db = Database::connect();
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect("/inventory/{$id}?tab=files");
+    }
+    $stmt = $db->prepare('SELECT stored_name, original_name FROM asset_files WHERE id = ? AND asset_id = ?');
+    $stmt->execute([(int) $p['fid'], $id]);
+    if ($f = $stmt->fetch()) {
+        $db->prepare('DELETE FROM asset_files WHERE id = ?')->execute([(int) $p['fid']]);
+        $path = ROOT_DIR . '/storage/attachments/assets/files/' . basename($f['stored_name']);
+        if (is_file($path)) {
+            unlink($path);
+        }
+        Assets::logHistory($db, $id, 'file_deleted', ['filename' => $f['original_name']], Auth::id());
+        flash('success', 'File removed.');
+    }
+    redirect("/inventory/{$id}?tab=files");
+});
+
+/* ── Settings › Inventory: tag numbering + catalog (assets.manage) ── */
+
+/** Field specs per catalog kind: [name, label, type, required?, default]. */
+function assetCatalogSpec(string $kind): ?array
+{
+    $kinds = ['deployable' => 'Deployable', 'pending' => 'Pending', 'undeployable' => 'Undeployable', 'archived' => 'Archived'];
+    return [
+        'categories' => ['title' => 'Categories', 'singular' => 'Category', 'table' => 'asset_categories', 'order' => 'name',
+            'fields' => [['name', 'Name', 'text', true]],
+            'columns' => [['name', 'Name']],
+            'in_use' => 'SELECT COUNT(*) FROM asset_models WHERE category_id = t.id'],
+        'manufacturers' => ['title' => 'Manufacturers', 'singular' => 'Manufacturer', 'table' => 'asset_manufacturers', 'order' => 'name',
+            'fields' => [['name', 'Name', 'text', true], ['url', 'Website', 'url'], ['support_url', 'Support URL', 'url'], ['support_phone', 'Support phone', 'text'], ['support_email', 'Support email', 'email']],
+            'columns' => [['name', 'Name'], ['url', 'Website'], ['support_phone', 'Support phone']],
+            'in_use' => 'SELECT COUNT(*) FROM asset_models WHERE manufacturer_id = t.id'],
+        'suppliers' => ['title' => 'Suppliers', 'singular' => 'Supplier', 'table' => 'asset_suppliers', 'order' => 'name',
+            'fields' => [['name', 'Name', 'text', true], ['contact', 'Contact', 'text'], ['phone', 'Phone', 'text'], ['email', 'Email', 'email'], ['url', 'Website', 'url'], ['address', 'Address', 'textarea'], ['notes', 'Notes', 'textarea']],
+            'columns' => [['name', 'Name'], ['contact', 'Contact'], ['phone', 'Phone'], ['email', 'Email']],
+            'in_use' => 'SELECT COUNT(*) FROM assets WHERE supplier_id = t.id'],
+        'statuses' => ['title' => 'Statuses', 'singular' => 'Status', 'table' => 'asset_statuses', 'order' => 'sort_order, name',
+            'fields' => [['name', 'Name', 'text', true], ['kind', 'Kind', 'select', true, 'deployable'], ['color', 'Colour', 'color', false, '#6c757d'], ['sort_order', 'Sort order', 'number', false, '0'], ['notes', 'Notes', 'textarea']],
+            'columns' => [['color', 'Status'], ['kind', 'Kind'], ['sort_order', 'Order']],
+            'options' => ['kind' => $kinds],
+            'in_use' => 'SELECT COUNT(*) FROM assets WHERE status_id = t.id'],
+        'models' => ['title' => 'Models', 'singular' => 'Model', 'table' => 'asset_models', 'order' => 'name',
+            'fields' => [['name', 'Name', 'text', true], ['model_number', 'Model number', 'text'], ['category_id', 'Category', 'select', true], ['manufacturer_id', 'Manufacturer', 'select'], ['eol_months', 'End of life (months)', 'number'], ['notes', 'Notes', 'textarea']],
+            'columns' => [['name', 'Name'], ['model_number', 'Model no.'], ['category_name', 'Category'], ['manufacturer_name', 'Manufacturer'], ['eol_months', 'EOL (months)']],
+            'in_use' => 'SELECT COUNT(*) FROM assets WHERE model_id = t.id'],
+    ][$kind] ?? null;
+}
+
+function assetCatalogCounts(PDO $db): array
+{
+    return [
+        'models' => (int) $db->query('SELECT COUNT(*) FROM asset_models')->fetchColumn(),
+        'categories' => (int) $db->query('SELECT COUNT(*) FROM asset_categories')->fetchColumn(),
+        'manufacturers' => (int) $db->query('SELECT COUNT(*) FROM asset_manufacturers')->fetchColumn(),
+        'suppliers' => (int) $db->query('SELECT COUNT(*) FROM asset_suppliers')->fetchColumn(),
+        'statuses' => (int) $db->query('SELECT COUNT(*) FROM asset_statuses')->fetchColumn(),
+    ];
+}
+
+$router->get('/admin/settings/inventory', function () {
+    Auth::requirePermission('assets.manage');
+    $db = Database::connect();
+    render('admin/settings/inventory', [
+        'kind' => null, 'spec' => null, 'counts' => assetCatalogCounts($db),
+        'tagPrefix' => getSetting('asset_tag_prefix', ''), 'tagZerofill' => getSetting('asset_tag_zerofill', '5'),
+        'tagNext' => getSetting('asset_tag_next', '1'), 'nextTagPreview' => assetNextTagPreview($db),
+    ]);
+});
+
+$router->post('/admin/settings/inventory', function () {
+    Auth::requirePermission('assets.manage');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/inventory');
+    }
+    setSetting('asset_tag_prefix', trim((string) ($_POST['asset_tag_prefix'] ?? '')));
+    setSetting('asset_tag_zerofill', (string) max(0, min(12, (int) ($_POST['asset_tag_zerofill'] ?? 5))));
+    setSetting('asset_tag_next', (string) max(1, (int) ($_POST['asset_tag_next'] ?? 1)));
+    logAudit('asset.tag_settings_changed', null, null, 'prefix=' . trim((string) ($_POST['asset_tag_prefix'] ?? '')) . ' next=' . (int) ($_POST['asset_tag_next'] ?? 1));
+    flash('success', 'Tag numbering saved.');
+    redirect('/admin/settings/inventory');
+});
+
+$router->get('/admin/settings/inventory/{kind}', function (array $p) {
+    Auth::requirePermission('assets.manage');
+    $spec = assetCatalogSpec($p['kind']);
+    if ($spec === null) {
+        redirect('/admin/settings/inventory');
+    }
+    $db = Database::connect();
+    $extra = $p['kind'] === 'models' ? ', (SELECT name FROM asset_categories c WHERE c.id = t.category_id) AS category_name, (SELECT name FROM asset_manufacturers m WHERE m.id = t.manufacturer_id) AS manufacturer_name' : '';
+    $rows = $db->query("SELECT t.*, ({$spec['in_use']}) AS in_use{$extra} FROM `{$spec['table']}` t ORDER BY {$spec['order']}")->fetchAll();
+    $editing = null;
+    if (($eid = (int) requestScalar('edit', '0')) > 0) {
+        foreach ($rows as $r) {
+            if ((int) $r['id'] === $eid) {
+                $editing = $r;
+            }
+        }
+    }
+    $options = $spec['options'] ?? [];
+    if ($p['kind'] === 'models') {
+        $options['category_id']     = $db->query('SELECT id, name FROM asset_categories ORDER BY name')->fetchAll(PDO::FETCH_KEY_PAIR);
+        $options['manufacturer_id'] = $db->query('SELECT id, name FROM asset_manufacturers ORDER BY name')->fetchAll(PDO::FETCH_KEY_PAIR);
+    }
+    render('admin/settings/inventory', [
+        'kind' => $p['kind'], 'spec' => $spec, 'rows' => $rows, 'editing' => $editing, 'options' => $options,
+        'counts' => assetCatalogCounts($db),
+    ]);
+});
+
+$router->post('/admin/settings/inventory/{kind}', function (array $p) {
+    Auth::requirePermission('assets.manage');
+    $spec = assetCatalogSpec($p['kind']);
+    if ($spec === null) {
+        redirect('/admin/settings/inventory');
+    }
+    $back = '/admin/settings/inventory/' . $p['kind'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect($back);
+    }
+    $db  = Database::connect();
+    $id  = (int) ($_POST['id'] ?? 0);
+    $row = [];
+    foreach ($spec['fields'] as $f) {
+        [$name, $label, $type] = $f;
+        $val = trim((string) ($_POST[$name] ?? ''));
+        if ($val === '' && !empty($f[3])) {
+            flashInput($_POST);
+            flash('error', $label . ' is required.');
+            redirect($back . ($id ? "?edit={$id}" : ''));
+        }
+        if ($type === 'select' && isset($spec['options'][$name]) && $val !== '' && !isset($spec['options'][$name][$val])) {
+            $val = array_key_first($spec['options'][$name]);
+        }
+        $row[$name] = $val === '' ? null : (in_array($type, ['number'], true) || str_ends_with($name, '_id') ? (int) $val : $val);
+    }
+    $dup = $db->prepare("SELECT id FROM `{$spec['table']}` WHERE LOWER(name) = LOWER(?) AND id <> ?" . ($p['kind'] === 'models' ? ' AND category_id = ?' : ''));
+    $dup->execute($p['kind'] === 'models' ? [$row['name'], $id, $row['category_id']] : [$row['name'], $id]);
+    if ($dup->fetchColumn() !== false) {
+        flashInput($_POST);
+        flash('error', $spec['singular'] . ' "' . $row['name'] . '" already exists.');
+        redirect($back . ($id ? "?edit={$id}" : ''));
+    }
+    if ($id > 0) {
+        $sets = implode(', ', array_map(static fn(string $c): string => "`$c` = ?", array_keys($row)));
+        $db->prepare("UPDATE `{$spec['table']}` SET {$sets} WHERE id = ?")->execute([...array_values($row), $id]);
+        logAudit('asset_catalog.updated', $id, $p['kind'], 'name=' . $row['name']);
+        flash('success', $spec['singular'] . ' updated.');
+    } else {
+        $cols = array_keys($row);
+        $db->prepare("INSERT INTO `{$spec['table']}` (`" . implode('`, `', $cols) . '`) VALUES (' . implode(', ', array_fill(0, count($cols), '?')) . ')')->execute(array_values($row));
+        logAudit('asset_catalog.created', (int) $db->lastInsertId(), $p['kind'], 'name=' . $row['name']);
+        flash('success', $spec['singular'] . ' added.');
+    }
+    redirect($back);
+});
+
+$router->post('/admin/settings/inventory/{kind}/{id}/delete', function (array $p) {
+    Auth::requirePermission('assets.manage');
+    $spec = assetCatalogSpec($p['kind']);
+    if ($spec === null) {
+        redirect('/admin/settings/inventory');
+    }
+    $back = '/admin/settings/inventory/' . $p['kind'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect($back);
+    }
+    $db = Database::connect();
+    $id = (int) $p['id'];
+    $s = $db->prepare("SELECT name, ({$spec['in_use']}) AS in_use FROM `{$spec['table']}` t WHERE id = ?");
+    $s->execute([$id]);
+    $r = $s->fetch();
+    if (!$r) {
+        redirect($back);
+    }
+    if ((int) $r['in_use'] > 0) {
+        flash('error', $spec['singular'] . ' "' . $r['name'] . '" is in use by ' . (int) $r['in_use'] . ' record(s) and cannot be deleted.');
+        redirect($back);
+    }
+    $db->prepare("DELETE FROM `{$spec['table']}` WHERE id = ?")->execute([$id]);
+    logAudit('asset_catalog.deleted', $id, $p['kind'], 'name=' . $r['name']);
+    flash('success', $spec['singular'] . ' deleted.');
+    redirect($back);
+});
+
 $router->get('/inventory/{id}', function (array $p) {
     Auth::requirePermission('assets.view', 'assets.manage');
     $db = Database::connect();
@@ -356,5 +838,7 @@ $router->get('/inventory/{id}', function (array $p) {
         'files'         => $files,
         'children'      => $children,
         'tab'           => requestScalar('tab', 'tickets'),
+        'users'         => Assets::canManage() ? $db->query('SELECT id, first_name, last_name, email FROM users WHERE is_external = 0 ORDER BY first_name, last_name')->fetchAll() : [],
+        'locations'     => Assets::canManage() ? $db->query('SELECT id, name FROM locations ORDER BY name')->fetchAll() : [],
     ]);
 });

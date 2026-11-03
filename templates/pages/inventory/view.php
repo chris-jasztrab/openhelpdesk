@@ -56,6 +56,74 @@ $money = static fn($v): string => $v !== null && $v !== '' ? '$' . number_format
     </div>
 </div>
 
+<?php if (Assets::canManage()): $checkedOut = $asset['assigned_type'] !== null || $asset['import_assignee'] !== null; ?>
+<div class="d-flex flex-wrap gap-2 mb-3" id="assetActions">
+    <?php if (!$asset['deleted_at']): ?>
+    <a href="/inventory/<?= (int) $asset['id'] ?>/edit" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Edit</a>
+    <?php if ($checkedOut): ?>
+    <form method="POST" action="/inventory/<?= (int) $asset['id'] ?>/checkin" class="d-inline" onsubmit="return confirm('Check this asset in?');">
+        <?= csrfField() ?>
+        <button type="submit" class="btn btn-sm btn-outline-secondary"><i class="bi bi-box-arrow-in-left me-1"></i>Check in</button>
+    </form>
+    <?php else: ?>
+    <button type="button" class="btn btn-sm text-white" style="background:var(--ld-primary);" onclick="document.getElementById('assetCheckout').classList.toggle('d-none');"><i class="bi bi-box-arrow-right me-1"></i>Check out</button>
+    <?php endif; ?>
+    <form method="POST" action="/inventory/<?= (int) $asset['id'] ?>/delete" class="d-inline ms-auto" onsubmit="return confirm('Delete <?= e($asset['asset_tag']) ?>? It can be restored later.');">
+        <?= csrfField() ?>
+        <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1"></i>Delete</button>
+    </form>
+    <?php else: ?>
+    <form method="POST" action="/inventory/<?= (int) $asset['id'] ?>/restore" class="d-inline">
+        <?= csrfField() ?>
+        <button type="submit" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-counterclockwise me-1"></i>Restore</button>
+    </form>
+    <?php endif; ?>
+</div>
+<?php if (!$asset['deleted_at'] && !$checkedOut): ?>
+<div class="card border-0 shadow-sm mb-3 d-none" id="assetCheckout">
+    <div class="card-body p-3">
+        <form method="POST" action="/inventory/<?= (int) $asset['id'] ?>/checkout" class="row g-2 align-items-end">
+            <?= csrfField() ?>
+            <div class="col-sm-3">
+                <label class="form-label small fw-semibold mb-1" for="coType">Check out to</label>
+                <select class="form-select form-select-sm" name="assigned_type" id="coType" onchange="document.querySelectorAll('[data-co]').forEach(function(el){el.classList.toggle('d-none', el.getAttribute('data-co')!==this.value);}.bind(this));">
+                    <option value="user">A person</option>
+                    <option value="location">A <?= label('location.singular') ?></option>
+                    <option value="asset">Another asset</option>
+                </select>
+            </div>
+            <div class="col-sm-4" data-co="user">
+                <label class="form-label small fw-semibold mb-1" for="coUser">Person</label>
+                <select class="form-select form-select-sm" name="user_id" id="coUser">
+                    <?php foreach ($users as $u): ?>
+                    <option value="<?= (int) $u['id'] ?>"><?= e($u['first_name'] . ' ' . $u['last_name']) ?> — <?= e($u['email']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-sm-4 d-none" data-co="location">
+                <label class="form-label small fw-semibold mb-1" for="coLoc"><?= label('location.singular') ?></label>
+                <select class="form-select form-select-sm" name="location_id" id="coLoc">
+                    <?php foreach ($locations as $l): ?>
+                    <option value="<?= (int) $l['id'] ?>"><?= e($l['name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-sm-4 d-none" data-co="asset">
+                <label class="form-label small fw-semibold mb-1" for="coAsset">Asset tag</label>
+                <input type="text" class="form-control form-control-sm font-monospace" name="asset_tag" id="coAsset" placeholder="e.g. 00123">
+            </div>
+            <div class="col-sm-3">
+                <label class="form-label small fw-semibold mb-1" for="coNote">Note</label>
+                <input type="text" class="form-control form-control-sm" name="note" id="coNote">
+            </div>
+            <div class="col-sm-2">
+                <button type="submit" class="btn btn-sm text-white w-100" style="background:var(--ld-primary);">Check out</button>
+            </div>
+        </form>
+    </div>
+</div>
+<?php endif; endif; ?>
+
 <ul class="nav nav-tabs mb-3">
     <?php foreach ($tabs as $key => $labelText): ?>
     <li class="nav-item">
@@ -211,15 +279,23 @@ $money = static fn($v): string => $v !== null && $v !== '' ? '$' . number_format
 </div>
 
 <?php else: ?>
+<?php if (Assets::canManage() && !$asset['deleted_at']): ?>
+<form method="POST" action="/inventory/<?= (int) $asset['id'] ?>/files" enctype="multipart/form-data" class="d-flex gap-2 align-items-center mb-3 flex-wrap">
+    <?= csrfField() ?>
+    <input type="file" class="form-control form-control-sm" name="file" required style="max-width:360px;" aria-label="File to attach">
+    <button type="submit" class="btn btn-sm btn-outline-secondary"><i class="bi bi-upload me-1"></i>Upload</button>
+    <span class="text-muted small">Receipts, warranty documents, photos.</span>
+</form>
+<?php endif; ?>
 <div class="card border-0 shadow-sm">
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
             <thead class="table-light">
-                <tr><th>File</th><th>Size</th><th>Uploaded by</th><th>Uploaded</th></tr>
+                <tr><th>File</th><th>Size</th><th>Uploaded by</th><th>Uploaded</th><?php if (Assets::canManage()): ?><th style="width:60px"></th><?php endif; ?></tr>
             </thead>
             <tbody>
                 <?php if (!$files): ?>
-                <tr><td colspan="4" class="text-center py-4 text-muted">No files attached.</td></tr>
+                <tr><td colspan="5" class="text-center py-4 text-muted">No files attached.</td></tr>
                 <?php endif; ?>
                 <?php foreach ($files as $f): ?>
                 <tr>
@@ -227,6 +303,14 @@ $money = static fn($v): string => $v !== null && $v !== '' ? '$' . number_format
                     <td class="text-muted small"><?= number_format((int) $f['file_size'] / 1024) ?> KB</td>
                     <td><?= e($f['uploader_name'] ?: '—') ?></td>
                     <td class="text-muted small"><?= e($when($f['created_at'])) ?></td>
+                    <?php if (Assets::canManage()): ?>
+                    <td>
+                        <form method="POST" action="/inventory/<?= (int) $asset['id'] ?>/files/<?= (int) $f['id'] ?>/delete" onsubmit="return confirm('Remove <?= e(addslashes($f['original_name'])) ?>?');">
+                            <?= csrfField() ?>
+                            <button type="submit" class="btn btn-sm btn-link text-danger p-0" title="Remove file"><i class="bi bi-trash"></i></button>
+                        </form>
+                    </td>
+                    <?php endif; ?>
                 </tr>
                 <?php endforeach; ?>
             </tbody>

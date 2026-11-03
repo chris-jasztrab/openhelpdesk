@@ -34,6 +34,9 @@ $th = static fn(string $col, string $text): string =>
         <a href="<?= e('/inventory?' . http_build_query(array_merge($filterParams, ['export' => 'csv']))) ?>" class="btn btn-sm btn-outline-secondary" title="Download the filtered list as CSV">
             <i class="bi bi-download me-1"></i>CSV
         </a>
+        <?php if (Assets::canManage()): ?>
+        <a href="/inventory/create" class="btn btn-sm text-white" style="background:var(--ld-primary);"><i class="bi bi-plus-lg me-1"></i>Add asset</a>
+        <?php endif; ?>
     </div>
 </div>
 

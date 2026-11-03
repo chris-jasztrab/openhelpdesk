@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.214.0 &mdash; 2026-11-03
+
+### Added
+- **Manage the inventory (phase 5 of the asset inventory).** Permission levels with *Manage inventory* (admins always) get an **Add asset** button and, on every asset: **Edit** (all identity, purchase and lifecycle fields, optional photo; the tag auto-numbers when left blank; every field change is logged old → new), **Check out** to a person, a location or another asset with an optional note (a person's asset moves to their location), **Check in** (back to the default location), **Delete** (soft — listed under *Show deleted* and restorable) and file upload/removal on the Files tab, all written to the asset's history and the audit log. New **Settings › Inventory** page: asset-tag numbering (prefix, digits, next number) plus catalogs for Models, Categories, Manufacturers, Suppliers and Statuses with add/edit/delete — a record in use cannot be deleted, duplicate names are refused.
+
 ## 2.213.0 &mdash; 2026-11-03
 
 ### Added
