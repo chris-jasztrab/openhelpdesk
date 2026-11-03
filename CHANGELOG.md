@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.210.0 &mdash; 2026-11-03
+
+### Added
+- **Asset inventory — schema and core (phase 1 of the Snipe-IT replacement).** New tables `asset_categories`, `asset_manufacturers`, `asset_suppliers`, `asset_models`, `asset_statuses`, `assets`, `asset_history`, `asset_files` and `ticket_asset_map` (migration 088 + schema.sql). An asset is described by its model (category and manufacturer live there, so furniture is just another model), can be assigned to a user, a location or another asset, keeps a soft-delete timestamp and a `snipeit_id` so the importer can upsert. Default statuses Ready to Deploy / Pending / Broken / Archived are seeded only on an empty table. Asset tags auto-number from the new `asset_tag_prefix` / `asset_tag_zerofill` / `asset_tag_next` settings. New permissions **View inventory** (`assets.view`) and **Manage inventory** (`assets.manage`) under an Inventory category — granted to no role yet, so nothing changes for users until Permission Levels is updated. `src/Assets.php` holds tag numbering, the history log, and the ticket ⇄ asset link/unlink that writes an internal timeline row on the ticket and a history row on the asset. No pages yet — those are the next phases.
+
 ## 2.209.0 &mdash; 2026-10-28
 
 ### Added

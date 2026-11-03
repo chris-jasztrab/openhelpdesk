@@ -193,6 +193,153 @@ CREATE TABLE IF NOT EXISTS `api_rate_limits` (
   PRIMARY KEY (`bucket`,`window_start`),
   KEY `idx_window_start` (`window_start`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS `asset_categories` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `name` varchar(255) NOT NULL,
+  `snipeit_id` int(10) unsigned DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_asset_categories_name` (`name`),
+  UNIQUE KEY `uniq_asset_categories_snipeit` (`snipeit_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS `asset_files` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `asset_id` int(10) unsigned NOT NULL,
+  `uploaded_by` int(10) unsigned DEFAULT NULL,
+  `original_name` varchar(255) NOT NULL,
+  `stored_name` varchar(255) NOT NULL,
+  `mime_type` varchar(127) NOT NULL,
+  `file_size` int(10) unsigned NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_asset_files_asset` (`asset_id`),
+  KEY `idx_asset_files_uploaded_by` (`uploaded_by`),
+  CONSTRAINT `fk_asset_files_asset` FOREIGN KEY (`asset_id`) REFERENCES `assets` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_asset_files_uploaded_by` FOREIGN KEY (`uploaded_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS `asset_history` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `asset_id` int(10) unsigned NOT NULL,
+  `user_id` int(10) unsigned DEFAULT NULL,
+  `actor_name` varchar(100) DEFAULT NULL,
+  `action` varchar(50) NOT NULL,
+  `details` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_asset_history_asset` (`asset_id`,`created_at`),
+  KEY `idx_asset_history_user` (`user_id`),
+  CONSTRAINT `fk_asset_history_asset` FOREIGN KEY (`asset_id`) REFERENCES `assets` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_asset_history_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS `asset_manufacturers` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `name` varchar(255) NOT NULL,
+  `url` varchar(255) DEFAULT NULL,
+  `support_url` varchar(255) DEFAULT NULL,
+  `support_phone` varchar(64) DEFAULT NULL,
+  `support_email` varchar(255) DEFAULT NULL,
+  `snipeit_id` int(10) unsigned DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_asset_manufacturers_name` (`name`),
+  UNIQUE KEY `uniq_asset_manufacturers_snipeit` (`snipeit_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS `asset_models` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `name` varchar(255) NOT NULL,
+  `model_number` varchar(255) DEFAULT NULL,
+  `category_id` int(10) unsigned NOT NULL,
+  `manufacturer_id` int(10) unsigned DEFAULT NULL,
+  `eol_months` int(10) unsigned DEFAULT NULL,
+  `image` varchar(255) DEFAULT NULL,
+  `notes` text DEFAULT NULL,
+  `snipeit_id` int(10) unsigned DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_asset_models_snipeit` (`snipeit_id`),
+  KEY `idx_asset_models_category` (`category_id`),
+  KEY `idx_asset_models_manufacturer` (`manufacturer_id`),
+  CONSTRAINT `fk_asset_models_category` FOREIGN KEY (`category_id`) REFERENCES `asset_categories` (`id`),
+  CONSTRAINT `fk_asset_models_manufacturer` FOREIGN KEY (`manufacturer_id`) REFERENCES `asset_manufacturers` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS `asset_statuses` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `name` varchar(64) NOT NULL,
+  `kind` enum('deployable','pending','undeployable','archived') NOT NULL DEFAULT 'deployable',
+  `color` varchar(7) NOT NULL DEFAULT '#6c757d',
+  `notes` text DEFAULT NULL,
+  `sort_order` int(10) unsigned NOT NULL DEFAULT 0,
+  `snipeit_id` int(10) unsigned DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_asset_statuses_name` (`name`),
+  UNIQUE KEY `uniq_asset_statuses_snipeit` (`snipeit_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS `asset_suppliers` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `name` varchar(255) NOT NULL,
+  `contact` varchar(255) DEFAULT NULL,
+  `phone` varchar(64) DEFAULT NULL,
+  `email` varchar(255) DEFAULT NULL,
+  `url` varchar(255) DEFAULT NULL,
+  `address` text DEFAULT NULL,
+  `notes` text DEFAULT NULL,
+  `snipeit_id` int(10) unsigned DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_asset_suppliers_name` (`name`),
+  UNIQUE KEY `uniq_asset_suppliers_snipeit` (`snipeit_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS `assets` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `asset_tag` varchar(64) NOT NULL,
+  `name` varchar(255) DEFAULT NULL,
+  `serial` varchar(255) DEFAULT NULL,
+  `model_id` int(10) unsigned NOT NULL,
+  `status_id` int(10) unsigned NOT NULL,
+  `location_id` int(10) unsigned DEFAULT NULL,
+  `default_location_id` int(10) unsigned DEFAULT NULL,
+  `assigned_type` enum('user','location','asset') DEFAULT NULL,
+  `assigned_id` int(10) unsigned DEFAULT NULL,
+  `import_assignee` varchar(100) DEFAULT NULL,
+  `supplier_id` int(10) unsigned DEFAULT NULL,
+  `order_number` varchar(100) DEFAULT NULL,
+  `purchase_date` date DEFAULT NULL,
+  `purchase_cost` decimal(12,2) DEFAULT NULL,
+  `warranty_months` int(10) unsigned DEFAULT NULL,
+  `eol_date` date DEFAULT NULL,
+  `last_checkout_at` datetime DEFAULT NULL,
+  `last_checkin_at` datetime DEFAULT NULL,
+  `last_audit_at` datetime DEFAULT NULL,
+  `next_audit_date` date DEFAULT NULL,
+  `image` varchar(255) DEFAULT NULL,
+  `notes` text DEFAULT NULL,
+  `created_by` int(10) unsigned DEFAULT NULL,
+  `snipeit_id` int(10) unsigned DEFAULT NULL,
+  `deleted_at` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_assets_tag` (`asset_tag`),
+  UNIQUE KEY `uniq_assets_snipeit` (`snipeit_id`),
+  KEY `idx_assets_serial` (`serial`),
+  KEY `idx_assets_name` (`name`),
+  KEY `idx_assets_model` (`model_id`),
+  KEY `idx_assets_status` (`status_id`),
+  KEY `idx_assets_location` (`location_id`),
+  KEY `idx_assets_default_location` (`default_location_id`),
+  KEY `idx_assets_supplier` (`supplier_id`),
+  KEY `idx_assets_created_by` (`created_by`),
+  KEY `idx_assets_assigned` (`assigned_type`,`assigned_id`),
+  KEY `idx_assets_deleted` (`deleted_at`),
+  CONSTRAINT `fk_assets_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_assets_default_location` FOREIGN KEY (`default_location_id`) REFERENCES `locations` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_assets_location` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_assets_model` FOREIGN KEY (`model_id`) REFERENCES `asset_models` (`id`),
+  CONSTRAINT `fk_assets_status` FOREIGN KEY (`status_id`) REFERENCES `asset_statuses` (`id`),
+  CONSTRAINT `fk_assets_supplier` FOREIGN KEY (`supplier_id`) REFERENCES `asset_suppliers` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE IF NOT EXISTS `audit_log` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `user_id` int(10) unsigned DEFAULT NULL,
@@ -636,6 +783,18 @@ CREATE TABLE IF NOT EXISTS `status_banner_locations` (
   KEY `idx_sbl_location` (`location_id`),
   CONSTRAINT `fk_sbl_banner` FOREIGN KEY (`banner_id`) REFERENCES `status_banners` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_sbl_location` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS `ticket_asset_map` (
+  `ticket_id` int(10) unsigned NOT NULL,
+  `asset_id` int(10) unsigned NOT NULL,
+  `linked_by` int(10) unsigned DEFAULT NULL,
+  `linked_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`ticket_id`,`asset_id`),
+  KEY `idx_ticket_asset_map_asset` (`asset_id`),
+  KEY `idx_ticket_asset_map_linked_by` (`linked_by`),
+  CONSTRAINT `fk_ticket_asset_map_asset` FOREIGN KEY (`asset_id`) REFERENCES `assets` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_ticket_asset_map_linked_by` FOREIGN KEY (`linked_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_ticket_asset_map_ticket` FOREIGN KEY (`ticket_id`) REFERENCES `tickets` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE IF NOT EXISTS `ticket_attachments` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
