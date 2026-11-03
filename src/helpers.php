@@ -8108,6 +8108,7 @@ function adminSidebar(string $active = ''): array
     return array_map(fn($item) => array_merge($item, ['active' => $item['key'] === $active]), [
         ['icon' => 'bi-speedometer2',    'label' => label('nav.dashboard'),     'url' => '/admin',            'key' => 'dashboard'],
         ['icon' => 'bi-ticket-detailed', 'label' => label('nav.tickets'),       'url' => '/admin/tickets',    'key' => 'tickets'],
+        ['icon' => 'bi-pc-display',      'label' => label('nav.inventory', 'Inventory'), 'url' => '/inventory', 'key' => 'inventory'],
         ['icon' => 'bi-sliders',         'label' => label('nav.settings'),      'url' => '/admin/settings',   'key' => 'settings'],
         ['icon' => 'bi-question-circle', 'label' => label('nav.docs'),          'url' => '/admin/docs',       'key' => 'docs'],
     ]);
@@ -8140,6 +8141,9 @@ function staffSidebar(string $active = ''): array
         ['icon' => 'bi-grid-1x2',         'label' => 'Floor mode',                      'url' => '/agent/floor',            'key' => 'floor', 'touchOnly' => true],
         ['icon' => 'bi-book',             'label' => label('agent.nav.knowledge_base'), 'url' => '/agent/kb',               'key' => 'kb'],
     ];
+    if (Assets::canView()) {
+        $items[] = ['icon' => 'bi-pc-display', 'label' => label('nav.inventory', 'Inventory'), 'url' => '/inventory', 'key' => 'inventory'];
+    }
     // Canned Responses (personal reply snippets) now lives on the profile page
     // for every staff member — see templates/pages/profile/edit.php.
     // Status Banners moved to the Settings area (Operations group) — it's open

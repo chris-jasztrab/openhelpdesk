@@ -389,6 +389,24 @@ $_hasFilters      = array_filter($userTicketFilters, fn($v) => is_array($v) ? !e
 $_baseUrl         = '/admin/users/' . (int)$profileUser['id'];
 ?>
 
+<?php if (!empty($userAssets)): ?>
+<!-- Assets checked out to this user (inventory) -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body p-4">
+        <h5 class="fw-semibold mb-3"><i class="bi bi-pc-display me-1 text-muted"></i>Assets <span class="badge bg-secondary ms-1"><?= count($userAssets) ?></span></h5>
+        <div class="d-flex flex-wrap gap-2">
+            <?php foreach ($userAssets as $ua): ?>
+            <a href="/inventory/<?= (int) $ua['id'] ?>" class="btn btn-sm btn-outline-secondary text-start text-decoration-none">
+                <span class="font-monospace fw-semibold"><?= e($ua['asset_tag']) ?></span>
+                <span class="text-muted">· <?= e($ua['model_name']) ?><?= $ua['name'] ? ' (' . e($ua['name']) . ')' : '' ?></span>
+                <span class="badge ms-1" style="background:<?= e($ua['status_color']) ?>;color:<?= ticketStatusTextColor($ua['status_color']) ?>;"><?= e($ua['status_name']) ?></span>
+            </a>
+            <?php endforeach; ?>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <!-- User tickets section header -->
 <div class="d-flex align-items-center justify-content-between mb-3">
     <h5 class="fw-semibold mb-0">

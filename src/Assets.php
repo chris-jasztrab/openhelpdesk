@@ -105,6 +105,77 @@ class Assets
         return true;
     }
 
+    /** May the current user open the inventory at all? (assets.manage implies view; admins hold both.) */
+    public static function canView(): bool
+    {
+        return Auth::can('assets.view') || Auth::can('assets.manage');
+    }
+
+    /** Plain-text assignee for a row carrying the assetSelect() join columns. */
+    public static function assigneeLabel(array $a): string
+    {
+        return match ($a['assigned_type'] ?? null) {
+            'user'     => (string) ($a['assigned_user_name'] ?? ''),
+            'location' => (string) ($a['assigned_location_name'] ?? ''),
+            'asset'    => (string) ($a['assigned_asset_tag'] ?? ''),
+            default    => $a['import_assignee'] ?? '',
+        };
+    }
+
+    /** Linked/escaped assignee for templates; unmatched Snipe-IT assignees are flagged. */
+    public static function assigneeHtml(array $a): string
+    {
+        return match ($a['assigned_type'] ?? null) {
+            'user'     => '<a href="/admin/users/' . (int) $a['assigned_id'] . '" class="text-decoration-none">' . e((string) $a['assigned_user_name']) . '</a>',
+            'location' => '<i class="bi bi-geo-alt text-muted me-1"></i>' . e((string) $a['assigned_location_name']),
+            'asset'    => '<a href="/inventory/' . (int) $a['assigned_id'] . '" class="text-decoration-none font-monospace">' . e((string) $a['assigned_asset_tag']) . '</a>',
+            default    => $a['import_assignee']
+                ? '<span class="text-muted fst-italic" title="Checked out in Snipe-IT to an account that does not exist here">' . e((string) $a['import_assignee']) . ' <i class="bi bi-question-circle"></i></span>'
+                : '<span class="text-muted">—</span>',
+        };
+    }
+
+    public static function historyIcon(string $action): string
+    {
+        return match ($action) {
+            'checkout'        => 'bi-box-arrow-right',
+            'checkin'         => 'bi-box-arrow-in-left',
+            'update'          => 'bi-pencil',
+            'create'          => 'bi-plus-circle',
+            'delete'          => 'bi-trash',
+            'restore'         => 'bi-arrow-counterclockwise',
+            'audit'           => 'bi-clipboard-check',
+            'file_uploaded'   => 'bi-paperclip',
+            'ticket_linked'   => 'bi-link-45deg',
+            'ticket_unlinked' => 'bi-x-circle',
+            default           => 'bi-dot',
+        };
+    }
+
+    /** One escaped HTML sentence for a history row. */
+    public static function historyText(string $action, array $d): string
+    {
+        $target = isset($d['target']['name']) && $d['target']['name'] !== null ? e((string) $d['target']['name']) : null;
+        if (isset($d['target']['type'], $d['target']['id']) && $d['target']['id'] !== null && $target !== null) {
+            $url = $d['target']['type'] === 'user' ? '/admin/users/' . (int) $d['target']['id'] : null;
+            $target = $url ? '<a href="' . $url . '" class="text-decoration-none">' . $target . '</a>' : $target;
+        }
+        $ticket = isset($d['ticket_id']) ? '<a href="' . e(staffTicketUrl((int) $d['ticket_id'])) . '" class="text-decoration-none">#' . (int) $d['ticket_id'] . '</a>' : null;
+        return match ($action) {
+            'checkout'        => 'Checked out' . ($target ? ' to ' . $target : ''),
+            'checkin'         => 'Checked in' . ($target ? ' from ' . $target : ''),
+            'update'          => 'Updated',
+            'create'          => 'Created',
+            'delete'          => 'Deleted',
+            'restore'         => 'Restored',
+            'audit'           => 'Audited',
+            'file_uploaded'   => 'Uploaded ' . e((string) ($d['filename'] ?? 'a file')),
+            'ticket_linked'   => 'Linked to ticket ' . ($ticket ?? ''),
+            'ticket_unlinked' => 'Unlinked from ticket ' . ($ticket ?? ''),
+            default           => e(ucfirst(str_replace('_', ' ', $action))),
+        };
+    }
+
     /** "00123 — Dell Latitude 5540 (HC04)" for timeline text. */
     public static function describe(PDO $db, int $assetId): string
     {

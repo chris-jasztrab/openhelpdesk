@@ -76,6 +76,9 @@
                         <button type="button" class="btn btn-sm px-2 py-1 ld-search-tab" data-type="contacts" role="tab" aria-selected="false">Contacts</button>
                         <?php endif; ?>
                         <button type="button" class="btn btn-sm px-2 py-1 ld-search-tab" data-type="kb" role="tab" aria-selected="false">Knowledge Base Articles</button>
+                        <?php if (Assets::canView()): ?>
+                        <button type="button" class="btn btn-sm px-2 py-1 ld-search-tab" data-type="assets" role="tab" aria-selected="false">Assets</button>
+                        <?php endif; ?>
                     </div>
                     <div id="ld-search-results" class="p-2" role="listbox" aria-label="Search results">
                         <div class="text-center text-muted py-3 small">Type to search...</div>
@@ -413,6 +416,26 @@
                 var path = [a.category_name, a.folder_name].filter(Boolean).join(' / ');
                 if (path) html += '<span class="text-muted small ms-1">' + esc(path) + '</span>';
                 html += '</div>';
+                html += '</a>';
+            });
+            html += '</div>';
+        }
+
+        // Assets (inventory)
+        if (data.assets && data.assets.length > 0) {
+            hasResults = true;
+            html += '<div class="ld-search-group">';
+            html += '<div class="px-2 py-1 text-muted small fw-semibold text-uppercase" style="font-size:.7rem;letter-spacing:.05em;">Assets</div>';
+            data.assets.forEach(function (a) {
+                html += '<a href="/inventory/' + a.id + '" class="ld-search-item d-flex align-items-center gap-2 px-2 py-2 rounded text-decoration-none text-dark">';
+                html += '<i class="bi bi-pc-display text-muted"></i>';
+                html += '<div class="flex-grow-1 text-truncate">';
+                html += '<span class="font-monospace small me-1">' + esc(a.tag) + '</span>';
+                html += '<span class="fw-medium">' + esc(a.name || a.model) + '</span>';
+                var sub = [a.name ? a.model : null, a.assigned].filter(Boolean).join(' · ');
+                if (sub) html += '<span class="text-muted small ms-1">' + esc(sub) + '</span>';
+                html += '</div>';
+                html += '<span class="badge" style="font-size:.65rem;background:' + esc(a.color) + ';">' + esc(a.status) + '</span>';
                 html += '</a>';
             });
             html += '</div>';

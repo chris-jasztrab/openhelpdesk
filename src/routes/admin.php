@@ -1121,7 +1121,19 @@ $router->get('/admin/users/{id}', function (array $p) {
     $kbStmt->execute([$uid]);
     $kbCount = (int) $kbStmt->fetchColumn();
 
+    $userAssets = [];
+    if (Assets::canView()) {
+        $stmt = $db->prepare(
+            'SELECT a.id, a.asset_tag, a.name, a.serial, m.name AS model_name, s.name AS status_name, s.color AS status_color
+             FROM assets a JOIN asset_models m ON m.id = a.model_id JOIN asset_statuses s ON s.id = a.status_id
+             WHERE a.assigned_type = "user" AND a.assigned_id = ? AND a.deleted_at IS NULL ORDER BY a.asset_tag'
+        );
+        $stmt->execute([$uid]);
+        $userAssets = $stmt->fetchAll();
+    }
+
     render('admin/users/view', [
+        'userAssets'   => $userAssets,
         'profileUser'        => $user,
         'openTickets'        => $openTickets,
         'userTicketFilters'  => $userTicketFilters,

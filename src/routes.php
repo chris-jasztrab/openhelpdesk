@@ -1341,6 +1341,37 @@ $router->get('/search', function () {
         $result['kb'] = $stmt->fetchAll();
     }
 
+    // --- Assets (inventory permission only) ---
+    if (($type === 'all' || $type === 'assets') && Assets::canView()) {
+        $stmt = $db->prepare(
+            'SELECT a.id, a.asset_tag, a.name, a.assigned_type, a.assigned_id, a.import_assignee,
+                    m.name AS model_name, s.name AS status_name, s.color AS status_color,
+                    CONCAT(u.first_name, " ", u.last_name) AS assigned_user_name,
+                    al.name AS assigned_location_name, pa.asset_tag AS assigned_asset_tag
+             FROM assets a
+             JOIN asset_models m ON m.id = a.model_id
+             JOIN asset_statuses s ON s.id = a.status_id
+             LEFT JOIN users u ON a.assigned_type = "user" AND u.id = a.assigned_id
+             LEFT JOIN locations al ON a.assigned_type = "location" AND al.id = a.assigned_id
+             LEFT JOIN assets pa ON a.assigned_type = "asset" AND pa.id = a.assigned_id
+             WHERE a.deleted_at IS NULL AND (a.asset_tag LIKE ? OR a.name LIKE ? OR a.serial LIKE ? OR m.name LIKE ?)
+             ORDER BY a.asset_tag
+             LIMIT 5'
+        );
+        $stmt->execute([$like, $like, $like, $like]);
+        foreach ($stmt as $a) {
+            $result['assets'][] = [
+                'id'       => (int) $a['id'],
+                'tag'      => $a['asset_tag'],
+                'name'     => $a['name'],
+                'model'    => $a['model_name'],
+                'status'   => $a['status_name'],
+                'color'    => $a['status_color'],
+                'assigned' => Assets::assigneeLabel($a),
+            ];
+        }
+    }
+
     echo json_encode($result);
     exit;
 });
@@ -3539,6 +3570,7 @@ $router->get('/agent', function () {
 });
 
 require ROOT_DIR . '/src/routes/agent.php';
+require ROOT_DIR . '/src/routes/inventory.php';
 
 /* ------------------------------------------------------------------
  * Admin area

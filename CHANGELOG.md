@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.212.0 &mdash; 2026-11-03
+
+### Added
+- **Inventory pages (phase 3 of the asset inventory).** New **Inventory** entry on the sidebar for admins and for any permission level granted *View inventory*. `/inventory` lists every asset with tag, name, model + manufacturer, category, serial, status (plus a *Deployed* badge when a deployable asset is checked out), who or where it is assigned to, and location — searchable by tag/name/serial/model, filterable by category, status, location and assignment (including "Snipe-IT assignee with no account"), sortable on every column, paged at 50, with a CSV download of the filtered list and a toggle for soft-deleted assets. `/inventory/{id}` shows the asset with tabs: **Tickets** (every ticket linked to the asset, each one checked against the viewer's ticket access — confidential ones are counted, not shown), **Details** (identity, purchase and lifecycle fields, notes, assets checked out to it), **History** (checkouts, check-ins, audits, uploads, and field changes with old → new values) and **Files** (downloads). Model and asset images are served through `/inventory/...` so they work on the PHP dev server too. The global search gets an **Assets** tab and group for anyone who can view the inventory, and the admin user page shows an **Assets** card listing what is checked out to that person. `/inventory/search` returns JSON for the ticket-side picker (next phase).
+
 ## 2.211.0 &mdash; 2026-11-03
 
 ### Added
