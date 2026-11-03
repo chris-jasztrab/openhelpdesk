@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.211.0 &mdash; 2026-11-03
+
+### Added
+- **Snipe-IT importer (phase 2 of the asset inventory).** `php scripts/import-snipeit.php --source=<backup folder or zip> --user-domain=example.org [--verify-csv=export.csv] [--alias-location="Snipe name=Local name"] [--alias-user="username=email"] [--apply]` loads a Snipe-IT backup into the inventory: statuses, categories, manufacturers, suppliers, models, every asset (soft-deleted ones keep their `deleted_at`), the whole action log as asset history (checkouts, check-ins, field changes with old/new values, audits, uploads), model images and uploaded asset files. Dry run by default — the dump goes into a staging schema, everything is mapped inside a transaction, a report prints (counts, live assets per location, Snipe users with no helpdesk account) and the transaction rolls back. Snipe users carry no email, so they match as `username@--user-domain`; an asset checked out to someone with no account stays unassigned with the Snipe username in `import_assignee`. A user-assigned asset takes the user's helpdesk location. Locations match by name or alias; soft-deleted Snipe locations are skipped. Asset-tag auto-numbering is set to continue Snipe's sequence. `--verify-csv` checks tag, serial, model, status, deployed flag and assignee of every row in Snipe's own export. Only `db-dumps/*.sql`, model/asset images and asset files are read from the zip — never its `.env`, OAuth keys or password hashes. Safe to re-run; licenses, accessories, consumables and components are reported but not imported.
+
 ## 2.210.0 &mdash; 2026-11-03
 
 ### Added
