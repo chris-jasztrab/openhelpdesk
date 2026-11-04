@@ -40,7 +40,9 @@ $router->get('/inventory', function () {
 
     $q          = trim(requestScalar('q'));
     $catFilter  = array_values(array_filter(array_map('intval', (array) ($_GET['category'] ?? []))));
-    $statFilter = array_values(array_filter(array_map('intval', (array) ($_GET['status'] ?? []))));
+    $statRaw    = (array) ($_GET['status'] ?? []);
+    $statFilter = array_values(array_filter(array_map('intval', $statRaw)));
+    $deployed   = in_array('deployed', $statRaw, true); // virtual status: deployable kind + an assignee
     $locFilter  = array_values(array_filter(array_map('trim', (array) ($_GET['location'] ?? []))));
     $assigned   = requestScalar('assigned');
     $deleted    = requestScalar('deleted') === '1';
@@ -55,9 +57,16 @@ $router->get('/inventory', function () {
         $where[] = 'c.id IN (' . implode(',', array_fill(0, count($catFilter), '?')) . ')';
         $params  = array_merge($params, $catFilter);
     }
+    $statParts = [];
     if ($statFilter !== []) {
-        $where[] = 's.id IN (' . implode(',', array_fill(0, count($statFilter), '?')) . ')';
-        $params  = array_merge($params, $statFilter);
+        $statParts[] = 's.id IN (' . implode(',', array_fill(0, count($statFilter), '?')) . ')';
+        $params      = array_merge($params, $statFilter);
+    }
+    if ($deployed) {
+        $statParts[] = "(s.kind = 'deployable' AND a.assigned_type IS NOT NULL)";
+    }
+    if ($statParts !== []) {
+        $where[] = '(' . implode(' OR ', $statParts) . ')';
     }
     $locNone = in_array('none', $locFilter, true);
     $locIds  = array_values(array_filter(array_map('intval', $locFilter)));
@@ -94,7 +103,7 @@ $router->get('/inventory', function () {
     $filterParams = [];
     if ($q !== '')          $filterParams['q']        = $q;
     if ($catFilter !== [])  $filterParams['category'] = $catFilter;
-    if ($statFilter !== []) $filterParams['status']   = $statFilter;
+    if ($statFilter !== [] || $deployed) $filterParams['status'] = array_merge($statFilter, $deployed ? ['deployed'] : []);
     if ($locFilter !== [])  $filterParams['location'] = $locFilter;
     if ($assigned !== '')   $filterParams['assigned'] = $assigned;
     if ($deleted)           $filterParams['deleted']  = '1';
@@ -141,6 +150,8 @@ $router->get('/inventory', function () {
         'qFilter'      => $q,
         'catFilter'    => $catFilter,
         'statFilter'   => $statFilter,
+        'deployed'     => $deployed,
+        'deployedCount' => (int) $db->query("SELECT COUNT(*) FROM assets a JOIN asset_statuses s ON s.id = a.status_id WHERE s.kind = 'deployable' AND a.assigned_type IS NOT NULL AND a.deleted_at IS NULL")->fetchColumn(),
         'locFilter'    => $locFilter,
         'assigned'     => $assigned,
         'deleted'      => $deleted,

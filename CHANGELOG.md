@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.215.0 &mdash; 2026-11-04
+
+### Added
+- **"Deployed" option in the Inventory status filter.** Inventory › Filters › Status now ends with a **Deployed** checkbox (with its count) that lists every asset in a deployable status that is checked out to a person, location or other asset — the same rule as the *Deployed* badge on each row. It combines with the real statuses like the other checkboxes, survives sorting, paging and the CSV download, and clears with the rest.
+
 ## 2.214.0 &mdash; 2026-11-03
 
 ### Added
