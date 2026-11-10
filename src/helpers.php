@@ -4135,16 +4135,33 @@ function ticketPerPageOptions(): array
  */
 function ticketListPerPage(int $userId): int
 {
-    $opts  = ticketPerPageOptions();
-    $saved = (int) getSetting("ticket_per_page:{$userId}", '15');
+    return rememberedPerPage("ticket_per_page:{$userId}", ticketPerPageOptions(), 15);
+}
+
+/** Page sizes offered on the Inventory list. */
+function inventoryPerPageOptions(): array
+{
+    return [10, 25, 50, 100];
+}
+
+/** Assets per page on the Inventory list — same remember-the-choice rule as tickets, default 50. */
+function inventoryListPerPage(int $userId): int
+{
+    return rememberedPerPage("inventory_per_page:{$userId}", inventoryPerPageOptions(), 50);
+}
+
+/** A valid ?per_page= wins and is saved under $settingKey; otherwise the saved choice, else $default. */
+function rememberedPerPage(string $settingKey, array $opts, int $default): int
+{
+    $saved = (int) getSetting($settingKey, (string) $default);
     $req   = (int) ($_GET['per_page'] ?? 0);
     if (in_array($req, $opts, true)) {
         if ($req !== $saved) {
-            setSetting("ticket_per_page:{$userId}", (string) $req);
+            setSetting($settingKey, (string) $req);
         }
         return $req;
     }
-    return in_array($saved, $opts, true) ? $saved : 15;
+    return in_array($saved, $opts, true) ? $saved : $default;
 }
 
 /* ── Kanban boards ────────────────────────────────────────────────

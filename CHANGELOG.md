@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.219.0 &mdash; 2026-11-10
+
+### Added
+- **Choose how many assets the Inventory list shows per page.** The list footer now reads *Showing 1–50 of N* with a **per page** picker (10 / 25 / 50 / 100, default 50). Changing it reloads the same filtered, sorted view and remembers your choice, so page links and later visits keep it. Same rule the ticket lists use.
+
 ## 2.218.1 &mdash; 2026-11-10
 
 ### Changed

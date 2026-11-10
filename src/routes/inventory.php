@@ -141,7 +141,7 @@ $router->get('/inventory', function () {
     );
     $countStmt->execute($params);
     $total      = (int) $countStmt->fetchColumn();
-    $perPage    = 50;
+    $perPage    = inventoryListPerPage((int) Auth::id());
     $totalPages = max(1, (int) ceil($total / $perPage));
     $page       = max(1, min($totalPages, (int) requestScalar('page', '1')));
 
@@ -152,6 +152,7 @@ $router->get('/inventory', function () {
         'assets'       => $stmt->fetchAll(),
         'total'        => $total,
         'page'         => $page,
+        'perPage'      => $perPage,
         'totalPages'   => $totalPages,
         'sort'         => $sort,
         'dir'          => $dir,

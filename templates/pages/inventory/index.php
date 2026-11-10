@@ -175,9 +175,22 @@ $th = static fn(string $col, string $text): string =>
             </tbody>
         </table>
     </div>
-    <?php if ($totalPages > 1): ?>
+    <?php if ($total > 0): ?>
     <div class="card-footer bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <span class="text-muted small">Page <?= $page ?> of <?= $totalPages ?></span>
+        <form method="GET" action="/inventory" class="d-flex align-items-center gap-2">
+            <?php foreach ($filterParams + ['sort' => $sort, 'dir' => $dir] as $k => $v): ?>
+                <?php foreach ((array) $v as $vv): ?>
+                <input type="hidden" name="<?= e($k) ?><?= is_array($v) ? '[]' : '' ?>" value="<?= e((string) $vv) ?>">
+                <?php endforeach; ?>
+            <?php endforeach; ?>
+            <span class="text-muted small">Showing <?= (($page - 1) * $perPage) + 1 ?>–<?= min($page * $perPage, $total) ?> of <?= number_format($total) ?></span>
+            <select name="per_page" class="form-select form-select-sm w-auto" aria-label="Assets per page" onchange="this.form.submit()">
+                <?php foreach (inventoryPerPageOptions() as $opt): ?>
+                <option value="<?= $opt ?>" <?= $perPage === $opt ? 'selected' : '' ?>><?= $opt ?> per page</option>
+                <?php endforeach; ?>
+            </select>
+        </form>
+        <?php if ($totalPages > 1): ?>
         <nav aria-label="Inventory pages">
             <ul class="pagination pagination-sm mb-0">
                 <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
@@ -193,6 +206,7 @@ $th = static fn(string $col, string $text): string =>
                 </li>
             </ul>
         </nav>
+        <?php endif; ?>
     </div>
     <?php endif; ?>
 </div>
