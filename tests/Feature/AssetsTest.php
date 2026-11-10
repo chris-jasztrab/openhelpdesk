@@ -113,6 +113,32 @@ class AssetsTest extends TestCase
         $this->assertSame('2030-01-15', $this->db->query("SELECT next_audit_date FROM assets WHERE id = {$id}")->fetchColumn());
     }
 
+    public function test_checkout_follows_target_location_and_checkin_returns_to_default(): void
+    {
+        $id = $this->asset('AT-CO1');
+        $this->db->exec("INSERT INTO locations (name) VALUES ('AT Home')");
+        $home = (int) $this->db->lastInsertId();
+        $this->db->exec("INSERT INTO locations (name) VALUES ('AT Branch')");
+        $branch = (int) $this->db->lastInsertId();
+        $this->db->prepare('UPDATE assets SET location_id = ?, default_location_id = ?, import_assignee = ? WHERE id = ?')->execute([$home, $home, 'ghost', $id]);
+
+        $this->assertNull(Assets::checkout($this->db, $id, 'user', 0, $this->userId), 'unknown target writes nothing');
+        $this->assertNull(Assets::checkout($this->db, $id, 'bogus', 1, $this->userId));
+        $this->assertSame(0, $this->n("SELECT COUNT(*) FROM asset_history WHERE asset_id = ? AND action = 'checkout'", [$id]));
+
+        $this->assertSame('AT Branch', Assets::checkout($this->db, $id, 'location', $branch, $this->userId, 'loaner'));
+        $row = $this->db->query("SELECT assigned_type, assigned_id, location_id, import_assignee, last_checkout_at FROM assets WHERE id = {$id}")->fetch();
+        $this->assertSame(['location', $branch, $branch, null], [$row['assigned_type'], (int) $row['assigned_id'], (int) $row['location_id'], $row['import_assignee']]);
+        $this->assertNotNull($row['last_checkout_at']);
+        $this->assertSame(1, $this->n("SELECT COUNT(*) FROM asset_history WHERE asset_id = ? AND action = 'checkout' AND user_id = ? AND details LIKE '%loaner%'", [$id, $this->userId]));
+
+        $this->assertSame('AT Branch', Assets::checkin($this->db, $id, $this->userId));
+        $row = $this->db->query("SELECT assigned_type, assigned_id, location_id FROM assets WHERE id = {$id}")->fetch();
+        $this->assertSame([null, null, $home], [$row['assigned_type'], $row['assigned_id'], (int) $row['location_id']]);
+        $this->assertNull(Assets::checkin($this->db, $id, $this->userId), 'already in: writes nothing');
+        $this->assertSame(1, $this->n("SELECT COUNT(*) FROM asset_history WHERE asset_id = ? AND action = 'checkin'", [$id]));
+    }
+
     public function test_link_writes_map_timeline_and_history_and_is_idempotent(): void
     {
         $ticket = $this->ticket();

@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.218.0 &mdash; 2026-11-10
+
+### Added
+- **Check out from the asset form and from the list.** The Add/Edit asset form gains a **Checked out to** picker (nobody / a person / a branch): saving with a person or branch checks the asset out to them (its location follows the target, as the Check out button does), changing it re-checks it out, and choosing *nobody* checks it in to the default location. An asset checked out to another asset is left alone by the form. On the Inventory list every unassigned row shows a small **Check out** button beside *Assigned to* that opens a modal (person or branch, optional note) and returns to the same filtered page. Both reuse the one checkout/check-in path, so history, audit log and the *Deployed* badge behave exactly as before.
+
 ## 2.217.0 &mdash; 2026-11-10
 
 ### Added

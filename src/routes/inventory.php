@@ -168,6 +168,7 @@ $router->get('/inventory', function () {
         'categories'   => $db->query('SELECT c.id, c.name, COUNT(a.id) AS n FROM asset_categories c LEFT JOIN asset_models m ON m.category_id = c.id LEFT JOIN assets a ON a.model_id = m.id AND a.deleted_at IS NULL GROUP BY c.id ORDER BY c.name')->fetchAll(),
         'statuses'     => $db->query('SELECT s.*, (SELECT COUNT(*) FROM assets a WHERE a.status_id = s.id AND a.deleted_at IS NULL) AS n FROM asset_statuses s ORDER BY s.sort_order, s.name')->fetchAll(),
         'locations'    => $db->query('SELECT id, name FROM locations ORDER BY name')->fetchAll(),
+        'users'        => Assets::canManage() && !$deleted ? assetCheckoutUsers($db) : [],
         'deletedCount' => (int) $db->query('SELECT COUNT(*) FROM assets WHERE deleted_at IS NOT NULL')->fetchColumn(),
     ]);
 });
@@ -394,8 +395,41 @@ function assetFormData(PDO $db): array
         'statuses'  => $db->query('SELECT id, name FROM asset_statuses ORDER BY sort_order, name')->fetchAll(),
         'locations' => $db->query('SELECT id, name FROM locations ORDER BY name')->fetchAll(),
         'suppliers' => $db->query('SELECT id, name FROM asset_suppliers ORDER BY name')->fetchAll(),
+        'users'     => assetCheckoutUsers($db),
         'nextTag'   => assetNextTagPreview($db),
     ];
+}
+
+/** People an asset can be checked out to. */
+function assetCheckoutUsers(PDO $db): array
+{
+    return $db->query('SELECT id, first_name, last_name, email FROM users WHERE is_external = 0 ORDER BY first_name, last_name')->fetchAll();
+}
+
+/**
+ * Apply the form's "Assigned to" picker (co_type / co_user_id / co_location_id)
+ * after the row itself is saved: check out when the target changed, check in
+ * when it was cleared, leave an "another asset" assignment alone.
+ */
+function assetFormAssign(PDO $db, int $id, ?array $before): void
+{
+    $type = (string) ($_POST['co_type'] ?? '');
+    if (!in_array($type, ['', 'user', 'location'], true)) {
+        return;
+    }
+    $haveType = $before['assigned_type'] ?? null;
+    if ($type === '') {
+        if ($haveType !== null) {
+            Assets::checkin($db, $id, Auth::id());
+        }
+        return;
+    }
+    $wantId = (int) ($_POST[$type === 'user' ? 'co_user_id' : 'co_location_id'] ?? 0);
+    if ($type !== $haveType || $wantId !== (int) ($before['assigned_id'] ?? 0)) {
+        if (Assets::checkout($db, $id, $type, $wantId, Auth::id()) === null) {
+            flash('error', 'Saved, but the person or ' . strtolower(label('location.singular')) . ' to check it out to was not found.');
+        }
+    }
 }
 
 /** What nextTag() would hand out, without advancing the counter. */
@@ -486,6 +520,7 @@ $router->post('/inventory/create', function () {
     }
     Assets::logHistory($db, $id, 'create', [], Auth::id());
     logAudit('asset.created', $id, 'asset', 'tag=' . $row['asset_tag']);
+    assetFormAssign($db, $id, null);
     flash('success', 'Asset ' . $row['asset_tag'] . ' created.');
     redirect('/inventory/' . $id);
 });
@@ -534,6 +569,7 @@ $router->post('/inventory/{id}/edit', function (array $p) {
         Assets::logHistory($db, $id, 'update', $changes === [] ? [] : ['changes' => $changes], Auth::id());
         logAudit('asset.updated', $id, 'asset', 'tag=' . $row['asset_tag'] . ' fields=' . implode(',', array_keys($changes)));
     }
+    assetFormAssign($db, $id, $before);
     flash('success', 'Asset updated.');
     redirect('/inventory/' . $id);
 });
@@ -542,43 +578,22 @@ $router->post('/inventory/{id}/checkout', function (array $p) {
     Auth::requirePermission('assets.manage');
     $db = Database::connect();
     $id = (int) $p['id'];
+    // The list page's modal posts return=<list URL> so the user lands back on the filtered list.
+    $back = (string) ($_POST['return'] ?? '');
+    $back = str_starts_with($back, '/inventory') ? $back : "/inventory/{$id}";
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
-        redirect("/inventory/{$id}");
+        redirect($back);
     }
     $type = (string) ($_POST['assigned_type'] ?? '');
-    $note = trim((string) ($_POST['note'] ?? ''));
-    $target = null;
-    $location = null;
-    if ($type === 'user') {
-        $s = $db->prepare('SELECT id, CONCAT(first_name, " ", last_name) AS name, location_id FROM users WHERE id = ?');
-        $s->execute([(int) ($_POST['user_id'] ?? 0)]);
-        if ($target = $s->fetch()) {
-            $location = $target['location_id'] !== null ? (int) $target['location_id'] : null;
-        }
-    } elseif ($type === 'location') {
-        $s = $db->prepare('SELECT id, name FROM locations WHERE id = ?');
-        $s->execute([(int) ($_POST['location_id'] ?? 0)]);
-        if ($target = $s->fetch()) {
-            $location = (int) $target['id'];
-        }
-    } elseif ($type === 'asset') {
-        $s = $db->prepare('SELECT id, asset_tag AS name, location_id FROM assets WHERE asset_tag = ? AND id <> ? AND deleted_at IS NULL');
-        $s->execute([trim((string) ($_POST['asset_tag'] ?? '')), $id]);
-        if ($target = $s->fetch()) {
-            $location = $target['location_id'] !== null ? (int) $target['location_id'] : null;
-        }
-    }
-    if (!$target) {
+    $key  = match ($type) { 'user' => $_POST['user_id'] ?? 0, 'location' => $_POST['location_id'] ?? 0, default => $_POST['asset_tag'] ?? '' };
+    $name = Assets::checkout($db, $id, $type, $key, Auth::id(), trim((string) ($_POST['note'] ?? '')));
+    if ($name === null) {
         flash('error', 'Choose who or where to check this asset out to.');
-        redirect("/inventory/{$id}?tab=details");
+        redirect($back === "/inventory/{$id}" ? "/inventory/{$id}?tab=details" : $back);
     }
-    $db->prepare('UPDATE assets SET assigned_type = ?, assigned_id = ?, import_assignee = NULL, location_id = COALESCE(?, location_id), last_checkout_at = NOW() WHERE id = ? AND deleted_at IS NULL')
-       ->execute([$type, (int) $target['id'], $location, $id]);
-    Assets::logHistory($db, $id, 'checkout', array_filter(['target' => ['type' => $type, 'id' => (int) $target['id'], 'name' => $target['name']], 'note' => $note ?: null]), Auth::id());
-    logAudit('asset.checked_out', $id, 'asset', $type . '=' . $target['name']);
-    flash('success', 'Checked out to ' . $target['name'] . '.');
-    redirect("/inventory/{$id}");
+    flash('success', 'Checked out to ' . $name . '.');
+    redirect($back);
 });
 
 $router->post('/inventory/{id}/checkin', function (array $p) {
@@ -589,19 +604,11 @@ $router->post('/inventory/{id}/checkin', function (array $p) {
         flash('error', 'Invalid request.');
         redirect("/inventory/{$id}");
     }
-    $stmt = $db->prepare(assetSelect() . ' WHERE a.id = ?');
-    $stmt->execute([$id]);
-    $a = $stmt->fetch();
-    if (!$a || ($a['assigned_type'] === null && $a['import_assignee'] === null)) {
+    $from = Assets::checkin($db, $id, Auth::id(), trim((string) ($_POST['note'] ?? '')));
+    if ($from === null) {
         flash('error', 'That asset is not checked out.');
         redirect("/inventory/{$id}");
     }
-    $from = Assets::assigneeLabel($a);
-    $db->prepare('UPDATE assets SET assigned_type = NULL, assigned_id = NULL, import_assignee = NULL, location_id = COALESCE(default_location_id, location_id), last_checkin_at = NOW() WHERE id = ?')
-       ->execute([$id]);
-    $note = trim((string) ($_POST['note'] ?? ''));
-    Assets::logHistory($db, $id, 'checkin', array_filter(['target' => ['type' => $a['assigned_type'] ?? 'user', 'id' => $a['assigned_id'] !== null ? (int) $a['assigned_id'] : null, 'name' => $from], 'note' => $note ?: null]), Auth::id());
-    logAudit('asset.checked_in', $id, 'asset', 'from=' . $from);
     flash('success', 'Checked in from ' . $from . '.');
     redirect("/inventory/{$id}");
 });
@@ -934,7 +941,7 @@ $router->get('/inventory/{id}', function (array $p) {
         'files'         => $files,
         'children'      => $children,
         'tab'           => requestScalar('tab', 'tickets'),
-        'users'         => Assets::canManage() ? $db->query('SELECT id, first_name, last_name, email FROM users WHERE is_external = 0 ORDER BY first_name, last_name')->fetchAll() : [],
+        'users'         => Assets::canManage() ? assetCheckoutUsers($db) : [],
         'locations'     => Assets::canManage() ? $db->query('SELECT id, name FROM locations ORDER BY name')->fetchAll() : [],
     ]);
 });

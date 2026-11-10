@@ -205,6 +205,66 @@ class Assets
         return $out;
     }
 
+    /**
+     * Check an asset out to a user, location or another asset. $key is the
+     * user/location id, or the asset tag for type "asset". The asset's location
+     * follows the target (a user's home location, the location itself, the
+     * parent asset's location) when known. Returns the target's display name,
+     * or null when the target does not exist — nothing is written then.
+     */
+    public static function checkout(PDO $db, int $assetId, string $type, string|int $key, ?int $userId, string $note = ''): ?string
+    {
+        if ($type === 'user') {
+            $s = $db->prepare('SELECT id, CONCAT(first_name, " ", last_name) AS name, location_id FROM users WHERE id = ?');
+            $s->execute([(int) $key]);
+        } elseif ($type === 'location') {
+            $s = $db->prepare('SELECT id, name, id AS location_id FROM locations WHERE id = ?');
+            $s->execute([(int) $key]);
+        } elseif ($type === 'asset') {
+            $s = $db->prepare('SELECT id, asset_tag AS name, location_id FROM assets WHERE asset_tag = ? AND id <> ? AND deleted_at IS NULL');
+            $s->execute([trim((string) $key), $assetId]);
+        } else {
+            return null;
+        }
+        $target = $s->fetch();
+        if (!$target) {
+            return null;
+        }
+        $location = $target['location_id'] !== null ? (int) $target['location_id'] : null;
+        $db->prepare('UPDATE assets SET assigned_type = ?, assigned_id = ?, import_assignee = NULL, location_id = COALESCE(?, location_id), last_checkout_at = NOW() WHERE id = ? AND deleted_at IS NULL')
+           ->execute([$type, (int) $target['id'], $location, $assetId]);
+        self::logHistory($db, $assetId, 'checkout', array_filter(['target' => ['type' => $type, 'id' => (int) $target['id'], 'name' => $target['name']], 'note' => $note ?: null]), $userId);
+        logAudit('asset.checked_out', $assetId, 'asset', $type . '=' . $target['name']);
+        return (string) $target['name'];
+    }
+
+    /**
+     * Check an asset in: clears the assignee (including an unmatched Snipe-IT
+     * one) and returns it to its default location. Returns who it came back
+     * from, or null when it was not checked out — nothing is written then.
+     */
+    public static function checkin(PDO $db, int $assetId, ?int $userId, string $note = ''): ?string
+    {
+        $s = $db->prepare('SELECT a.assigned_type, a.assigned_id, a.import_assignee,
+                                  CONCAT(u.first_name, " ", u.last_name) AS assigned_user_name, al.name AS assigned_location_name, pa.asset_tag AS assigned_asset_tag
+                           FROM assets a
+                           LEFT JOIN users u      ON a.assigned_type = "user" AND u.id = a.assigned_id
+                           LEFT JOIN locations al ON a.assigned_type = "location" AND al.id = a.assigned_id
+                           LEFT JOIN assets pa    ON a.assigned_type = "asset" AND pa.id = a.assigned_id
+                           WHERE a.id = ?');
+        $s->execute([$assetId]);
+        $a = $s->fetch();
+        if (!$a || ($a['assigned_type'] === null && $a['import_assignee'] === null)) {
+            return null;
+        }
+        $from = self::assigneeLabel($a);
+        $db->prepare('UPDATE assets SET assigned_type = NULL, assigned_id = NULL, import_assignee = NULL, location_id = COALESCE(default_location_id, location_id), last_checkin_at = NOW() WHERE id = ?')
+           ->execute([$assetId]);
+        self::logHistory($db, $assetId, 'checkin', array_filter(['target' => ['type' => $a['assigned_type'] ?? 'user', 'id' => $a['assigned_id'] !== null ? (int) $a['assigned_id'] : null, 'name' => $from], 'note' => $note ?: null]), $userId);
+        logAudit('asset.checked_in', $assetId, 'asset', 'from=' . $from);
+        return $from;
+    }
+
     /** Plain-text assignee for a row carrying the assetSelect() join columns. */
     public static function assigneeLabel(array $a): string
     {

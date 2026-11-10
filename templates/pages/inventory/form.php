@@ -81,6 +81,35 @@ $v = static fn(string $k, $d = '') => old($k, (string) ($editing[$k] ?? $d));
                             </select>
                             <div class="form-text">Where it goes when checked in.</div>
                         </div>
+                        <?php $coType = old('co_type', (string) ($editing['assigned_type'] ?? '')); $coId = (int) ($editing['assigned_id'] ?? 0); ?>
+                        <div class="col-12">
+                            <label for="co_type" class="form-label fw-semibold">Checked out to</label>
+                            <div class="row g-2">
+                                <div class="col-sm-4">
+                                    <select class="form-select" id="co_type" name="co_type" onchange="document.querySelectorAll('[data-co]').forEach(function(el){el.classList.toggle('d-none', el.getAttribute('data-co')!==this.value);}.bind(this));">
+                                        <option value="" <?= $coType === '' ? 'selected' : '' ?>>— nobody —</option>
+                                        <option value="user" <?= $coType === 'user' ? 'selected' : '' ?>>A person</option>
+                                        <option value="location" <?= $coType === 'location' ? 'selected' : '' ?>>A <?= label('location.singular') ?></option>
+                                        <?php if ($coType === 'asset'): ?><option value="asset" selected>Another asset</option><?php endif; ?>
+                                    </select>
+                                </div>
+                                <div class="col-sm-8 <?= $coType === 'user' ? '' : 'd-none' ?>" data-co="user">
+                                    <select class="form-select" name="co_user_id" id="co_user_id" aria-label="Person">
+                                        <?php $sel = (int) old('co_user_id', $coType === 'user' ? $coId : 0); foreach ($users as $u): ?>
+                                        <option value="<?= (int) $u['id'] ?>" <?= $sel === (int) $u['id'] ? 'selected' : '' ?>><?= e($u['first_name'] . ' ' . $u['last_name']) ?> — <?= e($u['email']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-sm-8 <?= $coType === 'location' ? '' : 'd-none' ?>" data-co="location">
+                                    <select class="form-select" name="co_location_id" id="co_location_id" aria-label="<?= label('location.singular') ?>">
+                                        <?php $sel = (int) old('co_location_id', $coType === 'location' ? $coId : 0); foreach ($locations as $l): ?>
+                                        <option value="<?= (int) $l['id'] ?>" <?= $sel === (int) $l['id'] ? 'selected' : '' ?>><?= e($l['name']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-text">Checking out moves it to that person's or <?= strtolower(label('location.singular')) ?>'s location; choosing nobody checks it in to the default <?= strtolower(label('location.singular')) ?>.</div>
+                        </div>
                     </div>
                 </div>
             </div>

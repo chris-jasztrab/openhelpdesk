@@ -7,6 +7,7 @@ $breadcrumbs  = [
 ];
 $hasFilters       = !empty($filterParams);
 $panelFilterCount = count(array_diff_key($filterParams, ['q' => null, 'deleted' => null]));
+$canCheckout = !empty($users); // only handed over for assets.manage on the live (not deleted) list
 $th = static fn(string $col, string $text): string =>
     '<a href="' . sortUrl($col, $sort, $dir, $filterParams, '/inventory') . '" class="text-decoration-none text-dark">' . $text . ' ' . sortIcon($col, $sort, $dir) . '</a>';
 ?>
@@ -164,7 +165,12 @@ $th = static fn(string $col, string $text): string =>
                             <span class="badge bg-primary-subtle text-primary border">Deployed</span>
                             <?php endif; ?>
                         </td>
-                        <td><?= Assets::assigneeHtml($a) ?></td>
+                        <td>
+                            <?= Assets::assigneeHtml($a) ?>
+                            <?php if ($canCheckout && $a['assigned_type'] === null): ?>
+                            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1 ms-1" data-bs-toggle="modal" data-bs-target="#coModal" data-id="<?= (int) $a['id'] ?>" data-tag="<?= e($a['asset_tag']) ?>" onclick="event.stopPropagation()" title="Check out <?= e($a['asset_tag']) ?>" aria-label="Check out <?= e($a['asset_tag']) ?>"><i class="bi bi-box-arrow-right"></i></button>
+                            <?php endif; ?>
+                        </td>
                         <td class="text-muted"><?= e($a['location_name'] ?: '—') ?></td>
                     </tr>
                     <?php endforeach; ?>
@@ -193,6 +199,61 @@ $th = static fn(string $col, string $text): string =>
     </div>
     <?php endif; ?>
 </div>
+
+<?php if ($canCheckout): ?>
+<div class="modal fade" id="coModal" tabindex="-1" aria-labelledby="coModalTitle">
+    <div class="modal-dialog">
+        <form method="POST" id="coModalForm" class="modal-content">
+            <?= csrfField() ?>
+            <input type="hidden" name="return" value="<?= e($_SERVER['REQUEST_URI'] ?? '/inventory') ?>">
+            <div class="modal-header">
+                <h5 class="modal-title" id="coModalTitle">Check out <span class="font-monospace" id="coModalTag"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold" for="coModalType">Check out to</label>
+                    <select class="form-select" name="assigned_type" id="coModalType" onchange="document.querySelectorAll('#coModal [data-co]').forEach(function(el){el.classList.toggle('d-none', el.getAttribute('data-co')!==this.value);}.bind(this));">
+                        <option value="user">A person</option>
+                        <option value="location">A <?= label('location.singular') ?></option>
+                    </select>
+                </div>
+                <div class="mb-3" data-co="user">
+                    <label class="form-label fw-semibold" for="coModalUser">Person</label>
+                    <select class="form-select" name="user_id" id="coModalUser">
+                        <?php foreach ($users as $u): ?>
+                        <option value="<?= (int) $u['id'] ?>"><?= e($u['first_name'] . ' ' . $u['last_name']) ?> — <?= e($u['email']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="mb-3 d-none" data-co="location">
+                    <label class="form-label fw-semibold" for="coModalLoc"><?= label('location.singular') ?></label>
+                    <select class="form-select" name="location_id" id="coModalLoc">
+                        <?php foreach ($locations as $l): ?>
+                        <option value="<?= (int) $l['id'] ?>"><?= e($l['name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label fw-semibold" for="coModalNote">Note <span class="text-muted fw-normal">(optional)</span></label>
+                    <input type="text" class="form-control" name="note" id="coModalNote">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn text-white" style="background:var(--ld-primary);"><i class="bi bi-box-arrow-right me-1"></i>Check out</button>
+            </div>
+        </form>
+    </div>
+</div>
+<script>
+document.getElementById('coModal').addEventListener('show.bs.modal', function (ev) {
+    var b = ev.relatedTarget;
+    document.getElementById('coModalForm').action = '/inventory/' + b.getAttribute('data-id') + '/checkout';
+    document.getElementById('coModalTag').textContent = b.getAttribute('data-tag');
+});
+</script>
+<?php endif; ?>
 
 <script>
 (function () {
