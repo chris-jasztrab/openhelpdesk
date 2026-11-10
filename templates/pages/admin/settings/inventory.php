@@ -54,6 +54,11 @@ $kinds = ['models' => 'Models', 'categories' => 'Categories', 'manufacturers' =>
                 <label for="asset_tag_next" class="form-label fw-semibold">Next number</label>
                 <input type="number" min="1" class="form-control" id="asset_tag_next" name="asset_tag_next" value="<?= (int) $tagNext ?>">
             </div>
+            <div class="col-sm-4">
+                <label for="asset_audit_interval_months" class="form-label fw-semibold">Audit interval (months)</label>
+                <input type="number" min="0" max="120" class="form-control" id="asset_audit_interval_months" name="asset_audit_interval_months" value="<?= (int) $auditInterval ?>">
+                <div class="form-text">Audit mode sets the next audit date this far ahead unless a date is typed. 0 leaves it unchanged.</div>
+            </div>
             <div class="col-12">
                 <button type="submit" class="btn btn-sm text-white" style="background:var(--ld-primary);"><i class="bi bi-check-lg me-1"></i>Save</button>
             </div>

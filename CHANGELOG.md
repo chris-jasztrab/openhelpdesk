@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.217.0 &mdash; 2026-11-10
+
+### Added
+- **Inventory › Audit mode (physical inventory by scanning).** New **Audit mode** button on the Inventory list (requires *Manage inventory*) opens `/inventory/audit`: pick where you are, optionally type a next-audit date, then scan tag after tag with no taps in between — a text field keeps focus for USB barcode scanners (Enter or Tab submits), and on phones and tablets the rear camera starts automatically and decodes QR codes (jsQR, self-hosted), with a beep and vibration per scan. Each scan stamps the asset's **last audit** and **next audit date** (typed date, else today + the new **Settings › Inventory › Audit interval**, default 12 months; 0 leaves it unchanged), writes an *Audited at …* history row, and adds the asset to a newest-first table (code, tag, name, location, checked-out-to, previous audit). An asset whose recorded location differs from where it was scanned is highlighted **not here** — its location is never changed. Unknown codes show as a red *Not found* row; rescanning the same asset refreshes its row instead of duplicating it; the list survives a page reload on that device.
+- **Old Snipe-IT QR labels keep working.** Scanner input is resolved from a Snipe-IT URL (`…/hardware/{id}` via the imported Snipe-IT id), one of our asset URLs, an exact tag, a bare number zero-padded to the configured tag width (`26` → `00026`), or a serial. `GET /hardware/{id}` now 301-redirects to the matching asset on the app's own host, so pointing `inventory.wpl.ca` at the helpdesk makes every existing label open the right asset.
+- **"Not audited since" filter** on the Inventory list (includes never-audited assets), carried through sorting, paging and the CSV export, which also gains *Last Audit* and *Next Audit* columns.
+
 ## 2.216.0 &mdash; 2026-11-10
 
 ### Added

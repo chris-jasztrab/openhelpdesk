@@ -35,6 +35,7 @@ $th = static fn(string $col, string $text): string =>
             <i class="bi bi-download me-1"></i>CSV
         </a>
         <?php if (Assets::canManage()): ?>
+        <a href="/inventory/audit" class="btn btn-sm btn-outline-secondary" title="Scan tags to record a physical inventory"><i class="bi bi-upc-scan me-1"></i>Audit mode</a>
         <a href="/inventory/create" class="btn btn-sm text-white" style="background:var(--ld-primary);"><i class="bi bi-plus-lg me-1"></i>Add asset</a>
         <?php endif; ?>
     </div>
@@ -100,6 +101,11 @@ $th = static fn(string $col, string $text): string =>
                     <option value="unassigned" <?= $assigned === 'unassigned' ? 'selected' : '' ?>>Unassigned</option>
                     <option value="import" <?= $assigned === 'import' ? 'selected' : '' ?>>Snipe-IT assignee with no account</option>
                 </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label small fw-semibold mb-1" for="invAuditBefore">Not audited since</label>
+                <input type="date" class="form-control form-control-sm" name="audit_before" id="invAuditBefore" value="<?= e($auditBefore) ?>">
+                <div class="form-text">Includes assets never audited.</div>
             </div>
             <?php if ($deletedCount > 0): ?>
             <div class="mb-3">

@@ -46,6 +46,10 @@ $router->get('/inventory', function () {
     $locFilter  = array_values(array_filter(array_map('trim', (array) ($_GET['location'] ?? []))));
     $assigned   = requestScalar('assigned');
     $deleted    = requestScalar('deleted') === '1';
+    $auditBefore = requestScalar('audit_before');
+    if ($auditBefore !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $auditBefore)) {
+        $auditBefore = '';
+    }
 
     $where  = [$deleted ? 'a.deleted_at IS NOT NULL' : 'a.deleted_at IS NULL'];
     $params = [];
@@ -87,6 +91,10 @@ $router->get('/inventory', function () {
     } elseif ($assigned === 'import') {
         $where[] = 'a.import_assignee IS NOT NULL';
     }
+    if ($auditBefore !== '') {
+        $where[]  = '(a.last_audit_at IS NULL OR a.last_audit_at < ?)';
+        $params[] = $auditBefore;
+    }
     $whereSql = ' WHERE ' . implode(' AND ', $where);
 
     $sortable = [
@@ -107,6 +115,7 @@ $router->get('/inventory', function () {
     if ($locFilter !== [])  $filterParams['location'] = $locFilter;
     if ($assigned !== '')   $filterParams['assigned'] = $assigned;
     if ($deleted)           $filterParams['deleted']  = '1';
+    if ($auditBefore !== '') $filterParams['audit_before'] = $auditBefore;
 
     if (requestScalar('export') === 'csv') {
         $stmt = $db->prepare(assetSelect() . $whereSql . $orderSql);
@@ -114,12 +123,12 @@ $router->get('/inventory', function () {
         header('Content-Type: text/csv; charset=utf-8');
         header('Content-Disposition: attachment; filename="inventory-' . date('Y-m-d') . '.csv"');
         $out = fopen('php://output', 'wb');
-        fputcsv($out, ['Tag', 'Name', 'Serial', 'Model', 'Model No.', 'Category', 'Manufacturer', 'Status', 'Location', 'Assigned To', 'Purchase Date', 'Cost', 'Warranty (months)', 'EOL', 'Notes']);
+        fputcsv($out, ['Tag', 'Name', 'Serial', 'Model', 'Model No.', 'Category', 'Manufacturer', 'Status', 'Location', 'Assigned To', 'Purchase Date', 'Cost', 'Warranty (months)', 'EOL', 'Last Audit', 'Next Audit', 'Notes']);
         foreach ($stmt as $a) {
             fputcsv($out, [
                 $a['asset_tag'], $a['name'], $a['serial'], $a['model_name'], $a['model_number'], $a['category_name'],
                 $a['manufacturer_name'], $a['status_name'], $a['location_name'], Assets::assigneeLabel($a),
-                $a['purchase_date'], $a['purchase_cost'], $a['warranty_months'], $a['eol_date'], $a['notes'],
+                $a['purchase_date'], $a['purchase_cost'], $a['warranty_months'], $a['eol_date'], $a['last_audit_at'], $a['next_audit_date'], $a['notes'],
             ]);
         }
         fclose($out);
@@ -155,11 +164,85 @@ $router->get('/inventory', function () {
         'locFilter'    => $locFilter,
         'assigned'     => $assigned,
         'deleted'      => $deleted,
+        'auditBefore'  => $auditBefore,
         'categories'   => $db->query('SELECT c.id, c.name, COUNT(a.id) AS n FROM asset_categories c LEFT JOIN asset_models m ON m.category_id = c.id LEFT JOIN assets a ON a.model_id = m.id AND a.deleted_at IS NULL GROUP BY c.id ORDER BY c.name')->fetchAll(),
         'statuses'     => $db->query('SELECT s.*, (SELECT COUNT(*) FROM assets a WHERE a.status_id = s.id AND a.deleted_at IS NULL) AS n FROM asset_statuses s ORDER BY s.sort_order, s.name')->fetchAll(),
         'locations'    => $db->query('SELECT id, name FROM locations ORDER BY name')->fetchAll(),
         'deletedCount' => (int) $db->query('SELECT COUNT(*) FROM assets WHERE deleted_at IS NOT NULL')->fetchColumn(),
     ]);
+});
+
+/**
+ * Legacy Snipe-IT QR codes encode https://inventory.wpl.ca/hardware/{snipe id}.
+ * With inventory.* pointed at this app, send them to the asset on the
+ * canonical host so the login cookie applies.
+ */
+$router->get('/hardware/{id}', function (array $p) {
+    $db = Database::connect();
+    $s  = $db->prepare('SELECT id FROM assets WHERE snipeit_id = ?');
+    $s->execute([(int) $p['id']]);
+    $id = $s->fetchColumn();
+    if ($id === false) {
+        http_response_code(404);
+        render('errors/404', ['layout' => 'app', 'pageTitle' => 'Asset not found']);
+    }
+    redirect(appUrl() . '/inventory/' . (int) $id, 301);
+});
+
+/** Audit mode: scan tag after tag; each scan stamps last_audit_at. */
+$router->get('/inventory/audit', function () {
+    Auth::requirePermission('assets.manage');
+    $db     = Database::connect();
+    $months = (int) getSetting('asset_audit_interval_months', '12');
+    render('inventory/audit', [
+        'locations'      => $db->query('SELECT id, name FROM locations ORDER BY name')->fetchAll(),
+        'myLocationId'   => (int) (Auth::user()['location_id'] ?? 0),
+        'defaultNext'    => $months > 0 ? date('Y-m-d', strtotime("+{$months} months")) : '',
+        'intervalMonths' => $months,
+    ]);
+});
+
+$router->post('/inventory/audit/scan', function () {
+    Auth::requirePermission('assets.manage');
+    header('Content-Type: application/json');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Session expired — reload the page.']);
+        exit;
+    }
+    $db   = Database::connect();
+    $post = static fn (string $k): string => is_string($_POST[$k] ?? null) ? (string) $_POST[$k] : '';
+    $code = trim($post('code'));
+    $at   = (int) $post('location_id') ?: null;
+    $next = $post('next_audit_date');
+    if ($next !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $next)) {
+        $next = '';
+    }
+    $id = Assets::resolveScan($db, $code);
+    if ($id === null) {
+        echo json_encode(['found' => false, 'code' => $code]);
+        exit;
+    }
+    $stmt = $db->prepare(assetSelect() . ' WHERE a.id = ?');
+    $stmt->execute([$id]);
+    $a    = $stmt->fetch();
+    $prev = $a['last_audit_at'];
+    $d    = Assets::audit($db, $id, $at, $next ?: null, Auth::id());
+    echo json_encode([
+        'found'      => true,
+        'code'       => $code,
+        'id'         => $id,
+        'tag'        => $a['asset_tag'],
+        'name'       => $a['name'],
+        'model'      => $a['model_name'],
+        'location'   => $a['location_name'],
+        'mismatch'   => !empty($d['mismatch']),
+        'assigned'   => $a['assigned_type'] === 'user' ? $a['assigned_user_name'] : ($a['assigned_type'] === null ? ($a['import_assignee'] ?? '') : Assets::assigneeLabel($a)),
+        'status'     => $a['status_name'],
+        'prev_audit' => $prev ? date('M j, Y', strtotime($prev)) : null,
+        'next_audit' => $d['next'] ?? null,
+    ]);
+    exit;
 });
 
 /** Typeahead for the ticket-side picker: live assets matching q, the requester's own first. */
@@ -658,6 +741,7 @@ $router->get('/admin/settings/inventory', function () {
         'kind' => null, 'spec' => null, 'counts' => assetCatalogCounts($db),
         'tagPrefix' => getSetting('asset_tag_prefix', ''), 'tagZerofill' => getSetting('asset_tag_zerofill', '5'),
         'tagNext' => getSetting('asset_tag_next', '1'), 'nextTagPreview' => assetNextTagPreview($db),
+        'auditInterval' => getSetting('asset_audit_interval_months', '12'),
     ]);
 });
 
@@ -670,8 +754,9 @@ $router->post('/admin/settings/inventory', function () {
     setSetting('asset_tag_prefix', trim((string) ($_POST['asset_tag_prefix'] ?? '')));
     setSetting('asset_tag_zerofill', (string) max(0, min(12, (int) ($_POST['asset_tag_zerofill'] ?? 5))));
     setSetting('asset_tag_next', (string) max(1, (int) ($_POST['asset_tag_next'] ?? 1)));
+    setSetting('asset_audit_interval_months', (string) max(0, min(120, (int) ($_POST['asset_audit_interval_months'] ?? 12))));
     logAudit('asset.tag_settings_changed', null, null, 'prefix=' . trim((string) ($_POST['asset_tag_prefix'] ?? '')) . ' next=' . (int) ($_POST['asset_tag_next'] ?? 1));
-    flash('success', 'Tag numbering saved.');
+    flash('success', 'Inventory settings saved.');
     redirect('/admin/settings/inventory');
 });
 

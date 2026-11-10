@@ -75,6 +75,44 @@ class AssetsTest extends TestCase
         $this->assertSame('10', $this->db->query("SELECT setting_value FROM settings WHERE setting_key = 'asset_tag_next'")->fetchColumn());
     }
 
+    public function test_resolve_scan_matches_snipe_url_our_url_tag_padded_tag_and_serial(): void
+    {
+        $id = $this->asset('09926');
+        $this->db->prepare('UPDATE assets SET snipeit_id = 999026, serial = ?, deleted_at = NULL WHERE id = ?')->execute(['SN-AT-26', $id]);
+        $this->assertSame($id, Assets::resolveScan($this->db, 'https://inventory.wpl.ca/hardware/999026'));
+        $this->assertSame($id, Assets::resolveScan($this->db, 'https://helpdesk.wpl.ca/inventory/' . $id));
+        $this->assertSame($id, Assets::resolveScan($this->db, ' 09926 '));
+        $this->assertSame($id, Assets::resolveScan($this->db, '9926'), 'digits zero-pad to the configured tag width');
+        $this->assertSame($id, Assets::resolveScan($this->db, 'SN-AT-26'));
+        $this->assertNull(Assets::resolveScan($this->db, 'https://inventory.wpl.ca/hardware/999027'));
+        $this->assertNull(Assets::resolveScan($this->db, 'nope'));
+        $this->db->prepare('UPDATE assets SET deleted_at = NOW() WHERE id = ?')->execute([$id]);
+        $this->assertNull(Assets::resolveScan($this->db, '09926'), 'deleted assets never match');
+    }
+
+    public function test_audit_stamps_dates_logs_history_and_flags_location_mismatch(): void
+    {
+        $id = $this->asset('09927');
+        $this->db->exec("INSERT INTO locations (name) VALUES ('AT Here')");
+        $here = (int) $this->db->lastInsertId();
+        $this->db->exec("INSERT INTO locations (name) VALUES ('AT There')");
+        $there = (int) $this->db->lastInsertId();
+        $this->db->prepare('UPDATE assets SET location_id = ? WHERE id = ?')->execute([$there, $id]);
+
+        $d = Assets::audit($this->db, $id, $here, null, $this->userId);
+        $this->assertTrue($d['mismatch']);
+        $this->assertSame('AT Here', $d['at']['name']);
+        $row = $this->db->query("SELECT last_audit_at, next_audit_date, location_id FROM assets WHERE id = {$id}")->fetch();
+        $this->assertNotNull($row['last_audit_at']);
+        $this->assertSame(date('Y-m-d', strtotime('+' . (int) getSetting('asset_audit_interval_months', '12') . ' months')), $row['next_audit_date']);
+        $this->assertSame($there, (int) $row['location_id'], 'audit never moves the asset');
+        $this->assertSame(1, $this->n("SELECT COUNT(*) FROM asset_history WHERE asset_id = ? AND action = 'audit' AND user_id = ?", [$id, $this->userId]));
+
+        $d = Assets::audit($this->db, $id, $there, '2030-01-15', $this->userId);
+        $this->assertArrayNotHasKey('mismatch', $d);
+        $this->assertSame('2030-01-15', $this->db->query("SELECT next_audit_date FROM assets WHERE id = {$id}")->fetchColumn());
+    }
+
     public function test_link_writes_map_timeline_and_history_and_is_idempotent(): void
     {
         $ticket = $this->ticket();

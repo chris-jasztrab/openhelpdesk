@@ -72,6 +72,74 @@ class Assets
     }
 
     /**
+     * Turn whatever a barcode scanner or camera produced into a live asset id.
+     * Accepts, in order: a Snipe-IT URL (.../hardware/{snipeit_id}), one of
+     * our URLs (.../inventory/{id}), an exact asset tag, the tag zero-padded
+     * to the configured width ("26" → "00026"), then a serial number.
+     */
+    public static function resolveScan(PDO $db, string $code): ?int
+    {
+        $code = trim($code);
+        if ($code === '') {
+            return null;
+        }
+        $live = ' AND deleted_at IS NULL';
+        if (preg_match('~/hardware/(\d+)(?:[/?#]|$)~i', $code, $m)) {
+            $s = $db->prepare('SELECT id FROM assets WHERE snipeit_id = ?' . $live);
+            $s->execute([(int) $m[1]]);
+            return ($id = $s->fetchColumn()) !== false ? (int) $id : null;
+        }
+        if (preg_match('~/inventory/(\d+)(?:[/?#]|$)~i', $code, $m)) {
+            $s = $db->prepare('SELECT id FROM assets WHERE id = ?' . $live);
+            $s->execute([(int) $m[1]]);
+            return ($id = $s->fetchColumn()) !== false ? (int) $id : null;
+        }
+        $candidates = [$code];
+        if (ctype_digit($code)) {
+            $candidates[] = getSetting('asset_tag_prefix', '') . str_pad($code, (int) getSetting('asset_tag_zerofill', '5'), '0', STR_PAD_LEFT);
+        }
+        foreach ($candidates as $tag) {
+            $s = $db->prepare('SELECT id FROM assets WHERE asset_tag = ?' . $live);
+            $s->execute([$tag]);
+            if (($id = $s->fetchColumn()) !== false) {
+                return (int) $id;
+            }
+        }
+        $s = $db->prepare('SELECT id FROM assets WHERE serial = ?' . $live . ' LIMIT 1');
+        $s->execute([$code]);
+        return ($id = $s->fetchColumn()) !== false ? (int) $id : null;
+    }
+
+    /**
+     * Stamp one audit: last_audit_at = now, next_audit_date = the typed date
+     * or today + the configured interval (0 months = leave as is). The
+     * asset's own location is never changed; a mismatch is only recorded.
+     * Returns the history details that were written.
+     */
+    public static function audit(PDO $db, int $assetId, ?int $atLocationId, ?string $nextDate, ?int $userId): array
+    {
+        $s = $db->prepare('SELECT a.location_id, l.name AS location_name, al.name AS at_name
+                           FROM assets a LEFT JOIN locations l ON l.id = a.location_id LEFT JOIN locations al ON al.id = ?
+                           WHERE a.id = ?');
+        $s->execute([$atLocationId, $assetId]);
+        $a = $s->fetch();
+        if ($nextDate === null || $nextDate === '') {
+            $months   = (int) getSetting('asset_audit_interval_months', '12');
+            $nextDate = $months > 0 ? date('Y-m-d', strtotime("+{$months} months")) : null;
+        }
+        $db->prepare('UPDATE assets SET last_audit_at = NOW(), next_audit_date = COALESCE(?, next_audit_date) WHERE id = ?')
+           ->execute([$nextDate, $assetId]);
+        $details = array_filter([
+            'at'       => $atLocationId !== null ? ['id' => $atLocationId, 'name' => $a['at_name']] : null,
+            'expected' => $a['location_id'] !== null ? ['id' => (int) $a['location_id'], 'name' => $a['location_name']] : null,
+            'mismatch' => $atLocationId !== null && $a['location_id'] !== null && (int) $a['location_id'] !== $atLocationId,
+            'next'     => $nextDate,
+        ], static fn ($v) => $v !== null && $v !== false);
+        self::logHistory($db, $assetId, 'audit', $details, $userId);
+        return $details;
+    }
+
+    /**
      * Link an asset to a ticket. Idempotent — a second call for the same pair
      * is a no-op and returns false. Writes an internal timeline row on the
      * ticket and a history row on the asset.
@@ -195,7 +263,8 @@ class Assets
             'create'          => 'Created',
             'delete'          => 'Deleted',
             'restore'         => 'Restored',
-            'audit'           => 'Audited',
+            'audit'           => 'Audited' . (isset($d['at']['name']) ? ' at ' . e((string) $d['at']['name']) : '')
+                . (!empty($d['mismatch']) && isset($d['expected']['name']) ? ' <span class="badge bg-warning text-dark">expected ' . e((string) $d['expected']['name']) . '</span>' : ''),
             'file_uploaded'   => 'Uploaded ' . e((string) ($d['filename'] ?? 'a file')),
             'file_deleted'    => 'Removed file ' . e((string) ($d['filename'] ?? '')),
             'ticket_linked'   => 'Linked to ticket ' . ($ticket ?? ''),
