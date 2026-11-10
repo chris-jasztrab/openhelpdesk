@@ -4609,7 +4609,7 @@ $router->post('/admin/tickets/create', function () {
     $assignedTo = !empty($_POST['assigned_to'])  ? (int) $_POST['assigned_to']  : null;
     $groupId    = !empty($_POST['group_id'])      ? (int) $_POST['group_id']     : null;
     $status     = $_POST['status'] ?? 'open';
-    $dueDate    = trim($_POST['due_date'] ?? '') ?: null;
+    $dueDate    = Auth::can('tickets.set_due_date') ? (trim($_POST['due_date'] ?? '') ?: null) : null;
     $tagNames   = $_POST['tags'] ?? [];
     // Agents/admins/power-users can file a ticket on behalf of another user
     // (e.g. someone phones the helpdesk). When set, `created_by` becomes the

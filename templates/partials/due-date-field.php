@@ -9,6 +9,9 @@
  *
  * Expects $ticket (due_date, resolution_due_at, creator_name).
  */
+if (!Auth::can('tickets.set_due_date')) {
+    return;
+}
 $ddSla       = !empty($ticket['resolution_due_at']) ? date('Y-m-d', strtotime($ticket['resolution_due_at'])) : '';
 $ddPrompt    = $ddSla !== '' && getSetting('due_date_extension_prompt', '1') === '1';
 $ddFirstName = strtok(trim((string) ($ticket['creator_name'] ?? '')), ' ') ?: 'there';

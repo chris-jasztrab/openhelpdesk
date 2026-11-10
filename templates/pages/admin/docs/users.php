@@ -59,7 +59,7 @@ $locLabel     = label('location.singular', 'Location');
     <tbody class="text-muted">
         <tr><td>Reports</td><td>View reports</td></tr>
         <tr><td>Knowledge Base</td><td>Create &amp; delete KB articles (also needed to edit them); Manage KB categories &amp; folders</td></tr>
-        <tr><td>Tickets</td><td>Forward tickets to internal contacts; Forward tickets to external contacts; Manage ticket templates; View all tickets; Manage recurring tickets; Manage ticket types &amp; forms; Manage priorities; Manage SLA policies</td></tr>
+        <tr><td>Tickets</td><td>Forward tickets to internal contacts; Forward tickets to external contacts; Manage ticket templates; View all tickets; Set due dates; Manage recurring tickets; Manage ticket types &amp; forms; Manage priorities; Manage SLA policies</td></tr>
         <tr><td>People</td><td>Manage users; Manage groups; Manage agent skills</td></tr>
         <tr><td>Organization</td><td>Manage locations</td></tr>
         <tr><td>Automation</td><td>Manage automations &amp; escalations; View out-of-office status; Manage CSAT surveys; Manage AI classification</td></tr>
@@ -70,6 +70,7 @@ $locLabel     = label('location.singular', 'Location');
     </tbody>
 </table>
 </div>
+<p class="text-muted mb-3"><strong>Set due dates</strong> shows the <em>Due Date</em> field on the New Ticket form and the ticket page. Levels without it still see the date on lists and the ticket, but can't set or change it. No built-in level holds it by default; admins always can.</p>
 <p class="text-muted mb-3"><strong>View all tickets</strong> lets a level see every non-confidential ticket regardless of group; the editor asks you to confirm before granting it, and users holding it carry a <span class="badge bg-warning text-dark">Sees all tickets</span> badge in the user list.</p>
 <div class="alert alert-warning small mb-2"><i class="bi bi-shield-lock me-2"></i>
     <strong>Admin-only areas.</strong> Permission Levels, Microsoft Teams, the Danger Zone and these Docs can't be granted to any other level, so no level can raise its own (or anyone else's) power.

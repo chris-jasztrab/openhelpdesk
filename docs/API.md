@@ -195,7 +195,7 @@ Creates a ticket on behalf of the caller. Returns the full **TicketDetail**
 | `location_id` | int | no | |
 | `group_id` | int | no | **Staff only** — ignored for portal users; group then falls back to the type's default, then the system default |
 | `assigned_to` | int | no | **Staff only** |
-| `due_date` | date (`YYYY-MM-DD`) | no | **Staff only** |
+| `due_date` | date (`YYYY-MM-DD`) | no | **Staff with `tickets.set_due_date` only** (ignored otherwise) |
 
 Side effects on create: timeline entry, SLA init, AI classification + auto-assign
 (if enabled and the type isn't confidential), and requester/assignee email
@@ -218,7 +218,7 @@ Partial update — only the fields present in the body change. Returns
 | `priority_id` | int \| null | `null` clears |
 | `assigned_to` | int \| null | `null` unassigns; must be a staff user |
 | `group_id` | int \| null | `null` removes group |
-| `due_date` | date \| null | `null` clears |
+| `due_date` | date \| null | `null` clears; ignored without `tickets.set_due_date` |
 
 Each change is timelined. Status changes also drive SLA pause/resume and fire the
 CSAT survey when the new status matches the configured trigger.

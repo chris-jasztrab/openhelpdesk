@@ -725,7 +725,7 @@ $router->get('/api/v1/tickets', function () {
  *   "location_id": 3,                       (optional)
  *   "group_id":    4,                       (optional, agent/admin only)
  *   "assigned_to": 5,                       (optional, agent/admin only)
- *   "due_date":    "2026-04-01"             (optional, agent/admin only)
+ *   "due_date":    "2026-04-01"             (optional, needs tickets.set_due_date)
  * }
  *
  * Returns: the created ticket object (HTTP 201).
@@ -760,7 +760,8 @@ $router->post('/api/v1/tickets', function () {
     if (_apiIsStaff($user)) {
         $groupId    = isset($input['group_id'])    && $input['group_id']    !== null ? (int) $input['group_id']    : null;
         $assignedTo = isset($input['assigned_to']) && $input['assigned_to'] !== null ? (int) $input['assigned_to'] : null;
-        if (isset($input['due_date']) && $input['due_date'] !== null && $input['due_date'] !== '') {
+        if (isset($input['due_date']) && $input['due_date'] !== null && $input['due_date'] !== ''
+            && roleCan($user['role'] ?? null, 'tickets.set_due_date')) {
             $ts      = strtotime($input['due_date']);
             $dueDate = $ts ? date('Y-m-d', $ts) : null;
         }
@@ -940,7 +941,7 @@ $router->get('/api/v1/tickets/{id}', function (array $p) {
  *   "priority_id": 2,           (null to remove)
  *   "assigned_to": 5,           (null to unassign)
  *   "group_id":    4,           (null to remove group)
- *   "due_date":    "2026-04-01" (null to clear)
+ *   "due_date":    "2026-04-01" (null to clear; needs tickets.set_due_date)
  * }
  *
  * Returns: { "updated": ["status", "priority", ...] }
@@ -1084,7 +1085,7 @@ $router->post('/api/v1/tickets/{id}/update', function (array $p) {
     }
 
     // ── Due date ──────────────────────────────────────────────────────────────
-    if (array_key_exists('due_date', $input)) {
+    if (array_key_exists('due_date', $input) && roleCan($user['role'] ?? null, 'tickets.set_due_date')) {
         $dueDate = null;
         if ($input['due_date'] !== null && $input['due_date'] !== '') {
             $ts      = strtotime($input['due_date']);

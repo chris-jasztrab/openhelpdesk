@@ -145,12 +145,14 @@ $statusOptions = ticketStatusLabelMap();
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <!-- Due date (admin-only, not in layout; hidden for a type whose due date comes from one of its date fields) -->
+                        <!-- Due date (tickets.set_due_date only, not in layout; hidden for a type whose due date comes from one of its date fields) -->
+                        <?php if (Auth::can('tickets.set_due_date')): ?>
                         <div class="col-md-6 col-lg-4" id="due-date-wrap">
                             <label for="due_date" class="form-label fw-semibold">Due Date</label>
                             <input type="date" class="form-control" id="due_date" name="due_date"
                                    value="<?= e(old('due_date', '')) ?>">
                         </div>
+                        <?php endif; ?>
                     </div>
 
                     <?php

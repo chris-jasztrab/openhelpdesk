@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.216.0 &mdash; 2026-11-10
+
+### Added
+- **"Set due dates" permission.** The Due Date field on the New Ticket form and on the ticket page's Update form now shows only for permission levels holding the new **Tickets › Set due dates** permission (`tickets.set_due_date`); the server ignores a posted due date without it, including the API. Admins always have it. It is granted to no level on upgrade, so grant it from Settings › Users & Access › Permission Levels to the levels that should set due dates. Due dates set by a type's date field (e.g. Start Date) are unaffected.
+
 ## 2.215.0 &mdash; 2026-11-04
 
 ### Added

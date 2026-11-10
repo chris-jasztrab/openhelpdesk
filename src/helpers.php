@@ -9460,7 +9460,7 @@ function sendTicketReminder(PDO $db, array $ticket, string $tpl): bool
  */
 function applyTicketDueDateChange(PDO $db, array $ticket, array $in, int $uid): bool
 {
-    if (!array_key_exists('due_date', $in)) {
+    if (!array_key_exists('due_date', $in) || !Auth::can('tickets.set_due_date')) {
         return false;
     }
     $new = trim((string) $in['due_date']);
