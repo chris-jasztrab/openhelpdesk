@@ -139,6 +139,16 @@ class AssetsTest extends TestCase
         $this->assertSame(1, $this->n("SELECT COUNT(*) FROM asset_history WHERE asset_id = ? AND action = 'checkin'", [$id]));
     }
 
+    public function test_status_label_shows_deployed_only_for_checked_out_deployable_assets(): void
+    {
+        $ready = ['status_kind' => 'deployable', 'status_name' => 'Ready to Deploy', 'status_color' => '#198754', 'assigned_type' => null];
+        $this->assertSame('Ready to Deploy', Assets::statusLabel($ready));
+        $this->assertSame('Deployed', Assets::statusLabel(['assigned_type' => 'user'] + $ready));
+        $this->assertSame('Broken', Assets::statusLabel(['status_kind' => 'undeployable', 'status_name' => 'Broken', 'assigned_type' => 'user']));
+        $this->assertStringContainsString('>Deployed<', Assets::statusBadgeHtml(['assigned_type' => 'location'] + $ready));
+        $this->assertStringContainsString('>Ready to Deploy<', Assets::statusBadgeHtml($ready));
+    }
+
     public function test_link_writes_map_timeline_and_history_and_is_idempotent(): void
     {
         $ticket = $this->ticket();

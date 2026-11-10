@@ -127,7 +127,7 @@ $router->get('/inventory', function () {
         foreach ($stmt as $a) {
             fputcsv($out, [
                 $a['asset_tag'], $a['name'], $a['serial'], $a['model_name'], $a['model_number'], $a['category_name'],
-                $a['manufacturer_name'], $a['status_name'], $a['location_name'], Assets::assigneeLabel($a),
+                $a['manufacturer_name'], Assets::statusLabel($a), $a['location_name'], Assets::assigneeLabel($a),
                 $a['purchase_date'], $a['purchase_cost'], $a['warranty_months'], $a['eol_date'], $a['last_audit_at'], $a['next_audit_date'], $a['notes'],
             ]);
         }
@@ -239,7 +239,7 @@ $router->post('/inventory/audit/scan', function () {
         'location'   => $a['location_name'],
         'mismatch'   => !empty($d['mismatch']),
         'assigned'   => $a['assigned_type'] === 'user' ? $a['assigned_user_name'] : ($a['assigned_type'] === null ? ($a['import_assignee'] ?? '') : Assets::assigneeLabel($a)),
-        'status'     => $a['status_name'],
+        'status'     => Assets::statusLabel($a),
         'prev_audit' => $prev ? date('M j, Y', strtotime($prev)) : null,
         'next_audit' => $d['next'] ?? null,
     ]);
@@ -278,8 +278,8 @@ $router->get('/inventory/search', function () {
             'tag'      => $a['asset_tag'],
             'name'     => $a['name'],
             'model'    => $a['model_name'],
-            'status'   => $a['status_name'],
-            'color'    => $a['status_color'],
+            'status'   => Assets::statusLabel($a),
+            'color'    => Assets::statusColor($a),
             'assigned' => Assets::assigneeLabel($a),
             'mine'     => $a['assigned_type'] === 'user' && (int) $a['assigned_id'] === $uid,
         ];

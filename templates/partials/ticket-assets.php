@@ -14,7 +14,7 @@ $_rid = (int) ($ticket['created_by'] ?? 0);
 
 $_stmt = $_adb->prepare(
     'SELECT a.id, a.asset_tag, a.name, a.serial, a.assigned_type, a.assigned_id, a.import_assignee, a.deleted_at,
-            m.name AS model_name, s.name AS status_name, s.color AS status_color,
+            m.name AS model_name, s.name AS status_name, s.kind AS status_kind, s.color AS status_color,
             CONCAT(u.first_name, " ", u.last_name) AS assigned_user_name, al.name AS assigned_location_name, pa.asset_tag AS assigned_asset_tag
      FROM ticket_asset_map tam
      JOIN assets a ON a.id = tam.asset_id
@@ -57,7 +57,7 @@ if ($_rid > 0) {
                     <div class="text-muted"><?= Assets::assigneeHtml($a) ?><?= $a['serial'] ? ' · <span class="font-monospace">' . e($a['serial']) . '</span>' : '' ?></div>
                 </div>
                 <div class="d-flex align-items-center gap-2 flex-shrink-0">
-                    <span class="badge" style="background:<?= e($a['status_color']) ?>;color:<?= ticketStatusTextColor($a['status_color']) ?>;"><?= e($a['status_name']) ?></span>
+                    <?= Assets::statusBadgeHtml($a) ?>
                     <form method="POST" action="/tickets/<?= $_tid ?>/assets/<?= (int) $a['id'] ?>/remove" class="d-inline" onsubmit="return confirm('Unlink <?= e($a['asset_tag']) ?> from this ticket?');">
                         <?= csrfField() ?>
                         <button type="submit" class="btn btn-sm btn-link text-danger p-0" title="Unlink" aria-label="Unlink <?= e($a['asset_tag']) ?>"><i class="bi bi-x-lg"></i></button>

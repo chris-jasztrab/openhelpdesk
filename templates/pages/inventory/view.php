@@ -36,10 +36,7 @@ $money = static fn($v): string => $v !== null && $v !== '' ? '$' . number_format
                         <?= e($asset['model_name']) ?><?= $asset['manufacturer_name'] ? ' · ' . e($asset['manufacturer_name']) : '' ?> · <?= e($asset['category_name']) ?>
                     </div>
                     <div class="d-flex flex-wrap gap-2 align-items-center">
-                        <span class="badge" style="background:<?= e($asset['status_color']) ?>;color:<?= ticketStatusTextColor($asset['status_color']) ?>;"><?= e($asset['status_name']) ?></span>
-                        <?php if ($asset['status_kind'] === 'deployable' && $asset['assigned_type'] !== null): ?>
-                        <span class="badge bg-primary-subtle text-primary border">Deployed</span>
-                        <?php endif; ?>
+                        <?= Assets::statusBadgeHtml($asset) ?>
                         <?php if ($asset['deleted_at']): ?>
                         <span class="badge bg-danger">Deleted <?= e($day($asset['deleted_at'])) ?></span>
                         <?php endif; ?>
@@ -188,7 +185,7 @@ $money = static fn($v): string => $v !== null && $v !== '' ? '$' . number_format
                     <dt class="col-5 text-muted fw-normal">Model</dt><dd class="col-7"><?= e($asset['model_name']) ?><?= $asset['model_number'] ? ' <span class="text-muted">(' . e($asset['model_number']) . ')</span>' : '' ?></dd>
                     <dt class="col-5 text-muted fw-normal">Manufacturer</dt><dd class="col-7"><?= e($asset['manufacturer_name'] ?: '—') ?></dd>
                     <dt class="col-5 text-muted fw-normal">Category</dt><dd class="col-7"><?= e($asset['category_name']) ?></dd>
-                    <dt class="col-5 text-muted fw-normal">Status</dt><dd class="col-7"><?= e($asset['status_name']) ?></dd>
+                    <dt class="col-5 text-muted fw-normal">Status</dt><dd class="col-7"><?= e(Assets::statusLabel($asset)) ?></dd>
                     <dt class="col-5 text-muted fw-normal">Assigned to</dt><dd class="col-7"><?= Assets::assigneeHtml($asset) ?></dd>
                     <dt class="col-5 text-muted fw-normal"><?= label('location.singular') ?></dt><dd class="col-7"><?= e($asset['location_name'] ?: '—') ?></dd>
                     <dt class="col-5 text-muted fw-normal">Default <?= label('location.singular') ?></dt><dd class="col-7"><?= e($asset['default_location_name'] ?: '—') ?></dd>

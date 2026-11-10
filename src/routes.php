@@ -1345,7 +1345,7 @@ $router->get('/search', function () {
     if (($type === 'all' || $type === 'assets') && Assets::canView()) {
         $stmt = $db->prepare(
             'SELECT a.id, a.asset_tag, a.name, a.assigned_type, a.assigned_id, a.import_assignee,
-                    m.name AS model_name, s.name AS status_name, s.color AS status_color,
+                    m.name AS model_name, s.name AS status_name, s.kind AS status_kind, s.color AS status_color,
                     CONCAT(u.first_name, " ", u.last_name) AS assigned_user_name,
                     al.name AS assigned_location_name, pa.asset_tag AS assigned_asset_tag
              FROM assets a
@@ -1365,8 +1365,8 @@ $router->get('/search', function () {
                 'tag'      => $a['asset_tag'],
                 'name'     => $a['name'],
                 'model'    => $a['model_name'],
-                'status'   => $a['status_name'],
-                'color'    => $a['status_color'],
+                'status'   => Assets::statusLabel($a),
+                'color'    => Assets::statusColor($a),
                 'assigned' => Assets::assigneeLabel($a),
             ];
         }

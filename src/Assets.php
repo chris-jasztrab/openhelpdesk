@@ -265,6 +265,33 @@ class Assets
         return $from;
     }
 
+    /** A deployable asset that is checked out is "Deployed" — it is no longer ready to deploy. */
+    public static function isDeployed(array $a): bool
+    {
+        return ($a['status_kind'] ?? null) === 'deployable' && ($a['assigned_type'] ?? null) !== null;
+    }
+
+    /** Status text for lists, CSV and JSON: "Deployed" overrides the stored status while checked out. */
+    public static function statusLabel(array $a): string
+    {
+        return self::isDeployed($a) ? 'Deployed' : (string) $a['status_name'];
+    }
+
+    /** Badge colour matching statusLabel() for JSON consumers that paint their own badge. */
+    public static function statusColor(array $a): string
+    {
+        return self::isDeployed($a) ? '#0d6efd' : (string) $a['status_color'];
+    }
+
+    /** Escaped status badge matching statusLabel(). */
+    public static function statusBadgeHtml(array $a): string
+    {
+        if (self::isDeployed($a)) {
+            return '<span class="badge bg-primary-subtle text-primary border">Deployed</span>';
+        }
+        return '<span class="badge" style="background:' . e((string) $a['status_color']) . ';color:' . ticketStatusTextColor((string) $a['status_color']) . ';">' . e((string) $a['status_name']) . '</span>';
+    }
+
     /** Plain-text assignee for a row carrying the assetSelect() join columns. */
     public static function assigneeLabel(array $a): string
     {

@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.218.1 &mdash; 2026-11-10
+
+### Changed
+- **A deployed asset no longer also says "Ready to Deploy".** Wherever an asset's status is shown — the Inventory list and asset page, the ticket page's Assets card, a user's Assets block, the global search and ticket typeahead results, the audit-scan table and the CSV export — a *Ready to Deploy* asset that is checked out now shows only **Deployed**. The stored status is unchanged; it reappears as soon as the asset is checked in.
+
 ## 2.218.0 &mdash; 2026-11-10
 
 ### Added

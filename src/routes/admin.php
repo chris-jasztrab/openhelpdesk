@@ -1124,7 +1124,7 @@ $router->get('/admin/users/{id}', function (array $p) {
     $userAssets = [];
     if (Assets::canView()) {
         $stmt = $db->prepare(
-            'SELECT a.id, a.asset_tag, a.name, a.serial, m.name AS model_name, s.name AS status_name, s.color AS status_color
+            'SELECT a.id, a.asset_tag, a.name, a.serial, a.assigned_type, m.name AS model_name, s.name AS status_name, s.kind AS status_kind, s.color AS status_color
              FROM assets a JOIN asset_models m ON m.id = a.model_id JOIN asset_statuses s ON s.id = a.status_id
              WHERE a.assigned_type = "user" AND a.assigned_id = ? AND a.deleted_at IS NULL ORDER BY a.asset_tag'
         );

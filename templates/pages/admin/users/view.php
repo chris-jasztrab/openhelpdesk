@@ -399,7 +399,7 @@ $_baseUrl         = '/admin/users/' . (int)$profileUser['id'];
             <a href="/inventory/<?= (int) $ua['id'] ?>" class="btn btn-sm btn-outline-secondary text-start text-decoration-none">
                 <span class="font-monospace fw-semibold"><?= e($ua['asset_tag']) ?></span>
                 <span class="text-muted">· <?= e($ua['model_name']) ?><?= $ua['name'] ? ' (' . e($ua['name']) . ')' : '' ?></span>
-                <span class="badge ms-1" style="background:<?= e($ua['status_color']) ?>;color:<?= ticketStatusTextColor($ua['status_color']) ?>;"><?= e($ua['status_name']) ?></span>
+                <span class="ms-1"><?= Assets::statusBadgeHtml($ua) ?></span>
             </a>
             <?php endforeach; ?>
         </div>

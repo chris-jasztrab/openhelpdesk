@@ -71,7 +71,7 @@ $th = static fn(string $col, string $text): string =>
                         <span><span class="d-inline-block rounded-circle me-1" style="width:.6rem;height:.6rem;background:<?= e($s['color']) ?>;"></span><?= e($s['name']) ?> <span class="text-muted">(<?= (int) $s['n'] ?>)</span></span>
                     </label>
                     <?php endforeach; ?>
-                    <label class="filter-check-item" title="Ready-to-deploy status and checked out to a person, <?= strtolower(label('location.singular')) ?> or asset">
+                    <label class="filter-check-item" title="Checked out to a person, <?= strtolower(label('location.singular')) ?> or asset (shown in place of Ready to Deploy)">
                         <input type="checkbox" name="status[]" value="deployed" <?= $deployed ? 'checked' : '' ?>>
                         <span><span class="badge bg-primary-subtle text-primary border">Deployed</span> <span class="text-muted">(<?= (int) $deployedCount ?>)</span></span>
                     </label>
@@ -160,10 +160,7 @@ $th = static fn(string $col, string $text): string =>
                         <td class="text-muted"><?= e($a['category_name']) ?></td>
                         <td class="text-muted small font-monospace"><?= e($a['serial'] ?: '—') ?></td>
                         <td>
-                            <span class="badge" style="background:<?= e($a['status_color']) ?>;color:<?= ticketStatusTextColor($a['status_color']) ?>;"><?= e($a['status_name']) ?></span>
-                            <?php if ($a['status_kind'] === 'deployable' && $a['assigned_type'] !== null): ?>
-                            <span class="badge bg-primary-subtle text-primary border">Deployed</span>
-                            <?php endif; ?>
+                            <?= Assets::statusBadgeHtml($a) ?>
                         </td>
                         <td>
                             <?= Assets::assigneeHtml($a) ?>
