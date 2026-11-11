@@ -132,7 +132,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <h5 class="fw-semibold mb-3"><i class="bi bi-terminal text-primary me-2"></i>Keeping SLA States Current</h5>
 <ul class="text-muted mb-0">
     <li>The <strong>SLA Recalculation</strong> cron job is <strong>required</strong> and runs every 5 minutes; it moves tickets into Warning and Breached as time passes. Get the exact command from <a href="/admin/settings/cron-jobs">Cron Jobs</a>. It can also be triggered over HTTP with a secret token (<code>SLA_CRON_TOKEN</code> in <code>.env</code>). The same job sends <a href="/admin/docs/automations#ticket-reminders">Ticket Reminders</a> (so it counts as an email-sending job) and routes any ticket with no group to the default group.</li>
-    <li><strong>Recalculate All</strong> on the SLA Policies page recalculates every active ticket immediately.</li>
+    <li>Saving a policy, business hours or a holiday does <strong>not</strong> change tickets that already exist. Press <strong>Recalculate All</strong> on the SLA Policies page to apply them: every open ticket under SLA gets its deadlines worked out again from its original SLA start (time already credited for pauses is kept), and a note is added to its timeline. SLA-exempt tickets, tickets that never had a clock and closed tickets are left alone, and no notifications are sent.</li>
     <li>The first time a ticket's state is calculated, no notifications are sent, so putting a backlog under SLA doesn't flood anyone.</li>
     <li>Tickets marked <strong>SLA-exempt</strong> (e.g. imported with "Exclude from SLA") never get a clock, even if they are edited later.</li>
 </ul>

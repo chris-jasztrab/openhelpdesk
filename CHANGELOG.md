@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.220.0 &mdash; 2026-11-11
+
+### Changed
+- **Recalculate All now applies edited SLA policies to existing tickets.** Until now the button on *Settings → SLA Policies* only re-judged each ticket against the deadlines it was given when created, so changing a policy, the business hours or a holiday never reached open tickets — a ticket that breached under the old target stayed breached. It now works every open ticket's deadlines out again from its original SLA start using what is saved now, keeps the time earlier pauses already credited, moves a due date that was following the SLA, and adds an *SLA recalculated from the current policy* note to the timeline. Tickets imported without SLA, tickets that never had an SLA clock and closed tickets are left alone; no notifications are sent and the tickets are not marked as updated. The cron job is unchanged.
+
 ## 2.219.0 &mdash; 2026-11-10
 
 ### Added

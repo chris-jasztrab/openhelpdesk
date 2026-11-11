@@ -8116,9 +8116,11 @@ $router->post('/admin/settings/sla-recalculate', function () {
         redirect('/admin/settings/sla-policies');
     }
 
-    $count = Sla::recalculateAll(Database::connect());
-    logAudit('sla.recalculated', null, 'sla_policy', 'tickets_updated=' . (int) $count);
-    flash('success', "SLA recalculated for {$count} ticket(s).");
+    $db      = Database::connect();
+    $redated = Sla::reapplyPolicies($db);
+    $count   = Sla::recalculateAll($db);
+    logAudit('sla.recalculated', null, 'sla_policy', 'deadlines_changed=' . (int) $redated . '; states_updated=' . (int) $count);
+    flash('success', "SLA recalculated from the current policies: deadlines changed on {$redated} ticket(s).");
     redirect('/admin/settings/sla-policies');
 });
 

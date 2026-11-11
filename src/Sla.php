@@ -230,9 +230,10 @@ class Sla
      * Compute the SLA state for a single ticket.
      *
      * @param array $ticket Ticket row with SLA columns
+     * @param DateTimeImmutable|null $now Instant to judge against; defaults to the present
      * @return string|null 'on_track', 'warning', 'breached', or null if no SLA
      */
-    public static function computeSlaState(array $ticket): ?string
+    public static function computeSlaState(array $ticket, ?DateTimeImmutable $now = null): ?string
     {
         if (!empty($ticket['sla_exempt'])) {
             return null;
@@ -251,7 +252,7 @@ class Sla
             return $ticket['sla_state'] ?? 'on_track';
         }
 
-        $now = new DateTimeImmutable('now');
+        $now ??= new DateTimeImmutable('now');
 
         // Check for breach: either due date is past
         $responseBreach = false;
@@ -385,6 +386,117 @@ class Sla
         }
 
         return $updated;
+    }
+
+    /**
+     * Re-derive the due dates of every open ticket that is under SLA from the
+     * policies, business hours and holidays as they stand now — the "Recalculate
+     * All" button. recalculateAll() alone only re-judges the state against the
+     * due dates a ticket was given at creation, so an edited policy never
+     * reached existing tickets.
+     *
+     * Left alone: SLA-exempt tickets, tickets that never had a clock (this is
+     * not the moment to invent one retroactively), and tickets whose
+     * type+priority has no policy or business hours now.
+     *
+     * Dates are measured from the ticket's SLA baseline, then pushed out by the
+     * minutes earlier pauses / resume-on-reopen already credited — read back
+     * from the timeline notes resume() and onReopened() write, since the credit
+     * is stored nowhere else. A ticket paused right now is judged as at the
+     * moment it paused; resume() credits that pause when it ends.
+     *
+     * Silent like an import: the state is written here, so the next
+     * recalculateAll() sees no transition and nothing is notified. updated_at
+     * is put back — a policy edit is not activity on the ticket.
+     *
+     * @return int Number of tickets whose due dates changed
+     */
+    public static function reapplyPolicies(PDO $db): int
+    {
+        if (!slaEnabled()) {
+            return 0;
+        }
+
+        $openIn  = ticketStatusSqlIn(ticketOpenBucketSlugs(), 'status');
+        $tickets = $db->query(
+            "SELECT id, type_id, priority_id, created_at, sla_started_at, first_response_due_at, resolution_due_at,
+                    first_responded_at, sla_state, sla_paused_at, updated_at
+             FROM tickets
+             WHERE $openIn
+               AND sla_exempt = 0
+               AND priority_id IS NOT NULL
+               AND (first_response_due_at IS NOT NULL OR resolution_due_at IS NOT NULL)"
+        )->fetchAll(PDO::FETCH_ASSOC);
+
+        $ctx     = self::makeImportContext($db);
+        $tz      = self::storageTimezone();
+        $credits = $db->prepare(
+            "SELECT details FROM ticket_timeline
+              WHERE ticket_id = ? AND action IN ('sla_resumed', 'sla_reopened') AND created_at >= ?"
+        );
+        $write   = $db->prepare('UPDATE tickets SET first_response_due_at = ?, resolution_due_at = ?, sla_state = ? WHERE id = ?');
+        $restore = $db->prepare('UPDATE tickets SET updated_at = ? WHERE id = ?');
+        $note    = $db->prepare(
+            'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, ?, ?, 1)'
+        );
+
+        $changed = 0;
+        foreach ($tickets as $t) {
+            $id      = (int) $t['id'];
+            $typeId  = $t['type_id'] !== null ? (int) $t['type_id'] : null;
+            $typeKey = $typeId === null ? 'null' : (string) $typeId;
+            $ctx['schedules'][$typeKey] ??= self::getBusinessSchedule($typeId, $db) ?? false;
+            $ctx['policies'][$typeKey . ':' . $t['priority_id']] ??= self::findPolicy($db, $typeId, (int) $t['priority_id']) ?? false;
+            $biz      = $ctx['schedules'][$typeKey];
+            $sla      = $ctx['policies'][$typeKey . ':' . $t['priority_id']];
+            $baseline = self::baselineFor($t);
+            if (!$biz || !$sla || $baseline === null) {
+                continue;
+            }
+
+            [$responseDue, $resolutionDue] = self::dueDatesFor($sla, new DateTimeImmutable($baseline, $tz), $biz, $ctx['excluded']);
+
+            $credit = 0;
+            $credits->execute([$id, $baseline]);
+            foreach ($credits->fetchAll(PDO::FETCH_COLUMN) as $details) {
+                if (preg_match('/(?:paused|closed) (\d+) business minutes/', (string) $details, $m)) {
+                    $credit += (int) $m[1];
+                }
+            }
+            if ($credit > 0) {
+                // Wall-clock shift, exactly as resume() applied it the first time.
+                $shift = static fn (?string $due): ?string => $due === null
+                    ? null
+                    : (new DateTimeImmutable($due, $tz))->modify("+{$credit} minutes")->format('Y-m-d H:i:s');
+                $responseDue   = $shift($responseDue);
+                $resolutionDue = $shift($resolutionDue);
+            }
+
+            if ($responseDue === $t['first_response_due_at'] && $resolutionDue === $t['resolution_due_at']) {
+                continue;
+            }
+
+            $state = self::computeSlaState(
+                ['first_response_due_at' => $responseDue, 'resolution_due_at' => $resolutionDue, 'sla_paused_at' => null] + $t,
+                !empty($t['sla_paused_at']) ? new DateTimeImmutable($t['sla_paused_at'], $tz) : null
+            ) ?? 'on_track';
+
+            $write->execute([$responseDue, $resolutionDue, $state, $id]);
+            self::syncDueDate($db, $id, $t['resolution_due_at']);
+            $restore->execute([$t['updated_at'], $id]);
+
+            $parts = [];
+            if ($responseDue !== null) {
+                $parts[] = 'First response due by ' . (new DateTimeImmutable($responseDue))->format('M j, Y g:i A');
+            }
+            if ($resolutionDue !== null) {
+                $parts[] = 'Resolution due by ' . (new DateTimeImmutable($resolutionDue))->format('M j, Y g:i A');
+            }
+            $note->execute([$id, 'sla_set', 'SLA recalculated from the current policy: ' . implode(', ', $parts)]);
+            $changed++;
+        }
+
+        return $changed;
     }
 
     /**

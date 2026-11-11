@@ -302,4 +302,49 @@ class SlaImportBaselineTest extends TestCase
         $this->assertSame('breached', $row['sla_state']);
         $this->assertSame('2022-02-02 02:02:02', $row['updated_at'], ' — a background state flip must not bump updated_at');
     }
+
+    /**
+     * Ticket #80025: the policy was loosened after the ticket breached its old
+     * first-response target, and Recalculate All left it breached because the
+     * due dates were never re-derived.
+     */
+    public function test_reapply_policies_moves_existing_tickets_onto_the_edited_policy(): void
+    {
+        $id      = $this->makeImportedTicket(0, 0);
+        $exempt  = $this->makeImportedTicket(0, 1);
+        $noClock = $this->makeImportedTicket(0, 0);
+        Sla::initializeForTicket($this->db, $id, $this->priorityId);
+        // Two hours in: past the 60-minute response target of the old policy.
+        $started = (new DateTimeImmutable('-2 hours'))->format('Y-m-d H:i:s');
+        $this->db->prepare(
+            "UPDATE tickets SET sla_started_at = ?, first_response_due_at = '2022-01-01 01:00:00', sla_state = 'breached',
+                    updated_at = '2022-02-02 02:02:02' WHERE id = ?"
+        )->execute([$started, $id]);
+
+        $this->db->exec('UPDATE sla_policies SET first_response_minutes = 6000, resolution_minutes = 12000');
+        $this->assertSame(1, Sla::reapplyPolicies($this->db), ' — only the ticket with a clock is re-dated');
+
+        $stmt = $this->db->prepare('SELECT first_response_due_at, resolution_due_at, sla_state, updated_at FROM tickets WHERE id = ?');
+        $stmt->execute([$id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $this->assertSame('on_track', $row['sla_state'], ' — the looser policy un-breaches it');
+        $this->assertGreaterThan(date('Y-m-d H:i:s', strtotime('+3 days')), $row['first_response_due_at']);
+        $this->assertSame('2022-02-02 02:02:02', $row['updated_at'], ' — a policy edit is not ticket activity');
+        $this->assertNull($this->ticket($exempt)['resolution_due_at'], ' — exempt imports stay outside SLA');
+        $this->assertNull($this->ticket($noClock)['resolution_due_at'], ' — no clock is invented retroactively');
+
+        // Time an earlier pause credited survives the recompute.
+        $this->db->prepare(
+            "INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal, created_at)
+             VALUES (?, NULL, 'sla_resumed', 'SLA timers resumed (paused 30 business minutes)', 1, ?)"
+        )->execute([$id, date('Y-m-d H:i:s')]);
+        $this->assertSame(1, Sla::reapplyPolicies($this->db));
+        $stmt->execute([$id]);
+        $this->assertSame(
+            1800,
+            strtotime($stmt->fetch(PDO::FETCH_ASSOC)['resolution_due_at']) - strtotime($row['resolution_due_at']),
+            ' — the 30 paused minutes are added back'
+        );
+        $this->assertSame(0, Sla::reapplyPolicies($this->db), ' — a second run with nothing changed touches nothing');
+    }
 }

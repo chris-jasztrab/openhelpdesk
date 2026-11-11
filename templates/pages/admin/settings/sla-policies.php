@@ -450,7 +450,8 @@ document.querySelectorAll('.sla-input').forEach(function(input) {
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <p class="mb-0">Recalculate SLA state for all active tickets? This may take a moment.</p>
+                <p>Recalculate the SLA deadlines of every open ticket from the policies, business hours and holidays as saved now?</p>
+                <p class="mb-0 text-muted small">Tickets imported without SLA, and tickets that never had an SLA clock, are left alone. Closed tickets keep the deadlines they closed with. No notifications are sent.</p>
             </div>
             <div class="modal-footer">
                 <form method="POST" action="/admin/settings/sla-recalculate">
