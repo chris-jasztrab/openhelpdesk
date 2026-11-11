@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.222.0 &mdash; 2026-11-11
+
+### Added
+- **Branding themes.** A new **Themes** card on Settings → Branding saves the live colours (the four main colours and the four timeline colours) and the fallback icon under a name, so a seasonal look no longer has to be re-entered by hand. **Apply** beside a saved theme switches the helpdesk to it at once, the theme matching the live colours is marked **Active**, and saving under an existing name replaces it. The logo and app name are not part of a theme. Themes are kept in one `branding_themes` settings row, so there is no migration.
+
 ## 2.221.1 &mdash; 2026-11-11
 
 ### Changed
