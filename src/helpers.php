@@ -6622,8 +6622,14 @@ function notifyAgentNoteAdded(PDO $db, int $ticketId, string $message): void
 
 /**
  * Email the ticket requester when their ticket status changes to resolved or closed.
+ *
+ * When $newStatus is also the survey trigger, the satisfaction survey is put in
+ * this email rather than sent as a second one: the survey row is claimed here,
+ * so the sendCsatSurvey() call that follows at the call site no-ops. Call this
+ * BEFORE sendCsatSurvey(). Pass $withSurvey = false where the close must not
+ * survey at all (Close-menu reasons, the task parent's auto-resolve).
  */
-function notifyRequesterStatusChanged(PDO $db, int $ticketId, string $newStatus): void
+function notifyRequesterStatusChanged(PDO $db, int $ticketId, string $newStatus, bool $withSurvey = true): void
 {
     // Match the slug against the two semantic default flags rather than the
     // literal strings 'resolved' / 'closed', so admins can rename either
@@ -6674,10 +6680,15 @@ function notifyRequesterStatusChanged(PDO $db, int $ticketId, string $newStatus)
         'last_name'  => $row['last_name'],
     ]);
 
+    $survey = $withSurvey && $newStatus === getSetting('csat_trigger_status', ticketDefaultResolvedStatusSlug())
+        ? csatCreateSurvey($db, $ticketId)
+        : null;
+
     $emailHtml = renderEmail('ticket-status-changed', [
         'ticketId'    => $ticketId,
         'subject'     => $row['subject'],
         'newStatus'   => $newStatus,
+        'survey'      => $survey,
         'ticketUrl'   => $ticketUrl,
         'introText'   => !empty($tpl['intro']) ? $tpl['intro'] : $defaultIntros[$templateKind],
         'buttonLabel' => !empty($tpl['button']) ? $tpl['button'] : 'View Ticket',
@@ -7112,20 +7123,22 @@ function runEscalationRule(\PDO $db, array $rule, array $ticket): void
 /* ── CSAT Survey ──────────────────────────────────────────────── */
 
 /**
- * Create a CSAT survey record and send the rating email to the ticket creator.
- * Silently skips if CSAT is disabled, email not configured, or survey already sent.
+ * Claim a ticket's one survey: insert the csat_surveys row and return the links
+ * an email needs (surveyUrl, reopenUrl, showReopen) plus the requester `row`.
+ * Null when no survey should go out — CSAT disabled, ticket already surveyed,
+ * requester has no email or opted out, or External mode with no URL.
  */
-function sendCsatSurvey(\PDO $db, int $ticketId): void
+function csatCreateSurvey(\PDO $db, int $ticketId): ?array
 {
     if (getSetting('csat_enabled') !== '1') {
-        return;
+        return null;
     }
 
     // Don't send twice for the same ticket
     $exists = $db->prepare('SELECT id FROM csat_surveys WHERE ticket_id = ?');
     $exists->execute([$ticketId]);
     if ($exists->fetchColumn()) {
-        return;
+        return null;
     }
 
     // Fetch ticket subject + creator details
@@ -7138,10 +7151,10 @@ function sendCsatSurvey(\PDO $db, int $ticketId): void
     $stmt->execute([$ticketId]);
     $row = $stmt->fetch();
     if (!$row || empty($row['email'])) {
-        return;
+        return null;
     }
     if (!(bool)($row['notify_csat'] ?? 1)) {
-        return; // user opted out of satisfaction surveys
+        return null; // user opted out of satisfaction surveys
     }
 
     $mode = getSetting('csat_mode', 'internal');
@@ -7150,14 +7163,12 @@ function sendCsatSurvey(\PDO $db, int $ticketId): void
     // one-survey-per-ticket slot) if the admin has selected External but
     // left the URL blank.
     if ($mode === 'external' && trim(getSetting('csat_external_url', '')) === '') {
-        return;
+        return null;
     }
 
     $token = bin2hex(random_bytes(32));
 
     $appUrl     = env('APP_URL', 'http://localhost:8000');
-    $brandColor = getSetting('branding_primary_color', '#4f46e5');
-    $appName    = getSetting('app_name', 'OpenHelpDesk');
     $showReopen = getSetting('csat_show_reopen', '1') === '1';
 
     if ($mode === 'external') {
@@ -7179,6 +7190,24 @@ function sendCsatSurvey(\PDO $db, int $ticketId): void
     // deep-link to it (public page for built-in, third-party URL for external).
     $db->prepare('INSERT INTO csat_surveys (ticket_id, user_id, token, survey_url) VALUES (?, ?, ?, ?)')
        ->execute([$ticketId, (int) $row['user_id'], $token, $surveyUrl]);
+
+    return ['row' => $row, 'surveyUrl' => $surveyUrl, 'reopenUrl' => $reopenUrl, 'showReopen' => $showReopen];
+}
+
+/**
+ * Send the standalone survey email to the ticket creator. No-ops when
+ * csatCreateSurvey() declines — including when the closed/resolved notice
+ * already carried this ticket's survey (notifyRequesterStatusChanged).
+ */
+function sendCsatSurvey(\PDO $db, int $ticketId): void
+{
+    $survey = csatCreateSurvey($db, $ticketId);
+    if ($survey === null) {
+        return;
+    }
+    ['row' => $row, 'surveyUrl' => $surveyUrl, 'reopenUrl' => $reopenUrl, 'showReopen' => $showReopen] = $survey;
+    $brandColor = getSetting('branding_primary_color', '#4f46e5');
+    $appName    = getSetting('app_name', 'OpenHelpDesk');
 
     $tpl = getEmailTpl('csat_survey', [
         'ticket_id'  => $ticketId,
@@ -9816,7 +9845,7 @@ function resolveParentsWithClosedTasks(PDO $db): int
         $note->execute([$id, 'All task tickets are closed. Status changed from '
             . ticketStatusLabel($p['status']) . ' to ' . ticketStatusLabel($resolved) . '.']);
         Sla::onStatusChanged($db, $id, $p['status'], $resolved);
-        notifyRequesterStatusChanged($db, $id, $resolved);
+        notifyRequesterStatusChanged($db, $id, $resolved, false);
     }
     return count($parents);
 }
@@ -10709,7 +10738,7 @@ function applyTicketCloseMode(PDO $db, int $ticketId, string $status, string $mo
             $note($message, $ticketId);
             break;
         case 'closed_email':
-            notifyRequesterStatusChanged($db, $ticketId, $status);
+            notifyRequesterStatusChanged($db, $ticketId, $status, false);
             break;
     }
     return $redirect;

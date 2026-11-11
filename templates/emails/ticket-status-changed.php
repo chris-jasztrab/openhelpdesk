@@ -46,6 +46,14 @@
                 </tr>
             </table>
 
+<?php
+// The satisfaction survey rides this notice when the new status is the survey
+// trigger, so the requester gets one email instead of two (see notifyRequesterStatusChanged).
+if (!empty($survey)) {
+    ['surveyUrl' => $surveyUrl, 'reopenUrl' => $reopenUrl, 'showReopen' => $showReopen] = $survey;
+    require ROOT_DIR . '/templates/partials/email-csat-block.php';
+}
+?>
             <table cellpadding="0" cellspacing="0">
                 <tr>
                     <td style="border-radius:6px; background:<?= e(getSetting('branding_primary_color', '#4f46e5')) ?>;">

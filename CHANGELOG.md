@@ -11,6 +11,14 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.221.0 &mdash; 2026-11-11
+
+### Changed
+- **Closing a ticket sends the requester one email instead of two.** When the status that triggers the satisfaction survey also sends a resolved/closed notice, the survey buttons now sit inside that notice and no separate survey email follows. The standalone survey email is still used where no notice goes out (*Send & set status* on the agent ticket page, *Close and request feedback*, the API and Teams bot, or a requester who has switched off closed notices). The combined email uses the *Ticket Resolved* / *Ticket Closed* template wording. Close-menu reasons (duplicate, won't fix, no response…) still send no survey.
+
+### Fixed
+- **Admin *Send & set status* to Closed no longer sends three emails.** The admin ticket page sent the reply, the survey and the closed notice; it now sends the reply and one closed notice carrying the survey.
+
 ## 2.220.0 &mdash; 2026-11-11
 
 ### Changed

@@ -5971,14 +5971,16 @@ $router->post('/admin/tickets/{id}/comment', function (array $p) {
                 'INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, ?, ?, ?, 0)'
             )->execute([$id, Auth::id(), 'status_changed', "Status changed from {$oldStatus} to {$statusAfter}"]);
             notifyAgentStatusChanged($db, $id, $oldStatus, $statusAfter, Auth::id());
+            // Notice first: it carries the survey when this status triggers one,
+            // and the sendCsatSurvey below then no-ops (one email, not two).
+            if (in_array($statusAfter, ticketClosedBucketSlugs(), true)) {
+                notifyRequesterStatusChanged($db, $id, $statusAfter);
+            }
             $csatTrigger = getSetting('csat_trigger_status', ticketDefaultResolvedStatusSlug());
             if ($statusAfter === $csatTrigger) {
                 sendCsatSurvey($db, $id);
             }
             Sla::onStatusChanged($db, $id, $oldStatus, $statusAfter);
-            if (in_array($statusAfter, ticketClosedBucketSlugs(), true)) {
-                notifyRequesterStatusChanged($db, $id, $statusAfter);
-            }
             $base .= ' Status set to ' . ticketStatusLabel($statusAfter) . '.';
         }
     }
