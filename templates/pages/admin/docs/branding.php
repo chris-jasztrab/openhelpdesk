@@ -28,6 +28,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
     </tbody>
 </table>
 </div>
+<p class="text-muted mt-3 mb-0"><strong>Themes</strong> save you re-entering colours each season. Type a name under <strong>Themes</strong> and click <strong>Save theme</strong> to keep a copy of the live colours (including the timeline colours) and the fallback icon. <strong>Apply</strong> beside a saved theme switches the helpdesk to it straight away; the one that matches the live colours is marked <strong>Active</strong>. Saving under an existing name replaces that theme. The logo and app name are not part of a theme.</p>
 <p class="text-muted small mt-3 mb-0"><strong>Reset to Defaults</strong> restores the default colours and name in the form, ready for you to save. Your logo also becomes the installed-app icon: see <a href="/admin/docs/portal#install-app">Portal → Install as an App</a>.</p>
 </div>
 </div>

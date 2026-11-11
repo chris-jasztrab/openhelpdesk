@@ -51,6 +51,26 @@ class SettingsTest extends TestCase
         $this->assertSee('navbar_icon', $r, ' — navbar icon input must be present on branding page');
     }
 
+    public function test_branding_theme_save_apply_delete(): void
+    {
+        $admin    = $this->adminClient();
+        $original = getSetting('branding_primary_color', '#4f46e5');
+        try {
+            $this->post($admin, '/admin/settings/branding/themes', ['save' => '1', 'theme_name' => '[TEST] Theme']);
+            $this->assertSee('[TEST] Theme', $this->get($admin, '/admin/settings/branding'));
+
+            setSetting('branding_primary_color', '#123456');
+            $this->post($admin, '/admin/settings/branding/themes', ['apply' => '[TEST] Theme']);
+            $stmt = \Database::connect()->prepare('SELECT setting_value FROM settings WHERE setting_key = ?');
+            $stmt->execute(['branding_primary_color']);
+            $this->assertSame($original, $stmt->fetchColumn(), ' — applying the theme restores the saved colour');
+        } finally {
+            setSetting('branding_primary_color', $original);
+            $this->post($admin, '/admin/settings/branding/themes', ['delete' => '[TEST] Theme']);
+        }
+        $this->assertNotSee('[TEST] Theme', $this->get($admin, '/admin/settings/branding'));
+    }
+
     /** @dataProvider brandIcons */
     public function test_normalize_brand_icon(string $raw, string $expected): void
     {

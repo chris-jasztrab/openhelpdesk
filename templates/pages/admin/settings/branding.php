@@ -98,6 +98,50 @@ $breadcrumbs  = [
                 </div>
             </div>
 
+            <!-- Themes: these controls belong to #themeForm (below the main form), not to Save Branding -->
+            <div class="card border-0 shadow-sm mb-4" id="themes">
+                <div class="card-header bg-transparent fw-semibold">
+                    <i class="bi bi-brush me-1"></i>Themes
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        A theme is a named copy of the colours below and the fallback icon. Save the look you have now, then switch back to it with one click. The logo and app name are not part of a theme.
+                    </p>
+                    <label for="themeName" class="form-label">Save the current look as a theme</label>
+                    <div class="input-group" style="max-width:420px;">
+                        <input type="text" class="form-control" id="themeName" name="theme_name" form="themeForm"
+                               maxlength="60" placeholder="e.g. Christmas" required>
+                        <button type="submit" class="btn btn-outline-secondary" form="themeForm" name="save" value="1">
+                            <i class="bi bi-plus-lg me-1"></i>Save theme
+                        </button>
+                    </div>
+                    <div class="form-text">Saves the colours that are live now. If you've changed colours in the form, click Save Branding first. Reusing a name replaces that theme.</div>
+
+                    <?php if ($brandingThemes): ?>
+                    <ul class="list-group mt-3">
+                        <?php foreach ($brandingThemes as $tName => $t): $tName = (string) $tName; ?>
+                        <li class="list-group-item d-flex align-items-center gap-2 flex-wrap">
+                            <span class="d-inline-flex rounded overflow-hidden border flex-shrink-0" aria-hidden="true">
+                                <?php foreach (['branding_navbar_start', 'branding_navbar_end', 'branding_primary_color', 'branding_timeline_note_accent'] as $swatchKey): ?>
+                                <span style="width:16px; height:22px; background:<?= e($t[$swatchKey] ?? '#ffffff') ?>;"></span>
+                                <?php endforeach; ?>
+                            </span>
+                            <span class="fw-semibold min-w-0 text-break"><?= e($tName) ?></span>
+                            <?php if ($t == $liveTheme): ?><span class="badge bg-success">Active</span><?php endif; ?>
+                            <span class="ms-auto d-flex gap-2">
+                                <button type="submit" class="btn btn-sm text-white" style="background:var(--ld-primary);"
+                                        form="themeForm" name="apply" value="<?= e($tName) ?>" formnovalidate>Apply</button>
+                                <button type="submit" class="btn btn-sm btn-outline-danger js-theme-delete"
+                                        form="themeForm" name="delete" value="<?= e($tName) ?>" formnovalidate
+                                        aria-label="Delete theme <?= e($tName) ?>"><i class="bi bi-trash"></i></button>
+                            </span>
+                        </li>
+                        <?php endforeach; ?>
+                    </ul>
+                    <?php endif; ?>
+                </div>
+            </div>
+
             <!-- Colors -->
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-transparent fw-semibold">
@@ -291,8 +335,16 @@ $breadcrumbs  = [
     </div>
 </form>
 
+<form method="POST" action="/admin/settings/branding/themes" id="themeForm"><?= csrfField() ?></form>
+
 <script>
 (function () {
+    document.querySelectorAll('.js-theme-delete').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+            if (!confirm('Delete the theme "' + btn.value + '"? The live colours stay as they are.')) e.preventDefault();
+        });
+    });
+
     // Sync color pickers with text inputs
     var pairs = [
         ['primaryColorPicker',        'primaryColor'],

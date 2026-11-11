@@ -9520,6 +9520,8 @@ $router->get('/admin/settings/branding', function () {
         'timelineNoteAccent'  => getSetting('branding_timeline_note_accent',  '#ca8a04'),
         'timelineSystemBg'    => getSetting('branding_timeline_system_bg',    '#eff6ff'),
         'timelineSystemAccent'=> getSetting('branding_timeline_system_accent','#3b82f6'),
+        'brandingThemes'      => json_decode(getSetting('branding_themes', '{}'), true) ?: [],
+        'liveTheme'           => brandingThemeSnapshot(),
     ]);
 });
 
@@ -9648,6 +9650,85 @@ $router->post('/admin/settings/branding', function () {
     logAuditChange('branding.settings_changed', null, null, $brandBefore, $brandFields);
 
     flash('success', 'Branding settings updated successfully.');
+    redirect('/admin/settings/branding');
+});
+
+/**
+ * The live values of the settings a saved branding theme carries: the eight
+ * colours and the fallback icon. Logo and app name are not part of a theme.
+ */
+function brandingThemeSnapshot(): array
+{
+    $defaults = [
+        'branding_primary_color'          => '#4f46e5',
+        'branding_primary_hover'          => '#4338ca',
+        'branding_navbar_start'           => '#1e1b4b',
+        'branding_navbar_end'             => '#312e81',
+        'branding_timeline_note_bg'       => '#fefce8',
+        'branding_timeline_note_accent'   => '#ca8a04',
+        'branding_timeline_system_bg'     => '#eff6ff',
+        'branding_timeline_system_accent' => '#3b82f6',
+        'branding_navbar_icon'            => 'bi-headset',
+    ];
+    $snapshot = [];
+    foreach ($defaults as $key => $default) {
+        $snapshot[$key] = getSetting($key, $default);
+    }
+    return $snapshot;
+}
+
+// Themes live in one settings row, branding_themes: JSON of name => snapshot.
+$router->post('/admin/settings/branding/themes', function () {
+    Auth::requirePermission('settings.manage');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/branding');
+        return;
+    }
+
+    $themes = json_decode(getSetting('branding_themes', '{}'), true) ?: [];
+
+    if (isset($_POST['apply'])) {
+        $name  = (string) $_POST['apply'];
+        $theme = $themes[$name] ?? null;
+        if (!is_array($theme)) {
+            flash('error', 'That theme no longer exists.');
+            redirect('/admin/settings/branding');
+            return;
+        }
+        $before = $after = [];
+        foreach (brandingThemeSnapshot() as $key => $current) {
+            $value = (string) ($theme[$key] ?? '');
+            // The row is plain JSON, so re-check each value on the way out.
+            $value = $key === 'branding_navbar_icon'
+                ? normalizeBrandIcon($value)
+                : (preg_match('/^#[0-9a-fA-F]{6}$/', $value) ? $value : '');
+            if ($value === '') {
+                continue;
+            }
+            $before[$key] = $current;
+            $after[$key]  = $value;
+            setSetting($key, $value);
+        }
+        logAuditChange('branding.settings_changed', null, null, $before, $after);
+        flash('success', 'Theme "' . $name . '" applied.');
+    } elseif (isset($_POST['delete'])) {
+        unset($themes[(string) $_POST['delete']]);
+        setSetting('branding_themes', json_encode($themes));
+        flash('success', 'Theme deleted.');
+    } else {
+        $name = mb_substr(trim((string) ($_POST['theme_name'] ?? '')), 0, 60);
+        if ($name === '') {
+            flash('error', 'Give the theme a name.');
+            redirect('/admin/settings/branding');
+            return;
+        }
+        $replaced      = isset($themes[$name]);
+        $themes[$name] = brandingThemeSnapshot();
+        setSetting('branding_themes', json_encode($themes));
+        flash('success', 'Theme "' . $name . '" ' . ($replaced ? 'updated' : 'saved') . '.');
+    }
+
     redirect('/admin/settings/branding');
 });
 
