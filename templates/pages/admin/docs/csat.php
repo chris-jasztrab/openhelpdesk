@@ -312,7 +312,7 @@ await fetch('https://help.example.com/api/csat/webhook', {
     <div class="col-md-6">
         <div class="border rounded p-3 h-100">
             <div class="fw-semibold mb-2">Switch ON (default)</div>
-            <p class="text-muted small mb-2">The email shows <strong>two buttons</strong>: a red <em>&ldquo;No, please reopen it&rdquo;</em> and a green <em>&ldquo;Yes, it was resolved!&rdquo;</em>.</p>
+            <p class="text-muted small mb-2">The email shows <strong>two buttons</strong>: a red <em>&ldquo;No, please reopen it&rdquo;</em> and a green <em>&ldquo;Yes, leave feedback&rdquo;</em>, under a line telling the requester they can reopen the ticket or rate their experience.</p>
             <p class="text-muted small mb-0">The reopen button always points back to this app. It opens a <em>Reopen this ticket?</em> page, and only the requester's confirmation there reopens the ticket (status Open, with a timeline note). Email security scanners that pre-open links can't reopen tickets by accident. Once a rating has been recorded, the ticket can't be reopened this way. The rate button goes to the built-in rating page or your external URL, depending on the mode.</p>
         </div>
     </div>

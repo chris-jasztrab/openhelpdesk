@@ -61,7 +61,7 @@ $closedLabel  = label('portal.status.closed', 'Closed');
 <p class="text-muted mb-2">When the team marks your request <strong><?= e($doneLabel) ?></strong> or <strong><?= e($closedLabel) ?></strong>, you'll usually get an email saying so. Sometimes it includes a short message explaining why &mdash; for example, that it's the same problem as another request, or that we closed it because we didn't hear back. That message also appears on the request's timeline.</p>
 <p class="text-muted mb-2">You may also get a <strong>satisfaction survey</strong> &mdash; one per request, and always optional:</p>
 <ul class="text-muted mb-0">
-    <li><strong>Yes, it was resolved!</strong> (or <strong>Rate your experience</strong>) opens a page where you pick a face from <em>Terrible</em> to <em>Excellent</em>, add a comment if you like, and click <strong>Submit My Rating</strong>.</li>
+    <li><strong>Yes, leave feedback</strong> (or <strong>Rate your experience</strong>) opens a page where you pick a face from <em>Terrible</em> to <em>Excellent</em>, add a comment if you like, and click <strong>Submit My Rating</strong>.</li>
     <li><strong>No, please reopen it</strong> asks you to confirm with <strong>Yes, reopen it</strong>, then sends your request back to the team.</li>
 </ul>
 </div>

@@ -12,8 +12,12 @@ $brandColor = $brandColor ?? getSetting('branding_primary_color', '#4f46e5');
                 <h2 style="margin:0 0 8px; font-size:17px; color:#1e293b; font-weight:700;">
                     Was your issue resolved? 🤔
                 </h2>
-                <p style="margin:0 0 20px; font-size:13px; color:#64748b;">
+                <p style="margin:0 0 8px; font-size:13px; color:#64748b;">
                     Ticket <strong>#<?= (int) $ticketId ?></strong>
+                </p>
+                <p style="margin:0 0 20px; font-size:14px; line-height:1.5; color:#475569;">
+                    If it isn't fixed, reopen the ticket and we'll pick it back up.
+                    If it is, we'd welcome your feedback. Rating your experience takes less than a minute.
                 </p>
                 <table cellpadding="0" cellspacing="0">
                     <tr>
@@ -26,7 +30,7 @@ $brandColor = $brandColor ?? getSetting('branding_primary_color', '#4f46e5');
                         <td>
                             <a href="<?= htmlspecialchars($surveyUrl, ENT_QUOTES, 'UTF-8') ?>"
                                style="display:inline-block; padding:11px 24px; background:#dcfce7; border:2px solid #86efac; border-radius:8px; text-decoration:none; font-size:14px; font-weight:600; color:#16a34a;">
-                                ✅ Yes, it was resolved!
+                                ✅ Yes, leave feedback
                             </a>
                         </td>
                     </tr>

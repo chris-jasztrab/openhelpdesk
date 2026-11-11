@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.221.1 &mdash; 2026-11-11
+
+### Changed
+- **The survey block in emails now says what each button does.** Under *Was your issue resolved?* a line explains that the requester can reopen the ticket if it isn't fixed, or rate their experience if it is, and the green button reads **Yes, leave feedback** (was *Yes, it was resolved!*). Applies to the closed/resolved notice that carries the survey and to the standalone survey email.
+
 ## 2.221.0 &mdash; 2026-11-11
 
 ### Changed
