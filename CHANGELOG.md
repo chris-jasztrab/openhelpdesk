@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.223.0 &mdash; 2026-11-11
+
+### Added
+- **A little winter fun.** While the brand icon is the snowflake, five quick clicks on it let it snow: flakes fall, the screen frosts over, and you can draw in the frost with a finger or the mouse. **Defrost** at the top of the screen (or Esc) melts it and hands the page back. It's one cosmetic overlay that writes nothing to the database, touches no ticket data, and is suppressed for anyone with `prefers-reduced-motion` set. The Halloween ghost's click handling is now shared with it. Intentional; please don't "fix" it ([templates/partials/navbar.php](templates/partials/navbar.php)).
+
 ## 2.222.0 &mdash; 2026-11-11
 
 ### Added

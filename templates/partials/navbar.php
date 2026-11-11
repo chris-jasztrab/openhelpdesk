@@ -263,9 +263,6 @@
     // on the bar moves or restyles. Visual-only, never touches state.
     var ghost = document.querySelector('.navbar-brand .fa-ghost');
     if (ghost) {
-        var ghostHits  = 0;
-        var ghostTimer = null;
-
         function pacmanChase() {
             if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
             var bar   = ghost.closest('nav').getBoundingClientRect();
@@ -313,18 +310,148 @@
                 });
         }
 
-        ghost.addEventListener('click', function (e) {
+        fiveClicks(ghost, pacmanChase);
+    }
+
+    // Five quick clicks on a brand icon run its easter egg; fewer follow the
+    // home link half a second after the last one.
+    function fiveClicks(icon, run) {
+        var hits  = 0;
+        var timer = null;
+        icon.addEventListener('click', function (e) {
             if (e.ctrlKey || e.metaKey || e.shiftKey) return; // opening home in a new tab/window
             e.preventDefault();
-            clearTimeout(ghostTimer);
-            if (++ghostHits >= 5) {
-                ghostHits = 0;
-                pacmanChase();
+            clearTimeout(timer);
+            if (++hits >= 5) {
+                hits = 0;
+                run();
                 return;
             }
-            var href = ghost.closest('a').href;
-            ghostTimer = setTimeout(function () { ghostHits = 0; location.href = href; }, 500);
+            var href = icon.closest('a').href;
+            timer = setTimeout(function () { hits = 0; location.href = href; }, 500);
         });
+    }
+
+    // --- Easter egg: click the snowflake brand icon five times to let it snow ---
+    // Only exists while the brand icon is the Font Awesome snowflake (Winter).
+    // Snow falls, the screen frosts over, and you can draw in the frost with a
+    // finger or the mouse. Defrost (or Esc) melts it all and hands the page
+    // back. Everything is one fixed overlay; visual-only, never touches state.
+    var snowflake = document.querySelector('.navbar-brand .fa-snowflake');
+    if (snowflake) fiveClicks(snowflake, letItSnow);
+
+    function letItSnow() {
+        if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        if (document.getElementById('ld-snow')) return; // already snowing
+
+        var fill  = 'position:absolute;inset:0;width:100%;height:100%;';
+        var layer = document.createElement('div');
+        layer.id = 'ld-snow';
+        layer.style.cssText = 'position:fixed;inset:0;z-index:2000;pointer-events:none;transition:opacity 1s;';
+        var frost = document.createElement('canvas');
+        frost.style.cssText = fill + 'opacity:0;transition:opacity 12s ease-in;touch-action:none;cursor:crosshair;';
+        var snow = document.createElement('canvas');
+        snow.style.cssText = fill + 'pointer-events:none;';
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-light btn-sm shadow';
+        btn.innerHTML = '<i class="bi bi-sun me-1" aria-hidden="true"></i>Defrost';
+        btn.style.cssText = 'position:absolute;top:10px;left:50%;transform:translateX(-50%);pointer-events:auto;display:none;';
+        layer.append(frost, snow, btn);
+        document.body.appendChild(layer);
+
+        // Frost: pale blue fog, thicker toward the edges, with a little sparkle.
+        // Resizing a canvas wipes it, so a resize repaints and drops any drawing.
+        function paintFrost() {
+            var w = frost.width = snow.width = window.innerWidth;
+            var h = frost.height = snow.height = window.innerHeight;
+            var c = frost.getContext('2d');
+            c.fillStyle = 'rgba(228,240,250,.86)';
+            c.fillRect(0, 0, w, h);
+            var g = c.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.2, w / 2, h / 2, Math.max(w, h) * 0.75);
+            g.addColorStop(0, 'rgba(255,255,255,0)');
+            g.addColorStop(1, 'rgba(255,255,255,.95)');
+            c.fillStyle = g;
+            c.fillRect(0, 0, w, h);
+            c.fillStyle = 'rgba(255,255,255,.6)';
+            for (var i = w * h / 300; i > 0; i--) c.fillRect(Math.random() * w, Math.random() * h, 1.5, 1.5);
+        }
+        paintFrost();
+        window.addEventListener('resize', paintFrost);
+
+        // Drawing: a fingertip-wide stroke rubs the frost away.
+        var last = null;
+        function rub(e) {
+            var c = frost.getContext('2d');
+            c.globalCompositeOperation = 'destination-out';
+            c.lineWidth = 26;
+            c.lineCap = 'round';
+            c.shadowColor = '#000';
+            c.shadowBlur = 6; // soft, melted edge
+            c.beginPath();
+            c.moveTo(last.x, last.y);
+            c.lineTo(e.clientX + 0.01, e.clientY); // never zero-length, so a tap leaves a dot
+            c.stroke();
+            last = { x: e.clientX, y: e.clientY };
+        }
+        frost.addEventListener('pointerdown', function (e) {
+            frost.setPointerCapture(e.pointerId);
+            last = { x: e.clientX, y: e.clientY };
+            rub(e);
+        });
+        frost.addEventListener('pointermove', function (e) { if (last) rub(e); });
+        frost.addEventListener('pointerup', function () { last = null; });
+        frost.addEventListener('pointercancel', function () { last = null; });
+
+        // Snow: flakes join one per frame up to a width-scaled cap, then recycle.
+        var flakes = [];
+        var sc     = snow.getContext('2d');
+        var prev   = 0;
+        var raf    = requestAnimationFrame(function fall(t) {
+            var w  = snow.width;
+            var h  = snow.height;
+            var dt = prev ? Math.min(3, (t - prev) / 16.7) : 1; // same speed at any refresh rate
+            prev = t;
+            if (flakes.length < Math.min(350, w / 4)) {
+                flakes.push({ x: Math.random() * w, y: -5, r: 1 + Math.random() * 3, v: 0.6 + Math.random() * 1.6, p: Math.random() * 6.28 });
+            }
+            sc.clearRect(0, 0, w, h);
+            sc.fillStyle = '#fff';
+            sc.shadowColor = 'rgba(60,105,170,.7)'; // blue halo keeps flakes visible on white pages
+            sc.shadowBlur = 4;
+            sc.beginPath(); // one path, one fill: a single shadow pass for every flake
+            flakes.forEach(function (f) {
+                f.y += f.v * dt;
+                f.p += 0.02 * dt;
+                f.x += Math.sin(f.p) * 0.6 * dt;
+                if (f.y > h + 5) { f.y = -5; f.x = Math.random() * w; }
+                sc.moveTo(f.x + f.r, f.y);
+                sc.arc(f.x, f.y, f.r, 0, 6.28);
+            });
+            sc.fill();
+            raf = requestAnimationFrame(fall);
+        });
+
+        // A few seconds of snow first, then the frost creeps in and the page
+        // underneath stops taking clicks until it's defrosted.
+        var frostTimer = setTimeout(function () {
+            frost.style.opacity = '1';
+            frost.style.pointerEvents = 'auto';
+            btn.style.display = '';
+        }, 3000);
+
+        function defrost() {
+            clearTimeout(frostTimer);
+            layer.style.opacity = '0';
+            frost.style.pointerEvents = 'none';
+            btn.style.pointerEvents = 'none';
+            window.removeEventListener('resize', paintFrost);
+            document.removeEventListener('keydown', onKey);
+            setTimeout(function () { cancelAnimationFrame(raf); layer.remove(); }, 1000);
+        }
+        function onKey(e) { if (e.key === 'Escape') defrost(); }
+        btn.addEventListener('click', defrost);
+        document.addEventListener('keydown', onKey);
     }
 
     // --- Global Search ---
