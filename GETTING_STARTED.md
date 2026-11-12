@@ -1312,7 +1312,7 @@ This feature lets agents and admins flag a single timeline reply as the **ticket
 
 ### Marking and unmarking
 
-On the agent and admin ticket detail pages, every customer-visible reply in the timeline shows a small **Mark as solution** button next to the timestamp. Click it; the page reloads with that comment flagged. The button on the marked comment toggles to **Unmark solution** so you can clear or reassign the flag at any time.
+On the agent and admin ticket detail pages, every reply and internal note in the timeline shows a small **Mark as solution** button next to the timestamp. Click it; the page reloads with that comment flagged. The button on the marked comment toggles to **Unmark solution** so you can clear or reassign the flag at any time.
 
 A ticket has at most one marked solution. Marking a different comment replaces the previous one — there's no separate "clear" step needed when you're picking a better answer.
 
@@ -1324,20 +1324,17 @@ The flag does *not* change ticket status. If you want the ticket moved to **Reso
 - **The marked comment:** picks up a green left border, a green **Solution** badge in the header line, and a brief highlight pulse when you land on it via the link.
 - **Older-updates collapser:** the timeline collapses anything older than the most recent ten entries behind a **Show N older updates** button. The marked solution is **always force-shown** even if it would otherwise sit inside the collapsed range — otherwise the anchor would land on a `display:none` element and silently fail.
 
-### Why internal notes can't be marked
+### Internal notes as the solution
 
-Internal notes (`Add Note` rather than `Reply`) are visible only to agents and admins — the portal timeline filters them out entirely so the requester never sees them. If we let you mark one as the solution, two things would break:
+Sometimes the fix is recorded in an internal note (`Add Note` rather than `Reply`) and never sent to the requester. Internal-note rows carry the same **Mark as solution** button as public replies.
 
-1. The green **Go to solution** alert would render on the requester's portal view but the anchor would point at a comment that doesn't exist in their HTML, so the link would jump to nothing.
-2. The very existence of the note would leak via the URL fragment (`#timeline-entry-12345`) even though the note's contents stay hidden.
-
-So the **Mark as solution** button is intentionally absent on internal-note rows. Agent and admin views display a small muted hint in the slot the button would occupy — *"internal — can't be the solution"* — so it's clear the absence is by design rather than a missing feature. Reply publicly first if you want the note's content to be the answer of record.
+A solution that is an internal note stays staff-only. The agent and admin views show the green alert, tagged *internal note, not visible to the requester*. The portal timeline never loads internal notes, so the requester sees no alert, no badge and no anchor to the note. If the requester needs the answer, reply publicly as well.
 
 The button is also absent on system events (Created, Status Changed, Assigned, AI Classified, etc.) — only `comment` rows authored by a person can be flagged.
 
 ### What the requester sees
 
-On `/portal/tickets/{id}`, when a solution is marked the requester sees the same green alert at the top of the page — labelled **Answer available** rather than **Solution available** by default — and the marked reply gets the same green border and **Answer** badge in the timeline. There is no Mark / Unmark button on the portal; the requester is read-only on this flag.
+On `/portal/tickets/{id}`, when a public reply is marked as the solution the requester sees the same green alert at the top of the page — labelled **Answer available** rather than **Solution available** by default — and the marked reply gets the same green border and **Answer** badge in the timeline. There is no Mark / Unmark button on the portal; the requester is read-only on this flag.
 
 The labels (`portal.solution.available`, `portal.solution.go`, `portal.solution.badge`) all run through the application label system, so if your team prefers **Solution** over **Answer** (or **Resolution**, or your own term) you can rename them at **Admin → Settings → Application name & labels**.
 

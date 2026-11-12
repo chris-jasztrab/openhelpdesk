@@ -13,15 +13,14 @@ $actionLabels = ['created' => 'Created', 'assigned' => 'Assigned', 'status_chang
 $slaStateColors = ['on_track' => 'success', 'warning' => 'warning', 'breached' => 'danger'];
 $slaStateLabels = ['on_track' => 'On Track', 'warning' => 'Warning', 'breached' => 'Breached'];
 
-// Resolve the marked-solution timeline row (if any). Defensively re-checks
-// is_internal in case the comment was flipped to internal after being
-// marked — the "Go to solution" anchor would otherwise point at a row the
-// requester cannot see, and we never want to surface internal notes here.
+// Resolve the marked-solution timeline row (if any). An internal note can be
+// the solution: staff see it here, while the portal timeline excludes
+// internal rows so the requester gets no banner and no anchor.
 $solutionTimelineId = (int) ($ticket['solution_timeline_id'] ?? 0);
 $solutionEntry      = null;
 if ($solutionTimelineId > 0) {
     foreach ($timeline as $__solRow) {
-        if ((int) $__solRow['id'] === $solutionTimelineId && empty($__solRow['is_internal'])) {
+        if ((int) $__solRow['id'] === $solutionTimelineId) {
             $solutionEntry = $__solRow;
             break;
         }
@@ -125,6 +124,7 @@ $resolutionClosedSlugs  = ticketClosedBucketSlugs();
         <strong>Solution available</strong> &middot;
         posted by <?= e($solutionEntry['user_name'] ?: 'an agent') ?>
         on <?= date('M j, Y g:i A', strtotime($solutionEntry['created_at'])) ?>
+        <?php if (!empty($solutionEntry['is_internal'])): ?>&middot; <i class="bi bi-lock-fill"></i> internal note, not visible to the requester<?php endif; ?>
     </div>
     <span class="btn btn-sm btn-success">
         <i class="bi bi-arrow-down-circle me-1"></i>Go to solution
@@ -471,7 +471,7 @@ $resolutionClosedSlugs  = ticketClosedBucketSlugs();
                         $tlClass    = $isNote ? 'ld-timeline-note' : ($isSystem ? 'ld-timeline-system' : '');
                         if ($isAi)       $tlClass .= ' ld-timeline-ai';
                         if ($isSolution) $tlClass .= ' ld-timeline-solution';
-                        $canMarkSolution = $entry['action'] === 'comment' && empty($entry['is_internal']);
+                        $canMarkSolution = $entry['action'] === 'comment';
                     ?>
                     <div class="list-group-item px-4 py-3 <?= $tlClass ?><?= $isOlder ? ' timeline-older-item' : '' ?>"
                          id="timeline-entry-<?= (int) $entry['id'] ?>"
@@ -510,15 +510,10 @@ $resolutionClosedSlugs  = ticketClosedBucketSlugs();
                                             <input type="hidden" name="timeline_id" value="<?= $isSolution ? '' : (int) $entry['id'] ?>">
                                             <button type="submit"
                                                     class="btn btn-sm <?= $isSolution ? 'btn-outline-secondary' : 'btn-outline-success' ?> py-0 px-2"
-                                                    title="<?= $isSolution ? 'Remove the solution flag from this reply' : 'Flag this reply as the solution to the ticket' ?>">
+                                                    title="<?= $isSolution ? 'Remove the solution flag from this entry' : ($isNote ? 'Flag this internal note as the solution — staff only, the requester will not see it' : 'Flag this reply as the solution to the ticket') ?>">
                                                 <i class="bi bi-check-circle me-1"></i><?= $isSolution ? 'Unmark solution' : 'Mark as solution' ?>
                                             </button>
                                         </form>
-                                        <?php elseif ($entry['action'] === 'comment' && $isNote): ?>
-                                        <small class="text-muted fst-italic"
-                                               title="The requester can't see internal notes, so we can't anchor a 'Go to solution' link at one. Reply publicly to mark a solution.">
-                                            <i class="bi bi-info-circle me-1"></i>internal &mdash; can't be the solution
-                                        </small>
                                         <?php endif; ?>
                                         <small class="text-muted"><?= date('M j, Y g:i A', strtotime($entry['created_at'])) ?></small>
                                     </div>

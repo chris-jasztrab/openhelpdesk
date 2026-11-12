@@ -572,13 +572,13 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <h5 class="fw-semibold mb-3"><i class="bi bi-check-circle text-success me-2"></i>Marking a Comment as the Solution</h5>
 <p class="text-muted mb-2">On a long ticket the answer often ends up buried halfway down the timeline. Staff can flag the comment that resolved the issue so everyone can jump straight to it.</p>
 <ul class="text-muted mb-2">
-    <li>Every customer-visible reply in the timeline shows a small <strong>Mark as solution</strong> button next to its timestamp. Click it to flag that comment.</li>
+    <li>Every reply and internal note in the timeline shows a small <strong>Mark as solution</strong> button next to its timestamp. Click it to flag that comment.</li>
     <li>Once a comment is marked, a green alert with a <strong>Go to solution</strong> button appears at the top of the ticket — on the agent, admin, <em>and</em> the requester's portal view. It scrolls to the marked comment, which gets a green left border and a <strong>Solution</strong> badge.</li>
     <li>A ticket has one solution at a time. Marking a different comment replaces the previous one; use <strong>Unmark solution</strong> to clear it.</li>
     <li><strong>Close and create KB article</strong> uses the marked solution as the article's resolution.</li>
 </ul>
 <div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-2"></i>
-    Internal notes can't be marked — the requester can't see them, so a "Go to solution" link would point at nothing on the portal. Marking a solution does <em>not</em> change the ticket status: you can flag a candidate fix while a ticket is still <em>Waiting on Customer</em> and resolve it separately. On the portal the banner and badge say <strong>Answer</strong> by default — rename them under <a href="/admin/settings/labels">Settings → Customization → Labels</a>.
+    An internal note can be the solution. It stays staff-only: the agent and admin views show the banner (flagged as an internal note), while the requester's portal view shows no banner and no badge, because the portal never loads internal notes. Marking a solution does <em>not</em> change the ticket status: you can flag a candidate fix while a ticket is still <em>Waiting on Customer</em> and resolve it separately. On the portal the banner and badge say <strong>Answer</strong> by default — rename them under <a href="/admin/settings/labels">Settings → Customization → Labels</a>.
 </div>
 </div>
 </div>

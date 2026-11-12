@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.224.0 &mdash; 2026-11-12
+
+### Changed
+- **An internal note can now be marked as the solution.** Internal-note rows in the agent and admin timelines carry the same **Mark as solution** button as public replies, replacing the old *internal — can't be the solution* hint, and the route no longer refuses them. The note stays staff-only: the staff banner is tagged *internal note, not visible to the requester*, and the portal shows no banner, badge or anchor because its timeline never loads internal notes. No migration.
+
 ## 2.223.0 &mdash; 2026-11-11
 
 ### Added

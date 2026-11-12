@@ -1934,11 +1934,7 @@ $router->post('/agent/tickets/{id}/solution', function (array $p) {
         redirect("/agent/tickets/{$id}");
     }
     if (!in_array($row['action'], ['comment'], true)) {
-        flash('error', 'Only customer-visible replies can be marked as the solution.');
-        redirect("/agent/tickets/{$id}");
-    }
-    if ((int) $row['is_internal'] === 1) {
-        flash('error', 'Internal notes cannot be marked as the solution — the requester would not be able to see it.');
+        flash('error', 'Only replies and internal notes can be marked as the solution.');
         redirect("/agent/tickets/{$id}");
     }
 

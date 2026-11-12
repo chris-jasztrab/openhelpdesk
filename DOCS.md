@@ -227,7 +227,7 @@ The ticket page (`/agent/tickets/{id}`; admins `/admin/tickets/{id}`) has a stic
 - **Send & change status**: the arrow beside Send lets you reply and change the status in one step.
 - Replies are autosaved as server-side drafts (they follow you to other computers). If another agent replies while you are typing, sending is paused so you can review their reply first.
 - **Similar past tickets** (when AI is enabled): related tickets from the whole archive, each with a relevance note.
-- **Timeline**: a full activity log that updates live while you are on the page. Click the heading to change the sort order. The **System notes** and **AI notes** switches show or hide automated entries. **Mark as solution** on a public reply highlights it for the requester. There is one solution per ticket, and marking it does not change the ticket's status.
+- **Timeline**: a full activity log that updates live while you are on the page. Click the heading to change the sort order. The **System notes** and **AI notes** switches show or hide automated entries. **Mark as solution** on a public reply highlights it for the requester; on an internal note it highlights it for staff only. There is one solution per ticket, and marking it does not change the ticket's status.
 
 **Sidebar**
 

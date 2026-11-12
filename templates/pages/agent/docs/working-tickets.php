@@ -211,11 +211,11 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/agent/help'], ['label' => 'Worki
 <h5 class="fw-semibold mb-3"><i class="bi bi-check-circle text-success me-2"></i>Marking the Solution</h5>
 <p class="text-muted mb-2">When the answer is buried in a long conversation, flag the reply that solved it:</p>
 <ul class="text-muted mb-2">
-    <li>Click <strong>Mark as solution</strong> next to any public reply.</li>
-    <li>A green <em>&ldquo;Solution available&rdquo;</em> bar with a <strong>Go to solution</strong> button appears at the top of the ticket &mdash; for staff and for the requester &mdash; and the reply gets a <span class="badge bg-success">Solution</span> badge.</li>
+    <li>Click <strong>Mark as solution</strong> next to any public reply or internal note.</li>
+    <li>A green <em>&ldquo;Solution available&rdquo;</em> bar with a <strong>Go to solution</strong> button appears at the top of the ticket and the reply gets a <span class="badge bg-success">Solution</span> badge.</li>
     <li>Only one reply can be the solution; marking another replaces it. <strong>Unmark solution</strong> clears it.</li>
 </ul>
-<p class="text-muted mb-0">Internal notes can't be marked. Marking a solution doesn't change the ticket's status &mdash; close it separately when you're ready.</p>
+<p class="text-muted mb-0">The requester sees the bar too when the solution is a public reply. When it is an internal note, only staff see it &mdash; the requester's view shows no solution at all, so reply publicly as well if they need the answer. Marking a solution doesn't change the ticket's status &mdash; close it separately when you're ready.</p>
 </div>
 </div>
 
