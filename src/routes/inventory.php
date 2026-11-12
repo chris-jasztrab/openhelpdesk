@@ -579,9 +579,7 @@ $router->post('/inventory/{id}/checkout', function (array $p) {
     Auth::requirePermission('assets.manage');
     $db = Database::connect();
     $id = (int) $p['id'];
-    // The list page's modal posts return=<list URL> so the user lands back on the filtered list.
-    $back = (string) ($_POST['return'] ?? '');
-    $back = str_starts_with($back, '/inventory') ? $back : "/inventory/{$id}";
+    $back = assetReturnUrl($id);
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect($back);
@@ -599,20 +597,28 @@ $router->post('/inventory/{id}/checkout', function (array $p) {
 
 $router->post('/inventory/{id}/checkin', function (array $p) {
     Auth::requirePermission('assets.manage');
-    $db = Database::connect();
-    $id = (int) $p['id'];
+    $db   = Database::connect();
+    $id   = (int) $p['id'];
+    $back = assetReturnUrl($id);
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
-        redirect("/inventory/{$id}");
+        redirect($back);
     }
     $from = Assets::checkin($db, $id, Auth::id(), trim((string) ($_POST['note'] ?? '')));
     if ($from === null) {
         flash('error', 'That asset is not checked out.');
-        redirect("/inventory/{$id}");
+        redirect($back);
     }
     flash('success', 'Checked in from ' . $from . '.');
-    redirect("/inventory/{$id}");
+    redirect($back);
 });
+
+/** Where a checkout/check-in lands: the filtered list or the ticket it was done from (return=), else the asset. */
+function assetReturnUrl(int $id): string
+{
+    $back = (string) ($_POST['return'] ?? '');
+    return preg_match('~^/(inventory|admin/tickets|agent/tickets)([/?#]|$)~', $back) ? $back : "/inventory/{$id}";
+}
 
 $router->post('/inventory/{id}/delete', function (array $p) {
     Auth::requirePermission('assets.manage');

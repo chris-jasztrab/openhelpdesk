@@ -11,6 +11,12 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.229.0 &mdash; 2026-11-12
+
+### Added
+- **Task tickets can link the person's devices.** Each task ticket row under **Admin → Ticket Types → Edit → Task tickets** has a new **Link the person's devices** switch, shown when the type's form has a person (user picker) field. When it is on, every device checked out to the person picked in a ticked person field is linked to that task ticket as it is created — e.g. on **Employee Offboarding**, the **Offboarding - IT** task arrives with the leaver's laptop, phone and so on in its **Assets** card, so IT knows what to collect. If nobody's devices are checked out to that person, an internal note on the task says so. Off by default; tasks already created are not changed. Migration 094 adds `ticket_type_tasks.link_person_assets`.
+- **Check in from the ticket.** Each checked-out device in a ticket's **Assets** card now has a **Check in** button for staff who manage the inventory. It checks the device in, records the ticket number in the device's history, and returns to the ticket.
+
 ## 2.228.0 &mdash; 2026-11-12
 
 ### Added

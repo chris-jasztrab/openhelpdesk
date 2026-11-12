@@ -2108,7 +2108,7 @@ $router->get('/admin/types/{id}/edit', function (array $p) {
 
     // Task tickets: which other types this one spawns, and which of this
     // type's custom fields each task carries.
-    $taskStmt = $db->prepare('SELECT id, child_type_id, field_ids FROM ticket_type_tasks WHERE type_id = ? ORDER BY sort_order, id');
+    $taskStmt = $db->prepare('SELECT id, child_type_id, field_ids, link_person_assets FROM ticket_type_tasks WHERE type_id = ? ORDER BY sort_order, id');
     $taskStmt->execute([(int) $p['id']]);
     $typeTasks = array_map(
         static fn(array $t) => ['field_ids' => array_map('intval', (array) json_decode((string) $t['field_ids'], true))] + $t,
@@ -2150,6 +2150,7 @@ $router->post('/admin/types/{id}/tasks', function (array $p) {
     $taskId      = (int) ($_POST['task_id'] ?? 0);
     $childTypeId = (int) ($_POST['child_type_id'] ?? 0);
     $fieldIds    = array_values(array_unique(array_filter(array_map('intval', (array) ($_POST['field_ids'] ?? [])))));
+    $linkAssets  = !empty($_POST['link_person_assets']) ? 1 : 0;
 
     $check = $db->prepare('SELECT id FROM ticket_types WHERE id = ?');
     $check->execute([$childTypeId]);
@@ -2159,13 +2160,13 @@ $router->post('/admin/types/{id}/tasks', function (array $p) {
     }
 
     if ($taskId) {
-        $db->prepare('UPDATE ticket_type_tasks SET child_type_id = ?, field_ids = ? WHERE id = ? AND type_id = ?')
-           ->execute([$childTypeId, json_encode($fieldIds), $taskId, $id]);
+        $db->prepare('UPDATE ticket_type_tasks SET child_type_id = ?, field_ids = ?, link_person_assets = ? WHERE id = ? AND type_id = ?')
+           ->execute([$childTypeId, json_encode($fieldIds), $linkAssets, $taskId, $id]);
     } else {
-        $db->prepare('INSERT INTO ticket_type_tasks (type_id, child_type_id, field_ids) VALUES (?, ?, ?)')
-           ->execute([$id, $childTypeId, json_encode($fieldIds)]);
+        $db->prepare('INSERT INTO ticket_type_tasks (type_id, child_type_id, field_ids, link_person_assets) VALUES (?, ?, ?, ?)')
+           ->execute([$id, $childTypeId, json_encode($fieldIds), $linkAssets]);
     }
-    logAudit('ticket_type.task_saved', $id, 'ticket_type', 'child_type_id=' . $childTypeId . '; field_ids=' . implode(',', $fieldIds));
+    logAudit('ticket_type.task_saved', $id, 'ticket_type', 'child_type_id=' . $childTypeId . '; field_ids=' . implode(',', $fieldIds) . '; link_person_assets=' . $linkAssets);
     flash('success', 'Task ticket saved.');
     redirect("/admin/types/{$id}/edit#task-tickets");
 });

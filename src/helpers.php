@@ -9724,7 +9724,7 @@ function spawnTicketTypeTasks(PDO $db, int $parentId): array
     }
 
     $ts = $db->prepare(
-        'SELECT tk.child_type_id, tk.field_ids, ct.name AS child_type_name
+        'SELECT tk.child_type_id, tk.field_ids, tk.link_person_assets, ct.name AS child_type_name
          FROM ticket_type_tasks tk
          JOIN ticket_types ct ON ct.id = tk.child_type_id
          WHERE tk.type_id = ?
@@ -9781,6 +9781,22 @@ function spawnTicketTypeTasks(PDO $db, int $parentId): array
         }
 
         $timeline->execute([$childId, 'created', 'Task ticket created from ticket #' . $parentId . '.']);
+
+        // "Link the person's devices": everything checked out to whoever is picked
+        // in the task's person field — e.g. the leaver's laptop on the IT offboarding task.
+        if ((int) $task['link_person_assets'] === 1 && $fieldIds) {
+            $pv = $db->prepare(
+                "SELECT v.value FROM ticket_field_values v
+                 JOIN ticket_form_fields f ON f.id = v.field_id AND f.field_type = 'user_picker'
+                 WHERE v.ticket_id = ? AND v.field_id IN ($ph) ORDER BY v.field_id LIMIT 1"
+            );
+            $pv->execute(array_merge([$parentId], $fieldIds));
+            if ($personId = validUserPickerId($db, $pv->fetchColumn() ?: null)) {
+                require_once __DIR__ . '/Assets.php';
+                Assets::linkUserDevices($db, $childId, $personId);
+            }
+        }
+
         $assignedTo = runPostTicketCreateHooks($db, $childId);
         if ($priId) {
             Sla::initializeForTicket($db, $childId, $priId, $typeId);

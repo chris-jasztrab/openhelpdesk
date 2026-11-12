@@ -339,7 +339,8 @@ $taskTypeNames = array_column($taskTypes, 'name', 'id');
 // One form per task, plus a blank one to add a task. Each picks the type the
 // task ticket is created as (its Default Group is the team that works it) and
 // which of this type's custom fields it carries.
-$taskForms = array_merge($typeTasks, [['id' => 0, 'child_type_id' => 0, 'field_ids' => []]]);
+$taskForms = array_merge($typeTasks, [['id' => 0, 'child_type_id' => 0, 'field_ids' => [], 'link_person_assets' => 0]]);
+$hasPersonField = (bool) array_filter($taskFields, static fn(array $f) => $f['field_type'] === 'user_picker');
 ?>
 <div class="card border-0 shadow-sm mt-4" style="max-width:600px;" id="task-tickets">
     <div class="card-body p-4">
@@ -379,6 +380,12 @@ $taskForms = array_merge($typeTasks, [['id' => 0, 'child_type_id' => 0, 'field_i
                 </div>
                 <?php else: ?>
                 <p class="small text-muted mb-2">This type's form has no custom fields yet, so task tickets will carry none. <a href="/admin/workflows/ticket-fields?type=<?= (int) $editing['id'] ?>">Edit this type's form</a>.</p>
+                <?php endif; ?>
+                <?php if ($hasPersonField): $lpId = 'task_' . (int) $tf['id'] . '_link_assets'; ?>
+                <div class="form-check small mb-2">
+                    <input class="form-check-input" type="checkbox" name="link_person_assets" value="1" id="<?= $lpId ?>" <?= !empty($tf['link_person_assets']) ? 'checked' : '' ?>>
+                    <label class="form-check-label" for="<?= $lpId ?>">Link the person's devices: every device checked out to the person picked in a ticked person field is linked to this task ticket</label>
+                </div>
                 <?php endif; ?>
                 <button type="submit" class="btn btn-sm btn-outline-primary">
                     <i class="bi bi-<?= $isNew ? 'plus-lg' : 'check-lg' ?> me-1"></i><?= $isNew ? 'Add task ticket' : 'Save' ?>

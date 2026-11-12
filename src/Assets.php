@@ -158,6 +158,28 @@ class Assets
         return true;
     }
 
+    /**
+     * Link every live device checked out to a person to a ticket (task tickets
+     * set to "link the person's devices"). When they have none, an internal
+     * note says so, so IT knows there is nothing to collect. Returns the count.
+     */
+    public static function linkUserDevices(PDO $db, int $ticketId, int $userId): int
+    {
+        $s = $db->prepare("SELECT id FROM assets WHERE assigned_type = 'user' AND assigned_id = ? AND deleted_at IS NULL ORDER BY asset_tag");
+        $s->execute([$userId]);
+        $n = 0;
+        foreach ($s->fetchAll(PDO::FETCH_COLUMN) as $assetId) {
+            $n += (int) self::link($db, $ticketId, (int) $assetId, null);
+        }
+        if ($n === 0) {
+            $u = $db->prepare("SELECT CONCAT(first_name, ' ', last_name) FROM users WHERE id = ?");
+            $u->execute([$userId]);
+            $db->prepare('INSERT INTO ticket_timeline (ticket_id, user_id, action, details, is_internal) VALUES (?, NULL, ?, ?, 1)')
+               ->execute([$ticketId, 'asset_linked', 'No devices are checked out to ' . ($u->fetchColumn() ?: 'this person') . '.']);
+        }
+        return $n;
+    }
+
     /** Remove a ticket ⇄ asset link. Returns false when there was nothing to remove. */
     public static function unlink(PDO $db, int $ticketId, int $assetId, ?int $userId): bool
     {

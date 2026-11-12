@@ -58,6 +58,14 @@ if ($_rid > 0) {
                 </div>
                 <div class="d-flex align-items-center gap-2 flex-shrink-0">
                     <?= Assets::statusBadgeHtml($a) ?>
+                    <?php if (Assets::canManage() && !$a['deleted_at'] && ($a['assigned_type'] !== null || $a['import_assignee'] !== null)): ?>
+                    <form method="POST" action="/inventory/<?= (int) $a['id'] ?>/checkin" class="d-inline" onsubmit="return confirm('Check <?= e($a['asset_tag']) ?> in?');">
+                        <?= csrfField() ?>
+                        <input type="hidden" name="return" value="<?= e(staffTicketUrl($_tid)) ?>#ticketAssetsCard">
+                        <input type="hidden" name="note" value="Ticket #<?= $_tid ?>">
+                        <button type="submit" class="btn btn-sm btn-link p-0" title="Check in" aria-label="Check in <?= e($a['asset_tag']) ?>"><i class="bi bi-box-arrow-in-left"></i></button>
+                    </form>
+                    <?php endif; ?>
                     <form method="POST" action="/tickets/<?= $_tid ?>/assets/<?= (int) $a['id'] ?>/remove" class="d-inline" onsubmit="return confirm('Unlink <?= e($a['asset_tag']) ?> from this ticket?');">
                         <?= csrfField() ?>
                         <button type="submit" class="btn btn-sm btn-link text-danger p-0" title="Unlink" aria-label="Unlink <?= e($a['asset_tag']) ?>"><i class="bi bi-x-lg"></i></button>

@@ -173,6 +173,41 @@ class TicketTypeTasksTest extends TestCase
         $this->assertSame('open', $this->statusOf($parentId));
     }
 
+    public function test_link_person_assets_links_the_picked_persons_devices_to_that_task_only(): void
+    {
+        require_once ROOT_DIR . '/src/Assets.php';
+        [$parentId] = $this->newHire();
+        $leaver = (int) $this->db->query("SELECT id FROM users WHERE is_external = 0 AND is_shared_account = 0 AND id <> {$this->requester} LIMIT 1")->fetchColumn();
+        $this->db->exec("INSERT INTO ticket_form_fields (field_type, label) VALUES ('user_picker', 'TTT Leaver')");
+        $person = (int) $this->db->lastInsertId();
+        $this->db->prepare('INSERT INTO ticket_field_values (ticket_id, field_id, value) VALUES (?, ?, ?)')->execute([$parentId, $person, (string) $leaver]);
+        $typeId = (int) $this->db->query("SELECT type_id FROM tickets WHERE id = $parentId")->fetchColumn();
+        [$itRow, $payRow] = $this->db->query("SELECT id FROM ticket_type_tasks WHERE type_id = $typeId ORDER BY id")->fetchAll(PDO::FETCH_COLUMN);
+        $this->db->prepare('UPDATE ticket_type_tasks SET field_ids = ?, link_person_assets = 1 WHERE id = ?')->execute([json_encode([$person]), $itRow]);
+        $this->db->prepare('UPDATE ticket_type_tasks SET field_ids = ? WHERE id = ?')->execute([json_encode([$person]), $payRow]);
+
+        $this->db->exec("INSERT INTO asset_categories (name) VALUES ('TTT Laptops')");
+        $this->db->prepare("INSERT INTO asset_models (name, category_id) VALUES ('TTT ThinkPad', ?)")->execute([(int) $this->db->lastInsertId()]);
+        $model  = (int) $this->db->lastInsertId();
+        $status = (int) $this->db->query('SELECT id FROM asset_statuses ORDER BY id LIMIT 1')->fetchColumn();
+        $this->db->prepare("INSERT INTO assets (asset_tag, model_id, status_id, assigned_type, assigned_id) VALUES ('TTT-LAP1', ?, ?, 'user', ?)")
+            ->execute([$model, $status, $leaver]);
+        $asset = (int) $this->db->lastInsertId();
+
+        [$itTask, $payTask] = spawnTicketTypeTasks($this->db, $parentId);
+
+        $n = fn(string $sql) => (int) $this->db->query($sql)->fetchColumn();
+        $this->assertSame(1, $n("SELECT COUNT(*) FROM ticket_asset_map WHERE ticket_id = $itTask AND asset_id = $asset"), 'IT task gets the leaver\'s device');
+        $this->assertSame(0, $n("SELECT COUNT(*) FROM ticket_asset_map WHERE ticket_id = $payTask"), 'a task without the switch links nothing');
+
+        // Nobody's devices: an internal note says there is nothing to collect.
+        $this->db->prepare("UPDATE assets SET assigned_type = NULL, assigned_id = NULL WHERE id = ?")->execute([$asset]);
+        $this->db->prepare("DELETE FROM ticket_asset_map WHERE ticket_id = ?")->execute([$itTask]);
+        $none = $n("SELECT u.id FROM users u WHERE NOT EXISTS (SELECT 1 FROM assets a WHERE a.assigned_type = 'user' AND a.assigned_id = u.id AND a.deleted_at IS NULL) LIMIT 1");
+        $this->assertSame(0, \Assets::linkUserDevices($this->db, $itTask, $none));
+        $this->assertSame(1, $n("SELECT COUNT(*) FROM ticket_timeline WHERE ticket_id = $itTask AND is_internal = 1 AND details LIKE 'No devices are checked out to %'"));
+    }
+
     public function test_a_restricted_type_is_creatable_only_by_its_groups_members(): void
     {
         $member = $this->db->query('SELECT user_id, group_id FROM group_user_map LIMIT 1')->fetch();
