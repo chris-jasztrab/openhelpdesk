@@ -11,6 +11,17 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.230.0 &mdash; 2026-11-12
+
+### Added
+- **Warranty looked up from the manufacturer.** Dell and Lenovo assets now get their warranty from the manufacturer by serial number / service tag. An asset's **Details** tab shows whether the warranty is **Expired** (with the date it ended and how long ago) or **In warranty** (with the end date and days left; amber within 90 days), when it started, the coverage (e.g. *3Y On-site, 9X5*), and when it was last looked up. Staff who manage the inventory can press **Look up warranty** to ask right away.
+  - A new daily **Warranty Lookups** job (Settings → Cron Jobs, `scripts/process-warranty-lookups.php`) looks up up to 150 assets a run, oldest first, and asks again every 30 days. It sends no email. A changed end date is recorded in the asset's **History**.
+  - **Lenovo** works with no setup, through the public lookup Lenovo's own support site uses. It is unofficial and can stop working without notice; saving a ClientID from your Lenovo account manager under **Settings → Inventory → Warranty lookup** switches to Lenovo's official Warranty API. Serial numbers scanned from the whole Lenovo label (`1S` + model + serial) are trimmed to the 8-character serial automatically.
+  - **Dell** needs a free TechDirect Warranty API key (client ID + secret) under **Settings → Inventory → Warranty lookup**; until one is saved, Dell assets are skipped. Only 7-character service tags are looked up.
+  - HP and other makes are not looked up; their hand-entered **Warranty (months)** still shows.
+  - The Inventory list has a **Warranty** filter (Expired, Ends within 90 days, In warranty, Unknown), and the CSV export has Warranty Start, Warranty End and Warranty Coverage columns.
+  - Migration 095 adds `assets.warranty_start`, `warranty_end`, `warranty_service`, `warranty_checked_at` and `warranty_error`.
+
 ## 2.229.1 &mdash; 2026-11-12
 
 ### Fixed

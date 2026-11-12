@@ -108,6 +108,15 @@ $th = static fn(string $col, string $text): string =>
                 <input type="date" class="form-control form-control-sm" name="audit_before" id="invAuditBefore" value="<?= e($auditBefore) ?>">
                 <div class="form-text">Includes assets never audited.</div>
             </div>
+            <div class="mb-3">
+                <label class="form-label small fw-semibold mb-1" for="invWarranty">Warranty</label>
+                <select class="form-select form-select-sm" name="warranty" id="invWarranty">
+                    <option value="">Any</option>
+                    <?php foreach (['expired' => 'Expired', 'soon' => 'Ends within 90 days', 'active' => 'In warranty', 'unknown' => 'Unknown'] as $k => $t): ?>
+                    <option value="<?= $k ?>" <?= ($warranty ?? '') === $k ? 'selected' : '' ?>><?= $t ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
             <?php if ($deletedCount > 0): ?>
             <div class="mb-3">
                 <label class="filter-check-item">

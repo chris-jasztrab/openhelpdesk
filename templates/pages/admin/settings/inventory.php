@@ -65,6 +65,45 @@ $kinds = ['models' => 'Models', 'categories' => 'Categories', 'manufacturers' =>
         </form>
     </div>
 </div>
+<div class="card border-0 shadow-sm mb-4" id="warranty">
+    <div class="card-body p-4">
+        <h6 class="fw-bold mb-1">Warranty lookup</h6>
+        <p class="text-muted small mb-3">
+            Dell and Lenovo assets get their warranty start, end and coverage from the manufacturer, by serial number / service tag:
+            once a day by the <a href="/admin/settings/cron-jobs">Warranty Lookups</a> job (each asset again every 30 days) and on demand with
+            <em>Look up warranty</em> on an asset's Details tab.
+            <?php $wc = $warrantyCounts ?? []; ?>
+            So far <?= (int) ($wc['looked_up'] ?? 0) ?> <?= (int) ($wc['looked_up'] ?? 0) === 1 ? 'asset has' : 'assets have' ?> a warranty on record: <?= (int) ($wc['active'] ?? 0) ?> in warranty, <?= (int) ($wc['expired'] ?? 0) ?> expired.
+        </p>
+        <form method="POST" action="/admin/settings/inventory" class="row g-3" style="max-width:640px;" autocomplete="off">
+            <?= csrfField() ?>
+            <input type="hidden" name="section" value="warranty">
+            <div class="col-12 small fw-semibold">Dell — TechDirect Warranty API <span class="fw-normal text-muted">(<?= $dellClientId !== '' && $dellSecretSet ? 'set up' : 'not set up: Dell assets are skipped' ?>)</span></div>
+            <div class="col-sm-6">
+                <label for="dell_client_id" class="form-label small">Client ID</label>
+                <input type="text" class="form-control form-control-sm font-monospace" id="dell_client_id" name="dell_client_id" value="<?= e($dellClientId) ?>">
+            </div>
+            <div class="col-sm-6">
+                <label for="dell_client_secret" class="form-label small">Client secret</label>
+                <input type="password" class="form-control form-control-sm" id="dell_client_secret" name="dell_client_secret" placeholder="<?= $dellSecretSet ? 'Saved; type to replace' : '' ?>">
+                <?php if ($dellSecretSet): ?><div class="form-check small mt-1"><input class="form-check-input" type="checkbox" name="dell_client_secret_clear" id="dell_client_secret_clear"><label class="form-check-label" for="dell_client_secret_clear">Clear</label></div><?php endif; ?>
+            </div>
+            <div class="col-12 form-text mt-1">Free from Dell TechDirect (tdm.dell.com → APIs → Warranty API); approval takes a few business days.</div>
+            <div class="col-sm-6">
+                <label for="lenovo_client_id" class="form-label small fw-semibold">Lenovo ClientID <span class="fw-normal text-muted">(optional)</span></label>
+                <input type="password" class="form-control form-control-sm" id="lenovo_client_id" name="lenovo_client_id" placeholder="<?= $lenovoIdSet ? 'Saved; type to replace' : '' ?>">
+                <?php if ($lenovoIdSet): ?><div class="form-check small mt-1"><input class="form-check-input" type="checkbox" name="lenovo_client_id_clear" id="lenovo_client_id_clear"><label class="form-check-label" for="lenovo_client_id_clear">Clear</label></div><?php endif; ?>
+            </div>
+            <div class="col-12 form-text mt-1">
+                Without a ClientID, Lenovo is asked through the public lookup its support website uses. It needs no key, but it is unofficial and can stop working without notice.
+                A ClientID from your Lenovo account manager switches to Lenovo's official Warranty API.
+            </div>
+            <div class="col-12">
+                <button type="submit" class="btn btn-sm text-white" style="background:var(--ld-primary);"><i class="bi bi-check-lg me-1"></i>Save</button>
+            </div>
+        </form>
+    </div>
+</div>
 <div class="card border-0 shadow-sm">
     <div class="card-body p-4 small text-muted">
         <p class="mb-2"><strong class="text-dark">How it fits together.</strong> Every asset is one physical thing described by a <strong>model</strong> (which carries the category and manufacturer), a <strong>status</strong>, and optionally a supplier. A chair or a bookshelf is just another model in a non-IT category.</p>

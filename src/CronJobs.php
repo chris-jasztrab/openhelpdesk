@@ -214,6 +214,22 @@ final class CronJobs
                 'required'         => false,
                 'note'             => 'Only required if you track domains in Admin → Settings → Domains. Without it, domains are only re-checked when someone presses Re-check.',
             ],
+            'warranty-lookups' => [
+                'title'            => 'Warranty Lookups',
+                'icon'             => 'bi-shield-check',
+                'description'      => 'Asks Dell and Lenovo for the warranty of inventory assets by serial number / service tag and saves the start date, end date and coverage on each asset. Each asset is asked again every 30 days; up to 150 per run. Sends no email.',
+                'frequency'        => 'Once daily',
+                'interval_seconds' => 86400,
+                'script'           => 'scripts/process-warranty-lookups.php',
+                'log_name'         => 'warranty-lookups.log',
+                'sends_mail'       => false,
+                'self_logs'        => false,
+                'timeout'          => 900,
+                'cron_linux'       => $buildLinux('30 6 * * *', 'scripts/process-warranty-lookups.php', 'warranty-lookups.log'),
+                'cron_windows'     => $buildWindows('/SC DAILY /ST 06:30', 'scripts/process-warranty-lookups.php', 'OpenHelpDesk Warranty Lookups'),
+                'required'         => false,
+                'note'             => 'Only needed for the inventory. Without it, a warranty is only looked up when someone presses Look up warranty on an asset. Dell needs a TechDirect API key in Admin → Settings → Inventory.',
+            ],
         ];
 
         // Derive display paths from log_name so there's one source of truth.

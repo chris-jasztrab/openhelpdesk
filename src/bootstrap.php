@@ -11,6 +11,7 @@ require_once ROOT_DIR . '/src/Router.php';
 require_once ROOT_DIR . '/src/Sla.php';
 require_once ROOT_DIR . '/src/Assets.php';
 require_once ROOT_DIR . '/src/Domains.php';
+require_once ROOT_DIR . '/src/Warranty.php';
 require_once ROOT_DIR . '/src/TimeDiagnostics.php';
 require_once ROOT_DIR . '/src/Holidays.php';
 require_once ROOT_DIR . '/src/AI.php';

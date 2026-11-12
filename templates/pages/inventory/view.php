@@ -205,7 +205,28 @@ $money = static fn($v): string => $v !== null && $v !== '' ? '$' . number_format
                     <dt class="col-5 text-muted fw-normal">Order number</dt><dd class="col-7"><?= e($asset['order_number'] ?: '—') ?></dd>
                     <dt class="col-5 text-muted fw-normal">Purchase date</dt><dd class="col-7"><?= e($day($asset['purchase_date'])) ?></dd>
                     <dt class="col-5 text-muted fw-normal">Purchase cost</dt><dd class="col-7"><?= e($money($asset['purchase_cost'])) ?></dd>
-                    <dt class="col-5 text-muted fw-normal">Warranty</dt><dd class="col-7"><?= $asset['warranty_months'] !== null ? (int) $asset['warranty_months'] . ' months' : '—' ?></dd>
+                    <dt class="col-5 text-muted fw-normal">Warranty</dt>
+                    <dd class="col-7" id="assetWarranty">
+                        <?php if ($asset['warranty_end']): $left = (int) round((strtotime($asset['warranty_end']) - strtotime(date('Y-m-d'))) / 86400); ?>
+                            <?php if ($left < 0): ?>
+                            <span class="badge bg-danger">Expired</span> <?= e($day($asset['warranty_end'])) ?> <span class="text-muted">(<?= -$left ?> day<?= $left === -1 ? '' : 's' ?> ago)</span>
+                            <?php else: ?>
+                            <span class="badge <?= $left <= 90 ? 'bg-warning text-dark' : 'bg-success' ?>">In warranty</span> until <?= e($day($asset['warranty_end'])) ?> <span class="text-muted">(<?= $left ?> day<?= $left === 1 ? '' : 's' ?> left)</span>
+                            <?php endif; ?>
+                            <?php if ($asset['warranty_start']): ?><div class="text-muted">Started <?= e($day($asset['warranty_start'])) ?></div><?php endif; ?>
+                            <?php if ($asset['warranty_service']): ?><div class="text-muted"><?= e($asset['warranty_service']) ?></div><?php endif; ?>
+                        <?php elseif ($asset['warranty_months'] !== null): ?>
+                            <?= (int) $asset['warranty_months'] ?> months
+                        <?php else: ?>—<?php endif; ?>
+                        <?php if ($asset['warranty_error']): ?><div class="text-muted"><i class="bi bi-exclamation-triangle text-warning me-1"></i><?= e($asset['warranty_error']) ?></div><?php endif; ?>
+                        <?php if ($asset['warranty_checked_at']): ?><div class="text-muted">Looked up from <?= e(ucfirst((string) Warranty::vendor($asset['manufacturer_name']))) ?> <?= e($day($asset['warranty_checked_at'])) ?></div><?php endif; ?>
+                        <?php if (Assets::canManage() && !$asset['deleted_at'] && Warranty::canLookUp($asset['manufacturer_name'], $asset['serial'])): ?>
+                        <form method="POST" action="/inventory/<?= (int) $asset['id'] ?>/warranty" class="mt-1">
+                            <?= csrfField() ?>
+                            <button type="submit" class="btn btn-sm btn-outline-secondary py-0"><i class="bi bi-arrow-repeat me-1"></i>Look up warranty</button>
+                        </form>
+                        <?php endif; ?>
+                    </dd>
                     <dt class="col-5 text-muted fw-normal">End of life</dt><dd class="col-7"><?= e($day($asset['eol_date'])) ?><?= !$asset['eol_date'] && $asset['eol_months'] ? ' <span class="text-muted">(model: ' . (int) $asset['eol_months'] . ' months)</span>' : '' ?></dd>
                     <dt class="col-5 text-muted fw-normal">Last checkout</dt><dd class="col-7"><?= e($when($asset['last_checkout_at'])) ?></dd>
                     <dt class="col-5 text-muted fw-normal">Last check-in</dt><dd class="col-7"><?= e($when($asset['last_checkin_at'])) ?></dd>

@@ -50,6 +50,10 @@ $router->get('/inventory', function () {
     if ($auditBefore !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $auditBefore)) {
         $auditBefore = '';
     }
+    $warranty = requestScalar('warranty');
+    if (!in_array($warranty, ['expired', 'soon', 'active', 'unknown'], true)) {
+        $warranty = '';
+    }
 
     $where  = [$deleted ? 'a.deleted_at IS NOT NULL' : 'a.deleted_at IS NULL'];
     $params = [];
@@ -95,6 +99,19 @@ $router->get('/inventory', function () {
         $where[]  = '(a.last_audit_at IS NULL OR a.last_audit_at < ?)';
         $params[] = $auditBefore;
     }
+    $today = date('Y-m-d');
+    if ($warranty === 'expired') {
+        $where[]  = 'a.warranty_end < ?';
+        $params[] = $today;
+    } elseif ($warranty === 'soon') {
+        $where[] = 'a.warranty_end BETWEEN ? AND ?';
+        array_push($params, $today, date('Y-m-d', strtotime('+90 days')));
+    } elseif ($warranty === 'active') {
+        $where[]  = 'a.warranty_end >= ?';
+        $params[] = $today;
+    } elseif ($warranty === 'unknown') {
+        $where[] = 'a.warranty_end IS NULL';
+    }
     $whereSql = ' WHERE ' . implode(' AND ', $where);
 
     $sortable = [
@@ -116,6 +133,7 @@ $router->get('/inventory', function () {
     if ($assigned !== '')   $filterParams['assigned'] = $assigned;
     if ($deleted)           $filterParams['deleted']  = '1';
     if ($auditBefore !== '') $filterParams['audit_before'] = $auditBefore;
+    if ($warranty !== '')    $filterParams['warranty'] = $warranty;
 
     if (requestScalar('export') === 'csv') {
         $stmt = $db->prepare(assetSelect() . $whereSql . $orderSql);
@@ -123,12 +141,13 @@ $router->get('/inventory', function () {
         header('Content-Type: text/csv; charset=utf-8');
         header('Content-Disposition: attachment; filename="inventory-' . date('Y-m-d') . '.csv"');
         $out = fopen('php://output', 'wb');
-        fputcsv($out, ['Tag', 'Name', 'Serial', 'Model', 'Model No.', 'Category', 'Manufacturer', 'Status', 'Location', 'Assigned To', 'Purchase Date', 'Cost', 'Warranty (months)', 'EOL', 'Last Audit', 'Next Audit', 'Notes']);
+        fputcsv($out, ['Tag', 'Name', 'Serial', 'Model', 'Model No.', 'Category', 'Manufacturer', 'Status', 'Location', 'Assigned To', 'Purchase Date', 'Cost', 'Warranty (months)', 'Warranty Start', 'Warranty End', 'Warranty Coverage', 'EOL', 'Last Audit', 'Next Audit', 'Notes']);
         foreach ($stmt as $a) {
             fputcsv($out, [
                 $a['asset_tag'], $a['name'], $a['serial'], $a['model_name'], $a['model_number'], $a['category_name'],
                 $a['manufacturer_name'], Assets::statusLabel($a), $a['location_name'], Assets::assigneeLabel($a),
-                $a['purchase_date'], $a['purchase_cost'], $a['warranty_months'], $a['eol_date'], $a['last_audit_at'], $a['next_audit_date'], $a['notes'],
+                $a['purchase_date'], $a['purchase_cost'], $a['warranty_months'], $a['warranty_start'], $a['warranty_end'], $a['warranty_service'],
+                $a['eol_date'], $a['last_audit_at'], $a['next_audit_date'], $a['notes'],
             ]);
         }
         fclose($out);
@@ -166,6 +185,7 @@ $router->get('/inventory', function () {
         'assigned'     => $assigned,
         'deleted'      => $deleted,
         'auditBefore'  => $auditBefore,
+        'warranty'     => $warranty,
         'categories'   => $db->query('SELECT c.id, c.name, COUNT(a.id) AS n FROM asset_categories c LEFT JOIN asset_models m ON m.category_id = c.id LEFT JOIN assets a ON a.model_id = m.id AND a.deleted_at IS NULL GROUP BY c.id ORDER BY c.name')->fetchAll(),
         'statuses'     => $db->query('SELECT s.*, (SELECT COUNT(*) FROM assets a WHERE a.status_id = s.id AND a.deleted_at IS NULL) AS n FROM asset_statuses s ORDER BY s.sort_order, s.name')->fetchAll(),
         'locations'    => $db->query('SELECT id, name FROM locations ORDER BY name')->fetchAll(),
@@ -613,6 +633,23 @@ $router->post('/inventory/{id}/checkin', function (array $p) {
     redirect($back);
 });
 
+/** Ask Dell / Lenovo for this asset's warranty now. */
+$router->post('/inventory/{id}/warranty', function (array $p) {
+    Auth::requirePermission('assets.manage');
+    $id = (int) $p['id'];
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect("/inventory/{$id}?tab=details");
+    }
+    $r = Warranty::refresh(Database::connect(), $id, Auth::id());
+    if ($r['ok']) {
+        flash('success', 'Warranty ' . ($r['end'] < date('Y-m-d') ? 'expired on ' : 'ends on ') . date('M j, Y', strtotime($r['end'])) . '.');
+    } else {
+        flash('error', $r['error'] . '.');
+    }
+    redirect("/inventory/{$id}?tab=details");
+});
+
 /** Where a checkout/check-in lands: the filtered list or the ticket it was done from (return=), else the asset. */
 function assetReturnUrl(int $id): string
 {
@@ -756,6 +793,13 @@ $router->get('/admin/settings/inventory', function () {
         'tagPrefix' => getSetting('asset_tag_prefix', ''), 'tagZerofill' => getSetting('asset_tag_zerofill', '5'),
         'tagNext' => getSetting('asset_tag_next', '1'), 'nextTagPreview' => assetNextTagPreview($db),
         'auditInterval' => getSetting('asset_audit_interval_months', '12'),
+        'dellClientId'  => getSetting('warranty_dell_client_id', ''),
+        'dellSecretSet' => getSetting('warranty_dell_client_secret', '') !== '',
+        'lenovoIdSet'   => getSetting('warranty_lenovo_client_id', '') !== '',
+        'warrantyCounts' => $db->query(
+            "SELECT COUNT(*) AS looked_up, SUM(a.warranty_end < CURDATE()) AS expired, SUM(a.warranty_end >= CURDATE()) AS active
+             FROM assets a WHERE a.deleted_at IS NULL AND a.warranty_end IS NOT NULL"
+        )->fetch(),
     ]);
 });
 
@@ -764,6 +808,23 @@ $router->post('/admin/settings/inventory', function () {
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
         redirect('/admin/settings/inventory');
+    }
+    if (($_POST['section'] ?? '') === 'warranty') {
+        // Secrets: blank keeps the stored value (the boxes are never pre-filled); Clear removes it.
+        $keep = static fn(string $key, string $field) => isset($_POST[$field . '_clear']) ? ''
+            : (trim((string) ($_POST[$field] ?? '')) !== '' ? trim((string) $_POST[$field]) : getSetting($key, ''));
+        $before = ['warranty_dell_client_id' => getSetting('warranty_dell_client_id', ''), 'warranty_dell_client_secret' => getSetting('warranty_dell_client_secret', ''), 'warranty_lenovo_client_id' => getSetting('warranty_lenovo_client_id', '')];
+        $after  = [
+            'warranty_dell_client_id'     => trim((string) ($_POST['dell_client_id'] ?? '')),
+            'warranty_dell_client_secret' => $keep('warranty_dell_client_secret', 'dell_client_secret'),
+            'warranty_lenovo_client_id'   => $keep('warranty_lenovo_client_id', 'lenovo_client_id'),
+        ];
+        foreach ($after as $k => $v) {
+            setSetting($k, $v);
+        }
+        logAuditChange('asset.warranty_settings_changed', null, null, $before, $after, ['warranty_dell_client_secret', 'warranty_lenovo_client_id']);
+        flash('success', 'Warranty lookup settings saved.');
+        redirect('/admin/settings/inventory#warranty');
     }
     setSetting('asset_tag_prefix', trim((string) ($_POST['asset_tag_prefix'] ?? '')));
     setSetting('asset_tag_zerofill', (string) max(0, min(12, (int) ($_POST['asset_tag_zerofill'] ?? 5))));
