@@ -39,15 +39,19 @@ class AssetsTest extends TestCase
         }
     }
 
+    private ?int $model = null;
+
     private function asset(string $tag): int
     {
-        $this->db->exec("INSERT INTO asset_categories (name) VALUES ('AT Laptops')");
-        $cat = (int) $this->db->lastInsertId();
-        $this->db->prepare("INSERT INTO asset_models (name, category_id) VALUES ('AT Latitude', ?)")->execute([$cat]);
-        $model = (int) $this->db->lastInsertId();
+        if ($this->model === null) {
+            $this->db->exec("INSERT INTO asset_categories (name) VALUES ('AT Laptops')");
+            $cat = (int) $this->db->lastInsertId();
+            $this->db->prepare("INSERT INTO asset_models (name, category_id) VALUES ('AT Latitude', ?)")->execute([$cat]);
+            $this->model = (int) $this->db->lastInsertId();
+        }
         $status = (int) $this->db->query('SELECT id FROM asset_statuses ORDER BY id LIMIT 1')->fetchColumn();
         $this->db->prepare('INSERT INTO assets (asset_tag, name, model_id, status_id) VALUES (?, ?, ?, ?)')
-            ->execute([$tag, 'AT-HOST', $model, $status]);
+            ->execute([$tag, 'AT-HOST', $this->model, $status]);
         return (int) $this->db->lastInsertId();
     }
 
@@ -178,6 +182,22 @@ class AssetsTest extends TestCase
         $this->assertSame(0, $this->n('SELECT COUNT(*) FROM ticket_asset_map WHERE ticket_id = ? AND asset_id = ?', [$ticket, $asset]));
         $this->assertSame(1, $this->n("SELECT COUNT(*) FROM ticket_timeline WHERE ticket_id = ? AND action = 'asset_unlinked'", [$ticket]));
         $this->assertSame(1, $this->n("SELECT COUNT(*) FROM asset_history WHERE asset_id = ? AND action = 'ticket_unlinked'", [$asset]));
+    }
+
+    public function test_merge_copies_linked_assets_to_the_target(): void
+    {
+        $source = $this->ticket();
+        $target = $this->ticket();
+        $both   = $this->asset('AT-MRG1');
+        $only   = $this->asset('AT-MRG2');
+        Assets::link($this->db, $source, $both, $this->userId);
+        Assets::link($this->db, $source, $only, $this->userId);
+        Assets::link($this->db, $target, $both, $this->userId);
+
+        moveTicketThread($this->db, $source, $target);
+
+        $this->assertSame(2, $this->n('SELECT COUNT(*) FROM ticket_asset_map WHERE ticket_id = ?', [$target]), 'already-linked asset is not duplicated');
+        $this->assertSame(2, $this->n('SELECT COUNT(*) FROM ticket_asset_map WHERE ticket_id = ?', [$source]), 'source keeps its links');
     }
 
     public function test_history_keeps_imported_actor_and_timestamp(): void

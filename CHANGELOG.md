@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.226.2 &mdash; 2026-11-12
+
+### Fixed
+- **Merging tickets keeps their linked assets.** Merging a ticket into another (single or bulk, from the agent or admin ticket list) copied its CCs and tags to the surviving ticket but dropped the devices linked in its **Assets** card. They are now copied as well, the same way closing a ticket as a duplicate already did; the merged ticket keeps its own links, so it still shows on each device's **Tickets** tab. Merges done before this release are not repaired. No migration.
+
 ## 2.226.1 &mdash; 2026-11-12
 
 ### Fixed

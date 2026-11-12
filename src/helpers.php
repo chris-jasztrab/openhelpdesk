@@ -10863,6 +10863,11 @@ function moveTicketThread(PDO $db, int $sourceId, int $targetId): void
        ->execute([$targetId, $sourceId]);
     // A marked solution would now point at a row on another ticket.
     $db->prepare('UPDATE tickets SET solution_timeline_id = NULL WHERE id = ?')->execute([$sourceId]);
+    // Linked assets are copied, not moved, the same as a duplicate-close: the source keeps its own record.
+    $db->prepare(
+        'INSERT IGNORE INTO ticket_asset_map (ticket_id, asset_id, linked_by)
+         SELECT ?, asset_id, linked_by FROM ticket_asset_map WHERE ticket_id = ?'
+    )->execute([$targetId, $sourceId]);
 }
 
 /** Slugs that pause SLA timers — replaces the inline $pausingStatuses arrays. */
