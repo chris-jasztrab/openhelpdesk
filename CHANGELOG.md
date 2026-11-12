@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.230.1 &mdash; 2026-11-12
+
+### Fixed
+- **Fresh installs get the new inventory columns.** `database/schema.sql` now declares the warranty columns and index from migration 095 and `ticket_type_tasks.link_person_assets` from migration 094, so a new install matches an upgraded one. Existing installs are unaffected; their migrations already added them.
+
 ## 2.230.0 &mdash; 2026-11-12
 
 ### Added
