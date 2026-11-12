@@ -86,7 +86,7 @@ $subject = "[{$appName}] " . ($expired > 0 ? 'EXPIRED: ' : '') . count($due) . '
 $rows = '';
 $text = "Expiring domains and certificates\n\n";
 foreach ($due as $a) {
-    $what  = $a['kind'] === 'domain' ? 'Domain registration' : 'SSL certificate';
+    $what  = $a['kind'] === 'domain' ? 'Domain registration' : 'SSL certificate' . (!empty($a['internal']) ? ' (as seen inside the network)' : '');
     $when  = $a['days_left'] <= 0 ? 'EXPIRED' : "in {$a['days_left']} day" . ($a['days_left'] === 1 ? '' : 's');
     $color = $a['days_left'] <= 7 ? '#dc3545' : '#b45309';
     $rows .= '<tr>'

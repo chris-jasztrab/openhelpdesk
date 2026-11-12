@@ -11,6 +11,12 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.225.1 &mdash; 2026-11-12
+
+### Fixed
+- **Re-checking a domain with many hosts no longer takes minutes.** With a Cloudflare token a zone can list dozens of hosts, most of which have no web server, and each one was waited on in turn (147 seconds for 42 hosts). Port 443 is now probed on every host at once before any certificate is read, which brought the same check down to about 26 seconds with identical results.
+- **Certificates read through internal DNS are labelled.** When a host's public address does not answer from the helpdesk server, the certificate is read through the server's own DNS, which on a split-horizon network can be a different, internal server. Those rows now carry an *internal view* tag on the domain page, and the alert panel and email digest say *as seen inside the network*. No migration.
+
 ## 2.225.0 &mdash; 2026-11-12
 
 ### Added

@@ -136,7 +136,10 @@ $recStyle = 'word-break:break-all;white-space:pre-wrap;';
                 <tr>
                     <td class="text-nowrap font-monospace"><?= e($h['host']) ?></td>
                     <td class="small"><?= $h['ips'] ? e(implode(', ', $h['ips'])) : '<span class="text-muted">No public address</span>' ?></td>
-                    <td class="text-nowrap"><?= $badge($st, $label) ?></td>
+                    <td class="text-nowrap">
+                        <?= $badge($st, $label) ?>
+                        <?php if (!empty($c['internal'])): ?><span class="badge bg-light text-dark border" title="The public address did not answer from this server, so this certificate was read through internal DNS. It may be a different server than the internet reaches.">internal view</span><?php endif; ?>
+                    </td>
                     <?php if (!empty($c['found'])): ?>
                     <td><?= e($c['issuer']) ?></td>
                     <td class="font-monospace small"><?= e($c['subject']) ?></td>

@@ -32,7 +32,7 @@ $badge = static function (?string $status): string {
         <?php foreach ($alerts as $a): ?>
         <li>
             <a href="/admin/settings/domains/<?= (int) $a['domain_id'] ?>" class="alert-link"><?= e($a['label']) ?></a>
-            — <?= $a['kind'] === 'domain' ? 'domain registration' : 'SSL certificate' ?>
+            — <?= $a['kind'] === 'domain' ? 'domain registration' : 'SSL certificate' . (!empty($a['internal']) ? ' (as seen inside the network)' : '') ?>
             <?= $a['days_left'] <= 0 ? '<strong>expired</strong> ' . e($a['expires_on']) : 'expires ' . e($a['expires_on']) . ' (' . (int) $a['days_left'] . ' day' . ($a['days_left'] === 1 ? '' : 's') . ')' ?>
         </li>
         <?php endforeach; ?>

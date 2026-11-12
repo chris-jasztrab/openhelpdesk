@@ -480,11 +480,12 @@ final class Domains
      *
      * @param list<string> $ips public A records for the host
      */
-    public static function certificate(string $host, array $ips = []): array
+    public static function certificate(string $host, array $ips = [], ?array $reachable = null): array
     {
-        // ponytail: sequential connects, up to 2 × TIMEOUT per dead host. Fine for ~20 hosts
-        // on a nightly job; switch to non-blocking sockets if the host list grows past ~100.
         foreach (array_merge(array_slice($ips, 0, 1), [$host]) as $target) {
+            if ($reachable !== null && !isset($reachable[$target])) {
+                continue; // already known not to answer on 443 — don't wait out a timeout per host
+            }
             $cert = self::fetchCert($target, $host, false);
             if ($cert === null) {
                 continue;
@@ -496,6 +497,9 @@ final class Domains
             return [
                 'found'      => true,
                 'via'        => $target,
+                // Read through this server's own DNS, not the public address: on a split-horizon
+                // network that can be a different (internal) server than the internet reaches.
+                'internal'   => $target === $host,
                 'subject'    => $cn,
                 'issuer'     => $str($p['issuer']['O'] ?? $p['issuer']['CN'] ?? ''),
                 'valid_from' => isset($p['validFrom_time_t']) ? date('Y-m-d', $p['validFrom_time_t']) : null,
@@ -506,6 +510,49 @@ final class Domains
             ];
         }
         return ['found' => false];
+    }
+
+    /**
+     * Which of these addresses / names accept a TCP connection on :443, probed
+     * all at once. A zone is mostly hosts with no web server, and waiting out a
+     * timeout for each in turn made a 40-host check take minutes.
+     *
+     * @param list<string> $targets
+     * @return array<string, true>
+     */
+    public static function reachable(array $targets): array
+    {
+        $socks = [];
+        foreach (array_unique($targets) as $t) {
+            $s = @stream_socket_client("tcp://{$t}:443", $en, $es, self::TIMEOUT, STREAM_CLIENT_CONNECT | STREAM_CLIENT_ASYNC_CONNECT);
+            if ($s) {
+                stream_set_blocking($s, false);
+                $socks[$t] = $s;
+            }
+        }
+        $ok       = [];
+        $deadline = microtime(true) + self::TIMEOUT;
+        while ($socks !== [] && ($left = $deadline - microtime(true)) > 0) {
+            $r = null;
+            $w = $e = array_values($socks);
+            if (!@stream_select($r, $w, $e, (int) $left, (int) (($left - (int) $left) * 1e6))) {
+                break;
+            }
+            // Writable = connect finished (a refused connect has no peer name); except = failed (Windows).
+            foreach (array_merge($w, $e) as $s) {
+                $t = array_search($s, $socks, true);
+                if ($t === false) {
+                    continue;
+                }
+                if (in_array($s, $w, true) && @stream_socket_get_name($s, true) !== false) {
+                    $ok[$t] = true;
+                }
+                fclose($s);
+                unset($socks[$t]);
+            }
+        }
+        array_map('fclose', $socks);
+        return $ok;
     }
 
     /**
@@ -625,11 +672,21 @@ final class Domains
         }
         $dkimStatus = $dkim === [] ? 'missing' : (in_array('fail', array_column($dkim, 'status'), true) ? 'fail' : (in_array('ok', array_column($dkim, 'status'), true) ? 'ok' : 'warn'));
 
+        $hostIps = [];
+        foreach ($hosts as $h) {
+            $hostIps[$h] = $only($ask($h, 'A'), 'A');
+            $ask($h, 'AAAA');
+        }
+        $targets = $hosts;
+        foreach ($hostIps as $ips) {
+            if ($ips !== []) {
+                $targets[] = $ips[0];
+            }
+        }
+        $reachable   = self::reachable($targets);
         $hostResults = [];
         foreach ($hosts as $h) {
-            $ips = $only($ask($h, 'A'), 'A');
-            $ask($h, 'AAAA');
-            $hostResults[] = ['host' => $h, 'ips' => $ips, 'cert' => self::certificate($h, $ips)];
+            $hostResults[] = ['host' => $h, 'ips' => $hostIps[$h], 'cert' => self::certificate($h, $hostIps[$h], $reachable)];
         }
 
         return [
@@ -701,7 +758,7 @@ final class Domains
             foreach (json_decode((string) $r['check_data'], true)['hosts'] ?? [] as $h) {
                 $to = $h['cert']['valid_to'] ?? null;
                 if ($to !== null && ($d = self::daysLeft($to)) <= $days) {
-                    $out[] = $base + ['key' => 'cert:' . $h['host'], 'kind' => 'cert', 'label' => $h['host'], 'expires_on' => $to, 'days_left' => $d];
+                    $out[] = $base + ['key' => 'cert:' . $h['host'], 'kind' => 'cert', 'label' => $h['host'], 'expires_on' => $to, 'days_left' => $d, 'internal' => !empty($h['cert']['internal'])];
                 }
             }
         }
