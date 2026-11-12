@@ -68,7 +68,7 @@ $badge = static function (?string $status): string {
             <?php foreach ($domains as $d):
                 $c     = json_decode((string) $d['check_data'], true) ?: [];
                 $left  = $d['expires_at'] !== null ? Domains::daysLeft($d['expires_at']) : null;
-                $certs = array_map(static fn ($h) => Domains::certStatus($h['cert'] ?? [], $alertDays)[1], $c['hosts'] ?? []);
+                $certs = array_map(static fn ($h) => Domains::certStatus($h['cert'] ?? [], $alertDays)[1], Domains::splitHosts($c['hosts'] ?? [], $d['ignored_hosts'])[0]);
                 $bad   = count(array_filter($certs, static fn ($s) => $s === 'fail'));
                 $soon  = count(array_filter($certs, static fn ($s) => $s === 'warn'));
                 $good  = count(array_filter($certs, static fn ($s) => $s === 'ok'));

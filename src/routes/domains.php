@@ -178,6 +178,33 @@ $router->post('/admin/settings/domains/{id}/refresh', function (array $p) {
     redirect($back);
 });
 
+$router->post('/admin/settings/domains/{id}/hosts', function (array $p) {
+    Auth::requireAdmin();
+    $id   = (int) $p['id'];
+    $back = '/admin/settings/domains/' . $id;
+    _domainCsrfOrBack($back);
+    $db = Database::connect();
+    $st = $db->prepare('SELECT name, ignored_hosts FROM domains WHERE id = ?');
+    $st->execute([$id]);
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$row) {
+        redirect('/admin/settings/domains');
+    }
+    $host = Domains::hostUnder((string) ($_POST['host'] ?? ''), $row['name']);
+    if ($host === null) {
+        flash('error', 'That is not a host under ' . $row['name'] . '.');
+        redirect($back);
+    }
+    $before = Domains::splitList($row['ignored_hosts']);
+    $ignore = ($_POST['action'] ?? '') === 'ignore';
+    $after  = $ignore ? array_values(array_unique([...$before, $host])) : array_values(array_diff($before, [$host]));
+    sort($after);
+    $db->prepare('UPDATE domains SET ignored_hosts = ? WHERE id = ?')->execute([implode("\n", $after) ?: null, $id]);
+    logAuditChange('domains.hosts_ignored_changed', $id, 'domain', ['ignored_hosts' => implode(', ', $before)], ['ignored_hosts' => implode(', ', $after)]);
+    flash('success', $ignore ? "{$host} is now ignored. It is listed under Ignored hosts." : "{$host} restored.");
+    redirect($back . ($ignore ? '' : '?ignored=1') . '#hosts');
+});
+
 $router->post('/admin/settings/domains/{id}/delete', function (array $p) {
     Auth::requireAdmin();
     _domainCsrfOrBack('/admin/settings/domains');

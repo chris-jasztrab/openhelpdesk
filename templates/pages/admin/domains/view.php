@@ -17,6 +17,11 @@ $badge = static function (?string $status, ?string $text = null) use ($tone, $wo
     return '<span class="badge bg-' . $t . '-subtle text-' . $t . '-emphasis border border-' . $t . '-subtle">' . e($text ?? $words[$status] ?? '—') . '</span>';
 };
 $recStyle = 'word-break:break-all;white-space:pre-wrap;';
+[$shownHosts, $ignoredHosts] = Domains::splitHosts($check['hosts'] ?? [], $domain['ignored_hosts'] ?? null);
+// An ignored host that has since left the zone still needs a Restore row.
+foreach (array_diff(Domains::splitList($domain['ignored_hosts'] ?? null), array_column($ignoredHosts, 'host')) as $_gone) {
+    $ignoredHosts[] = ['host' => $_gone, 'ips' => [], 'cert' => []];
+}
 ?>
 <div class="mb-4">
     <h2 class="fw-bold mb-0">Settings</h2>
@@ -126,14 +131,27 @@ $recStyle = 'word-break:break-all;white-space:pre-wrap;';
     </div>
 </div>
 
-<div class="card border-0 shadow-sm mb-4">
-    <div class="card-header bg-white py-3"><h5 class="mb-0 fw-semibold"><i class="bi bi-shield-lock me-2" aria-hidden="true"></i>Hosts and SSL certificates</h5></div>
+<div class="card border-0 shadow-sm mb-4" id="hosts">
+    <div class="card-header bg-white py-3"><h5 class="mb-0 fw-semibold"><i class="bi bi-shield-lock me-2" aria-hidden="true"></i>Hosts and SSL certificates <span class="badge bg-secondary-subtle text-secondary-emphasis border"><?= count($shownHosts) ?></span></h5></div>
     <div class="table-responsive">
         <table class="table align-middle mb-0" data-no-resize>
-            <thead class="table-light"><tr><th>Host</th><th>Address</th><th>SSL</th><th>Issued by</th><th>Issued to</th><th>Expires</th></tr></thead>
+            <thead class="table-light"><tr><th aria-label="Ignore"></th><th>Host</th><th>Address</th><th>SSL</th><th>Issued by</th><th>Issued to</th><th>Expires</th></tr></thead>
             <tbody>
-            <?php foreach ($check['hosts'] as $h): $c = $h['cert']; [$label, $st] = Domains::certStatus($c, $alertDays); ?>
+            <?php if (!$shownHosts): ?>
+                <tr><td colspan="7" class="text-center text-muted py-4">Every host is ignored. Restore one from the list below.</td></tr>
+            <?php endif; ?>
+            <?php foreach ($shownHosts as $h): $c = $h['cert']; [$label, $st] = Domains::certStatus($c, $alertDays); ?>
                 <tr>
+                    <td style="width:1%;">
+                        <form method="POST" action="/admin/settings/domains/<?= $id ?>/hosts" class="d-inline">
+                            <?= csrfField() ?>
+                            <input type="hidden" name="host" value="<?= e($h['host']) ?>">
+                            <input type="hidden" name="action" value="ignore">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary text-nowrap" title="Hide <?= e($h['host']) ?> and leave it out of SSL verdicts and expiry alerts">
+                                <i class="bi bi-eye-slash" aria-hidden="true"></i> Ignore
+                            </button>
+                        </form>
+                    </td>
                     <td class="text-nowrap font-monospace"><?= e($h['host']) ?></td>
                     <td class="small"><?= $h['ips'] ? e(implode(', ', $h['ips'])) : '<span class="text-muted">No public address</span>' ?></td>
                     <td class="text-nowrap">
@@ -152,6 +170,36 @@ $recStyle = 'word-break:break-all;white-space:pre-wrap;';
             </tbody>
         </table>
     </div>
+    <?php if ($ignoredHosts): ?>
+    <details class="border-top" id="ignored-hosts" <?= isset($_GET['ignored']) ? 'open' : '' ?>>
+        <summary class="px-3 py-3 fw-semibold">
+            <i class="bi bi-eye-slash me-1" aria-hidden="true"></i>Ignored hosts
+            <span class="badge bg-secondary-subtle text-secondary-emphasis border"><?= count($ignoredHosts) ?></span>
+            <span class="small text-muted fw-normal ms-1">left out of SSL verdicts and expiry alerts</span>
+        </summary>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0" data-no-resize>
+                <tbody>
+                <?php foreach ($ignoredHosts as $h): $c = $h['cert'] ?? []; [$label, $st] = Domains::certStatus($c, $alertDays); ?>
+                    <tr>
+                        <td class="text-nowrap font-monospace ps-3"><?= e($h['host']) ?></td>
+                        <td class="text-nowrap"><?= $c ? $badge($st, $label) : '<span class="small text-muted">Not in the last check</span>' ?></td>
+                        <td class="small text-muted"><?= !empty($c['found']) ? e($c['issuer']) . ', expires ' . e($c['valid_to']) : '' ?></td>
+                        <td class="text-end pe-3">
+                            <form method="POST" action="/admin/settings/domains/<?= $id ?>/hosts" class="d-inline">
+                                <?= csrfField() ?>
+                                <input type="hidden" name="host" value="<?= e($h['host']) ?>">
+                                <input type="hidden" name="action" value="restore">
+                                <button type="submit" class="btn btn-sm btn-outline-secondary text-nowrap"><i class="bi bi-eye" aria-hidden="true"></i> Restore</button>
+                            </form>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </details>
+    <?php endif; ?>
 </div>
 
 <div class="card border-0 shadow-sm mb-4">

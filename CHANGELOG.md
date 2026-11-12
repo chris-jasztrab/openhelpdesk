@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.226.0 &mdash; 2026-11-12
+
+### Added
+- **Hosts on a domain can be ignored.** Every host in the **Hosts and SSL certificates** table on a domain's page now has an **Ignore** button at the start of its row. An ignored host leaves the table, the SSL verdict counts on the Domains list and every expiry alert (page, dashboard and email), which clears the permanent "broken" verdicts caused by records that point at someone else's servers, such as Microsoft enrolment names and Google verification hosts. Ignored hosts are still checked, and are listed with their last result under a collapsible **Ignored hosts** section beneath the table, each with a **Restore** button. Nothing is ignored by default. Migration 092 adds `domains.ignored_hosts`.
+
 ## 2.225.1 &mdash; 2026-11-12
 
 ### Fixed

@@ -746,7 +746,7 @@ final class Domains
         $days ??= self::alertDays();
         $out  = [];
         try {
-            $rows = $db->query('SELECT id, name, expires_at, check_data FROM domains ORDER BY name')->fetchAll(PDO::FETCH_ASSOC);
+            $rows = $db->query('SELECT id, name, expires_at, check_data, ignored_hosts FROM domains ORDER BY name')->fetchAll(PDO::FETCH_ASSOC);
         } catch (\Throwable $e) {
             return [];
         }
@@ -755,7 +755,7 @@ final class Domains
             if ($r['expires_at'] !== null && ($d = self::daysLeft($r['expires_at'])) <= $days) {
                 $out[] = $base + ['key' => 'domain:' . $r['name'], 'kind' => 'domain', 'label' => $r['name'], 'expires_on' => $r['expires_at'], 'days_left' => $d];
             }
-            foreach (json_decode((string) $r['check_data'], true)['hosts'] ?? [] as $h) {
+            foreach (self::splitHosts(json_decode((string) $r['check_data'], true)['hosts'] ?? [], $r['ignored_hosts'])[0] as $h) {
                 $to = $h['cert']['valid_to'] ?? null;
                 if ($to !== null && ($d = self::daysLeft($to)) <= $days) {
                     $out[] = $base + ['key' => 'cert:' . $h['host'], 'kind' => 'cert', 'label' => $h['host'], 'expires_on' => $to, 'days_left' => $d, 'internal' => !empty($h['cert']['internal'])];
@@ -763,6 +763,22 @@ final class Domains
             }
         }
         usort($out, static fn ($a, $b) => $a['days_left'] <=> $b['days_left']);
+        return $out;
+    }
+
+    /**
+     * Split a check's hosts into the ones to show and the ones this domain ignores.
+     *
+     * @param list<array> $hosts check_data['hosts']
+     * @return array{0:list<array>,1:list<array>} [shown, ignored]
+     */
+    public static function splitHosts(array $hosts, ?string $ignoredRaw): array
+    {
+        $ignored = array_flip(self::splitList($ignoredRaw));
+        $out     = [[], []];
+        foreach ($hosts as $h) {
+            $out[isset($ignored[$h['host']]) ? 1 : 0][] = $h;
+        }
         return $out;
     }
 

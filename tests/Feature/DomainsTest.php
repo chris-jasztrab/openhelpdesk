@@ -95,4 +95,14 @@ class DomainsTest extends TestCase
         $this->assertNull(Domains::hostUnder('bad host!', 'example.ca'));
         $this->assertSame(['first', 'week', 'week', 'expired'], array_map([Domains::class, 'tier'], [30, 7, 1, 0]));
     }
+
+    public function test_ignored_hosts_are_split_out(): void
+    {
+        $hosts = [['host' => 'www.example.ca'], ['host' => 'google123.example.ca'], ['host' => 'mail.example.ca']];
+        [$shown, $ignored] = Domains::splitHosts($hosts, "google123.example.ca\nGONE.example.ca");
+
+        $this->assertSame(['www.example.ca', 'mail.example.ca'], array_column($shown, 'host'));
+        $this->assertSame(['google123.example.ca'], array_column($ignored, 'host'));
+        $this->assertCount(3, Domains::splitHosts($hosts, null)[0], 'nothing ignored by default');
+    }
 }
