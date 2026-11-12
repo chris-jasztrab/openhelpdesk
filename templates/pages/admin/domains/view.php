@@ -153,6 +153,7 @@ $internalFirst = array_flip(Domains::splitList($domain['internal_hosts'] ?? null
                                 <i class="bi bi-eye-slash" aria-hidden="true"></i> Ignore
                             </button>
                         </form>
+                        <?php if ($h['ips']): // no public address means internal DNS is already the only way in ?>
                         <form method="POST" action="/admin/settings/domains/<?= $id ?>/hosts" class="d-inline">
                             <?= csrfField() ?>
                             <input type="hidden" name="host" value="<?= e($h['host']) ?>">
@@ -164,15 +165,18 @@ $internalFirst = array_flip(Domains::splitList($domain['internal_hosts'] ?? null
                                 <i class="bi bi-hdd-network" aria-hidden="true"></i> Internal DNS
                             </button>
                         </form>
+                        <?php endif; ?>
                         </div>
                     </td>
                     <td class="text-nowrap font-monospace"><?= e($h['host']) ?></td>
                     <td class="small"><?= $h['ips'] ? e(implode(', ', $h['ips'])) : '<span class="text-muted">No public address</span>' ?></td>
                     <td class="text-nowrap">
                         <?= $badge($st, $label) ?>
-                        <?php if (!empty($c['internal'])): ?><span class="badge bg-light text-dark border" title="<?= $int
-                            ? 'Read through internal DNS, as set for this host. The internet may reach a different server.'
-                            : 'The public address did not answer from this server, so this certificate was read through internal DNS. It may be a different server than the internet reaches.' ?>">internal view</span><?php endif; ?>
+                        <?php if (!empty($c['internal'])): ?><span class="badge bg-light text-dark border" title="<?= match (true) {
+                            !$h['ips'] => 'This name has no public address, so its certificate was read through this server\'s own DNS (an internal-only host).',
+                            $int       => 'Read through internal DNS, as set for this host. The internet may reach a different server.',
+                            default    => 'The public address did not answer from this server, so this certificate was read through internal DNS. It may be a different server than the internet reaches.',
+                        } ?>">internal view</span><?php endif; ?>
                     </td>
                     <?php if (!empty($c['found'])): ?>
                     <td><?= e($c['issuer']) ?></td>
@@ -266,7 +270,7 @@ $internalFirst = array_flip(Domains::splitList($domain['internal_hosts'] ?? null
                 <div class="col-md-6">
                     <label class="form-label fw-semibold" for="extra_hosts">Hosts to check</label>
                     <textarea class="form-control font-monospace" id="extra_hosts" name="extra_hosts" rows="6"><?= e($domain['extra_hosts'] ?? '') ?></textarea>
-                    <div class="form-text">One per line. Hosts found through Cloudflare are checked as well.</div>
+                    <div class="form-text">One per line. Hosts found through Cloudflare are checked as well. Internal-only servers can go here too; a name with no public address is read through this server's own DNS and is included in expiry alerts.</div>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label fw-semibold" for="dkim_selectors">DKIM selectors</label>

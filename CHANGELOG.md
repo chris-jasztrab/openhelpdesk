@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.229.1 &mdash; 2026-11-12
+
+### Fixed
+- **Internal-only servers in the SSL check are labelled correctly.** A server that only exists on the internal network (for example one carrying the `*.wpl.ca` wildcard) can be added to a domain's **Hosts to check**; its certificate is read through this server's own DNS and counts toward expiry alerts like any other host. Its **internal view** badge no longer claims a public address failed to answer, the **Internal DNS** toggle is hidden on hosts with no public address (it would change nothing), and the **Hosts to check** help text now says internal-only names are welcome.
+
 ## 2.229.0 &mdash; 2026-11-12
 
 ### Added

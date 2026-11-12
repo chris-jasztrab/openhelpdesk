@@ -119,7 +119,7 @@ $badge = static function (?string $status): string {
                     <div class="mb-3">
                         <label class="form-label fw-semibold" for="dom_hosts">Hosts to check</label>
                         <textarea class="form-control font-monospace" id="dom_hosts" name="extra_hosts" rows="4" placeholder="www&#10;mail&#10;catalogue"></textarea>
-                        <div class="form-text">One per line; the domain is added for you. Not needed once a Cloudflare token is saved, which finds every host.</div>
+                        <div class="form-text">One per line; the domain is added for you. A Cloudflare token finds every public host; internal-only servers still go here, and are read through this server's own DNS.</div>
                     </div>
                     <button type="submit" class="btn text-white" style="background:var(--ld-primary);"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add and check</button>
                     <span class="form-text ms-2">Checking takes a few seconds per host.</span>
