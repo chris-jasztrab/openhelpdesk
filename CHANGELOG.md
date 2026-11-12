@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.224.1 &mdash; 2026-11-12
+
+### Fixed
+- **A status banner's "Posted by" now names whoever last posted it.** The byline showed the banner's original creator next to the last-updated time, so editing or re-posting someone else's old banner credited them with today's post. The banner strip and the Status Banners list now show the last person to edit, clear or re-post it, falling back to the creator. No migration.
+
 ## 2.224.0 &mdash; 2026-11-12
 
 ### Changed

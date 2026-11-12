@@ -3161,7 +3161,7 @@ $router->get('/agent/banners', function () {
                   WHERE sbl.banner_id = b.id) AS location_names,
                 CONCAT(u.first_name, " ", u.last_name) AS posted_by_name
          FROM status_banners b
-         LEFT JOIN users     u ON b.created_by  = u.id
+         LEFT JOIN users     u ON u.id = COALESCE(b.updated_by, b.created_by)
          ORDER BY b.is_active DESC,
                   FIELD(b.severity, "critical", "warning", "info"),
                   b.updated_at DESC'
