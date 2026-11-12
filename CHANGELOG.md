@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.226.1 &mdash; 2026-11-12
+
+### Fixed
+- **Camera scanning works again on phones.** The inventory **Audit** page and the floor page's QR scanner showed *Camera unavailable: Permission denied* without ever asking for the camera, because a site-wide security header (`Permissions-Policy`) switched the camera off for every page. The header now allows the camera for the helpdesk's own pages only; embedded third-party content still cannot use it, and location and microphone stay off. The browser still asks for permission the first time. No migration.
+
 ## 2.226.0 &mdash; 2026-11-12
 
 ### Added
