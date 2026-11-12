@@ -874,7 +874,11 @@ $router->post('/admin/settings/inventory/{kind}/{id}/delete', function (array $p
 });
 
 $router->get('/inventory/{id}', function (array $p) {
-    Auth::requirePermission('assets.view', 'assets.manage');
+    Auth::requireAuth();
+    if (!Assets::canView()) {
+        // A scanned asset label: without inventory access, report a problem with the device instead.
+        redirect(Assets::newTicketUrl((int) $p['id']));
+    }
     $db = Database::connect();
     $id = (int) $p['id'];
 

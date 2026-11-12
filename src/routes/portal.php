@@ -306,6 +306,7 @@ $router->get('/portal/tickets/create', function () {
         'formLayouts'          => $formLayouts,
         'slaNoticeMap'         => slaNoticeMap($db),
         'preselectedTypeId'    => $preselectedTypeId,
+        'linkAsset'            => Assets::forNewTicket($db, $_GET['asset_id'] ?? old('asset_id')),
         'embedMode'            => $embedMode,
         'tourMode'             => $tourMode,
         'isSharedAccount'      => userIsSharedAccount($db, Auth::id()),
@@ -482,6 +483,11 @@ $router->post('/portal/tickets/create', function () {
     $db->prepare(
         'INSERT INTO ticket_timeline (ticket_id, user_id, action, details) VALUES (?, ?, ?, ?)'
     )->execute([$ticketId, Auth::id(), 'created', 'Ticket created.']);
+
+    // Opened from a scanned asset label.
+    if ($linkAsset = Assets::forNewTicket($db, $_POST['asset_id'] ?? null)) {
+        Assets::link($db, $ticketId, (int) $linkAsset['id'], Auth::id());
+    }
 
     // If the AI dup-check warned the user and they overrode it, record that
     // on the new ticket so admins can see the override happened.

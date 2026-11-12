@@ -85,6 +85,7 @@ endif; ?>
     <div class="card-body p-4">
         <form method="POST" action="/portal/tickets/create" enctype="multipart/form-data" id="portal-ticket-form">
             <?= csrfField() ?>
+            <?php require ROOT_DIR . '/templates/partials/ticket-create-asset.php'; ?>
 
             <div id="ticketDraftNote" class="alert alert-info d-flex align-items-center justify-content-between py-2 px-3 mb-3 small d-none">
                 <span><i class="bi bi-arrow-counterclockwise me-1"></i>Restored your unsent ticket draft.</span>
@@ -211,7 +212,7 @@ endif; ?>
                             <?php foreach ($locations as $loc):
                                 $sel = (old('location_id') != '')
                                     ? (old('location_id') == $loc['id'])
-                                    : ((int) $loc['id'] === (int) $userLocationId);
+                                    : ((int) $loc['id'] === (int) ($linkAsset['location_id'] ?? $userLocationId));
                             ?>
                             <option value="<?= (int) $loc['id'] ?>" <?= $sel ? 'selected' : '' ?>>
                                 <?= e($loc['name']) ?>

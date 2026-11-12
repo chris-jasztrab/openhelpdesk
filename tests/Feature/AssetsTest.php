@@ -200,6 +200,18 @@ class AssetsTest extends TestCase
         $this->assertSame(2, $this->n('SELECT COUNT(*) FROM ticket_asset_map WHERE ticket_id = ?', [$source]), 'source keeps its links');
     }
 
+    public function test_for_new_ticket_accepts_live_asset_ids_only(): void
+    {
+        $id = $this->asset('AT-NEW');
+        $this->assertSame('AT-NEW', Assets::forNewTicket($this->db, (string) $id)['asset_tag']);
+        $this->assertSame('AT Latitude', Assets::forNewTicket($this->db, $id)['model_name']);
+        $this->assertNull(Assets::forNewTicket($this->db, 'abc'));
+        $this->assertNull(Assets::forNewTicket($this->db, ['1']));
+        $this->assertNull(Assets::forNewTicket($this->db, null));
+        $this->db->prepare('UPDATE assets SET deleted_at = NOW() WHERE id = ?')->execute([$id]);
+        $this->assertNull(Assets::forNewTicket($this->db, $id), 'deleted assets are never linked');
+    }
+
     public function test_history_keeps_imported_actor_and_timestamp(): void
     {
         $asset = $this->asset('AT-HIST');

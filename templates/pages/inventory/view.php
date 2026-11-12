@@ -46,6 +46,9 @@ $money = static fn($v): string => $v !== null && $v !== '' ? '$' . number_format
                 </div>
             </div>
             <div class="text-muted small text-lg-end">
+                <?php if (!$asset['deleted_at']): ?>
+                <a href="<?= e(Assets::newTicketUrl((int) $asset['id'])) ?>" class="btn btn-sm btn-outline-secondary mb-2" id="assetNewTicket"><i class="bi bi-plus-lg me-1"></i>New ticket</a>
+                <?php endif; ?>
                 <?php if ($asset['serial']): ?><div>Serial <span class="font-monospace text-dark"><?= e($asset['serial']) ?></span></div><?php endif; ?>
                 <?php if ($asset['snipeit_id']): ?><div>Snipe-IT #<?= (int) $asset['snipeit_id'] ?></div><?php endif; ?>
             </div>

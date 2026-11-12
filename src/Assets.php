@@ -185,6 +185,32 @@ class Assets
         return Auth::can('assets.manage');
     }
 
+    /**
+     * The device a New Ticket form was opened for: ?asset_id= from the asset
+     * page or a scanned label, then the form's hidden field. Live assets only.
+     * Carries tag + model only — the form also serves portal users.
+     */
+    public static function forNewTicket(PDO $db, mixed $raw): ?array
+    {
+        $id = is_scalar($raw) && ctype_digit((string) $raw) ? (int) $raw : 0;
+        if ($id <= 0) {
+            return null;
+        }
+        $s = $db->prepare(
+            'SELECT a.id, a.asset_tag, a.location_id, m.name AS model_name
+             FROM assets a JOIN asset_models m ON m.id = a.model_id WHERE a.id = ? AND a.deleted_at IS NULL'
+        );
+        $s->execute([$id]);
+        return $s->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    /** New Ticket for this asset: the staff form for staff, the portal form for everyone else. */
+    public static function newTicketUrl(int $assetId): string
+    {
+        $base = Auth::isAdmin() ? '/admin' : (Auth::isStaff() ? '/agent' : '/portal');
+        return $base . '/tickets/create?asset_id=' . $assetId;
+    }
+
     /** Image types accepted for asset photos (never SVG — it can carry scripts). */
     public const IMAGE_TYPES = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif', 'image/webp' => 'webp'];
 

@@ -4585,6 +4585,7 @@ $router->get('/admin/tickets/create', function () {
         'groupMembers'  => $groupMembers,
         'templates'     => $templates,
         'isAgent'       => false,
+        'linkAsset'     => Assets::forNewTicket($db, $_GET['asset_id'] ?? old('asset_id')),
         'customFields'  => $customFields,
         'fieldOptions'  => $fieldOptions,
         'formLayouts'   => $formLayouts,
@@ -4791,6 +4792,11 @@ $router->post('/admin/tickets/create', function () {
     $db->prepare(
         'INSERT INTO ticket_timeline (ticket_id, user_id, action, details) VALUES (?, ?, ?, ?)'
     )->execute([$ticketId, Auth::id(), 'created', $timelineDetails]);
+
+    // Opened from an asset page or a scanned label.
+    if ($linkAsset = Assets::forNewTicket($db, $_POST['asset_id'] ?? null)) {
+        Assets::link($db, $ticketId, (int) $linkAsset['id'], Auth::id());
+    }
 
     // If the AI dup-check warned the agent and they overrode it, audit that.
     $dupOverrideCsv = (string) ($_POST['_dup_matched_ids'] ?? '');

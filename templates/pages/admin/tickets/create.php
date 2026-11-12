@@ -75,6 +75,7 @@ $statusOptions = ticketStatusLabelMap();
               enctype="multipart/form-data">
             <?= csrfField() ?>
             <input type="hidden" id="dup_matched_ids" name="_dup_matched_ids" value="">
+            <?php require ROOT_DIR . '/templates/partials/ticket-create-asset.php'; ?>
 
             <div id="ticketDraftNote" class="alert alert-info d-flex align-items-center justify-content-between py-2 px-3 mb-3 small d-none">
                 <span><i class="bi bi-arrow-counterclockwise me-1"></i>Restored your unsent ticket draft.</span>
@@ -200,7 +201,7 @@ $statusOptions = ticketStatusLabelMap();
                                 <option value="">— Select —</option>
                                 <?php foreach ($locations as $loc): ?>
                                     <option value="<?= $loc['id'] ?>"
-                                        <?= old('location_id', '') == $loc['id'] ? 'selected' : '' ?>>
+                                        <?= old('location_id', (string) ($linkAsset['location_id'] ?? '')) == $loc['id'] ? 'selected' : '' ?>>
                                         <?= e($loc['name']) ?>
                                     </option>
                                 <?php endforeach; ?>

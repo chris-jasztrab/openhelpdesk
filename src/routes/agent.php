@@ -1134,6 +1134,7 @@ $router->get('/agent/tickets/create', function () {
         'templates'     => $templates,
         'isAgent'       => true,
         'formAction'    => '/admin/tickets/create',
+        'linkAsset'     => Assets::forNewTicket($db, $_GET['asset_id'] ?? old('asset_id')),
         'customFields'  => $customFields,
         'fieldOptions'  => $fieldOptions,
         'formLayouts'   => $formLayouts,

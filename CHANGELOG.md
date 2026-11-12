@@ -11,6 +11,12 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.227.0 &mdash; 2026-11-12
+
+### Added
+- **New ticket from an asset.** An asset's page now has a **New ticket** button. It opens the New Ticket form with a note saying which device the ticket will be linked to, and the location already set to where the device is; the device is linked as soon as the ticket is created, so it appears in the ticket's **Assets** card and on the device's **Tickets** tab.
+- **Scanning an asset label reports a problem with that device.** Anyone who scans an asset label (or opens an asset link) without access to the inventory used to get an access error. They now land on the New Ticket form for that device instead — portal users on the portal form, staff on the staff form — showing only the device's tag and model. Old Snipe-IT labels work the same way. People who can see the inventory still get the asset page. No migration.
+
 ## 2.226.2 &mdash; 2026-11-12
 
 ### Fixed
