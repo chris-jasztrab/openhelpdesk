@@ -184,7 +184,7 @@ $router->post('/admin/settings/domains/{id}/hosts', function (array $p) {
     $back = '/admin/settings/domains/' . $id;
     _domainCsrfOrBack($back);
     $db = Database::connect();
-    $st = $db->prepare('SELECT name, ignored_hosts FROM domains WHERE id = ?');
+    $st = $db->prepare('SELECT name, ignored_hosts, internal_hosts FROM domains WHERE id = ?');
     $st->execute([$id]);
     $row = $st->fetch(PDO::FETCH_ASSOC);
     if (!$row) {
@@ -195,14 +195,23 @@ $router->post('/admin/settings/domains/{id}/hosts', function (array $p) {
         flash('error', 'That is not a host under ' . $row['name'] . '.');
         redirect($back);
     }
-    $before = Domains::splitList($row['ignored_hosts']);
-    $ignore = ($_POST['action'] ?? '') === 'ignore';
-    $after  = $ignore ? array_values(array_unique([...$before, $host])) : array_values(array_diff($before, [$host]));
+    // ignore / restore edit the ignored list; internal / public edit the internal-DNS-first list.
+    $action = (string) ($_POST['action'] ?? '');
+    $col    = in_array($action, ['internal', 'public'], true) ? 'internal_hosts' : 'ignored_hosts';
+    $add    = in_array($action, ['ignore', 'internal'], true);
+    $before = Domains::splitList($row[$col]);
+    $after  = $add ? array_values(array_unique([...$before, $host])) : array_values(array_diff($before, [$host]));
     sort($after);
-    $db->prepare('UPDATE domains SET ignored_hosts = ? WHERE id = ?')->execute([implode("\n", $after) ?: null, $id]);
-    logAuditChange('domains.hosts_ignored_changed', $id, 'domain', ['ignored_hosts' => implode(', ', $before)], ['ignored_hosts' => implode(', ', $after)]);
-    flash('success', $ignore ? "{$host} is now ignored. It is listed under Ignored hosts." : "{$host} restored.");
-    redirect($back . ($ignore ? '' : '?ignored=1') . '#hosts');
+    $db->prepare("UPDATE domains SET {$col} = ? WHERE id = ?")->execute([implode("\n", $after) ?: null, $id]);
+    logAuditChange($col === 'ignored_hosts' ? 'domains.hosts_ignored_changed' : 'domains.hosts_internal_changed', $id, 'domain', [$col => implode(', ', $before)], [$col => implode(', ', $after)]);
+    if ($col === 'internal_hosts') {
+        set_time_limit(60);
+        Domains::recheckHost($db, $id, $host, $add);
+        flash('success', $add ? "{$host} is now checked through internal DNS first, and was re-checked." : "{$host} is now checked at its public address first, and was re-checked.");
+        redirect($back . '#hosts');
+    }
+    flash('success', $add ? "{$host} is now ignored. It is listed under Ignored hosts." : "{$host} restored.");
+    redirect($back . ($add ? '' : '?ignored=1') . '#hosts');
 });
 
 $router->post('/admin/settings/domains/{id}/delete', function (array $p) {

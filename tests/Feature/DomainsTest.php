@@ -105,4 +105,11 @@ class DomainsTest extends TestCase
         $this->assertSame(['google123.example.ca'], array_column($ignored, 'host'));
         $this->assertCount(3, Domains::splitHosts($hosts, null)[0], 'nothing ignored by default');
     }
+
+    public function test_certificate_targets_public_first_unless_internal_is_set(): void
+    {
+        $this->assertSame(['203.0.113.5', 'www.example.ca'], Domains::certTargets('www.example.ca', ['203.0.113.5', '203.0.113.6']));
+        $this->assertSame(['www.example.ca', '203.0.113.5'], Domains::certTargets('www.example.ca', ['203.0.113.5'], true));
+        $this->assertSame(['intranet.example.ca'], Domains::certTargets('intranet.example.ca', [], true), 'no public address: internal DNS is the only try');
+    }
 }

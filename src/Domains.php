@@ -474,15 +474,28 @@ final class Domains
     }
 
     /**
-     * The certificate served on :443 for $host. Tries the public address first
-     * (so split-horizon DNS can't hand us an internal server), then the name as
-     * this server resolves it.
+     * Where to read $host's certificate, in order: its first public address,
+     * then the name as this server resolves it. $internalFirst reverses that,
+     * for a split-horizon name whose public address reaches the wrong box from inside.
+     *
+     * @param list<string> $ips public A records for the host
+     * @return list<string>
+     */
+    public static function certTargets(string $host, array $ips, bool $internalFirst = false): array
+    {
+        $t = array_merge(array_slice($ips, 0, 1), [$host]);
+        return $internalFirst ? array_reverse($t) : $t;
+    }
+
+    /**
+     * The certificate served on :443 for $host, from the first of certTargets()
+     * that answers.
      *
      * @param list<string> $ips public A records for the host
      */
-    public static function certificate(string $host, array $ips = [], ?array $reachable = null): array
+    public static function certificate(string $host, array $ips = [], ?array $reachable = null, bool $internalFirst = false): array
     {
-        foreach (array_merge(array_slice($ips, 0, 1), [$host]) as $target) {
+        foreach (self::certTargets($host, $ips, $internalFirst) as $target) {
             if ($reachable !== null && !isset($reachable[$target])) {
                 continue; // already known not to answer on 443 — don't wait out a timeout per host
             }
@@ -684,9 +697,10 @@ final class Domains
             }
         }
         $reachable   = self::reachable($targets);
+        $internal    = array_flip(self::splitList($row['internal_hosts'] ?? ''));
         $hostResults = [];
         foreach ($hosts as $h) {
-            $hostResults[] = ['host' => $h, 'ips' => $hostIps[$h], 'cert' => self::certificate($h, $hostIps[$h], $reachable)];
+            $hostResults[] = ['host' => $h, 'ips' => $hostIps[$h], 'cert' => self::certificate($h, $hostIps[$h], $reachable, isset($internal[$h]))];
         }
 
         return [
@@ -725,6 +739,24 @@ final class Domains
             $id,
         ]);
         return true;
+    }
+
+    /** Re-read one host's certificate into the stored check, so a per-host setting shows without a full re-check. */
+    public static function recheckHost(PDO $db, int $id, string $host, bool $internalFirst): void
+    {
+        $st = $db->prepare('SELECT check_data FROM domains WHERE id = ?');
+        $st->execute([$id]);
+        $data = json_decode((string) $st->fetchColumn(), true);
+        if (!is_array($data)) {
+            return;
+        }
+        foreach ($data['hosts'] ?? [] as $i => $h) {
+            if ($h['host'] === $host) {
+                $data['hosts'][$i]['cert'] = self::certificate($host, $h['ips'], null, $internalFirst);
+            }
+        }
+        $db->prepare('UPDATE domains SET check_data = ? WHERE id = ?')
+           ->execute([json_encode($data, JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES), $id]);
     }
 
     /* ───────────────────────── Expiry alerts ───────────────────────── */

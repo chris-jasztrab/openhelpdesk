@@ -22,6 +22,7 @@ $recStyle = 'word-break:break-all;white-space:pre-wrap;';
 foreach (array_diff(Domains::splitList($domain['ignored_hosts'] ?? null), array_column($ignoredHosts, 'host')) as $_gone) {
     $ignoredHosts[] = ['host' => $_gone, 'ips' => [], 'cert' => []];
 }
+$internalFirst = array_flip(Domains::splitList($domain['internal_hosts'] ?? null));
 ?>
 <div class="mb-4">
     <h2 class="fw-bold mb-0">Settings</h2>
@@ -135,14 +136,15 @@ foreach (array_diff(Domains::splitList($domain['ignored_hosts'] ?? null), array_
     <div class="card-header bg-white py-3"><h5 class="mb-0 fw-semibold"><i class="bi bi-shield-lock me-2" aria-hidden="true"></i>Hosts and SSL certificates <span class="badge bg-secondary-subtle text-secondary-emphasis border"><?= count($shownHosts) ?></span></h5></div>
     <div class="table-responsive">
         <table class="table align-middle mb-0" data-no-resize>
-            <thead class="table-light"><tr><th aria-label="Ignore"></th><th>Host</th><th>Address</th><th>SSL</th><th>Issued by</th><th>Issued to</th><th>Expires</th></tr></thead>
+            <thead class="table-light"><tr><th aria-label="Host settings"></th><th>Host</th><th>Address</th><th>SSL</th><th>Issued by</th><th>Issued to</th><th>Expires</th></tr></thead>
             <tbody>
             <?php if (!$shownHosts): ?>
                 <tr><td colspan="7" class="text-center text-muted py-4">Every host is ignored. Restore one from the list below.</td></tr>
             <?php endif; ?>
-            <?php foreach ($shownHosts as $h): $c = $h['cert']; [$label, $st] = Domains::certStatus($c, $alertDays); ?>
+            <?php foreach ($shownHosts as $h): $c = $h['cert']; [$label, $st] = Domains::certStatus($c, $alertDays); $int = isset($internalFirst[$h['host']]); ?>
                 <tr>
                     <td style="width:1%;">
+                        <div class="d-flex gap-1">
                         <form method="POST" action="/admin/settings/domains/<?= $id ?>/hosts" class="d-inline">
                             <?= csrfField() ?>
                             <input type="hidden" name="host" value="<?= e($h['host']) ?>">
@@ -151,12 +153,26 @@ foreach (array_diff(Domains::splitList($domain['ignored_hosts'] ?? null), array_
                                 <i class="bi bi-eye-slash" aria-hidden="true"></i> Ignore
                             </button>
                         </form>
+                        <form method="POST" action="/admin/settings/domains/<?= $id ?>/hosts" class="d-inline">
+                            <?= csrfField() ?>
+                            <input type="hidden" name="host" value="<?= e($h['host']) ?>">
+                            <input type="hidden" name="action" value="<?= $int ? 'public' : 'internal' ?>">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary text-nowrap<?= $int ? ' active' : '' ?>" aria-pressed="<?= $int ? 'true' : 'false' ?>"
+                                    title="<?= $int
+                                        ? 'On: ' . e($h['host']) . ' is read through this server\'s own DNS first. Click to read its public address first again.'
+                                        : 'Off: ' . e($h['host']) . ' is read at its public address first. Click to read it through this server\'s own DNS first, for a name that exists both inside and outside the network.' ?>">
+                                <i class="bi bi-hdd-network" aria-hidden="true"></i> Internal DNS
+                            </button>
+                        </form>
+                        </div>
                     </td>
                     <td class="text-nowrap font-monospace"><?= e($h['host']) ?></td>
                     <td class="small"><?= $h['ips'] ? e(implode(', ', $h['ips'])) : '<span class="text-muted">No public address</span>' ?></td>
                     <td class="text-nowrap">
                         <?= $badge($st, $label) ?>
-                        <?php if (!empty($c['internal'])): ?><span class="badge bg-light text-dark border" title="The public address did not answer from this server, so this certificate was read through internal DNS. It may be a different server than the internet reaches.">internal view</span><?php endif; ?>
+                        <?php if (!empty($c['internal'])): ?><span class="badge bg-light text-dark border" title="<?= $int
+                            ? 'Read through internal DNS, as set for this host. The internet may reach a different server.'
+                            : 'The public address did not answer from this server, so this certificate was read through internal DNS. It may be a different server than the internet reaches.' ?>">internal view</span><?php endif; ?>
                     </td>
                     <?php if (!empty($c['found'])): ?>
                     <td><?= e($c['issuer']) ?></td>

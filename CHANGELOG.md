@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.228.0 &mdash; 2026-11-12
+
+### Added
+- **Check a host through internal DNS first.** On **Settings → Domains → (domain)**, each row of **Hosts and SSL certificates** has an **Internal DNS** toggle next to **Ignore**. The SSL check normally reads a host's certificate from its public address and only falls back to this server's own DNS when the public address does not answer. For a name that exists both inside and outside the network, the public address can reach the wrong box from inside (often the firewall), so the row showed *Wrong name* or the firewall's certificate. With the toggle on, the host is read through internal DNS first and the public address becomes the fallback. Turning it on or off re-checks that one host straight away; the setting is kept for every later check and expiry alert.
+
 ## 2.227.0 &mdash; 2026-11-12
 
 ### Added
