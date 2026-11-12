@@ -17,6 +17,19 @@ $statusLabels = ticketStatusLabelMap();
     </div>
 </div>
 
+<?php if (Auth::isAdmin() && ($_domainAlerts = Domains::alerts(Database::connect()))): ?>
+<div class="alert alert-warning border-0 shadow-sm d-flex align-items-center flex-wrap gap-2" role="alert">
+    <i class="bi bi-globe2" aria-hidden="true"></i>
+    <span>
+        <strong><?= count($_domainAlerts) ?> domain or certificate expir<?= count($_domainAlerts) === 1 ? 'y' : 'ies' ?></strong>
+        within <?= Domains::alertDays() ?> days. Soonest: <?= e($_domainAlerts[0]['label']) ?>
+        (<?= $_domainAlerts[0]['kind'] === 'domain' ? 'registration' : 'SSL certificate' ?>,
+        <?= $_domainAlerts[0]['days_left'] <= 0 ? 'expired' : (int) $_domainAlerts[0]['days_left'] . ' day' . ($_domainAlerts[0]['days_left'] === 1 ? '' : 's') ?>).
+    </span>
+    <a href="/admin/settings/domains" class="alert-link ms-auto">Review</a>
+</div>
+<?php endif; ?>
+
 <div class="row g-4">
     <div class="col-lg-8">
         <div class="card border-0 shadow-sm">

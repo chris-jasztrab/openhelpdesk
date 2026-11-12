@@ -198,6 +198,22 @@ final class CronJobs
                 'required'         => false,
                 'note'             => 'Only required if you have a Microsoft Graph app secret expiry date configured in Admin → Settings → Email / SMTP.',
             ],
+            'domain-checks' => [
+                'title'            => 'Domain Checks',
+                'icon'             => 'bi-globe2',
+                'description'      => 'Re-checks every tracked domain (registrar and expiry, DNS, SPF/DKIM/DMARC, SSL certificates) and emails all administrators one digest of domains and certificates newly inside the expiry alert window. Each item is mentioned on entering the window, at 7 days, and once expired.',
+                'frequency'        => 'Once daily',
+                'interval_seconds' => 86400,
+                'script'           => 'scripts/process-domain-checks.php',
+                'log_name'         => 'domain-checks.log',
+                'sends_mail'       => true,
+                'self_logs'        => false,
+                'timeout'          => 900,
+                'cron_linux'       => $buildLinux('0 7 * * *', 'scripts/process-domain-checks.php', 'domain-checks.log'),
+                'cron_windows'     => $buildWindows('/SC DAILY /ST 07:00', 'scripts/process-domain-checks.php', 'OpenHelpDesk Domain Checks'),
+                'required'         => false,
+                'note'             => 'Only required if you track domains in Admin → Settings → Domains. Without it, domains are only re-checked when someone presses Re-check.',
+            ],
         ];
 
         // Derive display paths from log_name so there's one source of truth.

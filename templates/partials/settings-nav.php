@@ -65,6 +65,8 @@ $settingsNavGroups = [
     'Security' => [
         ['label' => 'SSO / Microsoft 365', 'url' => '/admin/settings/sso', 'icon' => 'bi-shield-lock',
          'keywords' => 'sso saml oauth login azure entra m365 office365 single sign on'],
+        ['label' => 'Domains', 'url' => '/admin/settings/domains', 'icon' => 'bi-globe2',
+         'keywords' => 'domain dns registrar expiry renewal mx spf dkim dmarc ssl tls certificate cloudflare whois'],
     ],
     'Integrations' => [
         ['label' => 'Microsoft Teams', 'url' => '/admin/settings/teams', 'icon' => 'bi-microsoft-teams',
@@ -151,6 +153,7 @@ $settingsNavPerm = static function (string $url): string {
         '/admin/settings/backup'            => 'import.manage',
         '/admin/settings/danger-zone'       => '@admin',
         '/admin/settings/teams'             => '@admin',
+        '/admin/settings/domains'           => '@admin',
         '/admin/roles'                      => '@admin',
         '/admin/settings'                   => 'settings.manage',
         '/admin/settings/inventory'         => 'assets.manage',

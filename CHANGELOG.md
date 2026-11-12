@@ -11,6 +11,12 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.225.0 &mdash; 2026-11-12
+
+### Added
+- **Domains: track the domains you own, their mail setup and their certificates.** A new admin-only page, **Settings → Domains**, lists each root domain with its registrar and registration expiry (looked up through RDAP, then WHOIS), its MX records, an SPF / DKIM / DMARC verdict with the raw records, and the SSL certificate served by the root and by every host listed under it (issuer, expiry, whether it matches the name and is trusted). DNS is asked of a public resolver (default `1.1.1.1`) so results show what the internet sees rather than the internal DNS view. With an optional read-only Cloudflare API token the whole zone is listed and every host and DKIM selector is found automatically; without one, only the root, the hosts you list and the common DKIM selectors are checked.
+- **Expiry alerts for domains and certificates.** Anything expiring inside the alert window (default 30 days, configurable on the page) is flagged on the Domains page and on the admin dashboard. A new daily **Domain Checks** cron job re-checks every domain and emails all administrators one digest of what has newly entered the window, again at 7 days, and once expired. The job is listed under Settings → Cron Jobs with Dry run / Run now and must be added to the crontab to run. Migration 091 adds the `domains` and `domain_alerts_sent` tables.
+
 ## 2.224.1 &mdash; 2026-11-12
 
 ### Fixed

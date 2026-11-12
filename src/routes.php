@@ -3571,6 +3571,7 @@ $router->get('/agent', function () {
 
 require ROOT_DIR . '/src/routes/agent.php';
 require ROOT_DIR . '/src/routes/inventory.php';
+require ROOT_DIR . '/src/routes/domains.php';
 
 /* ------------------------------------------------------------------
  * Admin area
