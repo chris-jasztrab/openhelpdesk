@@ -36,18 +36,23 @@ $mailDisabled = env('MAIL_ENABLED', 'true') === 'false';
         <?php endif; ?>
     </div>
     <div class="card-body p-0">
-        <form method="POST" action="/admin/settings/email-queue/retry" class="d-flex flex-wrap align-items-center gap-2 p-3 border-bottom bg-light">
+        <form method="POST" action="/admin/settings/email-queue/settings" class="d-flex flex-wrap align-items-center gap-2 p-3 border-bottom bg-light">
             <?= csrfField() ?>
             <label for="mail_queue_retry_minutes" class="small fw-semibold mb-0">Retry failed emails every</label>
             <input type="number" id="mail_queue_retry_minutes" name="mail_queue_retry_minutes" class="form-control form-control-sm"
                    style="width:6rem" min="0" max="1440" value="<?= (int) $retryMinutes ?>">
             <span class="small">minutes</span>
-            <button type="submit" class="btn btn-sm btn-outline-primary">Save</button>
             <span class="small text-muted w-100">
                 Emails that failed to send in the last 3 days are retried automatically; 0 turns this off.
                 Emails held by <code>MAIL_ENABLED=false</code> are never retried.
                 <?php if ($retryMinutes > 0 && $retryLastAt > 0): ?>Last retry: <?= e(date('M j, g:i a', $retryLastAt)) ?>.<?php endif; ?>
             </span>
+            <div class="form-check form-switch w-100 mb-0">
+                <input class="form-check-input" type="checkbox" role="switch" id="mail_queue_delay_notice" name="mail_queue_delay_notice" value="1" <?= $delayNotice ? 'checked' : '' ?>>
+                <label class="form-check-label small fw-semibold" for="mail_queue_delay_notice">Add a "this message was delayed" note to emails sent from the queue</label>
+                <div class="small text-muted">The note sits at the top of the email and says how long it waited in the queue, so the reader knows it may be out of date.</div>
+            </div>
+            <button type="submit" class="btn btn-sm btn-outline-primary">Save</button>
         </form>
         <?php if ($mailDisabled): ?>
         <div class="alert alert-warning rounded-0 border-0 mb-0">

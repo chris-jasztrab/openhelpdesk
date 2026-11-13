@@ -9935,10 +9935,11 @@ $router->get('/admin/settings/email-queue', function () {
         'total'        => $total,
         'retryMinutes' => (int) getSetting('mail_queue_retry_minutes', '30'),
         'retryLastAt'  => (int) getSetting('mail_queue_retry_last_at', '0'),
+        'delayNotice'  => getSetting('mail_queue_delay_notice', '1') === '1',
     ]);
 });
 
-$router->post('/admin/settings/email-queue/retry', function () {
+$router->post('/admin/settings/email-queue/settings', function () {
     Auth::requirePermission('settings.manage');
     if (!verifyCsrf($_POST['_token'] ?? '')) {
         flash('error', 'Invalid request.');
@@ -9949,11 +9950,19 @@ $router->post('/admin/settings/email-queue/retry', function () {
         flash('error', 'Retry interval must be 0 (off) or between 5 and 1440 minutes.');
         redirect('/admin/settings/email-queue');
     }
-    $before = getSetting('mail_queue_retry_minutes', '30');
-    setSetting('mail_queue_retry_minutes', (string) $minutes);
-    logAuditChange('mail_queue.retry_changed', null, null,
-        ['mail_queue_retry_minutes' => $before], ['mail_queue_retry_minutes' => (string) $minutes]);
-    flash('success', $minutes === 0 ? 'Automatic retry is off.' : "Failed emails will be retried every {$minutes} minutes.");
+    $after  = [
+        'mail_queue_retry_minutes' => (string) $minutes,
+        'mail_queue_delay_notice'  => isset($_POST['mail_queue_delay_notice']) ? '1' : '0',
+    ];
+    $before = [
+        'mail_queue_retry_minutes' => getSetting('mail_queue_retry_minutes', '30'),
+        'mail_queue_delay_notice'  => getSetting('mail_queue_delay_notice', '1'),
+    ];
+    foreach ($after as $key => $value) {
+        setSetting($key, $value);
+    }
+    logAuditChange('mail_queue.settings_changed', null, null, $before, $after);
+    flash('success', 'Email queue settings saved.');
     redirect('/admin/settings/email-queue');
 });
 

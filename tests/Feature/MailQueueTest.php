@@ -64,4 +64,23 @@ class MailQueueTest extends TestCase
 
         $this->assertSame(['fresh', 'tried twice'], array_column($mine, 'subject'));
     }
+
+    public function testDelayNoticeSaysHowLongTheEmailWaited(): void
+    {
+        [$html, $text] = mailQueueDelayNotice([
+            'html_body'      => '<html><body style="margin:0"><p>hi</p></body></html>',
+            'text_body'      => 'hi',
+            'queued_minutes' => 135,
+            'created_at'     => '2026-11-12 14:14:00',
+        ]);
+
+        $this->assertStringContainsString('waited 2 hours 15 minutes in the email queue (queued Nov 12 at 2:14 pm)', $text);
+        $this->assertStringEndsWith("\n\nhi", $text);
+        // The note goes right after <body>, before the original content.
+        $this->assertMatchesRegularExpression('#^<html><body style="margin:0"><table.*was delayed.*</table><p>hi</p>#s', $html);
+        // Multi-day waits read in days, and a body with no <body> tag still gets the note.
+        [$html2, $text2] = mailQueueDelayNotice(['html_body' => '<p>x</p>', 'text_body' => '', 'queued_minutes' => 4400, 'created_at' => '2026-11-10 08:00:00']);
+        $this->assertStringContainsString('waited 3 days', $text2);
+        $this->assertStringEndsWith('<p>x</p>', $html2);
+    }
 }

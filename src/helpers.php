@@ -4487,22 +4487,26 @@ function mailQueuePush(string $toEmail, string $toName, string $subject, string 
  * an admin presses "Send all now", and the timed retry (mailQueueRetryDue)
  * checks the switch itself. Delivered rows are deleted; failures stay with the
  * error. Stops early once the transport stalls, leaving the rest queued.
+ * Each email gets the "this message was delayed" note unless that is switched
+ * off under Settings → Email Queue.
  *
  * @return array{sent:int, failed:int}
  */
 function mailQueueSendAll(?array $rows = null): array
 {
     $db   = Database::connect();
-    $rows ??= $db->query('SELECT * FROM mail_queue ORDER BY id ASC')->fetchAll(PDO::FETCH_ASSOC);
+    $rows ??= $db->query('SELECT *, TIMESTAMPDIFF(MINUTE, created_at, NOW()) AS queued_minutes FROM mail_queue ORDER BY id ASC')->fetchAll(PDO::FETCH_ASSOC);
     $del  = $db->prepare('DELETE FROM mail_queue WHERE id = ?');
     $fail = $db->prepare('UPDATE mail_queue SET attempts = attempts + 1, last_error = ?, last_attempt_at = NOW() WHERE id = ?');
+    $note = getSetting('mail_queue_delay_notice', '1') === '1';
     $sent = 0;
     $failed = 0;
     foreach ($rows as $row) {
         $attachments = $row['attachments'] ? (json_decode($row['attachments'], true) ?: []) : [];
+        [$html, $text] = $note ? mailQueueDelayNotice($row) : [$row['html_body'], (string) $row['text_body']];
         $r = deliverMail(
-            $row['to_email'], $row['to_name'], $row['subject'], $row['html_body'],
-            (string) $row['text_body'], $row['ticket_id'] !== null ? (int) $row['ticket_id'] : null, $attachments
+            $row['to_email'], $row['to_name'], $row['subject'], $html,
+            $text, $row['ticket_id'] !== null ? (int) $row['ticket_id'] : null, $attachments
         );
         if (!empty($r['skipped'])) {
             break; // the transport stalled on an earlier row; the rest wait for the next run
@@ -4516,6 +4520,35 @@ function mailQueueSendAll(?array $rows = null): array
         }
     }
     return ['sent' => $sent, 'failed' => $failed];
+}
+
+/**
+ * A queued email's bodies with a note on top saying it was delayed and how long
+ * it sat in the queue, so the reader knows how stale it may be. Uses the row's
+ * `queued_minutes` (computed by MySQL, whose clock can differ from PHP's).
+ *
+ * @return array{0:string, 1:string} [html, text]
+ */
+function mailQueueDelayNotice(array $row): array
+{
+    $mins   = max(0, (int) ($row['queued_minutes'] ?? 0));
+    $waited = $mins < 1 ? 'less than a minute' : ($mins >= 2880 ? intdiv($mins, 1440) . ' days' : formatSlaDuration($mins));
+    $queued = date('M j \a\t g:i a', strtotime((string) $row['created_at']));
+    $url    = rtrim((string) env('APP_URL', ''), '/');
+    $lead   = "This message was delayed. It waited {$waited} in the email queue (queued {$queued}) and may be out of date.";
+    $tail   = 'to get the most up to date information on your tickets.';
+
+    $link   = $url !== '' ? '<a href="' . e($url) . '/login" style="color:#78350f; font-weight:bold;">HelpDesk</a>' : 'HelpDesk';
+    $banner = '<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f1f5f9; padding:24px 0 0;"><tr><td align="center">'
+            . '<table width="600" cellpadding="0" cellspacing="0"><tr><td style="background:#fef3c7; border:1px solid #f59e0b; border-radius:8px; padding:14px 18px; font-family:Arial,Helvetica,sans-serif; font-size:14px; line-height:1.5; color:#78350f;">'
+            . '<strong>' . e($lead) . '</strong> Please login to the ' . $link . ' ' . e($tail)
+            . '</td></tr></table></td></tr></table>';
+    $html = preg_replace_callback('/<body[^>]*>/i', fn ($m) => $m[0] . $banner, $row['html_body'], 1, $n);
+    if ($n === 0) {
+        $html = $banner . $row['html_body'];
+    }
+    $text = $lead . ' Please login to the HelpDesk' . ($url !== '' ? " ({$url})" : '') . ' ' . $tail . "\n\n" . (string) $row['text_body'];
+    return [$html, $text];
 }
 
 /**
@@ -4555,7 +4588,7 @@ function deliverMail(string $toEmail, string $toName, string $subject, string $h
 function mailQueueRetryRows(PDO $db): array
 {
     return $db->query(
-        "SELECT * FROM mail_queue
+        "SELECT *, TIMESTAMPDIFF(MINUTE, created_at, NOW()) AS queued_minutes FROM mail_queue
           WHERE reason <> 'MAIL_ENABLED=false' AND created_at >= NOW() - INTERVAL 3 DAY
           ORDER BY attempts, id"
     )->fetchAll(PDO::FETCH_ASSOC);

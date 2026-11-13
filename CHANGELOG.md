@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.232.0 &mdash; 2026-11-13
+
+### Added
+- **Emails sent late from the queue say so.** Every email sent from the Email Queue, by **Send all now** or the automatic retry, now starts with a yellow note: *"This message was delayed. It waited 2 hours 15 minutes in the email queue (queued Nov 12 at 2:14 pm) and may be out of date. Please login to the HelpDesk to get the most up to date information on your tickets."* Waits of two days or more read in days. The plain-text version carries the same note. Turn it off with the new switch at the top of **Settings → Email Queue**; it is on by default. The retry interval and the switch now save together with one **Save** button.
+
 ## 2.231.0 &mdash; 2026-11-13
 
 ### Added

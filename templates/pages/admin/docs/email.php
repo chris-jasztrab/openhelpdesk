@@ -105,6 +105,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
 <ul class="text-muted mb-2">
     <li><strong>Send all now</strong> tries to deliver everything in the queue (even while <code>MAIL_ENABLED=false</code>, after you confirm). Sent messages leave the queue; failures stay.</li>
     <li><strong>Flush queue</strong> deletes every held message without sending it.</li>
+    <li>Every email sent from the queue, by <strong>Send all now</strong> or the automatic retry, gets a note at the top saying it was delayed and how long it waited in the queue, so the reader knows it may be out of date. Turn the note off with the switch at the top of the Email Queue page.</li>
 </ul>
 <div class="alert alert-warning small mb-0"><i class="bi bi-exclamation-triangle me-2"></i>
     Emails that failed to send (for example during a Microsoft outage) are retried automatically every 30 minutes for 3 days; change the interval, or set it to 0 to turn retries off, at the top of the Email Queue page. Mail held by <code>MAIL_ENABLED=false</code> is never retried, so turning it back on never sends that backlog by itself. Review the queue before pressing <strong>Send all now</strong>: a backlog can hold weeks of stale notifications.
