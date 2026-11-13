@@ -1,0 +1,6 @@
+Asset Tag,Name,Serial,Model,Model No.,Category,Manufacturer,Status,Location,Supplier,Order Number,Purchase Date,Cost,Warranty (months),EOL,Notes
+,CIRC-DESK-01,PF4ABC12,ThinkPad T14 Gen 5,21ML,Laptops,Lenovo,Ready to Deploy,Main Library,CDW,PO-2026-0412,2026-03-15,1489.00,36,2031-03-15,Blank Asset Tag = the next automatic tag
+,CIRC-DESK-02,PF4ABC13,ThinkPad T14 Gen 5,21ML,Laptops,Lenovo,Ready to Deploy,Main Library,CDW,PO-2026-0412,2026-03-15,1489.00,36,2031-03-15,
+01250,REF-PC-03,7XK2P94,OptiPlex 7020 Micro,D15U,Desktops,Dell,Ready to Deploy,East Branch,Dell Canada,PO-2026-0398,2026-02-02,1120.50,48,,"Tag typed in, so this exact tag is used"
+,,CN0A1B2C3D,P2425H,P2425H,Monitors,Dell,Ready to Deploy,East Branch,Dell Canada,PO-2026-0398,2026-02-02,249.99,36,,Only Model is required; leave any other cell blank
+,SELF-CHECK-2,SC88213,SelfCheck 1000,,Kiosks,Bibliotheca,Out for Repair,Main Library,,,2022-09-01,,,,A model not in the catalog is created under its Category

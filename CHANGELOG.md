@@ -11,6 +11,17 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.238.0 &mdash; 2026-11-13
+
+### Added
+- **Import assets from a CSV file.** A new **Import** button on the Inventory page adds many assets at once, in three steps like Import Users:
+  1. **Upload.** Any column names work. The page explains every column and offers an example file (`import-assets-sample.csv`) to fill in.
+  2. **Match columns.** Each field shows the column from your file it was matched to and the first values in it; change any that were missed or matched wrongly. Columns nothing uses are listed so none is overlooked. The inventory list's own CSV export matches automatically.
+  3. **Preview.** Counts of assets to create, update, skip and leave out, the models and suppliers the import would add to the catalog, and every row with a problem or warning by line number — before anything is saved.
+- **How rows are handled.** Only *Model* is required; it is matched by name or model number, and a model not in the catalog is created when the row has a Category (plus its Manufacturer, if given). A blank asset tag gets the next automatic tag. Status and location are matched by name — an unknown status falls back to a default you choose, an unknown location is left blank and flagged. Dates in any common form are accepted, `$` and commas in costs are ignored, and a serial number already on another asset is flagged. New suppliers are created. Nothing is checked out by an import.
+- **Update existing assets from a file.** On the matching step, choose what happens when a row's asset tag already exists: skip the row (the default), or update that asset with the row's non-blank cells. Export the list as CSV, fill in the missing purchase dates or serials, and import it back — each change lands in the asset's History, and a blank cell never erases anything.
+- The import runs as one transaction: if any row fails, nothing is changed. Up to 5,000 rows per file. Needs *Manage assets*.
+
 ## 2.237.0 &mdash; 2026-11-13
 
 ### Added

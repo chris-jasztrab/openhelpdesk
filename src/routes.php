@@ -3571,6 +3571,7 @@ $router->get('/agent', function () {
 
 require ROOT_DIR . '/src/routes/agent.php';
 require ROOT_DIR . '/src/routes/inventory-reports.php'; // before inventory.php: its /inventory/{id} would take "reports"
+require ROOT_DIR . '/src/routes/inventory-import.php';  // likewise for "import"
 require ROOT_DIR . '/src/routes/inventory.php';
 require ROOT_DIR . '/src/routes/domains.php';
 

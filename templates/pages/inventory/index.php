@@ -52,6 +52,7 @@ $th = static fn(string $col, string $text): string =>
                 title="Change the model, status, <?= e(strtolower(label('location.singular'))) ?> or purchase details of the ticked assets, or of the whole filtered list"><i class="bi bi-pencil-square me-1"></i>Edit<?= $bulkBase > 0 ? ' (' . number_format($bulkBase) . ' filtered)' : '' ?></button>
         <?php endif; ?>
         <a href="/inventory/audit" class="btn btn-sm btn-outline-secondary" title="Scan tags to record a physical inventory"><i class="bi bi-upc-scan me-1"></i>Audit mode</a>
+        <a href="/inventory/import" class="btn btn-sm btn-outline-secondary" title="Add or update many assets from a CSV file"><i class="bi bi-upload me-1"></i>Import</a>
         <a href="/inventory/create" class="btn btn-sm text-white" style="background:var(--ld-primary);"><i class="bi bi-plus-lg me-1"></i>Add asset</a>
         <?php endif; ?>
     </div>
