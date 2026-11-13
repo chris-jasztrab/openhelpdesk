@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.237.0 &mdash; 2026-11-13
+
+### Added
+- **Bulk edit from the inventory list.** A new **Edit** button next to Labels changes many assets at once: tick assets and it reads "Edit (n ticked)"; with nothing ticked and a filter on it reads "Edit (N filtered)" and covers the whole filtered list, every page. Set any of model, status, location, default location, supplier, order number, purchase date, purchase cost, warranty months, end-of-life date or next audit date — only the boxes you fill in are changed, blank ones stay as they are on each asset. Each changed asset gets its own History entry showing old and new values. At most 2,000 assets per edit; deleted assets are never touched. Needs *Manage assets*. (Manufacturer and category belong to the model, so those are still changed under Settings › Inventory › Models.)
+
 ## 2.236.0 &mdash; 2026-11-13
 
 ### Added

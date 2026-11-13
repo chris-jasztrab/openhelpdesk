@@ -254,6 +254,35 @@ class Assets
     }
 
     /**
+     * Set the same column values on many live assets (the list's bulk edit and
+     * the CSV import's "update existing"). Each asset that actually changes
+     * gets its own 'update' history row with the diff. Returns how many changed.
+     * $set is trusted column => value; callers validate it.
+     */
+    public static function bulkUpdate(PDO $db, array $ids, array $set, ?int $userId): int
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
+        if ($ids === [] || $set === []) {
+            return 0;
+        }
+        $rows = $db->prepare('SELECT * FROM assets WHERE deleted_at IS NULL AND id IN (' . implode(',', array_fill(0, count($ids), '?')) . ')');
+        $rows->execute($ids);
+        $n = 0;
+        foreach ($rows->fetchAll(PDO::FETCH_ASSOC) as $before) {
+            $changes = self::changes($before, $set, array_keys($set));
+            if ($changes === []) {
+                continue;
+            }
+            $cols = array_keys($changes);
+            $db->prepare('UPDATE assets SET ' . implode(', ', array_map(static fn(string $c): string => "`$c` = ?", $cols)) . ' WHERE id = ?')
+               ->execute([...array_map(static fn(string $c) => $set[$c], $cols), (int) $before['id']]);
+            self::logHistory($db, (int) $before['id'], 'update', ['changes' => $changes], $userId);
+            $n++;
+        }
+        return $n;
+    }
+
+    /**
      * Check an asset out to a user, location or another asset. $key is the
      * user/location id, or the asset tag for type "asset". The asset's location
      * follows the target (a user's home location, the location itself, the

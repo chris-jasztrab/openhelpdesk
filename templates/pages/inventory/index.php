@@ -46,6 +46,11 @@ $th = static fn(string $col, string $text): string =>
         <a href="<?= e($labelsUrl) ?>" class="btn btn-sm btn-outline-secondary" id="printLabelsBtn"
            data-base-href="<?= e($labelsUrl) ?>" data-base-text="<?= e($labelsText) ?>"
            title="Print QR code labels — prints the filtered list, or only the ticked assets"><i class="bi bi-qr-code me-1"></i><?= e($labelsText) ?></a>
+        <?php if ($canPick): $bulkBase = $hasFilters ? (int) $total : 0; ?>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="bulkEditBtn" data-bs-toggle="modal" data-bs-target="#bulkModal"
+                data-base-count="<?= $bulkBase ?>" <?= $bulkBase > 0 ? '' : 'disabled' ?>
+                title="Change the model, status, <?= e(strtolower(label('location.singular'))) ?> or purchase details of the ticked assets, or of the whole filtered list"><i class="bi bi-pencil-square me-1"></i>Edit<?= $bulkBase > 0 ? ' (' . number_format($bulkBase) . ' filtered)' : '' ?></button>
+        <?php endif; ?>
         <a href="/inventory/audit" class="btn btn-sm btn-outline-secondary" title="Scan tags to record a physical inventory"><i class="bi bi-upc-scan me-1"></i>Audit mode</a>
         <a href="/inventory/create" class="btn btn-sm text-white" style="background:var(--ld-primary);"><i class="bi bi-plus-lg me-1"></i>Add asset</a>
         <?php endif; ?>
@@ -367,18 +372,78 @@ document.getElementById('coModal').addEventListener('show.bs.modal', function (e
 <?php endif; ?>
 
 <?php if ($canPick): ?>
+<div class="modal fade" id="bulkModal" tabindex="-1" aria-labelledby="bulkModalTitle">
+    <div class="modal-dialog modal-lg">
+        <form method="POST" action="/inventory/bulk-edit<?= $hasFilters ? '?' . e(http_build_query($filterParams)) : '' ?>" class="modal-content">
+            <?= csrfField() ?>
+            <input type="hidden" name="return" value="<?= e($_SERVER['REQUEST_URI'] ?? '/inventory') ?>">
+            <input type="hidden" name="ids" id="bulkIds" value="">
+            <div class="modal-header">
+                <h5 class="modal-title" id="bulkModalTitle">Edit <span id="bulkCount"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small">
+                    Only the boxes you fill in are changed — anything left blank stays as it is on each asset.
+                    Manufacturer and category belong to the model; change those under <a href="/admin/settings/inventory/models">Settings › Inventory › Models</a>.
+                </p>
+                <div class="row g-3">
+                    <?php foreach ([
+                        ['model_id', 'Model', array_map(static fn($m) => [$m['id'], $m['category_name'] . ' — ' . $m['name']], $bulkModels)],
+                        ['status_id', 'Status', array_map(static fn($s) => [$s['id'], $s['name']], $statuses)],
+                        ['location_id', label('location.singular'), array_map(static fn($l) => [$l['id'], $l['name']], $locations)],
+                        ['default_location_id', 'Default ' . strtolower(label('location.singular')), array_map(static fn($l) => [$l['id'], $l['name']], $locations)],
+                        ['supplier_id', 'Supplier', array_map(static fn($s) => [$s['id'], $s['name']], $bulkSuppliers)],
+                    ] as [$name, $text, $opts]): ?>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold mb-1" for="bulk_<?= $name ?>"><?= e($text) ?></label>
+                        <select class="form-select form-select-sm" name="<?= $name ?>" id="bulk_<?= $name ?>">
+                            <option value="">— leave as is —</option>
+                            <?php foreach ($opts as [$v, $t]): ?><option value="<?= (int) $v ?>"><?= e($t) ?></option><?php endforeach; ?>
+                        </select>
+                    </div>
+                    <?php endforeach; ?>
+                    <?php foreach ([
+                        ['order_number', 'Order number', 'text', ''], ['purchase_date', 'Purchase date', 'date', ''],
+                        ['purchase_cost', 'Purchase cost (each)', 'number', 'step="0.01" min="0"'], ['warranty_months', 'Warranty (months)', 'number', 'min="0"'],
+                        ['eol_date', 'End of life date', 'date', ''], ['next_audit_date', 'Next audit date', 'date', ''],
+                    ] as [$name, $text, $type, $attr]): ?>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold mb-1" for="bulk_<?= $name ?>"><?= e($text) ?></label>
+                        <input type="<?= $type ?>" class="form-control form-control-sm" name="<?= $name ?>" id="bulk_<?= $name ?>" <?= $attr ?> placeholder="leave as is">
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn text-white" style="background:var(--ld-primary);"><i class="bi bi-check-lg me-1"></i>Update <span id="bulkCount2"></span></button>
+            </div>
+        </form>
+    </div>
+</div>
 <script>
-/* Tick assets → the Labels button prints just those; none ticked → it prints
-   the whole filtered list (or opens the label chooser when unfiltered). */
+/* Tick assets → the Labels and Edit buttons act on just those; none ticked →
+   they act on the whole filtered list (Labels opens the chooser when unfiltered). */
 (function () {
     var btn = document.getElementById('printLabelsBtn');
     var all = document.getElementById('lblPickAll');
+    var edit = document.getElementById('bulkEditBtn');
     function picks() { return Array.prototype.slice.call(document.querySelectorAll('.lbl-pick:checked')); }
     function update() {
         var p = picks();
         btn.href = p.length ? '/inventory/labels?ids=' + p.map(function (c) { return c.value; }).join(',') : btn.getAttribute('data-base-href');
         btn.innerHTML = '<i class="bi bi-qr-code me-1"></i>' + (p.length ? 'Labels (' + p.length + ' ticked)' : btn.getAttribute('data-base-text'));
+        var base = parseInt(edit.getAttribute('data-base-count'), 10) || 0;
+        var what = p.length ? p.length + ' ticked' : (base ? base.toLocaleString() + ' filtered' : '');
+        edit.disabled = !what;
+        edit.innerHTML = '<i class="bi bi-pencil-square me-1"></i>Edit' + (what ? ' (' + what + ')' : '');
+        document.getElementById('bulkIds').value = p.map(function (c) { return c.value; }).join(',');
+        var n = p.length || base, label = n.toLocaleString() + ' asset' + (n === 1 ? '' : 's');
+        document.getElementById('bulkCount').textContent = label + (p.length ? '' : ' (the whole filtered list)');
+        document.getElementById('bulkCount2').textContent = label;
     }
+    update();
     document.querySelectorAll('.lbl-pick').forEach(function (c) { c.addEventListener('change', update); });
     if (all) {
         all.addEventListener('change', function () {

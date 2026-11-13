@@ -314,6 +314,9 @@ $router->get('/inventory', function () {
         'statuses'     => $db->query('SELECT s.*, (SELECT COUNT(*) FROM assets a WHERE a.status_id = s.id AND a.deleted_at IS NULL) AS n FROM asset_statuses s ORDER BY s.sort_order, s.name')->fetchAll(),
         'locations'    => $db->query('SELECT id, name FROM locations ORDER BY name')->fetchAll(),
         'users'        => Assets::canManage() && !$deleted ? assetCheckoutUsers($db) : [],
+        // Pickers for the bulk-edit modal.
+        'bulkModels'    => Assets::canManage() && !$deleted ? $db->query('SELECT m.id, m.name, c.name AS category_name FROM asset_models m JOIN asset_categories c ON c.id = m.category_id ORDER BY c.name, m.name')->fetchAll() : [],
+        'bulkSuppliers' => Assets::canManage() && !$deleted ? $db->query('SELECT id, name FROM asset_suppliers ORDER BY name')->fetchAll() : [],
         'deletedCount' => (int) $db->query('SELECT COUNT(*) FROM assets WHERE deleted_at IS NOT NULL')->fetchColumn(),
     ]);
 });
@@ -789,6 +792,83 @@ function assetStoreImage(string $field, int $assetId): ?string
     $name = 'asset_' . $assetId . '_' . bin2hex(random_bytes(4)) . '.' . Assets::IMAGE_TYPES[$mime];
     return move_uploaded_file($_FILES[$field]['tmp_name'], $dir . $name) ? $name : null;
 }
+
+/** Columns the list's bulk edit can set => the table that validates an id (null = a plain value). */
+const ASSET_BULK_FIELDS = [
+    'model_id' => 'asset_models', 'status_id' => 'asset_statuses', 'location_id' => 'locations', 'default_location_id' => 'locations',
+    'supplier_id' => 'asset_suppliers', 'order_number' => null, 'purchase_date' => null, 'purchase_cost' => null,
+    'warranty_months' => null, 'eol_date' => null, 'next_audit_date' => null,
+];
+
+/**
+ * Bulk edit from the list: the ticked assets (ids=1,2,3), else everything
+ * matching the list filters carried in the query string. Only the boxes that
+ * were filled in are changed; blank means "leave as is".
+ */
+$router->post('/inventory/bulk-edit', function () {
+    Auth::requirePermission('assets.manage');
+    $db   = Database::connect();
+    $back = (string) ($_POST['return'] ?? '');
+    $back = preg_match('~^/inventory([?#]|$)~', $back) ? $back : '/inventory';
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect($back);
+    }
+    $set = [];
+    foreach (ASSET_BULK_FIELDS as $col => $table) {
+        $v = is_string($_POST[$col] ?? null) ? trim($_POST[$col]) : '';
+        if ($v === '') {
+            continue;
+        }
+        if ($table !== null) {
+            $s = $db->prepare("SELECT id FROM `{$table}` WHERE id = ?");
+            $s->execute([(int) $v]);
+            if ($s->fetchColumn() === false) {
+                flash('error', 'That ' . str_replace('_', ' ', substr($col, 0, -3)) . ' no longer exists.');
+                redirect($back);
+            }
+            $set[$col] = (int) $v;
+        } elseif (str_ends_with($col, '_date')) {
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $v)) {
+                flash('error', 'Dates must be YYYY-MM-DD.');
+                redirect($back);
+            }
+            $set[$col] = $v;
+        } elseif ($col === 'purchase_cost') {
+            $set[$col] = number_format((float) $v, 2, '.', '');
+        } elseif ($col === 'warranty_months') {
+            $set[$col] = max(0, (int) $v);
+        } else {
+            $set[$col] = mb_substr($v, 0, 100);
+        }
+    }
+    if ($set === []) {
+        flash('error', 'Nothing to change — fill in at least one box.');
+        redirect($back);
+    }
+    $ids = array_filter(array_map('intval', explode(',', is_string($_POST['ids'] ?? null) ? $_POST['ids'] : '')));
+    if ($ids === []) {
+        $f = assetListFilters();
+        if ($f['filterParams'] === [] || $f['deleted']) {
+            flash('error', 'Tick the assets to change, or filter the list first.');
+            redirect($back);
+        }
+        $stmt = $db->prepare('SELECT a.id FROM assets a JOIN asset_models m ON m.id = a.model_id JOIN asset_categories c ON c.id = m.category_id
+                              JOIN asset_statuses s ON s.id = a.status_id LEFT JOIN locations l ON l.id = a.location_id' . $f['whereSql']);
+        $stmt->execute($f['params']);
+        $ids = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    }
+    if (count($ids) > 2000) {
+        flash('error', 'That is ' . number_format(count($ids)) . ' assets — bulk edit changes at most 2,000 at a time. Narrow the filter.');
+        redirect($back);
+    }
+    $db->beginTransaction();
+    $n = Assets::bulkUpdate($db, $ids, $set, Auth::id());
+    $db->commit();
+    logAudit('asset.bulk_updated', null, 'asset', 'changed=' . $n . ' of=' . count($ids) . ' fields=' . implode(',', array_keys($set)));
+    flash('success', $n . ' asset' . ($n === 1 ? '' : 's') . ' updated' . ($n < count($ids) ? ' (' . (count($ids) - $n) . ' already had those values)' : '') . '.');
+    redirect($back);
+});
 
 $router->get('/inventory/create', function () {
     Auth::requirePermission('assets.manage');
