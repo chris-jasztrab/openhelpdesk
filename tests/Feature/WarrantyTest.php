@@ -32,6 +32,9 @@ class WarrantyTest extends TestCase
         $this->assertSame('MJ0ABCDE', Warranty::serial('lenovo', '1S20XWS0AB00MJ0ABCDE'), '1S + machine type model + serial');
         $this->assertSame('V5AB1234', Warranty::serial('lenovo', '61B1JAR1USV5AB1234'), 'model + serial without 1S');
         $this->assertNull(Warranty::serial('lenovo', 'N/A'));
+        $this->assertSame('PF4NRA05', Warranty::serial('lenovo', 'PF-4NRA05'), 'typed hyphen');
+        $this->assertSame('VTHM3190', Warranty::serial('lenovo', '1S61A6HAR3USVTHM3190/VTHM3190'), 'scan with a separator');
+        $this->assertSame('BKL1234', Warranty::serial('dell', 'BKL-1234'));
         $this->assertSame('BKL1234', Warranty::serial('dell', 'bkl1234'));
         $this->assertNull(Warranty::serial('dell', 'VN0ABC123456789012345678'), 'a monitor PPID is not a service tag');
         $this->assertNull(Warranty::serial(null, 'MJ0ABCDE'));
@@ -61,6 +64,49 @@ class WarrantyTest extends TestCase
         $this->assertSame(['ok' => true, 'start' => '2022-03-10', 'end' => '2025-03-11', 'service' => 'Next Business Day Onsite'], $r);
         $this->assertFalse(Warranty::parseDell(['serviceTag' => 'X', 'invalid' => true])['ok']);
         $this->assertFalse(Warranty::parseDell(['serviceTag' => 'X', 'entitlements' => []])['ok'], 'no coverage rows = no warranty on record');
+    }
+
+    public function test_scan_ids_cover_lenovo_with_a_serial_and_due_only_skips_fresh_answers(): void
+    {
+        $db = Database::connect();
+        $db->beginTransaction();
+        try {
+            $db->exec("INSERT INTO asset_categories (name) VALUES ('WT Scan')");
+            $cat  = (int) $db->lastInsertId();
+            $mk   = static function (string $mfName) use ($db, $cat): int {
+                $db->prepare('INSERT INTO asset_manufacturers (name) VALUES (?)')->execute([$mfName]);
+                $db->prepare('INSERT INTO asset_models (name, category_id, manufacturer_id) VALUES (?, ?, ?)')->execute([$mfName . ' model', $cat, (int) $db->lastInsertId()]);
+                return (int) $db->lastInsertId();
+            };
+            $lenovo = $mk('WT Lenovo Inc');
+            $hp     = $mk('WT Hewlett');
+            $add    = static function (string $tag, int $model, ?string $serial, ?string $checked = null) use ($db): int {
+                $db->prepare('INSERT INTO assets (asset_tag, model_id, status_id, serial, warranty_checked_at) VALUES (?, ?, (SELECT id FROM asset_statuses ORDER BY id LIMIT 1), ?, ?)')
+                   ->execute([$tag, $model, $serial, $checked]);
+                return (int) $db->lastInsertId();
+            };
+            $never  = $add('WT-S1', $lenovo, 'MJ0AAAA1');
+            $fresh  = $add('WT-S2', $lenovo, 'MJ0AAAA2', date('Y-m-d H:i:s'));
+            $stale  = $add('WT-S3', $lenovo, 'MJ0AAAA3', date('Y-m-d H:i:s', strtotime('-40 days')));
+            $noSer  = $add('WT-S4', $lenovo, null);
+            $other  = $add('WT-S5', $hp, 'CND12345');
+
+            $all = Warranty::scanIds($db, false);
+            $due = Warranty::scanIds($db, true);
+            foreach ([$never, $fresh, $stale] as $id) {
+                $this->assertContains($id, $all);
+            }
+            $this->assertNotContains($noSer, $all, 'no serial, nothing to ask');
+            $this->assertNotContains($other, $all, 'HP has no lookup');
+            $this->assertContains($never, $due);
+            $this->assertContains($stale, $due, 'answered over 30 days ago');
+            $this->assertNotContains($fresh, $due, 'answered today');
+
+            $this->assertSame(['checked' => 0, 'found' => 0, 'failed' => 0, 'stalled' => false], Warranty::refreshIds($db, [$noSer, $other, 0], 1),
+                'ids that are not candidates are ignored without a network call');
+        } finally {
+            $db->rollBack();
+        }
     }
 
     public function test_save_writes_the_asset_and_logs_a_changed_end_date(): void

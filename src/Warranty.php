@@ -42,11 +42,12 @@ final class Warranty
      * The serial the vendor wants, or null when the stored one cannot be one.
      * Lenovo labels are often scanned whole — "1S" + machine type model + the
      * 8-character serial, or the model + serial without "1S" — so anything
-     * longer than 10 characters is cut to its last 8.
+     * longer than 10 characters is cut to its last 8. Neither vendor uses
+     * punctuation, so typed hyphens ("PF-4NRA05") and scan separators go.
      */
     public static function serial(?string $vendor, ?string $raw): ?string
     {
-        $s = strtoupper((string) preg_replace('/\s+/', '', (string) $raw));
+        $s = strtoupper((string) preg_replace('/[^A-Za-z0-9]+/', '', (string) $raw));
         if ($vendor === 'dell') {
             return preg_match('/^[A-Z0-9]{7}$/', $s) ? $s : null;
         }
@@ -100,28 +101,71 @@ final class Warranty
         return $r;
     }
 
+    /** Never looked up, or last answered RECHECK_DAYS+ ago (transient failures never stamp warranty_checked_at). */
+    private const DUE = 'AND (a.warranty_checked_at IS NULL OR a.warranty_checked_at < NOW() - INTERVAL ' . self::RECHECK_DAYS . ' DAY)';
+
+    /** Live Dell/Lenovo assets with a serial (Dell only once a key is saved), narrowed by $where. */
+    private static function candidates(PDO $db, string $where = '', array $params = [], string $tail = ''): array
+    {
+        $vendors = "mf.name LIKE '%lenovo%'" . (self::dellConfigured() ? " OR mf.name LIKE '%dell%'" : '');
+        $s = $db->prepare(
+            "SELECT a.id, a.asset_tag, a.serial, mf.name AS mf FROM assets a
+             JOIN asset_models m ON m.id = a.model_id JOIN asset_manufacturers mf ON mf.id = m.manufacturer_id
+             WHERE a.deleted_at IS NULL AND a.serial IS NOT NULL AND a.serial <> '' AND ($vendors) {$where} {$tail}"
+        );
+        $s->execute($params);
+        return $s->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     /**
-     * The daily run: every live Dell/Lenovo asset never looked up, or last
-     * looked up RECHECK_DAYS+ ago, oldest first, at most $limit. Lenovo is
-     * asked one serial at a time, half a second apart, and the run stops
-     * asking it after three failures in a row (blocked or down).
+     * Asset ids for the Warranty report's "Look up all": every candidate, or
+     * only the due ones. Dell first, so a Lenovo stall cannot hold Dell up.
      *
-     * @return array{checked:int, found:int, failed:int}
+     * @return int[]
+     */
+    public static function scanIds(PDO $db, bool $dueOnly): array
+    {
+        $rows = self::candidates($db, $dueOnly ? self::DUE : '', [], "ORDER BY mf.name LIKE '%dell%' DESC, a.id");
+        return array_map('intval', array_column($rows, 'id'));
+    }
+
+    /**
+     * Look up these assets now — one batch of "Look up all", driven by the
+     * browser so a 300-asset run shows progress and never outlives a request.
+     *
+     * @return array{checked:int, found:int, failed:int, stalled:bool}
+     */
+    public static function refreshIds(PDO $db, array $ids, ?int $userId, ?callable $log = null): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
+        if ($ids === []) {
+            return ['checked' => 0, 'found' => 0, 'failed' => 0, 'stalled' => false];
+        }
+        $rows = self::candidates($db, 'AND a.id IN (' . implode(',', array_fill(0, count($ids), '?')) . ')', $ids, 'ORDER BY a.id');
+        return self::refreshRows($db, $rows, $userId, $log);
+    }
+
+    /**
+     * The daily run: every due candidate, oldest first, at most $limit.
+     *
+     * @return array{checked:int, found:int, failed:int, stalled:bool}
      */
     public static function refreshDue(PDO $db, int $limit, ?callable $log = null): array
     {
-        $vendors = "mf.name LIKE '%lenovo%'" . (self::dellConfigured() ? " OR mf.name LIKE '%dell%'" : '');
-        $rows = $db->query(
-            "SELECT a.id, a.asset_tag, a.serial, mf.name AS mf FROM assets a
-             JOIN asset_models m ON m.id = a.model_id JOIN asset_manufacturers mf ON mf.id = m.manufacturer_id
-             WHERE a.deleted_at IS NULL AND a.serial IS NOT NULL AND a.serial <> '' AND ($vendors)
-               AND (a.warranty_checked_at IS NULL OR a.warranty_checked_at < NOW() - INTERVAL " . self::RECHECK_DAYS . " DAY)
-             ORDER BY a.warranty_checked_at IS NOT NULL, a.warranty_checked_at, a.id LIMIT " . max(1, $limit)
-        )->fetchAll(PDO::FETCH_ASSOC);
+        $rows = self::candidates($db, self::DUE, [], 'ORDER BY a.warranty_checked_at IS NOT NULL, a.warranty_checked_at, a.id LIMIT ' . max(1, $limit));
+        return self::refreshRows($db, $rows, null, $log);
+    }
 
-        $n    = ['checked' => 0, 'found' => 0, 'failed' => 0];
-        $note = static function (array $row, array $r) use ($db, &$n, $log): void {
-            self::save($db, (int) $row['id'], $r);
+    /**
+     * Dell tags go in batches of 100; Lenovo is asked one serial at a time,
+     * half a second apart, and is left alone for the rest of the run after
+     * three failures in a row (blocked or down) — 'stalled' says that happened.
+     */
+    private static function refreshRows(PDO $db, array $rows, ?int $userId, ?callable $log): array
+    {
+        $n    = ['checked' => 0, 'found' => 0, 'failed' => 0, 'stalled' => false];
+        $note = static function (array $row, array $r) use ($db, &$n, $log, $userId): void {
+            self::save($db, (int) $row['id'], $r, $userId);
             $n['checked']++;
             $n[$r['ok'] ? 'found' : 'failed']++;
             if ($log) {
@@ -146,8 +190,11 @@ final class Warranty
             }
             $r = self::lookup($vendor, $row['serial']);
             $lenovoFails = !$r['ok'] && empty($r['final']) ? $lenovoFails + 1 : 0;
-            if ($lenovoFails === 3 && $log) {
-                $log('  Lenovo failed three times in a row; skipping the rest of Lenovo until the next run.');
+            if ($lenovoFails === 3) {
+                $n['stalled'] = true;
+                if ($log) {
+                    $log('  Lenovo failed three times in a row; skipping the rest of Lenovo until the next run.');
+                }
             }
             $note($row, $r);
         }

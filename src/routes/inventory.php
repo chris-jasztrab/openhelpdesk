@@ -30,6 +30,45 @@ function assetSelect(): string
             LEFT JOIN assets pa        ON a.assigned_type = "asset" AND pa.id = a.assigned_id';
 }
 
+/** When an asset was acquired: its purchase date, else the manufacturer's warranty start (few purchase dates came over from Snipe-IT). */
+const ASSET_ACQUIRED = 'COALESCE(a.purchase_date, a.warranty_start)';
+
+/** Age buckets shared by the Age report and the list's age= filter: key => [label, min years, max years or null]. */
+const ASSET_AGE_BUCKETS = [
+    'lt1' => ['Under 1 year', 0, 1], '1-2' => ['1–2 years', 1, 2], '2-3' => ['2–3 years', 2, 3], '3-4' => ['3–4 years', 3, 4],
+    '4-5' => ['4–5 years', 4, 5], '5-7' => ['5–7 years', 5, 7], '7plus' => ['7+ years', 7, null], 'unknown' => ['Unknown', null, null],
+];
+
+/** WHERE fragment for one age bucket (dates bound into $params). */
+function assetAgeWhere(string $key, array &$params): string
+{
+    [, $min, $max] = ASSET_AGE_BUCKETS[$key];
+    if ($key === 'unknown') {
+        return ASSET_ACQUIRED . ' IS NULL';
+    }
+    $sql = [ASSET_ACQUIRED . ($min > 0 ? ' <= ?' : ' IS NOT NULL')];
+    if ($min > 0) {
+        $params[] = date('Y-m-d', strtotime("-{$min} years"));
+    }
+    if ($max !== null) {
+        $sql[]    = ASSET_ACQUIRED . ' > ?';
+        $params[] = date('Y-m-d', strtotime("-{$max} years"));
+    }
+    return '(' . implode(' AND ', $sql) . ')';
+}
+
+/** CASE expression naming each row's age bucket — the same edges as assetAgeWhere(). */
+function assetAgeCase(): string
+{
+    $sql = 'CASE WHEN ' . ASSET_ACQUIRED . " IS NULL THEN 'unknown'";
+    foreach (ASSET_AGE_BUCKETS as $key => [, , $max]) {
+        if ($key !== 'unknown') {
+            $sql .= $max !== null ? ' WHEN ' . ASSET_ACQUIRED . " > '" . date('Y-m-d', strtotime("-{$max} years")) . "' THEN '{$key}'" : " ELSE '{$key}'";
+        }
+    }
+    return $sql . ' END';
+}
+
 $router->get('/inventory', function () {
     Auth::requirePermission('assets.view', 'assets.manage');
     $db = Database::connect();
@@ -50,13 +89,35 @@ $router->get('/inventory', function () {
     if ($auditBefore !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $auditBefore)) {
         $auditBefore = '';
     }
+    $auditAfter = requestScalar('audit_after');
+    if ($auditAfter !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $auditAfter)) {
+        $auditAfter = '';
+    }
+    $audit = in_array(requestScalar('audit'), ['never', 'overdue'], true) ? requestScalar('audit') : '';
     $warranty = requestScalar('warranty');
-    if (!in_array($warranty, ['expired', 'soon', 'active', 'unknown'], true)) {
+    if (!in_array($warranty, ['expired', 'soon', 'active', 'unknown', 'error'], true)) {
         $warranty = '';
     }
+    $wDays    = max(1, min(3650, (int) requestScalar('warranty_days', '90')));
+    $mfFilter = array_values(array_filter(array_map('trim', (array) ($_GET['manufacturer'] ?? []))));
+    $model    = (int) requestScalar('model', '0');
+    $age      = isset(ASSET_AGE_BUCKETS[requestScalar('age')]) ? requestScalar('age') : '';
+    $missing  = in_array(requestScalar('missing'), ['serial', 'purchase_date'], true) ? requestScalar('missing') : '';
 
     $where  = [$deleted ? 'a.deleted_at IS NOT NULL' : 'a.deleted_at IS NULL'];
     $params = [];
+    // Location and manufacturer take ids plus "none" (no location / model without a manufacturer).
+    $idsOrNone = static function (string $col, array $vals) use (&$where, &$params): void {
+        $ids   = array_values(array_filter(array_map('intval', $vals)));
+        $parts = in_array('none', $vals, true) ? ["{$col} IS NULL"] : [];
+        if ($ids !== []) {
+            $parts[] = "{$col} IN (" . implode(',', array_fill(0, count($ids), '?')) . ')';
+            $params  = array_merge($params, $ids);
+        }
+        if ($parts !== []) {
+            $where[] = '(' . implode(' OR ', $parts) . ')';
+        }
+    };
     if ($q !== '') {
         $where[] = '(a.asset_tag LIKE ? OR a.name LIKE ? OR a.serial LIKE ? OR m.name LIKE ? OR m.model_number LIKE ?)';
         array_push($params, "%$q%", "%$q%", "%$q%", "%$q%", "%$q%");
@@ -76,16 +137,11 @@ $router->get('/inventory', function () {
     if ($statParts !== []) {
         $where[] = '(' . implode(' OR ', $statParts) . ')';
     }
-    $locNone = in_array('none', $locFilter, true);
-    $locIds  = array_values(array_filter(array_map('intval', $locFilter)));
-    if ($locNone && $locIds !== []) {
-        $where[] = '(a.location_id IS NULL OR a.location_id IN (' . implode(',', array_fill(0, count($locIds), '?')) . '))';
-        $params  = array_merge($params, $locIds);
-    } elseif ($locNone) {
-        $where[] = 'a.location_id IS NULL';
-    } elseif ($locIds !== []) {
-        $where[] = 'a.location_id IN (' . implode(',', array_fill(0, count($locIds), '?')) . ')';
-        $params  = array_merge($params, $locIds);
+    $idsOrNone('a.location_id', $locFilter);
+    $idsOrNone('m.manufacturer_id', $mfFilter);
+    if ($model > 0) {
+        $where[]  = 'a.model_id = ?';
+        $params[] = $model;
     }
     if (in_array($assigned, ['user', 'location', 'asset'], true)) {
         $where[]  = 'a.assigned_type = ?';
@@ -99,18 +155,38 @@ $router->get('/inventory', function () {
         $where[]  = '(a.last_audit_at IS NULL OR a.last_audit_at < ?)';
         $params[] = $auditBefore;
     }
+    if ($auditAfter !== '') {
+        $where[]  = 'a.last_audit_at >= ?';
+        $params[] = $auditAfter;
+    }
     $today = date('Y-m-d');
+    if ($audit === 'never') {
+        $where[] = 'a.last_audit_at IS NULL';
+    } elseif ($audit === 'overdue') {
+        $where[]  = 'a.next_audit_date < ?';
+        $params[] = $today;
+    }
     if ($warranty === 'expired') {
         $where[]  = 'a.warranty_end < ?';
         $params[] = $today;
     } elseif ($warranty === 'soon') {
         $where[] = 'a.warranty_end BETWEEN ? AND ?';
-        array_push($params, $today, date('Y-m-d', strtotime('+90 days')));
+        array_push($params, $today, date('Y-m-d', strtotime("+{$wDays} days")));
     } elseif ($warranty === 'active') {
         $where[]  = 'a.warranty_end >= ?';
         $params[] = $today;
     } elseif ($warranty === 'unknown') {
         $where[] = 'a.warranty_end IS NULL';
+    } elseif ($warranty === 'error') {
+        $where[] = 'a.warranty_error IS NOT NULL';
+    }
+    if ($age !== '') {
+        $where[] = assetAgeWhere($age, $params);
+    }
+    if ($missing === 'serial') {
+        $where[] = "(a.serial IS NULL OR a.serial = '')";
+    } elseif ($missing === 'purchase_date') {
+        $where[] = 'a.purchase_date IS NULL';
     }
     $whereSql = ' WHERE ' . implode(' AND ', $where);
 
@@ -119,6 +195,7 @@ $router->get('/inventory', function () {
         'category' => 'c.name', 'status' => 's.name', 'location' => 'l.name',
         'assigned' => 'COALESCE(u.last_name, al.name, pa.asset_tag, a.import_assignee)',
         'purchase_date' => 'a.purchase_date', 'created_at' => 'a.created_at',
+        'warranty_end' => 'a.warranty_end', 'last_audit' => 'a.last_audit_at', 'acquired' => ASSET_ACQUIRED,
     ];
     $sort     = requestScalar('sort', 'tag');
     $dir      = strtolower(requestScalar('dir', 'asc')) === 'desc' ? 'desc' : 'asc';
@@ -133,7 +210,14 @@ $router->get('/inventory', function () {
     if ($assigned !== '')   $filterParams['assigned'] = $assigned;
     if ($deleted)           $filterParams['deleted']  = '1';
     if ($auditBefore !== '') $filterParams['audit_before'] = $auditBefore;
+    if ($auditAfter !== '')  $filterParams['audit_after']  = $auditAfter;
+    if ($audit !== '')       $filterParams['audit']        = $audit;
     if ($warranty !== '')    $filterParams['warranty'] = $warranty;
+    if ($warranty === 'soon' && $wDays !== 90) $filterParams['warranty_days'] = $wDays;
+    if ($mfFilter !== [])    $filterParams['manufacturer'] = $mfFilter;
+    if ($model > 0)          $filterParams['model']    = $model;
+    if ($age !== '')         $filterParams['age']      = $age;
+    if ($missing !== '')     $filterParams['missing']  = $missing;
 
     if (requestScalar('export') === 'csv') {
         $stmt = $db->prepare(assetSelect() . $whereSql . $orderSql);
@@ -141,12 +225,12 @@ $router->get('/inventory', function () {
         header('Content-Type: text/csv; charset=utf-8');
         header('Content-Disposition: attachment; filename="inventory-' . date('Y-m-d') . '.csv"');
         $out = fopen('php://output', 'wb');
-        fputcsv($out, ['Tag', 'Name', 'Serial', 'Model', 'Model No.', 'Category', 'Manufacturer', 'Status', 'Location', 'Assigned To', 'Purchase Date', 'Cost', 'Warranty (months)', 'Warranty Start', 'Warranty End', 'Warranty Coverage', 'EOL', 'Last Audit', 'Next Audit', 'Notes']);
+        fputcsv($out, ['Tag', 'Name', 'Serial', 'Model', 'Model No.', 'Category', 'Manufacturer', 'Status', 'Location', 'Assigned To', 'Purchase Date', 'Cost', 'Warranty (months)', 'Warranty Start', 'Warranty End', 'Warranty Coverage', 'Warranty Lookup Error', 'EOL', 'Last Audit', 'Next Audit', 'Notes']);
         foreach ($stmt as $a) {
             fputcsv($out, [
                 $a['asset_tag'], $a['name'], $a['serial'], $a['model_name'], $a['model_number'], $a['category_name'],
                 $a['manufacturer_name'], Assets::statusLabel($a), $a['location_name'], Assets::assigneeLabel($a),
-                $a['purchase_date'], $a['purchase_cost'], $a['warranty_months'], $a['warranty_start'], $a['warranty_end'], $a['warranty_service'],
+                $a['purchase_date'], $a['purchase_cost'], $a['warranty_months'], $a['warranty_start'], $a['warranty_end'], $a['warranty_service'], $a['warranty_error'],
                 $a['eol_date'], $a['last_audit_at'], $a['next_audit_date'], $a['notes'],
             ]);
         }
@@ -185,7 +269,21 @@ $router->get('/inventory', function () {
         'assigned'     => $assigned,
         'deleted'      => $deleted,
         'auditBefore'  => $auditBefore,
+        'auditAfter'   => $auditAfter,
+        'audit'        => $audit,
         'warranty'     => $warranty,
+        'wDays'        => $wDays,
+        'mfFilter'     => $mfFilter,
+        'modelFilter'  => $model > 0 ? $db->query('SELECT id, name FROM asset_models WHERE id = ' . $model)->fetch() : null,
+        'age'          => $age,
+        'missing'      => $missing,
+        'manufacturers' => $db->query('SELECT mf.id, mf.name, COUNT(a.id) AS n FROM asset_manufacturers mf LEFT JOIN asset_models m ON m.manufacturer_id = mf.id LEFT JOIN assets a ON a.model_id = m.id AND a.deleted_at IS NULL GROUP BY mf.id ORDER BY mf.name')->fetchAll(),
+        // Extra columns, shown when the list is answering that question.
+        'showCols'     => [
+            'warranty' => $warranty !== '',
+            'audit'    => $auditBefore !== '' || $auditAfter !== '' || $audit !== '',
+            'acquired' => $age !== '',
+        ],
         'categories'   => $db->query('SELECT c.id, c.name, COUNT(a.id) AS n FROM asset_categories c LEFT JOIN asset_models m ON m.category_id = c.id LEFT JOIN assets a ON a.model_id = m.id AND a.deleted_at IS NULL GROUP BY c.id ORDER BY c.name')->fetchAll(),
         'statuses'     => $db->query('SELECT s.*, (SELECT COUNT(*) FROM assets a WHERE a.status_id = s.id AND a.deleted_at IS NULL) AS n FROM asset_statuses s ORDER BY s.sort_order, s.name')->fetchAll(),
         'locations'    => $db->query('SELECT id, name FROM locations ORDER BY name')->fetchAll(),

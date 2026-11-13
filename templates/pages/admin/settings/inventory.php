@@ -70,7 +70,8 @@ $kinds = ['models' => 'Models', 'categories' => 'Categories', 'manufacturers' =>
         <h6 class="fw-bold mb-1">Warranty lookup</h6>
         <p class="text-muted small mb-3">
             Dell and Lenovo assets get their warranty start, end and coverage from the manufacturer, by serial number / service tag:
-            once a day by the <a href="/admin/settings/cron-jobs">Warranty Lookups</a> job (each asset again every 30 days) and on demand with
+            once a day by the <a href="/admin/settings/cron-jobs">Warranty Lookups</a> job (each asset again every 30 days), all at once with
+            <a href="/inventory/reports?tab=warranty#warrantyScan">Look up all</a> on the Warranty report, and one at a time with
             <em>Look up warranty</em> on an asset's Details tab.
             <?php $wc = $warrantyCounts ?? []; ?>
             So far <?= (int) ($wc['looked_up'] ?? 0) ?> <?= (int) ($wc['looked_up'] ?? 0) === 1 ? 'asset has' : 'assets have' ?> a warranty on record: <?= (int) ($wc['active'] ?? 0) ?> in warranty, <?= (int) ($wc['expired'] ?? 0) ?> expired.

@@ -11,6 +11,23 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.233.0 &mdash; 2026-11-13
+
+### Added
+- **Inventory reports.** A new **Reports** button on the Inventory page opens seven reports. Every number links to the matching assets in the inventory list, where you can download them as CSV. Each report's table also downloads as CSV.
+  - **Overview:** totals by category, location, status, manufacturer or model. Shows how many are deployed, in warranty, out of warranty or unknown, and how many have and have not been audited in your audit interval.
+  - **Warranty:** in warranty, out of warranty, ending within a window you choose (30, 90, 180 or 365 days, or any number), unknown, and failed lookups with the reason. Includes a list of the warranties that end next.
+  - **Audit:** pick a date, or the last 3, 6, 12 or 24 months, to see what has and has not been audited since. Also shows what was never audited and what is past its next audit date, by location (or any grouping) with a progress bar.
+  - **Age:** assets in age bands from under 1 year to 7+ years, counted from the purchase date, or from the start of the manufacturer's warranty when there is no purchase date.
+  - **Checked out:** who holds which devices. Filter by category and a minimum count, for example "people with 2 or more laptops".
+  - **Activity:** every check-out, check-in, audit, edit, warranty update, deletion and ticket link in a date range, filtered by action.
+  - **Data quality:** assets with no serial number, location, manufacturer or purchase date; Snipe-IT assignees with no account; failed warranty lookups; serial numbers shared by several assets (placeholders like `XXXXX` show up here); and Dell or Lenovo serials that cannot be looked up.
+- **Look up all warranties at once.** The Warranty report has **Look up all** (every Dell and Lenovo asset with a serial number) and **Only the ones due** (never looked up, or last looked up over 30 days ago). It works through them 10 at a time with a progress bar and a running log, and you can stop it at any point. The daily job still does 150 a day; this is for doing the whole inventory now. Keep the page open while it runs (Lenovo takes about two seconds an asset). Dell is included once a TechDirect key is saved.
+- **More inventory list filters:** manufacturer (including "none"), model, warranty ending within a number of days you choose, failed warranty lookups, never audited, past the next audit date, audited since a date, age band, and missing serial number or purchase date. When a warranty, audit or age filter is on, the list adds a **Warranty ends**, **Last audit** or **Acquired** column you can sort by. The CSV gains a **Warranty Lookup Error** column.
+
+### Fixed
+- **Lenovo and Dell serials typed with hyphens can now be looked up.** Serials like `PF-4NRA05`, and label scans containing a `/`, were rejected as invalid. Spaces, hyphens and other punctuation are now ignored. This covers 21 ThinkPad X1 Yoga Gen 8s on our system, which would otherwise never have been looked up.
+
 ## 2.232.1 &mdash; 2026-11-13
 
 ### Fixed
