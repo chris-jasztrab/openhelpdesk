@@ -11,6 +11,14 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.234.0 &mdash; 2026-11-13
+
+### Added
+- **Print QR code labels for assets.** A new **Labels** button on the Inventory page (and **Print label** on each asset) opens a print page where each label carries a QR code that opens the asset when scanned — the same codes Audit mode and the new-ticket flow already understand. Print one asset, a ticked selection from the list, every asset, or just **Assets without a QR label** (assets created here — Snipe-IT imports already have one).
+  - **Label printer presets.** Pick your printer and the page lays labels out at that exact label size: Dymo LabelWriter 450 (30334 and 30252 stock) and 550, Zebra ZD411t, ZD421 and GK420d, Brother QL-800, QL-820NWB and P-touch P750W, Rollo, Munbyn ITPP941, Phomemo M110, or a custom size.
+  - **Adjustable layout, saved per printer.** Width, height, margin, QR size, font sizes and which fields appear (tag, name, model, serial) can all be changed, previewed at true size, and saved per printer; the last-used printer becomes the default.
+  - **Nothing gets cut off.** Each label prints as its own page of exactly the label size, so a batch feeds one label after another. In the print dialog pick the matching label size, margins **None**, scale **100%** — the page has a tips section for Dymo and Zebra quirks.
+
 ## 2.233.0 &mdash; 2026-11-13
 
 ### Added

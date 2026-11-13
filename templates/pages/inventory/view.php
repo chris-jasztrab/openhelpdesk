@@ -60,6 +60,7 @@ $money = static fn($v): string => $v !== null && $v !== '' ? '$' . number_format
 <div class="d-flex flex-wrap gap-2 mb-3" id="assetActions">
     <?php if (!$asset['deleted_at']): ?>
     <a href="/inventory/<?= (int) $asset['id'] ?>/edit" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Edit</a>
+    <a href="/inventory/labels?ids=<?= (int) $asset['id'] ?>" class="btn btn-sm btn-outline-secondary" title="Print a QR code label for this asset"><i class="bi bi-qr-code me-1"></i>Print label</a>
     <?php if ($checkedOut): ?>
     <form method="POST" action="/inventory/<?= (int) $asset['id'] ?>/checkin" class="d-inline" onsubmit="return confirm('Check this asset in?');">
         <?= csrfField() ?>

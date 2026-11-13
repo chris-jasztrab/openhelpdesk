@@ -365,6 +365,102 @@ $router->post('/inventory/audit/scan', function () {
     exit;
 });
 
+/* ── QR label printing (assets.manage) ── */
+
+/**
+ * Built-in label-printer presets: key => [display name, label width mm, label height mm].
+ * One entry per common label printer with its usual asset-tag media; saved
+ * per-preset overrides (padding, QR size, fonts, fields) live in the
+ * asset_label_profiles setting as JSON.
+ */
+function assetLabelPresets(): array
+{
+    return [
+        'dymo_lw450_30334'  => ['Dymo LabelWriter 450 — 30334 multipurpose (57 × 32 mm)', 57.2, 31.8],
+        'dymo_lw450_30252'  => ['Dymo LabelWriter 450 — 30252 address (89 × 28 mm)', 88.9, 28.6],
+        'dymo_lw550'        => ['Dymo LabelWriter 550 — 30334 multipurpose (57 × 32 mm)', 57.2, 31.8],
+        'zebra_zd411t'      => ['Zebra ZD411t — 2 × 1 in (51 × 25 mm)', 50.8, 25.4],
+        'zebra_zd421'       => ['Zebra ZD421 — 2.25 × 1.25 in (57 × 32 mm)', 57.2, 31.8],
+        'zebra_gk420d'      => ['Zebra GK420d — 2 × 1 in (51 × 25 mm)', 50.8, 25.4],
+        'brother_ql800'     => ['Brother QL-800 — DK-1201 address (90 × 29 mm)', 90.3, 29.0],
+        'brother_ql820nwb'  => ['Brother QL-820NWB — DK-1204 multipurpose (54 × 17 mm)', 54.3, 17.1],
+        'brother_pt_p750w'  => ['Brother P-touch P750W — TZe 24 mm tape (72 × 24 mm)', 72.0, 24.0],
+        'rollo'             => ['Rollo — 2 × 1 in (51 × 25 mm)', 50.8, 25.4],
+        'munbyn_itpp941'    => ['Munbyn ITPP941 — 2.25 × 1.25 in (57 × 32 mm)', 57.2, 31.8],
+        'phomemo_m110'      => ['Phomemo M110 — 40 × 30 mm', 40.0, 30.0],
+        'custom'            => ['Custom label size', 60.0, 30.0],
+    ];
+}
+
+/**
+ * Print QR code labels. ?ids=1,2,3 prints those assets; ?set=new prints every
+ * live asset without a legacy Snipe-IT label (snipeit_id IS NULL — imported
+ * assets already carry a printed QR code); ?set=all prints everything live.
+ * The QR encodes {appUrl}/inventory/{id}, which resolveScan() and any phone
+ * camera both understand.
+ */
+$router->get('/inventory/labels', function () {
+    Auth::requirePermission('assets.manage');
+    $db     = Database::connect();
+    $select = 'SELECT a.id, a.asset_tag, a.name, a.serial, m.name AS model_name
+               FROM assets a JOIN asset_models m ON m.id = a.model_id';
+    $set    = requestScalar('set');
+    $ids    = array_values(array_filter(array_map('intval', explode(',', requestScalar('ids')))));
+    $assets = [];
+    if ($set === 'new' || $set === 'all') {
+        $assets = $db->query($select . ' WHERE a.deleted_at IS NULL' . ($set === 'new' ? ' AND a.snipeit_id IS NULL' : '') . ' ORDER BY a.asset_tag LIMIT 2000')->fetchAll();
+    } elseif ($ids !== []) {
+        $ids  = array_slice($ids, 0, 2000);
+        $stmt = $db->prepare($select . ' WHERE a.id IN (' . implode(',', array_fill(0, count($ids), '?')) . ') ORDER BY a.asset_tag');
+        $stmt->execute($ids);
+        $assets = $stmt->fetchAll();
+    }
+    render('inventory/labels', [
+        'assets'         => $assets,
+        'presets'        => assetLabelPresets(),
+        'profiles'       => json_decode(getSetting('asset_label_profiles', '{}'), true) ?: [],
+        'selectedPreset' => getSetting('asset_label_preset', 'dymo_lw450_30334'),
+        'labelBase'      => appUrl(),
+        'newCount'       => (int) $db->query('SELECT COUNT(*) FROM assets WHERE deleted_at IS NULL AND snipeit_id IS NULL')->fetchColumn(),
+        'allCount'       => (int) $db->query('SELECT COUNT(*) FROM assets WHERE deleted_at IS NULL')->fetchColumn(),
+    ]);
+});
+
+/** Save the label layout for one printer preset and remember it as the default. */
+$router->post('/inventory/labels/settings', function () {
+    Auth::requirePermission('assets.manage');
+    header('Content-Type: application/json');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Session expired — reload the page.']);
+        exit;
+    }
+    $presets = assetLabelPresets();
+    $key     = (string) ($_POST['preset'] ?? '');
+    if (!isset($presets[$key])) {
+        http_response_code(422);
+        echo json_encode(['error' => 'Unknown printer preset.']);
+        exit;
+    }
+    $num     = static fn(string $k, float $min, float $max): float => max($min, min($max, (float) ($_POST[$k] ?? 0)));
+    $profile = [
+        'w'      => $num('w', 10, 300),
+        'h'      => $num('h', 8, 300),
+        'pad'    => $num('pad', 0, 20),
+        'qr'     => $num('qr', 6, 100),
+        'f1'     => $num('f1', 4, 40),
+        'f2'     => $num('f2', 4, 40),
+        'fields' => array_values(array_intersect(['tag', 'name', 'model', 'serial'], array_map('strval', (array) ($_POST['fields'] ?? [])))),
+    ];
+    $all       = json_decode(getSetting('asset_label_profiles', '{}'), true) ?: [];
+    $all[$key] = $profile;
+    setSetting('asset_label_profiles', json_encode($all));
+    setSetting('asset_label_preset', $key);
+    logAudit('asset.label_settings_changed', null, null, 'preset=' . $key);
+    echo json_encode(['ok' => true]);
+    exit;
+});
+
 /** Typeahead for the ticket-side picker: live assets matching q, the requester's own first. */
 $router->get('/inventory/search', function () {
     Auth::requirePermission('assets.view', 'assets.manage');

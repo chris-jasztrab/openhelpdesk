@@ -8,6 +8,7 @@ $breadcrumbs  = [
 $hasFilters       = !empty($filterParams);
 $panelFilterCount = count(array_diff_key($filterParams, ['q' => null, 'deleted' => null, 'warranty_days' => null]));
 $canCheckout = !empty($users); // only handed over for assets.manage on the live (not deleted) list
+$canPick     = Assets::canManage() && !$deleted; // checkbox column feeding the QR label printer
 $th = static fn(string $col, string $text): string =>
     '<a href="' . sortUrl($col, $sort, $dir, $filterParams, '/inventory') . '" class="text-decoration-none text-dark">' . $text . ' ' . sortIcon($col, $sort, $dir) . '</a>';
 ?>
@@ -37,6 +38,7 @@ $th = static fn(string $col, string $text): string =>
         </a>
         <a href="/inventory/reports" class="btn btn-sm btn-outline-secondary" title="Warranty, audit, age, assignment and activity reports"><i class="bi bi-bar-chart me-1"></i>Reports</a>
         <?php if (Assets::canManage()): ?>
+        <a href="/inventory/labels" class="btn btn-sm btn-outline-secondary" id="printLabelsBtn" title="Print QR code labels — tick assets below to print a specific set"><i class="bi bi-qr-code me-1"></i>Labels</a>
         <a href="/inventory/audit" class="btn btn-sm btn-outline-secondary" title="Scan tags to record a physical inventory"><i class="bi bi-upc-scan me-1"></i>Audit mode</a>
         <a href="/inventory/create" class="btn btn-sm text-white" style="background:var(--ld-primary);"><i class="bi bi-plus-lg me-1"></i>Add asset</a>
         <?php endif; ?>
@@ -200,6 +202,7 @@ $th = static fn(string $col, string $text): string =>
         <table class="table table-hover align-middle mb-0 table-resize">
             <thead class="table-light">
                 <tr>
+                    <?php if ($canPick): ?><th style="width:2rem;"><input type="checkbox" class="form-check-input" id="lblPickAll" aria-label="Select all assets on this page for label printing"></th><?php endif; ?>
                     <th><?= $th('tag', 'Tag') ?></th>
                     <th><?= $th('name', 'Name') ?></th>
                     <th><?= $th('model', 'Model') ?></th>
@@ -215,10 +218,13 @@ $th = static fn(string $col, string $text): string =>
             </thead>
             <tbody>
                 <?php if (empty($assets)): ?>
-                <tr><td colspan="<?= 8 + count(array_filter($showCols)) ?>" class="text-center py-4 text-muted">No assets found.</td></tr>
+                <tr><td colspan="<?= 8 + count(array_filter($showCols)) + (int) $canPick ?>" class="text-center py-4 text-muted">No assets found.</td></tr>
                 <?php else: ?>
                     <?php foreach ($assets as $a): ?>
                     <tr style="cursor:pointer;" onclick="window.location='/inventory/<?= (int) $a['id'] ?>'">
+                        <?php if ($canPick): ?>
+                        <td onclick="event.stopPropagation()"><input type="checkbox" class="form-check-input lbl-pick" value="<?= (int) $a['id'] ?>" aria-label="Select <?= e($a['asset_tag']) ?> for label printing"></td>
+                        <?php endif; ?>
                         <td class="fw-semibold text-nowrap">
                             <a href="/inventory/<?= (int) $a['id'] ?>" class="text-decoration-none text-dark font-monospace"><?= e($a['asset_tag']) ?></a>
                         </td>
@@ -349,6 +355,29 @@ document.getElementById('coModal').addEventListener('show.bs.modal', function (e
     document.getElementById('coModalForm').action = '/inventory/' + b.getAttribute('data-id') + '/checkout';
     document.getElementById('coModalTag').textContent = b.getAttribute('data-tag');
 });
+</script>
+<?php endif; ?>
+
+<?php if ($canPick): ?>
+<script>
+/* Tick assets → the Labels button prints just those; none ticked → it opens the label chooser. */
+(function () {
+    var btn = document.getElementById('printLabelsBtn');
+    var all = document.getElementById('lblPickAll');
+    function picks() { return Array.prototype.slice.call(document.querySelectorAll('.lbl-pick:checked')); }
+    function update() {
+        var p = picks();
+        btn.href = p.length ? '/inventory/labels?ids=' + p.map(function (c) { return c.value; }).join(',') : '/inventory/labels';
+        btn.innerHTML = '<i class="bi bi-qr-code me-1"></i>Labels' + (p.length ? ' (' + p.length + ')' : '');
+    }
+    document.querySelectorAll('.lbl-pick').forEach(function (c) { c.addEventListener('change', update); });
+    if (all) {
+        all.addEventListener('change', function () {
+            document.querySelectorAll('.lbl-pick').forEach(function (c) { c.checked = all.checked; });
+            update();
+        });
+    }
+})();
 </script>
 <?php endif; ?>
 
