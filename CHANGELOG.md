@@ -11,6 +11,15 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.239.0 &mdash; 2026-11-13
+
+### Added
+- **Scheduled inventory expiry digest.** Inventory › Reports has a new **Email digest** tab (for people with *Manage assets*) that schedules one email listing warranties ending within a look-ahead window (default 90 days), warranties that ended since the last digest, end-of-life dates coming up, and how many audits are overdue — each asset linked, long lists cut at 40 with a link to the rest.
+  - **Schedule.** Monthly on a day of the month (1–28) or weekly on a weekday. It ships **off**; switching it on starts the clock that day, so the first digest arrives on the next scheduled day. A scheduled day with nothing to report sends nothing, and a day the server missed is caught up on the next run.
+  - **Recipients.** All administrators, extra email addresses, or both. The tab shows who it goes to and what it would contain if it were sent today.
+  - **Send me a test now** emails the digest to you alone, without moving the schedule.
+- **New cron job: Inventory Digest** (`scripts/process-asset-digest.php`, daily at 7:30 am) on Settings › Cron Jobs, with Dry run / Run now like the others. It must be in the server's crontab for the digest to go out; it does nothing while the digest is off or on days that are not a scheduled day.
+
 ## 2.238.0 &mdash; 2026-11-13
 
 ### Added

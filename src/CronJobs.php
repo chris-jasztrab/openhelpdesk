@@ -230,6 +230,22 @@ final class CronJobs
                 'required'         => false,
                 'note'             => 'Only needed for the inventory. Without it, a warranty is only looked up when someone presses Look up warranty on an asset. Dell needs a TechDirect API key in Admin → Settings → Inventory.',
             ],
+            'asset-digest' => [
+                'title'            => 'Inventory Digest',
+                'icon'             => 'bi-envelope-paper',
+                'description'      => 'Emails the inventory expiry digest — warranties ending soon, warranties that just ended, end-of-life dates coming up and audits overdue — on the weekly or monthly schedule set under Inventory → Reports → Email digest. Runs daily but only sends on a scheduled day, and not at all while the digest is switched off.',
+                'frequency'        => 'Once daily',
+                'interval_seconds' => 86400,
+                'script'           => 'scripts/process-asset-digest.php',
+                'log_name'         => 'asset-digest.log',
+                'sends_mail'       => true,
+                'self_logs'        => false,
+                'timeout'          => 120,
+                'cron_linux'       => $buildLinux('30 7 * * *', 'scripts/process-asset-digest.php', 'asset-digest.log'),
+                'cron_windows'     => $buildWindows('/SC DAILY /ST 07:30', 'scripts/process-asset-digest.php', 'OpenHelpDesk Inventory Digest'),
+                'required'         => false,
+                'note'             => 'Only needed if you switch the digest on under Inventory → Reports → Email digest.',
+            ],
         ];
 
         // Derive display paths from log_name so there's one source of truth.

@@ -18,7 +18,10 @@ const INVENTORY_REPORT_TABS = [
     'overview' => ['Overview', 'bi-grid'], 'warranty' => ['Warranty', 'bi-shield-check'], 'audit' => ['Audit', 'bi-clipboard-check'],
     'age' => ['Age', 'bi-hourglass-split'], 'people' => ['Checked out', 'bi-person-badge'], 'activity' => ['Activity', 'bi-clock-history'],
     'quality' => ['Data quality', 'bi-exclamation-diamond'],
+    'digest' => ['Email digest', 'bi-envelope-paper'], // assets.manage only
 ];
+
+require_once ROOT_DIR . '/src/AssetDigest.php';
 
 const INVENTORY_REPORT_FROM = ' FROM assets a JOIN asset_models m ON m.id = a.model_id JOIN asset_categories c ON c.id = m.category_id
     JOIN asset_statuses s ON s.id = a.status_id LEFT JOIN asset_manufacturers mf ON mf.id = m.manufacturer_id
@@ -103,6 +106,9 @@ $router->get('/inventory/reports', function () {
     Auth::requirePermission('assets.view', 'assets.manage');
     $db    = Database::connect();
     $tab   = isset(INVENTORY_REPORT_TABS[requestScalar('tab')]) ? requestScalar('tab') : 'overview';
+    if ($tab === 'digest' && !Assets::canManage()) {
+        $tab = 'overview';
+    }
     $dims  = inventoryReportDims();
     $by    = isset($dims[requestScalar('by')]) ? requestScalar('by') : ($tab === 'audit' ? 'location' : 'category');
     $today = date('Y-m-d');
@@ -293,7 +299,66 @@ $router->get('/inventory/reports', function () {
         $data += ['dupes' => $dupes, 'badSerial' => $badSerial, 'counts' => $c];
     }
 
+    if ($tab === 'digest') {
+        $s = AssetDigest::settings();
+        $data += [
+            'digest'     => $s,
+            'preview'    => AssetDigest::data($db, $s['days'], $s['last_sent'] !== '' ? $s['last_sent'] : date('Y-m-d', strtotime('-30 days')), $today),
+            'recipients' => AssetDigest::recipients($db, $s),
+            'next'       => !$s['enabled'] ? null : (AssetDigest::isDue($s, $today) ? $today : AssetDigest::nextSlot($s, $today)),
+        ];
+    }
+
     render('inventory/reports', $data);
+});
+
+/** Save the digest schedule, or (action=test) email the digest to yourself now. */
+$router->post('/inventory/reports/digest', function () {
+    Auth::requirePermission('assets.manage');
+    $back = '/inventory/reports?tab=digest';
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect($back);
+    }
+    $db    = Database::connect();
+    $today = date('Y-m-d');
+    if (($_POST['action'] ?? '') === 'test') {
+        $me = Auth::user();
+        $r  = AssetDigest::send($db, AssetDigest::settings(), $today, [[(string) $me['email'], trim($me['first_name'] . ' ' . $me['last_name'])]]);
+        flash($r['sent'] ? 'success' : 'error', $r['sent']
+            ? 'Test digest sent to ' . $me['email'] . ' using the saved settings. The schedule is unchanged.'
+            : 'The test digest could not be sent — check Settings › Email.');
+        redirect($back);
+    }
+    $before  = AssetDigest::settings();
+    $enabled = isset($_POST['enabled']);
+    $weekly  = ($_POST['frequency'] ?? '') === 'weekly';
+    $extra   = preg_split('/[\s,;]+/', (string) ($_POST['recipients'] ?? ''), -1, PREG_SPLIT_NO_EMPTY);
+    $bad     = array_filter($extra, static fn($e) => !filter_var($e, FILTER_VALIDATE_EMAIL));
+    $after   = [
+        'asset_digest_enabled'    => $enabled ? '1' : '0',
+        'asset_digest_frequency'  => $weekly ? 'weekly' : 'monthly',
+        'asset_digest_day'        => (string) ($weekly ? max(1, min(7, (int) ($_POST['weekday'] ?? 1))) : max(1, min(28, (int) ($_POST['monthday'] ?? 1)))),
+        'asset_digest_days'       => (string) max(1, min(730, (int) ($_POST['days'] ?? 90))),
+        'asset_digest_admins'     => isset($_POST['admins']) ? '1' : '0',
+        'asset_digest_recipients' => implode(', ', array_diff($extra, $bad)),
+    ];
+    foreach ($after as $k => $v) {
+        setSetting($k, $v);
+    }
+    // Switching it on starts the clock today, so the first digest is the next scheduled day — not tomorrow morning.
+    if ($enabled && (!$before['enabled'] || $before['last_sent'] === '')) {
+        setSetting('asset_digest_last_sent', $today);
+    }
+    logAudit('asset.digest_settings_changed', null, null, http_build_query($after, '', '; '));
+    if ($bad) {
+        flash('error', 'Saved, but these are not email addresses and were left out: ' . implode(', ', $bad));
+    } elseif ($enabled && AssetDigest::recipients($db, AssetDigest::settings()) === []) {
+        flash('error', 'Saved, but nobody is set to receive the digest — tick administrators or add an address.');
+    } else {
+        flash('success', $enabled ? 'Digest schedule saved.' : 'Digest saved and switched off.');
+    }
+    redirect($back);
 });
 
 /**

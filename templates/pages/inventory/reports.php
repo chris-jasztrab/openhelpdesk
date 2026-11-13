@@ -34,7 +34,7 @@ $pct   = static fn(int $part, int $whole): int => $whole > 0 ? (int) round(100 *
 </div>
 
 <ul class="nav nav-tabs mb-4 flex-nowrap overflow-auto" style="scrollbar-width:thin;">
-    <?php foreach (INVENTORY_REPORT_TABS as $k => [$t, $icon]): ?>
+    <?php foreach (INVENTORY_REPORT_TABS as $k => [$t, $icon]): if ($k === 'digest' && !Assets::canManage()) continue; ?>
     <li class="nav-item"><a class="nav-link text-nowrap <?= $k === $tab ? 'active' : '' ?>" href="/inventory/reports?tab=<?= $k ?>"><i class="bi <?= $icon ?> me-1"></i><?= $t ?></a></li>
     <?php endforeach; ?>
 </ul>
@@ -499,4 +499,109 @@ $groupBar = static function (array $extra = [], string $before = '') use ($tab, 
         </div>
     </div>
 </div>
+
+<?php elseif ($tab === 'digest'): $s = $digest; ?>
+<div class="row g-4">
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <span class="fw-semibold"><i class="bi bi-envelope-paper me-1"></i>Scheduled expiry digest</span>
+                <span class="badge <?= $s['enabled'] ? 'bg-success' : 'bg-secondary' ?>"><?= $s['enabled'] ? 'On' : 'Off' ?></span>
+            </div>
+            <div class="card-body p-4">
+                <p class="text-muted small">
+                    One email listing warranties about to end, warranties that ended since the last digest, end-of-life dates coming up
+                    and how many audits are overdue. Nothing is sent on a scheduled day with nothing to report.
+                </p>
+                <form method="POST" action="/inventory/reports/digest">
+                    <?= csrfField() ?>
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" role="switch" id="dgEnabled" name="enabled" <?= $s['enabled'] ? 'checked' : '' ?>>
+                        <label class="form-check-label fw-semibold" for="dgEnabled">Send the digest on a schedule</label>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-sm-4">
+                            <label class="form-label small fw-semibold mb-1" for="dgFreq">How often</label>
+                            <select class="form-select form-select-sm" name="frequency" id="dgFreq">
+                                <option value="monthly" <?= $s['frequency'] === 'monthly' ? 'selected' : '' ?>>Monthly</option>
+                                <option value="weekly" <?= $s['frequency'] === 'weekly' ? 'selected' : '' ?>>Weekly</option>
+                            </select>
+                        </div>
+                        <div class="col-sm-4" data-dg="monthly">
+                            <label class="form-label small fw-semibold mb-1" for="dgMonthday">Day of the month</label>
+                            <select class="form-select form-select-sm" name="monthday" id="dgMonthday">
+                                <?php for ($i = 1; $i <= 28; $i++): ?><option value="<?= $i ?>" <?= $s['frequency'] === 'monthly' && $s['day'] === $i ? 'selected' : '' ?>><?= $i ?></option><?php endfor; ?>
+                            </select>
+                        </div>
+                        <div class="col-sm-4" data-dg="weekly">
+                            <label class="form-label small fw-semibold mb-1" for="dgWeekday">Day of the week</label>
+                            <select class="form-select form-select-sm" name="weekday" id="dgWeekday">
+                                <?php foreach (['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as $i => $name): ?>
+                                <option value="<?= $i + 1 ?>" <?= $s['frequency'] === 'weekly' && $s['day'] === $i + 1 ? 'selected' : '' ?>><?= $name ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-sm-4">
+                            <label class="form-label small fw-semibold mb-1" for="dgDays">Look ahead</label>
+                            <div class="input-group input-group-sm">
+                                <input type="number" class="form-control" name="days" id="dgDays" min="1" max="730" value="<?= (int) $s['days'] ?>">
+                                <span class="input-group-text">days</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-label small fw-semibold mb-1">Send to</div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="dgAdmins" name="admins" <?= $s['admins'] ? 'checked' : '' ?>>
+                            <label class="form-check-label" for="dgAdmins">All administrators</label>
+                        </div>
+                        <label class="form-label small text-muted mt-2 mb-1" for="dgRecipients">Also send to (email addresses, separated by commas)</label>
+                        <input type="text" class="form-control form-control-sm" name="recipients" id="dgRecipients" value="<?= e($s['recipients']) ?>" placeholder="it-team@example.org, manager@example.org">
+                    </div>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <button type="submit" class="btn btn-sm text-white" style="background:var(--ld-primary);"><i class="bi bi-check-lg me-1"></i>Save schedule</button>
+                        <button type="submit" name="action" value="test" class="btn btn-sm btn-outline-secondary" formnovalidate title="Uses the saved settings and does not move the schedule"><i class="bi bi-send me-1"></i>Send me a test now</button>
+                    </div>
+                </form>
+            </div>
+            <div class="card-footer bg-white small text-muted">
+                <?php if ($next): ?>Next digest: <strong><?= $next === $today ? 'at the next run (7:30 am)' : e($day($next)) ?></strong>.<?php else: ?>Switched off — nothing will be sent.<?php endif; ?>
+                <?php if ($s['last_sent']): ?> Last <?= $s['enabled'] ? 'sent or started' : 'sent' ?> <?= e($day($s['last_sent'])) ?>.<?php endif; ?>
+                Sent by the <a href="/admin/settings/cron-jobs">Inventory Digest</a> job, which must be in the server's crontab.
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white fw-semibold">If it were sent today</div>
+            <ul class="list-group list-group-flush">
+                <?php foreach ([
+                    ["Warranties ending within {$preview['days']} days", count($preview['ending']), $list(['warranty' => 'soon', 'warranty_days' => $preview['days'], 'sort' => 'warranty_end'])],
+                    ['Warranties ended since ' . $day($preview['since']), count($preview['expired']), $list(['warranty' => 'expired', 'sort' => 'warranty_end', 'dir' => 'desc'])],
+                    ["End-of-life dates within {$preview['days']} days", count($preview['eol']), null],
+                    ['Audits overdue', $preview['audit_overdue'], $list(['audit' => 'overdue'])],
+                ] as [$label, $n, $url]): ?>
+                <li class="list-group-item d-flex justify-content-between gap-2"><span class="min-w-0"><?= e($label) ?></span><span class="fw-semibold"><?= $cell($n, $url) ?></span></li>
+                <?php endforeach; ?>
+            </ul>
+        </div>
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white fw-semibold">Goes to <span class="text-muted fw-normal small">(<?= count($recipients) ?>)</span></div>
+            <ul class="list-group list-group-flush small">
+                <?php if (!$recipients): ?><li class="list-group-item text-muted">Nobody yet.</li><?php endif; ?>
+                <?php foreach ($recipients as [$email, $name]): ?>
+                <li class="list-group-item"><?= e($name !== '' ? $name . ' — ' : '') ?><span class="text-muted"><?= e($email) ?></span></li>
+                <?php endforeach; ?>
+            </ul>
+        </div>
+    </div>
+</div>
+<script>
+(function () {
+    var f = document.getElementById('dgFreq');
+    function show() { document.querySelectorAll('[data-dg]').forEach(function (el) { el.classList.toggle('d-none', el.getAttribute('data-dg') !== f.value); }); }
+    f.addEventListener('change', show);
+    show();
+})();
+</script>
 <?php endif; ?>
