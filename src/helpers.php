@@ -4423,8 +4423,9 @@ function sendMail(string $toEmail, string $toName, string $subject, string $html
     //
     // Anything that is NOT delivered here (kill switch, SMTP unconfigured, SMTP
     // error) is parked in `mail_queue` so an admin can see the backlog and send
-    // or flush it from Settings → Email Queue. Nothing drains that table on its
-    // own, so flipping MAIL_ENABLED back on never blasts the backlog by itself.
+    // or flush it from Settings → Email Queue. Failed sends are retried on a
+    // timer (mailQueueRetryDue); kill-switch rows never are, so flipping
+    // MAIL_ENABLED back on never blasts the backlog by itself.
     $queueArgs = [$toEmail, $toName, $subject, $htmlBody, $textBody, $ticketId, $attachments, $transactional];
 
     if (env('MAIL_ENABLED', 'true') === 'false') {
@@ -4481,16 +4482,18 @@ function mailQueuePush(string $toEmail, string $toName, string $subject, string 
 }
 
 /**
- * Attempt delivery of every queued email, oldest first. Bypasses the
- * MAIL_ENABLED kill switch on purpose: this only runs when an admin presses
- * "Send all now". Delivered rows are deleted; failures stay with the error.
+ * Attempt delivery of queued emails ($rows, default every row, oldest first).
+ * Bypasses the MAIL_ENABLED kill switch on purpose: the default runs only when
+ * an admin presses "Send all now", and the timed retry (mailQueueRetryDue)
+ * checks the switch itself. Delivered rows are deleted; failures stay with the
+ * error. Stops early once the transport stalls, leaving the rest queued.
  *
  * @return array{sent:int, failed:int}
  */
-function mailQueueSendAll(): array
+function mailQueueSendAll(?array $rows = null): array
 {
     $db   = Database::connect();
-    $rows = $db->query('SELECT * FROM mail_queue ORDER BY id ASC')->fetchAll(PDO::FETCH_ASSOC);
+    $rows ??= $db->query('SELECT * FROM mail_queue ORDER BY id ASC')->fetchAll(PDO::FETCH_ASSOC);
     $del  = $db->prepare('DELETE FROM mail_queue WHERE id = ?');
     $fail = $db->prepare('UPDATE mail_queue SET attempts = attempts + 1, last_error = ?, last_attempt_at = NOW() WHERE id = ?');
     $sent = 0;
@@ -4501,6 +4504,9 @@ function mailQueueSendAll(): array
             $row['to_email'], $row['to_name'], $row['subject'], $row['html_body'],
             (string) $row['text_body'], $row['ticket_id'] !== null ? (int) $row['ticket_id'] : null, $attachments
         );
+        if (!empty($r['skipped'])) {
+            break; // the transport stalled on an earlier row; the rest wait for the next run
+        }
         if ($r['messageId'] !== false) {
             $del->execute([$row['id']]);
             $sent++;
@@ -4517,13 +4523,65 @@ function mailQueueSendAll(): array
  * No kill switch and no queueing here. Only sendMail() and mailQueueSendAll()
  * should call this.
  *
- * @return array{messageId:string|false, error:string}
+ * Circuit breaker: mail goes out while the user waits, so once one send fails
+ * SLOWLY (Microsoft / the SMTP server is stalling, as in the 2026-11-12 outage)
+ * every later send in this request or cron run is skipped without trying —
+ * sendMail() queues it for the timed retry. A fast failure (one bad address,
+ * a config error) doesn't trip it: those cost no waiting.
+ *
+ * @return array{messageId:string|false, error:string, skipped?:true}
  */
 function deliverMail(string $toEmail, string $toName, string $subject, string $htmlBody, string $textBody = '', ?int $ticketId = null, array $attachments = []): array
 {
-    return getSetting('mail_transport') === 'graph'
+    static $stalled = null; // ponytail: per-process; a 5 s threshold, not a health check
+    if ($stalled !== null) {
+        return ['messageId' => false, 'error' => "Not attempted: an earlier send stalled ({$stalled})", 'skipped' => true];
+    }
+    $start  = microtime(true);
+    $result = getSetting('mail_transport') === 'graph'
         ? graphDeliver($toEmail, $toName, $subject, $htmlBody, $ticketId, $attachments)
         : smtpDeliver($toEmail, $toName, $subject, $htmlBody, $textBody, $ticketId, $attachments);
+    if ($result['messageId'] === false && microtime(true) - $start >= 5) {
+        $stalled = mb_substr($result['error'], 0, 150);
+    }
+    return $result;
+}
+
+/**
+ * Queued emails the timed retry may send: real delivery failures from the last
+ * 3 days, least-tried first so one row that keeps failing can't hold up the
+ * rest. Kill-switch rows are never retried — an admin releases those.
+ */
+function mailQueueRetryRows(PDO $db): array
+{
+    return $db->query(
+        "SELECT * FROM mail_queue
+          WHERE reason <> 'MAIL_ENABLED=false' AND created_at >= NOW() - INTERVAL 3 DAY
+          ORDER BY attempts, id"
+    )->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/**
+ * Retry failed sends every `mail_queue_retry_minutes` (Settings → Email Queue,
+ * default 30, 0 = off). Rides the 5-minute SLA cron. Returns null when it
+ * didn't run, else the send counts.
+ *
+ * @return array{sent:int, failed:int}|null
+ */
+function mailQueueRetryDue(PDO $db): ?array
+{
+    $minutes = (int) getSetting('mail_queue_retry_minutes', '30');
+    if ($minutes <= 0 || env('MAIL_ENABLED', 'true') === 'false'
+        || (class_exists('CronRun', false) && CronRun::isDryRun())) {
+        return null;
+    }
+    // 60 s of slack so a cron tick that starts a second early isn't pushed a whole tick later.
+    if (time() - (int) getSetting('mail_queue_retry_last_at', '0') < $minutes * 60 - 60) {
+        return null;
+    }
+    setSetting('mail_queue_retry_last_at', (string) time());
+    $rows = mailQueueRetryRows($db);
+    return $rows ? mailQueueSendAll($rows) : ['sent' => 0, 'failed' => 0];
 }
 
 /**

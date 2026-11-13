@@ -46,9 +46,11 @@ $followups = processDueTicketFollowups($db);
 $reminders = processTicketReminders($db);
 $swept     = sweepNoGroupTickets($db);
 $completed = resolveParentsWithClosedTasks($db);
+$retry     = mailQueueRetryDue($db);
 
 $message = date('Y-m-d H:i:s') . " - SLA recalculated: {$count} ticket(s) updated. Follow-up reminders sent: {$followups}."
     . " Ticket reminders: {$reminders['overdue']} overdue, {$reminders['update']} update due."
+    . ($retry !== null ? " Email queue retry: {$retry['sent']} sent, {$retry['failed']} failed." : '')
     . ($completed > 0 ? " Resolved {$completed} ticket(s) whose task tickets are all closed." : '')
     . ($swept > 0 ? " WARN: routed {$swept} ticket(s) with no group to the default group." : '') . "\n";
 

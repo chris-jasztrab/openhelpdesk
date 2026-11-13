@@ -25,6 +25,18 @@ if (!function_exists('logMsg')) {
 }
 
 /**
+ * Applied to every Graph call. In the 2026-11-12 Microsoft outage Graph held
+ * each request ~20 s before answering 502, and outbound mail is sent while the
+ * user waits. A stall now gives up after 10 s without a byte (5 s to connect);
+ * a large attachment upload that keeps moving is unaffected.
+ */
+const GRAPH_CURL_LIMITS = [
+    CURLOPT_CONNECTTIMEOUT  => 5,
+    CURLOPT_LOW_SPEED_LIMIT => 1,
+    CURLOPT_LOW_SPEED_TIME  => 10,
+];
+
+/**
  * Perform an HTTP GET request with cURL. Returns the body, or null on
  * transport error / HTTP >= 400.
  *
@@ -36,7 +48,7 @@ if (!function_exists('logMsg')) {
 function curlGet(string $url, array $headers = [], ?int &$statusCode = null, bool $logErrors = true): ?string
 {
     $ch = curl_init($url);
-    curl_setopt_array($ch, [
+    curl_setopt_array($ch, GRAPH_CURL_LIMITS + [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_HTTPHEADER     => $headers,
         CURLOPT_TIMEOUT        => 30,
@@ -70,7 +82,7 @@ function curlGet(string $url, array $headers = [], ?int &$statusCode = null, boo
 function curlPost(string $url, string $body, array $headers = []): ?string
 {
     $ch = curl_init($url);
-    curl_setopt_array($ch, [
+    curl_setopt_array($ch, GRAPH_CURL_LIMITS + [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_POST           => true,
         CURLOPT_POSTFIELDS     => $body,
@@ -101,7 +113,7 @@ function curlPost(string $url, string $body, array $headers = []): ?string
 function curlPatch(string $url, string $body, array $headers = []): void
 {
     $ch = curl_init($url);
-    curl_setopt_array($ch, [
+    curl_setopt_array($ch, GRAPH_CURL_LIMITS + [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_CUSTOMREQUEST  => 'PATCH',
         CURLOPT_POSTFIELDS     => $body,
@@ -130,7 +142,7 @@ function curlPatch(string $url, string $body, array $headers = []): void
 function graphRequest(string $method, string $url, array $headers = [], string $body = ''): array
 {
     $ch = curl_init($url);
-    curl_setopt_array($ch, [
+    curl_setopt_array($ch, GRAPH_CURL_LIMITS + [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_CUSTOMREQUEST  => $method,
         CURLOPT_POSTFIELDS     => $body,

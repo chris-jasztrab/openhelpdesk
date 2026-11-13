@@ -11,6 +11,17 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.231.0 &mdash; 2026-11-13
+
+### Added
+- **Failed emails are retried automatically.** Emails that failed to send are now retried every 30 minutes for up to 3 days, for example ones that failed during a Microsoft outage. Change the interval at the top of **Settings → Email Queue** (5–1440 minutes, or 0 to turn it off); the page shows when the last retry ran. Emails held by `MAIL_ENABLED=false` are never retried, so turning outbound mail back on still never sends that backlog by itself. Retries run as part of the 5-minute SLA job, so no new cron line is needed.
+
+### Fixed
+- **A Microsoft outage no longer freezes ticket saves.** Ticket emails go out while the person saving waits. During the 2026-11-12 Microsoft 365 outage each email took 20–30 seconds to fail, so a save that notified a five-person group could hang for about two minutes.
+  - **Circuit breaker:** after one email fails *slowly* (5 seconds or more), the rest of the emails for that save go straight to the queue without trying. **Send all now** and the automatic retry stop early in the same way. A quick failure, such as one bad address, doesn't trip it.
+  - **Shorter waits on Microsoft:** every Microsoft Graph call (sending mail, reading inbound mail, the out-of-office check) gives up after 5 seconds trying to connect or 10 seconds with no data. Before, it waited up to 30 seconds. A large attachment upload that keeps moving is not cut off.
+  - **Send all now** now reports how many emails are left in the queue, including any it didn't try after a stall.
+
 ## 2.230.1 &mdash; 2026-11-12
 
 ### Fixed

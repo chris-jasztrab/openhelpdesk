@@ -107,7 +107,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
     <li><strong>Flush queue</strong> deletes every held message without sending it.</li>
 </ul>
 <div class="alert alert-warning small mb-0"><i class="bi bi-exclamation-triangle me-2"></i>
-    Nothing drains the queue automatically, so turning <code>MAIL_ENABLED</code> back on never sends the backlog by itself. Review it before pressing <strong>Send all now</strong>: a backlog can hold weeks of stale notifications.
+    Emails that failed to send (for example during a Microsoft outage) are retried automatically every 30 minutes for 3 days; change the interval, or set it to 0 to turn retries off, at the top of the Email Queue page. Mail held by <code>MAIL_ENABLED=false</code> is never retried, so turning it back on never sends that backlog by itself. Review the queue before pressing <strong>Send all now</strong>: a backlog can hold weeks of stale notifications.
 </div>
 </div>
 </div>

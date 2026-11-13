@@ -43,4 +43,25 @@ class MailQueueTest extends TestCase
         $this->assertSame(4242, (int) $rows[0]['ticket_id']);
         $this->assertSame(0, (int) $rows[0]['attempts']);
     }
+
+    /**
+     * The timed retry must never release kill-switch rows or stale ones, and a
+     * row that keeps failing goes to the back. Selection only — nothing is sent.
+     */
+    public function testRetryPicksRecentFailuresLeastTriedFirst(): void
+    {
+        $db  = Database::connect();
+        $ins = $db->prepare(
+            "INSERT INTO mail_queue (to_email, subject, html_body, reason, attempts, created_at)
+             VALUES (?, ?, '<p>x</p>', ?, ?, NOW() - INTERVAL ? DAY)"
+        );
+        $ins->execute([self::TO, 'kill switch', 'MAIL_ENABLED=false', 0, 0]);
+        $ins->execute([self::TO, 'too old', 'Graph POST HTTP 502', 0, 4]);
+        $ins->execute([self::TO, 'tried twice', 'Graph POST HTTP 502', 2, 0]);
+        $ins->execute([self::TO, 'fresh', 'Graph POST HTTP 502', 0, 1]);
+
+        $mine = array_values(array_filter(mailQueueRetryRows($db), fn ($r) => $r['to_email'] === self::TO));
+
+        $this->assertSame(['fresh', 'tried twice'], array_column($mine, 'subject'));
+    }
 }

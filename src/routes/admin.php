@@ -9919,7 +9919,8 @@ $router->post('/admin/settings/labels/reset', function () {
 
 /**
  * Email queue — every email sendMail() could not deliver (kill switch off,
- * SMTP unconfigured, SMTP error). Nothing drains it automatically.
+ * SMTP unconfigured, SMTP error). Failed sends are retried on a timer
+ * (mailQueueRetryDue, via the SLA cron); kill-switch rows wait for an admin.
  */
 $router->get('/admin/settings/email-queue', function () {
     Auth::requirePermission('settings.manage');
@@ -9929,7 +9930,31 @@ $router->get('/admin/settings/email-queue', function () {
         'SELECT id, to_email, to_name, subject, ticket_id, reason, attempts, last_error, created_at
          FROM mail_queue ORDER BY id DESC LIMIT 500'
     )->fetchAll(PDO::FETCH_ASSOC);
-    render('admin/settings/email-queue', ['rows' => $rows, 'total' => $total]);
+    render('admin/settings/email-queue', [
+        'rows'         => $rows,
+        'total'        => $total,
+        'retryMinutes' => (int) getSetting('mail_queue_retry_minutes', '30'),
+        'retryLastAt'  => (int) getSetting('mail_queue_retry_last_at', '0'),
+    ]);
+});
+
+$router->post('/admin/settings/email-queue/retry', function () {
+    Auth::requirePermission('settings.manage');
+    if (!verifyCsrf($_POST['_token'] ?? '')) {
+        flash('error', 'Invalid request.');
+        redirect('/admin/settings/email-queue');
+    }
+    $minutes = (int) ($_POST['mail_queue_retry_minutes'] ?? 30);
+    if ($minutes !== 0 && ($minutes < 5 || $minutes > 1440)) {
+        flash('error', 'Retry interval must be 0 (off) or between 5 and 1440 minutes.');
+        redirect('/admin/settings/email-queue');
+    }
+    $before = getSetting('mail_queue_retry_minutes', '30');
+    setSetting('mail_queue_retry_minutes', (string) $minutes);
+    logAuditChange('mail_queue.retry_changed', null, null,
+        ['mail_queue_retry_minutes' => $before], ['mail_queue_retry_minutes' => (string) $minutes]);
+    flash('success', $minutes === 0 ? 'Automatic retry is off.' : "Failed emails will be retried every {$minutes} minutes.");
+    redirect('/admin/settings/email-queue');
 });
 
 // Deliberately bypasses MAIL_ENABLED: an admin pressed the button and confirmed.
@@ -9943,11 +9968,13 @@ $router->post('/admin/settings/email-queue/send-all', function () {
     session_write_close();
     @set_time_limit(0);
     ignore_user_abort(true);
-    $r = mailQueueSendAll();
+    $r    = mailQueueSendAll();
+    $left = (int) Database::connect()->query('SELECT COUNT(*) FROM mail_queue')->fetchColumn();
     session_start();
     logAudit('mail_queue.sent', null, null, "Sent {$r['sent']} queued email(s), {$r['failed']} failed");
-    flash($r['failed'] > 0 ? 'error' : 'success',
-        "Sent {$r['sent']} queued email(s)." . ($r['failed'] > 0 ? " {$r['failed']} failed and remain in the queue." : ''));
+    // $left also counts rows not tried because the transport stalled part-way through.
+    flash($left > 0 ? 'error' : 'success',
+        "Sent {$r['sent']} queued email(s)." . ($left > 0 ? " {$left} remain in the queue." : ''));
     redirect('/admin/settings/email-queue');
 });
 

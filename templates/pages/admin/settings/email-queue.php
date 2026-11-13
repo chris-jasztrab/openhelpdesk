@@ -36,6 +36,19 @@ $mailDisabled = env('MAIL_ENABLED', 'true') === 'false';
         <?php endif; ?>
     </div>
     <div class="card-body p-0">
+        <form method="POST" action="/admin/settings/email-queue/retry" class="d-flex flex-wrap align-items-center gap-2 p-3 border-bottom bg-light">
+            <?= csrfField() ?>
+            <label for="mail_queue_retry_minutes" class="small fw-semibold mb-0">Retry failed emails every</label>
+            <input type="number" id="mail_queue_retry_minutes" name="mail_queue_retry_minutes" class="form-control form-control-sm"
+                   style="width:6rem" min="0" max="1440" value="<?= (int) $retryMinutes ?>">
+            <span class="small">minutes</span>
+            <button type="submit" class="btn btn-sm btn-outline-primary">Save</button>
+            <span class="small text-muted w-100">
+                Emails that failed to send in the last 3 days are retried automatically; 0 turns this off.
+                Emails held by <code>MAIL_ENABLED=false</code> are never retried.
+                <?php if ($retryMinutes > 0 && $retryLastAt > 0): ?>Last retry: <?= e(date('M j, g:i a', $retryLastAt)) ?>.<?php endif; ?>
+            </span>
+        </form>
         <?php if ($mailDisabled): ?>
         <div class="alert alert-warning rounded-0 border-0 mb-0">
             <i class="bi bi-exclamation-triangle me-1"></i>
@@ -44,7 +57,7 @@ $mailDisabled = env('MAIL_ENABLED', 'true') === 'false';
         </div>
         <?php endif; ?>
         <?php if ($total === 0): ?>
-        <p class="text-muted p-4 mb-0">The queue is empty. Emails land here when mail is disabled, SMTP is not configured, or the SMTP server rejects a send.</p>
+        <p class="text-muted p-4 mb-0">The queue is empty. Emails land here when mail is disabled, sending is not configured, or the mail server rejects or times out a send.</p>
         <?php else: ?>
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
