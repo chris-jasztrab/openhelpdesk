@@ -38,7 +38,14 @@ $th = static fn(string $col, string $text): string =>
         </a>
         <a href="/inventory/reports" class="btn btn-sm btn-outline-secondary" title="Warranty, audit, age, assignment and activity reports"><i class="bi bi-bar-chart me-1"></i>Reports</a>
         <?php if (Assets::canManage()): ?>
-        <a href="/inventory/labels" class="btn btn-sm btn-outline-secondary" id="printLabelsBtn" title="Print QR code labels — tick assets below to print a specific set"><i class="bi bi-qr-code me-1"></i>Labels</a>
+        <?php
+        // No ticks: print the whole filtered list (or open the chooser when unfiltered). Ticks override (see JS below).
+        $labelsUrl  = $hasFilters ? '/inventory/labels?set=filter&' . http_build_query($filterParams) : '/inventory/labels';
+        $labelsText = 'Labels' . ($hasFilters ? ' (' . number_format($total) . ' filtered)' : '');
+        ?>
+        <a href="<?= e($labelsUrl) ?>" class="btn btn-sm btn-outline-secondary" id="printLabelsBtn"
+           data-base-href="<?= e($labelsUrl) ?>" data-base-text="<?= e($labelsText) ?>"
+           title="Print QR code labels — prints the filtered list, or only the ticked assets"><i class="bi bi-qr-code me-1"></i><?= e($labelsText) ?></a>
         <a href="/inventory/audit" class="btn btn-sm btn-outline-secondary" title="Scan tags to record a physical inventory"><i class="bi bi-upc-scan me-1"></i>Audit mode</a>
         <a href="/inventory/create" class="btn btn-sm text-white" style="background:var(--ld-primary);"><i class="bi bi-plus-lg me-1"></i>Add asset</a>
         <?php endif; ?>
@@ -175,6 +182,7 @@ $th = static fn(string $col, string $text): string =>
                     <option value="">—</option>
                     <option value="serial" <?= $missing === 'serial' ? 'selected' : '' ?>>Serial number</option>
                     <option value="purchase_date" <?= $missing === 'purchase_date' ? 'selected' : '' ?>>Purchase date</option>
+                    <option value="label" <?= $missing === 'label' ? 'selected' : '' ?>>QR label (created here, not imported)</option>
                 </select>
             </div>
             <?php if ($deletedCount > 0): ?>
@@ -360,15 +368,16 @@ document.getElementById('coModal').addEventListener('show.bs.modal', function (e
 
 <?php if ($canPick): ?>
 <script>
-/* Tick assets → the Labels button prints just those; none ticked → it opens the label chooser. */
+/* Tick assets → the Labels button prints just those; none ticked → it prints
+   the whole filtered list (or opens the label chooser when unfiltered). */
 (function () {
     var btn = document.getElementById('printLabelsBtn');
     var all = document.getElementById('lblPickAll');
     function picks() { return Array.prototype.slice.call(document.querySelectorAll('.lbl-pick:checked')); }
     function update() {
         var p = picks();
-        btn.href = p.length ? '/inventory/labels?ids=' + p.map(function (c) { return c.value; }).join(',') : '/inventory/labels';
-        btn.innerHTML = '<i class="bi bi-qr-code me-1"></i>Labels' + (p.length ? ' (' + p.length + ')' : '');
+        btn.href = p.length ? '/inventory/labels?ids=' + p.map(function (c) { return c.value; }).join(',') : btn.getAttribute('data-base-href');
+        btn.innerHTML = '<i class="bi bi-qr-code me-1"></i>' + (p.length ? 'Labels (' + p.length + ' ticked)' : btn.getAttribute('data-base-text'));
     }
     document.querySelectorAll('.lbl-pick').forEach(function (c) { c.addEventListener('change', update); });
     if (all) {

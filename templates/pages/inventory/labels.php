@@ -18,6 +18,7 @@ $breadcrumbs = [
         <div class="d-flex gap-2 align-items-center flex-wrap">
             <?php if (!empty($assets)): ?>
             <span class="badge bg-secondary fs-6"><?= number_format(count($assets)) ?> label<?= count($assets) === 1 ? '' : 's' ?></span>
+            <?php if (count($assets) === 2000): ?><span class="badge bg-warning text-dark fs-6" title="A print run caps at 2,000 labels — narrow the filter for the rest">capped at 2,000</span><?php endif; ?>
             <button type="button" class="btn btn-sm text-white" style="background:var(--ld-primary);" onclick="window.print()">
                 <i class="bi bi-printer me-1"></i>Print
             </button>
@@ -40,8 +41,9 @@ $breadcrumbs = [
             </div>
             <p class="text-muted small mb-0">
                 "Assets without a QR label" are the ones created here — assets imported from Snipe-IT already carry a printed QR code.
-                To print a specific set, tick assets on the <a href="/inventory">inventory list</a> and use its Labels button,
-                or open one asset and click <em>Print label</em>.
+                To print a specific set, use the <a href="/inventory">inventory list</a>: filter it (<?= e(strtolower(label('location.singular'))) ?>,
+                category, assigned person, "missing QR label"…) and its Labels button prints everything matching, or tick
+                individual assets to print only those. One asset's page also has a <em>Print label</em> button.
             </p>
         </div>
     </div>

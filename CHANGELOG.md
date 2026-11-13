@@ -11,6 +11,12 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.235.0 &mdash; 2026-11-13
+
+### Added
+- **Print labels for a filtered set.** With filters on (a location, a category, checked out to a person, a search…), the inventory list's **Labels** button now reads "Labels (N filtered)" and prints every matching asset — all pages, not just the visible one. Ticking assets still overrides it ("Labels (n ticked)"), and with no filters it opens the label chooser as before. A print run caps at 2,000 labels and says so.
+- **"Missing: QR label" filter.** The list's Missing filter gains *QR label (created here, not imported)* — the assets added in this app, which never got a Snipe-IT label. Combine it with any other filter, e.g. unlabeled assets at one branch.
+
 ## 2.234.0 &mdash; 2026-11-13
 
 ### Added

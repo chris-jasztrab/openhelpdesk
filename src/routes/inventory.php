@@ -69,14 +69,15 @@ function assetAgeCase(): string
     return $sql . ' END';
 }
 
-$router->get('/inventory', function () {
-    Auth::requirePermission('assets.view', 'assets.manage');
-    $db = Database::connect();
-
-    if (isset($_GET['reset'])) {
-        redirect('/inventory');
-    }
-
+/**
+ * Parse the inventory list's GET filter params and build the matching WHERE
+ * clause. Shared by the list and label printing (?set=filter), so "print
+ * labels for what I filtered" always matches exactly what the list shows.
+ * Returns whereSql + bind params, the filterParams echo for links/forms, and
+ * each filter's parsed state for the template.
+ */
+function assetListFilters(): array
+{
     $q          = trim(requestScalar('q'));
     $catFilter  = array_values(array_filter(array_map('intval', (array) ($_GET['category'] ?? []))));
     $statRaw    = (array) ($_GET['status'] ?? []);
@@ -102,7 +103,7 @@ $router->get('/inventory', function () {
     $mfFilter = array_values(array_filter(array_map('trim', (array) ($_GET['manufacturer'] ?? []))));
     $model    = (int) requestScalar('model', '0');
     $age      = isset(ASSET_AGE_BUCKETS[requestScalar('age')]) ? requestScalar('age') : '';
-    $missing  = in_array(requestScalar('missing'), ['serial', 'purchase_date'], true) ? requestScalar('missing') : '';
+    $missing  = in_array(requestScalar('missing'), ['serial', 'purchase_date', 'label'], true) ? requestScalar('missing') : '';
 
     $where  = [$deleted ? 'a.deleted_at IS NOT NULL' : 'a.deleted_at IS NULL'];
     $params = [];
@@ -187,20 +188,11 @@ $router->get('/inventory', function () {
         $where[] = "(a.serial IS NULL OR a.serial = '')";
     } elseif ($missing === 'purchase_date') {
         $where[] = 'a.purchase_date IS NULL';
+    } elseif ($missing === 'label') {
+        // Created in this app — Snipe-IT imports came with a QR label already on the device.
+        $where[] = 'a.snipeit_id IS NULL';
     }
     $whereSql = ' WHERE ' . implode(' AND ', $where);
-
-    $sortable = [
-        'tag' => 'a.asset_tag', 'name' => 'a.name', 'serial' => 'a.serial', 'model' => 'm.name',
-        'category' => 'c.name', 'status' => 's.name', 'location' => 'l.name',
-        'assigned' => 'COALESCE(u.last_name, al.name, pa.asset_tag, a.import_assignee)',
-        'purchase_date' => 'a.purchase_date', 'created_at' => 'a.created_at',
-        'warranty_end' => 'a.warranty_end', 'last_audit' => 'a.last_audit_at', 'acquired' => ASSET_ACQUIRED,
-    ];
-    $sort     = requestScalar('sort', 'tag');
-    $dir      = strtolower(requestScalar('dir', 'asc')) === 'desc' ? 'desc' : 'asc';
-    $orderCol = $sortable[$sort] ?? 'a.asset_tag';
-    $orderSql = " ORDER BY {$orderCol} " . strtoupper($dir) . ', a.asset_tag ASC';
 
     $filterParams = [];
     if ($q !== '')          $filterParams['q']        = $q;
@@ -218,6 +210,40 @@ $router->get('/inventory', function () {
     if ($model > 0)          $filterParams['model']    = $model;
     if ($age !== '')         $filterParams['age']      = $age;
     if ($missing !== '')     $filterParams['missing']  = $missing;
+
+    return [
+        'whereSql' => $whereSql,
+        'params'   => $params,
+        'filterParams' => $filterParams,
+        'q' => $q, 'catFilter' => $catFilter, 'statFilter' => $statFilter, 'deployed' => $deployed,
+        'locFilter' => $locFilter, 'assigned' => $assigned, 'deleted' => $deleted,
+        'auditBefore' => $auditBefore, 'auditAfter' => $auditAfter, 'audit' => $audit,
+        'warranty' => $warranty, 'wDays' => $wDays, 'mfFilter' => $mfFilter, 'model' => $model,
+        'age' => $age, 'missing' => $missing,
+    ];
+}
+
+$router->get('/inventory', function () {
+    Auth::requirePermission('assets.view', 'assets.manage');
+    $db = Database::connect();
+
+    if (isset($_GET['reset'])) {
+        redirect('/inventory');
+    }
+
+    extract(assetListFilters());
+
+    $sortable = [
+        'tag' => 'a.asset_tag', 'name' => 'a.name', 'serial' => 'a.serial', 'model' => 'm.name',
+        'category' => 'c.name', 'status' => 's.name', 'location' => 'l.name',
+        'assigned' => 'COALESCE(u.last_name, al.name, pa.asset_tag, a.import_assignee)',
+        'purchase_date' => 'a.purchase_date', 'created_at' => 'a.created_at',
+        'warranty_end' => 'a.warranty_end', 'last_audit' => 'a.last_audit_at', 'acquired' => ASSET_ACQUIRED,
+    ];
+    $sort     = requestScalar('sort', 'tag');
+    $dir      = strtolower(requestScalar('dir', 'asc')) === 'desc' ? 'desc' : 'asc';
+    $orderCol = $sortable[$sort] ?? 'a.asset_tag';
+    $orderSql = " ORDER BY {$orderCol} " . strtoupper($dir) . ', a.asset_tag ASC';
 
     if (requestScalar('export') === 'csv') {
         $stmt = $db->prepare(assetSelect() . $whereSql . $orderSql);
@@ -409,6 +435,12 @@ $router->get('/inventory/labels', function () {
     $assets = [];
     if ($set === 'new' || $set === 'all') {
         $assets = $db->query($select . ' WHERE a.deleted_at IS NULL' . ($set === 'new' ? ' AND a.snipeit_id IS NULL' : '') . ' ORDER BY a.asset_tag LIMIT 2000')->fetchAll();
+    } elseif ($set === 'filter') {
+        // Everything matching the inventory list's current filters (the list's Labels button carries them here).
+        $f    = assetListFilters();
+        $stmt = $db->prepare(assetSelect() . $f['whereSql'] . ' ORDER BY a.asset_tag LIMIT 2000');
+        $stmt->execute($f['params']);
+        $assets = $stmt->fetchAll();
     } elseif ($ids !== []) {
         $ids  = array_slice($ids, 0, 2000);
         $stmt = $db->prepare($select . ' WHERE a.id IN (' . implode(',', array_fill(0, count($ids), '?')) . ') ORDER BY a.asset_tag');
