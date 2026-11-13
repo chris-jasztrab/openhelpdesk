@@ -11,6 +11,12 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.236.0 &mdash; 2026-11-13
+
+### Added
+- **Named custom label sizes.** On the label print page, pick **New custom size…**, give it a name (e.g. "Avery 2 × 1 in"), set the dimensions and save — it becomes its own entry in the printer dropdown, editable and deletable like any preset.
+- **Label stock / ribbon notes.** Every printer preset has a free-text supplies note — which label SKU and ribbon/ink it takes — shown and editable right on the print page and saved with the preset. The built-in printers come pre-filled: Dymo 30334/30252 rolls (direct thermal, the 550 needs genuine chipped stock), Zebra ZD411t thermal-transfer labels (Z-Select 4000T paper or Z-Ultimate 3000T polyester) + wax ribbon such as Zebra 2300, ZD421 t/d variants, GK420d direct-thermal only, Brother DK-1201/DK-1204 rolls and TZe-251 tape, and direct-thermal rolls for Rollo, Munbyn and Phomemo.
+
 ## 2.235.0 &mdash; 2026-11-13
 
 ### Added

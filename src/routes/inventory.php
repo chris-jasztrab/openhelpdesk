@@ -394,27 +394,40 @@ $router->post('/inventory/audit/scan', function () {
 /* ── QR label printing (assets.manage) ── */
 
 /**
- * Built-in label-printer presets: key => [display name, label width mm, label height mm].
- * One entry per common label printer with its usual asset-tag media; saved
- * per-preset overrides (padding, QR size, fonts, fields) live in the
- * asset_label_profiles setting as JSON.
+ * Built-in label-printer presets: key => [display name, label width mm,
+ * label height mm, label stock / ribbon supplies note]. One entry per common
+ * label printer with its usual asset-tag media; saved per-preset overrides
+ * (padding, QR size, fonts, fields, stock note) live in the
+ * asset_label_profiles setting as JSON, as do named custom sizes (custom_*).
  */
 function assetLabelPresets(): array
 {
     return [
-        'dymo_lw450_30334'  => ['Dymo LabelWriter 450 — 30334 multipurpose (57 × 32 mm)', 57.2, 31.8],
-        'dymo_lw450_30252'  => ['Dymo LabelWriter 450 — 30252 address (89 × 28 mm)', 88.9, 28.6],
-        'dymo_lw550'        => ['Dymo LabelWriter 550 — 30334 multipurpose (57 × 32 mm)', 57.2, 31.8],
-        'zebra_zd411t'      => ['Zebra ZD411t — 2 × 1 in (51 × 25 mm)', 50.8, 25.4],
-        'zebra_zd421'       => ['Zebra ZD421 — 2.25 × 1.25 in (57 × 32 mm)', 57.2, 31.8],
-        'zebra_gk420d'      => ['Zebra GK420d — 2 × 1 in (51 × 25 mm)', 50.8, 25.4],
-        'brother_ql800'     => ['Brother QL-800 — DK-1201 address (90 × 29 mm)', 90.3, 29.0],
-        'brother_ql820nwb'  => ['Brother QL-820NWB — DK-1204 multipurpose (54 × 17 mm)', 54.3, 17.1],
-        'brother_pt_p750w'  => ['Brother P-touch P750W — TZe 24 mm tape (72 × 24 mm)', 72.0, 24.0],
-        'rollo'             => ['Rollo — 2 × 1 in (51 × 25 mm)', 50.8, 25.4],
-        'munbyn_itpp941'    => ['Munbyn ITPP941 — 2.25 × 1.25 in (57 × 32 mm)', 57.2, 31.8],
-        'phomemo_m110'      => ['Phomemo M110 — 40 × 30 mm', 40.0, 30.0],
-        'custom'            => ['Custom label size', 60.0, 30.0],
+        'dymo_lw450_30334'  => ['Dymo LabelWriter 450 — 30334 multipurpose (57 × 32 mm)', 57.2, 31.8,
+            'Dymo 30334 labels — direct thermal, no ribbon or ink'],
+        'dymo_lw450_30252'  => ['Dymo LabelWriter 450 — 30252 address (89 × 28 mm)', 88.9, 28.6,
+            'Dymo 30252 labels — direct thermal, no ribbon or ink'],
+        'dymo_lw550'        => ['Dymo LabelWriter 550 — 30334 multipurpose (57 × 32 mm)', 57.2, 31.8,
+            'Dymo 30334 labels — the 550 only feeds genuine chipped Dymo stock; direct thermal, no ribbon'],
+        'zebra_zd411t'      => ['Zebra ZD411t — 2 × 1 in (51 × 25 mm)', 50.8, 25.4,
+            '2 × 1 in thermal-transfer labels (Zebra Z-Select 4000T paper, or Z-Ultimate 3000T polyester for durable asset tags) + wax ribbon such as Zebra 2300; also runs direct-thermal stock (Z-Select 4000D) with no ribbon'],
+        'zebra_zd421'       => ['Zebra ZD421 — 2.25 × 1.25 in (57 × 32 mm)', 57.2, 31.8,
+            '2.25 × 1.25 in labels; the ZD421t needs a wax ribbon (e.g. Zebra 2300), the ZD421d takes direct-thermal stock with no ribbon'],
+        'zebra_gk420d'      => ['Zebra GK420d — 2 × 1 in (51 × 25 mm)', 50.8, 25.4,
+            'Direct thermal only — 2 × 1 in DT labels (e.g. Zebra Z-Select 4000D), no ribbon'],
+        'brother_ql800'     => ['Brother QL-800 — DK-1201 address (90 × 29 mm)', 90.3, 29.0,
+            'Brother DK-1201 rolls — direct thermal, no ribbon or ink'],
+        'brother_ql820nwb'  => ['Brother QL-820NWB — DK-1204 multipurpose (54 × 17 mm)', 54.3, 17.1,
+            'Brother DK-1204 rolls — direct thermal, no ribbon or ink'],
+        'brother_pt_p750w'  => ['Brother P-touch P750W — TZe 24 mm tape (72 × 24 mm)', 72.0, 24.0,
+            'Brother TZe-251 24 mm laminated tape (black on white) — the ink ribbon is built into the tape cassette'],
+        'rollo'             => ['Rollo — 2 × 1 in (51 × 25 mm)', 50.8, 25.4,
+            '2 × 1 in direct-thermal labels, any brand — no ribbon or ink'],
+        'munbyn_itpp941'    => ['Munbyn ITPP941 — 2.25 × 1.25 in (57 × 32 mm)', 57.2, 31.8,
+            '2.25 × 1.25 in direct-thermal labels — no ribbon or ink'],
+        'phomemo_m110'      => ['Phomemo M110 — 40 × 30 mm', 40.0, 30.0,
+            'Phomemo 40 × 30 mm direct-thermal labels — no ribbon or ink'],
+        'custom'            => ['New custom size…', 60.0, 30.0, ''],
     ];
 }
 
@@ -447,10 +460,21 @@ $router->get('/inventory/labels', function () {
         $stmt->execute($ids);
         $assets = $stmt->fetchAll();
     }
+    // Saved named custom sizes join the dropdown; the "New custom size…" sentinel stays last.
+    $profiles = json_decode(getSetting('asset_label_profiles', '{}'), true) ?: [];
+    $presets  = assetLabelPresets();
+    $newCustom = $presets['custom'];
+    unset($presets['custom']);
+    foreach ($profiles as $k => $p) {
+        if (str_starts_with($k, 'custom_') && !empty($p['name'])) {
+            $presets[$k] = [(string) $p['name'], (float) ($p['w'] ?? 60), (float) ($p['h'] ?? 30), (string) ($p['stock'] ?? '')];
+        }
+    }
+    $presets['custom'] = $newCustom;
     render('inventory/labels', [
         'assets'         => $assets,
-        'presets'        => assetLabelPresets(),
-        'profiles'       => json_decode(getSetting('asset_label_profiles', '{}'), true) ?: [],
+        'presets'        => $presets,
+        'profiles'       => $profiles,
         'selectedPreset' => getSetting('asset_label_preset', 'dymo_lw450_30334'),
         'labelBase'      => appUrl(),
         'newCount'       => (int) $db->query('SELECT COUNT(*) FROM assets WHERE deleted_at IS NULL AND snipeit_id IS NULL')->fetchColumn(),
@@ -469,7 +493,33 @@ $router->post('/inventory/labels/settings', function () {
     }
     $presets = assetLabelPresets();
     $key     = (string) ($_POST['preset'] ?? '');
-    if (!isset($presets[$key])) {
+    $all     = json_decode(getSetting('asset_label_profiles', '{}'), true) ?: [];
+
+    if (($_POST['action'] ?? '') === 'delete') {
+        if (!str_starts_with($key, 'custom_') || !isset($all[$key])) {
+            http_response_code(422);
+            echo json_encode(['error' => 'Only saved custom sizes can be deleted.']);
+            exit;
+        }
+        unset($all[$key]);
+        setSetting('asset_label_profiles', json_encode($all));
+        if (getSetting('asset_label_preset', '') === $key) {
+            setSetting('asset_label_preset', 'dymo_lw450_30334');
+        }
+        logAudit('asset.label_settings_changed', null, null, 'deleted=' . $key);
+        echo json_encode(['ok' => true, 'reload' => true]);
+        exit;
+    }
+
+    // "New custom size…" + a name becomes its own named preset (custom_<slug>).
+    $name   = mb_substr(trim((string) ($_POST['name'] ?? '')), 0, 60);
+    $reload = false;
+    if ($key === 'custom' && $name !== '') {
+        $key    = 'custom_' . trim(substr(preg_replace('/[^a-z0-9]+/', '-', strtolower($name)), 0, 40), '-');
+        $reload = true;
+    }
+    $isCustom = str_starts_with($key, 'custom_');
+    if (!$isCustom && !isset($presets[$key])) {
         http_response_code(422);
         echo json_encode(['error' => 'Unknown printer preset.']);
         exit;
@@ -483,13 +533,17 @@ $router->post('/inventory/labels/settings', function () {
         'f1'     => $num('f1', 4, 40),
         'f2'     => $num('f2', 4, 40),
         'fields' => array_values(array_intersect(['tag', 'name', 'model', 'serial'], array_map('strval', (array) ($_POST['fields'] ?? [])))),
+        'stock'  => mb_substr(trim((string) ($_POST['stock'] ?? '')), 0, 300),
     ];
-    $all       = json_decode(getSetting('asset_label_profiles', '{}'), true) ?: [];
+    if ($isCustom) {
+        $profile['name'] = $name !== '' ? $name : (string) ($all[$key]['name'] ?? 'Custom');
+        $reload = $reload || $profile['name'] !== (string) ($all[$key]['name'] ?? '');
+    }
     $all[$key] = $profile;
     setSetting('asset_label_profiles', json_encode($all));
     setSetting('asset_label_preset', $key);
     logAudit('asset.label_settings_changed', null, null, 'preset=' . $key);
-    echo json_encode(['ok' => true]);
+    echo json_encode(['ok' => true, 'reload' => $reload, 'preset' => $key]);
     exit;
 });
 

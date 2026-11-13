@@ -96,7 +96,18 @@ $breadcrumbs = [
                     <button type="button" class="btn btn-sm btn-outline-secondary" id="lblSave" title="Save this layout for the selected printer and make it the default">
                         <i class="bi bi-save me-1"></i>Save for this printer
                     </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger d-none" id="lblDelete" title="Delete this saved custom size" aria-label="Delete this saved custom size"><i class="bi bi-trash"></i></button>
                     <span class="small ms-1" id="lblSaveMsg"></span>
+                </div>
+            </div>
+            <div class="row g-2 align-items-end mt-1">
+                <div class="col-lg-3 col-md-4 d-none" id="lblNameWrap">
+                    <label class="form-label small fw-semibold mb-1" for="lblName">Custom size name</label>
+                    <input type="text" class="form-control form-control-sm" id="lblName" maxlength="60" placeholder="e.g. Avery 2 × 1 in">
+                </div>
+                <div class="col">
+                    <label class="form-label small fw-semibold mb-1" for="lblStock">Label stock / ribbon <span class="text-muted fw-normal">(which labels and ink this printer takes — saved with the preset)</span></label>
+                    <input type="text" class="form-control form-control-sm" id="lblStock" maxlength="300" placeholder="e.g. Zebra Z-Select 4000T 2 × 1 in + wax ribbon">
                 </div>
             </div>
         </div>
@@ -186,14 +197,14 @@ $breadcrumbs = [
         el.innerHTML = qr.createSvgTag({ cellSize: 2, margin: 0, scalable: true });
     });
 
-    var PRESETS = <?= json_encode(array_map(static fn(array $p): array => ['name' => $p[0], 'w' => $p[1], 'h' => $p[2]], $presets)) ?>;
+    var PRESETS = <?= json_encode(array_map(static fn(array $p): array => ['name' => $p[0], 'w' => $p[1], 'h' => $p[2], 'stock' => $p[3] ?? ''], $presets)) ?>;
     var SAVED   = <?= json_encode($profiles) ?>;
     var FIELDS  = ['tag', 'name', 'model', 'serial'];
     var inputs  = { w: 'lblW', h: 'lblH', pad: 'lblPad', qr: 'lblQr', f1: 'lblF1', f2: 'lblF2' };
 
     function defaultsFor(key) {
         var p = PRESETS[key];
-        return { w: p.w, h: p.h, pad: 2, qr: Math.min(Math.round((p.h - 4) * 2) / 2, 26), f1: 11, f2: 7, fields: FIELDS.slice() };
+        return { w: p.w, h: p.h, pad: 2, qr: Math.min(Math.round((p.h - 4) * 2) / 2, 26), f1: 11, f2: 7, fields: FIELDS.slice(), stock: p.stock || '' };
     }
     function profileFor(key) {
         var d = defaultsFor(key), s = SAVED[key] || {};
@@ -209,6 +220,11 @@ $breadcrumbs = [
     function fillForm(p) {
         Object.keys(inputs).forEach(function (k) { document.getElementById(inputs[k]).value = p[k]; });
         document.querySelectorAll('.lbl-field').forEach(function (c) { c.checked = p.fields.indexOf(c.value) !== -1; });
+        var key = presetSel.value;
+        document.getElementById('lblStock').value = p.stock || '';
+        document.getElementById('lblName').value = (SAVED[key] && SAVED[key].name) || '';
+        document.getElementById('lblNameWrap').classList.toggle('d-none', !(key === 'custom' || key.indexOf('custom_') === 0));
+        document.getElementById('lblDelete').classList.toggle('d-none', key.indexOf('custom_') !== 0);
     }
     function apply() {
         var p = readForm();
@@ -227,21 +243,36 @@ $breadcrumbs = [
     Object.keys(inputs).forEach(function (k) { document.getElementById(inputs[k]).addEventListener('input', apply); });
     document.querySelectorAll('.lbl-field').forEach(function (c) { c.addEventListener('change', apply); });
 
-    document.getElementById('lblSave').addEventListener('click', function () {
-        var p = readForm(), body = new FormData(), msg = document.getElementById('lblSaveMsg');
-        body.append('_token', <?= json_encode(csrfToken()) ?>);
-        body.append('preset', presetSel.value);
-        Object.keys(inputs).forEach(function (k) { body.append(k, p[k]); });
-        p.fields.forEach(function (f) { body.append('fields[]', f); });
+    var TOKEN = <?= json_encode(csrfToken()) ?>;
+    function post(fields, msgOnOk) {
+        var body = new FormData(), msg = document.getElementById('lblSaveMsg');
+        body.append('_token', TOKEN);
+        Object.keys(fields).forEach(function (k) {
+            Array.isArray(fields[k]) ? fields[k].forEach(function (v) { body.append(k + '[]', v); }) : body.append(k, fields[k]);
+        });
         fetch('/inventory/labels/settings', { method: 'POST', body: body })
             .then(function (r) { return r.json(); })
             .then(function (r) {
-                SAVED[presetSel.value] = p;
-                msg.textContent = r.ok ? 'Saved' : (r.error || 'Save failed');
+                if (r.ok && r.reload) { location.reload(); return; }
+                msg.textContent = r.ok ? msgOnOk : (r.error || 'Save failed');
                 msg.className = 'small ms-1 ' + (r.ok ? 'text-success' : 'text-danger');
                 setTimeout(function () { msg.textContent = ''; }, 3000);
             })
             .catch(function () { msg.textContent = 'Save failed'; msg.className = 'small ms-1 text-danger'; });
+    }
+    document.getElementById('lblSave').addEventListener('click', function () {
+        var p = readForm();
+        p.preset = presetSel.value;
+        p.name  = document.getElementById('lblName').value;
+        p.stock = document.getElementById('lblStock').value;
+        SAVED[presetSel.value] = Object.assign({}, SAVED[presetSel.value], p);
+        post(p, 'Saved');
+    });
+    document.getElementById('lblDelete').addEventListener('click', function () {
+        var key = presetSel.value;
+        if (key.indexOf('custom_') === 0 && confirm('Delete the saved custom size "' + (PRESETS[key] ? PRESETS[key].name : key) + '"?')) {
+            post({ action: 'delete', preset: key }, 'Deleted');
+        }
     });
 
     fillForm(profileFor(presetSel.value));
