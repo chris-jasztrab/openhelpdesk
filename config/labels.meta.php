@@ -105,6 +105,11 @@ return [
             'group' => 'staff_nav',
             'where' => 'Settings page left menu, the Audit Log entry.',
         ],
+        'nav.inventory' => [
+            'group' => 'staff_nav',
+            'where' => 'Icon rail — the Inventory item (admin and staff rails), plus the heading, page titles '
+                     . 'and breadcrumbs of the Inventory list, asset, add/edit and Audit mode pages.',
+        ],
         'agent.nav.dashboard' => [
             'group' => 'staff_nav',
             'where' => 'Staff (non-admin) icon rail — first item.',
@@ -169,6 +174,27 @@ return [
         ],
 
         /* ── Portal requests & actions ────────────────────────────── */
+        'sla.notice_title' => [
+            'group' => 'portal_requests',
+            'where' => '"What happens next" pop-up after a request is submitted (portal form and the staff/admin '
+                     . 'New Ticket form), when its priority has SLA targets — the pop-up title.',
+        ],
+        'sla.notice_intro' => [
+            'group' => 'portal_requests',
+            'where' => '"What happens next" pop-up after a request is submitted — the sentence above the due times.',
+        ],
+        'sla.notice_response' => [
+            'group' => 'portal_requests',
+            'where' => '"What happens next" pop-up after a request is submitted — the first-response due time label.',
+        ],
+        'sla.notice_resolution' => [
+            'group' => 'portal_requests',
+            'where' => '"What happens next" pop-up after a request is submitted — the resolution due time label.',
+        ],
+        'sla.notice_footer' => [
+            'group' => 'portal_requests',
+            'where' => '"What happens next" pop-up after a request is submitted — the small print at the bottom.',
+        ],
         'portal.request.my_plural' => [
             'group' => 'portal_requests',
             'where' => 'The "My Requests" scope toggle on the portal request list, and the page heading / '

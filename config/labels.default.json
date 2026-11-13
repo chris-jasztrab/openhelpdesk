@@ -62,6 +62,7 @@
   "nav.settings": "Settings",
   "nav.reports": "Reports",
   "nav.audit_log": "Audit Log",
+  "nav.inventory": "Inventory",
   "nav.docs": "Docs",
 
   "portal.nav.dashboard": "Dashboard",

@@ -11,6 +11,13 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.232.1 &mdash; 2026-11-13
+
+### Fixed
+- **Fresh installs get the Domains tables.** `database/schema.sql` now declares `domains` (including the ignored-hosts and internal-DNS columns from migrations 092 and 093) and `domain_alerts_sent`. Before this, a new install would show an error on Settings → Domains. Existing installs are unaffected.
+- **"Inventory" and the "What happens next" pop-up can be renamed on the Labels page.** Settings → Labels listed these labels under *Not wired up yet* even though the app uses them. `nav.inventory` is also now in the default labels file.
+- **Test suite back to green** (861 tests). Two staff ticket-create tests still posted the form without a type, location and priority, which the form has required for a while, so the ticket was never created. One of them had been passing without checking that a ticket was made; it now checks. The list-vs-export test now loads the list 50 per page, so it no longer flags tickets that were only on page 2.
+
 ## 2.232.0 &mdash; 2026-11-13
 
 ### Added

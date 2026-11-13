@@ -86,12 +86,14 @@ class TicketExportListParityTest extends TestCase
     public function test_list_and_export_agree_on_status_filters(): void
     {
         foreach (['', 'status[]=open', 'status[]=resolved', 'status[]=definitely_not_a_status'] as $query) {
-            $listBody = (string) $this->get($this->agentClient(), '/agent/tickets?' . $query)->getBody();
+            // Largest page size the list offers, so every exported id can be on page one.
+            $listBody = (string) $this->get($this->agentClient(), '/agent/tickets?per_page=50&' . $query)->getBody();
             $exportIds = $this->exportIdsFor($query);
+            $this->assertLessThanOrEqual(50, count($exportIds),
+                'Precondition: the export must fit on one list page; the fixture set has outgrown this test');
 
             // Every id in the export must appear in the rendered list. The list
-            // paginates, so the converse is not asserted — a short fixture set
-            // keeps both on one page in practice.
+            // paginates, so the converse is not asserted.
             $missing = array_values(array_filter(
                 $exportIds,
                 static fn(string $id): bool => !str_contains($listBody, '/tickets/' . $id)

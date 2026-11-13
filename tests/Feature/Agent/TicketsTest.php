@@ -106,7 +106,7 @@ class TicketsTest extends TestCase
             'description'     => 'Filed by agent over the phone.',
             'status'          => 'open',
             'on_behalf_of_id' => $portalUserId,
-        ]);
+        ] + $this->requiredTicketFields());
         $this->assertTrue(in_array($r->getStatusCode(), [200, 302]));
 
         $sel = $db->prepare(
@@ -140,13 +140,43 @@ class TicketsTest extends TestCase
         $this->assertOk($r);
     }
 
+    /**
+     * Type, location and priority are required on the create form: a type the
+     * test agent may create (one with no task tickets, so cleanup stays one row),
+     * any location, and a priority that type allows.
+     */
+    private function requiredTicketFields(): array
+    {
+        $db    = \Database::connect();
+        $types = $db->query(
+            'SELECT t.id FROM ticket_types t
+              WHERE NOT EXISTS (SELECT 1 FROM ticket_type_tasks k WHERE k.type_id = t.id) ORDER BY t.id'
+        )->fetchAll(\PDO::FETCH_COLUMN);
+        $priorities = $db->query('SELECT id FROM ticket_priorities ORDER BY id')->fetchAll(\PDO::FETCH_COLUMN);
+        foreach ($types as $typeId) {
+            if (!userCanCreateTicketType($db, (int) $typeId, DatabaseSeeder::$agentId)) {
+                continue;
+            }
+            foreach ($priorities as $priId) {
+                if (priorityAllowedForType($db, (int) $typeId, (int) $priId)) {
+                    return [
+                        'type_id'     => (int) $typeId,
+                        'priority_id' => (int) $priId,
+                        'location_id' => (int) $db->query('SELECT id FROM locations ORDER BY id LIMIT 1')->fetchColumn(),
+                    ];
+                }
+            }
+        }
+        $this->fail('No ticket type + priority the test agent is allowed to create.');
+    }
+
     public function test_create_ticket_and_clean_up(): void
     {
         $r = $this->post($this->agentClient(), '/admin/tickets/create', [
             'subject'     => '[TEST] Agent-created ticket',
             'description' => 'Created by agent feature test.',
             'status'      => 'open',
-        ]);
+        ] + $this->requiredTicketFields());
 
         $code = $r->getStatusCode();
         $this->assertTrue($code === 200 || $code === 302, "Agent create ticket: expected 200/302, got $code");
@@ -158,7 +188,9 @@ class TicketsTest extends TestCase
         $db  = \Database::connect();
         $row = $db->prepare("SELECT id FROM tickets WHERE subject = '[TEST] Agent-created ticket'");
         $row->execute();
-        foreach ($row->fetchAll(\PDO::FETCH_COLUMN) as $id) {
+        $ids = $row->fetchAll(\PDO::FETCH_COLUMN);
+        $this->assertNotEmpty($ids, 'Ticket row was not created.');
+        foreach ($ids as $id) {
             $db->prepare('DELETE FROM ticket_timeline WHERE ticket_id = ?')->execute([$id]);
             $db->prepare('DELETE FROM tickets WHERE id = ?')->execute([$id]);
         }

@@ -403,6 +403,31 @@ CREATE TABLE IF NOT EXISTS `csat_surveys` (
   CONSTRAINT `csat_surveys_ibfk_1` FOREIGN KEY (`ticket_id`) REFERENCES `tickets` (`id`) ON DELETE CASCADE,
   CONSTRAINT `csat_surveys_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS `domains` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `name` varchar(253) NOT NULL,
+  `registrar` varchar(255) DEFAULT NULL,
+  `expires_at` date DEFAULT NULL,
+  `extra_hosts` text DEFAULT NULL,
+  `ignored_hosts` text DEFAULT NULL,
+  `internal_hosts` text DEFAULT NULL,
+  `dkim_selectors` varchar(255) DEFAULT NULL,
+  `notes` text DEFAULT NULL,
+  `check_data` mediumtext DEFAULT NULL,
+  `checked_at` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_domains_name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS `domain_alerts_sent` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `alert_key` varchar(190) NOT NULL,
+  `expires_on` date NOT NULL,
+  `tier` varchar(16) NOT NULL,
+  `sent_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_domain_alert` (`alert_key`,`expires_on`,`tier`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE IF NOT EXISTS `escalation_log` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `rule_id` int(10) unsigned NOT NULL,
