@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.241.1 &mdash; 2026-11-16
+
+### Fixed
+- **SLA policies on the last ticket-type tabs now save.** The SLA Policies page sends every ticket type&rsquo;s targets in one form, and past roughly 20 types that is more fields than PHP reads by default (1,000). The rest were dropped without an error, so the page said &ldquo;saved&rdquo; while the types at the end of the alphabet kept nothing &mdash; and could lose targets they already had. The form is now sent in a single packed field, so the number of types no longer matters, and a save that arrives cut off is refused with a message instead of being applied.
+
 ## 2.241.0 &mdash; 2026-11-16
 
 ### Added
