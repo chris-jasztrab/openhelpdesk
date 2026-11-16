@@ -100,6 +100,34 @@ $breadcrumbs = [
                 </div>
             </div>
 
+            <!-- Ticket Links -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-transparent fw-semibold">
+                    <i class="bi bi-link-45deg me-1"></i>Ticket Links
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        Choose where a link opens when you click it in a ticket&rsquo;s description or timeline.
+                    </p>
+                    <div class="d-flex gap-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="ticket_links" id="ticketLinksNew"
+                                   value="new" <?= ($ticketLinks ?? 'new') === 'new' ? 'checked' : '' ?>>
+                            <label class="form-check-label" for="ticketLinksNew">
+                                <i class="bi bi-box-arrow-up-right me-1"></i>New tab
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="ticket_links" id="ticketLinksSame"
+                                   value="same" <?= ($ticketLinks ?? 'new') === 'same' ? 'checked' : '' ?>>
+                            <label class="form-check-label" for="ticketLinksSame">
+                                <i class="bi bi-window me-1"></i>Same window
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <?php if (roleIsAdmin($user['role'])): ?>
             <!-- System Timeline Notes (admin only) -->
             <div class="card border-0 shadow-sm mb-4">

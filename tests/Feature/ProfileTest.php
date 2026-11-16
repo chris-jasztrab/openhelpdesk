@@ -102,6 +102,23 @@ class ProfileTest extends TestCase
         $this->assertTrue($code === 200 || $code === 302, "Expected 200 or redirect, got $code");
     }
 
+    public function test_ticket_links_setting_saves_and_reaches_the_page(): void
+    {
+        $client = $this->agentClient();
+
+        foreach (['same' => 'var same = true', 'new' => 'var same = false'] as $value => $expected) {
+            $this->post($client, '/profile', [
+                'first_name'   => 'TestAgent',
+                'last_name'    => 'User',
+                'theme'        => 'light',
+                'ticket_links' => $value,
+            ]);
+            $r = $this->get($client, '/profile');
+            $this->assertSee('Ticket Links', $r);
+            $this->assertSee($expected, $r);
+        }
+    }
+
     public function test_wrong_current_password_rejects_password_change(): void
     {
         $r = $this->post($this->portalClient(), '/profile', [

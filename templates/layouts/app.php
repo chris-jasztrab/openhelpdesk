@@ -594,6 +594,23 @@
     })();
     </script>
     <?php endif; ?>
+    <?php if (Auth::check()): ?>
+    <script>
+    /* Ticket links: open links inside ticket content (rich text, plain-text
+       descriptions, timeline entries) in a new tab or the same window, per the
+       user's profile setting. Done at click time so it also covers timeline
+       entries loaded later, and whatever target the original email carried. */
+    (function () {
+        var same = <?= json_encode(getUserTicketLinkTarget((int) Auth::id()) === 'same') ?>;
+        document.addEventListener('click', function (e) {
+            var a = e.target.closest && e.target.closest('.ck-content a[href], .rich a[href], a.tk-link');
+            if (!a || !/^https?:$/.test(a.protocol) || a.closest('.ck-editor__editable')) return;
+            a.target = same ? '_self' : '_blank';
+            if (!same) a.rel = 'noopener noreferrer';
+        }, true);
+    })();
+    </script>
+    <?php endif; ?>
     <?php require ROOT_DIR . '/templates/partials/table-resize.php'; ?>
 </body>
 </html>

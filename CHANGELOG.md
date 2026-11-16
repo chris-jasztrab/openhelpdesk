@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.241.0 &mdash; 2026-11-16
+
+### Added
+- **Choose where ticket links open.** My Profile has a new **Ticket Links** setting: **New tab** (the default) or **Same window**. It applies to links in a ticket&rsquo;s description and timeline, for everyone &mdash; staff and portal users each set their own. Links in emailed tickets used to open either way depending on how the original email was written; they now all follow your setting.
+
 ## 2.240.1 &mdash; 2026-11-16
 
 ### Fixed

@@ -450,7 +450,7 @@ function linkify(?string $value): string
     $escaped = htmlspecialchars($value ?? '', ENT_QUOTES | ENT_HTML5, 'UTF-8');
     return preg_replace(
         '/(https?:\/\/[^\s\'"<>]+)/i',
-        '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>',
+        '<a href="$1" class="tk-link" target="_blank" rel="noopener noreferrer">$1</a>',
         $escaped
     );
 }
@@ -4238,6 +4238,16 @@ function kanbanLoadBoard(PDO $db, int $boardId, int $userId): ?array
 function getUserTimelineSort(int $userId): string
 {
     return getSetting("timeline_sort:{$userId}", 'desc') === 'asc' ? 'asc' : 'desc';
+}
+
+/**
+ * Where links inside a ticket's description and timeline open for this user:
+ * 'new' (new tab — the default) or 'same' (current window). Applied by the
+ * click handler in layouts/app.php.
+ */
+function getUserTicketLinkTarget(int $userId): string
+{
+    return getSetting("ticket_links:{$userId}", 'new') === 'same' ? 'same' : 'new';
 }
 
 /* ── "Tickets by user" page (from the inbox-view person card) ─── */

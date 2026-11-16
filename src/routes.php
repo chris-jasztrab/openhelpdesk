@@ -2239,6 +2239,7 @@ $router->get('/profile', function () {
         'theme'              => $theme,
         'timelineSort'       => getUserTimelineSort((int) Auth::id()),
         'ticketView'         => getUserTicketView((int) Auth::id()),
+        'ticketLinks'        => getUserTicketLinkTarget((int) Auth::id()),
         'aiNotesVisible'     => aiNotesVisible(),
         'systemNotesVisible' => systemNotesVisible(),
         'sidebarItems'       => $sidebarItems,
@@ -2292,6 +2293,9 @@ $router->post('/profile', function () {
 
     // Save default ticket-timeline sort order
     setSetting('timeline_sort:' . $userId, ($_POST['timeline_sort'] ?? '') === 'asc' ? 'asc' : 'desc');
+
+    // Save where links inside a ticket open (new tab vs. same window)
+    setSetting('ticket_links:' . $userId, ($_POST['ticket_links'] ?? '') === 'same' ? 'same' : 'new');
 
     // Save AI / system note timeline preferences. The toggles only render for
     // admins, so a non-admin POST must not be allowed to clear these settings.
@@ -2391,6 +2395,12 @@ $router->post('/profile/setting', function () {
     // stay in sync.
     if ($field === 'timeline_sort') {
         setSetting('timeline_sort:' . $userId, $value === 'asc' ? 'asc' : 'desc');
+        echo json_encode(['ok' => true, 'message' => 'Saved']);
+        exit;
+    }
+
+    if ($field === 'ticket_links') {
+        setSetting('ticket_links:' . $userId, $value === 'same' ? 'same' : 'new');
         echo json_encode(['ok' => true, 'message' => 'Saved']);
         exit;
     }
