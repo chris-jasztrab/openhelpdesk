@@ -4542,7 +4542,7 @@ function mailQueueSendAll(?array $rows = null): array
 function mailQueueDelayNotice(array $row): array
 {
     $mins   = max(0, (int) ($row['queued_minutes'] ?? 0));
-    $waited = $mins < 1 ? 'less than a minute' : ($mins >= 2880 ? intdiv($mins, 1440) . ' days' : formatSlaDuration($mins));
+    $waited = $mins < 1 ? 'less than a minute' : ($mins >= 1440 ? intdiv($mins, 1440) . (intdiv($mins, 1440) === 1 ? ' day' : ' days') : formatSlaDuration($mins));
     $queued = date('M j \a\t g:i a', strtotime((string) $row['created_at']));
     $url    = rtrim((string) env('APP_URL', ''), '/');
     $lead   = "This message was delayed. It waited {$waited} in the email queue (queued {$queued}) and may be out of date.";
@@ -4909,17 +4909,25 @@ function applyEmailTokens(string $template, array $tokens): string
 
 /**
  * Format SLA minutes as a human-readable duration, e.g. "30 minutes",
- * "4 hours", "1 hour 30 minutes".
+ * "4 hours", "1 hour 30 minutes". Every full 24 hours is a working day, the
+ * way Sla::dueDatesFor() counts it: 10080 → "7 working days", not "168 hours".
  */
 function formatSlaDuration(int $minutes): string
 {
-    $h = intdiv($minutes, 60);
+    $d = intdiv($minutes, 1440);
+    $h = intdiv($minutes % 1440, 60);
     $m = $minutes % 60;
     $parts = [];
+    if ($d > 0) {
+        $parts[] = $d . ' working ' . ($d === 1 ? 'day' : 'days');
+        if ($minutes % 1440 === 0) {
+            return $parts[0];
+        }
+    }
     if ($h > 0) {
         $parts[] = $h . ' ' . ($h === 1 ? 'hour' : 'hours');
     }
-    if ($m > 0 || $h === 0) {
+    if ($m > 0 || ($h === 0 && $d === 0)) {
         $parts[] = $m . ' ' . ($m === 1 ? 'minute' : 'minutes');
     }
     return implode(' ', $parts);
@@ -5106,14 +5114,17 @@ function slaTargetSentence(int $responseMinutes, int $resolutionMinutes): string
 {
     $response   = $responseMinutes   > 0 ? formatSlaDuration($responseMinutes)   : '';
     $resolution = $resolutionMinutes > 0 ? formatSlaDuration($resolutionMinutes) : '';
+    // "(business hours)" only qualifies hours and minutes; a target in whole
+    // working days needs no such note.
+    $suffix = ($responseMinutes % 1440 !== 0 || $resolutionMinutes % 1440 !== 0) ? ' (business hours)' : '';
     if ($response !== '' && $resolution !== '') {
-        return "First response within {$response} and resolution within {$resolution} (business hours)";
+        return "First response within {$response} and resolution within {$resolution}{$suffix}";
     }
     if ($response !== '') {
-        return "First response within {$response} (business hours)";
+        return "First response within {$response}{$suffix}";
     }
     if ($resolution !== '') {
-        return "Resolution within {$resolution} (business hours)";
+        return "Resolution within {$resolution}{$suffix}";
     }
     return '';
 }

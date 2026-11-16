@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.242.1 &mdash; 2026-11-16
+
+### Fixed
+- **SLA targets are shown in working days, not a pile of hours.** The service level note on the new-ticket forms, and the `{{sla}}`, `{{sla_response}}` and `{{sla_resolution}}` email placeholders, used to spell a 7-day target as &ldquo;168 hours (business hours)&rdquo;. They now read &ldquo;First response within 2 working days and resolution within 7 working days&rdquo;. Targets under a day still show hours and minutes, with the &ldquo;(business hours)&rdquo; note only where it applies.
+
 ## 2.242.0 &mdash; 2026-11-16
 
 ### Changed
