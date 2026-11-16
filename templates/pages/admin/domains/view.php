@@ -23,6 +23,51 @@ foreach (array_diff(Domains::splitList($domain['ignored_hosts'] ?? null), array_
     $ignoredHosts[] = ['host' => $_gone, 'ips' => [], 'cert' => []];
 }
 $internalFirst = array_flip(Domains::splitList($domain['internal_hosts'] ?? null));
+// Host name → button opening that host's certificate pop-up. The pop-ups are collected
+// here and printed at the end of the page, outside the tables. Bootstrap's modal closes
+// on Esc and on a click outside by default.
+$certModals = '';
+$hostCell   = static function (array $h) use (&$certModals, $badge, $alertDays, $recStyle): string {
+    $c = $h['cert'] ?? [];
+    if (empty($c['found'])) {
+        return e($h['host']);
+    }
+    static $n = 0;
+    $mid  = 'cert-modal-' . ++$n;
+    $mono = static fn (?string $v): string => '<span class="font-monospace small" style="' . $recStyle . '">' . e((string) $v) . '</span>';
+    $rows = [
+        'Status'              => $badge(...array_reverse(Domains::certStatus($c, $alertDays))),
+        'Serial number'       => $mono($c['serial'] ?? ''),
+        'Issued to'           => $mono($c['subject_dn'] ?? $c['subject']),
+        'Alternative names'   => $mono(implode("\n", $c['sans'] ?? [])),
+        'Issued by'           => $mono($c['issuer_dn'] ?? $c['issuer']),
+        'Valid from'          => e((string) $c['valid_from']),
+        'Valid to'            => e((string) $c['valid_to']) . ' <span class="small text-muted">(' . number_format(Domains::daysLeft($c['valid_to'])) . ' days)</span>',
+        'Name matches host'   => empty($c['name_match']) ? 'No' : 'Yes',
+        'Trusted chain'       => empty($c['trusted']) ? 'No' : 'Yes',
+        'Public key'          => e($c['key'] ?? ''),
+        'Signature algorithm' => e($c['sig_alg'] ?? ''),
+        'SHA-256 fingerprint' => $mono($c['sha256'] ?? ''),
+        'SHA-1 fingerprint'   => $mono($c['sha1'] ?? ''),
+        'Read from'           => e((string) ($c['via'] ?? '')) . (!empty($c['internal']) ? ' <span class="small text-muted">(internal DNS)</span>' : ''),
+    ];
+    $body = '';
+    foreach ($rows as $label => $html) {
+        if (strip_tags($html) !== '') {
+            $body .= '<dt class="col-sm-4">' . $label . '</dt><dd class="col-sm-8">' . $html . '</dd>';
+        }
+    }
+    if (!isset($c['serial'])) {
+        $body .= '<dd class="col-12 small text-muted mb-0">Checked before serial numbers were recorded. Press <strong>Re-check now</strong> to load the serial number and fingerprints.</dd>';
+    }
+    $certModals .= '<div class="modal fade" id="' . $mid . '" tabindex="-1" aria-labelledby="' . $mid . '-label" aria-hidden="true">'
+        . '<div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">'
+        . '<div class="modal-header"><h5 class="modal-title font-monospace" id="' . $mid . '-label">' . e($h['host']) . '</h5>'
+        . '<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>'
+        . '<div class="modal-body"><dl class="row mb-0">' . $body . '</dl></div>'
+        . '</div></div></div>';
+    return '<button type="button" class="btn btn-link p-0 font-monospace text-start" data-bs-toggle="modal" data-bs-target="#' . $mid . '" title="Show certificate details">' . e($h['host']) . '</button>';
+};
 ?>
 <div class="mb-4">
     <h2 class="fw-bold mb-0">Settings</h2>
@@ -168,7 +213,7 @@ $internalFirst = array_flip(Domains::splitList($domain['internal_hosts'] ?? null
                         <?php endif; ?>
                         </div>
                     </td>
-                    <td class="text-nowrap font-monospace"><?= e($h['host']) ?></td>
+                    <td class="text-nowrap font-monospace"><?= $hostCell($h) ?></td>
                     <td class="small"><?= $h['ips'] ? e(implode(', ', $h['ips'])) : '<span class="text-muted">No public address</span>' ?></td>
                     <td class="text-nowrap">
                         <?= $badge($st, $label) ?>
@@ -202,7 +247,7 @@ $internalFirst = array_flip(Domains::splitList($domain['internal_hosts'] ?? null
                 <tbody>
                 <?php foreach ($ignoredHosts as $h): $c = $h['cert'] ?? []; [$label, $st] = Domains::certStatus($c, $alertDays); ?>
                     <tr>
-                        <td class="text-nowrap font-monospace ps-3"><?= e($h['host']) ?></td>
+                        <td class="text-nowrap font-monospace ps-3"><?= $hostCell($h) ?></td>
                         <td class="text-nowrap"><?= $c ? $badge($st, $label) : '<span class="small text-muted">Not in the last check</span>' ?></td>
                         <td class="small text-muted"><?= !empty($c['found']) ? e($c['issuer']) . ', expires ' . e($c['valid_to']) : '' ?></td>
                         <td class="text-end pe-3">
@@ -292,3 +337,4 @@ $internalFirst = array_flip(Domains::splitList($domain['internal_hosts'] ?? null
     <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1" aria-hidden="true"></i>Stop tracking this domain</button>
 </form>
 <?php require ROOT_DIR . '/templates/partials/settings-nav-end.php'; ?>
+<?= $certModals ?>

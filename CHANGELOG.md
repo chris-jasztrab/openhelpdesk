@@ -11,6 +11,12 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.240.0 &mdash; 2026-11-16
+
+### Added
+- **Certificate details pop-up on a domain's Hosts and SSL certificates list.** Clicking a host name (in the main list or under Ignored hosts) opens a window with that host's certificate: **serial number**, full subject and issuer, every alternative name, valid-from and valid-to dates, public key type and size, signature algorithm, SHA-256 and SHA-1 fingerprints, whether the name matches and the chain is trusted, and the address it was read from. Esc, the ✕ or a click outside closes it.
+  - The serial number and fingerprints are recorded from the next check onward. A domain last checked before this version shows what it has, with a note to press **Re-check now**.
+
 ## 2.239.0 &mdash; 2026-11-13
 
 ### Added

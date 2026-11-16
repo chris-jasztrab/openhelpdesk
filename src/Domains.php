@@ -507,7 +507,24 @@ final class Domains
             $sans = preg_match_all('/DNS:([^,\s]+)/', (string) ($p['extensions']['subjectAltName'] ?? ''), $m) ? $m[1] : [];
             $str  = static fn ($v): string => is_array($v) ? implode(', ', $v) : (string) $v;
             $cn   = $str($p['subject']['CN'] ?? '');
+            $dn   = static fn (array $parts): string => implode(', ', array_map(static fn ($k, $v) => $k . '=' . $str($v), array_keys($parts), $parts));
+            $pk   = openssl_pkey_get_public($cert);
+            $key  = $pk ? (openssl_pkey_get_details($pk) ?: []) : [];
+            $fp   = static fn (string $alg): string => strtoupper(implode(':', str_split((string) openssl_x509_fingerprint($cert, $alg), 2)));
             return [
+                // Detail for the certificate pop-up; absent on results stored before 2.240.0.
+                'serial'     => strtoupper((string) ($p['serialNumberHex'] ?? '')),
+                'sans'       => $sans,
+                'subject_dn' => $dn($p['subject'] ?? []),
+                'issuer_dn'  => $dn($p['issuer'] ?? []),
+                'sig_alg'    => (string) ($p['signatureTypeSN'] ?? ''),
+                'key'        => implode(' ', array_filter([
+                    [OPENSSL_KEYTYPE_RSA => 'RSA', OPENSSL_KEYTYPE_EC => 'EC'][$key['type'] ?? -1] ?? '',
+                    $key['ec']['curve_name'] ?? '',
+                    isset($key['bits']) ? $key['bits'] . ' bit' : '',
+                ])),
+                'sha256'     => $fp('sha256'),
+                'sha1'       => $fp('sha1'),
                 'found'      => true,
                 'via'        => $target,
                 // Read through this server's own DNS, not the public address: on a split-horizon
