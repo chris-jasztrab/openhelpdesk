@@ -147,7 +147,7 @@ $breadcrumbs  = [['label'=>'Admin','url'=>'/admin'],['label'=>'Docs','url'=>'/ad
     <li><code>72h</code>, <code>3d</code> and <code>4320m</code> mean the same thing, and units can be combined: <code>1d 2h 30m</code>.</li>
     <li>A bare number uses the field's own unit: minutes for SLA targets, hours for the escalation cooldown. Add the unit to be unambiguous.</li>
 </ul>
-<p class="text-muted mb-0">Values are stored in minutes and shown rolled up (<code>60m</code> shows as <code>1h</code>, <code>80m</code> as <code>1h 20m</code>, <code>24h</code> as <code>1d</code>). Here <code>1d</code> always means 24 hours. SLA time only elapses during business hours, so a <code>1d</code> target means 24 <em>business</em> hours.</p>
+<p class="text-muted mb-0">Values are stored in minutes and shown rolled up (<code>60m</code> shows as <code>1h</code>, <code>80m</code> as <code>1h 20m</code>, <code>24h</code> as <code>1d</code>). In an SLA target, <code>1d</code> is one <strong>working day</strong>, however long that day is: a ticket opened Monday at 10:00 with a <code>2d</code> target is due Wednesday at 10:00. Every full 24 hours is a day, so <code>48h</code> means the same as <code>2d</code>. Anything under a day (<code>8h</code>, or the <code>4h</code> in <code>1d 4h</code>) counts business hours. Days the SLA doesn&rsquo;t count &mdash; closed days, holidays, and days deselected under <em>SLA counts on</em> &mdash; are skipped.</p>
 </div>
 </div>
 

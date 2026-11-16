@@ -49,7 +49,7 @@ $breadcrumbs  = [
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h5 class="fw-bold mb-1">SLA Policies</h5>
-        <p class="text-muted mb-0">Define response and resolution targets per ticket type and priority. Enter times in days, hours or minutes &mdash; type <code>d</code>, <code>h</code> or <code>m</code> (e.g. <code>90m</code>, <code>8h</code>, <code>2d</code>); a bare number means minutes. These count business time only.</p>
+        <p class="text-muted mb-0">Define response and resolution targets per ticket type and priority. Enter times in days, hours or minutes &mdash; type <code>d</code>, <code>h</code> or <code>m</code> (e.g. <code>90m</code>, <code>8h</code>, <code>2d</code>); a bare number means minutes. A day is one <strong>working day</strong>, however long it is: <code>2d</code> on a ticket opened Monday at 10:00 is due Wednesday at 10:00, and <code>48h</code> means the same. Anything under a day counts business hours.</p>
     </div>
     <button type="button" class="btn btn-outline-secondary"
             data-bs-toggle="modal" data-bs-target="#recalcSlaModal">

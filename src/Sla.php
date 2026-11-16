@@ -194,6 +194,65 @@ class Sla
         return $current;
     }
 
+    /** Every full 24h of an SLA target is one working day, however long that day is. */
+    public const DAY_MINUTES = 1440;
+
+    /**
+     * Move forward a number of working days, keeping the time of day.
+     *
+     * A working day is one the SLA counts: open in the schedule, not a holiday,
+     * and not deselected under "SLA counts on". Its length doesn't matter — a
+     * ticket opened Monday 10:00 with a 2-day target is due Wednesday 10:00
+     * whether the team works 3 hours or 12. A ticket that arrives outside
+     * business hours starts at the next opening. The result is kept inside the
+     * target day's hours (a short Friday caps a 6pm ticket at Friday's close).
+     *
+     * @return DateTimeImmutable The resulting datetime in the business timezone
+     */
+    public static function addWorkingDays(DateTimeImmutable $start, int $days, string $tz, array $schedule, array $excludedDates = [], ?array $countedDays = null): DateTimeImmutable
+    {
+        $current = $start->setTimezone(new DateTimeZone($tz));
+
+        // [opening, closing] of a date, or null when the SLA doesn't count it.
+        $hours = static function (DateTimeImmutable $d) use ($schedule, $excludedDates, $countedDays): ?array {
+            $key = strtolower(substr($d->format('D'), 0, 3));
+            $day = $schedule[$key] ?? null;
+            if (!is_array($day) || count($day) < 2
+                || in_array($d->format('Y-m-d'), $excludedDates, true)
+                || ($countedDays !== null && !in_array($key, $countedDays, true))) {
+                return null;
+            }
+            return [$d->modify($day[0]), $d->modify($day[1])];
+        };
+        // Step to the next counted day. Bounded so a schedule with no open
+        // day can't loop forever.
+        $guard = 0;
+        $nextDay = static function (DateTimeImmutable $d) use ($hours, &$guard): DateTimeImmutable {
+            do {
+                $d = $d->modify('+1 day');
+            } while ($hours($d) === null && ++$guard < 366);
+            return $d;
+        };
+
+        $open = $hours($current);
+        $atOpening = $open === null || $current < $open[0] || $current >= $open[1];
+        if ($open === null || $current >= $open[1]) {
+            $current = $nextDay($current); // arrived on a closed day or after closing
+        }
+        for ($i = 0; $i < $days; $i++) {
+            $current = $nextDay($current);
+        }
+
+        $open = $hours($current);
+        if ($open === null) {
+            return $current;
+        }
+        if ($atOpening || $current < $open[0]) {
+            return $open[0];
+        }
+        return $current > $open[1] ? $open[1] : $current;
+    }
+
     /**
      * Is this ticket permanently outside SLA?
      *
@@ -573,13 +632,22 @@ class Sla
         $due = [];
         foreach (['first_response_minutes', 'resolution_minutes'] as $field) {
             $minutes = (int) ($sla[$field] ?? 0);
-            // addBusinessMinutes() returns the instant expressed in the business
+            if ($minutes <= 0) {
+                $due[] = null;
+                continue;
+            }
+            // Whole days are working days ("2d" and "48h" both mean two of
+            // them); only what is left over counts business hours.
+            $at = $from;
+            $days = intdiv($minutes, self::DAY_MINUTES);
+            if ($days > 0) {
+                $at = self::addWorkingDays($at, $days, $biz['tz'], $biz['schedule'], $excluded, $countedDays);
+            }
+            // Both helpers return the instant expressed in the business
             // timezone; convert back to storage time before formatting.
-            $due[] = $minutes > 0
-                ? self::addBusinessMinutes($from, $minutes, $biz['tz'], $biz['schedule'], $excluded, $countedDays)
-                    ->setTimezone(self::storageTimezone())
-                    ->format('Y-m-d H:i:s')
-                : null;
+            $due[] = self::addBusinessMinutes($at, $minutes % self::DAY_MINUTES, $biz['tz'], $biz['schedule'], $excluded, $countedDays)
+                ->setTimezone(self::storageTimezone())
+                ->format('Y-m-d H:i:s');
         }
         return $due;
     }

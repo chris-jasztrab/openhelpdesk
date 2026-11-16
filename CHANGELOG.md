@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.242.0 &mdash; 2026-11-16
+
+### Changed
+- **A day in an SLA target is now a working day.** `2d` used to mean 48 *business hours*, which on a long opening day ran to a week or more, and `30d` to several months. A day is now one working day however long it is: a ticket opened Monday at 10:00 with a `2d` target is due Wednesday at 10:00. Every full 24 hours counts as a day, so `48h` means the same as `2d`; anything under a day (`8h`, or the `4h` in `1d 4h`) still counts business hours. Closed days, holidays and days deselected under **SLA counts on** are skipped, and a ticket that arrives outside business hours starts at the next opening. Existing policies need no editing &mdash; new tickets use the new meaning straight away, and open tickets keep their current deadlines until **Recalculate All** is run.
+
 ## 2.241.1 &mdash; 2026-11-16
 
 ### Fixed
