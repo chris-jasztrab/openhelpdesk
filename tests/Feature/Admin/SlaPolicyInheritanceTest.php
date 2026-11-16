@@ -301,6 +301,33 @@ class SlaPolicyInheritanceTest extends TestCase
         )->execute([$typeId, $this->priorityId, $firstResponse, $resolution, $countedDays]);
     }
 
+    /**
+     * The page sends the form as one JSON field of [name, value] pairs so it
+     * isn't cut off by max_input_vars; the handler must rebuild it faithfully.
+     */
+    public function test_a_packed_form_saves_the_same_as_a_plain_one(): void
+    {
+        $t = $this->typeId;
+        $p = $this->priorityId;
+        $r = $this->post($this->adminClient(), self::PATH, [
+            'packed' => json_encode([
+                ["policies[0][$p][first_response_minutes]", '1h'],
+                ["policies[0][$p][resolution_minutes]", '8h'],
+                ["policies[$t][$p][first_response_minutes]", '48h'],
+                ["policies[$t][$p][resolution_minutes]", '7d'],
+                ["policies[$t][$p][days][mon]", '1'],
+                ["policies[$t][$p][days][tue]", '1'],
+            ]),
+        ]);
+        $this->assertOk($r);
+
+        $row = $this->typeRow();
+        $this->assertNotNull($row);
+        $this->assertSame(2880, (int) $row['first_response_minutes']);
+        $this->assertSame(10080, (int) $row['resolution_minutes']);
+        $this->assertSame('mon,tue', $row['counted_days']);
+    }
+
     private function typeRow(): ?array
     {
         $stmt = $this->db->prepare(

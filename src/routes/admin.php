@@ -7988,8 +7988,47 @@ $router->post('/admin/settings/sla-policies', function () {
         redirect('/admin/settings/sla-policies');
     }
 
+    // The page posts every type's fields at once, which outgrows PHP's
+    // max_input_vars (1000 by default) at around 20 ticket types — PHP then
+    // silently drops the fields past the limit, i.e. the last tabs. So the page
+    // packs the whole form into one JSON field of [name, value] pairs and we
+    // rebuild the nested array here. A plain POST still works (no JS, tests).
+    $post = $_POST;
+    if (isset($_POST['packed'])) {
+        $pairs = json_decode((string) $_POST['packed'], true);
+        if (!is_array($pairs)) {
+            flash('error', 'The form could not be read. Nothing was saved.');
+            redirect('/admin/settings/sla-policies');
+        }
+        $post = [];
+        foreach ($pairs as $pair) {
+            if (!is_array($pair) || !is_string($pair[0] ?? null) || !is_string($pair[1] ?? null)) {
+                continue;
+            }
+            $ref = &$post;
+            foreach (preg_split('/\]\[|\[|\]/', $pair[0], -1, PREG_SPLIT_NO_EMPTY) as $key) {
+                if ($ref !== null && !is_array($ref)) {
+                    unset($ref);
+                    continue 2;
+                }
+                $ref = &$ref[$key];
+            }
+            $ref = $pair[1];
+            unset($ref);
+        }
+    } else {
+        // Unpacked and at the limit means PHP truncated it. Saving would wipe
+        // the policies of every type that got cut off, so refuse instead.
+        $fieldCount = 0;
+        array_walk_recursive($_POST, static function () use (&$fieldCount): void { $fieldCount++; });
+        if ($fieldCount >= (int) ini_get('max_input_vars')) {
+            flash('error', 'The form was too large for the server to read in full, so nothing was saved. Reload the page and try again.');
+            redirect('/admin/settings/sla-policies');
+        }
+    }
+
     $db = Database::connect();
-    $policiesData = $_POST['policies'] ?? [];
+    $policiesData = is_array($post['policies'] ?? null) ? $post['policies'] : [];
 
     // Delete all existing policies and re-insert (simplest for the nested type+priority structure)
     $db->exec('DELETE FROM sla_policies');
@@ -8067,7 +8106,7 @@ $router->post('/admin/settings/sla-policies', function () {
     // Per-type business-hours overrides. `type_hours[<typeId>][enabled]` gates
     // whether the type keeps its own weekly schedule; when off we store NULL so
     // the type inherits the global business hours. Timezone always inherits.
-    $typeHours = is_array($_POST['type_hours'] ?? null) ? $_POST['type_hours'] : [];
+    $typeHours = is_array($post['type_hours'] ?? null) ? $post['type_hours'] : [];
     $validTypeIds = array_map('intval', $db->query('SELECT id FROM ticket_types')->fetchAll(PDO::FETCH_COLUMN));
     $setHours = $db->prepare('UPDATE ticket_types SET business_hours_schedule = ? WHERE id = ?');
     $hoursOverridden = 0;
@@ -8105,7 +8144,7 @@ $router->post('/admin/settings/sla-policies', function () {
     // Global default for what a reopen does to the clock. Per-type overrides live
     // on the ticket type itself; this is the value a type inherits when its own
     // sla_reopen_behavior is NULL.
-    $reopenRaw = trim((string) ($_POST['sla_reopen_behavior'] ?? ''));
+    $reopenRaw = is_string($post['sla_reopen_behavior'] ?? null) ? trim($post['sla_reopen_behavior']) : '';
     if (in_array($reopenRaw, Sla::REOPEN_BEHAVIORS, true)) {
         setSetting('sla_reopen_behavior', $reopenRaw);
     }

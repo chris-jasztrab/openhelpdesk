@@ -64,8 +64,9 @@ $breadcrumbs  = [
 <?php else: ?>
 <div class="card border-0 shadow-sm">
     <div class="card-body p-4">
-        <form method="POST" action="/admin/settings/sla-policies">
+        <form method="POST" action="/admin/settings/sla-policies" id="slaPoliciesForm">
             <?= csrfField() ?>
+            <input type="hidden" name="packed" id="slaPacked" disabled>
 
             <!-- Tabs -->
             <ul class="nav nav-tabs mb-3" role="tablist">
@@ -417,6 +418,25 @@ document.querySelectorAll('.th-day-toggle').forEach(function(t) {
         });
     });
 });
+// Send the whole form as one JSON field. Every type's rows post together, and
+// past ~20 ticket types that is more fields than PHP reads (max_input_vars),
+// so the last tabs used to be dropped without any error.
+(function() {
+    var form = document.getElementById('slaPoliciesForm');
+    if (!form) return;
+    form.addEventListener('submit', function() {
+        var packed = document.getElementById('slaPacked');
+        var pairs = [];
+        new FormData(form).forEach(function(value, name) {
+            if (name !== '_token') pairs.push([name, String(value)]);
+        });
+        form.querySelectorAll('input, select, textarea').forEach(function(el) {
+            if (el.name !== '_token') el.disabled = true;
+        });
+        packed.value = JSON.stringify(pairs);
+        packed.disabled = false;
+    });
+})();
 document.querySelectorAll('.sla-input').forEach(function(input) {
     input.addEventListener('input', function() {
         var target = document.getElementById(this.dataset.target);
