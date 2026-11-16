@@ -91,6 +91,24 @@ $ticketListScope = $ticketListScope ?? 'agent';
         if (live) live.textContent = 'Ticket list updated. ' + (count ? count.textContent.replace(/\s+/g, ' ').trim() : '');
     }
 
+    // Records the scroll offset of the page and of every scrolled box inside
+    // the results, and returns a function that restores them after a swap.
+    // Boxes are matched by position, so a list whose layout changed is skipped.
+    function scrollSnapshot() {
+        var x = window.scrollX, y = window.scrollY, saved = [];
+        document.querySelectorAll('#ticketResults *').forEach(function (el, i) {
+            if (el.scrollTop || el.scrollLeft) saved.push([i, el.tagName, el.scrollTop, el.scrollLeft]);
+        });
+        return function () {
+            var all = document.querySelectorAll('#ticketResults *');
+            saved.forEach(function (s) {
+                var el = all[s[0]];
+                if (el && el.tagName === s[1]) { el.scrollTop = s[2]; el.scrollLeft = s[3]; }
+            });
+            window.scrollTo(x, y);
+        };
+    }
+
     function refresh(url, opts) {
         opts = opts || {};
         // Background auto-refresh: no dimming, no fallback navigation, and it
@@ -113,6 +131,10 @@ $ticketListScope = $ticketListScope ?? 'agent';
                 var sig = REGIONS.map(function (id) { var el = doc.getElementById(id); return el ? el.innerHTML : ''; }).join('\n');
                 if (silent && sig === lastSig) return; // nothing changed
                 lastSig = sig;
+                // The table scrolls inside a box that lives in #ticketResults, so
+                // the swap below replaces it and would drop the agent back at the
+                // top. A background refresh puts the list back where it was.
+                var keep = silent ? scrollSnapshot() : null;
                 REGIONS.forEach(function (id) {
                     var src = doc.getElementById(id);
                     var dst = document.getElementById(id);
@@ -129,6 +151,7 @@ $ticketListScope = $ticketListScope ?? 'agent';
                 rememberUrl();
                 syncStaticRefs();
                 reinit();
+                if (keep) keep();
                 var res = document.getElementById('ticketResults');
                 if (res) { res.removeAttribute('aria-busy'); res.style.opacity = ''; }
                 if (opts.refocus && (!document.activeElement || document.activeElement === document.body)) {

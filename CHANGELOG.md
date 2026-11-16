@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.240.1 &mdash; 2026-11-16
+
+### Fixed
+- **Ticket list no longer jumps back to the top while you are scrolled down.** The admin and agent All Tickets lists refresh themselves in the background (every 30 seconds, and when you return to the tab). The table scrolls inside its own box, and that box was replaced on each refresh, so the list snapped back to the first row. A background refresh now keeps the list where you left it. Sorting, filtering and changing page still start at the top.
+
 ## 2.240.0 &mdash; 2026-11-16
 
 ### Added
