@@ -40,7 +40,8 @@ $breadcrumbs  = [
                         &middot; <?= e($ticket['location_name']) ?>
                         <?php endif; ?>
                     </div>
-                    <div class="border rounded p-2 bg-light small" style="max-height:120px;overflow-y:auto;white-space:pre-wrap;"><?= e($ticket['description']) ?></div>
+                    <?php $desc = (string) ($ticket['description'] ?? ''); $descRich = $desc !== '' && ltrim($desc)[0] === '<'; ?>
+                    <div class="border rounded p-2 bg-light small<?= $descRich ? ' ck-content' : '' ?>" style="max-height:120px;overflow-y:auto;<?= $descRich ? '' : 'white-space:pre-wrap;' ?>"><?= $descRich ? sanitizeRichHtml($desc) : linkify($desc) ?></div>
                 </div>
             </div>
 
@@ -69,7 +70,8 @@ $breadcrumbs  = [
                                     <span class="fw-semibold small"><?= e($c['user_name']) ?></span>
                                     <span class="text-muted small"><?= e(date('M j, Y g:i a', strtotime($c['created_at']))) ?></span>
                                 </div>
-                                <div class="text-muted small" style="overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;"><?= e($c['details']) ?></div>
+                                <?php $det = (string) ($c['details'] ?? ''); $detRich = $det !== '' && ltrim($det)[0] === '<'; ?>
+                                <div class="text-muted small<?= $detRich ? ' ck-content' : '' ?>" style="max-height:6em;overflow:hidden;<?= $detRich ? '' : 'white-space:pre-wrap;' ?>"><?= $detRich ? sanitizeRichHtml($det) : e($det) ?></div>
                             </div>
                         </label>
                         <?php endforeach; ?>

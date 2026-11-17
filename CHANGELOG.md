@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.243.1 &mdash; 2026-11-17
+
+### Fixed
+- **Split Ticket showed raw HTML** &mdash; the original description and the "Comments to Move" previews printed their markup (`<p>Hi …<br>`) as text. Both the admin and agent split pages now render them the same way the ticket view does.
+
 ## 2.243.0 &mdash; 2026-11-17
 
 ### Added
