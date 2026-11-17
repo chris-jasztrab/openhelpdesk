@@ -4040,6 +4040,7 @@ $router->get('/admin/tickets', function () {
         'group'      => 'g.name',
         'location'   => 'l.name',
         'created_at' => 't.created_at',
+        'updated'    => ticketLastActivitySql('t'),
         'due_date'   => 't.due_date',
     ];
     $sort = requestScalar('sort', 'created_at');
@@ -4056,7 +4057,7 @@ $router->get('/admin/tickets', function () {
 
     $stmt = $db->prepare($sql);
     $stmt->execute($params);
-    $tickets = $stmt->fetchAll();
+    $tickets = ticketListWithActivity($db, $stmt->fetchAll());
 
     // Who else currently has these tickets open (snapshot at render time) — drives
     // the amber "Opened by X" subject hint in the list.

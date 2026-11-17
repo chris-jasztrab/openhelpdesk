@@ -569,6 +569,9 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                     <?php if (in_array('created_at', $visibleColumns)): ?>
                     <th style="white-space:nowrap;"><a href="<?= sortUrl('created_at', $sort, $dir, $sortParams, '/agent/tickets') ?>" class="text-decoration-none text-dark">Opened <?= sortIcon('created_at', $sort, $dir) ?></a></th>
                     <?php endif; ?>
+                    <?php if (in_array('updated', $visibleColumns)): ?>
+                    <th style="white-space:nowrap;"><a href="<?= sortUrl('updated', $sort, $dir, $sortParams, '/agent/tickets') ?>" class="text-decoration-none text-dark">Updated <?= sortIcon('updated', $sort, $dir) ?></a></th>
+                    <?php endif; ?>
                     <?php if (in_array('due_date', $visibleColumns)): ?>
                     <th style="white-space:nowrap;"><a href="<?= sortUrl('due_date', $sort, $dir, $sortParams, '/agent/tickets') ?>" class="text-decoration-none text-dark">Due <?= sortIcon('due_date', $sort, $dir) ?></a></th>
                     <?php endif; ?>
@@ -602,6 +605,7 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                             <?php else: ?>
                             <?php $presence = $ticketPresence[$t['id']] ?? null; ?>
                             <span class="ld-subject-cell" data-ticket-id="<?= (int) $t['id'] ?>">
+                                <?= ticketCustomerRepliedBadgeHtml($t, true) ?>
                                 <a href="/agent/tickets/<?= $t['id'] ?>" class="ld-subject-link text-decoration-none fw-semibold text-dark"<?= $presence ? ' style="color:#b45309;"' : '' ?>>
                                     <?= e($t['subject']) ?>
                                 </a>
@@ -698,6 +702,9 @@ $currentUrl = '/agent/tickets' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SER
                         <?php endif; ?>
                         <?php if (in_array('created_at', $visibleColumns)): ?>
                         <td class="text-muted small" style="white-space:nowrap;"><?= date('M j, Y', strtotime($t['created_at'])) ?></td>
+                        <?php endif; ?>
+                        <?php if (in_array('updated', $visibleColumns)): ?>
+                        <?= ticketUpdatedCellHtml($t) ?>
                         <?php endif; ?>
                         <?php if (in_array('due_date', $visibleColumns)): ?>
                         <td class="text-muted small" style="white-space:nowrap;">

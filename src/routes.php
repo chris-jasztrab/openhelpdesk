@@ -3510,6 +3510,7 @@ $router->get('/agent', function () {
         'group'      => 'g.name',
         'location'   => 'l.name',
         'created_at' => 't.created_at',
+        'updated'    => ticketLastActivitySql('t'),
         'due_date'   => 't.due_date',
     ];
     $sort     = isset($sortableColumns[requestScalar('sort')]) ? requestScalar('sort') : 'created_at';
@@ -3537,7 +3538,7 @@ $router->get('/agent', function () {
          LIMIT 10"
     );
     $stmt->execute($vis['params']);
-    $recent = $stmt->fetchAll();
+    $recent = ticketListWithActivity($db, $stmt->fetchAll());
 
     // Quick-assign / type / group / priority dropdown data for dashboard
     $dashTypes = $db->query('SELECT * FROM ticket_types ORDER BY sort_order, name')->fetchAll();

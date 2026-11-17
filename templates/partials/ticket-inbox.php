@@ -112,6 +112,7 @@ $inboxBase = $inboxBase ?? '/agent/tickets';
                             <span class="text-muted fst-italic"><i class="bi bi-shield-lock me-1"></i>[Confidential]</span>
                         <?php else: ?>
                             <span class="text-muted small me-1">#<?= $t['id'] ?></span>
+                            <?= ticketCustomerRepliedBadgeHtml($t, true) ?>
                             <span class="ld-inbox-subject-text ld-subject-link fw-semibold"><?= e($t['subject']) ?></span>
                             <?php if ($isAssignedToMe): ?>
                             <span class="badge bg-primary bg-opacity-10 text-primary ms-1">Mine</span>

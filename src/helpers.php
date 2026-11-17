@@ -4016,9 +4016,98 @@ function ticketColumnDefinitions(): array
         'location'     => 'Location',
         'sla'          => 'SLA',
         'created_at'   => 'Opened',
+        'updated'      => 'Updated',
         'due_date'     => 'Due',
         'confidential' => 'Confidential',
     ];
+}
+
+/**
+ * Extra SELECT columns for a ticket list on alias $t (leading comma included):
+ *   last_activity_at    — the newest thing a person did on the ticket (any
+ *                         timeline entry with a user), else when it was opened.
+ *                         Automation, SLA and cron entries have no user, so
+ *                         they never make a ticket look freshly updated.
+ *   customer_replied_at — when the newest public comment was written, but only
+ *                         if the requester (or anyone not on staff) wrote it;
+ *                         NULL when staff had the last word or nobody replied.
+ * "Staff" matches ticketLastContactSql(): a staff member commenting on their
+ * own ticket is the customer there.
+ */
+function ticketListActivitySelectSql(string $t): string
+{
+    return ', ' . ticketLastActivitySql($t) . " AS last_activity_at
+            , (SELECT IF(lc.user_id = {$t}.created_by OR lcu.id IS NULL OR NOT (" . staffRoleSqlIn('lcu.role') . "), lc.created_at, NULL)
+                 FROM ticket_timeline lc LEFT JOIN users lcu ON lcu.id = lc.user_id
+                WHERE lc.ticket_id = {$t}.id AND lc.action = 'comment' AND lc.is_internal = 0
+                ORDER BY lc.created_at DESC, lc.id DESC LIMIT 1) AS customer_replied_at";
+}
+
+/** The last_activity_at expression on its own — the list's "Updated" sort key. */
+function ticketLastActivitySql(string $t): string
+{
+    return "COALESCE((SELECT MAX(la.created_at) FROM ticket_timeline la
+                       WHERE la.ticket_id = {$t}.id AND la.user_id IS NOT NULL), {$t}.created_at)";
+}
+
+/**
+ * Add last_activity_at / customer_replied_at to one page of list rows.
+ *
+ * A second query over just the page's ids, not extra columns on the list
+ * query: with a sort that needs a filesort (priority, agent, type …) the
+ * database evaluates select-list subqueries for every matching ticket before
+ * it applies LIMIT — measured on prod at 75 ms → 265 ms across 13k tickets.
+ */
+function ticketListWithActivity(PDO $db, array $tickets): array
+{
+    $ids = array_map('intval', array_column($tickets, 'id'));
+    if (!$ids) {
+        return $tickets;
+    }
+    $rows = $db->query(
+        'SELECT t.id ' . ticketListActivitySelectSql('t') . ' FROM tickets t WHERE t.id IN (' . implode(',', $ids) . ')'
+    )->fetchAll(PDO::FETCH_UNIQUE | PDO::FETCH_ASSOC);
+    foreach ($tickets as &$t) {
+        $t += $rows[(int) $t['id']] ?? [];
+    }
+    return $tickets;
+}
+
+/**
+ * "Customer replied" badge for a ticket-list row selected with
+ * ticketListActivitySelectSql(): shown while the ticket is still open and the
+ * requester had the last word, i.e. it is staff's turn. '' otherwise.
+ * $iconOnly is the compact form that goes in front of a truncating subject
+ * (the table layouts), where a trailing badge would be clipped off.
+ */
+function ticketCustomerRepliedBadgeHtml(array $t, bool $iconOnly = false): string
+{
+    if (!ticketAwaitingStaffReply($t)) {
+        return '';
+    }
+    $title = 'The customer replied ' . humanRelativeTime($t['customer_replied_at']) . ' and nobody on staff has answered since';
+    return $iconOnly
+        ? '<span class="badge bg-success me-1" title="' . e($title) . '"><i class="bi bi-reply-fill"></i></span>'
+        : '<span class="badge bg-success bg-opacity-25 text-dark ms-1" title="' . e($title) . '"><i class="bi bi-reply-fill me-1"></i>Customer replied</span>';
+}
+
+/** True while the ticket is open and the requester wrote the newest public comment. */
+function ticketAwaitingStaffReply(array $t): bool
+{
+    return !empty($t['customer_replied_at']) && in_array($t['status'], ticketOpenBucketSlugs(), true);
+}
+
+/**
+ * The "Updated" list cell: relative time of last_activity_at, exact time on
+ * hover. Green with a reply arrow while the customer is waiting on staff.
+ */
+function ticketUpdatedCellHtml(array $t): string
+{
+    $ts      = strtotime((string) ($t['last_activity_at'] ?? $t['created_at']));
+    $waiting = ticketAwaitingStaffReply($t);
+    return '<td class="small ' . ($waiting ? 'text-success fw-semibold' : 'text-muted') . '" style="white-space:nowrap;" title="'
+        . e(($waiting ? 'Customer is waiting on a reply — last activity ' : '') . date('D, M j, Y g:i A', $ts)) . '">'
+        . ($waiting ? '<i class="bi bi-reply-fill me-1"></i>' : '') . e(humanRelativeTime($ts)) . '</td>';
 }
 
 /** Columns hidden by default — users must opt-in via the Columns picker. */

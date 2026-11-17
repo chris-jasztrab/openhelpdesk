@@ -158,6 +158,7 @@ $dir  = $dir ?? 'desc';
                     <?php if (in_array('location', $visibleColumns)): ?><th style="white-space:nowrap;"><a href="<?= sortUrl('location', $sort, $dir, [], '/agent') ?>" class="text-decoration-none text-dark">Location <?= sortIcon('location', $sort, $dir) ?></a></th><?php endif; ?>
                     <?php if (in_array('sla', $visibleColumns)): ?><th style="white-space:nowrap;">SLA</th><?php endif; ?>
                     <?php if (in_array('created_at', $visibleColumns)): ?><th style="white-space:nowrap;"><a href="<?= sortUrl('created_at', $sort, $dir, [], '/agent') ?>" class="text-decoration-none text-dark">Opened <?= sortIcon('created_at', $sort, $dir) ?></a></th><?php endif; ?>
+                    <?php if (in_array('updated', $visibleColumns)): ?><th style="white-space:nowrap;"><a href="<?= sortUrl('updated', $sort, $dir, [], '/agent') ?>" class="text-decoration-none text-dark">Updated <?= sortIcon('updated', $sort, $dir) ?></a></th><?php endif; ?>
                     <?php if (in_array('due_date', $visibleColumns)): ?><th style="white-space:nowrap;"><a href="<?= sortUrl('due_date', $sort, $dir, [], '/agent') ?>" class="text-decoration-none text-dark">Due <?= sortIcon('due_date', $sort, $dir) ?></a></th><?php endif; ?>
                     <?php if (in_array('confidential', $visibleColumns)): ?><th style="white-space:nowrap;text-align:center;">Confidential</th><?php endif; ?>
                 </tr>
@@ -173,6 +174,7 @@ $dir  = $dir ?? 'desc';
                         <a href="/agent/tickets/<?= (int)$t['id'] ?>" class="text-muted text-decoration-none"><?= (int)$t['id'] ?></a>
                     </td>
                     <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<?= e($t['subject']) ?>">
+                        <?= ticketCustomerRepliedBadgeHtml($t, true) ?>
                         <a href="/agent/tickets/<?= (int)$t['id'] ?>" class="text-decoration-none fw-semibold text-dark">
                             <?= e($t['subject']) ?>
                         </a>
@@ -242,6 +244,9 @@ $dir  = $dir ?? 'desc';
                     <?php endif; ?>
                     <?php if (in_array('created_at', $visibleColumns)): ?>
                     <td class="text-muted small" style="white-space:nowrap;"><?= date('M j, Y', strtotime($t['created_at'])) ?></td>
+                    <?php endif; ?>
+                    <?php if (in_array('updated', $visibleColumns)): ?>
+                    <?= ticketUpdatedCellHtml($t) ?>
                     <?php endif; ?>
                     <?php if (in_array('due_date', $visibleColumns)): ?>
                     <td class="text-muted small" style="white-space:nowrap;">

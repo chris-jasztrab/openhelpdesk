@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.244.0 &mdash; 2026-11-17
+
+### Added
+- **Ticket lists show when a ticket was last updated and whether it is your turn.** A new sortable **Updated** column (agent list, admin list and the agent dashboard) shows how long ago a person last did anything on the ticket &mdash; a reply, a note, a status or assignment change &mdash; with the exact time on hover. Automation, SLA and reminder entries don't count, so a ticket nobody touched never looks fresh. When the customer wrote the newest public reply on an open ticket, the row gets a green reply marker in front of the subject and the Updated time turns green; it clears as soon as someone on staff replies publicly (an internal note doesn't clear it). The Compact and Card layouts show the same marker, and cards also show the Updated time. The column is switched on for everyone, including people with a saved column choice, and can be hidden again from **Columns**.
+
 ## 2.243.1 &mdash; 2026-11-17
 
 ### Fixed
