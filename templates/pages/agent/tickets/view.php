@@ -1872,6 +1872,7 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
         if (statusSplitBtn) statusSplitBtn.style.display = isForward ? 'none' : '';
         box.style.display    = '';
         if (window._replyEditor) window._replyEditor.ui.update();
+        if (window.ReplyTemplate) window.ReplyTemplate.apply(mode); // user's standard template for this mode
         // Focus the editor first (CKEditor scrolls the caret into view), THEN
         // scroll the whole panel's bottom — through the Send Reply button —
         // into view so this scroll wins over the focus scroll and the editor
@@ -2075,6 +2076,7 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
 })();
 </script>
 
+<?php require ROOT_DIR . '/templates/partials/reply-template-js.php'; ?>
 <script>
 /* ── Canned Response Picker ─────────────────────────────────────── */
 (function () {
@@ -2260,6 +2262,7 @@ ClassicEditor.create(document.querySelector('#replyEditor'), {
 }).then(function(editor) {
     window._replyEditor = editor;
     editor.ui.view.editable.element.style.minHeight = '150px';
+    ReplyTemplate.apply(); // reply box was opened before the editor finished loading
 
     // ── Reply draft autosave (server-side) ────────────────────────────────
     // Persist the in-progress reply to the server (ticket_drafts) so it
@@ -2278,12 +2281,13 @@ ClassicEditor.create(document.querySelector('#replyEditor'), {
         captureFields: false,
         getHtml:       function () { return editor.getData(); },
         setHtml:       function (html) { editor.setData(html); },
-        hasText:       function () { return !!TicketDraft.textOf(editor.getData()); },
+        // An unedited standard template isn't a draft worth saving or restoring over.
+        hasText:       function () { return !ReplyTemplate.untouched() && !!TicketDraft.textOf(editor.getData()); },
         noteEl:        draftNote,
         discardBtn:    document.getElementById('replyDraftDiscard'),
         statusAnchor:  document.getElementById('replyMessageHidden'),
         onRestored:    function () { if (window._openReplyPanel) window._openReplyPanel(); },
-        onDiscarded:   function () { editor.setData(''); editor.editing.view.focus(); },
+        onDiscarded:   function () { editor.setData(''); ReplyTemplate.apply(); editor.editing.view.focus(); },
     });
     ticketDraft.watchEditor(editor);
 
@@ -2292,7 +2296,8 @@ ClassicEditor.create(document.querySelector('#replyEditor'), {
 
     // Form submit: validate and populate hidden field
     document.getElementById('replyForm').addEventListener('submit', function(e) {
-        var data = editor.getData();
+        // Sending just the unedited standard template counts as sending nothing.
+        var data = ReplyTemplate.untouched() ? '' : editor.getData();
         var text = data.replace(/<[^>]*>/g, '').trim();
         if (this.dataset.mode === 'forward') {
             // The conversation thread is the payload; the note is optional. Just

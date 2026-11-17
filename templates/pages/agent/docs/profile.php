@@ -22,6 +22,7 @@ $breadcrumbs  = [['label' => 'Help', 'url' => '/agent/help'], ['label' => 'Profi
         <tr><td><strong>Personal Information</strong></td><td>Your first and last name.</td></tr>
         <tr><td><strong>Appearance</strong></td><td>Light or Dark mode, applied straight away.</td></tr>
         <tr><td><strong>Ticket Timeline</strong></td><td>Show ticket timelines <em>Newest first</em> or <em>Oldest first</em>. Clicking the Timeline heading on a ticket changes the same setting.</td></tr>
+        <tr><td><strong>Reply Templates</strong></td><td>Text filled in for you when you start a <em>Reply</em>, <em>Forward</em> or <em>Internal note</em> &mdash; one box each, e.g. <code>Hi {{customer_first_name}},</code>, a few blank lines, then <code>-{{agent_first_name}}</code>. The cursor lands on the first blank line. An untouched template is never sent or saved as a draft; leave a box empty for none.</td></tr>
         <tr><td><strong>Email Notifications</strong></td><td>Which emails you receive (see below).</td></tr>
         <tr><td><strong>Change Password</strong></td><td>Enter your current password and a new one (at least 8 characters) twice, then click <strong>Update Password</strong>.</td></tr>
         <tr><td><strong>Two-Factor Authentication</strong></td><td>Extra sign-in protection (see below).</td></tr>

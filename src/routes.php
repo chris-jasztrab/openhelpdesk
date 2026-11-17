@@ -2240,6 +2240,10 @@ $router->get('/profile', function () {
         'timelineSort'       => getUserTimelineSort((int) Auth::id()),
         'ticketView'         => getUserTicketView((int) Auth::id()),
         'ticketLinks'        => getUserTicketLinkTarget((int) Auth::id()),
+        'replyTemplates'     => array_map(
+            fn (string $m) => getUserReplyTemplate((int) Auth::id(), $m),
+            array_combine(REPLY_TEMPLATE_MODES, REPLY_TEMPLATE_MODES)
+        ),
         'aiNotesVisible'     => aiNotesVisible(),
         'systemNotesVisible' => systemNotesVisible(),
         'sidebarItems'       => $sidebarItems,
@@ -2402,6 +2406,19 @@ $router->post('/profile/setting', function () {
     if ($field === 'ticket_links') {
         setSetting('ticket_links:' . $userId, $value === 'same' ? 'same' : 'new');
         echo json_encode(['ok' => true, 'message' => 'Saved']);
+        exit;
+    }
+
+    // Standard reply templates: reply_template_reply / _forward / _note.
+    if (str_starts_with($field, 'reply_template_')
+        && in_array($mode = substr($field, 15), REPLY_TEMPLATE_MODES, true)) {
+        if (!Auth::isStaff()) {
+            http_response_code(403);
+            echo json_encode(['ok' => false, 'message' => 'Not allowed.']);
+            exit;
+        }
+        setSetting("reply_template:{$mode}:{$userId}", mb_substr(trim($value), 0, 2000));
+        echo json_encode(['ok' => true, 'message' => 'Template saved']);
         exit;
     }
 

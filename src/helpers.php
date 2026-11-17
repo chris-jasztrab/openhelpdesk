@@ -4250,6 +4250,53 @@ function getUserTicketLinkTarget(int $userId): string
     return getSetting("ticket_links:{$userId}", 'new') === 'same' ? 'same' : 'new';
 }
 
+/** Reply-box modes a user can keep a standard template for. */
+const REPLY_TEMPLATE_MODES = ['reply', 'forward', 'note'];
+
+/** The user's raw (unresolved, plain-text) template for one reply mode. */
+function getUserReplyTemplate(int $userId, string $mode): string
+{
+    return getSetting("reply_template:{$mode}:{$userId}", '');
+}
+
+/**
+ * The user's reply templates for this ticket, ready for the editor: tokens
+ * resolved, one <p> per line. Only modes with a template are returned.
+ * Inserted by partials/reply-template-js.php when the reply box opens.
+ */
+function userReplyTemplates(int $userId, array $ticket): array
+{
+    $first = trim((string) ($ticket['creator_first_name'] ?? ''));
+    $full  = trim((string) ($ticket['creator_name'] ?? ''));
+    $tokens = [
+        // A greeting must never read "Hi ," — fall back to the full name, then "there".
+        '{{customer_first_name}}' => $first !== '' ? $first : ($full !== '' ? $full : 'there'),
+        '{{customer_last_name}}'  => (string) ($ticket['creator_last_name'] ?? ''),
+        '{{customer_full_name}}'  => $full,
+        '{{customer_email}}'      => (string) ($ticket['creator_email'] ?? ''),
+        '{{ticket_id}}'           => '#' . ($ticket['id'] ?? ''),
+        '{{ticket_subject}}'      => (string) ($ticket['subject'] ?? ''),
+        '{{agent_first_name}}'    => (string) (Auth::user()['first_name'] ?? ''),
+        '{{agent_full_name}}'     => Auth::fullName(),
+        '{{org_name}}'            => getSetting('app_name', 'OpenHelpDesk'),
+    ];
+
+    $out = [];
+    foreach (REPLY_TEMPLATE_MODES as $mode) {
+        $raw = trim(str_replace("\r", '', getUserReplyTemplate($userId, $mode)));
+        if ($raw === '') {
+            continue;
+        }
+        $html = '';
+        foreach (explode("\n", $raw) as $line) {
+            // Escape after substituting so a name or subject can't inject markup.
+            $html .= '<p>' . (trim($line) === '' ? '&nbsp;' : e(strtr($line, $tokens))) . '</p>';
+        }
+        $out[$mode] = $html;
+    }
+    return $out;
+}
+
 /* ── "Tickets by user" page (from the inbox-view person card) ─── */
 
 /**

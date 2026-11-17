@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.243.0 &mdash; 2026-11-17
+
+### Added
+- **Reply Templates** &mdash; My Profile › Reply Templates holds a personal standard text for each of Reply, Forward and Internal note (e.g. `Hi {{customer_first_name}},`, blank lines, `-{{agent_first_name}}`). It is filled in when the reply box opens in that mode, with the cursor on the first blank line, and uses the same `{{…}}` placeholders as canned responses. An untouched template is never sent, never saved as a draft, and is swapped out when you change mode; anything you have typed is left alone.
+
 ## 2.242.1 &mdash; 2026-11-16
 
 ### Fixed

@@ -119,6 +119,23 @@ class ProfileTest extends TestCase
         }
     }
 
+    public function test_reply_template_saves_for_staff_only(): void
+    {
+        $client = $this->agentClient();
+        $save   = fn ($c, string $value) => $this->post($c, '/profile/setting', [
+            'field' => 'reply_template_reply',
+            'value' => $value,
+        ]);
+
+        $this->assertOk($save($client, "Hi {{customer_first_name}},\n\n-TemplateSignOff"));
+        $this->assertSee('-TemplateSignOff', $this->get($client, '/profile'));
+
+        $this->assertSame(403, $save($this->portalClient(), 'nope')->getStatusCode());
+
+        $save($client, ''); // leave the shared test agent without a template
+        $this->assertNotSee('-TemplateSignOff', $this->get($client, '/profile'));
+    }
+
     public function test_wrong_current_password_rejects_password_change(): void
     {
         $r = $this->post($this->portalClient(), '/profile', [

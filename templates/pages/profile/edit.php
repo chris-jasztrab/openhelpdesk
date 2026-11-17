@@ -128,6 +128,33 @@ $breadcrumbs = [
                 </div>
             </div>
 
+            <?php if (roleIsStaff($user['role'])): ?>
+            <!-- Reply Templates (staff) -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-transparent fw-semibold">
+                    <i class="bi bi-envelope-paper me-1"></i>Reply Templates
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        Text that is filled in for you when you start a reply, forward or note on a ticket
+                        &mdash; a greeting and your sign-off, for example. Leave a box empty for no template.
+                        Blank lines are kept, and the cursor lands on the first one. You can use
+                        <code>{{customer_first_name}}</code>, <code>{{customer_full_name}}</code>,
+                        <code>{{agent_first_name}}</code>, <code>{{agent_full_name}}</code>,
+                        <code>{{ticket_id}}</code>, <code>{{ticket_subject}}</code> and <code>{{org_name}}</code>.
+                    </p>
+                    <?php foreach (['reply' => 'Reply', 'forward' => 'Forward', 'note' => 'Internal note'] as $rtMode => $rtLabel): ?>
+                    <div class="mb-3">
+                        <label for="replyTemplate_<?= $rtMode ?>" class="form-label small fw-semibold"><?= $rtLabel ?></label>
+                        <textarea class="form-control font-monospace small" id="replyTemplate_<?= $rtMode ?>"
+                                  name="reply_template_<?= $rtMode ?>" rows="5" maxlength="2000"
+                                  placeholder="<?= $rtMode === 'reply' ? "Hi {{customer_first_name}},\n\n\n\n-{{agent_first_name}}" : '' ?>"><?= e($replyTemplates[$rtMode] ?? '') ?></textarea>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            <?php endif; ?>
+
             <?php if (roleIsAdmin($user['role'])): ?>
             <!-- System Timeline Notes (admin only) -->
             <div class="card border-0 shadow-sm mb-4">
