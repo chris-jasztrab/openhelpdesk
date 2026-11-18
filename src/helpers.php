@@ -4082,13 +4082,22 @@ function ticketListWithActivity(PDO $db, array $tickets): array
  */
 function ticketCustomerRepliedBadgeHtml(array $t, bool $iconOnly = false): string
 {
-    if (!ticketAwaitingStaffReply($t)) {
+    if (!customerWaitingMarkerVisible() || !ticketAwaitingStaffReply($t)) {
         return '';
     }
     $title = 'The customer replied ' . humanRelativeTime($t['customer_replied_at']) . ' and nobody on staff has answered since';
     return $iconOnly
         ? '<span class="badge bg-success me-1" title="' . e($title) . '"><i class="bi bi-reply-fill"></i></span>'
         : '<span class="badge bg-success bg-opacity-25 text-dark ms-1" title="' . e($title) . '"><i class="bi bi-reply-fill me-1"></i>Customer replied</span>';
+}
+
+/**
+ * Per-user profile preference: show the green "customer is waiting on a reply"
+ * markers on the ticket lists. On unless the user turned it off.
+ */
+function customerWaitingMarkerVisible(): bool
+{
+    return getSetting('customer_waiting_marker:' . (int) Auth::id(), '1') === '1';
 }
 
 /** True while the ticket is open and the requester wrote the newest public comment. */
@@ -4104,7 +4113,7 @@ function ticketAwaitingStaffReply(array $t): bool
 function ticketUpdatedCellHtml(array $t): string
 {
     $ts      = strtotime((string) ($t['last_activity_at'] ?? $t['created_at']));
-    $waiting = ticketAwaitingStaffReply($t);
+    $waiting = customerWaitingMarkerVisible() && ticketAwaitingStaffReply($t);
     return '<td class="small ' . ($waiting ? 'text-success fw-semibold' : 'text-muted') . '" style="white-space:nowrap;" title="'
         . e(($waiting ? 'Customer is waiting on a reply — last activity ' : '') . date('D, M j, Y g:i A', $ts)) . '">'
         . ($waiting ? '<i class="bi bi-reply-fill me-1"></i>' : '') . e(humanRelativeTime($ts)) . '</td>';

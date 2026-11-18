@@ -2239,6 +2239,7 @@ $router->get('/profile', function () {
         'theme'              => $theme,
         'timelineSort'       => getUserTimelineSort((int) Auth::id()),
         'ticketView'         => getUserTicketView((int) Auth::id()),
+        'customerWaitingMarker' => customerWaitingMarkerVisible(),
         'ticketLinks'        => getUserTicketLinkTarget((int) Auth::id()),
         'replyTemplates'     => array_map(
             fn (string $m) => getUserReplyTemplate((int) Auth::id(), $m),
@@ -2379,6 +2380,12 @@ $router->post('/profile/setting', function () {
             exit;
         }
         setUserTicketView($userId, $value !== '' ? $value : 'table');
+        echo json_encode(['ok' => true, 'message' => 'Saved']);
+        exit;
+    }
+
+    if ($field === 'customer_waiting_marker') {
+        setSetting('customer_waiting_marker:' . $userId, $value === '1' ? '1' : '0');
         echo json_encode(['ok' => true, 'message' => 'Saved']);
         exit;
     }

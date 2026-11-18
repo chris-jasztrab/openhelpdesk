@@ -98,6 +98,16 @@ class TicketListActivityTest extends TestCase
         $this->assertTrue(ticketAwaitingStaffReply($r));
         $this->assertStringContainsString('Customer replied', ticketCustomerRepliedBadgeHtml($r));
 
+        // The profile switch hides the markers for that user only; it is on by default.
+        $prefKey = 'customer_waiting_marker:' . (int) \Auth::id();
+        setSetting($prefKey, '0');
+        $this->assertSame('', ticketCustomerRepliedBadgeHtml($r));
+        $this->assertStringNotContainsString('bi-reply-fill', ticketUpdatedCellHtml($r));
+        \Database::connect()->prepare('DELETE FROM settings WHERE setting_key = ?')->execute([$prefKey]);
+        $cache = &settingsCache();
+        unset($cache[$prefKey]);
+        $this->assertStringContainsString('bi-reply-fill', ticketUpdatedCellHtml($r));
+
         // An internal note is activity, but the customer is still waiting.
         $noteAt = $this->entry(DatabaseSeeder::$agentId, 'comment', 1, 4);
         $r = $this->row();

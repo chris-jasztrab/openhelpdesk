@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.245.0 &mdash; 2026-11-18
+
+### Added
+- **The customer-waiting markers on the ticket lists can be switched off per person.** **My Profile &rsaquo; Ticket List** has a new switch, *Mark tickets where the customer is waiting on a reply*. It is on for everyone by default; turning it off hides the green reply arrow and the green Updated time for that person only. The Updated column itself is unaffected.
+
 ## 2.244.0 &mdash; 2026-11-17
 
 ### Added

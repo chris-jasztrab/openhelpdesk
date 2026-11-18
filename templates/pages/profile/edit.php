@@ -129,6 +129,33 @@ $breadcrumbs = [
             </div>
 
             <?php if (roleIsStaff($user['role'])): ?>
+            <!-- Customer-waiting marker on the ticket lists (staff) -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-transparent fw-semibold">
+                    <i class="bi bi-reply-fill me-1"></i>Ticket List
+                </div>
+                <div class="card-body">
+                    <div class="d-flex align-items-start gap-3">
+                        <div class="form-check form-switch mb-0 pt-1">
+                            <input class="form-check-input" type="checkbox"
+                                   name="customer_waiting_marker" id="customerWaitingMarker" value="1"
+                                   <?= ($customerWaitingMarker ?? true) ? 'checked' : '' ?>>
+                        </div>
+                        <label class="mb-0 flex-grow-1" for="customerWaitingMarker" style="cursor:pointer;">
+                            <div class="fw-semibold small">
+                                Mark tickets where the customer is waiting on a reply
+                            </div>
+                            <div class="text-muted" style="font-size:.8rem;">
+                                Shows a green <span class="badge bg-success"><i class="bi bi-reply-fill"></i></span>
+                                arrow on the ticket lists, and a green Updated time, on open tickets where the
+                                customer wrote the newest reply. Turn this off to hide the markers; the Updated
+                                column itself stays.
+                            </div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
             <!-- Reply Templates (staff) -->
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-transparent fw-semibold">
