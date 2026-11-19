@@ -1905,7 +1905,8 @@ var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).conten
     closeBtn.addEventListener('click',   closePanel);
 
     // Let the draft-restore logic (in the editor block) re-open the reply panel.
-    window._openReplyPanel = function() { openMode('reply'); };
+    // A too-long internal note comes back as a note — never as a public reply.
+    window._openReplyPanel = function(mode) { openMode(mode === 'note' ? 'note' : 'reply'); };
 
     document.querySelectorAll('.reply-status-opt').forEach(function(el) {
         el.addEventListener('click', function(e) {
@@ -2274,6 +2275,7 @@ ClassicEditor.create(document.querySelector('#replyEditor'), {
     // user-scoped; remove any leftover so it can't surface for someone else.
     try { localStorage.removeItem('ldReplyDraft:<?= (int) $ticket['id'] ?>'); } catch (e) {}
 
+    var restoredMode; // set only when the server put a rejected reply back (flashReplyTooLong)
     var ticketDraft = TicketDraft.init({
         context:       'reply',
         ticketId:      <?= (int) $ticket['id'] ?>,
@@ -2286,7 +2288,8 @@ ClassicEditor.create(document.querySelector('#replyEditor'), {
         noteEl:        draftNote,
         discardBtn:    document.getElementById('replyDraftDiscard'),
         statusAnchor:  document.getElementById('replyMessageHidden'),
-        onRestored:    function () { if (window._openReplyPanel) window._openReplyPanel(); },
+        setExtras:     function (x) { restoredMode = x.mode; },
+        onRestored:    function () { if (window._openReplyPanel) window._openReplyPanel(restoredMode); },
         onDiscarded:   function () { editor.setData(''); ReplyTemplate.apply(); editor.editing.view.focus(); },
     });
     ticketDraft.watchEditor(editor);

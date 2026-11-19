@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.245.1 &mdash; 2026-11-19
+
+### Fixed
+- **A reply that is too long to save is no longer lost.** When a reply, internal note or portal comment was rejected as too long, the page came back with an empty box and the text had to be typed again. The text now comes back in the reply box (as a restored draft) so it can be shortened and sent. An internal note comes back as an internal note, never as a public reply.
+
 ## 2.245.0 &mdash; 2026-11-18
 
 ### Added

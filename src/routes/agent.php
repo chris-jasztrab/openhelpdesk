@@ -2300,9 +2300,10 @@ $router->post('/agent/tickets/{id}/comment', function (array $p) {
 
     // Move pasted screenshots out of the HTML and into attachment storage before
     // the INSERT — `details` is TEXT, and a base64 data URI overflows it.
+    $typed   = $message;
     $message = inlineImagesToAttachments($message, $inlineAtt, $inlineRejected);
     if (textColumnOverflows($message)) {
-        flash('error', 'That reply is too long to save. Please shorten it.');
+        flashReplyTooLong($db, 'reply', $id, ['html' => $typed, 'extras' => ['mode' => $isInternal ? 'note' : 'reply']], $isInternal ? 'note' : 'reply');
         redirect("/agent/tickets/{$id}");
     }
 

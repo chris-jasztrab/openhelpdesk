@@ -834,9 +834,10 @@ $router->post('/portal/tickets/{id}/comment', function (array $p) {
 
     // Move pasted screenshots out of the HTML and into attachment storage before
     // the INSERT — `details` is TEXT, and a base64 data URI overflows it.
+    $typed   = $message;
     $message = inlineImagesToAttachments($message, $inlineAtt, $inlineRejected);
     if (textColumnOverflows($message)) {
-        flash('error', 'That comment is too long to save. Please shorten it.');
+        flashReplyTooLong($db, 'portal_reply', $id, ['fields' => ['message' => $typed]], 'comment');
         redirect("/portal/tickets/{$id}");
     }
 

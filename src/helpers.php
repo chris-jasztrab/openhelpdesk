@@ -368,6 +368,39 @@ function ticketDraftDelete(PDO $db, int $userId, string $context, int $ticketId 
 }
 
 /**
+ * Put a rejected submit back into the user's autosaved draft, so the form's
+ * restore banner hands them their text instead of an empty box. The reply
+ * pages delete the draft client-side just before sending, so a server-side
+ * rejection (e.g. reply too long) would otherwise lose everything typed.
+ * Returns false when the draft itself can't be stored.
+ */
+function ticketDraftSave(PDO $db, int $userId, string $context, int $ticketId, array $payload): bool
+{
+    try {
+        $db->prepare(
+            'INSERT INTO ticket_drafts (user_id, context, ticket_id, payload, updated_at)
+             VALUES (?, ?, ?, ?, NOW())
+             ON DUPLICATE KEY UPDATE payload = VALUES(payload), updated_at = NOW()'
+        )->execute([$userId, $context, $ticketId, json_encode($payload, JSON_UNESCAPED_UNICODE)]);
+        return true;
+    } catch (Throwable $e) {
+        return false; // e.g. over max_allowed_packet
+    }
+}
+
+/**
+ * Flash message for a reply/comment that is too long to save. Keeps the text
+ * (as originally typed, pasted images included) in the draft when it can.
+ */
+function flashReplyTooLong(PDO $db, string $context, int $ticketId, array $payload, string $noun = 'reply'): void
+{
+    $kept = ticketDraftSave($db, (int) Auth::id(), $context, $ticketId, $payload);
+    flash('error', "That {$noun} is too long to save. " . ($kept
+        ? 'Nothing was sent — your text is back in the box below, so shorten it and send again.'
+        : 'Please shorten it.'));
+}
+
+/**
  * Neutralise CSV / DDE formula injection. Spreadsheet apps (Excel, LibreOffice)
  * execute a cell whose text begins with = + - @ (or a leading tab / CR). Prefix
  * any such value with a single quote so it is treated as literal text. Run every
