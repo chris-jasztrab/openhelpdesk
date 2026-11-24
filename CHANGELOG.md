@@ -11,6 +11,11 @@ To release a new version: update `config/version.php`, add a dated entry below u
 
 ---
 
+## 2.245.2 &mdash; 2026-11-24
+
+### Fixed
+- **Ticket list column widths no longer snap back.** The list refreshes itself in the background (every 30 seconds, and whenever you return to the tab). That refresh put a resized Subject column, or any column of a table wider than the window, back to its page-load width. Dragged widths now survive the refresh and a page reload, a refresh no longer lands in the middle of a drag, and changing a ticket's type, group or agent from the list no longer re-fits columns you sized by hand.
+
 ## 2.245.1 &mdash; 2026-11-19
 
 ### Fixed

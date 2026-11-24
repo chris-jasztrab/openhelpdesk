@@ -173,7 +173,7 @@ $ticketListScope = $ticketListScope ?? 'agent';
     // other agents' changes appear without F5. Skipped while the agent is
     // mid-interaction so a swap never yanks rows, menus or focus from under them.
     function busy() {
-        if (document.hidden) return true;
+        if (document.hidden || document.body.classList.contains('ld-col-resizing')) return true;
         if (document.querySelector('.ticket-cb:checked, .dropdown-menu.show, .modal.show, #filterPanel.open')) return true;
         var pop = document.getElementById('ldInboxPop');
         if (pop && pop.style.display === 'block') return true;

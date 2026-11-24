@@ -66,8 +66,9 @@
         catch (e) { return null; }
     }
 
-    function saveWidths(key, count, widths) {
-        try { localStorage.setItem(key, JSON.stringify({ n: count, w: widths })); }
+    // grown: a fit-mode table the user took off 100% width (see finish()).
+    function saveWidths(key, count, widths, grown) {
+        try { localStorage.setItem(key, JSON.stringify({ n: count, w: widths, g: !!grown })); }
         catch (e) { /* private mode / quota exceeded — just don't persist */ }
     }
 
@@ -135,7 +136,7 @@
     function syncTableWidth(table) {
         var cells = headerCells(table);
         if (!cells) return;
-        if (flexColIndex(cells) >= 0) { table.style.width = "100%"; return; }
+        if (flexColIndex(cells) >= 0 && table.style.width === "100%") return;
         var total = 0;
         for (var i = 0; i < cells.length; i++) total += cells[i].offsetWidth;
         table.style.width = total + "px";
@@ -197,7 +198,7 @@
             if (startX === undefined) return;
             moved = true;
             var dx = e.clientX - startX;
-            if (fitMode && !isFlex && startFlexWidth > flexFloor) {
+            if (fitMode && !isFlex && table.style.width === "100%" && startFlexWidth > flexFloor) {
                 // Steal from / give back to the flex column; the table stays at
                 // 100% so widening this column never adds horizontal scroll —
                 // it just narrows the Subject (which truncates with an ellipsis).
@@ -222,9 +223,14 @@
             if (!moved) return;
             // Mark the column so content-driven re-fits leave it alone.
             th.dataset.ldResized = "1";
+            table.dataset.ldUserSized = "1";
             var widths = [];
             for (var i = 0; i < cells.length; i++) widths.push(cells[i].offsetWidth);
-            saveWidths(key, cells.length, widths);
+            // A fit-mode table the user took off 100% (dragged the flex column
+            // itself, or any column of a crowded table) must come back at those
+            // pixel widths, not be re-fitted to 100% — otherwise the next
+            // reload / background list refresh undoes the drag.
+            saveWidths(key, cells.length, widths, table.style.width !== "100%");
         }
 
         grip.addEventListener("pointerup", finish);
@@ -256,12 +262,13 @@
         for (var i = 0; i < cells.length; i++) natural.push(Math.ceil(cells[i].getBoundingClientRect().width));
 
         var stored = loadWidths(key);
-        var widths = (stored && stored.n === cells.length && stored.w)
-            ? stored.w
-            : natural;
+        var useStored = !!(stored && stored.n === cells.length && stored.w);
+        var widths = useStored ? stored.w : natural;
+        // Tells content-driven re-fits (ldMeasureTicketTable) to keep out.
+        if (useStored) table.dataset.ldUserSized = "1";
 
         var flexIndex = flexColIndex(cells);
-        if (flexIndex >= 0) {
+        if (flexIndex >= 0 && !(useStored && stored.g)) {
             // Fit mode: pin every column except the flex one, and keep the table
             // at 100% so the flex column soaks up the leftover width and the
             // table fills its container without forcing horizontal scroll.

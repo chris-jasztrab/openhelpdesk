@@ -1069,6 +1069,9 @@ document.getElementById('deleteFilterModal').addEventListener('show.bs.modal', f
     window.ldMeasureTicketTable = function () {
         var tbl = document.getElementById("ticketTable");
         if (!tbl) return;
+        // Widths the user dragged (or that were restored from their saved set)
+        // are theirs: a content re-fit after a quick edit must not undo them.
+        if (tbl.dataset.ldUserSized) return;
         var thead = tbl.tHead;
         if (!thead || !thead.rows.length) return;
         var ths = Array.prototype.slice.call(thead.rows[0].cells);
